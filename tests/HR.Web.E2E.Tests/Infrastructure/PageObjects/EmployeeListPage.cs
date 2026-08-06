@@ -175,8 +175,7 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public async Task<string> ClickDownloadTemplateAsync()
     {
         var downloadTask = page.WaitForDownloadAsync();
-        await page.GetByRole(AriaRole.Button, new() { Name = "Bulk Update" }).ClickAsync();
-        await page.GetByRole(AriaRole.Menuitem, new() { Name = "Download Template" }).ClickAsync();
+        await OpenBulkUpdateMenuItemAsync("Download Template");
         var download = await downloadTask;
         return download.SuggestedFilename;
     }
@@ -188,11 +187,51 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     /// </summary>
     public async Task ClickBulkImportAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Bulk Update" }).ClickAsync();
-        await page.GetByRole(AriaRole.Menuitem, new() { Name = "Import", Exact = true }).ClickAsync();
+        await OpenBulkUpdateMenuItemAsync("Import", exact: true);
         await page.WaitForSelectorAsync(
             "[role='dialog'].bulk-compensation-import-dialog",
             new() { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Clicks the "Bulk Update" toolbar button (BulkUpdateMenu.razor's SfDropDownButton) and then
+    /// the named menu item within the popup it opens. A single click on a just-mounted
+    /// SfDropDownButton can land before Syncfusion's JS interop has attached its click listener —
+    /// the click is silently swallowed, no popup ever opens, and the follow-up item click then
+    /// waits the full default timeout for an item that will never appear (same class of race
+    /// DropDownSelector.SelectAsync guards against for SfDropDownList combo boxes). Retries the
+    /// button click a few times, but only when the popup itself never opened at all — checked via
+    /// its own ".e-dropdown-popup" container rather than the specific item, since re-clicking the
+    /// trigger while the popup IS already open toggles a SfDropDownButton closed again (unlike
+    /// SfDropDownList's combobox, which stays open on a same-target re-click) — retrying past that
+    /// point would just flap the menu open/closed and never let a genuinely-slow-to-render item
+    /// catch up.
+    /// </summary>
+    private async Task OpenBulkUpdateMenuItemAsync(string itemName, bool exact = false)
+    {
+        var button = page.GetByRole(AriaRole.Button, new() { Name = "Bulk Update" });
+        var popup = page.Locator(".e-dropdown-popup");
+
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            if (await popup.IsVisibleAsync())
+                break;
+
+            await button.ClickAsync();
+            try
+            {
+                await popup.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = attempt < 3 ? 2_000 : 10_000 });
+                break;
+            }
+            catch (TimeoutException) when (attempt < 3)
+            {
+                // Popup never opened — listener likely wasn't bound yet. Try again.
+            }
+        }
+
+        var menuItem = page.GetByRole(AriaRole.Menuitem, new() { Name = itemName, Exact = exact });
+        await menuItem.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await menuItem.ClickAsync();
     }
 
     public async Task ClickEmployeeAsync(string nameFragment)

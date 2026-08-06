@@ -36,27 +36,40 @@ public sealed class AppFixture : IAsyncLifetime
         MarketingBaseUrl = _app.GetEndpoint("marketing", "http").ToString().TrimEnd('/');
         ApiBaseUrl = _app.GetEndpoint("api", "http").ToString().TrimEnd('/');
 
-        // Probe until the web app is actually serving requests.
+        // Probe until every app the tests navigate to directly is actually serving requests.
         // StartAsync returns as soon as Aspire begins orchestrating — Postgres migrations
-        // and seed data may still be running, so we wait for a real HTTP response.
+        // and seed data may still be running, so we wait for a real HTTP response. AppHost.cs only
+        // makes "marketing" WaitFor("api"), not "web" — marketing and web start in parallel, so
+        // marketing can still be mid-startup even once web already answers /login. Without probing
+        // it separately here too, a test that's first to navigate to MarketingBaseUrl in a run can
+        // hit that startup window as ERR_CONNECTION_REFUSED instead of a clean wait.
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         var deadline = DateTime.UtcNow.AddMinutes(3);
-        while (DateTime.UtcNow < deadline)
-        {
-            try
-            {
-                var response = await http.GetAsync($"{WebBaseUrl}/login");
-                if ((int)response.StatusCode < 500) break;
-            }
-            catch { /* app not up yet */ }
-            await Task.Delay(1_000);
-        }
+        await WaitUntilRespondingAsync(http, $"{WebBaseUrl}/login", deadline);
+        await WaitUntilRespondingAsync(http, $"{MarketingBaseUrl}/", deadline);
 
         _playwright = await Playwright.CreateAsync();
         _browser    = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
-            Headless  = false,
-            SlowMo    = 100, // ms pause between actions — makes the run watchable
+            Headless = true,
+            //Headless = false,
+            //SlowMo = 100, // ms pause between actions — makes the run watchable
+
+            // Headless Chromium treats every page as backgrounded/unfocused (there's no real
+            // window to hold focus), which triggers Chrome's normal power-saving throttling of
+            // background-tab timers — setTimeout/rAF-based work can be delayed to as little as
+            // once per second. Headed runs don't hit this because the page is a real, focused
+            // window. Syncfusion's AllowFiltering debounce (and other internal JS timers) rely on
+            // exactly this kind of timer, so filtering/popup state that updates promptly in a
+            // headed run can stall for seconds in headless — surfacing as the combobox item-list
+            // waits in DropDownSelector timing out even though nothing is actually broken. These
+            // flags disable that throttling so headless behaves like a normal focused tab.
+            Args =
+            [
+                "--disable-background-timer-throttling",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-renderer-backgrounding",
+            ],
         });
     }
 
@@ -67,14 +80,32 @@ public sealed class AppFixture : IAsyncLifetime
         if (_app       != null) await _app.DisposeAsync();
     }
 
+    private static async Task WaitUntilRespondingAsync(HttpClient http, string url, DateTime deadline)
+    {
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var response = await http.GetAsync(url);
+                if ((int)response.StatusCode < 500) return;
+            }
+            catch { /* app not up yet */ }
+            await Task.Delay(1_000);
+        }
+    }
+
     private static void KillStaleTestHosts()
     {
         // "testhost" holds Aspire's ports and causes "Service postgres should have valid address
-        // at this point"; a leftover "HR.Web" from a previous run that crashed or was killed
-        // mid-test (rather than disposed cleanly via DisposeAsync) can similarly hold the app's own
-        // port, causing every page load in a fresh run to hang against a dead/orphaned instance
-        // instead of the one this run just started.
-        foreach (var processName in new[] { "testhost", "HR.Web" })
+        // at this point"; a leftover "HR.Web"/"HR.Api"/"HR.Marketing" from a previous run that
+        // crashed or was killed mid-test (rather than disposed cleanly via DisposeAsync) can
+        // similarly hold that project's own fixed E2E port (AppHost.cs pins the "http" launch
+        // profile rather than Aspire's dynamic allocation when E2E_TESTING=true) — this run's
+        // app.GetEndpoint still resolves to the expected URL, but the server actually listening on
+        // it is the dead stale process, not the one this run just started, surfacing as
+        // ERR_CONNECTION_REFUSED (or a hang) on navigation instead of a clear "port in use" startup
+        // failure.
+        foreach (var processName in new[] { "testhost", "HR.Web", "HR.Api", "HR.Marketing" })
         {
             try
             {

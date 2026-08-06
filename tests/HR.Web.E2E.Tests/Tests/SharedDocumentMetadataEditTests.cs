@@ -79,12 +79,7 @@ public sealed class SharedDocumentMetadataEditTests(AppFixture fixture) : E2ETes
         await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
         var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
-        await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
-        await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await _page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = "Policy" })
-            .First
-            .ClickAsync();
+        await DropDownSelector.SelectAsync(_page, categoryGroup, "Policy");
 
         await File.WriteAllBytesAsync(filePath, BuildTestPdf());
         await dialog.Locator("input[type='file']").SetInputFilesAsync(filePath);

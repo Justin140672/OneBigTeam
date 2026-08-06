@@ -10,82 +10,95 @@
 <main id="home">
   <section class="hero section-band">
     <div class="section-inner hero-grid">
-      <div class="hero-copy">
-        <p class="eyebrow">HR, recruitment and workforce admin in one place</p>
+      <div class="hero-content">
         <h1>Simple HR software for growing teams</h1>
         <p class="hero-text">
-            One Big Team is an all-in-one HR and workforce management platform that helps growing businesses manage their people from recruitment to offboarding. 
-            Streamline HR processes, automate routine tasks, stay compliant, and give managers and employees the tools they need—all in one easy-to-use system.
+          One Big Team brings employee records, leave, recruitment, documents and workflows
+          into one shared workspace — so managers and employees always know where things stand.
         </p>
-        <div class="hero-actions" id="trial">
+        <div class="hero-actions">
           <a class="button button-primary button-large" href="/signup">Start free trial</a>
+          <a class="button button-secondary button-large" href="#watch">Watch the product video</a>
         </div>
       </div>
 
-      <div class="hero-visual" aria-label="One Big Team product dashboard preview">
-        <img src="/assets/one-big-team-hero.png" alt="Mockup of the One Big Team HR dashboard showing employee records, leave, recruitment and reporting panels.">
+      <div class="image-placeholder hero-shot">
+        <img src="/assets/dashboard_hr.png" alt="Screenshot: HR dashboard" />
       </div>
     </div>
   </section>
 
-  <section id="features" class="section section-muted">
+  <section id="watch" class="section section-muted">
+    <div class="section-inner two-column">
+      <div>
+        <h2>See it work before you sign up.</h2>
+        <p>
+          No sales call to book. A full walkthrough of employee records, leave,
+          recruitment and reporting — watch it whenever suits you, then start
+          your own free trial straight after.
+        </p>
+      </div>
+      <VideoCard Title="One Big Team product overview"
+                 Caption="A full walkthrough of employee records, leave, recruitment and reporting." />
+    </div>
+  </section>
+
+  <section id="features" class="section">
     <div class="section-inner">
       <div class="section-heading">
-        <p class="eyebrow">Feature overview</p>
         <h2>Everything your HR team needs to stay organised.</h2>
       </div>
 
-      <div class="feature-grid">
-        <a class="feature-card" href="/features/employee-management">
-          <span class="feature-icon" aria-hidden="true"><i class="fa-solid fa-users"></i></span>
+      <div class="card-grid">
+        <a class="card" href="/features/employee-management">
+          <span class="card-icon" aria-hidden="true"><Icon Name="users" /></span>
           <h3>Employee records</h3>
           <p>Keep employee details, roles and key documents in one dependable place.</p>
-          <span class="feature-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+          <span class="card-arrow" aria-hidden="true"><Icon Name="arrow-right" /></span>
         </a>
-        <a class="feature-card" href="/features/leave-management">
-          <span class="feature-icon" aria-hidden="true"><i class="fa-solid fa-calendar-days"></i></span>
+        <a class="card" href="/features/leave-management">
+          <span class="card-icon" aria-hidden="true"><Icon Name="calendar-days" /></span>
           <h3>Leave management</h3>
           <p>Give teams a clear way to request, review and track time away from work.</p>
-          <span class="feature-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+          <span class="card-arrow" aria-hidden="true"><Icon Name="arrow-right" /></span>
         </a>
-        <a class="feature-card" href="/features/sickness-absence">
-          <span class="feature-icon" aria-hidden="true"><i class="fa-solid fa-heart-pulse"></i></span>
+        <a class="card" href="/features/sickness-absence">
+          <span class="card-icon" aria-hidden="true"><Icon Name="heart-pulse" /></span>
           <h3>Sickness tracking</h3>
           <p>Record absences consistently and spot patterns without digging through email.</p>
-          <span class="feature-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+          <span class="card-arrow" aria-hidden="true"><Icon Name="arrow-right" /></span>
         </a>
-        <a class="feature-card" href="/features/recruitment">
-          <span class="feature-icon" aria-hidden="true"><i class="fa-solid fa-user-plus"></i></span>
+        <a class="card" href="/features/recruitment">
+          <span class="card-icon" aria-hidden="true"><Icon Name="user-plus" /></span>
           <h3>Recruitment</h3>
           <p>Track candidates, hiring stages and role progress from first contact to offer.</p>
-          <span class="feature-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+          <span class="card-arrow" aria-hidden="true"><Icon Name="arrow-right" /></span>
         </a>
-        <a class="feature-card" href="/features/company-documents">
-          <span class="feature-icon" aria-hidden="true"><i class="fa-solid fa-folder-open"></i></span>
+        <a class="card" href="/features/company-documents">
+          <span class="card-icon" aria-hidden="true"><Icon Name="folder-open" /></span>
           <h3>Company documents</h3>
           <p>Store policies, templates and shared files where employees can find them.</p>
-          <span class="feature-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+          <span class="card-arrow" aria-hidden="true"><Icon Name="arrow-right" /></span>
         </a>
-        <a class="feature-card" href="/features/workflows-reminders">
-          <span class="feature-icon" aria-hidden="true"><i class="fa-solid fa-diagram-project"></i></span>
+        <a class="card" href="/features/workflows-reminders">
+          <span class="card-icon" aria-hidden="true"><Icon Name="diagram-project" /></span>
           <h3>Workflows and reminders</h3>
           <p>Turn repeat HR tasks into reliable prompts, approvals and follow-ups.</p>
-          <span class="feature-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+          <span class="card-arrow" aria-hidden="true"><Icon Name="arrow-right" /></span>
         </a>
-        <a class="feature-card" href="/features/reporting">
-          <span class="feature-icon" aria-hidden="true"><i class="fa-solid fa-chart-line"></i></span>
+        <a class="card" href="/features/reporting">
+          <span class="card-icon" aria-hidden="true"><Icon Name="chart-line" /></span>
           <h3>Reporting</h3>
           <p>Understand headcount, leave, sickness and recruitment activity at a glance.</p>
-          <span class="feature-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+          <span class="card-arrow" aria-hidden="true"><Icon Name="arrow-right" /></span>
         </a>
       </div>
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section-muted">
     <div class="section-inner">
       <div class="section-heading">
-        <p class="eyebrow">How it works</p>
         <h2>Set up your HR workspace in four clear steps.</h2>
       </div>
 
@@ -117,7 +130,6 @@
   <section id="pricing" class="section pricing-teaser">
     <div class="section-inner pricing-panel">
       <div>
-        <p class="eyebrow">Pricing</p>
         <h2>Simple pricing based on active employee count.</h2>
       </div>
       <div>
@@ -126,38 +138,44 @@
           organisation. Your exact monthly price is confirmed after organisation import,
           so the plan reflects the team you actually manage.
         </p>
-        <a class="button button-secondary" href="/pricing">Discuss pricing</a>
+        <a class="button button-secondary" href="/pricing">See pricing</a>
       </div>
     </div>
   </section>
 
-  <section id="about" class="section section-muted">
-    <div class="section-inner">
-      <div class="section-heading">
-        <p class="eyebrow">Why teams choose One Big Team</p>
-        <h2>Built for SMBs that need clarity without extra complexity.</h2>
+  <section id="about" class="section">
+    <div class="section-inner two-column">
+      <div>
+        <div class="section-heading">
+          <h2>Built for SMEs that need clarity without extra complexity.</h2>
+        </div>
+
+        <div class="benefit-grid">
+          <div>
+            <strong>One source of truth</strong>
+            <p>Bring records, requests, documents and reminders into one shared workspace.</p>
+          </div>
+          <div>
+            <strong>Less manual chasing</strong>
+            <p>Give managers clearer workflows and employees a simpler route to support.</p>
+          </div>
+          <div>
+            <strong>Ready for growth</strong>
+            <p>Keep HR consistent as your team expands, restructures or hires more often.</p>
+          </div>
+        </div>
       </div>
 
-      <div class="benefit-grid">
-        <div>
-          <strong>One source of truth</strong>
-          <p>Bring records, requests, documents and reminders into one shared workspace.</p>
-        </div>
-        <div>
-          <strong>Less manual chasing</strong>
-          <p>Give managers clearer workflows and employees a simpler route to support.</p>
-        </div>
-        <div>
-          <strong>Ready for growth</strong>
-          <p>Keep HR consistent as your team expands, restructures or hires more often.</p>
-        </div>
+      <div class="image-placeholder is-portrait">
+        <span class="image-placeholder-icon" aria-hidden="true"><Icon Name="image" /></span>
+        <span class="image-placeholder-label">Photo: HR admin using One Big Team</span>
+        <span class="image-placeholder-spec">Real photography, warm natural light, laptop visible on screen, no stock-look poses</span>
       </div>
     </div>
   </section>
 
   <section id="contact" class="section final-cta">
     <div class="section-inner cta-panel">
-      <p class="eyebrow">Start building your HR foundation</p>
       <h2>Bring your people processes together with One Big Team.</h2>
       <div class="hero-actions">
         <a class="button button-primary button-large" href="/signup">Start free trial</a>

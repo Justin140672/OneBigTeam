@@ -95,7 +95,7 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         // Supabase Auth user created after the admin employee record.
         var createdUser = Assert.Single(deps.SupabaseAuthGateway.CreatedUsers);
         Assert.Equal(request.AdminEmail, createdUser.Email);
-        Assert.EndsWith("/verify-email", createdUser.RedirectTo);
+        Assert.EndsWith("/verify-email/", createdUser.RedirectTo);
 
         // No compensation triggered.
         Assert.Empty(deps.Provisioner.DeactivatedCompanyIds);

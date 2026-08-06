@@ -41,7 +41,7 @@ public class CompanyEmployeeNumberSettingsReaderTests
 
         var mode = await reader.GetModeAsync(Guid.NewGuid(), CancellationToken.None);
 
-        Assert.Equal(EmployeeNumberMode.Manual, mode);
+        Assert.Equal(EmployeeNumberMode.Automatic, mode);
     }
 
     private static CompaniesDbContext BuildContext()

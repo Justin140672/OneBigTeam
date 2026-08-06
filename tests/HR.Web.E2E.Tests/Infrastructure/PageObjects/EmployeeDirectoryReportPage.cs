@@ -118,6 +118,23 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
     }
 
     /// <summary>
+    /// Clicks <paramref name="headerText"/> until it's unsorted (Syncfusion's default sort cycle is
+    /// ascending → descending → unsorted, not a two-state ascending/descending toggle) — a starting
+    /// point callers can rely on rather than assuming a freshly-navigated page is already unsorted.
+    /// On this shared, long-lived E2E database a previous test/run can leave a column sorted, and a
+    /// full page navigation doesn't necessarily reset it if the grid's sort state is itself
+    /// persisted (e.g. a saved report view). Bounded to 3 clicks — the length of the cycle — so a
+    /// column that's stuck sorted for some other reason fails fast instead of looping forever.
+    /// </summary>
+    public async Task ResetSortAsync(string headerText)
+    {
+        for (var i = 0; i < 3 && await GetSortDirectionAsync(headerText) is not null; i++)
+        {
+            await SortByColumnAsync(headerText);
+        }
+    }
+
+    /// <summary>
     /// Returns "ascending"/"descending" for the header matching <paramref name="headerText"/> based
     /// on Syncfusion's <c>aria-sort</c> attribute (version-independent, unlike CSS class names), or
     /// null if the column isn't currently sorted.
@@ -135,6 +152,18 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
     private ILocator NextPageButton => page.Locator(".e-pagercontainer .e-nextpage");
     private ILocator PreviousPageButton => page.Locator(".e-pagercontainer .e-prevpage");
     private ILocator CurrentPageItem => page.Locator(".e-pagercontainer .e-numericitem.e-currentitem");
+
+    /// <summary>
+    /// True if the grid rendered a pager at all — Syncfusion's SfGrid doesn't render
+    /// ".e-pagercontainer" when every row already fits on one page (this shared, long-lived
+    /// E2E database's Acme employee count is close enough to PageSize that this varies run to
+    /// run). Callers should check this before IsNextPageDisabledAsync/IsPreviousPageDisabledAsync
+    /// — those use a bare GetAttributeAsync, which waits Playwright's full default actionability
+    /// timeout (30s) for an element that will never exist at all when there's no pager, rather
+    /// than failing fast.
+    /// </summary>
+    public async Task<bool> IsPagerVisibleAsync() =>
+        await page.Locator(".e-pagercontainer").IsVisibleAsync();
 
     public async Task<bool> IsNextPageDisabledAsync() =>
         await NextPageButton.GetAttributeAsync("aria-disabled") == "true";

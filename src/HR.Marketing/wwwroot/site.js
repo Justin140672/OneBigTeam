@@ -14,6 +14,24 @@ navLinks.forEach((link) => {
   });
 });
 
+document.querySelectorAll("[data-video-card]").forEach((card) => {
+  const facade = card.querySelector(".video-card-facade");
+
+  facade?.addEventListener("click", () => {
+    const youTubeId = card.dataset.youtubeId;
+    const title = card.dataset.videoTitle || "Product video";
+
+    const iframe = document.createElement("iframe");
+    iframe.src = `https://www.youtube-nocookie.com/embed/${youTubeId}?autoplay=1`;
+    iframe.title = title;
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.allowFullscreen = true;
+
+    card.replaceChildren(iframe);
+    iframe.focus();
+  });
+});
+
 window.dataLayer = window.dataLayer || [];
 
 function trackEvent(event, payload) {

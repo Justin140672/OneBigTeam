@@ -294,6 +294,13 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         // James Okafor is seeded reporting to Sarah Chen (EmployeesModule.SeedEmployeesAsync).
         await empEdit.GoToAsync(AcmeId, JamesOkaforId);
 
+        // The Reporting Chain summary is a separate async-loaded panel — GoToAsync's own wait
+        // condition (the Details tab's combobox) doesn't guarantee it has rendered yet, so reading
+        // page content immediately after can race it (in the worst case even catching the
+        // pre-hydration HTML shell, same reasoning as Employee_WithDirectReports_ShowsDirectReportsCountOnOverview
+        // below). Wait for a concrete signal from that panel first.
+        await _page.GetByText("Reports To:").WaitForAsync(new() { Timeout = 15_000 });
+
         var content = await _page.ContentAsync();
         Assert.Contains("Reports To:", content);
         Assert.Contains("Sarah Chen", content);
@@ -578,8 +585,9 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
     [Fact]
     public async Task EmploymentTab_EditingEmployeeNumber_PersistsNewValue()
     {
-        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
-        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var login      = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit    = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
         // Uppercase — UpdateEmploymentDetailsHandler normalizes employee numbers to uppercase
         // server-side (see Employee.NormalizeEmployeeNumber), and Guid.NewGuid()'s hex digits are
@@ -590,15 +598,47 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // James Okafor is a pre-seeded employee — edit his Employment tab's Employee Number.
-        await empEdit.GoToAsync(AcmeId, JamesOkaforId);
-        await empEdit.OpenEmploymentTabAsync();
+        // The Employee Number field on this tab only renders when Numbering Mode is Manual (see
+        // EmployeeEdit.razor) — Automatic mode replaces it with an informational message and
+        // assigns numbers itself, so this test (which edits the value directly) needs Manual mode
+        // regardless of Acme's default. This doubles as the E2E coverage that Manual mode still
+        // lets an admin set employee numbers by hand now that Automatic is the company default.
+        //
+        // The restore below deliberately targets "Automatic" (Acme's known seed default), not
+        // whatever GetEmployeeNumberModeAsync() reads back here. Capturing and restoring "whatever
+        // it currently is" is self-perpetuating if an earlier run got interrupted between the
+        // switch-to-Manual above and its own restore (e.g. killed mid-test) — the next run would
+        // read back the already-stuck "Manual" value as its baseline and "restore" straight back to
+        // it, leaving Acme stuck on Manual forever and breaking every other test that assumes
+        // Automatic. Hardcoding the known-correct baseline makes this self-healing instead.
+        await hrSettings.GoToAsync(AcmeId);
+        await hrSettings.SelectEmployeeNumberModeAsync("Manual");
+        await hrSettings.SaveAsync();
 
-        await empEdit.FillEmployeeNumberAsync(newEmployeeNumber);
-        await empEdit.ClickSaveChangesAsync();
+        try
+        {
+            // James Okafor is a pre-seeded employee — edit his Employment tab's Employee Number.
+            await empEdit.GoToAsync(AcmeId, JamesOkaforId);
+            await empEdit.OpenEmploymentTabAsync();
 
-        // Re-navigate to confirm the new value persisted and shows in the header badge.
-        await empEdit.GoToAsync(AcmeId, JamesOkaforId);
-        Assert.Equal($"#{newEmployeeNumber}", await empEdit.GetEmployeeNumberHeaderTextAsync());
+            Assert.True(await empEdit.IsEmployeeNumberInputVisibleAsync(),
+                "Expected the Employee Number field to be editable while Numbering Mode is Manual");
+
+            await empEdit.FillEmployeeNumberAsync(newEmployeeNumber);
+            await empEdit.ClickSaveChangesAsync();
+
+            // Re-navigate to confirm the new value persisted and shows in the header badge.
+            await empEdit.GoToAsync(AcmeId, JamesOkaforId);
+            Assert.Equal($"#{newEmployeeNumber}", await empEdit.GetEmployeeNumberHeaderTextAsync());
+        }
+        finally
+        {
+            // Restore to Acme's known seed default so this test doesn't leak state into other
+            // tests/fixtures — see the comment above for why this is hardcoded rather than
+            // capture-and-restore.
+            await hrSettings.GoToAsync(AcmeId);
+            await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
+            await hrSettings.SaveAsync();
+        }
     }
 }

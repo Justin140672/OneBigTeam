@@ -318,13 +318,38 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// Reads the "Advert Title" field label's exact text, if present. No longer suffixed with
     /// "(optional)" — the field itself is still genuinely optional, but that qualifier was
     /// dropped from every field label across this card (see <see cref="HasOptionalSuffixAsync"/>).
+    /// A bounded wait, not a bare instant check — the Recruitment Advert Details card also holds
+    /// the async-populated Hiring Manager dropdown, so on the new-vacancy form it can still be
+    /// mid-render when GoToNewAsync's own wait (which only waits for *some* combobox) returns.
     /// </summary>
-    public Task<bool> HasAdvertTitleLabelAsync() =>
-        RecruitmentAdvertDetailsCard.GetByText("Advert Title", new() { Exact = true }).IsVisibleAsync();
+    public async Task<bool> HasAdvertTitleLabelAsync()
+    {
+        try
+        {
+            await RecruitmentAdvertDetailsCard.GetByText("Advert Title", new() { Exact = true }).WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>Reads the "Advert Description" field label's exact text, if present (no "(optional)" suffix — see <see cref="HasAdvertTitleLabelAsync"/>).</summary>
-    public Task<bool> HasAdvertDescriptionLabelAsync() =>
-        RecruitmentAdvertDetailsCard.GetByText("Advert Description", new() { Exact = true }).IsVisibleAsync();
+    public async Task<bool> HasAdvertDescriptionLabelAsync()
+    {
+        try
+        {
+            await RecruitmentAdvertDetailsCard.GetByText("Advert Description", new() { Exact = true }).WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// True if any field label within the Recruitment Advert Details card still contains the
@@ -407,7 +432,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
 
     public Task<bool> IsUnsavedChangesDialogVisibleAsync() =>
-        UnsavedChangesDialog.IsVisibleAsync();
+        UnsavedChangesDialog.WaitUntilVisibleAsync();
 
     public async Task ConfirmDiscardChangesAsync()
     {
@@ -439,8 +464,23 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     // VacancyService.PublishVacancyAsync (POST .../vacancies/{id}/publish) and reloads the
     // vacancy on success, same pattern as CloseVacancyAsync.
 
-    public Task<bool> IsPublishButtonVisibleAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Publish Vacancy" }).IsVisibleAsync();
+    // A bare instant IsVisibleAsync() here races the vacancy detail page's own Blazor render right
+    // after navigation (ClickVacancyAsync only waits for the navigation itself, not for
+    // VacancyDetail.razor's data fetch + CanPublish-gated button to actually render) — a bounded
+    // wait avoids reporting "not visible" for a button that's genuinely there a moment later.
+    public async Task<bool> IsPublishButtonVisibleAsync()
+    {
+        try
+        {
+            await page.GetByRole(AriaRole.Button, new() { Name = "Publish Vacancy" }).WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     public async Task PublishVacancyAsync()
     {
@@ -505,18 +545,46 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     /// <summary>
     /// Selects a value from the "Recruiter" dropdown that only renders in the Add Candidate dialog
-    /// once Source="ExternalRecruiter" is picked. This is the dialog's third combobox (index 2).
+    /// once Source="ExternalRecruiter" is picked. Indexing into the dialog's comboboxes by position
+    /// (this used to be "the dialog's third combobox, index 2") races that conditional render — if
+    /// this runs before Blazor has actually inserted the Recruiter combobox into the DOM (the
+    /// preceding Source selection only proves its own client-side value committed, not that the
+    /// server round trip which reveals this field has landed — same caveat DropDownSelector's own
+    /// doc comment calls out), Nth(2) can resolve against a stale 2-combobox DOM and either wait on
+    /// the wrong element or silently do nothing. Scoping to the field's own label group instead —
+    /// and waiting for that group to actually be visible first — ties this to the specific field
+    /// rather than a fragile position that depends on a prior async render having landed.
     /// </summary>
-    public Task SelectAddApplicationRecruiterAsync(string agencyNameFragment) =>
-        DropDownSelector.SelectAsync(page, page.Locator(".add-application-dialog"), agencyNameFragment, index: 2);
+    public async Task SelectAddApplicationRecruiterAsync(string agencyNameFragment)
+    {
+        var recruiterGroup = page.Locator(".add-application-dialog .mb-3").Filter(new() { HasText = "Recruiter" });
+        await recruiterGroup.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await DropDownSelector.SelectAsync(page, recruiterGroup, agencyNameFragment);
+    }
 
     /// <summary>
     /// The non-blocking "This recruiter isn't currently assigned to this vacancy." warning
     /// (data-testid="recruiter-not-assigned-warning") shown under the Recruiter dropdown when the
     /// chosen recruiter isn't among this vacancy's currently-assigned active recruiters.
     /// </summary>
-    public Task<bool> IsRecruiterNotAssignedWarningVisibleAsync() =>
-        page.Locator("[data-testid='recruiter-not-assigned-warning']").IsVisibleAsync();
+    // A bare instant IsVisibleAsync() here races the SignalR round-trip that actually invokes
+    // VacancyApplicationsTab.razor's OnSourceRecruiterChanged (which sets
+    // _recruiterNotAssignedWarning) — DropDownSelector's own post-selection wait reduces but does
+    // not guarantee that race is over by the time it returns (see its own doc comment). A bounded
+    // wait avoids reporting "not visible" for a warning that's genuinely there a moment later.
+    public async Task<bool> IsRecruiterNotAssignedWarningVisibleAsync()
+    {
+        try
+        {
+            await page.Locator("[data-testid='recruiter-not-assigned-warning']").WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     public async Task SubmitAddApplicationAsync()
     {

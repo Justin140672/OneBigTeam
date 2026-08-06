@@ -144,8 +144,15 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
         try
         {
             // Deactivating the stage above navigated the browser away to the Recruitment Stages
-            // settings page — return to the vacancy's Kanban board before dragging.
+            // settings page — return to the vacancy's Kanban board before dragging. Which tab is
+            // active is purely client-side Blazor state (VacancyDetail.razor has no "?tab=" query
+            // param support, unlike e.g. EmployeeEdit.razor), never reflected in the URL — so
+            // _kanbanUrl is just the plain vacancy URL, and a fresh GotoAsync to it lands on the
+            // default first tab, not Kanban. Re-open the Kanban tab explicitly rather than assuming
+            // the captured URL alone restores it.
+            var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
             await _page.GotoAsync(_kanbanUrl!);
+            await vacancyDetail.OpenKanbanTabAsync();
             await kanban.WaitForLoadedAsync();
 
             await kanban.DragCardToColumnAsync(candidateLast, "Interview");

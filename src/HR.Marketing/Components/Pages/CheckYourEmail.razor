@@ -10,7 +10,6 @@
 <main>
   <section class="contact-hero section-band">
     <div class="section-inner hero-copy">
-      <p class="eyebrow">Almost there</p>
       <h1>Check your email to confirm your account.</h1>
       <p class="hero-text">
         We've sent a verification link to
@@ -30,7 +29,6 @@
   <section class="section">
     <div class="section-inner contact-grid">
       <div>
-        <p class="eyebrow">Didn't get it?</p>
         <h2>The email may take a few minutes to arrive.</h2>
         <p class="estimator-intro">
           Check your spam or junk folder if you don't see it soon. If you still can't find it,
@@ -43,12 +41,10 @@
       </div>
 
       <div class="contact-form">
-        <form method="post" action="/resend-verification">
+        <form method="post" action="/resend-verification" class="form-submit-row">
           <input type="hidden" name="email" value="@Email">
-          <div class="form-submit-row">
-            <button class="button button-primary button-large" type="submit">Resend verification email</button>
-            <p class="small-note">We'll send another copy of the verification link to the same address.</p>
-          </div>
+          <button class="button button-primary button-large" type="submit">Resend verification email</button>
+          <p class="small-note">We'll send another copy of the verification link to the same address.</p>
         </form>
 
         <div class="form-submit-row">

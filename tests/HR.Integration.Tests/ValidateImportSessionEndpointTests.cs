@@ -19,15 +19,20 @@ public class ValidateImportSessionEndpointTests
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.HrAdministrator);
-            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.HrAdministrator);
+            // CompanyAdministrator is additionally required by the Manual-mode scenarios below,
+            // which call PUT .../hr-settings (company:manage) to switch the company into Manual
+            // employee-numbering mode before uploading. Employee is required by this file's own
+            // CreateCompanyAsync test helper (POST /api/companies, "role:employee" policy).
+            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.CompanyAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 
     [Fact]
     public async Task Returns_Ok_With_Expected_Response_After_Uploading_And_Validating_A_Valid_File()
     {
-        var companyId = Guid.NewGuid();
-        using var client = await AdminClient(companyId);
+        var (client, companyId) = await ManualModeAdminClientAsync();
+        using var _ = client;
         await EnsureDefaultLeavePolicyAsync(client, companyId);
 
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
@@ -47,8 +52,8 @@ public class ValidateImportSessionEndpointTests
     [Fact]
     public async Task Returns_Ok_And_Validated_When_One_Row_Is_Invalid_But_Another_Succeeds()
     {
-        var companyId = Guid.NewGuid();
-        using var client = await AdminClient(companyId);
+        var (client, companyId) = await ManualModeAdminClientAsync();
+        using var _ = client;
 
         // Second data row is missing a required "Last Name" value. One row is still valid, so
         // per ImportSession.Validate() the session lands on Validated (ready to confirm the
@@ -78,8 +83,8 @@ public class ValidateImportSessionEndpointTests
     [Fact]
     public async Task Returns_Ok_And_Validated_When_A_Row_References_A_New_Department()
     {
-        var companyId = Guid.NewGuid();
-        using var client = await AdminClient(companyId);
+        var (client, companyId) = await ManualModeAdminClientAsync();
+        using var _ = client;
 
         // Department, Location, Employment Type and Position Profile are all mandatory lookups
         // now — Location/Employment Type/Position Profile use pre-existing values here so the
@@ -132,8 +137,8 @@ public class ValidateImportSessionEndpointTests
     [Fact]
     public async Task Returns_Ok_And_Validated_When_Department_Location_And_PositionProfile_All_New()
     {
-        var companyId = Guid.NewGuid();
-        using var client = await AdminClient(companyId);
+        var (client, companyId) = await ManualModeAdminClientAsync();
+        using var _ = client;
 
         const string csv =
             "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
@@ -156,8 +161,8 @@ public class ValidateImportSessionEndpointTests
     [Fact]
     public async Task Returns_Ok_And_Validated_When_ColumnMapping_Override_Maps_NonStandard_Headers()
     {
-        var companyId = Guid.NewGuid();
-        using var client = await AdminClient(companyId);
+        var (client, companyId) = await ManualModeAdminClientAsync();
+        using var _ = client;
 
         // Headers don't match the standard template ("Given Name"/"Family Name" instead of
         // "First Name"/"Last Name") — without a mapping override this would fail to populate
@@ -280,6 +285,64 @@ public class ValidateImportSessionEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
         return client;
     }
+
+    // A company with no persisted company_settings row now defaults to Automatic employee
+    // numbering (CompanySettings.CreateDefault / CompanyEmployeeNumberSettingsReader — matches
+    // what every real company gets via CompanyProvisioner at signup). CSVs in this file that
+    // supply an explicit Employee Number per row therefore need a real company (SetEmployeeNumberModeAsync
+    // requires one) switched to Manual mode explicitly rather than relying on it being the implicit
+    // default.
+    private async Task<(HttpClient Client, Guid CompanyId)> ManualModeAdminClientAsync()
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
+        await SetEmployeeNumberModeAsync(client, companyId, "Manual");
+        return (client, companyId);
+    }
+
+    private static async Task<Guid> CreateCompanyAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync("/api/companies", new
+        {
+            name = $"Validate Import Test Co {Guid.NewGuid():N}",
+            addresses = new[]
+            {
+                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
+            }
+        });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
+        return payload!.Id;
+    }
+
+    // UpdateCompanySettings only persists TimeZone/Locale and silently ignores employeeNumberMode.
+    // The actual employee-number/HR settings live behind PUT /api/companies/{id}/hr-settings
+    // (UpdateHrSettingsHandler), which requires a real companies.companies row to exist.
+    private static async Task SetEmployeeNumberModeAsync(
+        HttpClient client, Guid companyId, string mode, string? prefix = null, int nextEmployeeNumber = 1, int minimumLength = 1)
+    {
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
+        {
+            id = companyId,
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 25,
+            probationMonths = 6,
+            employeeNumberMode = mode,
+            employeeNumberPrefix = prefix,
+            nextEmployeeNumber,
+            employeeNumberMinimumLength = minimumLength
+        });
+        response.EnsureSuccessStatusCode();
+    }
+
+    private sealed record IdPayload(Guid Id);
 
     /// <summary>
     /// DefaultLeavePolicyId is now mandatory on PositionProfile, so

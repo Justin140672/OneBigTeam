@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Identity;
@@ -11,7 +12,15 @@ internal sealed class RequireTenantMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context)
     {
-        if (context.User.Identity?.IsAuthenticated == true)
+        // Endpoints marked [AllowAnonymous]/.AllowAnonymous() (e.g. HR.Api's /api/dev/* endpoints)
+        // are meant to work regardless of session state — including when the caller happens to be
+        // presenting a stale/unrelated Bearer token that authenticates successfully against Supabase
+        // but doesn't resolve to a tenant (e.g. a leftover token from an earlier test session). Skip
+        // the tenant check entirely for those; only endpoints that actually require authorization
+        // should ever be blocked here.
+        var allowsAnonymous = context.GetEndpoint()?.Metadata.GetMetadata<IAllowAnonymous>() is not null;
+
+        if (!allowsAnonymous && context.User.Identity?.IsAuthenticated == true)
         {
             var resolved = context.Items[SupabaseCurrentUserResolutionMiddleware.CurrentUserItemKey]
                 as ResolvedCurrentUser;

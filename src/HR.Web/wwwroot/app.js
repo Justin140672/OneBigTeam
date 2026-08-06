@@ -57,6 +57,15 @@ function goBack() {
     window.history.back();
 }
 
+// Forces a genuine hard browser navigation (bypassing Blazor Server's "enhanced navigation", which
+// can intercept NavigationManager.NavigateTo(..., forceLoad: true) and keep the existing circuit
+// alive instead of tearing it down). Used after establishing a new Supabase session cookie
+// (persona switch / dev login), where a stale circuit's cached SupabaseSessionAccessor would keep
+// attaching an empty/old token to every hrapi call otherwise.
+function hardNavigate(url) {
+    window.location.href = url;
+}
+
 function setOrgChartZoom(zoom) {
     try { localStorage.setItem('orgChartZoom', zoom.toString()); } catch {}
 }

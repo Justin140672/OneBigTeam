@@ -160,6 +160,6 @@ public sealed class ApplicationSourceExternalRecruiterTests(AppFixture fixture) 
         // Advisory only — must not block submission.
         await vacancyDetail.SubmitAddApplicationAsync();
 
-        Assert.Equal("Applied", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+        Assert.Equal("Application Received", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
     }
 }

@@ -19,16 +19,34 @@ public class GetImportPreviewEndpointTests
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.HrAdministrator);
-            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.HrAdministrator);
+            // CompanyAdministrator is additionally required by the Manual-mode scenario below,
+            // which calls PUT .../hr-settings (company:manage) to switch the company into Manual
+            // employee-numbering mode before uploading. Employee is required by this file's own
+            // CreateCompanyAsync test helper (POST /api/companies, "role:employee" policy).
+            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.CompanyAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 
     [Fact]
     public async Task Returns_Ok_With_Valid_Rows_And_Counts_After_Uploading_And_Validating()
     {
-        var companyId = Guid.NewGuid();
-        using var client = await AdminClient(companyId);
+        // ValidCsv() supplies an explicit Employee Number per row, which only passes staging
+        // validation in Manual mode. A company with no persisted company_settings row now
+        // defaults to Automatic (CompanySettings.CreateDefault / CompanyEmployeeNumberSettingsReader
+        // — matches what every real company gets via CompanyProvisioner at signup), so this test
+        // needs a real company (SetEmployeeNumberModeAsync requires one) switched to Manual mode
+        // explicitly rather than relying on it being the implicit default.
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
+
         await EnsureDefaultLeavePolicyAsync(client, companyId);
+        await SetEmployeeNumberModeAsync(client, companyId, "Manual");
 
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
         var validateResponse = await client.PostAsync(
@@ -113,6 +131,45 @@ public class GetImportPreviewEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
         return client;
     }
+
+    private static async Task<Guid> CreateCompanyAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync("/api/companies", new
+        {
+            name = $"Import Preview Test Co {Guid.NewGuid():N}",
+            addresses = new[]
+            {
+                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
+            }
+        });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
+        return payload!.Id;
+    }
+
+    // UpdateCompanySettings only persists TimeZone/Locale and silently ignores employeeNumberMode.
+    // The actual employee-number/HR settings live behind PUT /api/companies/{id}/hr-settings
+    // (UpdateHrSettingsHandler), which requires a real companies.companies row to exist.
+    private static async Task SetEmployeeNumberModeAsync(
+        HttpClient client, Guid companyId, string mode, string? prefix = null, int nextEmployeeNumber = 1, int minimumLength = 1)
+    {
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
+        {
+            id = companyId,
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 25,
+            probationMonths = 6,
+            employeeNumberMode = mode,
+            employeeNumberPrefix = prefix,
+            nextEmployeeNumber,
+            employeeNumberMinimumLength = minimumLength
+        });
+        response.EnsureSuccessStatusCode();
+    }
+
+    private sealed record IdPayload(Guid Id);
 
     /// <summary>
     /// DefaultLeavePolicyId is now mandatory on PositionProfile, so

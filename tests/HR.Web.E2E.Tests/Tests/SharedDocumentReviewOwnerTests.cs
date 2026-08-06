@@ -171,39 +171,12 @@ public sealed class SharedDocumentReviewOwnerTests(AppFixture fixture) : E2ETest
         await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
         var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
-        await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
-        await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await _page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = "Policy" })
-            .First
-            .ClickAsync();
+        await DropDownSelector.SelectAsync(_page, categoryGroup, "Policy");
 
         if (reviewOwnerNameFragment is not null)
         {
             var reviewOwnerGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Review Owner" });
-            await reviewOwnerGroup.Locator("span[role='combobox']").First.ClickAsync();
-            await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-
-            // Type into the filter input — required for AllowFiltering dropdowns (same pattern as
-            // EmployeeEditPage.SelectManagerAsync).
-            var filterInput = _page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-            await filterInput.FillAsync(reviewOwnerNameFragment);
-            await _page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
-            await _page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-                .Filter(new() { HasText = reviewOwnerNameFragment })
-                .First
-                .ClickAsync();
-
-            await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
-                new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-            await Assertions.Expect(reviewOwnerGroup.Locator(".e-input-group input").First)
-                .ToHaveValueAsync(reviewOwnerNameFragment, new() { Timeout = 10_000 });
-
-            // Same "displayed value can be ahead of the server-side ValueChanged commit" concern
-            // as SharedDocumentDetailPage.SetReviewOwnerAsync — the file-write/SetInputFilesAsync
-            // steps below normally provide enough of a gap for the round trip to land, but this
-            // makes that explicit rather than incidental.
-            await _page.WaitForTimeoutAsync(300);
+            await DropDownSelector.SelectAsync(_page, reviewOwnerGroup, reviewOwnerNameFragment);
         }
 
         await File.WriteAllBytesAsync(filePath, BuildTestPdf());

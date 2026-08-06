@@ -18,19 +18,54 @@ public sealed class SupabaseSessionAccessor(IHttpContextAccessor httpContextAcce
     public const string CookieName = "obt_supabase_at";
 
     private string? _accessToken;
-    private bool _resolved;
+    private bool _initializedFromUrl;
 
     public string? AccessToken
     {
         get
         {
-            if (!_resolved)
-            {
-                _accessToken = httpContextAccessor.HttpContext?.Request.Cookies[CookieName];
-                _resolved = true;
-            }
+            // Confirmed via live diagnosis: Blazor Server's persistent circuit can survive a full
+            // browser navigation, keeping this SAME scoped instance alive from before any session
+            // cookie existed — IHttpContextAccessor.HttpContext is never reliably available again on
+            // that circuit afterward to re-read it. Routes.razor's Initialize(...) — driven by
+            // NavigationManager.Uri, which IS reliably available inside the circuit — is the source
+            // of truth once a real session has been established; this HttpContext-based read is only
+            // a fallback for plain-HTTP-request code paths that run before any circuit exists.
+            if (_initializedFromUrl)
+                return _accessToken;
 
-            return _accessToken;
+            return httpContextAccessor.HttpContext?.Request.Cookies[CookieName];
         }
+    }
+
+    /// <summary>
+    /// Sets the token from the "st" query-string parameter Routes.razor reads on arrival at "/" or
+    /// "/getting-started" (see /dev/persona-cookie and /verify-email-complete in Program.cs) — the
+    /// one value proven reliable across this circuit's whole lifetime, unlike a cookie re-read via
+    /// HttpContext.
+    /// </summary>
+    public void Initialize(string accessToken)
+    {
+        _accessToken = accessToken;
+        _initializedFromUrl = true;
+    }
+
+    /// <summary>
+    /// Sets the HttpOnly Supabase access-token session cookie on the current response. Shared by
+    /// every place that establishes a real Supabase session from a minimal API endpoint (the
+    /// /verify-email-complete email-verification flow, and /dev/persona-cookie used by the dev
+    /// persona switcher) — Blazor Server's interactive circuit cannot set cookies mid-response, so
+    /// both flows must go through a plain HTTP request/response endpoint like this one.
+    /// </summary>
+    public static void SetSessionCookie(HttpContext context, string accessToken, int expiresInSeconds)
+    {
+        context.Response.Cookies.Append(CookieName, accessToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = context.Request.IsHttps,
+            SameSite = SameSiteMode.Lax,
+            Expires = DateTimeOffset.UtcNow.AddSeconds(expiresInSeconds),
+            Path = "/",
+        });
     }
 }

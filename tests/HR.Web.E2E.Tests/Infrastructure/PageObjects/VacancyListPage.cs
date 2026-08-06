@@ -64,9 +64,32 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
             .IsVisibleAsync();
     }
 
+    public async Task SearchAsync(string query)
+    {
+        // VacancyList.razor's search placeholder is "Search by title or position profile".
+        var searchInput = page.GetByPlaceholder("Search by title or position profile");
+        await searchInput.ClearAsync();
+        await searchInput.FillAsync(query);
+        // HrTextBox (SfTextBox) only raises ValueChanged on blur/change, not on the "input" event
+        // Playwright's FillAsync dispatches — without an explicit Enter/blur here,
+        // SearchPageBase.OnSearchChanged never actually fires and the grid silently keeps showing
+        // the unfiltered rows (same reasoning as EmployeeListPage.SearchAsync).
+        await searchInput.PressAsync("Enter");
+        // OnSearchChanged debounces 300ms before reloading — wait past that, then for the grid to
+        // settle on the filtered result (row or empty state) rather than the pre-search rows.
+        await page.WaitForTimeoutAsync(400);
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+    }
+
     public async Task ClickVacancyAsync(string titleFragment)
     {
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        // The list endpoint has no pagination (VacancyList.razor's FetchItemsAsync loads every
+        // vacancy for the company on every call) and GridPageSettings caps the grid at 20 rows per
+        // page — on this shared, long-lived E2E database that's easy to exceed, so a vacancy this
+        // test just created (e.g. sorted onto page 2+) can silently sit outside the current page
+        // with no indication why. Search first so the grid narrows to just this vacancy regardless
+        // of how many others exist (same reasoning as EmployeeListPage.HasEmployeeAsync).
+        await SearchAsync(titleFragment);
 
         var link = page.Locator(".e-rowcell a")
             .Filter(new() { HasText = titleFragment })

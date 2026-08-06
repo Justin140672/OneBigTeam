@@ -16,6 +16,10 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
     public Guid? UserIdToReturn { get; set; }
     public bool ShouldThrowOnCreate { get; set; }
     public bool ShouldThrowOnExchange { get; set; }
+    public bool ShouldThrowOnSignIn { get; set; }
+
+    public List<(string Email, string Password)> EnsuredDevUsers { get; } = [];
+    public List<(string Email, string Password)> SignedInUsers { get; } = [];
 
     public Task<Guid> CreateUserAsync(string email, string redirectTo, CancellationToken cancellationToken)
     {
@@ -47,6 +51,23 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         return Task.FromResult(new SupabaseSession("access-token", "refresh-token", UserIdToReturn ?? Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(1)));
     }
 
+    public Task<Guid> EnsureDevUserAsync(string email, string password, CancellationToken cancellationToken)
+    {
+        EnsuredDevUsers.Add((email, password));
+        return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
+    }
+
+    public Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowOnSignIn)
+        {
+            throw new InvalidOperationException("Simulated Supabase sign-in failure.");
+        }
+
+        SignedInUsers.Add((email, password));
+        return Task.FromResult(new SupabaseSession("access-token", "refresh-token", UserIdToReturn ?? Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(1)));
+    }
+
     public void Reset()
     {
         CreatedUsers.Clear();
@@ -54,5 +75,8 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         UserIdToReturn = null;
         ShouldThrowOnCreate = false;
         ShouldThrowOnExchange = false;
+        ShouldThrowOnSignIn = false;
+        EnsuredDevUsers.Clear();
+        SignedInUsers.Clear();
     }
 }

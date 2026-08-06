@@ -154,6 +154,14 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
         var cardBox = await card.BoundingBoxAsync()
             ?? throw new InvalidOperationException($"Could not locate a bounding box for card '{candidateNameFragment}'.");
 
+        // WaitForLoadedAsync only confirms the Kanban widget shell itself exists, not that all of
+        // its (up to six) column headers have individually finished rendering yet (same race
+        // HasColumnHeaderAsync above already guards against) — a bare instant CountAsync() here can
+        // run before any header has rendered and see zero. Wait for the target column's own header
+        // specifically before counting/indexing into the header row.
+        if (!await HasColumnHeaderAsync(targetStageName))
+            throw new InvalidOperationException($"Could not find a Kanban column header for stage '{targetStageName}'.");
+
         // The target column's content cell is identified by column position relative to its header
         // — the header row and content row share the same column order (ApplicationStatusTransitionRules.
         // ColumnOrder), so the header cell's index is used to find the matching content cell.

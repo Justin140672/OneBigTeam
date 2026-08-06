@@ -68,15 +68,18 @@ public sealed class InviteEmployeeWizardTests(AppFixture fixture) : E2ETestBase(
         await DropDownSelector.SelectAsync(_page, list.InviteDialog, UninvitedEmployeeName);
         await list.InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
 
-        // Step 2: Roles — "Employee" is a fixed badge, not a removable multiselect item.
+        // Step 2: Roles — "Employee" is a fixed badge, not a removable multiselect item. Additional
+        // roles are now a plain checkbox table (InviteUserDialog.razor's _additionalRoleOptions),
+        // not a multiselect — see UserAdministrationListPage.InviteEmployeeAsync for the same
+        // pattern used to drive it.
         Assert.True(await list.IsEmployeeRoleBadgeVisibleAsync(),
             "Expected 'Employee' to be shown as a fixed badge on the Roles step");
         Assert.False(
             await list.InviteDialog.Locator("input[placeholder='Select one or more roles']").IsVisibleAsync(),
             "Did not expect the older 'Select one or more roles' multiselect placeholder (Employee is no longer selectable there)");
         Assert.True(
-            await list.InviteDialog.Locator("input[placeholder='Select additional roles (optional)']").IsVisibleAsync(),
-            "Expected a separate optional 'additional roles' multiselect alongside the fixed Employee badge");
+            await list.InviteDialog.Locator("table input[type='checkbox']").First.IsVisibleAsync(),
+            "Expected a checkbox table of additional roles alongside the fixed Employee badge");
 
         await list.InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
 

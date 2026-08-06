@@ -40,7 +40,21 @@ public static class IdentityModule
 
         services.Configure<SupabaseAuthOptions>(configuration.GetSection("SupabaseAuth"));
         services.AddHttpClient();
-        services.AddScoped<ISupabaseAuthGateway, SupabaseAuthGateway>();
+
+        // The real gateway makes genuine HTTP calls to Supabase's Auth Admin API — the E2E suite's
+        // signup/resend journeys create a real pending user per run, which hits Supabase's rate
+        // limits under repeated local/CI runs. Swap in a no-op fake for those runs (AppFixture sets
+        // E2E_TESTING=true, same flag HR.AppHost already reads).
+        var isE2ETesting = string.Equals(
+            Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
+        if (isE2ETesting)
+        {
+            services.AddScoped<ISupabaseAuthGateway, FakeSupabaseAuthGateway>();
+        }
+        else
+        {
+            services.AddScoped<ISupabaseAuthGateway, SupabaseAuthGateway>();
+        }
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
         services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();
         services.AddScoped<HR.SharedKernel.IAuthorizationService, IdentityAuthorizationService>();
@@ -161,16 +175,16 @@ public static class IdentityModule
             SystemRoles.HrAdministrator));
 
         // User Administration domain policies (ticket #92) — viewing/inviting/managing roles and
-        // disabling/enabling accounts, plus resending/cancelling invitations, are HR/Company Admin
-        // territory, matching employee:manage/company:manage's precedent of restricting
-        // security-sensitive actions to administrative roles.
+        // disabling/enabling accounts, plus resending/cancelling invitations, are HR Administrator
+        // territory only. Company Administrator must not manage user accounts/roles, matching the
+        // same mirror-image restriction already applied to employee:manage/hr-settings:manage above
+        // — Company Administrator is scoped to company profile/settings, not user/security
+        // administration.
         builder.AddPolicy("users:view", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         builder.AddPolicy("users:manage", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         // Getting Started checklist domain policies (CompanyOnboarding epic, Phase A) — same
         // HR/Company Admin OR-of-roles shape as users:view/users:manage above.
@@ -404,5 +418,85 @@ public static class IdentityModule
         }
 
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Idempotently ensures a matching, login-ready Supabase Auth user AND a linked UserProfile row
+    /// exist for every dev persona supplied (see HR.Api's DevPersonaStore.Personas), so the dev
+    /// persona switcher can perform a real Supabase password-grant login for any of them and HR.Api
+    /// can resolve their tenant (see SupabaseCurrentUserResolutionMiddleware/RequireTenantMiddleware
+    /// — without a UserProfile row, an authenticated dev persona has no resolvable tenant and every
+    /// request 403s). Called from HR.Api's IsDevelopment() startup seeding block, alongside
+    /// SeedDevUserAsync above (which seeds the matching ApplicationUser/UserRole rows keyed by the
+    /// same persona id). Identity cannot reference HR.Api's DevPersonaStore directly (host -> module
+    /// dependency direction only), so the caller supplies the persona details to seed.
+    /// </summary>
+    public static async Task SeedDevSupabaseUsersAsync(
+        this IServiceProvider services,
+        IEnumerable<(Guid Id, Guid CompanyId, string Email, string FirstName, string LastName)> personas)
+    {
+        using var scope = services.CreateScope();
+        var gateway = scope.ServiceProvider.GetRequiredService<ISupabaseAuthGateway>();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        var now = DateTimeOffset.UtcNow;
+
+        foreach (var persona in personas)
+        {
+            var supabaseUserId = await gateway.EnsureDevUserAsync(
+                persona.Email, SupabaseAuthGateway.DevSupabasePassword, CancellationToken.None);
+
+            var profile = await db.UserProfiles.FirstOrDefaultAsync(p => p.Id == persona.Id);
+            if (profile is null)
+            {
+                db.UserProfiles.Add(UserProfile.Create(
+                    persona.Id, supabaseUserId, persona.CompanyId, persona.Email,
+                    persona.FirstName, persona.LastName, now));
+            }
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Idempotently ensures a single dev persona's Supabase Auth user AND linked UserProfile row
+    /// exist (e.g. a brand-new self-service signup admin), using the same shared dev password as
+    /// SeedDevSupabaseUsersAsync. See that method's remarks for why the UserProfile row matters.
+    /// </summary>
+    public static async Task EnsureDevSupabaseUserAsync(
+        this IServiceProvider services,
+        Guid id, Guid companyId, string email, string firstName, string lastName,
+        CancellationToken cancellationToken)
+    {
+        using var scope = services.CreateScope();
+        var gateway = scope.ServiceProvider.GetRequiredService<ISupabaseAuthGateway>();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+
+        var supabaseUserId = await gateway.EnsureDevUserAsync(email, SupabaseAuthGateway.DevSupabasePassword, cancellationToken);
+
+        var profile = await db.UserProfiles.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        if (profile is null)
+        {
+            db.UserProfiles.Add(UserProfile.Create(
+                id, supabaseUserId, companyId, email, firstName, lastName, DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Performs a real Supabase password-grant login for a dev persona's email, used by the dev
+    /// persona switcher (HR.Api's /api/dev/persona/{userId} and /api/dev/persona/register) to
+    /// establish a genuine Supabase session that HR.Web can turn into a session cookie. Returns a
+    /// plain tuple rather than a module-defined type, since only IdentityModule itself may be a
+    /// public exported type from this assembly (see
+    /// IdentityModuleArchitectureTests.Identity_Module_Only_Exposes_Registration_Surface_As_Public).
+    /// </summary>
+    public static async Task<(string AccessToken, string RefreshToken, int ExpiresIn)> SignInDevPersonaAsync(
+        this IServiceProvider services, string email, CancellationToken cancellationToken)
+    {
+        using var scope = services.CreateScope();
+        var gateway = scope.ServiceProvider.GetRequiredService<ISupabaseAuthGateway>();
+        var session = await gateway.SignInWithPasswordAsync(email, SupabaseAuthGateway.DevSupabasePassword, cancellationToken);
+        var expiresIn = (int)Math.Max(1, (session.ExpiresAt - DateTimeOffset.UtcNow).TotalSeconds);
+        return (session.AccessToken, session.RefreshToken, expiresIn);
     }
 }

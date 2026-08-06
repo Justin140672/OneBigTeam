@@ -32,12 +32,16 @@ else
 
                 <ChildContent>
                     <div class="sidebar-header">
-                        <button class="sidebar-toggle" @onclick="ToggleSidebar">
+                        <button class="sidebar-toggle" @onclick="ToggleSidebar" aria-label="@(SidebarOpen ? "Collapse navigation" : "Expand navigation")">
                             <i class="fa-solid fa-bars"></i>
                         </button>
                         @if (SidebarOpen)
                         {
                             <img src="/images/logo.svg" alt="One Big Team" class="sidebar-logo" />
+                        }
+                        else
+                        {
+                            <img src="/images/logo-icon.svg" alt="One Big Team" class="sidebar-logo-icon" />
                         }
                     </div>
 
@@ -107,9 +111,12 @@ else
                             {
                                 <MenuItem Text="HR Settings" IconCss="fa-solid fa-sliders" Url="@_menuItems["HrSettings"]" />
                             }
-                            @if (Session.IsHrAdministrator || Session.CanManageCompany)
+                            @if (Session.IsHrAdministrator)
                             {
                                 <MenuItem Text="User Administration" IconCss="fa-solid fa-user-shield" Url="@_menuItems["UserAdministration"]" />
+                            }
+                            @if (Session.IsHrAdministrator || Session.CanManageCompany)
+                            {
                                 <MenuItem Text="Support" IconCss="fa-solid fa-headset">
                                     <MenuItems>
                                         <MenuItem Text="Support Requests" Url="@_menuItems["SupportQueue"]" />
@@ -131,13 +138,13 @@ else
             <div class="top-bar">
                 @if (ShowSidebar && !SidebarOpen)
                 {
-                    <button class="mobile-menu-button" @onclick="ToggleSidebar">
+                    <button class="mobile-menu-button" @onclick="ToggleSidebar" aria-label="Open navigation">
                         <i class="fa-solid fa-bars"></i>
                     </button>
                 }
                 <span class="page-title">@CurrentPageTitle</span>
                 <div class="top-bar-actions">
-                    <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
+                    <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")" aria-label="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
                         @if (IsDark)
                         {
                             <i class="fa-solid fa-sun"></i>
@@ -147,30 +154,24 @@ else
                             <i class="fa-solid fa-moon"></i>
                         }
                     </button>
-                    @if (Session.IsLoaded && Session.EmployeeId.HasValue)
+                    @if (Session.IsLoaded && Session.EmployeeId.HasValue && (Session.IsHrAdministrator || Session.CanManageCompany))
                     {
                         <div class="help-menu @(_helpOpen ? "help-open" : "")">
-                            <button class="help-btn" @onclick="ToggleHelp" title="Help">
+                            <button class="help-btn" @onclick="ToggleHelp" title="Help" aria-label="Help" aria-haspopup="true" aria-expanded="@_helpOpen">
                                 <i class="fa-solid fa-circle-question"></i>
                             </button>
                             @if (_helpOpen)
                             {
                                 <div class="help-dropdown">
-                                    @if (Session.IsHrAdministrator || Session.CanManageCompany)
-                                    {
-                                        <a class="help-item" href="/getting-started" @onclick="CloseHelp">
-                                            <i class="fa-solid fa-list-check me-2"></i>Getting Started
-                                        </a>
-                                        <a class="help-item" href="/explore" @onclick="CloseHelp">
-                                            <i class="fa-solid fa-compass me-2"></i>Explore One Big Team
-                                        </a>
-                                    }
-                                    @if (Session.IsHrAdministrator || Session.CanManageCompany)
-                                    {
-                                        <a class="help-item" href="/companies/@Session.CompanyId/support" @onclick="CloseHelp">
-                                            <i class="fa-solid fa-life-ring me-2"></i>Help &amp; Feedback
-                                        </a>
-                                    }
+                                    <a class="help-item" href="/getting-started" @onclick="CloseHelp">
+                                        <i class="fa-solid fa-list-check me-2"></i>Getting Started
+                                    </a>
+                                    <a class="help-item" href="/explore" @onclick="CloseHelp">
+                                        <i class="fa-solid fa-compass me-2"></i>Explore One Big Team
+                                    </a>
+                                    <a class="help-item" href="/companies/@Session.CompanyId/support" @onclick="CloseHelp">
+                                        <i class="fa-solid fa-life-ring me-2"></i>Help &amp; Feedback
+                                    </a>
                                 </div>
                             }
                         </div>
@@ -178,7 +179,7 @@ else
                     @if (Session.IsLoaded && Session.EmployeeId.HasValue)
                     {
                         <div class="notif-bell @(_notifOpen ? "notif-open" : "")">
-                            <button class="notif-btn" @onclick="ToggleNotifications" title="Notifications">
+                            <button class="notif-btn" @onclick="ToggleNotifications" title="Notifications" aria-label="@(_unreadCount > 0 ? $"Notifications, {_unreadCount} unread" : "Notifications")" aria-haspopup="true" aria-expanded="@_notifOpen">
                                 <i class="fa-solid fa-bell"></i>
                                 @if (_unreadCount > 0)
                                 {
@@ -207,7 +208,11 @@ else
                                                 var notif = n;
                                                 var (typeIcon, typeLabel, typeCss) = NotifTypeInfo(notif.Type);
                                                 <div class="notif-item @(notif.IsRead ? "" : "notif-unread") notif-type--@notif.Type.ToLowerInvariant()"
-                                                     @onclick="() => OnNotificationClick(notif)">
+                                                     role="button"
+                                                     tabindex="0"
+                                                     aria-label="@($"{NotifTypeInfo(notif.Type).Label}: {notif.Title}")"
+                                                     @onclick="() => OnNotificationClick(notif)"
+                                                     @onkeydown="e => OnNotificationKeyDown(e, notif)">
                                                     <div class="notif-item-header">
                                                         <i class="@typeIcon notif-type-icon"></i>
                                                         <span class="notif-type-label @typeCss">@typeLabel</span>
@@ -306,11 +311,12 @@ else
     // HR Administrator who is also a Manager or Recruiter) merge without duplicates.
     //
     // A Company Administrator with no other role also gets no sidebar — their whole job is
-    // company profile/settings plus User Administration, both reachable directly from the
-    // Company Settings page (their landing screen, see AppSession.LandingUrl), so a full nav
-    // menu is unnecessary surface area. CanManageCompany is deliberately excluded here; if they
-    // also hold a role that grants CanManageEmployees/IsHrAdministrator the sidebar still shows
-    // (with the Company/User Administration items already gated in below).
+    // company profile/settings, reachable directly from the Company Settings page (their landing
+    // screen, see AppSession.LandingUrl), so a full nav menu is unnecessary surface area.
+    // CanManageCompany is deliberately excluded here; if they also hold a role that grants
+    // CanManageEmployees/IsHrAdministrator the sidebar still shows (with the Company item already
+    // gated in below). User Administration is HR-Administrator-only, not reachable by
+    // CanManageCompany alone.
     //
     // A plain Manager never gets a sidebar — their dashboard is "home", and Reports are reached
     // via the Reports section on that dashboard (see ManagerDashboard.razor's TeamReportsWidget),
@@ -435,6 +441,12 @@ else
 
     private void CloseHelp() => _helpOpen = false;
 
+    private async Task OnNotificationKeyDown(KeyboardEventArgs e, NotificationDto notification)
+    {
+        if (e.Key is "Enter" or " ")
+            await OnNotificationClick(notification);
+    }
+
     private async Task OnNotificationClick(NotificationDto notification)
     {
         _notifOpen = false;
@@ -501,8 +513,16 @@ else
     private async Task OnPersonaSwitchAsync(string? userId)
     {
         if (string.IsNullOrEmpty(userId)) return;
-        var ok = await DevAuth.SwitchAsync(userId);
-        if (ok) NavigationManager.NavigateTo("/", forceLoad: true);
+        var session = await DevAuth.SwitchAsync(userId);
+        if (session is null) return;
+
+        // Must be a genuine hard browser navigation, not NavigationManager.NavigateTo(forceLoad:
+        // true) — Blazor Server's enhanced navigation can intercept that and keep the SAME circuit
+        // (and its SupabaseSessionAccessor, cached empty from before any cookie existed) alive
+        // instead of tearing it down. hardNavigate (app.js) bypasses Blazor's navigation layer
+        // entirely via window.location.href, guaranteeing a fresh circuit.
+        var query = $"accessToken={Uri.EscapeDataString(session.AccessToken)}&expiresIn={session.ExpiresIn}";
+        await JS.InvokeVoidAsync("hardNavigate", $"/dev/persona-cookie?{query}");
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

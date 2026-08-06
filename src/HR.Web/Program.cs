@@ -81,6 +81,14 @@ builder.Services.AddScoped<AppSession>();
 builder.Services.AddScoped<AuthenticationStateProvider, AppSessionAuthStateProvider>();
 builder.Services.AddAuthentication("NoOp")
     .AddScheme<AuthenticationSchemeOptions, NoOpAuthenticationHandler>("NoOp", _ => { });
+// Requires an authenticated user on every page by default via Components/Pages/_Imports.razor's
+// @attribute [Authorize] (Login.razor overrides it locally with its own [AllowAnonymous]).
+// Deliberately NOT a global AddAuthorizationCore FallbackPolicy: a FallbackPolicy applies to every
+// endpoint in the app indiscriminately, not just Razor Component pages — in practice that redirected
+// static assets (app.js, syncfusion-blazor.min.js) and the Blazor Server SignalR hub (/_blazor) to
+// /login too, breaking script loading and the circuit itself. Scoping via the per-page [Authorize]
+// attribute keeps enforcement to actual routable pages, which is all RazorComponentsEndpointHandler
+// needs to challenge-and-redirect unauthenticated visitors (see NoOpAuthenticationHandler).
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();
 
@@ -99,6 +107,19 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+
+// Required: any endpoint carrying authorization metadata — [Authorize] (Components/Pages/
+// _Imports.razor) or even just [AllowAnonymous] (Login.razor, NotFound.razor) — needs
+// AuthorizationMiddleware present to interpret that metadata, or ASP.NET Core throws
+// InvalidOperationException ("contains authorization metadata, but a middleware was not found...")
+// on the first request that matches such an endpoint. Earlier this was deliberately left out
+// because a global AddAuthorizationCore FallbackPolicy made EVERY endpoint carry that metadata,
+// including static assets and the SignalR hub — breaking script loading and the circuit. Now that
+// authorization is scoped to the per-page [Authorize] attribute instead of a blanket FallbackPolicy,
+// static assets/the hub carry no metadata at all, so UseAuthorization() has nothing to enforce on
+// them and is safe to have back.
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseAntiforgery();
 
@@ -120,9 +141,7 @@ app.Use(async (context, next) =>
 // is guaranteed available (this middleware runs for every real HTTP request). Without this,
 // SupabaseSessionAccessor's lazy first-access read could happen only once Blazor Server's
 // interactive circuit has taken over (a live SignalR connection, not an HTTP request), at which
-// point HttpContext is null and the token would be cached as missing for the whole circuit —
-// silently falling back to no Authorization header on every hrapi call, which HR.Api's dev-mode
-// dual auth scheme then treats as an anonymous/dev request rather than the real signed-in user.
+// point HttpContext is null and the token would be cached as missing for the whole circuit.
 app.Use(async (context, next) =>
 {
     _ = context.RequestServices.GetRequiredService<SupabaseSessionAccessor>().AccessToken;
@@ -197,20 +216,46 @@ app.MapGet("/verify-email-complete", async (
         return Results.Redirect("/verify-email-error");
     }
 
-    // HttpOnly so the token is never exposed to client-side script; read back only via
-    // IHttpContextAccessor during the next request's SupabaseSessionAccessor construction (see
-    // that class's remarks on why Blazor Server needs this rather than an in-memory-only session).
-    context.Response.Cookies.Append(SupabaseSessionAccessor.CookieName, access_token, new CookieOptions
-    {
-        HttpOnly = true,
-        Secure = context.Request.IsHttps,
-        SameSite = SameSiteMode.Lax,
-        Expires = DateTimeOffset.UtcNow.AddSeconds(expires_in ?? 3600),
-        Path = "/",
-    });
+    // HttpOnly so the token is never exposed to client-side script. Also carried one hop further
+    // via the URL below (not just the cookie) — see /dev/persona-cookie's remarks and Routes.razor
+    // for why: Blazor Server's persistent circuit can survive this navigation with its own
+    // SupabaseSessionAccessor instance still holding whatever it resolved BEFORE this cookie
+    // existed, and IHttpContextAccessor.HttpContext is never reliably available again on that
+    // circuit to re-read it.
+    SupabaseSessionAccessor.SetSessionCookie(context, access_token, expires_in ?? 3600);
 
-    return Results.Redirect("/getting-started");
+    var expiresInSeconds = expires_in ?? 3600;
+    return Results.Redirect($"/getting-started?st={Uri.EscapeDataString(access_token)}&se={expiresInSeconds}");
 }).AllowAnonymous();
+
+// Development-only: establishes a real Supabase session cookie for the dev persona switcher.
+// Blazor Server's interactive circuit (a live SignalR connection, not a normal HTTP
+// request/response) cannot set cookies mid-render — same constraint as /verify-email-complete
+// above. This must be a real browser navigation (GET + query string, not a server-to-server POST):
+// DevAuthService.SwitchAsync calls HR.Api's /api/dev/persona/{userId} (which performs a real
+// Supabase password-grant login) to get tokens, then MainLayout.razor navigates the actual browser
+// here via NavigationManager.NavigateTo(..., forceLoad: true) so the Set-Cookie header lands in the
+// user's real cookie jar — a POST issued from an HttpClient inside the Blazor Server process would
+// only set a cookie on that throwaway HttpClient, never on the user's browser.
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/dev/persona-cookie", (HttpContext context, string accessToken, int expiresIn) =>
+    {
+        if (string.IsNullOrWhiteSpace(accessToken))
+            return Results.BadRequest();
+
+        SupabaseSessionAccessor.SetSessionCookie(context, accessToken, expiresIn);
+
+        // Carries the token one hop further via the URL, not just the cookie — confirmed (via
+        // extensive live diagnosis) that Blazor Server's persistent circuit can survive a full
+        // browser navigation, keeping its own SupabaseSessionAccessor instance alive from BEFORE the
+        // cookie existed; IHttpContextAccessor.HttpContext is never available again on that circuit
+        // to re-read it. NavigationManager.Uri, unlike HttpContext, IS reliably available inside an
+        // interactive circuit — Routes.razor reads this query string on arrival and scrubs it
+        // immediately after (see its remarks).
+        return Results.Redirect($"/?st={Uri.EscapeDataString(accessToken)}&se={expiresIn}");
+    }).AllowAnonymous();
+}
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

@@ -43,6 +43,12 @@
     flex-shrink: 0;
 }
 
+.sidebar-logo-icon {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+}
+
 .sidebar-toggle,
 .mobile-menu-button {
     border: none;
@@ -341,6 +347,12 @@
 }
 
 .notif-item:hover {
+    background: var(--hr-gray-50);
+}
+
+.notif-item:focus-visible {
+    outline: 2px solid var(--hr-color-primary);
+    outline-offset: -2px;
     background: var(--hr-gray-50);
 }
 

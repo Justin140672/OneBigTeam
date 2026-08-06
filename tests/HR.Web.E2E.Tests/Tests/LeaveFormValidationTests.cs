@@ -109,13 +109,7 @@ public sealed class LeaveFormValidationTests(AppFixture fixture) : E2ETestBase(f
 
         // Select leave type but leave dates empty.
         var dialog = _page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" });
-        var typeCombobox = dialog.Locator("span[role='combobox']:has([placeholder='Select leave type'])");
-        await typeCombobox.ClickAsync();
-        await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await _page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = "Annual Leave" })
-            .First
-            .ClickAsync();
+        await DropDownSelector.SelectAsync(_page, dialog, "Annual Leave");
 
         await _page.GetByRole(AriaRole.Button, new() { Name = "Submit Request" }).ClickAsync();
 

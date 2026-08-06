@@ -12,7 +12,13 @@ internal sealed class CompanyEmployeeNumberSettingsReader(CompaniesDbContext dbC
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.CompanyId == companyId, cancellationToken);
 
-        return settings?.EmployeeNumberMode ?? EmployeeNumberMode.Manual;
+        // A company with no persisted company_settings row (never explicitly saved) must default
+        // the same way Domain.CompanySettings.CreateDefault does (Automatic) — GetHrSettingsHandler,
+        // which drives what the HR Settings page and EmployeeEdit.razor display, already falls back
+        // to CreateDefault() for exactly this case. Defaulting to Manual here instead disagreed with
+        // what the UI showed: the screen said "Automatic" while CreateEmployeeHandler (which reads
+        // the mode via this method) silently enforced Manual's "Employee number is required" rule.
+        return settings?.EmployeeNumberMode ?? EmployeeNumberMode.Automatic;
     }
 
     public async Task<EmployeeNumberSequencePreview> GetSequencePreviewAsync(Guid companyId, CancellationToken cancellationToken)

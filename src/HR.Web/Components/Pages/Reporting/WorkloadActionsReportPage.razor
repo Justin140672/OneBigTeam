@@ -470,10 +470,18 @@
         await LoadAsync();
     }
 
+    private int _employeeFilterRequestId;
+
+    // Requests aren't guaranteed to resolve in the order they were fired — applying every response
+    // unconditionally means a late-arriving response for an earlier keystroke can land after the
+    // user already picked an employee from a later, faster response, visibly clearing their
+    // selection. Only the most recently issued request's response is applied.
     private async Task OnEmployeeFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
         args.PreventDefaultAction = true;
+        var requestId = ++_employeeFilterRequestId;
         var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        if (requestId != _employeeFilterRequestId) return;
         _employeeOptions = (result?.Items ?? [])
             .Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
@@ -481,10 +489,14 @@
         await _employeeDropdown.FilterAsync(_employeeOptions, new Syncfusion.Blazor.Data.Query());
     }
 
+    private int _managerFilterRequestId;
+
     private async Task OnManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
         args.PreventDefaultAction = true;
+        var requestId = ++_managerFilterRequestId;
         var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
             .Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)

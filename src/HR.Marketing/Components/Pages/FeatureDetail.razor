@@ -27,9 +27,11 @@ else
     <main>
         <section class="pricing-hero section-band">
             <div class="section-inner hero-copy">
-                <span class="feature-icon feature-icon-large" aria-hidden="true"><i class="@feature.IconClass"></i></span>
-                <p class="eyebrow"><a href="/features">Features</a></p>
-                <h1>@feature.Title</h1>
+                <p class="small-note"><a href="/features">&larr; All features</a></p>
+                <div class="feature-title-row">
+                    <span class="card-icon feature-icon-large" aria-hidden="true"><Icon Name="@feature.IconName" /></span>
+                    <h1>@feature.Title</h1>
+                </div>
                 <p class="hero-text">@feature.Intro</p>
             </div>
         </section>
@@ -43,16 +45,15 @@ else
                             <li>@benefit</li>
                         }
                     </ul>
-                    <div class="feature-video-placeholder" aria-label="Screenshot coming soon">
-                        <span>Screenshot coming soon</span>
-                    </div>
+                    <VideoCard Title="@feature.Title"
+                               YouTubeId="@feature.YouTubeId"
+                               Caption="@($"See {feature.Title} in One Big Team.")" />
                 </div>
             </div>
         </section>
 
         <section id="contact" class="section final-cta">
             <div class="section-inner cta-panel">
-                <p class="eyebrow">Ready to replace scattered HR admin?</p>
                 <h2>Start building one simple people workspace for your growing team.</h2>
                 <div class="hero-actions">
                     <a class="button button-primary button-large" href="/signup">Start free trial</a>

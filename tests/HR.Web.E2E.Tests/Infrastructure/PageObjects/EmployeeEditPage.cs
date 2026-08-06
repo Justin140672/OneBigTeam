@@ -238,9 +238,36 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task<bool> HasValidationMessageAsync(string messageText) =>
         await page.Locator(".validation-message").Filter(new() { HasText = messageText }).First.IsVisibleAsync();
 
-    /// <summary>Fills the Employee Number field on the Employment tab.</summary>
-    public async Task FillEmployeeNumberAsync(string value) =>
-        await page.GetByPlaceholder("e.g. EMP-001").FillAsync(value);
+    /// <summary>
+    /// Fills the Employee Number field on the Employment tab. A no-op when the company's numbering
+    /// mode is Automatic (the field isn't rendered and a number gets assigned on save instead) —
+    /// callers that don't care which mode is active can call this unconditionally rather than
+    /// checking <see cref="IsEmployeeNumberInputVisibleAsync"/> themselves first.
+    /// </summary>
+    public async Task FillEmployeeNumberAsync(string value)
+    {
+        var field = page.GetByPlaceholder("e.g. EMP-001");
+
+        // A single instant IsVisibleAsync() snapshot can land mid-flicker — _companyEmployeeNumberMode
+        // starts as Manual (the field renders) and only flips to Automatic (the field is removed)
+        // once EmployeeEdit.razor's own async hrSettings fetch resolves, so a check that fires right
+        // as that swap happens can catch neither state reliably. Poll briefly instead of trusting one
+        // snapshot — for Manual-mode companies (where the field is required) this avoids silently
+        // skipping the fill and failing later with "Employee number is required."; for Automatic-mode
+        // companies it just spends a little longer confirming the field really is gone.
+        var deadline = DateTime.UtcNow.AddSeconds(2);
+        var visible = await field.IsVisibleAsync();
+        while (!visible && DateTime.UtcNow < deadline)
+        {
+            await page.WaitForTimeoutAsync(100);
+            visible = await field.IsVisibleAsync();
+        }
+
+        if (visible)
+        {
+            await field.FillAsync(value);
+        }
+    }
 
     /// <summary>
     /// Returns true if the Employee Number text input is visible on the new-employee form —
@@ -404,7 +431,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
 
     public Task<bool> IsUnsavedChangesDialogVisibleAsync() =>
-        UnsavedChangesDialog.IsVisibleAsync();
+        UnsavedChangesDialog.WaitUntilVisibleAsync();
 
     public async Task ConfirmDiscardChangesAsync()
     {

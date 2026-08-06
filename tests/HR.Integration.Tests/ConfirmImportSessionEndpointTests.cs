@@ -33,9 +33,22 @@ public class ConfirmImportSessionEndpointTests
     [Fact]
     public async Task Returns_Ok_And_Creates_Employees_For_All_Valid_Rows()
     {
-        var companyId = Guid.NewGuid();
-        using var client = await AdminClient(companyId);
+        // ValidCsv() supplies an explicit Employee Number per row, which only passes staging
+        // validation in Manual mode. A company with no persisted company_settings row now
+        // defaults to Automatic (CompanySettings.CreateDefault / CompanyEmployeeNumberSettingsReader
+        // — matches what every real company gets via CompanyProvisioner at signup), so this test
+        // needs a real company (SetEmployeeNumberModeAsync requires one) switched to Manual mode
+        // explicitly rather than relying on it being the implicit default.
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
+
         await EnsureDefaultLeavePolicyAsync(client, companyId);
+        await SetEmployeeNumberModeAsync(client, companyId, "Manual");
 
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
         var validateResponse = await client.PostAsync(
@@ -148,9 +161,18 @@ public class ConfirmImportSessionEndpointTests
     [Fact]
     public async Task Returns_Conflict_When_Session_Has_Already_Been_Confirmed()
     {
-        var companyId = Guid.NewGuid();
-        using var client = await AdminClient(companyId);
+        // See Returns_Ok_And_Creates_Employees_For_All_Valid_Rows above: ValidCsv()'s explicit
+        // Employee Numbers require Manual mode, which needs a real company row to switch onto.
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
+
         await EnsureDefaultLeavePolicyAsync(client, companyId);
+        await SetEmployeeNumberModeAsync(client, companyId, "Manual");
 
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
         await client.PostAsync($"/api/companies/{companyId}/data-import/sessions/{sessionId}/validate", EmptyJson());

@@ -169,11 +169,11 @@
     private bool _actionInProgress;
     private bool _showManageRolesDialog;
 
-    private bool _canManage => Session.IsHrAdministrator || Session.CanManageCompany;
+    private bool _canManage => Session.IsHrAdministrator;
 
     protected override async Task OnParametersSetAsync()
     {
-        if (!(Session.IsHrAdministrator || Session.CanManageCompany))
+        if (!Session.IsHrAdministrator)
         {
             Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
             return;

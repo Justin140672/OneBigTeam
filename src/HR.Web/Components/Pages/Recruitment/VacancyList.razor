@@ -11,6 +11,12 @@
     <h1 class="mb-1">Vacancies</h1>
     <p class="text-muted mb-3">Track open roles and their hiring progress.</p>
 
+    <div class="mb-3 col-md-4 px-0">
+        <HrTextBox Value="@SearchTerm"
+                   ValueChanged="@OnSearchChanged"
+                   Placeholder="Search by title or position profile" />
+    </div>
+
     @if (IsLoading)
     {
         <HrLoadingIndicator Label="Loading vacancies…" />
@@ -79,6 +85,11 @@
         return Task.CompletedTask;
     }
 
+    // The list endpoint has no pagination and no search support — it returns every vacancy for the
+    // company on every call, with GridPageSettings PageSize="20" doing purely client-side paging
+    // over that already-fully-loaded set. SearchPageBase's "search" parameter is therefore left
+    // unused here (same reasoning as the Show Inactive toggle below): there's nothing server-side
+    // to pass it to, so filtering by it happens client-side in DisplayedItems instead.
     protected override async Task<IReadOnlyList<VacancyListItemModel>?> FetchItemsAsync(string? search)
     {
         var result = await VacancyService.ListVacanciesAsync(CompanyId);
@@ -92,8 +103,22 @@
     // supports filtering to a single status, not an "active" grouping.
     protected override bool SupportsActiveFilter => true;
 
-    private IReadOnlyList<VacancyListItemModel> DisplayedItems =>
-        ShowInactive ? Items : Items.Where(i => i.Status != "Closed").ToList();
+    private IReadOnlyList<VacancyListItemModel> DisplayedItems
+    {
+        get
+        {
+            var items = ShowInactive ? Items : Items.Where(i => i.Status != "Closed");
+
+            if (!string.IsNullOrWhiteSpace(SearchTerm))
+            {
+                items = items.Where(i =>
+                    i.EffectiveTitle.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    (i.PositionProfileTitle?.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            return items.ToList();
+        }
+    }
 
     protected override string LoadErrorMessage => "Failed to load vacancies.";
 

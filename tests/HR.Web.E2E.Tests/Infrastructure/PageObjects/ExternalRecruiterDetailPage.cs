@@ -114,5 +114,5 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
     public Task ClickCloseAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
 
-    public Task<bool> IsUnsavedChangesDialogVisibleAsync() => UnsavedChangesDialog.IsVisibleAsync();
+    public Task<bool> IsUnsavedChangesDialogVisibleAsync() => UnsavedChangesDialog.WaitUntilVisibleAsync();
 }

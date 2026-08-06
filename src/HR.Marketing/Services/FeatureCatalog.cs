@@ -2,11 +2,12 @@ namespace HR.Marketing.Services;
 
 public sealed record FeatureInfo(
     string Slug,
-    string IconClass,
+    string IconName,
     string Title,
     string Summary,
     string Intro,
-    IReadOnlyList<string> Benefits);
+    IReadOnlyList<string> Benefits,
+    string? YouTubeId = null);
 
 public static class FeatureCatalog
 {
@@ -14,7 +15,7 @@ public static class FeatureCatalog
     {
         new FeatureInfo(
             "employee-management",
-            "fa-solid fa-users",
+            "users",
             "Employee Management",
             "Store employee information, documents and employment history in one secure place.",
             "Keep core employee information organised, accessible and consistent as your business grows beyond ad hoc files and scattered records.",
@@ -29,7 +30,7 @@ public static class FeatureCatalog
             }),
         new FeatureInfo(
             "leave-management",
-            "fa-solid fa-calendar-days",
+            "calendar-days",
             "Leave Management",
             "Request, approve and track annual leave without spreadsheets or email.",
             "Bring leave requests, balances and approvals into a shared process so everyone understands who is away and what needs action.",
@@ -44,7 +45,7 @@ public static class FeatureCatalog
             }),
         new FeatureInfo(
             "sickness-absence",
-            "fa-solid fa-heart-pulse",
+            "heart-pulse",
             "Sickness & Absence",
             "Record sickness, return-to-work meetings and absence trends.",
             "Track sickness and other absence clearly, so managers can respond with better context and keep records complete without relying on inbox history.",
@@ -59,7 +60,7 @@ public static class FeatureCatalog
             }),
         new FeatureInfo(
             "recruitment",
-            "fa-solid fa-user-plus",
+            "user-plus",
             "Recruitment",
             "Find, track and hire the right people with a simple recruitment workflow.",
             "Give hiring activity a simple home, from open roles to candidate progress, so recruitment does not disappear into personal inboxes.",
@@ -74,7 +75,7 @@ public static class FeatureCatalog
             }),
         new FeatureInfo(
             "company-documents",
-            "fa-solid fa-folder-open",
+            "folder-open",
             "Company Documents",
             "Share company policies, collect acknowledgements and keep important documents organised.",
             "Store company policies, templates and employee-facing documents where teams can find the right version without searching several folders.",
@@ -89,7 +90,7 @@ public static class FeatureCatalog
             }),
         new FeatureInfo(
             "workflows-reminders",
-            "fa-solid fa-diagram-project",
+            "diagram-project",
             "Workflows & Reminders",
             "Automate routine HR tasks with reminders, approvals and scheduled actions.",
             "Turn repeat HR admin into more reliable prompts and follow-ups, helping managers stay on top of tasks that otherwise depend on memory.",
@@ -104,7 +105,7 @@ public static class FeatureCatalog
             }),
         new FeatureInfo(
             "reporting",
-            "fa-solid fa-chart-line",
+            "chart-line",
             "Reporting",
             "Turn your HR data into clear reports to support better business decisions.",
             "See useful people information more clearly, so leaders can understand workforce activity without stitching together separate spreadsheets.",

@@ -51,7 +51,7 @@ public sealed class PublicHolidayEditPage(IPage page, string baseUrl)
         page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
 
     public Task<bool> IsUnsavedChangesDialogVisibleAsync() =>
-        UnsavedChangesDialog.IsVisibleAsync();
+        UnsavedChangesDialog.WaitUntilVisibleAsync();
 
     public async Task ConfirmDiscardChangesAsync()
     {

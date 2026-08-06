@@ -9,7 +9,9 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Verifies that a CompanyAdministrator-only user (CanManageCompany true, CanManageEmployees
 /// false — no other HR role) is scoped to the Company edit screen only:
 /// - Landing on "/" redirects straight to the Company edit page (Home.razor).
-/// - The sidebar (MainLayout.razor) shows only the "Company" menu item, not the full HR menu.
+/// - No sidebar is shown at all (MainLayout.razor's ShowSidebar deliberately excludes
+///   CanManageCompany — her whole job is company profile/settings, reachable directly from her
+///   landing page, so a full nav menu is unnecessary surface area), same as a plain Employee.
 /// - Backend access to the employee list is still denied even via direct navigation, proving
 ///   the narrowing isn't just a hidden UI affordance.
 ///
@@ -49,7 +51,7 @@ public sealed class CompanyAdministratorAccessTests(AppFixture fixture) : E2ETes
     }
 
     [Fact]
-    public async Task CompanyAdministrator_SeesOnlyCompanyMenuItem_InSidebar()
+    public async Task CompanyAdministrator_SeesNoSidebar()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
@@ -57,20 +59,39 @@ public sealed class CompanyAdministratorAccessTests(AppFixture fixture) : E2ETes
         await login.GoToAsync();
         await login.LoginAsync(CompanyAdminEmail);
 
-        // ── Step 2: Unlike a plain Employee (who has no ".app-nav-menu" at all), Priya
-        // gets a sidebar — but MainLayout.razor renders it with a single "Company" item
-        // and none of the full HR menu groups (People, Assets, Recruitment, Leave, Dashboard).
-        var navMenu = _page.Locator(".app-nav-menu");
-        Assert.True(await navMenu.IsVisibleAsync(),
-            "Priya (CompanyAdministrator-only) should see a sidebar nav menu containing the Company item");
+        // ── Step 2: Same as a plain Employee, Priya gets no sidebar at all —
+        // MainLayout.razor's ShowSidebar deliberately excludes CanManageCompany (her whole job
+        // is company profile/settings, reachable directly from her landing page — see
+        // CompanyAdministrator_RedirectedFromRoot_ToCompanyEdit above), so there's no ".app-nav-menu"
+        // to show a "Company" item (or a User Administration item — HR-Administrator-only, see
+        // IdentityModule.AddRolePolicies' "users:view"/"users:manage" policies) in.
+        await _page.WaitForURLAsync(new Regex($"/companies/{AcmeId}/edit"), new() { Timeout = 15_000 });
 
-        var navText = (await navMenu.TextContentAsync())?.Trim() ?? "";
-        Assert.Contains("Company", navText);
-        Assert.DoesNotContain("Dashboard", navText);
-        Assert.DoesNotContain("People", navText);
-        Assert.DoesNotContain("Assets", navText);
-        Assert.DoesNotContain("Recruitment", navText);
-        Assert.DoesNotContain("Leave", navText);
+        Assert.False(await _page.Locator(".app-nav-menu").IsVisibleAsync(),
+            "Priya (CompanyAdministrator-only) should not see a sidebar nav menu");
+    }
+
+    [Fact]
+    public async Task CompanyAdministrator_CannotAccess_UserAdministration()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        // ── Step 1: Login as Priya (CompanyAdministrator-only) ────────────────
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        // ── Step 2: Attempt to navigate directly to the User Administration list ──
+        // Proves the users:view/users:manage policy narrowing to HrAdministrator-only is
+        // enforced end-to-end (backend + UserAdministrationList.razor's own OnBeforeLoadAsync
+        // redirect), not merely hidden from the sidebar UI — same pattern as
+        // CompanyAdministrator_CannotAccess_EmployeeList/HrSettingsPage above.
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/user-administration");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        var finalUrl = _page.Url;
+        Assert.False(finalUrl.TrimEnd('/').EndsWith($"/companies/{AcmeId}/user-administration", StringComparison.OrdinalIgnoreCase),
+            $"Expected Priya (CompanyAdministrator-only, no IsHrAdministrator) to be redirected away " +
+            $"from the User Administration page, but ended up at: {finalUrl}");
     }
 
     [Fact]

@@ -134,21 +134,11 @@ public sealed class SharedDocumentReviewFrequencyTests(AppFixture fixture) : E2E
             await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
             var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
-            await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
-            await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-            await _page.Locator(".e-popup.e-ddl .e-list-item")
-                .Filter(new() { HasText = "Policy" })
-                .First
-                .ClickAsync();
+            await DropDownSelector.SelectAsync(_page, categoryGroup, "Policy");
 
             // Selects a Review Frequency without filling in a Next Review Date.
             var reviewFrequencyGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Review Frequency" });
-            await reviewFrequencyGroup.Locator("span[role='combobox']").First.ClickAsync();
-            await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-            await _page.Locator(".e-popup.e-ddl .e-list-item")
-                .Filter(new() { HasText = "Monthly" })
-                .First
-                .ClickAsync();
+            await DropDownSelector.SelectAsync(_page, reviewFrequencyGroup, "Monthly");
 
             await File.WriteAllBytesAsync(tempFile, BuildTestPdf());
             await dialog.Locator("input[type='file']").SetInputFilesAsync(tempFile);
@@ -192,22 +182,12 @@ public sealed class SharedDocumentReviewFrequencyTests(AppFixture fixture) : E2E
         await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
         var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
-        await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
-        await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await _page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = "Policy" })
-            .First
-            .ClickAsync();
+        await DropDownSelector.SelectAsync(_page, categoryGroup, "Policy");
 
         if (reviewFrequencyLabel is not null)
         {
             var reviewFrequencyGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Review Frequency" });
-            await reviewFrequencyGroup.Locator("span[role='combobox']").First.ClickAsync();
-            await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-            await _page.Locator(".e-popup.e-ddl .e-list-item")
-                .Filter(new() { HasText = reviewFrequencyLabel })
-                .First
-                .ClickAsync();
+            await DropDownSelector.SelectAsync(_page, reviewFrequencyGroup, reviewFrequencyLabel);
 
             var reviewDateInput = dialog.Locator(".col-md-6")
                 .Filter(new() { HasText = "Next Review Date" })

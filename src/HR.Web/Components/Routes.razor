@@ -1,6 +1,8 @@
 @using Microsoft.AspNetCore.Components.Authorization
+@using HR.Web.Services
 @inject NavigationManager Navigation
 @inject IWebHostEnvironment Env
+@inject SupabaseSessionAccessor SessionAccessor
 
 <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
@@ -34,4 +36,23 @@
 
 @code {
     private ErrorBoundary? _errorBoundary;
+
+    // Reads the "st" (session token) query-string param that /dev/persona-cookie and
+    // /verify-email-complete append to their redirect targets (see Program.cs). NavigationManager.Uri
+    // — unlike IHttpContextAccessor.HttpContext — is reliably available inside a Blazor Server
+    // interactive circuit even when that circuit persists across a full browser navigation (confirmed
+    // via live diagnosis: the circuit's own SupabaseSessionAccessor instance otherwise never gets a
+    // chance to see a fresh cookie again). Immediately scrubs the token from the URL/browser history
+    // afterward — it must not linger as a bookmarkable/shareable link.
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(Navigation.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("st", out var token) && !string.IsNullOrEmpty(token))
+        {
+            SessionAccessor.Initialize(token!);
+            Navigation.NavigateTo(uri.GetLeftPart(UriPartial.Path), replace: true);
+        }
+    }
 }

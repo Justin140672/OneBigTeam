@@ -126,6 +126,117 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         return new SupabaseSession(payload.AccessToken, payload.RefreshToken, userId, expiresAt);
     }
 
+    // Shared fixed password for all Development dev-persona Supabase Auth users (see
+    // EnsureDevUserAsync/SignInWithPasswordAsync and IdentityModule.SeedDevSupabaseUsersAsync).
+    // Never used outside Development — real environments never call these methods.
+    public const string DevSupabasePassword = "Dev-Only-Password-1!";
+
+    public async Task<Guid> EnsureDevUserAsync(string email, string password, CancellationToken cancellationToken)
+    {
+        var http = CreateClient(options.Value.SecretKey);
+
+        // UNVERIFIED: Supabase's Admin API for directly creating a confirmed user is
+        // POST /auth/v1/admin/users with { email, password, email_confirm: true }. Used here purely
+        // for dev-persona seeding (never sends an email, unlike CreateUserAsync's /auth/v1/invite).
+        var requestBody = new
+        {
+            email,
+            password,
+            email_confirm = true,
+        };
+
+        using var response = await http.PostAsJsonAsync("/auth/v1/admin/users", requestBody, JsonOptions, cancellationToken);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var created = await response.Content.ReadFromJsonAsync<SupabaseInviteResponse>(JsonOptions, cancellationToken);
+            if (created is null || !Guid.TryParse(created.Id, out var createdId))
+            {
+                var createdBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                throw new InvalidOperationException(
+                    $"Supabase admin create-user response did not contain a parseable user id. Response body: {createdBody}");
+            }
+
+            return createdId;
+        }
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        // Treat "already exists" as success — this method must be idempotent (called on every
+        // Development startup). Supabase's documented error for a duplicate email is typically a
+        // 422 (or 400) with a message/error_code mentioning "already been registered" /
+        // "email_exists" — matched loosely here since the exact shape is unverified against a live
+        // project.
+        var isAlreadyExists =
+            body.Contains("already", StringComparison.OrdinalIgnoreCase)
+            && body.Contains("regist", StringComparison.OrdinalIgnoreCase)
+            || body.Contains("email_exists", StringComparison.OrdinalIgnoreCase)
+            || body.Contains("user_already_exists", StringComparison.OrdinalIgnoreCase);
+
+        if (!isAlreadyExists)
+        {
+            throw new InvalidOperationException(
+                $"Supabase admin create-user request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+        }
+
+        // The create call above returns nothing usable on a duplicate, but callers need a stable
+        // Supabase user id every time (to link/verify a UserProfile row) — so look the existing user
+        // up by email instead. UNVERIFIED: Supabase's admin list-users endpoint
+        // (GET /auth/v1/admin/users) supports an "email" filter query parameter per its documented
+        // conventions; the exact filter param name is not confirmed against a live project.
+        using var lookupResponse = await http.GetAsync(
+            $"/auth/v1/admin/users?email={Uri.EscapeDataString(email)}", cancellationToken);
+
+        if (!lookupResponse.IsSuccessStatusCode)
+        {
+            var lookupBody = await lookupResponse.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase admin user lookup for '{email}' failed with status {(int)lookupResponse.StatusCode} ({lookupResponse.StatusCode}). Response body: {lookupBody}");
+        }
+
+        var lookupPayload = await lookupResponse.Content.ReadFromJsonAsync<SupabaseAdminUsersListResponse>(JsonOptions, cancellationToken);
+        var match = lookupPayload?.Users?.FirstOrDefault(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
+
+        if (match is null || !Guid.TryParse(match.Id, out var existingId))
+        {
+            var lookupBody = await lookupResponse.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase admin user lookup for '{email}' did not return a matching user. Response body: {lookupBody}");
+        }
+
+        return existingId;
+    }
+
+    public async Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)
+    {
+        // Uses the PUBLISHABLE key — this is the client-facing password grant, matching Supabase's
+        // convention that the secret key is reserved for server-only Admin API calls.
+        var http = CreateClient(options.Value.PublishableKey);
+
+        var requestBody = new { email, password };
+
+        using var response = await http.PostAsJsonAsync("/auth/v1/token?grant_type=password", requestBody, JsonOptions, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase password-grant sign-in failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<SupabaseTokenResponse>(JsonOptions, cancellationToken);
+        if (payload?.AccessToken is null || payload.RefreshToken is null || payload.User?.Id is null
+            || !Guid.TryParse(payload.User.Id, out var userId))
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase password-grant sign-in response was missing expected fields. Response body: {body}");
+        }
+
+        var expiresAt = DateTimeOffset.UtcNow.AddSeconds(payload.ExpiresIn ?? 3600);
+        return new SupabaseSession(payload.AccessToken, payload.RefreshToken, userId, expiresAt);
+    }
+
     private HttpClient CreateClient(string apiKey)
     {
         var http = httpClientFactory.CreateClient(nameof(SupabaseAuthGateway));
@@ -161,5 +272,20 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
     {
         [JsonPropertyName("id")]
         public string? Id { get; set; }
+    }
+
+    private sealed class SupabaseAdminUsersListResponse
+    {
+        [JsonPropertyName("users")]
+        public List<SupabaseAdminUserListItem>? Users { get; set; }
+    }
+
+    private sealed class SupabaseAdminUserListItem
+    {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+
+        [JsonPropertyName("email")]
+        public string? Email { get; set; }
     }
 }

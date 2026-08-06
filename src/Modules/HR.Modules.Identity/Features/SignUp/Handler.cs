@@ -140,7 +140,7 @@ internal sealed class SignUpHandler(
             configuration["services:web:https:0"] ??
             configuration["services:web:http:0"] ??
             "http://localhost:5157";
-        var redirectTo = $"{webBaseUrl}/verify-email";
+        var redirectTo = $"{webBaseUrl}/verify-email/";
 
         var supabaseUserId = await supabaseAuthGateway.CreateUserAsync(email, redirectTo, cancellationToken);
 

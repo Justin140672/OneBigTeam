@@ -53,6 +53,8 @@ The app currently ships a name and logo (`src/HR.Web/wwwroot/images/logo.svg`): 
 
 Note: this platform-level identity is distinct from per-company branding (logo/colours tenants configure for themselves) described under Operating Context.
 
+**Marketing site (HR.Marketing) direction:** the "Company Noticeboard" corkboard identity (see DESIGN.md) was explored and set aside in favor of the category-standard SaaS convention, played straight — chosen explicitly over a metaphor-driven redesign. Craft bar: Linear (crisp, minimal, precise typography) and Gusto (warm, approachable, trustworthy for HR data). This is a standing preference, not a one-off: future marketing-site work should execute the conventional SaaS register at that craft level rather than reopen a metaphor concept, unless the user asks to revisit it.
+
 ## Evidence on Hand
 
 No real customers, pilot users, case studies, testimonials, or sample production data exist yet. Future design and content work must not fabricate customer logos, quotes, metrics, or usage numbers.

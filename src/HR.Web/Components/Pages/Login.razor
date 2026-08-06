@@ -4,6 +4,7 @@
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 @inject DevAuthService DevAuth
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>Sign in — One Big Team</PageTitle>
 
@@ -75,15 +76,19 @@
             return;
         }
 
-        var ok = await DevAuth.SwitchAsync(match.UserId);
-        if (!ok)
+        var session = await DevAuth.SwitchAsync(match.UserId);
+        if (session is null)
         {
             _error = "Sign in failed. Please try again.";
             _busy  = false;
             return;
         }
 
-        Navigation.NavigateTo("/", forceLoad: true);
+        // Genuine hard browser navigation via app.js's hardNavigate — see MainLayout.razor's
+        // OnPersonaSwitchAsync remarks for why NavigationManager.NavigateTo(forceLoad: true) isn't
+        // reliable enough here.
+        var query = $"accessToken={Uri.EscapeDataString(session.AccessToken)}&expiresIn={session.ExpiresIn}";
+        await JS.InvokeVoidAsync("hardNavigate", $"/dev/persona-cookie?{query}");
     }
 
     private sealed class LoginForm

@@ -147,7 +147,7 @@
 
     protected override Task OnBeforeLoadAsync()
     {
-        if (!(Session.IsHrAdministrator || Session.CanManageCompany))
+        if (!Session.IsHrAdministrator)
             Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
         return Task.CompletedTask;
     }

@@ -1,0 +1,35 @@
+<div class="video-card">
+    @if (!string.IsNullOrWhiteSpace(YouTubeId))
+    {
+        <div class="video-card-frame" data-video-card data-youtube-id="@YouTubeId" data-video-title="@Title">
+            <button type="button" class="video-card-facade" aria-label="Play video: @Title">
+                <img src="https://i.ytimg.com/vi/@YouTubeId/hqdefault.jpg" alt="" loading="lazy">
+                <span class="video-card-play" aria-hidden="true"><Icon Name="play" /></span>
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="video-card-frame">
+            <div class="video-card-pending">
+                <span class="card-icon" aria-hidden="true"><Icon Name="video" /></span>
+                <p>@PendingNote</p>
+            </div>
+        </div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Caption))
+    {
+        <p class="video-card-caption">@Caption</p>
+    }
+</div>
+
+@code {
+    /// <summary>YouTube video id. Leave null until a real recording exists — renders an honest pending state instead of a fake/broken player.</summary>
+    [Parameter] public string? YouTubeId { get; set; }
+
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    [Parameter] public string? Caption { get; set; }
+
+    [Parameter] public string PendingNote { get; set; } = "Video coming soon — this card is wired for a real recording.";
+}

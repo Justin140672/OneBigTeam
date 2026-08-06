@@ -31,6 +31,13 @@ public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBa
 
         await empEdit.GoToAsync(AcmeId, SarahChen);
 
+        // GoToAsync only waits for a combobox to render, not for the full tab list — which
+        // depends on the employee's own async-loaded data (_showProbationTab etc.) — so a bare
+        // instant IsVisibleAsync() here can race that and report "not visible" for a tab that's
+        // genuinely there a moment later. A bounded wait avoids that.
+        await _page.GetByRole(AriaRole.Tab, new() { Name = "Compensation History" }).WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
         // Renamed from "Compensation" to "Compensation History" (the separate "Current
         // Compensation" card was removed entirely — see the next test).
         Assert.True(

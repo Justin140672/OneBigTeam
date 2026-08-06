@@ -29,14 +29,11 @@
 
                         <div class="mb-3">
                             <label class="form-label">Type <span class="text-danger">*</span></label>
-                            <SfDropDownList TValue="string" TItem="string"
-                                            DataSource="@SupportRequestOptions.Types"
+                            <SfDropDownList TValue="string" TItem="TypeOption"
+                                            DataSource="@_typeOptions"
                                             @bind-Value="_model.Type"
                                             Placeholder="Select a type">
-                                <DropDownListTemplates TItem="string">
-                                    <ItemTemplate Context="typeItem">@SupportRequestOptions.TypeLabel((string)typeItem)</ItemTemplate>
-                                    <ValueTemplate Context="typeItem">@SupportRequestOptions.TypeLabel((string)typeItem)</ValueTemplate>
-                                </DropDownListTemplates>
+                                <DropDownListFieldSettings Value="Value" Text="Label" />
                             </SfDropDownList>
                             <ValidationMessage For="@(() => _model.Type)" />
                         </div>
@@ -180,6 +177,11 @@
 
     private readonly List<string> _statusFilterOptions = [AllStatusesOption, .. SupportRequestOptions.Statuses];
     private string _statusFilter = AllStatusesOption;
+
+    private static readonly List<TypeOption> _typeOptions =
+        SupportRequestOptions.Types.Select(t => new TypeOption(t, SupportRequestOptions.TypeLabel(t))).ToList();
+
+    private sealed record TypeOption(string Value, string Label);
 
     private bool _listLoading = true;
     private string? _listError;

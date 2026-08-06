@@ -184,10 +184,18 @@
     // The review owner list can't be preloaded in one bounded page the way _categories is — a
     // company can have far more employees than any reasonable page size. Search server-side as
     // the user types instead, same pattern as EmployeeEmploymentTab's manager picker.
+    private int _reviewOwnerFilterRequestId;
+
+    // Requests aren't guaranteed to resolve in the order they were fired — applying every response
+    // unconditionally means a late-arriving response for an earlier keystroke can land after the
+    // user already picked a review owner from a later, faster response, visibly clearing their
+    // selection. Only the most recently issued request's response is applied.
     private async Task OnReviewOwnerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
         args.PreventDefaultAction = true;
+        var requestId = ++_reviewOwnerFilterRequestId;
         var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        if (requestId != _reviewOwnerFilterRequestId) return;
         _reviewOwnerOptions = (result?.Items ?? [])
             .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)

@@ -77,9 +77,10 @@ public static class CompaniesModule
         var now = DateTimeOffset.UtcNow;
 
         var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        if (!await db.Companies.AnyAsync(c => c.Id == acmeId))
+        var acme = await db.Companies.SingleOrDefaultAsync(c => c.Id == acmeId);
+        if (acme is null)
         {
-            var acme = Company.Create(acmeId, "Acme Corporation", now);
+            acme = Company.Create(acmeId, "Acme Corporation", now);
             acme.SetAddress(
                 CompanyAddress.Create(Guid.NewGuid(), acmeId, CompanyAddressType.RegisteredOffice,
                     "123 Main Street", null, "London", null, "EC1A 1BB", "GB", now),
@@ -92,14 +93,31 @@ public static class CompaniesModule
         }
 
         var betaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
-        if (!await db.Companies.AnyAsync(c => c.Id == betaCorpId))
+        var betaCorp = await db.Companies.SingleOrDefaultAsync(c => c.Id == betaCorpId);
+        if (betaCorp is null)
         {
-            var betaCorp = Company.Create(betaCorpId, "Beta Corp", now);
+            betaCorp = Company.Create(betaCorpId, "Beta Corp", now);
             betaCorp.SetAddress(
                 CompanyAddress.Create(Guid.NewGuid(), betaCorpId, CompanyAddressType.RegisteredOffice,
                     "10 Innovation Drive", null, "Bristol", null, "BS1 1AA", "GB", now),
                 now);
             db.Companies.Add(betaCorp);
+        }
+
+        // Both seeded dev/E2E companies must have a persisted company_settings row, same as every
+        // real company gets from CompanyProvisioner.ProvisionCompanyAsync on signup — without one,
+        // EmployeeNumberGenerator.GenerateNextAsync (Automatic mode's atomic next-number counter)
+        // has no row to claim/increment against and throws. CreateDefault() only supplies the same
+        // Automatic-mode defaults a real company already gets; it does not change either company's
+        // numbering mode. Guarded by Settings being null so this never overwrites a mode an admin
+        // has since changed via HR Settings.
+        if (acme.Settings is null)
+        {
+            acme.SetSettings(CompanySettings.CreateDefault(acmeId, now), now);
+        }
+        if (betaCorp.Settings is null)
+        {
+            betaCorp.SetSettings(CompanySettings.CreateDefault(betaCorpId, now), now);
         }
 
         await db.SaveChangesAsync();

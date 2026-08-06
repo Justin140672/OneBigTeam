@@ -33,14 +33,41 @@ public static class CompanyOnboardingModule
     }
 
     /// <summary>
-    /// No seed data is needed for this module — a company's onboarding progress and task
-    /// completions are lazily created the first time the checklist is viewed (see
-    /// GetOnboardingChecklistHandler). Kept as a no-op for symmetry with other modules' startup
-    /// wiring in HR.Api's Program.cs.
+    /// Seeds the two long-lived dev/E2E companies (Acme, Beta Corp — see
+    /// CompaniesModule.SeedCompaniesAsync) with an already-completed onboarding progress row, so
+    /// AppSession.ShowGettingStarted is false and HR/Company Administrators land on their normal
+    /// dashboard instead of "/getting-started" on every login. Without this, progress is lazily
+    /// created the first time the checklist is viewed (see GetOnboardingChecklistHandler) with
+    /// IsHidden=false — fine for a real brand-new company, but wrong for these shared, long-lived
+    /// fixtures that dozens of other E2E tests assume land straight on a dashboard. The "/getting-
+    /// started" page itself still has its own dedicated coverage (GettingStartedAndExploreTests),
+    /// so this doesn't reduce what's tested — it just stops it leaking into unrelated tests.
     /// </summary>
-    public static Task SeedCompanyOnboardingAsync(this IServiceProvider services)
+    public static async Task SeedCompanyOnboardingAsync(this IServiceProvider services)
     {
-        return Task.CompletedTask;
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompanyOnboardingDbContext>();
+
+        var now = DateTimeOffset.UtcNow;
+        var seededCompanyIds = new[]
+        {
+            Guid.Parse("00000000-0000-0000-0000-000000000001"), // Acme Corporation
+            Guid.Parse("00000000-0000-0000-0000-000000000002"), // Beta Corp
+        };
+
+        foreach (var companyId in seededCompanyIds)
+        {
+            if (await db.Progress.AnyAsync(p => p.CompanyId == companyId))
+            {
+                continue;
+            }
+
+            var progress = Domain.CompanyOnboardingProgress.Create(companyId, now);
+            progress.MarkCompleted(now);
+            db.Progress.Add(progress);
+        }
+
+        await db.SaveChangesAsync();
     }
 
     /// <summary>No middleware is needed for this module in Phase A.</summary>

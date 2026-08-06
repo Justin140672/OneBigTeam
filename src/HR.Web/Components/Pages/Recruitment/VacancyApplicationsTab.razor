@@ -145,8 +145,7 @@
                     <label class="form-label">Recruiter</label>
                     <SfDropDownList TValue="Guid?" TItem="ExternalRecruiterListItemModel"
                                     DataSource="@_activeRecruitersForSource" @bind-Value="_selectedSourceRecruiterId"
-                                    Placeholder="Select a recruiter" AllowFiltering="true"
-                                    ValueChange="OnSourceRecruiterChanged">
+                                    Placeholder="Select a recruiter" AllowFiltering="true">
                         <DropDownListFieldSettings Value="Id" Text="AgencyName" />
                         <DropDownListTemplates TItem="ExternalRecruiterListItemModel">
                             <ItemTemplate>
@@ -163,7 +162,7 @@
                     </SfDropDownList>
                     @if (_recruiterNotAssignedWarning)
                     {
-                        <div class="form-text text-warning" data-testid="recruiter-not-assigned-warning">
+                        <div class="form-text text-warning-emphasis" data-testid="recruiter-not-assigned-warning">
                             <i class="fa-solid fa-triangle-exclamation me-1"></i>This recruiter isn't currently assigned to this vacancy.
                         </div>
                     }
@@ -350,6 +349,7 @@
     private List<CandidateListItemModel> _candidates = [];
     private Guid? _selectedCandidateId;
     private string? _addNotes;
+    private int _candidateFilterRequestId;
 
     // Ticket #78 — application source. Options mirror Domain.ApplicationSource with display-friendly
     // labels; "Unspecified" is treated the same as "not selected" (Source sent as null either way).
@@ -369,7 +369,16 @@
     // replaced by this single optional field mirroring Vacancy.AssignedRecruiterId.
     private Guid? _vacancyAssignedRecruiterId;
     private Guid? _selectedSourceRecruiterId;
-    private bool _recruiterNotAssignedWarning;
+
+    // Computed rather than a field updated imperatively in OnSourceRecruiterChanged — that
+    // relied on Syncfusion's ValueChange event, which duplicates (and depends on firing in step
+    // with) the two-way @bind-Value on the Recruiter dropdown, which is what actually, reliably
+    // keeps _selectedSourceRecruiterId current. Deriving straight from that avoids depending on a
+    // second event mechanism at all.
+    private bool _recruiterNotAssignedWarning =>
+        _selectedSource == "ExternalRecruiter" &&
+        _selectedSourceRecruiterId is Guid id &&
+        id != _vacancyAssignedRecruiterId;
 
     // Per-application Source detail, looked up lazily since ListApplicationsForVacancy's own
     // response doesn't include Source (only GetApplication does) — see LoadAsync.
@@ -512,7 +521,6 @@
         _addNotes = null;
         _selectedSource = "Unspecified";
         _selectedSourceRecruiterId = null;
-        _recruiterNotAssignedWarning = false;
 
         // ListCandidatesValidator caps PageSize at 100 (InclusiveBetween(1, 100)) — requesting
         // more than that fails FluentValidation validation, and CandidateService.ListCandidatesAsync
@@ -541,25 +549,26 @@
         if (_selectedSource != "ExternalRecruiter")
         {
             _selectedSourceRecruiterId = null;
-            _recruiterNotAssignedWarning = false;
         }
-    }
-
-    // Warns (does not block) when the chosen recruiter isn't this vacancy's currently-assigned agency
-    // (Vacancy.AssignedRecruiterId) — per the ticket, this is advisory only.
-    private void OnSourceRecruiterChanged(ChangeEventArgs<Guid?, ExternalRecruiterListItemModel> args)
-    {
-        _selectedSourceRecruiterId = args.Value;
-        _recruiterNotAssignedWarning = args.Value is Guid id && id != _vacancyAssignedRecruiterId;
     }
 
     // Candidates are searched server-side as the user types rather than filtered against the
     // initial 100-row page above — otherwise a candidate outside that first page (e.g. sorted
     // later alphabetically once the table grows) could never be found no matter what's typed.
+    //
+    // Requests aren't guaranteed to resolve in the order they were fired — a slower earlier
+    // keystroke's response can land after a faster later one (or after the user has already
+    // clicked a result from that later response and picked a candidate). Applying every response
+    // unconditionally means that late arrival calls FilterAsync with a stale, narrower/different
+    // item list, which can visibly clear the selection the user just made a moment after they made
+    // it. Only the most recently *issued* request's response is applied; anything that resolves
+    // after a newer request has started is discarded.
     private async Task OnCandidateFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
         args.PreventDefaultAction = true;
+        var requestId = ++_candidateFilterRequestId;
         var result = await CandidateService.ListCandidatesAsync(CompanyId, search: args.Text, pageSize: 50);
+        if (requestId != _candidateFilterRequestId) return;
         _candidates = result?.Items ?? [];
         await _candidateDropdown.FilterAsync(_candidates, new Query());
     }

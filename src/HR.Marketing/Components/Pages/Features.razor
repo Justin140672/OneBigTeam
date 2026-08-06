@@ -11,7 +11,6 @@
 <main>
     <section class="pricing-hero section-band">
         <div class="section-inner hero-copy">
-            <p class="eyebrow">Features</p>
             <h1>Everything you need to manage your people in one place.</h1>
             <p class="hero-text">
                 Explore every feature included with your subscription.
@@ -21,14 +20,15 @@
 
     <section class="section pricing-section">
         <div class="section-inner section-inner-wide">
-            <div class="feature-grid">
-                @foreach (var feature in FeatureCatalog.All)
+            <div class="card-grid">
+                @for (var i = 0; i < FeatureCatalog.All.Count; i++)
                 {
-                    <a class="feature-card" href="/features/@feature.Slug">
-                        <span class="feature-icon" aria-hidden="true"><i class="@feature.IconClass"></i></span>
+                    var feature = FeatureCatalog.All[i];
+                    <a class="card" href="/features/@feature.Slug">
+                        <span class="card-icon" aria-hidden="true"><Icon Name="@feature.IconName" /></span>
                         <h3>@feature.Title</h3>
                         <p>@feature.Summary</p>
-                        <span class="feature-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+                        <span class="card-arrow" aria-hidden="true"><Icon Name="arrow-right" /></span>
                     </a>
                 }
             </div>
@@ -37,7 +37,6 @@
 
     <section id="contact" class="section final-cta">
         <div class="section-inner cta-panel">
-            <p class="eyebrow">Ready to simplify HR?</p>
             <h2>Start your free trial today. No setup fees. Cancel anytime.</h2>
             <div class="hero-actions">
                 <a class="button button-primary button-large" href="/signup">Start free trial</a>

@@ -22,14 +22,19 @@ public sealed class SidebarPage(IPage page)
     /// completes in OnInitializedAsync; on the very first render those flags default to false, so
     /// ".app-sidebar" may not be in the DOM yet even for a persona that will end up seeing it a
     /// moment later. A bounded wait (rather than an instant CountAsync snapshot) avoids racing that
-    /// round-trip; a genuine "no sidebar" persona still resolves promptly via the short timeout.
+    /// round-trip. The timeout only needs to be generous for the positive case — a genuine "no
+    /// sidebar" persona still resolves as soon as MainLayout finishes rendering with ShowSidebar
+    /// false, not by waiting out the full timeout — so a longer timeout here doesn't slow down
+    /// negative-case tests, it just gives a genuinely-showing sidebar (circuit connect + /api/me +
+    /// Syncfusion SfSidebar/SfMenu JS init, slower under SlowMo) enough room to actually render
+    /// before being wrongly reported as absent.
     /// </summary>
     public async Task<bool> IsSidebarVisibleAsync()
     {
         try
         {
-            await page.Locator(".app-sidebar").First.WaitForAsync(
-                new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            await NavMenu.First.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
             return true;
         }
         catch (TimeoutException)

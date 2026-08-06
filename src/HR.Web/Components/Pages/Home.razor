@@ -34,6 +34,18 @@
     {
         if (!firstRender) return;
 
+        // Session.InitialiseAsync() fails open (see its remarks) when /api/me rejects the request —
+        // e.g. a stale/expired session cookie that still passes NoOpAuthenticationHandler's SSR-level
+        // presence-only check but fails HR.Api's real token validation. Without this guard,
+        // LandingUrl silently defaults to "/" (every role flag false, no linked employee) and this
+        // page would NavigateTo("/") — itself — forever, since it never had a session to redirect
+        // away with in the first place.
+        if (!Session.IsLoaded)
+        {
+            Navigation.NavigateTo("/login", replace: true);
+            return;
+        }
+
         var lastDashboard = await JS.InvokeAsync<string>("getLastDashboard");
 
         // Fall back to the priority-ordered LandingUrl when there's no stored preference, or the

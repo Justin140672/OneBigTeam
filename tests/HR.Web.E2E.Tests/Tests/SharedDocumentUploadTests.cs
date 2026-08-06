@@ -39,15 +39,9 @@ public sealed class SharedDocumentUploadTests(AppFixture fixture) : E2ETestBase(
         var title = $"Test Policy {Guid.NewGuid():N}";
         await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
-        // Select a category via the Syncfusion SfDropDownList (same interaction pattern used
-        // throughout this test suite — click the combobox, wait for the popup, click the item).
+        // Select a category via the shared Syncfusion SfDropDownList helper.
         var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
-        await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
-        await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await _page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = "Policy" })
-            .First
-            .ClickAsync();
+        await DropDownSelector.SelectAsync(_page, categoryGroup, "Policy");
 
         var tempFile = Path.Combine(Path.GetTempPath(), $"shared-doc-{Guid.NewGuid():N}.pdf");
         try

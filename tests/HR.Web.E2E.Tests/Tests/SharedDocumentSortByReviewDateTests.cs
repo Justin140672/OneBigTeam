@@ -269,12 +269,7 @@ public sealed class SharedDocumentSortByReviewDateTests(AppFixture fixture) : E2
         await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
         var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
-        await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
-        await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await _page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = "Policy" })
-            .First
-            .ClickAsync();
+        await DropDownSelector.SelectAsync(_page, categoryGroup, "Policy");
 
         var reviewDateInput = dialog.Locator(".col-md-6")
             .Filter(new() { HasText = "Next Review Date" })

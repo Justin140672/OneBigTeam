@@ -111,7 +111,7 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
         page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
 
     public Task<bool> IsUnsavedChangesDialogVisibleAsync() =>
-        UnsavedChangesDialog.IsVisibleAsync();
+        UnsavedChangesDialog.WaitUntilVisibleAsync();
 
     /// <summary>
     /// Close navigates to "/" (CompanyEdit has no dedicated list page) — but Home.razor's

@@ -63,6 +63,14 @@ void ConfigureSupabaseJwtBearer(JwtBearerOptions options)
 	var supabaseProjectUrl = builder.Configuration["SupabaseAuth:ProjectUrl"] ?? "";
 	var supabaseJwksUrl = builder.Configuration["SupabaseAuth:JwksUrl"] ?? "";
 
+	// Without this, JwtBearerHandler silently remaps short JWT claim names to legacy long-form
+	// ClaimTypes URIs (e.g. "sub" -> ClaimTypes.NameIdentifier, "email" -> ClaimTypes.Email) via
+	// JwtSecurityTokenHandler's default inbound claim mapping. CurrentUserClaims/
+	// SupabaseCurrentUserResolutionMiddleware look up "sub"/"email" literally, so without this
+	// they'd never find them on a real Supabase-issued token — resolving to an authenticated-but-
+	// unidentified user (UserId null), which fails every downstream check with a fast 403.
+	options.MapInboundClaims = false;
+
 	options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
 	{
 		ValidateIssuer = true,
@@ -75,39 +83,36 @@ void ConfigureSupabaseJwtBearer(JwtBearerOptions options)
 		IssuerSigningKeyResolver = (_, _, kid, _) =>
 			SupabaseJwksKeyResolver.ResolveSigningKeys(supabaseJwksUrl, kid),
 	};
+
+	// The default Serilog MinimumLevel.Override for "Microsoft" (Warning) swallows JwtBearerHandler's
+	// own authentication-failure logs, so a validation failure otherwise surfaces only as a bare 401
+	// with no indication of why (expired token, bad signature, issuer/audience mismatch, etc.).
+	options.Events = new JwtBearerEvents
+	{
+		OnAuthenticationFailed = context =>
+		{
+			context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+				.CreateLogger("SupabaseJwtBearer")
+				.LogWarning(context.Exception, "Supabase JWT validation failed");
+			return Task.CompletedTask;
+		},
+	};
 }
 
 if (builder.Environment.IsDevelopment())
 {
 	builder.Services.AddSingleton<DevPersonaStore>();
+}
 
-	// Dual-scheme: requests carrying a real Authorization: Bearer header (e.g. HR.Web's
-	// /verify-email flow calling back in with a genuine Supabase access token, or anyone testing
-	// real Supabase Auth end-to-end locally) are validated as real Supabase JWTs; everything else
-	// keeps using the dev-persona auto-login as before. Without this, Development could never
-	// authenticate a real Supabase-issued token at all — DevAuthHandler ignores the header
-	// entirely and always signs the request in as the fixed dev persona.
-	builder.Services
-		.AddAuthentication("DevOrSupabase")
-		.AddPolicyScheme("DevOrSupabase", "DevOrSupabase", options =>
-		{
-			options.ForwardDefaultSelector = context =>
-				context.Request.Headers.ContainsKey("Authorization")
-					? JwtBearerDefaults.AuthenticationScheme
-					: "DevAuth";
-		})
-		.AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, DevAuthHandler>(
-			"DevAuth", _ => { })
-		.AddJwtBearer(ConfigureSupabaseJwtBearer);
-}
-else
-{
-	// Supabase-backed authentication for non-Development environments (Phase B of the "Move Email
-	// Verification into the Main Application" plan).
-	builder.Services
-		.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-		.AddJwtBearer(ConfigureSupabaseJwtBearer);
-}
+// Supabase-backed authentication for all environments. Development previously fell back to a
+// DevAuthHandler dev-persona auto-login bypass; that has been removed — Development now always
+// authenticates through real Supabase, same as production (see the "Switch development to real
+// Supabase auth" plan). The dev persona switcher in HR.Web still exists, but it now performs a
+// real Supabase password-grant login (see /api/dev/persona/{userId} below) rather than flipping
+// an in-memory claims pointer.
+builder.Services
+	.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+	.AddJwtBearer(ConfigureSupabaseJwtBearer);
 
 builder.Services
 	.AddAuthorizationBuilder()
@@ -230,7 +235,19 @@ try
 {
 	await app.Services.MigrateIdentityAsync();
 	if (app.Environment.IsDevelopment())
+	{
 		await app.Services.SeedDevUserAsync();
+		await app.Services.SeedDevSupabaseUsersAsync(DevPersonaStore.Personas.Select(p =>
+		{
+			var nameParts = p.Name.Split(' ', 2);
+			return (
+				Id: Guid.Parse(p.UserId),
+				CompanyId: Guid.Parse(p.CompanyId),
+				Email: p.Email,
+				FirstName: nameParts[0],
+				LastName: nameParts.Length > 1 ? nameParts[1] : "");
+		}));
+	}
 	identityMigrationStatus = "succeeded";
 	identityMigrationCheckedAt = DateTimeOffset.UtcNow;
 }
@@ -544,7 +561,10 @@ if (app.Environment.IsDevelopment())
 	{
 		// The dev persona switcher is the only real "sign-in" path in this codebase today (see
 		// HR.Modules.Identity.IdentityModule.TryDevSignInAsync remarks) — this is where the
-		// IsActive gate (ticket #88) and LastLoginAt recording (ticket #89) are wired in.
+		// IsActive gate (ticket #88) and LastLoginAt recording (ticket #89) are wired in. After the
+		// gate passes, a real Supabase password-grant login is performed for that persona's email
+		// so HR.Web can establish a genuine Supabase session cookie (see the "Switch development to
+		// real Supabase auth" plan).
 		if (!Guid.TryParse(userId, out var userGuid))
 			return Results.NoContent();
 
@@ -552,16 +572,27 @@ if (app.Environment.IsDevelopment())
 		if (!isAllowed)
 			return Results.StatusCode(StatusCodes.Status403Forbidden);
 
-		store.Switch(userId);
-		return Results.NoContent();
+		var persona = store.FindPersona(userId);
+		if (persona is null)
+			return Results.NotFound();
+
+		var session = await services.SignInDevPersonaAsync(persona.Email, CancellationToken.None);
+		return Results.Ok(new
+		{
+			accessToken = session.AccessToken,
+			refreshToken = session.RefreshToken,
+			expiresIn = session.ExpiresIn,
+		});
 	}).AllowAnonymous();
 
 	// Establishes a dev-stub session for a brand-new self-service signup admin (HR.Modules.Identity's
 	// SignUp feature returns exactly these fields). Identity cannot reference DevPersonaStore itself
 	// (it lives in HR.Api, the host) — the client (marketing StartTrial page / HR.Web) calls this
-	// immediately after a successful signup, achieving the "auto-login" UX via the same dev-stub
-	// mechanism used everywhere else in this codebase today.
-	app.MapPost("/api/dev/persona/register", (RegisterDevPersonaRequest request, DevPersonaStore store) =>
+	// immediately after a successful signup. The new admin is also seeded as a real Supabase dev
+	// user and logged in via password grant, so the "auto-login after signup" UX keeps working under
+	// real Supabase auth.
+	app.MapPost("/api/dev/persona/register", async (
+		RegisterDevPersonaRequest request, DevPersonaStore store, IServiceProvider services) =>
 	{
 		store.Register(new DevPersona(
 			request.UserId.ToString(),
@@ -569,7 +600,17 @@ if (app.Environment.IsDevelopment())
 			$"{request.FirstName} {request.LastName}".Trim(),
 			"Company Administrator",
 			request.Email));
-		return Results.NoContent();
+
+		await services.EnsureDevSupabaseUserAsync(
+			request.UserId, request.CompanyId, request.Email,
+			request.FirstName, request.LastName, CancellationToken.None);
+		var session = await services.SignInDevPersonaAsync(request.Email, CancellationToken.None);
+		return Results.Ok(new
+		{
+			accessToken = session.AccessToken,
+			refreshToken = session.RefreshToken,
+			expiresIn = session.ExpiresIn,
+		});
 	}).AllowAnonymous();
 
 	// Every Local*StorageService (used whenever the corresponding Supabase config section is
