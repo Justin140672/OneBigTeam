@@ -24,7 +24,9 @@ internal sealed class Endpoint(
         GetTeamSicknessTodayRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var authenticatedEmployeeId))
+        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
+        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
+        if (currentUser.UserId is not { } authenticatedEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;
@@ -32,9 +34,7 @@ internal sealed class Endpoint(
 
         if (authenticatedEmployeeId != request.ManagerId)
         {
-            var userId = currentUser.UserId;
-            var canManageAnyTeam = userId is not null
-                && await authorizationService.HasPermissionAsync(userId.Value, SicknessManagePermissionId, cancellationToken);
+            var canManageAnyTeam = await authorizationService.HasPermissionAsync(authenticatedEmployeeId, SicknessManagePermissionId, cancellationToken);
 
             if (!canManageAnyTeam)
             {

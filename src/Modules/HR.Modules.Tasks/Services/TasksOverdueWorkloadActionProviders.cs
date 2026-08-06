@@ -20,7 +20,8 @@ namespace HR.Modules.Tasks.Services;
 /// </summary>
 internal sealed class EmployeeTasksOverdueWorkloadActionProvider(
     TasksDbContext dbContext,
-    IEmployeeDepartmentReader employeeDepartmentReader) : IWorkloadActionProvider
+    IEmployeeDepartmentReader employeeDepartmentReader,
+    HR.SharedKernel.ICurrentUser currentUser) : IWorkloadActionProvider
 {
     public string ActionCategory => "Employee Tasks Overdue";
 
@@ -29,7 +30,10 @@ internal sealed class EmployeeTasksOverdueWorkloadActionProvider(
         ClaimsPrincipal caller,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(caller.FindFirst("sub")?.Value, out var callerEmployeeId))
+        // NOT caller.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
+        // resolved Employee/UserId. ICurrentUser.UserId reads off the ambient HttpContext, safe
+        // even from this provider's own DI scope.
+        if (currentUser.UserId is not { } callerEmployeeId)
             return [];
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
@@ -71,7 +75,8 @@ internal sealed class ManagerTasksOverdueWorkloadActionProvider(
     TasksDbContext dbContext,
     IDirectReportsReader directReportsReader,
     IEmployeeDepartmentReader employeeDepartmentReader,
-    IAuthorizationService authorizationService) : IWorkloadActionProvider
+    IAuthorizationService authorizationService,
+    HR.SharedKernel.ICurrentUser currentUser) : IWorkloadActionProvider
 {
     public string ActionCategory => "Manager Tasks Overdue";
 
@@ -85,7 +90,10 @@ internal sealed class ManagerTasksOverdueWorkloadActionProvider(
         IReadOnlyCollection<Guid>? employeeIds = null;
         if (!callerIsHr)
         {
-            if (!Guid.TryParse(caller.FindFirst("sub")?.Value, out var callerEmployeeId))
+            // NOT caller.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
+            // resolved Employee/UserId. ICurrentUser.UserId reads off the ambient HttpContext, safe
+            // even from this provider's own DI scope.
+            if (currentUser.UserId is not { } callerEmployeeId)
                 return [];
 
             var directReportIds = await directReportsReader.GetDirectReportIdsAsync(

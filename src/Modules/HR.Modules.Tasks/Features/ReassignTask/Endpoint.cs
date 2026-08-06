@@ -1,9 +1,10 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Tasks.Features.ReassignTask;
 
-internal sealed class Endpoint(ReassignTaskHandler handler) : Endpoint<ReassignTaskRequest, ReassignTaskResponse>
+internal sealed class Endpoint(ReassignTaskHandler handler, ICurrentUser currentUser) : Endpoint<ReassignTaskRequest, ReassignTaskResponse>
 {
     public override void Configure()
     {
@@ -13,10 +14,12 @@ internal sealed class Endpoint(ReassignTaskHandler handler) : Endpoint<ReassignT
 
     public override async Task HandleAsync(ReassignTaskRequest request, CancellationToken cancellationToken)
     {
-        Guid.TryParse(User.FindFirst("sub")?.Value, out var actorUserId);
+        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
+        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
+        var actorUserId = currentUser.UserId;
 
         var result = await handler.HandleAsync(
-            request with { ActorUserId = actorUserId == Guid.Empty ? null : actorUserId },
+            request with { ActorUserId = actorUserId },
             cancellationToken);
 
         if (result.IsFailure)

@@ -17,7 +17,8 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
     LeaveDbContext dbContext,
     IDirectReportsReader directReportsReader,
     IEmployeeDepartmentReader employeeDepartmentReader,
-    IAuthorizationService authorizationService) : IWorkloadActionProvider
+    IAuthorizationService authorizationService,
+    HR.SharedKernel.ICurrentUser currentUser) : IWorkloadActionProvider
 {
     public string ActionCategory => "Pending Leave Approvals";
 
@@ -31,7 +32,10 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
         IReadOnlyCollection<Guid>? employeeIds = null;
         if (!callerIsHr)
         {
-            if (!Guid.TryParse(caller.FindFirst("sub")?.Value, out var callerEmployeeId))
+            // NOT caller.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
+            // resolved Employee/UserId. ICurrentUser.UserId reads off the ambient HttpContext, safe
+            // even from this provider's own DI scope.
+            if (currentUser.UserId is not { } callerEmployeeId)
                 return [];
 
             var directReportIds = await directReportsReader.GetDirectReportIdsAsync(

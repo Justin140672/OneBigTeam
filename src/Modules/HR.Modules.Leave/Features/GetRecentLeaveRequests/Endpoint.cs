@@ -25,19 +25,19 @@ internal sealed class Endpoint(
         GetRecentLeaveRequestsRequest request,
         CancellationToken cancellationToken)
     {
-        // Viewer identity and HR-administrator status are both resolved server-side from the
-        // authenticated caller (JWT "sub" claim + IAuthorizationService), never trusted from the
+        // Viewer identity and HR-administrator status are both resolved server-side from
+        // ICurrentUser.UserId (this app's resolved Employee/UserId, NOT the raw Supabase "sub"
+        // claim — see GetMyEmployee/Endpoint.cs) + IAuthorizationService, never trusted from the
         // client — same convention as GetMyTeam's managerId resolution and GetTeamSicknessToday's
         // permission check.
-        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var viewerEmployeeId))
+        if (currentUser.UserId is not { } viewerEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;
         }
 
-        var userId = currentUser.UserId;
-        var isHrAdministrator = userId is not null
-            && (await authorizationService.GetEffectiveRolesAsync(userId.Value, cancellationToken)).Contains(HrAdministratorRoleId);
+        var isHrAdministrator =
+            (await authorizationService.GetEffectiveRolesAsync(viewerEmployeeId, cancellationToken)).Contains(HrAdministratorRoleId);
 
         var result = await handler.HandleAsync(request, viewerEmployeeId, isHrAdministrator, cancellationToken);
         await Send.ResultAsync(TypedResults.Ok(result));

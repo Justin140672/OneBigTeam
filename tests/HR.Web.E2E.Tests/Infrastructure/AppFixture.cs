@@ -51,9 +51,9 @@ public sealed class AppFixture : IAsyncLifetime
         _playwright = await Playwright.CreateAsync();
         _browser    = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
-            Headless = true,
-            //Headless = false,
-            //SlowMo = 100, // ms pause between actions — makes the run watchable
+            //Headless = true,
+            Headless = false,
+            SlowMo = 100, // ms pause between actions — makes the run watchable
 
             // Headless Chromium treats every page as backgrounded/unfocused (there's no real
             // window to hold focus), which triggers Chrome's normal power-saving throttling of

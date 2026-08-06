@@ -37,7 +37,9 @@ internal sealed class Endpoint(
         {
             var managerId = await managerReader.GetManagerIdAsync(request.CompanyId, request.EmployeeId, cancellationToken);
 
-            if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var authenticatedEmployeeId)
+            // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
+            // resolved Employee/UserId (see ICurrentUser.UserId usage above for the rationale).
+            if (currentUser.UserId is not { } authenticatedEmployeeId
                 || managerId != authenticatedEmployeeId)
             {
                 await Send.ResultAsync(TypedResults.Forbid());

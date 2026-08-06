@@ -15,7 +15,8 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
     IOnboardingReportReader onboardingReportReader,
     IDirectReportsReader directReportsReader,
     IEmployeeDepartmentReader employeeDepartmentReader,
-    IAuthorizationService authorizationService) : IWorkloadActionProvider
+    IAuthorizationService authorizationService,
+    HR.SharedKernel.ICurrentUser currentUser) : IWorkloadActionProvider
 {
     public string ActionCategory => "Outstanding Onboarding Tasks";
 
@@ -33,7 +34,10 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
             if (!callerIsManager)
                 return [];
 
-            if (!Guid.TryParse(caller.FindFirst("sub")?.Value, out var callerEmployeeId))
+            // NOT caller.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
+            // resolved Employee/UserId. ICurrentUser.UserId reads off the ambient HttpContext, safe
+            // even from this provider's own DI scope.
+            if (currentUser.UserId is not { } callerEmployeeId)
                 return [];
 
             var directReportIds = await directReportsReader.GetDirectReportIdsAsync(

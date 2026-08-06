@@ -1,9 +1,10 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Sickness.Features.GetMySicknessRecords;
 
-internal sealed class Endpoint(GetMySicknessRecordsHandler handler)
+internal sealed class Endpoint(GetMySicknessRecordsHandler handler, ICurrentUser currentUser)
     : Endpoint<GetMySicknessRecordsRequest, GetMySicknessRecordsResponse>
 {
     public override void Configure()
@@ -14,7 +15,9 @@ internal sealed class Endpoint(GetMySicknessRecordsHandler handler)
 
     public override async Task HandleAsync(GetMySicknessRecordsRequest request, CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var authenticatedEmployeeId))
+        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
+        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
+        if (currentUser.UserId is not { } authenticatedEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;

@@ -21,6 +21,7 @@ internal sealed class ProbationReviewsDueWorkloadActionProvider(
     IDirectReportsReader directReportsReader,
     IEmployeeDepartmentReader employeeDepartmentReader,
     IAuthorizationService authorizationService,
+    HR.SharedKernel.ICurrentUser currentUser,
     IClock clock) : IWorkloadActionProvider
 {
     public string ActionCategory => "Probation Reviews Due";
@@ -30,7 +31,7 @@ internal sealed class ProbationReviewsDueWorkloadActionProvider(
         ClaimsPrincipal caller,
         CancellationToken cancellationToken)
         => await ProbationReviewWorkloadActions.GetAsync(
-            dbContext, directReportsReader, employeeDepartmentReader, authorizationService, clock,
+            dbContext, directReportsReader, employeeDepartmentReader, authorizationService, currentUser, clock,
             companyId, caller, ActionCategory, overdueOnly: false, cancellationToken);
 }
 
@@ -43,6 +44,7 @@ internal sealed class OverdueProbationReviewsWorkloadActionProvider(
     IDirectReportsReader directReportsReader,
     IEmployeeDepartmentReader employeeDepartmentReader,
     IAuthorizationService authorizationService,
+    HR.SharedKernel.ICurrentUser currentUser,
     IClock clock) : IWorkloadActionProvider
 {
     public string ActionCategory => "Overdue Probation Reviews";
@@ -52,7 +54,7 @@ internal sealed class OverdueProbationReviewsWorkloadActionProvider(
         ClaimsPrincipal caller,
         CancellationToken cancellationToken)
         => await ProbationReviewWorkloadActions.GetAsync(
-            dbContext, directReportsReader, employeeDepartmentReader, authorizationService, clock,
+            dbContext, directReportsReader, employeeDepartmentReader, authorizationService, currentUser, clock,
             companyId, caller, ActionCategory, overdueOnly: true, cancellationToken);
 }
 
@@ -68,6 +70,7 @@ internal static class ProbationReviewWorkloadActions
         IDirectReportsReader directReportsReader,
         IEmployeeDepartmentReader employeeDepartmentReader,
         IAuthorizationService authorizationService,
+        HR.SharedKernel.ICurrentUser currentUser,
         IClock clock,
         Guid companyId,
         ClaimsPrincipal caller,
@@ -84,7 +87,11 @@ internal static class ProbationReviewWorkloadActions
             if (!callerIsManager)
                 return [];
 
-            if (!Guid.TryParse(caller.FindFirst("sub")?.Value, out var callerEmployeeId))
+            // NOT caller.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
+            // resolved Employee/UserId. ICurrentUser.UserId is safe here even though this provider
+            // runs in its own DI scope: it reads off the ambient HttpContext (IHttpContextAccessor),
+            // which is shared across scopes for the same request.
+            if (currentUser.UserId is not { } callerEmployeeId)
                 return [];
 
             var directReportIds = await directReportsReader.GetDirectReportIdsAsync(

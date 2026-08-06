@@ -179,32 +179,15 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
                 $"Supabase admin create-user request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
         }
 
-        // The create call above returns nothing usable on a duplicate, but callers need a stable
-        // Supabase user id every time (to link/verify a UserProfile row) — so look the existing user
-        // up by email instead. UNVERIFIED: Supabase's admin list-users endpoint
-        // (GET /auth/v1/admin/users) supports an "email" filter query parameter per its documented
-        // conventions; the exact filter param name is not confirmed against a live project.
-        using var lookupResponse = await http.GetAsync(
-            $"/auth/v1/admin/users?email={Uri.EscapeDataString(email)}", cancellationToken);
-
-        if (!lookupResponse.IsSuccessStatusCode)
-        {
-            var lookupBody = await lookupResponse.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException(
-                $"Supabase admin user lookup for '{email}' failed with status {(int)lookupResponse.StatusCode} ({lookupResponse.StatusCode}). Response body: {lookupBody}");
-        }
-
-        var lookupPayload = await lookupResponse.Content.ReadFromJsonAsync<SupabaseAdminUsersListResponse>(JsonOptions, cancellationToken);
-        var match = lookupPayload?.Users?.FirstOrDefault(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
-
-        if (match is null || !Guid.TryParse(match.Id, out var existingId))
-        {
-            var lookupBody = await lookupResponse.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException(
-                $"Supabase admin user lookup for '{email}' did not return a matching user. Response body: {lookupBody}");
-        }
-
-        return existingId;
+        // The create call above returns nothing usable on a duplicate, but callers need the SAME
+        // Supabase user id that will actually end up in the "sub" claim of tokens issued for this
+        // dev persona (to link/verify a UserProfile row) — so resolve it via the exact same
+        // password-grant sign-in SignInWithPasswordAsync uses, rather than a separate, unverified
+        // admin list-users lookup (that endpoint's filtering behaviour turned out not to reliably
+        // return the same id as the one tokens are actually issued with — confirmed via live
+        // diagnosis: UserProfile rows seeded from that lookup didn't match the real "sub" claim).
+        var session = await SignInWithPasswordAsync(email, password, cancellationToken);
+        return session.UserId;
     }
 
     public async Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)
@@ -272,20 +255,5 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
     {
         [JsonPropertyName("id")]
         public string? Id { get; set; }
-    }
-
-    private sealed class SupabaseAdminUsersListResponse
-    {
-        [JsonPropertyName("users")]
-        public List<SupabaseAdminUserListItem>? Users { get; set; }
-    }
-
-    private sealed class SupabaseAdminUserListItem
-    {
-        [JsonPropertyName("id")]
-        public string? Id { get; set; }
-
-        [JsonPropertyName("email")]
-        public string? Email { get; set; }
     }
 }

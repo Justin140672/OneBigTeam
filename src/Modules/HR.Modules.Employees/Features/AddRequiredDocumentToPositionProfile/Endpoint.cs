@@ -1,9 +1,10 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Employees.Features.AddRequiredDocumentToPositionProfile;
 
-internal sealed class Endpoint(AddRequiredDocumentHandler handler)
+internal sealed class Endpoint(AddRequiredDocumentHandler handler, ICurrentUser currentUser)
     : Endpoint<AddRequiredDocumentRequest, AddRequiredDocumentResponse>
 {
     public override void Configure()
@@ -16,7 +17,9 @@ internal sealed class Endpoint(AddRequiredDocumentHandler handler)
         AddRequiredDocumentRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var actorEmployeeId))
+        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
+        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
+        if (currentUser.UserId is not { } actorEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;

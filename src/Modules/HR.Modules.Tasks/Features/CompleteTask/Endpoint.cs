@@ -1,9 +1,10 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Tasks.Features.CompleteTask;
 
-internal sealed class Endpoint(CompleteTaskHandler handler) : Endpoint<CompleteTaskRequest, CompleteTaskResponse>
+internal sealed class Endpoint(CompleteTaskHandler handler, ICurrentUser currentUser) : Endpoint<CompleteTaskRequest, CompleteTaskResponse>
 {
     public override void Configure()
     {
@@ -13,7 +14,9 @@ internal sealed class Endpoint(CompleteTaskHandler handler) : Endpoint<CompleteT
 
     public override async Task HandleAsync(CompleteTaskRequest request, CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var completedBy))
+        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
+        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
+        if (currentUser.UserId is not { } completedBy)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;

@@ -6,7 +6,8 @@ namespace HR.Modules.Reporting.Features.GetProbationReport;
 
 internal sealed class Endpoint(
     GetProbationReportHandler handler,
-    IAuthorizationService authorizationService) : Endpoint<GetProbationReportRequest, GetProbationReportResponse>
+    IAuthorizationService authorizationService,
+    HR.SharedKernel.ICurrentUser currentUser) : Endpoint<GetProbationReportRequest, GetProbationReportResponse>
 {
     public override void Configure()
     {
@@ -21,7 +22,9 @@ internal sealed class Endpoint(
         GetProbationReportRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var callerEmployeeId))
+        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
+        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
+        if (currentUser.UserId is not { } callerEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;

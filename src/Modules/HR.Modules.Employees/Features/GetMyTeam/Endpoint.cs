@@ -1,9 +1,10 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Employees.Features.GetMyTeam;
 
-internal sealed class Endpoint(GetMyTeamHandler handler) : Endpoint<GetMyTeamRequest, GetMyTeamResponse>
+internal sealed class Endpoint(GetMyTeamHandler handler, ICurrentUser currentUser) : Endpoint<GetMyTeamRequest, GetMyTeamResponse>
 {
     public override void Configure()
     {
@@ -13,10 +14,11 @@ internal sealed class Endpoint(GetMyTeamHandler handler) : Endpoint<GetMyTeamReq
 
     public override async Task HandleAsync(GetMyTeamRequest request, CancellationToken cancellationToken)
     {
-        // Self-scoped by the caller's own user id (== Employee.Id, same convention as
+        // Self-scoped by the caller's own resolved user id (== Employee.Id, same convention as
         // GetMyEmployee / GetMyOnboardingStatus / GetMyProbationStatus) — no role check needed
-        // since a non-manager simply gets an empty team back.
-        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var managerId))
+        // since a non-manager simply gets an empty team back. NOT User.FindFirst("sub"): see
+        // GetMyEmployee/Endpoint.cs for why the raw Supabase claim is wrong here.
+        if (currentUser.UserId is not { } managerId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;

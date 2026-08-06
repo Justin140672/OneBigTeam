@@ -1,9 +1,10 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Employees.Features.AddMyEmergencyContact;
 
-internal sealed class Endpoint(AddMyEmergencyContactHandler handler)
+internal sealed class Endpoint(AddMyEmergencyContactHandler handler, ICurrentUser currentUser)
     : Endpoint<AddMyEmergencyContactRequest, AddMyEmergencyContactResponse>
 {
     public override void Configure()
@@ -16,7 +17,9 @@ internal sealed class Endpoint(AddMyEmergencyContactHandler handler)
         AddMyEmergencyContactRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var employeeId))
+        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
+        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
+        if (currentUser.UserId is not { } employeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;

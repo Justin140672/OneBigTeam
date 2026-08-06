@@ -6,7 +6,8 @@ namespace HR.Modules.Reporting.Features.ExportOnboardingProgressReport;
 
 internal sealed class Endpoint(
     ExportOnboardingProgressReportHandler handler,
-    IAuthorizationService authorizationService) : Endpoint<ExportOnboardingProgressReportRequest>
+    IAuthorizationService authorizationService,
+    HR.SharedKernel.ICurrentUser currentUser) : Endpoint<ExportOnboardingProgressReportRequest>
 {
     public override void Configure()
     {
@@ -18,7 +19,9 @@ internal sealed class Endpoint(
         ExportOnboardingProgressReportRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var callerEmployeeId))
+        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
+        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
+        if (currentUser.UserId is not { } callerEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;

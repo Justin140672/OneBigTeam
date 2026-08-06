@@ -452,6 +452,14 @@ public static class IdentityModule
                     persona.Id, supabaseUserId, persona.CompanyId, persona.Email,
                     persona.FirstName, persona.LastName, now));
             }
+            else if (profile.SupabaseAuthUserId != supabaseUserId)
+            {
+                // Self-heal: an earlier seeding run's admin-list-users lookup (since replaced with a
+                // password-grant sign-in — see SupabaseAuthGateway.EnsureDevUserAsync) could store a
+                // SupabaseAuthUserId that doesn't match the "sub" claim actually issued on tokens,
+                // permanently 404/403ing every request for that persona until corrected.
+                profile.UpdateSupabaseAuthUserId(supabaseUserId, now);
+            }
         }
 
         await db.SaveChangesAsync();

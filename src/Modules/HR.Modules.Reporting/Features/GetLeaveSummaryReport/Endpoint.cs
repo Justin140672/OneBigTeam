@@ -6,7 +6,8 @@ namespace HR.Modules.Reporting.Features.GetLeaveSummaryReport;
 
 internal sealed class Endpoint(
     GetLeaveSummaryReportHandler handler,
-    IAuthorizationService authorizationService) : Endpoint<GetLeaveSummaryReportRequest, GetLeaveSummaryReportResponse>
+    IAuthorizationService authorizationService,
+    HR.SharedKernel.ICurrentUser currentUser) : Endpoint<GetLeaveSummaryReportRequest, GetLeaveSummaryReportResponse>
 {
     public override void Configure()
     {
@@ -21,7 +22,9 @@ internal sealed class Endpoint(
         GetLeaveSummaryReportRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var callerEmployeeId))
+        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
+        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
+        if (currentUser.UserId is not { } callerEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;

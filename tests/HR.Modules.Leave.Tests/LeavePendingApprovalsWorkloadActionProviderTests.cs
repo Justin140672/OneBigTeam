@@ -4,6 +4,7 @@ using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
 using HR.Modules.Leave.Services;
 using HR.Modules.Leave.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Tests;
@@ -41,6 +42,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
         var companyId = Guid.NewGuid();
         var employeeA = Guid.NewGuid();
         var employeeB = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
 
         context.LeaveRequests.AddRange(
             CreatePendingRequest(companyId, employeeA, new DateOnly(2026, 8, 3)),
@@ -49,9 +51,9 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -72,7 +74,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService());
+            new FakeAuthorizationService(), new FakeCurrentUser(callerEmployeeId));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerEmployeeId), CancellationToken.None);
 
@@ -86,14 +88,15 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
+        var callerId = Guid.NewGuid();
         context.LeaveRequests.Add(CreatePendingRequest(companyId, Guid.NewGuid(), new DateOnly(2026, 8, 3)));
         await context.SaveChangesAsync();
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             context, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService());
+            new FakeAuthorizationService(), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -109,9 +112,9 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             context, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService());
+            new FakeAuthorizationService(), new FakeCurrentUser(null));
 
-        // No "sub" claim at all — the caller can't even be resolved to an employee id.
+        // No resolved current-user id at all — the caller can't even be resolved to an employee id.
         var result = await provider.GetActionsAsync(companyId, new ClaimsPrincipal(new ClaimsIdentity()), CancellationToken.None);
 
         Assert.Empty(result);
@@ -123,6 +126,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
         var startDate = new DateOnly(2026, 8, 3);
 
         context.LeaveRequests.Add(CreatePendingRequest(companyId, employeeId, startDate));
@@ -130,9 +134,9 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Approve Leave Request", action.ActionType);

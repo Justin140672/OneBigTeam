@@ -2,6 +2,7 @@ using System.Security.Claims;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Onboarding.Services;
 using HR.Modules.Onboarding.Tests.Infrastructure;
+using HR.SharedKernel;
 
 namespace HR.Modules.Onboarding.Tests;
 
@@ -24,6 +25,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
     {
         var employeeA = Guid.NewGuid();
         var employeeB = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
         var reader = new FakeOnboardingReportReader(
         [
             BuildItem(employeeA, new OnboardingReportTaskItem("Set up laptop", null, "HR", false)),
@@ -32,9 +34,9 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -53,7 +55,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-onboarding"));
+            new FakeAuthorizationService("reporting:view-onboarding"), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
 
@@ -64,6 +66,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
     [Fact]
     public async Task ManagerWithNoDirectReports_Returns_Empty()
     {
+        var callerId = Guid.NewGuid();
         var reader = new FakeOnboardingReportReader(
         [
             BuildItem(Guid.NewGuid(), new OnboardingReportTaskItem("Task A", null, "Manager", false)),
@@ -71,9 +74,9 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-onboarding"));
+            new FakeAuthorizationService("reporting:view-onboarding"), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -81,6 +84,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
     [Fact]
     public async Task CallerWithNoRecognisedRole_Returns_Empty_Not_Throws()
     {
+        var callerId = Guid.NewGuid();
         var reader = new FakeOnboardingReportReader(
         [
             BuildItem(Guid.NewGuid(), new OnboardingReportTaskItem("Task A", null, "Manager", false)),
@@ -88,9 +92,9 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService());
+            new FakeAuthorizationService(), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -100,6 +104,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
     {
         var employeeId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
         var dueDate = new DateOnly(2026, 8, 5);
         var reader = new FakeOnboardingReportReader(
         [
@@ -108,9 +113,9 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Set up laptop", action.ActionType);
@@ -124,6 +129,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
     public async Task Overdue_Task_Maps_To_Overdue_Status()
     {
         var employeeId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
         var reader = new FakeOnboardingReportReader(
         [
             BuildItem(employeeId, new OnboardingReportTaskItem("Late task", new DateOnly(2026, 1, 1), "HR", true)),
@@ -131,9 +137,9 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Overdue", action.Status);

@@ -4,6 +4,7 @@ using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
 using HR.Modules.Tasks.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Tests;
@@ -49,7 +50,7 @@ public class TasksOverdueWorkloadActionProvidersTests
             CreateOverdueTask(companyId, otherEmployeeId, "Someone else's overdue task", Today.AddDays(-1)));
         await context.SaveChangesAsync();
 
-        var provider = new EmployeeTasksOverdueWorkloadActionProvider(context, new FakeEmployeeDepartmentReader());
+        var provider = new EmployeeTasksOverdueWorkloadActionProvider(context, new FakeEmployeeDepartmentReader(), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -66,7 +67,7 @@ public class TasksOverdueWorkloadActionProvidersTests
         context.TaskItems.Add(CreateOverdueTask(companyId, Guid.NewGuid(), "Some task", Today.AddDays(-1)));
         await context.SaveChangesAsync();
 
-        var provider = new EmployeeTasksOverdueWorkloadActionProvider(context, new FakeEmployeeDepartmentReader());
+        var provider = new EmployeeTasksOverdueWorkloadActionProvider(context, new FakeEmployeeDepartmentReader(), new FakeCurrentUser(null));
 
         var result = await provider.GetActionsAsync(companyId, new ClaimsPrincipal(new ClaimsIdentity()), CancellationToken.None);
 
@@ -85,7 +86,7 @@ public class TasksOverdueWorkloadActionProvidersTests
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
-        var provider = new EmployeeTasksOverdueWorkloadActionProvider(context, new FakeEmployeeDepartmentReader());
+        var provider = new EmployeeTasksOverdueWorkloadActionProvider(context, new FakeEmployeeDepartmentReader(), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -103,6 +104,7 @@ public class TasksOverdueWorkloadActionProvidersTests
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
 
         context.TaskItems.AddRange(
             CreateOverdueTask(companyId, Guid.NewGuid(), "Task A", Today.AddDays(-1)),
@@ -111,9 +113,9 @@ public class TasksOverdueWorkloadActionProvidersTests
 
         var provider = new ManagerTasksOverdueWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -134,7 +136,7 @@ public class TasksOverdueWorkloadActionProvidersTests
 
         var provider = new ManagerTasksOverdueWorkloadActionProvider(
             context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService());
+            new FakeAuthorizationService(), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -147,14 +149,15 @@ public class TasksOverdueWorkloadActionProvidersTests
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
         context.TaskItems.Add(CreateOverdueTask(companyId, Guid.NewGuid(), "Task", Today.AddDays(-1)));
         await context.SaveChangesAsync();
 
         var provider = new ManagerTasksOverdueWorkloadActionProvider(
             context, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService());
+            new FakeAuthorizationService(), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -169,7 +172,7 @@ public class TasksOverdueWorkloadActionProvidersTests
 
         var provider = new ManagerTasksOverdueWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService());
+            new FakeAuthorizationService(), new FakeCurrentUser(null));
 
         var result = await provider.GetActionsAsync(companyId, new ClaimsPrincipal(new ClaimsIdentity()), CancellationToken.None);
 
