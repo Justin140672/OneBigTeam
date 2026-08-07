@@ -81,8 +81,18 @@ public sealed class ContactDetailsTab(IPage page)
     public async Task<bool> IsSuccessBannerVisibleAsync() =>
         await page.Locator(".cd-success-banner").IsVisibleAsync();
 
-    public async Task<bool> HasValidationErrorAsync() =>
-        await page.Locator(".is-invalid").First.IsVisibleAsync();
+    public async Task<bool> HasValidationErrorAsync()
+    {
+        try
+        {
+            await page.Locator(".is-invalid").First.WaitForAsync(new() { Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// This tab has no per-field ".is-invalid" styling (see <see cref="HasValidationErrorAsync"/>) —

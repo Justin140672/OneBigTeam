@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using HR.Web.E2E.Tests.Infrastructure;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
@@ -12,9 +13,7 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/position-profiles");
         await page.WaitForSelectorAsync(".e-grid, .spinner-border, .alert-danger",
             new() { Timeout = 20_000 });
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
     }
 
     public async Task ClickNewPositionProfileAsync()
@@ -23,11 +22,11 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
         await page.WaitForURLAsync("**/position-profiles/new", new() { Timeout = 15_000 });
     }
 
-    public async Task<bool> HasPositionProfileAsync(string titleFragment) =>
-        await page.Locator(".e-rowcell")
+    public Task<bool> HasPositionProfileAsync(string titleFragment) =>
+        page.Locator(".e-rowcell")
             .Filter(new() { HasText = titleFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
 
     public async Task<IReadOnlyList<string>> GetPositionProfileTitlesAsync()
     {
@@ -67,9 +66,7 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
         await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await confirmButton.ClickAsync();
         // Wait for the grid to refresh.
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
     }
 
     public async Task<bool> IsActiveAsync(string title)
@@ -84,8 +81,6 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
     public async Task ShowInactiveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).ClickAsync();
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
     }
 }

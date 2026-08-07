@@ -1,10 +1,10 @@
-using System.Security.Claims;
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Recruitment.Features.CreateVacancy;
 
-internal sealed class Endpoint(CreateVacancyHandler handler)
+internal sealed class Endpoint(CreateVacancyHandler handler, ICurrentUser currentUser)
     : Endpoint<CreateVacancyRequest, CreateVacancyResponse>
 {
     public override void Configure()
@@ -18,13 +18,14 @@ internal sealed class Endpoint(CreateVacancyHandler handler)
         CancellationToken cancellationToken)
     {
         // Defence in depth alongside TenantRouteAuthorizationMiddleware (which already blocks any
-        // request whose route {companyId} doesn't match the caller's own company_id claim): mirrors
-        // the same explicit per-endpoint check used throughout the Documents/DataImport modules
-        // (e.g. CompleteSharedCompanyDocumentReview/Endpoint.cs) so this "manage"-policy write never
-        // trusts a client-supplied company identifier even if the route-level check is ever bypassed
-        // or refactored.
-        var companyClaim = User.FindFirstValue("company_id");
-        if (!Guid.TryParse(companyClaim, out var callerCompanyId) || callerCompanyId != request.CompanyId)
+        // request whose route {companyId} doesn't match the caller's resolved tenant): mirrors the
+        // same explicit per-endpoint check used throughout the Documents/DataImport modules (e.g.
+        // CompleteSharedCompanyDocumentReview/Endpoint.cs) so this "manage"-policy write never trusts
+        // a client-supplied company identifier even if the route-level check is ever bypassed or
+        // refactored. Reads the DB-resolved tenant via ICurrentUser, not a raw "company_id" JWT
+        // claim — real Supabase-issued tokens never carry one, so relying on the claim directly
+        // would Forbid every request unconditionally (see TenantRouteAuthorizationMiddleware).
+        if (!Guid.TryParse(currentUser.TenantId, out var callerCompanyId) || callerCompanyId != request.CompanyId)
         {
             await Send.ResultAsync(TypedResults.Forbid());
             return;

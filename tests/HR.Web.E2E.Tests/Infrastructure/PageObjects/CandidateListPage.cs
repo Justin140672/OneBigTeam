@@ -32,7 +32,7 @@ public sealed class CandidateListPage(IPage page, string baseUrl)
         return await page.Locator(".e-rowcell")
             .Filter(new() { HasText = nameFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
     }
 
     public async Task ClickCandidateAsync(string nameFragment)

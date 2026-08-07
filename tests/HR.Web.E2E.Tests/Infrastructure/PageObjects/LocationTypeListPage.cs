@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using HR.Web.E2E.Tests.Infrastructure;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
@@ -30,7 +31,7 @@ public sealed class LocationTypeListPage(IPage page, string baseUrl)
         return await page.Locator(".e-rowcell")
             .Filter(new() { HasText = nameFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
     }
 
     public async Task DeactivateAsync(string nameFragment)
@@ -51,9 +52,7 @@ public sealed class LocationTypeListPage(IPage page, string baseUrl)
         var confirmButton = page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true });
         await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await confirmButton.ClickAsync();
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
     }
 
     public async Task<bool> IsActiveAsync(string nameFragment)

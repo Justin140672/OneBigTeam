@@ -4,6 +4,8 @@ using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -130,6 +132,31 @@ public class UploadEmployeeDocumentEndpointTests
             BuildPdfUpload(AcmeContractTypeId, "Download Test"));
         uploadResponse.EnsureSuccessStatusCode();
         var uploaded = await uploadResponse.Content.ReadFromJsonAsync<UploadPayload>();
+
+        // Uploads are scanned asynchronously via a Hangfire job (ScanUploadedFileJob). Unlike
+        // most other tests in this suite, Hangfire's in-process server IS actually running here
+        // (AddHangfireServer), so the real job races with anything this test writes directly to
+        // the DB — poll instead of doing a one-shot manual write, and fall back to forcing Clean
+        // only if the job hasn't finished after a reasonable wait.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (true)
+            {
+                var current = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == uploaded!.DocumentId);
+                if (current.ScanStatus == HR.Modules.Documents.Domain.FileScanStatus.Clean)
+                    break;
+                if (DateTime.UtcNow >= deadline)
+                {
+                    var doc = await db.Documents.SingleAsync(d => d.Id == uploaded!.DocumentId);
+                    doc.MarkScanClean(DateTimeOffset.UtcNow);
+                    await db.SaveChangesAsync();
+                    break;
+                }
+                await Task.Delay(100);
+            }
+        }
 
         using var noRedirect = _factory.CreateClient(
             new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });

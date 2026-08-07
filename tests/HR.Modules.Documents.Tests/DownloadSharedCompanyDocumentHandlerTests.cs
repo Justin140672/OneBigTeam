@@ -21,6 +21,8 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
             null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
+        // Default download-success fixtures assume a clean scan.
+        doc.MarkScanClean(Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -41,6 +43,8 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
             null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
+        // Default download-success fixtures assume a clean scan.
+        doc.MarkScanClean(Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -64,6 +68,7 @@ public class DownloadSharedCompanyDocumentHandlerTests
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
             null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
+        doc.MarkScanClean(Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
             Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
@@ -128,6 +133,8 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Remote Working Policy", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
             null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
+        // Default download-success fixtures assume a clean scan.
+        doc.MarkScanClean(Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -154,6 +161,8 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
             null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
+        // Default download-success fixtures assume a clean scan.
+        doc.MarkScanClean(Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -163,6 +172,42 @@ public class DownloadSharedCompanyDocumentHandlerTests
             Guid.NewGuid(), callerCanManage: false, CancellationToken.None); // draft, not a manager
 
         Assert.Empty(audit.Published);
+    }
+
+    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
+    // but FileScanStatus is internal — pass the enum's underlying int value instead and cast.
+    [Theory]
+    [InlineData((int)FileScanStatus.Pending, "This document is currently being security checked.")]
+    [InlineData((int)FileScanStatus.Scanning, "This document is currently being security checked.")]
+    [InlineData((int)FileScanStatus.Infected, "This document failed a security scan.")]
+    [InlineData((int)FileScanStatus.Failed, "This document failed a security scan.")]
+    public async Task HandleAsync_Returns_Validation_When_Document_Is_Not_Clean(
+        int statusValue, string expectedMessage)
+    {
+        var status = (FileScanStatus)statusValue;
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
+        switch (status)
+        {
+            case FileScanStatus.Pending: break; // Create() defaults to Pending
+            case FileScanStatus.Scanning: doc.MarkScanning(Now); break;
+            case FileScanStatus.Infected: doc.MarkScanInfected("EICAR.Test.File", Now); break;
+            case FileScanStatus.Failed: doc.MarkScanFailed("scanner unreachable", Now); break;
+        }
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new DownloadSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
+            Guid.NewGuid(), callerCanManage: true, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Equal(expectedMessage, result.Error.Message);
     }
 
     private static readonly DateTime FixedUtcNow = new(2026, 7, 13, 10, 0, 0, DateTimeKind.Utc);

@@ -39,8 +39,18 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
-    public async Task<bool> HasErrorAsync() =>
-        await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
+    public async Task<bool> HasErrorAsync()
+    {
+        try
+        {
+            await page.Locator(".alert-danger, .validation-message").First.WaitForAsync(new() { Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>Returns true if the "hired and linked to an employee" banner is visible on the candidate detail page.</summary>
     public async Task<bool> HasHiredBannerAsync() =>

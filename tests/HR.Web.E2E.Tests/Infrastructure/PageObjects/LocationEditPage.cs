@@ -50,8 +50,18 @@ public sealed class LocationEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
-    public async Task<bool> HasErrorAsync() =>
-        await page.Locator(".alert-danger, .validation-message, .invalid-feedback").First.IsVisibleAsync();
+    public async Task<bool> HasErrorAsync()
+    {
+        try
+        {
+            await page.Locator(".alert-danger, .validation-message, .invalid-feedback").First.WaitForAsync(new() { Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     public async Task<string> GetNameAsync() =>
         await page.GetByPlaceholder("Location name").InputValueAsync();

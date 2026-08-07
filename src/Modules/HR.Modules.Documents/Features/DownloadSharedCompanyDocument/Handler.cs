@@ -41,6 +41,10 @@ internal sealed class DownloadSharedCompanyDocumentHandler(
                 return Result.Failure<Uri>(Error.NotFound($"Shared document '{request.DocumentId}' was not found."));
         }
 
+        var scanError = ScanStatusAccessGuard.CheckDownloadable(document.ScanStatus);
+        if (scanError is not null)
+            return Result.Failure<Uri>(scanError);
+
         var url = await storage.GetDownloadUrlAsync(document.CurrentFileReference, cancellationToken);
 
         // Record the download regardless of whether the caller is HR or an in-audience employee

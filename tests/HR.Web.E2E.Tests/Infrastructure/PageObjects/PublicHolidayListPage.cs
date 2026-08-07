@@ -23,11 +23,11 @@ public sealed class PublicHolidayListPage(IPage page, string baseUrl)
         await page.WaitForURLAsync("**/public-holidays/new", new() { Timeout = 15_000 });
     }
 
-    public async Task<bool> HasHolidayAsync(string nameFragment) =>
-        await page.Locator(".e-rowcell")
+    public Task<bool> HasHolidayAsync(string nameFragment) =>
+        page.Locator(".e-rowcell")
             .Filter(new() { HasText = nameFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
 
     public async Task<IReadOnlyList<string>> GetHolidayNamesAsync()
     {

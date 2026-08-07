@@ -142,6 +142,23 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
         builder.Property(d => d.ExpiredAt)
             .HasColumnName("expired_at");
 
+        builder.Property(d => d.ScanStatus)
+            .HasColumnName("scan_status")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(d => d.ScanCompletedAt)
+            .HasColumnName("scan_completed_at");
+
+        builder.Property(d => d.ScanAttemptCount)
+            .HasColumnName("scan_attempt_count")
+            .IsRequired();
+
+        builder.Property(d => d.ScanFailureReason)
+            .HasColumnName("scan_failure_reason")
+            .HasMaxLength(500);
+
         builder.HasOne<CompanyDocumentCategory>()
             .WithMany()
             .HasForeignKey(d => d.CategoryId)

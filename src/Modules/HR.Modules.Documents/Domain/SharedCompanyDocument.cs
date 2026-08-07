@@ -7,7 +7,7 @@ namespace HR.Modules.Documents.Domain;
 /// EF Core global query filter in this codebase, so tenant isolation is enforced per-handler,
 /// the same convention used everywhere else here.
 /// </summary>
-internal sealed class SharedCompanyDocument
+internal sealed class SharedCompanyDocument : IScannableFile
 {
     private SharedCompanyDocument() { }
 
@@ -75,6 +75,17 @@ internal sealed class SharedCompanyDocument
     public Guid? ExpiredBy { get; private set; }
     public DateTimeOffset? ExpiredAt { get; private set; }
 
+    public FileScanStatus ScanStatus { get; private set; }
+    public DateTimeOffset? ScanCompletedAt { get; private set; }
+    public int ScanAttemptCount { get; private set; }
+    public string? ScanFailureReason { get; private set; }
+
+    // SharedCompanyDocument has no single owning employee — this entity uses
+    // CurrentFileReference (not StorageKey) as its storage pointer, so IScannableFile.StorageKey
+    // is implemented via that property below.
+    Guid? IScannableFile.EmployeeId => null;
+    string IScannableFile.StorageKey => CurrentFileReference;
+
     public static SharedCompanyDocument Create(
         Guid id,
         Guid companyId,
@@ -121,6 +132,8 @@ internal sealed class SharedCompanyDocument
         UpdatedBy                = createdBy,
         CreatedAt                = now,
         UpdatedAt                = now,
+        ScanStatus                  = FileScanStatus.Pending,
+        ScanAttemptCount             = 0,
     };
 
     public void UpdateDetails(
@@ -188,6 +201,41 @@ internal sealed class SharedCompanyDocument
         ContentType          = contentType.Trim();
         VersionNumber++;
         UpdatedBy = updatedBy;
+        UpdatedAt = now;
+        ScanStatus        = FileScanStatus.Pending;
+        ScanCompletedAt   = null;
+        ScanFailureReason = null;
+        ScanAttemptCount  = 0;
+    }
+
+    public void MarkScanning(DateTimeOffset now)
+    {
+        ScanStatus = FileScanStatus.Scanning;
+        ScanAttemptCount++;
+        UpdatedAt = now;
+    }
+
+    public void MarkScanClean(DateTimeOffset now)
+    {
+        ScanStatus = FileScanStatus.Clean;
+        ScanCompletedAt = now;
+        ScanFailureReason = null;
+        UpdatedAt = now;
+    }
+
+    public void MarkScanInfected(string threatName, DateTimeOffset now)
+    {
+        ScanStatus = FileScanStatus.Infected;
+        ScanCompletedAt = now;
+        ScanFailureReason = threatName;
+        UpdatedAt = now;
+    }
+
+    public void MarkScanFailed(string reason, DateTimeOffset now)
+    {
+        ScanStatus = FileScanStatus.Failed;
+        ScanCompletedAt = now;
+        ScanFailureReason = reason;
         UpdatedAt = now;
     }
 

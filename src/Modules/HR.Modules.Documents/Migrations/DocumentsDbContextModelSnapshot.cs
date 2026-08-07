@@ -18,7 +18,7 @@ namespace HR.Modules.Documents.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("documents")
-                .HasAnnotation("ProductVersion", "10.0.9")
+                .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -104,6 +104,25 @@ namespace HR.Modules.Documents.Migrations
                     b.Property<long>("FileSize")
                         .HasColumnType("bigint")
                         .HasColumnName("file_size");
+
+                    b.Property<int>("ScanAttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("scan_attempt_count");
+
+                    b.Property<DateTimeOffset?>("ScanCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scan_completed_at");
+
+                    b.Property<string>("ScanFailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("scan_failure_reason");
+
+                    b.Property<string>("ScanStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("scan_status");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -356,6 +375,25 @@ namespace HR.Modules.Documents.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("file_size");
 
+                    b.Property<int>("ScanAttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("scan_attempt_count");
+
+                    b.Property<DateTimeOffset?>("ScanCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scan_completed_at");
+
+                    b.Property<string>("ScanFailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("scan_failure_reason");
+
+                    b.Property<string>("ScanStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("scan_status");
+
                     b.Property<string>("StorageKey")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -413,6 +451,25 @@ namespace HR.Modules.Documents.Migrations
                     b.Property<long>("FileSize")
                         .HasColumnType("bigint")
                         .HasColumnName("file_size");
+
+                    b.Property<int>("ScanAttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("scan_attempt_count");
+
+                    b.Property<DateTimeOffset?>("ScanCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scan_completed_at");
+
+                    b.Property<string>("ScanFailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("scan_failure_reason");
+
+                    b.Property<string>("ScanStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("scan_status");
 
                     b.Property<string>("StorageKey")
                         .IsRequired()
@@ -563,6 +620,25 @@ namespace HR.Modules.Documents.Migrations
                     b.Property<Guid?>("ReviewOwnerEmployeeId")
                         .HasColumnType("uuid")
                         .HasColumnName("review_owner_employee_id");
+
+                    b.Property<int>("ScanAttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("scan_attempt_count");
+
+                    b.Property<DateTimeOffset?>("ScanCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scan_completed_at");
+
+                    b.Property<string>("ScanFailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("scan_failure_reason");
+
+                    b.Property<string>("ScanStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("scan_status");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -783,6 +859,25 @@ namespace HR.Modules.Documents.Migrations
                     b.Property<bool>("RequiresAcknowledgement")
                         .HasColumnType("boolean")
                         .HasColumnName("requires_acknowledgement");
+
+                    b.Property<int>("ScanAttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("scan_attempt_count");
+
+                    b.Property<DateTimeOffset?>("ScanCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scan_completed_at");
+
+                    b.Property<string>("ScanFailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("scan_failure_reason");
+
+                    b.Property<string>("ScanStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("scan_status");
 
                     b.Property<Guid>("SharedCompanyDocumentId")
                         .HasColumnType("uuid")

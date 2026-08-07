@@ -1,7 +1,10 @@
 using System.Security.Claims;
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+
+using IAuthorizationService = Microsoft.AspNetCore.Authorization.IAuthorizationService;
 
 namespace HR.Modules.DataImport.Features.UploadImportFile;
 
@@ -10,7 +13,7 @@ namespace HR.Modules.DataImport.Features.UploadImportFile;
 // bulk/administrative HR operations across other modules (e.g. CreateEmployee, CreateAssetCategory,
 // UploadEmployeeDocument's manager path). If a more granular data-import permission is introduced
 // later, this endpoint should be updated to use it instead.
-internal sealed class Endpoint(UploadImportFileHandler handler, IAuthorizationService authorizationService)
+internal sealed class Endpoint(UploadImportFileHandler handler, IAuthorizationService authorizationService, ICurrentUser currentUser)
     : Endpoint<UploadImportFileRequest, UploadImportFileResponse>
 {
     public override void Configure()
@@ -30,9 +33,11 @@ internal sealed class Endpoint(UploadImportFileHandler handler, IAuthorizationSe
             return;
         }
 
-        // Verify the caller belongs to the company in the route.
-        var companyClaim = User.FindFirstValue("company_id");
-        if (!Guid.TryParse(companyClaim, out var callerCompanyId) || callerCompanyId != request.CompanyId)
+        // Verify the caller belongs to the company in the route. Reads the DB-resolved tenant via
+        // ICurrentUser, not a raw "company_id" JWT claim — real Supabase-issued tokens never carry
+        // one, so relying on the claim directly would Forbid every request unconditionally (see
+        // TenantRouteAuthorizationMiddleware).
+        if (!Guid.TryParse(currentUser.TenantId, out var callerCompanyId) || callerCompanyId != request.CompanyId)
         {
             await Send.ResultAsync(TypedResults.Forbid());
             return;

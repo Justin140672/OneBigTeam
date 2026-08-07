@@ -1,11 +1,14 @@
 using System.Security.Claims;
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
+using IAuthorizationService = Microsoft.AspNetCore.Authorization.IAuthorizationService;
+
 namespace HR.Modules.Documents.Features.CancelDocumentRequest;
 
-internal sealed class Endpoint(CancelDocumentRequestHandler handler, IAuthorizationService authorizationService)
+internal sealed class Endpoint(CancelDocumentRequestHandler handler, IAuthorizationService authorizationService, ICurrentUser currentUser)
     : Endpoint<CancelDocumentRequestRequest>
 {
     public override void Configure()
@@ -22,8 +25,10 @@ internal sealed class Endpoint(CancelDocumentRequestHandler handler, IAuthorizat
             return;
         }
 
-        var companyClaim = User.FindFirstValue("company_id");
-        if (!Guid.TryParse(companyClaim, out var callerCompanyId) || callerCompanyId != request.CompanyId)
+        // Reads the DB-resolved tenant via ICurrentUser, not a raw "company_id" JWT claim — real
+        // Supabase-issued tokens never carry one, so relying on the claim directly would Forbid
+        // every request unconditionally (see TenantRouteAuthorizationMiddleware).
+        if (!Guid.TryParse(currentUser.TenantId, out var callerCompanyId) || callerCompanyId != request.CompanyId)
         {
             await Send.ResultAsync(TypedResults.Forbid());
             return;

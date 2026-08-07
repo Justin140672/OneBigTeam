@@ -30,11 +30,16 @@ internal sealed class DownloadEmployeeDocumentHandler(
                 d.FileName,
                 DocumentTypeName = dt.Name,
                 ed.Id,
+                d.ScanStatus,
             }
         ).FirstOrDefaultAsync(cancellationToken);
 
         if (row is null)
             return Result.Failure<Uri>(Error.NotFound("Employee document was not found."));
+
+        var scanError = ScanStatusAccessGuard.CheckDownloadable(row.ScanStatus);
+        if (scanError is not null)
+            return Result.Failure<Uri>(scanError);
 
         var url = await storage.GetDownloadUrlAsync(row.StorageKey, cancellationToken);
 

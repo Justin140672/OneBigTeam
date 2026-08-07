@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -132,6 +134,18 @@ public class GetEmployeeProfilePhotoEndpointTests
             BuildPngUpload("avatar.png"));
         Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
 
+        // Uploads are now scanned asynchronously via a Hangfire job (ScanUploadedFileJob), which
+        // never actually runs inside this integration test — simulate a completed Clean scan
+        // directly so this read test doesn't need to know about ScanStatusAccessGuard (that guard
+        // itself is covered by dedicated tests).
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
+            var photo = await db.EmployeeProfilePhotos.SingleAsync(p => p.CompanyId == companyId && p.EmployeeId == employeeId);
+            photo.MarkScanClean(DateTimeOffset.UtcNow);
+            await db.SaveChangesAsync();
+        }
+
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo");
 
@@ -145,6 +159,27 @@ public class GetEmployeeProfilePhotoEndpointTests
         Assert.Equal("avatar.png", payload.FileName);
         Assert.Equal("image/png", payload.ContentType);
         Assert.False(string.IsNullOrWhiteSpace(payload.DownloadUrl));
+    }
+
+    [Fact]
+    public async Task Get_Returns_NotFound_While_Photo_Scan_Is_Pending()
+    {
+        // A freshly uploaded photo starts life Pending — ScanUploadedFileJob (Hangfire) never
+        // actually runs inside this integration test, so it stays Pending until something marks
+        // it otherwise.
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        using var client = await ManagerClient(companyId);
+
+        var upload = await client.PostAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/profile-photo",
+            BuildPngUpload("avatar.png"));
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/profile-photo");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────

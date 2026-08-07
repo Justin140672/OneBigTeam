@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Persistence;
+using HR.Modules.Documents.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,6 +23,10 @@ internal sealed class GetPendingProfilePhotoHandler(
         if (pendingPhoto is null)
             return Result.Failure<GetPendingProfilePhotoResponse>(
                 Error.NotFound("No pending profile photo submission was found."));
+
+        var scanError = ScanStatusAccessGuard.CheckDownloadable(pendingPhoto.ScanStatus);
+        if (scanError is not null)
+            return Result.Failure<GetPendingProfilePhotoResponse>(scanError);
 
         var downloadUrl = await storage.GetDownloadUrlAsync(pendingPhoto.StorageKey, cancellationToken);
 

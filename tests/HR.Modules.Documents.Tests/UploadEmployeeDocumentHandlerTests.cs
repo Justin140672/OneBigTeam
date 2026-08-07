@@ -22,17 +22,16 @@ public class UploadEmployeeDocumentHandlerTests
     private static UploadEmployeeDocumentHandler BuildHandler(
         DocumentsDbContext db,
         FakeDocumentStorageService? storage = null,
-        FakeVirusScanService? scanner = null,
         FileUploadOptions? options = null,
         FakeAuditPublisher? auditPublisher = null,
         HR.SharedKernel.IIntegrationEventPublisher? integrationEventPublisher = null) =>
         new(db,
             storage ?? new FakeDocumentStorageService(),
             new FileUploadValidator(Options.Create(options ?? new FileUploadOptions())),
-            scanner ?? new FakeVirusScanService(),
             new FakeClock(FixedUtcNow),
             auditPublisher ?? new FakeAuditPublisher(),
-            integrationEventPublisher ?? new NoOpIntegrationEventPublisher());
+            integrationEventPublisher ?? new NoOpIntegrationEventPublisher(),
+            new NoOpBackgroundJobClient());
 
     [Fact]
     public async Task HandleAsync_Publishes_EmployeeDocumentUploaded_IntegrationEvent()
@@ -264,22 +263,49 @@ public class UploadEmployeeDocumentHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_Validation_When_File_Is_Infected()
+    public async Task HandleAsync_Stores_Document_With_Pending_ScanStatus()
     {
+        // Virus scanning now happens asynchronously (ScanUploadedFileJob, enqueued after
+        // persistence) rather than inline during upload — the upload itself always succeeds and
+        // the new row starts life as Pending.
         await using var db = BuildContext();
         var companyId      = Guid.NewGuid();
         var docType        = await SeedDocumentType(db, companyId);
-        var scanner        = new FakeVirusScanService { ReturnInfected = true, ThreatName = "EICAR.Test.File" };
-        var handler        = BuildHandler(db, scanner: scanner);
+        var handler        = BuildHandler(db);
 
         var result = await handler.HandleAsync(
             BuildRequest(companyId, Guid.NewGuid(), docType.Id),
             Guid.NewGuid(),
             CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("validation", result.Error.Code);
-        Assert.Contains("EICAR.Test.File", result.Error.Message);
+        Assert.True(result.IsSuccess);
+        var stored = await db.Documents.SingleAsync(d => d.Id == result.Value!.DocumentId);
+        Assert.Equal(FileScanStatus.Pending, stored.ScanStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Enqueues_ScanUploadedFileJob_On_Success()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var docType        = await SeedDocumentType(db, companyId);
+        var backgroundJobs = new SpyBackgroundJobClient();
+        var handler         = new UploadEmployeeDocumentHandler(
+            db,
+            new FakeDocumentStorageService(),
+            new FileUploadValidator(Options.Create(new FileUploadOptions())),
+            new FakeClock(FixedUtcNow),
+            new FakeAuditPublisher(),
+            new NoOpIntegrationEventPublisher(),
+            backgroundJobs);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, Guid.NewGuid(), docType.Id),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(backgroundJobs.CreatedJobs);
     }
 
     [Fact]

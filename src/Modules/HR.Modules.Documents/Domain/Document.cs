@@ -1,6 +1,6 @@
 namespace HR.Modules.Documents.Domain;
 
-internal sealed class Document
+internal sealed class Document : IScannableFile
 {
     private Document() { }
 
@@ -19,6 +19,11 @@ internal sealed class Document
     public Guid UploadedBy { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    public FileScanStatus ScanStatus { get; private set; }
+    public DateTimeOffset? ScanCompletedAt { get; private set; }
+    public int ScanAttemptCount { get; private set; }
+    public string? ScanFailureReason { get; private set; }
 
     public static Document Create(
         Guid id,
@@ -50,7 +55,40 @@ internal sealed class Document
         UploadedBy     = uploadedBy,
         CreatedAt      = now,
         UpdatedAt      = now,
+        ScanStatus       = FileScanStatus.Pending,
+        ScanAttemptCount = 0,
     };
+
+    public void MarkScanning(DateTimeOffset now)
+    {
+        ScanStatus = FileScanStatus.Scanning;
+        ScanAttemptCount++;
+        UpdatedAt = now;
+    }
+
+    public void MarkScanClean(DateTimeOffset now)
+    {
+        ScanStatus = FileScanStatus.Clean;
+        ScanCompletedAt = now;
+        ScanFailureReason = null;
+        UpdatedAt = now;
+    }
+
+    public void MarkScanInfected(string threatName, DateTimeOffset now)
+    {
+        ScanStatus = FileScanStatus.Infected;
+        ScanCompletedAt = now;
+        ScanFailureReason = threatName;
+        UpdatedAt = now;
+    }
+
+    public void MarkScanFailed(string reason, DateTimeOffset now)
+    {
+        ScanStatus = FileScanStatus.Failed;
+        ScanCompletedAt = now;
+        ScanFailureReason = reason;
+        UpdatedAt = now;
+    }
 
     public void UpdateDetails(
         string title,

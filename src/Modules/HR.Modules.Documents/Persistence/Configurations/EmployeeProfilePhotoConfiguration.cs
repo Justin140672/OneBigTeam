@@ -55,6 +55,23 @@ internal sealed class EmployeeProfilePhotoConfiguration : IEntityTypeConfigurati
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property(p => p.ScanStatus)
+            .HasColumnName("scan_status")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(p => p.ScanCompletedAt)
+            .HasColumnName("scan_completed_at");
+
+        builder.Property(p => p.ScanAttemptCount)
+            .HasColumnName("scan_attempt_count")
+            .IsRequired();
+
+        builder.Property(p => p.ScanFailureReason)
+            .HasColumnName("scan_failure_reason")
+            .HasMaxLength(500);
+
         builder.HasIndex(p => new { p.CompanyId, p.EmployeeId });
         builder.HasIndex(p => p.EmployeeId).IsUnique();
     }

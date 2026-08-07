@@ -1,4 +1,6 @@
+using Hangfire;
 using HR.Modules.Documents.Domain;
+using HR.Modules.Documents.Jobs;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.Infrastructure.Abstractions;
@@ -11,10 +13,10 @@ internal sealed class UploadRequestedDocumentHandler(
     DocumentsDbContext db,
     IDocumentStorageService storage,
     IFileUploadValidator fileValidator,
-    IVirusScanService virusScanner,
     ITaskCompleter taskCompleter,
     IClock clock,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    IBackgroundJobClient backgroundJobClient)
 {
     public async Task<Result<UploadRequestedDocumentResponse>> HandleAsync(
         UploadRequestedDocumentRequest request,
@@ -57,13 +59,8 @@ internal sealed class UploadRequestedDocumentHandler(
 
         await using var fileStream = file.OpenReadStream();
 
-        var scanResult = await virusScanner.ScanAsync(fileStream, file.FileName, cancellationToken);
-        if (!scanResult.IsClean)
-            return Result.Failure<UploadRequestedDocumentResponse>(
-                Error.Validation($"File was rejected: {scanResult.ThreatName}."));
-
-        fileStream.Seek(0, SeekOrigin.Begin);
-
+        // Virus scanning happens asynchronously via ScanUploadedFileJob (enqueued below) rather
+        // than inline — the row is stored with ScanStatus = Pending.
         var contentResult = fileValidator.ValidateContent(fileStream, file.ContentType);
         if (contentResult.IsFailure)
             return Result.Failure<UploadRequestedDocumentResponse>(contentResult.Error);
@@ -148,6 +145,9 @@ internal sealed class UploadRequestedDocumentHandler(
             documentType.Name,
             uploadedBy,
             now), cancellationToken);
+
+        backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
+            job.ExecuteAsync(FileScanTargetType.Document, document.Id, document.CompanyId, null));
 
         return Result.Success(new UploadRequestedDocumentResponse(
             document.Id,

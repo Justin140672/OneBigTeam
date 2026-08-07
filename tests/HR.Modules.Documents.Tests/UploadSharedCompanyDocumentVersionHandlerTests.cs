@@ -25,23 +25,23 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
     private static UploadSharedCompanyDocumentVersionHandler BuildHandler(
         DocumentsDbContext db,
         FakeDocumentStorageService? storage = null,
-        FakeVirusScanService? scanner = null,
         FakeEmployeeAudienceReader? audienceReader = null,
         FakeTaskCreator? taskCreator = null,
         FakeTaskCanceller? taskCanceller = null,
         FakeNotificationWriter? notificationWriter = null,
         FileUploadOptions? options = null,
-        FakeAuditPublisher? auditPublisher = null) =>
+        FakeAuditPublisher? auditPublisher = null,
+        Hangfire.IBackgroundJobClient? backgroundJobClient = null) =>
         new(db,
             storage ?? new FakeDocumentStorageService(),
             new FileUploadValidator(Options.Create(options ?? new FileUploadOptions())),
-            scanner ?? new FakeVirusScanService(),
             new SharedCompanyDocumentAudienceMatcher(db, audienceReader ?? new FakeEmployeeAudienceReader()),
             taskCreator ?? new FakeTaskCreator(),
             taskCanceller ?? new FakeTaskCanceller(),
             notificationWriter ?? new FakeNotificationWriter(),
             auditPublisher ?? new FakeAuditPublisher(),
-            new FakeClock(FixedUtcNow));
+            new FakeClock(FixedUtcNow),
+            backgroundJobClient ?? new NoOpBackgroundJobClient());
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")
@@ -193,6 +193,49 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Stores_New_Version_With_Pending_ScanStatus()
+    {
+        // Virus scanning now happens asynchronously (ScanUploadedFileJob, enqueued after
+        // persistence) rather than inline during upload.
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var doc        = await SeedDocument(db, companyId, category.Id);
+        var handler    = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, doc.Id),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var stored = await db.SharedCompanyDocumentVersions
+            .SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == result.Value!.VersionNumber);
+        Assert.Equal(FileScanStatus.Pending, stored.ScanStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Enqueues_ScanUploadedFileJob_On_Success()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var doc        = await SeedDocument(db, companyId, category.Id);
+        var backgroundJobs = new SpyBackgroundJobClient();
+        var handler          = BuildHandler(db, backgroundJobClient: backgroundJobs);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, doc.Id),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        // Uploading a new version enqueues a scan job for both the document (whose
+        // CurrentFileReference/ScanStatus were just reset to Pending) and the new version row.
+        Assert.Equal(2, backgroundJobs.CreatedJobs.Count);
     }
 
     [Fact]

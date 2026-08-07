@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using HR.Web.E2E.Tests.Infrastructure;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
@@ -33,7 +34,7 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         return await page.Locator(".e-rowcell")
             .Filter(new() { HasText = nameFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
     }
 
     private ILocator Row(string nameFragment) =>
@@ -94,18 +95,14 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
     public async Task MoveUpAsync(string nameFragment)
     {
         await Row(nameFragment).Locator("button[title='Move up']").ClickAsync();
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
     public async Task MoveDownAsync(string nameFragment)
     {
         await Row(nameFragment).Locator("button[title='Move down']").ClickAsync();
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
@@ -123,9 +120,7 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         var confirmButton = page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true });
         await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await confirmButton.ClickAsync();
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
     }
 
     public async Task ActivateAsync(string nameFragment)
@@ -139,9 +134,7 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Activate", Exact = true });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
     }
 
     public Task ShowInactiveAsync()

@@ -34,6 +34,10 @@ internal sealed class DownloadSharedCompanyDocumentVersionHandler(
         if (version is null)
             return Result.Failure<Uri>(Error.NotFound($"Version '{request.VersionNumber}' of shared document '{request.DocumentId}' was not found."));
 
+        var scanError = ScanStatusAccessGuard.CheckDownloadable(version.ScanStatus);
+        if (scanError is not null)
+            return Result.Failure<Uri>(scanError);
+
         var url = await storage.GetDownloadUrlAsync(version.FileReference, cancellationToken);
 
         // Record the download of this specific past version, with that version's own

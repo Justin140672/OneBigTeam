@@ -1,10 +1,11 @@
 using System.Security.Claims;
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Features.DownloadSharedCompanyDocumentVersion;
 
-internal sealed class Endpoint(DownloadSharedCompanyDocumentVersionHandler handler)
+internal sealed class Endpoint(DownloadSharedCompanyDocumentVersionHandler handler, ICurrentUser currentUser)
     : Endpoint<DownloadSharedCompanyDocumentVersionRequest>
 {
     public override void Configure()
@@ -29,8 +30,10 @@ internal sealed class Endpoint(DownloadSharedCompanyDocumentVersionHandler handl
         // route, on top of the global TenantRouteAuthorizationMiddleware — same pattern as
         // DownloadSharedCompanyDocument, since this endpoint hands back a real (if time-limited)
         // download URL and deserves the same care as a mutation.
-        var companyClaim = User.FindFirstValue("company_id");
-        if (!Guid.TryParse(companyClaim, out var callerCompanyId) || callerCompanyId != request.CompanyId)
+        // Reads the DB-resolved tenant via ICurrentUser, not a raw "company_id" JWT claim — real
+        // Supabase-issued tokens never carry one, so relying on the claim directly would Forbid
+        // every request unconditionally (see TenantRouteAuthorizationMiddleware).
+        if (!Guid.TryParse(currentUser.TenantId, out var callerCompanyId) || callerCompanyId != request.CompanyId)
         {
             await Send.ResultAsync(TypedResults.Forbid());
             return;

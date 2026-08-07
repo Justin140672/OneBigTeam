@@ -784,6 +784,39 @@ public class SharedCompanyDocumentEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Download_Returns_Unauthorized_Without_Auth()
+    {
+        using var client = _factory.CreateClient();
+        var response      = await client.GetAsync(
+            $"/api/companies/{Guid.NewGuid()}/shared-documents/{Guid.NewGuid()}/download");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Download_Returns_NotFound_While_Document_Scan_Is_Pending()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = await ClientAs(companyId, userId, allowAutoRedirect: false);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
+            var stored = await db.SharedCompanyDocuments.SingleAsync(d => d.Id == doc!.Id);
+            stored.MarkScanning(DateTimeOffset.UtcNow); // UploadAsync helper marks Clean by default; revert to a not-yet-Clean state.
+            await db.SaveChangesAsync();
+        }
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/download");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     // ── UpdateSharedCompanyDocumentMetadata ─────────────────────────────────────
 
     [Fact]
@@ -1549,6 +1582,41 @@ public class SharedCompanyDocumentEndpointTests
     // ── DownloadSharedCompanyDocumentVersion ────────────────────────────────────
 
     [Fact]
+    public async Task DownloadVersion_Returns_Unauthorized_Without_Auth()
+    {
+        using var client = _factory.CreateClient();
+        var response      = await client.GetAsync(
+            $"/api/companies/{Guid.NewGuid()}/shared-documents/{Guid.NewGuid()}/versions/1/download");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DownloadVersion_Returns_NotFound_While_Version_Scan_Is_Pending()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = await ClientAs(companyId, userId, allowAutoRedirect: false);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
+            var version = await db.SharedCompanyDocumentVersions
+                .SingleAsync(v => v.SharedCompanyDocumentId == doc!.Id && v.VersionNumber == 1);
+            version.MarkScanning(DateTimeOffset.UtcNow); // UploadAsync helper marks Clean by default; revert.
+            await db.SaveChangesAsync();
+        }
+
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions/1/download");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task DownloadVersion_Returns_Forbidden_For_Manager()
     {
         var companyId = Guid.NewGuid();
@@ -1976,7 +2044,24 @@ public class SharedCompanyDocumentEndpointTests
                 requiresAcknowledgement, acknowledgementDueDate, acknowledgementStatement));
         DocumentPayload? payload = null;
         if (response.IsSuccessStatusCode)
+        {
             payload = await response.Content.ReadFromJsonAsync<DocumentPayload>();
+
+            // Uploads are now scanned asynchronously via a Hangfire job (ScanUploadedFileJob),
+            // which never actually runs inside these integration tests — simulate a completed
+            // Clean scan directly so download/read tests exercised here don't need to know about
+            // ScanStatusAccessGuard (that guard itself is covered by dedicated tests).
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
+            var doc = await db.SharedCompanyDocuments.SingleAsync(d => d.Id == payload!.Id);
+            doc.MarkScanClean(DateTimeOffset.UtcNow);
+            var version = await db.SharedCompanyDocumentVersions
+                .Where(v => v.SharedCompanyDocumentId == payload!.Id)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstAsync();
+            version.MarkScanClean(DateTimeOffset.UtcNow);
+            await db.SaveChangesAsync();
+        }
         return (payload, response);
     }
 

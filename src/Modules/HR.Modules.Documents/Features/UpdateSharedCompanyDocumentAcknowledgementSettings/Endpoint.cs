@@ -1,10 +1,11 @@
 using System.Security.Claims;
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Features.UpdateSharedCompanyDocumentAcknowledgementSettings;
 
-internal sealed class Endpoint(UpdateSharedCompanyDocumentAcknowledgementSettingsHandler handler)
+internal sealed class Endpoint(UpdateSharedCompanyDocumentAcknowledgementSettingsHandler handler, ICurrentUser currentUser)
     : Endpoint<UpdateSharedCompanyDocumentAcknowledgementSettingsRequest, UpdateSharedCompanyDocumentAcknowledgementSettingsResponse>
 {
     public override void Configure()
@@ -23,8 +24,10 @@ internal sealed class Endpoint(UpdateSharedCompanyDocumentAcknowledgementSetting
             return;
         }
 
-        var companyClaim = User.FindFirstValue("company_id");
-        if (!Guid.TryParse(companyClaim, out var callerCompanyId) || callerCompanyId != request.CompanyId)
+        // Reads the DB-resolved tenant via ICurrentUser, not a raw "company_id" JWT claim — real
+        // Supabase-issued tokens never carry one, so relying on the claim directly would Forbid
+        // every request unconditionally (see TenantRouteAuthorizationMiddleware).
+        if (!Guid.TryParse(currentUser.TenantId, out var callerCompanyId) || callerCompanyId != request.CompanyId)
         {
             await Send.ResultAsync(TypedResults.Forbid());
             return;

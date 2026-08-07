@@ -411,8 +411,18 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public Task ClickSaveButtonAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
 
-    public async Task<bool> HasErrorAsync() =>
-        await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
+    public async Task<bool> HasErrorAsync()
+    {
+        try
+        {
+            await page.Locator(".alert-danger, .validation-message").First.WaitForAsync(new() { Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Reads the current value of the (now-optional) "Advert Title (optional)" field itself —

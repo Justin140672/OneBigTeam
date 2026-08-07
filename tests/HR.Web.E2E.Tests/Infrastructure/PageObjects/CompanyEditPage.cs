@@ -88,13 +88,21 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
     }
 
-    public async Task<bool> HasErrorAsync() =>
-        await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
+    public async Task<bool> HasErrorAsync()
+    {
+        try
+        {
+            await page.Locator(".alert-danger, .validation-message").First.WaitForAsync(new() { Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>Fills the company Name field on the Profile tab.</summary>
     public Task FillCompanyNameInputAsync(string value) =>

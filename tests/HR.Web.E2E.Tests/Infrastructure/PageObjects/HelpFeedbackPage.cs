@@ -59,7 +59,7 @@ public sealed class HelpFeedbackPage(IPage page, string baseUrl)
         return await SubmissionsCard.Locator(".list-group-item")
             .Filter(new() { HasText = titleFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
     }
 
     public async Task OpenSubmissionAsync(string titleFragment)

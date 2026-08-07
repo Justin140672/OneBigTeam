@@ -24,4 +24,30 @@ public static class LocatorExtensions
             return false;
         }
     }
+
+    /// <summary>
+    /// Waits out a Blazor Server "busy" round trip after clicking a save/confirm/deactivate button,
+    /// without the classic race of checking "spinner gone" as the only condition. A bare
+    /// WaitForFunctionAsync("!spinner || !visible") can resolve the instant it's called if the
+    /// spinner's own render patch hasn't reached the browser yet over SignalR — i.e. it reads
+    /// "hasn't started" as "already finished", and callers move on to assert new state before the
+    /// server has actually applied it. Waiting for the spinner to appear first (tolerating it never
+    /// showing, for round trips fast enough to skip a visible frame) then waiting for it to clear
+    /// closes that gap.
+    /// </summary>
+    public static async Task WaitForSpinnerToClearAsync(this IPage page, int appearTimeoutMs = 2_000, int clearTimeoutMs = 15_000)
+    {
+        try
+        {
+            await page.Locator(".spinner-border").First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = appearTimeoutMs });
+        }
+        catch (TimeoutException)
+        {
+            // Round trip completed before a spinner frame ever rendered — nothing to wait out.
+        }
+
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = clearTimeoutMs });
+    }
 }

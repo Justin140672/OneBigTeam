@@ -5,7 +5,7 @@ namespace HR.Modules.Documents.Domain;
 /// is written every time the document is created or its file is replaced, so "version history"
 /// is always a complete list (including the current version), not just past ones.
 /// </summary>
-internal sealed class SharedCompanyDocumentVersion
+internal sealed class SharedCompanyDocumentVersion : IScannableFile
 {
     private SharedCompanyDocumentVersion() { }
 
@@ -38,6 +38,14 @@ internal sealed class SharedCompanyDocumentVersion
     // change what earlier versions recorded here.
     public string? AcknowledgementStatement { get; private set; }
 
+    public FileScanStatus ScanStatus { get; private set; }
+    public DateTimeOffset? ScanCompletedAt { get; private set; }
+    public int ScanAttemptCount { get; private set; }
+    public string? ScanFailureReason { get; private set; }
+
+    Guid? IScannableFile.EmployeeId => null;
+    string IScannableFile.StorageKey => FileReference;
+
     public static SharedCompanyDocumentVersion Create(
         Guid id,
         Guid companyId,
@@ -68,5 +76,34 @@ internal sealed class SharedCompanyDocumentVersion
         RequiresAcknowledgement = requiresAcknowledgement,
         EffectiveDate           = effectiveDate,
         AcknowledgementStatement = string.IsNullOrWhiteSpace(acknowledgementStatement) ? null : acknowledgementStatement.Trim(),
+        ScanStatus               = FileScanStatus.Pending,
+        ScanAttemptCount         = 0,
     };
+
+    public void MarkScanning(DateTimeOffset now)
+    {
+        ScanStatus = FileScanStatus.Scanning;
+        ScanAttemptCount++;
+    }
+
+    public void MarkScanClean(DateTimeOffset now)
+    {
+        ScanStatus = FileScanStatus.Clean;
+        ScanCompletedAt = now;
+        ScanFailureReason = null;
+    }
+
+    public void MarkScanInfected(string threatName, DateTimeOffset now)
+    {
+        ScanStatus = FileScanStatus.Infected;
+        ScanCompletedAt = now;
+        ScanFailureReason = threatName;
+    }
+
+    public void MarkScanFailed(string reason, DateTimeOffset now)
+    {
+        ScanStatus = FileScanStatus.Failed;
+        ScanCompletedAt = now;
+        ScanFailureReason = reason;
+    }
 }

@@ -23,6 +23,8 @@ public class GetEmployeeProfilePhotoHandlerTests
         var photo = EmployeeProfilePhoto.Create(
             Guid.NewGuid(), companyId, employeeId, "avatar.png", 333, "image/png",
             storageKey, employeeId, DateTimeOffset.UtcNow);
+        // Default download-success fixtures assume a clean scan.
+        photo.MarkScanClean(DateTimeOffset.UtcNow);
         db.EmployeeProfilePhotos.Add(photo);
         db.SaveChanges();
         return photo;
@@ -103,5 +105,44 @@ public class GetEmployeeProfilePhotoHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+    }
+
+    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
+    // but FileScanStatus is internal — pass the enum's underlying int value instead and cast.
+    [Theory]
+    [InlineData((int)FileScanStatus.Pending, "This document is currently being security checked.")]
+    [InlineData((int)FileScanStatus.Scanning, "This document is currently being security checked.")]
+    [InlineData((int)FileScanStatus.Infected, "This document failed a security scan.")]
+    [InlineData((int)FileScanStatus.Failed, "This document failed a security scan.")]
+    public async Task HandleAsync_Returns_Validation_When_Photo_Is_Not_Clean(
+        int statusValue, string expectedMessage)
+    {
+        var status = (FileScanStatus)statusValue;
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var photo = EmployeeProfilePhoto.Create(
+            Guid.NewGuid(), companyId, employeeId, "avatar.png", 333, "image/png",
+            "employees/key.png", employeeId, DateTimeOffset.UtcNow);
+        switch (status)
+        {
+            case FileScanStatus.Pending: break; // Create() defaults to Pending
+            case FileScanStatus.Scanning: photo.MarkScanning(DateTimeOffset.UtcNow); break;
+            case FileScanStatus.Infected: photo.MarkScanInfected("EICAR.Test.File", DateTimeOffset.UtcNow); break;
+            case FileScanStatus.Failed: photo.MarkScanFailed("scanner unreachable", DateTimeOffset.UtcNow); break;
+        }
+        db.EmployeeProfilePhotos.Add(photo);
+        db.SaveChanges();
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeProfilePhotoRequest(companyId, employeeId),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Equal(expectedMessage, result.Error.Message);
     }
 }

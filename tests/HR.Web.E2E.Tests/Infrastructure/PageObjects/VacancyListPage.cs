@@ -61,7 +61,7 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
         return await page.Locator(".e-rowcell")
             .Filter(new() { HasText = titleFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
     }
 
     public async Task SearchAsync(string query)

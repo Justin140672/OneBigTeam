@@ -1,4 +1,6 @@
+using Hangfire;
 using HR.Modules.Documents.Domain;
+using HR.Modules.Documents.Jobs;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.SharedKernel;
@@ -10,10 +12,10 @@ internal sealed class UploadEmployeeDocumentHandler(
     DocumentsDbContext db,
     IDocumentStorageService storage,
     IFileUploadValidator fileValidator,
-    IVirusScanService virusScanner,
     IClock clock,
     IAuditEventPublisher auditPublisher,
-    IIntegrationEventPublisher integrationEventPublisher)
+    IIntegrationEventPublisher integrationEventPublisher,
+    IBackgroundJobClient backgroundJobClient)
 {
     // Backward-compatible overload used by existing tests — treats the caller as a manager.
     public Task<Result<UploadEmployeeDocumentResponse>> HandleAsync(
@@ -36,14 +38,10 @@ internal sealed class UploadEmployeeDocumentHandler(
 
         await using var fileStream = file.OpenReadStream();
 
-        var scanResult = await virusScanner.ScanAsync(fileStream, file.FileName, cancellationToken);
-        if (!scanResult.IsClean)
-            return Result.Failure<UploadEmployeeDocumentResponse>(
-                Error.Validation($"File was rejected: {scanResult.ThreatName}."));
-
-        fileStream.Seek(0, SeekOrigin.Begin);
-
         // Verify file content matches the declared content type (prevents extension/MIME spoofing).
+        // Virus scanning no longer happens inline here — the file is stored as-is with
+        // ScanStatus = Pending and asynchronously scanned by ScanUploadedFileJob below, so upload
+        // requests are never blocked on the scanner.
         var contentResult = fileValidator.ValidateContent(fileStream, file.ContentType);
         if (contentResult.IsFailure)
             return Result.Failure<UploadEmployeeDocumentResponse>(contentResult.Error);
@@ -134,6 +132,9 @@ internal sealed class UploadEmployeeDocumentHandler(
             new EmployeeDocumentUploadedIntegrationEvent(
                 document.CompanyId, request.EmployeeId, employeeDocument.Id, documentType.Name, now),
             cancellationToken);
+
+        backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
+            job.ExecuteAsync(FileScanTargetType.Document, document.Id, document.CompanyId, null));
 
         return Result.Success(new UploadEmployeeDocumentResponse(
             document.Id,

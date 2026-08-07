@@ -85,6 +85,6 @@ public sealed class EmployeeOffboardingTab(IPage page)
         return await checklistCard.Locator("table tbody tr")
             .Filter(new() { HasText = taskTitleFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
     }
 }

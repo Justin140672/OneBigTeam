@@ -46,7 +46,7 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
         return await page.Locator(".e-rowcell")
             .Filter(new() { HasText = nameOrEmailFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
     }
 
     public async Task<string?> GetInvitationStatusAsync(string nameOrEmailFragment)

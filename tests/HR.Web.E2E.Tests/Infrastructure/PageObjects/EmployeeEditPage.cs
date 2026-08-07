@@ -169,9 +169,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task ClickSaveChangesAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
 
         var errorBanner = page.Locator(".alert-danger").First;
         if (await errorBanner.IsVisibleAsync())
@@ -226,8 +224,18 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return await group.Locator(".e-input-group input").First.InputValueAsync();
     }
 
-    public async Task<bool> HasErrorAsync() =>
-        await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
+    public async Task<bool> HasErrorAsync()
+    {
+        try
+        {
+            await page.Locator(".alert-danger, .validation-message").First.WaitForAsync(new() { Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Returns true if a field-level validation message containing <paramref name="messageText"/>
@@ -660,9 +668,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         // read the status badge can catch it while the tab's own spinner is still showing. Wait
         // for the spinner to clear first, then for the tab's own content specifically (the
         // period-summary progress bar, or the "no record" empty state).
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
         await page.WaitForSelectorAsync(".progress, .alert-secondary", new() { Timeout = 15_000 });
     }
 
@@ -736,11 +742,17 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task OpenSicknessTabAsync()
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Sickness" }).ClickAsync();
-        await page.WaitForSelectorAsync(".card, .alert-secondary", new() { Timeout = 15_000 });
+        // Same trap as OpenProbationTabAsync: EmployeeEdit.razor always renders a ".card" above
+        // the tab strip, so a bare ".card, .alert-secondary" wait resolves immediately against
+        // that pre-existing card instead of EmployeeSicknessTab's own async-loaded content — the
+        // ensuing HasSicknessGridAsync check then races Syncfusion's own JS render pass for the
+        // grid. Wait for the spinner to clear first, then for the grid itself.
+        await page.WaitForSpinnerToClearAsync();
+        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 15_000 });
     }
 
-    public async Task<bool> HasSicknessGridAsync() =>
-        await page.Locator(".e-grid").IsVisibleAsync();
+    public Task<bool> HasSicknessGridAsync() =>
+        page.Locator(".e-grid").First.WaitUntilVisibleAsync();
 
     public async Task OpenRecordSicknessDialogAsync()
     {

@@ -1,3 +1,4 @@
+using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.UploadEmployeeProfilePhoto;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
@@ -20,15 +21,15 @@ public class UploadEmployeeProfilePhotoHandlerTests
     private static UploadEmployeeProfilePhotoHandler BuildHandler(
         DocumentsDbContext db,
         FakeProfilePhotoStorageService? storage = null,
-        FakeVirusScanService? scanner = null,
         ImageUploadOptions? options = null,
-        FakeAuditPublisher? auditPublisher = null) =>
+        FakeAuditPublisher? auditPublisher = null,
+        Hangfire.IBackgroundJobClient? backgroundJobClient = null) =>
         new(db,
             storage ?? new FakeProfilePhotoStorageService(),
             new ImageUploadValidator(Options.Create(options ?? new ImageUploadOptions())),
-            scanner ?? new FakeVirusScanService(),
             new FakeClock(FixedUtcNow),
-            auditPublisher ?? new FakeAuditPublisher());
+            auditPublisher ?? new FakeAuditPublisher(),
+            backgroundJobClient ?? new NoOpBackgroundJobClient());
 
     // Produces a valid PNG file with real IHDR dimensions so magic-byte and dimension
     // validation both pass by default.
@@ -169,24 +170,42 @@ public class UploadEmployeeProfilePhotoHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_Validation_When_File_Is_Infected_And_Does_Not_Upload()
+    public async Task HandleAsync_Stores_Photo_With_Pending_ScanStatus()
     {
+        // Virus scanning now happens asynchronously (ScanUploadedFileJob, enqueued after
+        // persistence) rather than inline during upload.
         await using var db = BuildContext();
         var storage        = new FakeProfilePhotoStorageService();
         var companyId      = Guid.NewGuid();
         var employeeId     = Guid.NewGuid();
-        var scanner        = new FakeVirusScanService { ReturnInfected = true, ThreatName = "EICAR.Test.File" };
-        var handler        = BuildHandler(db, storage, scanner: scanner);
+        var handler        = BuildHandler(db, storage);
 
         var result = await handler.HandleAsync(
             BuildRequest(companyId, employeeId),
             employeeId,
             CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("validation", result.Error.Code);
-        Assert.Contains("EICAR.Test.File", result.Error.Message);
-        Assert.Empty(storage.Uploads);
+        Assert.True(result.IsSuccess);
+        var stored = await db.EmployeeProfilePhotos.SingleAsync(p => p.Id == result.Value!.Id);
+        Assert.Equal(FileScanStatus.Pending, stored.ScanStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Enqueues_ScanUploadedFileJob_On_Success()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var employeeId     = Guid.NewGuid();
+        var backgroundJobs = new SpyBackgroundJobClient();
+        var handler         = BuildHandler(db, backgroundJobClient: backgroundJobs);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, employeeId),
+            employeeId,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(backgroundJobs.CreatedJobs);
     }
 
     [Fact]

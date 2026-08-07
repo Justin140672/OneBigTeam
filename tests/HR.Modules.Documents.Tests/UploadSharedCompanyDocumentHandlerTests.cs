@@ -24,10 +24,10 @@ public class UploadSharedCompanyDocumentHandlerTests
     private static UploadSharedCompanyDocumentHandler BuildHandler(
         DocumentsDbContext db,
         FakeDocumentStorageService? storage = null,
-        FakeVirusScanService? scanner = null,
         FileUploadOptions? options = null,
         FakeEmployeeAudienceReader? audienceReader = null,
-        FakeAuditPublisher? auditPublisher = null)
+        FakeAuditPublisher? auditPublisher = null,
+        Hangfire.IBackgroundJobClient? backgroundJobClient = null)
     {
         // Same fake instance backs both the audience rule builder and the direct
         // ReviewOwnerEmployeeId existence check, so a test that registers an employee id in one
@@ -36,11 +36,11 @@ public class UploadSharedCompanyDocumentHandlerTests
         return new(db,
             storage ?? new FakeDocumentStorageService(),
             new FileUploadValidator(Options.Create(options ?? new FileUploadOptions())),
-            scanner ?? new FakeVirusScanService(),
             new SharedCompanyDocumentAudienceRuleBuilder(reader),
             reader,
             auditPublisher ?? new FakeAuditPublisher(),
-            new FakeClock(FixedUtcNow));
+            new FakeClock(FixedUtcNow),
+            backgroundJobClient ?? new NoOpBackgroundJobClient());
     }
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
@@ -237,22 +237,43 @@ public class UploadSharedCompanyDocumentHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_Validation_When_File_Is_Infected()
+    public async Task HandleAsync_Stores_Document_With_Pending_ScanStatus()
     {
+        // Virus scanning now happens asynchronously (ScanUploadedFileJob, enqueued after
+        // persistence) rather than inline during upload.
         await using var db = BuildContext();
         var companyId      = Guid.NewGuid();
         var category       = await SeedCategory(db, companyId);
-        var scanner        = new FakeVirusScanService { ReturnInfected = true, ThreatName = "EICAR.Test.File" };
-        var handler        = BuildHandler(db, scanner: scanner);
+        var handler        = BuildHandler(db);
 
         var result = await handler.HandleAsync(
             BuildRequest(companyId, category.Id),
             Guid.NewGuid(),
             CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("validation", result.Error.Code);
-        Assert.Contains("EICAR.Test.File", result.Error.Message);
+        Assert.True(result.IsSuccess);
+        var stored = await db.SharedCompanyDocuments.SingleAsync(d => d.Id == result.Value!.Id);
+        Assert.Equal(FileScanStatus.Pending, stored.ScanStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Enqueues_ScanUploadedFileJob_On_Success()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var backgroundJobs = new SpyBackgroundJobClient();
+        var handler         = BuildHandler(db, backgroundJobClient: backgroundJobs);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, category.Id),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        // Uploading a new shared company document enqueues a scan job for both the document
+        // itself and its first version row.
+        Assert.Equal(2, backgroundJobs.CreatedJobs.Count);
     }
 
     [Fact]

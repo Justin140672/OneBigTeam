@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using HR.Web.E2E.Tests.Infrastructure;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
@@ -41,7 +42,7 @@ public sealed class DepartmentListPage(IPage page, string baseUrl)
         return await page.Locator(".e-rowcell")
             .Filter(new() { HasText = nameFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
     }
 
     public async Task<IReadOnlyList<string>> GetDepartmentNamesAsync()
@@ -79,9 +80,7 @@ public sealed class DepartmentListPage(IPage page, string baseUrl)
         await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await confirmButton.ClickAsync();
         // Wait for the grid to refresh.
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
     }
 
     public async Task<bool> IsActiveAsync(string nameFragment)

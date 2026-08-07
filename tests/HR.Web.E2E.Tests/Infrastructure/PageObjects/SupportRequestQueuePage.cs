@@ -24,7 +24,7 @@ public sealed class SupportRequestQueuePage(IPage page, string baseUrl)
         return await page.Locator(".e-rowcell")
             .Filter(new() { HasText = referenceOrTitleFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
     }
 
     public Task SelectStatusFilterAsync(string status) =>

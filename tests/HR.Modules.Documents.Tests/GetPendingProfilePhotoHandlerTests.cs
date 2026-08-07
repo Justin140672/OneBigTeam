@@ -23,6 +23,8 @@ public class GetPendingProfilePhotoHandlerTests
         var pending = PendingProfilePhoto.Create(
             Guid.NewGuid(), companyId, employeeId, "pending.png", 222, "image/png",
             storageKey, employeeId, DateTimeOffset.UtcNow);
+        // Default download-success fixtures assume a clean scan.
+        pending.MarkScanClean(DateTimeOffset.UtcNow);
         db.PendingProfilePhotos.Add(pending);
         db.SaveChanges();
         return pending;
@@ -103,5 +105,61 @@ public class GetPendingProfilePhotoHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+    }
+
+    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
+    // but FileScanStatus is internal — pass the enum's underlying int value instead and cast.
+    [Theory]
+    [InlineData((int)FileScanStatus.Pending, "This document is currently being security checked.")]
+    [InlineData((int)FileScanStatus.Scanning, "This document is currently being security checked.")]
+    [InlineData((int)FileScanStatus.Infected, "This document failed a security scan.")]
+    [InlineData((int)FileScanStatus.Failed, "This document failed a security scan.")]
+    public async Task HandleAsync_Returns_Validation_When_PendingPhoto_Is_Not_Clean(
+        int statusValue, string expectedMessage)
+    {
+        var status = (FileScanStatus)statusValue;
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var pending = PendingProfilePhoto.Create(
+            Guid.NewGuid(), companyId, employeeId, "pending.png", 222, "image/png",
+            "pending/key.png", employeeId, DateTimeOffset.UtcNow);
+        switch (status)
+        {
+            case FileScanStatus.Pending: break; // Create() defaults to Pending
+            case FileScanStatus.Scanning: pending.MarkScanning(DateTimeOffset.UtcNow); break;
+            case FileScanStatus.Infected: pending.MarkScanInfected("EICAR.Test.File", DateTimeOffset.UtcNow); break;
+            case FileScanStatus.Failed: pending.MarkScanFailed("scanner unreachable", DateTimeOffset.UtcNow); break;
+        }
+        db.PendingProfilePhotos.Add(pending);
+        db.SaveChanges();
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new GetPendingProfilePhotoRequest(companyId, employeeId),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Equal(expectedMessage, result.Error.Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Success_When_PendingPhoto_Is_Clean()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        SeedPendingPhoto(db, companyId, employeeId);
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new GetPendingProfilePhotoRequest(companyId, employeeId),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
     }
 }

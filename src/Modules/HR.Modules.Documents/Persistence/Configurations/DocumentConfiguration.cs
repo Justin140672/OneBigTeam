@@ -76,6 +76,23 @@ internal sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property(d => d.ScanStatus)
+            .HasColumnName("scan_status")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(d => d.ScanCompletedAt)
+            .HasColumnName("scan_completed_at");
+
+        builder.Property(d => d.ScanAttemptCount)
+            .HasColumnName("scan_attempt_count")
+            .IsRequired();
+
+        builder.Property(d => d.ScanFailureReason)
+            .HasColumnName("scan_failure_reason")
+            .HasMaxLength(500);
+
         builder.HasOne<DocumentType>()
             .WithMany()
             .HasForeignKey(d => d.DocumentTypeId)

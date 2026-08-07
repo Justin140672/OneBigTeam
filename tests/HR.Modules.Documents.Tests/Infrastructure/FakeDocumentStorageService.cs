@@ -22,9 +22,13 @@ internal sealed class FakeDocumentStorageService : IDocumentStorageService
         => Task.FromResult(new Uri($"https://storage.example.com/{storageKey}"));
 
     public List<string> Deletions { get; } = [];
+    public bool ThrowOnDelete { get; set; }
 
     public Task DeleteAsync(string storageKey, CancellationToken cancellationToken)
     {
+        if (ThrowOnDelete)
+            throw new InvalidOperationException("Simulated storage delete failure.");
+
         Deletions.Add(storageKey);
         return Task.CompletedTask;
     }

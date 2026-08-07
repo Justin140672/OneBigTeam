@@ -25,8 +25,8 @@ public class DownloadSharedCompanyDocumentVersionHandlerTests
         db.SharedCompanyDocuments.Add(doc);
 
         db.SharedCompanyDocumentVersions.AddRange(
-            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf", owner, Now, versionNote: null, requiresAcknowledgement: false, effectiveDate: null),
-            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 2, "key/v2.pdf", "v2.pdf", 200, "application/pdf", owner, Now.AddDays(1), versionNote: "Updated", requiresAcknowledgement: false, effectiveDate: null));
+            CleanVersion(SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf", owner, Now, versionNote: null, requiresAcknowledgement: false, effectiveDate: null)),
+            CleanVersion(SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 2, "key/v2.pdf", "v2.pdf", 200, "application/pdf", owner, Now.AddDays(1), versionNote: "Updated", requiresAcknowledgement: false, effectiveDate: null)));
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
@@ -54,8 +54,8 @@ public class DownloadSharedCompanyDocumentVersionHandlerTests
         db.SharedCompanyDocuments.Add(doc);
 
         db.SharedCompanyDocumentVersions.AddRange(
-            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf", owner, Now, versionNote: null, requiresAcknowledgement: false, effectiveDate: null),
-            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 2, "key/v2.pdf", "v2.pdf", 200, "application/pdf", owner, Now.AddDays(1), versionNote: "Updated", requiresAcknowledgement: false, effectiveDate: null));
+            CleanVersion(SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf", owner, Now, versionNote: null, requiresAcknowledgement: false, effectiveDate: null)),
+            CleanVersion(SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 2, "key/v2.pdf", "v2.pdf", 200, "application/pdf", owner, Now.AddDays(1), versionNote: "Updated", requiresAcknowledgement: false, effectiveDate: null)));
         await db.SaveChangesAsync();
 
         var audit = new FakeAuditPublisher();
@@ -133,6 +133,49 @@ public class DownloadSharedCompanyDocumentVersionHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
+    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
+    // but FileScanStatus is internal — pass the enum's underlying int value instead and cast.
+    [Theory]
+    [InlineData((int)FileScanStatus.Pending, "This document is currently being security checked.")]
+    [InlineData((int)FileScanStatus.Scanning, "This document is currently being security checked.")]
+    [InlineData((int)FileScanStatus.Infected, "This document failed a security scan.")]
+    [InlineData((int)FileScanStatus.Failed, "This document failed a security scan.")]
+    public async Task HandleAsync_Returns_Validation_When_Version_Is_Not_Clean(
+        int statusValue, string expectedMessage)
+    {
+        var status = (FileScanStatus)statusValue;
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var owner     = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, owner, Now);
+        db.SharedCompanyDocuments.Add(doc);
+
+        var version = SharedCompanyDocumentVersion.Create(
+            Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf", owner, Now,
+            versionNote: null, requiresAcknowledgement: false, effectiveDate: null);
+        switch (status)
+        {
+            case FileScanStatus.Pending: break; // Create() defaults to Pending
+            case FileScanStatus.Scanning: version.MarkScanning(Now); break;
+            case FileScanStatus.Infected: version.MarkScanInfected("EICAR.Test.File", Now); break;
+            case FileScanStatus.Failed: version.MarkScanFailed("scanner unreachable", Now); break;
+        }
+        db.SharedCompanyDocumentVersions.Add(version);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new DownloadSharedCompanyDocumentVersionRequest { CompanyId = companyId, DocumentId = doc.Id, VersionNumber = 1 },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Equal(expectedMessage, result.Error.Message);
+    }
+
     private static readonly DateTime FixedUtcNow = new(2026, 7, 13, 10, 0, 0, DateTimeKind.Utc);
 
     private static DownloadSharedCompanyDocumentVersionHandler Handler(
@@ -157,4 +200,11 @@ public class DownloadSharedCompanyDocumentVersionHandlerTests
         new(new DbContextOptionsBuilder<DocumentsDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
+
+    // Default download-success fixtures assume a clean scan.
+    private static SharedCompanyDocumentVersion CleanVersion(SharedCompanyDocumentVersion version)
+    {
+        version.MarkScanClean(Now);
+        return version;
+    }
 }

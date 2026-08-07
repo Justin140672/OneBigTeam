@@ -30,9 +30,7 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Documents", Exact = true }).ClickAsync();
         // Spinner appears while loading, then grid renders
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
         // Scoped to the actual Documents grid card specifically (data-testid=
         // "employee-documents-grid-section"), not a bare ".card-body td" — EmployeeDocumentsTab.
         // razor's "Document Requests" card above it (gated by its own, separately-loading
@@ -221,9 +219,7 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         await page.GetByRole(AriaRole.Tab, new() { Name = "Assets" }).ClickAsync();
         // Wait for the spinner to disappear, then ensure either the grid or the
         // empty-state placeholder has rendered.
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
         await page.WaitForSelectorAsync("[data-testid='employee-assets-grid'], .text-muted",
             new() { Timeout = 15_000 });
     }
@@ -307,9 +303,7 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         // Wait for the spinner to disappear, then for at least one balance value/"n/a" span
         // to render inside the "Current Balance" card — not just the static card shell that
         // is present before the async balance fetch completes.
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
         await page.Locator(".card-body .fs-4.fw-semibold").First.WaitForAsync(new() { Timeout = 15_000 });
     }
 

@@ -73,6 +73,16 @@ public sealed class PersonalDetailsTab(IPage page)
     public async Task<bool> IsDialogOpenAsync() =>
         await page.Locator(".e-dialog").IsVisibleAsync();
 
-    public async Task<bool> HasValidationErrorAsync() =>
-        await page.Locator(".is-invalid").First.IsVisibleAsync();
+    public async Task<bool> HasValidationErrorAsync()
+    {
+        try
+        {
+            await page.Locator(".is-invalid").First.WaitForAsync(new() { Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 }

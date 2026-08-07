@@ -13,13 +13,27 @@ var isE2ETesting = string.Equals(
 var postgres = builder.AddPostgres("postgres").WithHostPort(5432);
 var hrDatabase = postgres.AddDatabase("hr");
 
+// ClamAV daemon for virus-scanning uploaded documents/photos (Documents module,
+// ScanUploadedFileJob) — exposed on its default clamd port. Local/dev environments without this
+// configured fall back to NoOpVirusScanService (see DocumentsModule.AddStorageService).
+var clamAv = builder.AddContainer("clamav", "clamav/clamav", "stable")
+	.WithEndpoint(port: 3310, targetPort: 3310, name: "clamd");
+
 var api = isE2ETesting
 	? builder.AddProject<Projects.HR_Api>("api", launchProfileName: "http")
 	: builder.AddProject<Projects.HR_Api>("api");
 
 api
     .WithReference(hrDatabase)
-    .WaitFor(hrDatabase);
+    .WaitFor(hrDatabase)
+    // clamd speaks raw TCP (INSTREAM protocol), not HTTP, so Aspire's default HTTP-based service
+    // discovery URL format doesn't apply here — bind the container's "clamd" endpoint host/port
+    // directly onto the config keys ClamAvOptions/DocumentsModule.AddStorageService bind to
+    // ("Documents:ClamAv:Host" / ":Port"), so the real ClamAvVirusScanService is registered
+    // instead of silently falling back to NoOpVirusScanService.
+    .WithEnvironment("Documents__ClamAv__Host", clamAv.GetEndpoint("clamd").Property(EndpointProperty.Host))
+    .WithEnvironment("Documents__ClamAv__Port", clamAv.GetEndpoint("clamd").Property(EndpointProperty.Port))
+    .WaitFor(clamAv);
 
 var web = isE2ETesting
 	? builder.AddProject<Projects.HR_Web>("web", launchProfileName: "http")

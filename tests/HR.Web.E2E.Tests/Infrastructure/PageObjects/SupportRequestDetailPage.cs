@@ -38,7 +38,7 @@ public sealed class SupportRequestDetailPage(IPage page, string baseUrl)
         return await page.Locator(".support-thread-item")
             .Filter(new() { HasText = textFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
     }
 
     public Task<bool> HasReplyErrorAsync() =>

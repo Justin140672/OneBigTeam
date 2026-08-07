@@ -18,25 +18,53 @@ public class GetMyProfilePhotoHandlerTests
         new(db, storage ?? new FakeProfilePhotoStorageService());
 
     private static EmployeeProfilePhoto SeedCurrentPhoto(
-        DocumentsDbContext db, Guid companyId, Guid employeeId, string storageKey = "current/key.png")
+        DocumentsDbContext db, Guid companyId, Guid employeeId,
+        FileScanStatus status = FileScanStatus.Clean, string storageKey = "current/key.png")
     {
         var photo = EmployeeProfilePhoto.Create(
             Guid.NewGuid(), companyId, employeeId, "current.png", 111, "image/png",
             storageKey, employeeId, DateTimeOffset.UtcNow);
+        ApplyScanStatus(photo, status);
         db.EmployeeProfilePhotos.Add(photo);
         db.SaveChanges();
         return photo;
     }
 
     private static PendingProfilePhoto SeedPendingPhoto(
-        DocumentsDbContext db, Guid companyId, Guid employeeId, string storageKey = "pending/key.png")
+        DocumentsDbContext db, Guid companyId, Guid employeeId,
+        FileScanStatus status = FileScanStatus.Clean, string storageKey = "pending/key.png")
     {
         var pending = PendingProfilePhoto.Create(
             Guid.NewGuid(), companyId, employeeId, "pending.png", 222, "image/png",
             storageKey, employeeId, DateTimeOffset.UtcNow);
+        ApplyScanStatus(pending, status);
         db.PendingProfilePhotos.Add(pending);
         db.SaveChanges();
         return pending;
+    }
+
+    private static void ApplyScanStatus(EmployeeProfilePhoto photo, FileScanStatus status)
+    {
+        switch (status)
+        {
+            case FileScanStatus.Pending: break; // Create() defaults to Pending
+            case FileScanStatus.Clean: photo.MarkScanClean(DateTimeOffset.UtcNow); break;
+            case FileScanStatus.Scanning: photo.MarkScanning(DateTimeOffset.UtcNow); break;
+            case FileScanStatus.Infected: photo.MarkScanInfected("EICAR.Test.File", DateTimeOffset.UtcNow); break;
+            case FileScanStatus.Failed: photo.MarkScanFailed("scanner unreachable", DateTimeOffset.UtcNow); break;
+        }
+    }
+
+    private static void ApplyScanStatus(PendingProfilePhoto photo, FileScanStatus status)
+    {
+        switch (status)
+        {
+            case FileScanStatus.Pending: break; // Create() defaults to Pending
+            case FileScanStatus.Clean: photo.MarkScanClean(DateTimeOffset.UtcNow); break;
+            case FileScanStatus.Scanning: photo.MarkScanning(DateTimeOffset.UtcNow); break;
+            case FileScanStatus.Infected: photo.MarkScanInfected("EICAR.Test.File", DateTimeOffset.UtcNow); break;
+            case FileScanStatus.Failed: photo.MarkScanFailed("scanner unreachable", DateTimeOffset.UtcNow); break;
+        }
     }
 
     [Fact]
@@ -121,5 +149,102 @@ public class GetMyProfilePhotoHandlerTests
 
         Assert.Null(result.CurrentPhoto);
         Assert.Null(result.PendingPhoto);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Leak_Photos_From_Another_Company()
+    {
+        await using var db = BuildContext();
+        var employeeId     = Guid.NewGuid();
+        var companyId      = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+
+        SeedCurrentPhoto(db, otherCompanyId, employeeId);
+        SeedPendingPhoto(db, otherCompanyId, employeeId);
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.Null(result.CurrentPhoto);
+        Assert.Null(result.PendingPhoto);
+    }
+
+    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
+    // but FileScanStatus is internal — pass the enum's underlying int value instead and cast.
+    [Theory]
+    [InlineData((int)FileScanStatus.Pending)]
+    [InlineData((int)FileScanStatus.Scanning)]
+    [InlineData((int)FileScanStatus.Infected)]
+    [InlineData((int)FileScanStatus.Failed)]
+    public async Task HandleAsync_Omits_CurrentPhoto_When_Its_Scan_Is_Not_Clean(int statusValue)
+    {
+        var status = (FileScanStatus)statusValue;
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        SeedCurrentPhoto(db, companyId, employeeId, status);
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.Null(result.CurrentPhoto);
+    }
+
+    [Theory]
+    [InlineData((int)FileScanStatus.Pending)]
+    [InlineData((int)FileScanStatus.Scanning)]
+    [InlineData((int)FileScanStatus.Infected)]
+    [InlineData((int)FileScanStatus.Failed)]
+    public async Task HandleAsync_Omits_PendingPhoto_When_Its_Scan_Is_Not_Clean(int statusValue)
+    {
+        var status = (FileScanStatus)statusValue;
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        SeedPendingPhoto(db, companyId, employeeId, status);
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.Null(result.PendingPhoto);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Includes_CurrentPhoto_But_Omits_PendingPhoto_When_Only_Pending_Scan_Fails()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var current    = SeedCurrentPhoto(db, companyId, employeeId, FileScanStatus.Clean);
+        SeedPendingPhoto(db, companyId, employeeId, FileScanStatus.Infected);
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.NotNull(result.CurrentPhoto);
+        Assert.Equal(current.Id, result.CurrentPhoto!.Id);
+        Assert.Null(result.PendingPhoto);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Includes_PendingPhoto_But_Omits_CurrentPhoto_When_Only_Current_Scan_Fails()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        SeedCurrentPhoto(db, companyId, employeeId, FileScanStatus.Infected);
+        var pending = SeedPendingPhoto(db, companyId, employeeId, FileScanStatus.Clean);
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.Null(result.CurrentPhoto);
+        Assert.NotNull(result.PendingPhoto);
+        Assert.Equal(pending.Id, result.PendingPhoto!.Id);
     }
 }

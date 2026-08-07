@@ -1,5 +1,7 @@
+using Hangfire;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
+using HR.Modules.Documents.Jobs;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.SharedKernel;
@@ -11,13 +13,13 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
     DocumentsDbContext db,
     IDocumentStorageService storage,
     IFileUploadValidator fileValidator,
-    IVirusScanService virusScanner,
     SharedCompanyDocumentAudienceMatcher audienceMatcher,
     ITaskCreator taskCreator,
     ITaskCanceller taskCanceller,
     INotificationWriter notificationWriter,
     IAuditEventPublisher auditPublisher,
-    IClock clock)
+    IClock clock,
+    IBackgroundJobClient backgroundJobClient)
 {
     public async Task<Result<UploadSharedCompanyDocumentVersionResponse>> HandleAsync(
         UploadSharedCompanyDocumentVersionRequest request,
@@ -57,13 +59,8 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
 
         await using var fileStream = file.OpenReadStream();
 
-        var scanResult = await virusScanner.ScanAsync(fileStream, safeFileName, cancellationToken);
-        if (!scanResult.IsClean)
-            return Result.Failure<UploadSharedCompanyDocumentVersionResponse>(
-                Error.Validation($"File was rejected: {scanResult.ThreatName}."));
-
-        fileStream.Seek(0, SeekOrigin.Begin);
-
+        // Virus scanning happens asynchronously via ScanUploadedFileJob (enqueued below) rather
+        // than inline — the row is stored with ScanStatus = Pending.
         // Verify file content matches the declared content type (prevents extension/MIME spoofing).
         var contentResult = fileValidator.ValidateContent(fileStream, file.ContentType);
         if (contentResult.IsFailure)
@@ -212,6 +209,11 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
         await auditPublisher.PublishAsync(new SharedCompanyDocumentVersionUploadedAuditEvent(
             document.CompanyId, document.Id, document.Title, safeFileName, file.Length, document.VersionNumber,
             versionNote, request.RequiresReacknowledgement, uploadedBy, now), cancellationToken);
+
+        backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
+            job.ExecuteAsync(FileScanTargetType.SharedCompanyDocument, document.Id, document.CompanyId, null));
+        backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
+            job.ExecuteAsync(FileScanTargetType.SharedCompanyDocumentVersion, version.Id, document.CompanyId, null));
 
         return Result.Success(new UploadSharedCompanyDocumentVersionResponse(
             document.Id,

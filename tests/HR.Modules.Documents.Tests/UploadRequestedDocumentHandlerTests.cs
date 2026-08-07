@@ -23,8 +23,8 @@ public class UploadRequestedDocumentHandlerTests
     private static (UploadRequestedDocumentHandler Handler, FakeTaskCompleter TaskCompleter, FakeAuditPublisher Audit) BuildHandler(
         DocumentsDbContext db,
         FakeDocumentStorageService? storage = null,
-        FakeVirusScanService? scanner = null,
-        FileUploadOptions? options = null)
+        FileUploadOptions? options = null,
+        Hangfire.IBackgroundJobClient? backgroundJobClient = null)
     {
         var taskCompleter = new FakeTaskCompleter();
         var audit         = new FakeAuditPublisher();
@@ -32,10 +32,10 @@ public class UploadRequestedDocumentHandlerTests
             db,
             storage ?? new FakeDocumentStorageService(),
             new FileUploadValidator(Options.Create(options ?? new FileUploadOptions())),
-            scanner ?? new FakeVirusScanService(),
             taskCompleter,
             new FakeClock(FixedUtcNow),
-            audit);
+            audit,
+            backgroundJobClient ?? new NoOpBackgroundJobClient());
         return (handler, taskCompleter, audit);
     }
 
@@ -268,20 +268,39 @@ public class UploadRequestedDocumentHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_Validation_When_File_Infected()
+    public async Task HandleAsync_Stores_Document_With_Pending_ScanStatus()
+    {
+        // Virus scanning now happens asynchronously (ScanUploadedFileJob, enqueued after
+        // persistence) rather than inline during upload.
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var dt  = await SeedDocumentType(db, companyId);
+        var req = await SeedRequest(db, companyId, employeeId, dt.Id);
+        var (handler, _, _) = BuildHandler(db);
+
+        var result = await handler.HandleAsync(BuildRequest(companyId, employeeId, req.Id), employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var stored = await db.Documents.SingleAsync(d => d.Id == result.Value!.DocumentId);
+        Assert.Equal(FileScanStatus.Pending, stored.ScanStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Enqueues_ScanUploadedFileJob_On_Success()
     {
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var dt  = await SeedDocumentType(db, companyId);
         var req = await SeedRequest(db, companyId, employeeId, dt.Id);
-        var (handler, _, _) = BuildHandler(db, scanner: new FakeVirusScanService { ReturnInfected = true, ThreatName = "EICAR" });
+        var backgroundJobs = new SpyBackgroundJobClient();
+        var (handler, _, _) = BuildHandler(db, backgroundJobClient: backgroundJobs);
 
         var result = await handler.HandleAsync(BuildRequest(companyId, employeeId, req.Id), employeeId, CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("validation", result.Error.Code);
-        Assert.Contains("EICAR", result.Error.Message);
+        Assert.True(result.IsSuccess);
+        Assert.Single(backgroundJobs.CreatedJobs);
     }
 
     [Fact]

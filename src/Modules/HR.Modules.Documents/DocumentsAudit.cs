@@ -592,6 +592,36 @@ internal sealed record ProfilePhotoApprovedAuditEvent(
     object? IAuditEvent.Metadata        => new { ReviewedBy };
 }
 
+/// <summary>
+/// Raised for every virus-scan status transition (Pending/Scanning -> Clean/Infected/Failed) on
+/// any scannable entity in this module (Document, EmployeeProfilePhoto, PendingProfilePhoto,
+/// SharedCompanyDocument, SharedCompanyDocumentVersion). EntityType distinguishes which kind of
+/// row changed, since a single shared event shape covers all five per the existing audit
+/// convention in this module.
+/// </summary>
+internal sealed record FileScanStatusChangedAuditEvent(
+    Guid CompanyId,
+    string EntityTypeName,
+    Guid FileEntityId,
+    Guid? EmployeeIdValue,
+    string PreviousStatus,
+    string NewStatus,
+    string? FailureReason,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "document.scan_status_changed";
+    string  IAuditEvent.EntityType      => EntityTypeName;
+    Guid    IAuditEvent.EntityId        => FileEntityId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeIdValue;
+    Guid?   IAuditEvent.ActorUserId     => null;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"{EntityTypeName} {FileEntityId} scan status changed: {PreviousStatus} -> {NewStatus}";
+    object? IAuditEvent.Before          => new { Status = PreviousStatus };
+    object? IAuditEvent.After           => new { Status = NewStatus, FailureReason };
+    object? IAuditEvent.Metadata        => null;
+}
+
 internal sealed record ProfilePhotoRejectedAuditEvent(
     Guid CompanyId,
     Guid PendingProfilePhotoId,

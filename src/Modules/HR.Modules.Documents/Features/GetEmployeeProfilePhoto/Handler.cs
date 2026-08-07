@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Persistence;
+using HR.Modules.Documents.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,6 +23,10 @@ internal sealed class GetEmployeeProfilePhotoHandler(
         if (profilePhoto is null)
             return Result.Failure<GetEmployeeProfilePhotoResponse>(
                 Error.NotFound("No profile photo was found for this employee."));
+
+        var scanError = ScanStatusAccessGuard.CheckDownloadable(profilePhoto.ScanStatus);
+        if (scanError is not null)
+            return Result.Failure<GetEmployeeProfilePhotoResponse>(scanError);
 
         var downloadUrl = await storage.GetDownloadUrlAsync(profilePhoto.StorageKey, cancellationToken);
 

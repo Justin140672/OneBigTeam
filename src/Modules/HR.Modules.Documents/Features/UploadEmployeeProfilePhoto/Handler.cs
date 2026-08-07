@@ -1,5 +1,7 @@
+using Hangfire;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
+using HR.Modules.Documents.Jobs;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.SharedKernel;
@@ -11,9 +13,9 @@ internal sealed class UploadEmployeeProfilePhotoHandler(
     DocumentsDbContext db,
     IProfilePhotoStorageService storage,
     IImageUploadValidator imageValidator,
-    IVirusScanService virusScanner,
     IClock clock,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    IBackgroundJobClient backgroundJobClient)
 {
     public async Task<Result<UploadEmployeeProfilePhotoResponse>> HandleAsync(
         UploadEmployeeProfilePhotoRequest request,
@@ -28,13 +30,8 @@ internal sealed class UploadEmployeeProfilePhotoHandler(
 
         await using var fileStream = file.OpenReadStream();
 
-        var scanResult = await virusScanner.ScanAsync(fileStream, file.FileName, cancellationToken);
-        if (!scanResult.IsClean)
-            return Result.Failure<UploadEmployeeProfilePhotoResponse>(
-                Error.Validation($"File was rejected: {scanResult.ThreatName}."));
-
-        fileStream.Seek(0, SeekOrigin.Begin);
-
+        // Virus scanning happens asynchronously via ScanUploadedFileJob (enqueued below) rather
+        // than inline — the row is stored with ScanStatus = Pending.
         // Verify file content matches the declared content type and that its pixel dimensions
         // fall within the configured bounds (prevents extension/MIME spoofing).
         var contentResult = imageValidator.ValidateImageContent(fileStream, file.ContentType);
@@ -109,6 +106,9 @@ internal sealed class UploadEmployeeProfilePhotoHandler(
             IsManagerUpload: uploadedBy != request.EmployeeId,
             IsReplace: oldStorageKey is not null,
             now), cancellationToken);
+
+        backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
+            job.ExecuteAsync(FileScanTargetType.EmployeeProfilePhoto, photo.Id, photo.CompanyId, null));
 
         var downloadUrl = await storage.GetDownloadUrlAsync(photo.StorageKey, cancellationToken);
 

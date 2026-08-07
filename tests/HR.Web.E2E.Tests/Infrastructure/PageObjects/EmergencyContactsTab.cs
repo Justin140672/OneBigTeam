@@ -60,16 +60,30 @@ public sealed class EmergencyContactsTab(IPage page)
     /// early on a failed EditContext.Validate(), so the only signal is the rendered
     /// &lt;ValidationMessage&gt; div (class "validation-message", styled in app.css).
     /// </summary>
-    public async Task<bool> HasValidationMessageAsync() =>
-        await page.Locator(".validation-message").First.IsVisibleAsync();
+    public async Task<bool> HasValidationMessageAsync()
+    {
+        try
+        {
+            await page.Locator(".validation-message").First.WaitForAsync(new() { Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     // ── Contact list ───────────────────────────────────────────────────────────
 
-    public async Task<bool> HasContactAsync(string nameFragment) =>
-        await page.Locator(".ec-contact-name")
+    // SaveAddAsync/SaveEditAsync flip _saved (the success banner) to true *before* awaiting
+    // LoadAsync()'s refresh of _contacts, so ".ec-success-banner" appearing doesn't guarantee the
+    // list DOM has caught up with the server's confirmed data yet — callers that wait for the
+    // banner then immediately check this can still see the stale contact list.
+    public Task<bool> HasContactAsync(string nameFragment) =>
+        page.Locator(".ec-contact-name")
             .Filter(new() { HasText = nameFragment })
             .First
-            .IsVisibleAsync();
+            .WaitUntilVisibleAsync();
 
     public async Task<IReadOnlyList<string>> GetContactNamesAsync()
     {

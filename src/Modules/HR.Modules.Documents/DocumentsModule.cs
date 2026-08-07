@@ -87,7 +87,19 @@ public static class DocumentsModule
     {
         services.Configure<FileUploadOptions>(configuration.GetSection("Documents:FileUpload"));
         services.AddScoped<IFileUploadValidator, FileUploadValidator>();
-        services.AddScoped<IVirusScanService, NoOpVirusScanService>();
+
+        var clamAvSection = configuration.GetSection("Documents:ClamAv");
+        if (clamAvSection.Exists() && !string.IsNullOrWhiteSpace(clamAvSection["Host"]))
+        {
+            services.Configure<ClamAvOptions>(clamAvSection);
+            services.AddScoped<IVirusScanService, ClamAvVirusScanService>();
+        }
+        else
+        {
+            // No ClamAv configured (local/dev default) — same environment-based fallback
+            // pattern as the Supabase-vs-local storage switch below.
+            services.AddScoped<IVirusScanService, NoOpVirusScanService>();
+        }
 
         var supabaseSection = configuration.GetSection("Documents:Supabase");
 
@@ -243,6 +255,8 @@ public static class DocumentsModule
 
         services.AddScoped<SharedCompanyDocumentAcknowledgementReminderJob>();
         services.AddScoped<DetectDocumentsDueForReviewJob>();
+        services.AddHttpClient();
+        services.AddScoped<ScanUploadedFileJob>();
 
         services.AddScoped<ISharedCompanyDocumentAcknowledgementHistoryReplayer, SharedCompanyDocumentAcknowledgementHistoryReplayer>();
 
@@ -322,14 +336,21 @@ public static class DocumentsModule
 
         if (!await db.Documents.AnyAsync(d => d.CompanyId == acmeId))
         {
-            db.Documents.AddRange(
+            var acmeDocuments = new[]
+            {
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000001"), acmeId, null, "Employment Contract – Sarah Chen",   null, acmeContract,  "employment-contract-sarah-chen.pdf",   184320,  "application/pdf", "seed/acme/contracts/employment-contract-sarah-chen.pdf",   null,                      acmeHrMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000002"), acmeId, null, "Employment Contract – James Okafor", null, acmeContract,  "employment-contract-james-okafor.pdf", 184320,  "application/pdf", "seed/acme/contracts/employment-contract-james-okafor.pdf", null,                      acmeHrMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000003"), acmeId, null, "Employment Contract – Priya Sharma", null, acmeContract,  "employment-contract-priya-sharma.pdf", 184320,  "application/pdf", "seed/acme/contracts/employment-contract-priya-sharma.pdf", null,                      acmeHrMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000004"), acmeId, null, "Employment Contract – Tom Williams", null, acmeContract,  "employment-contract-tom-williams.pdf", 184320,  "application/pdf", "seed/acme/contracts/employment-contract-tom-williams.pdf", null,                      acmeHrMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000005"), acmeId, null, "Offer Letter – Tom Williams",        null, acmeContract,  "offer-letter-tom-williams.pdf",        102400,  "application/pdf", "seed/acme/contracts/offer-letter-tom-williams.pdf",        null,                      acmeHrMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000006"), acmeId, null, "Employee Handbook 2026",             null, acmeOther,     "employee-handbook-2026.pdf",          2097152,  "application/pdf", "seed/acme/other/employee-handbook-2026.pdf",               new DateOnly(2027, 1, 1),  acmeHrMgr, now),
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000007"), acmeId, null, "Remote Working Policy",             null, acmeOther,     "remote-working-policy.pdf",            307200,  "application/pdf", "seed/acme/other/remote-working-policy.pdf",                new DateOnly(2027, 6, 30), acmeHrMgr, now));
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000007"), acmeId, null, "Remote Working Policy",             null, acmeOther,     "remote-working-policy.pdf",            307200,  "application/pdf", "seed/acme/other/remote-working-policy.pdf",                new DateOnly(2027, 6, 30), acmeHrMgr, now),
+            };
+            // Seed documents represent already-existing, trusted content — same as the migration
+            // backfill for pre-existing production rows — so they start Clean rather than Pending.
+            foreach (var seedDoc in acmeDocuments)
+                seedDoc.MarkScanClean(now);
+            db.Documents.AddRange(acmeDocuments);
 
             await db.SaveChangesAsync();
         }
@@ -446,10 +467,15 @@ public static class DocumentsModule
 
         if (!await db.Documents.AnyAsync(d => d.CompanyId == betaCorpId))
         {
-            db.Documents.AddRange(
+            var betaDocuments = new[]
+            {
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000011"), betaCorpId, null, "Employment Contract – Alice Morgan", null, betaContract, "employment-contract-alice-morgan.pdf",  184320,  "application/pdf", "seed/beta/contracts/employment-contract-alice-morgan.pdf", null,                     betaEngMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000012"), betaCorpId, null, "Employment Contract – Bob Taylor",   null, betaContract, "employment-contract-bob-taylor.pdf",    184320,  "application/pdf", "seed/beta/contracts/employment-contract-bob-taylor.pdf",   null,                     betaEngMgr, now),
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000013"), betaCorpId, null, "Employee Handbook 2026",             null, betaOther,    "employee-handbook-2026.pdf",           2097152,  "application/pdf", "seed/beta/other/employee-handbook-2026.pdf",               new DateOnly(2027, 1, 1), betaEngMgr, now));
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000013"), betaCorpId, null, "Employee Handbook 2026",             null, betaOther,    "employee-handbook-2026.pdf",           2097152,  "application/pdf", "seed/beta/other/employee-handbook-2026.pdf",               new DateOnly(2027, 1, 1), betaEngMgr, now),
+            };
+            foreach (var seedDoc in betaDocuments)
+                seedDoc.MarkScanClean(now);
+            db.Documents.AddRange(betaDocuments);
 
             await db.SaveChangesAsync();
         }
