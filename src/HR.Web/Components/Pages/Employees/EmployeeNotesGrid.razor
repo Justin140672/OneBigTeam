@@ -4,8 +4,8 @@
 <HrGrid TValue="EmployeeNoteItemModel"
         DataSource="@Items"
         AllowFiltering="false"
-        AllowPaging="false"
         data-testid="employee-notes-grid">
+    <GridPageSettings PageSize="10" />
     <GridColumns>
         <GridColumn HeaderText="Category" Width="130" AllowSorting="false" AllowFiltering="false">
             <Template>

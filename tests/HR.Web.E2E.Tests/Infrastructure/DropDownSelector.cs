@@ -53,6 +53,15 @@ public static class DropDownSelector
         // intermittently instead of always (confirmed: stepping through slowly in Playwright
         // Inspector, which gives interop time to finish, made it work every time). Poll for the
         // attribute to actually appear instead of trusting a single immediate read.
+        //
+        // This budget was briefly raised from 20 attempts (5s) to 60 (15s) on a theory that a
+        // combobox mounting after its own async data load (e.g. the Add Candidate picker) could
+        // need longer under a busy parallel run. That traded a narrow, unconfirmed fix for a much
+        // broader regression: aria-owns simply never appears for some combobox configurations at
+        // all (not delayed — absent), and every one of those now pays the FULL 15s before falling
+        // back to the unscoped selector, on every single selection across the whole suite. Reverted
+        // to the original, known-good 5s budget. If a genuinely slow-to-attach case turns up again,
+        // fix it narrowly at that call site rather than taxing every combobox selection here.
         string? popupId = null;
         for (var attempt = 0; attempt < 20 && popupId is null; attempt++)
         {
@@ -181,7 +190,17 @@ public static class DropDownSelector
         // not guarantee — the race window; callers with a downstream element/condition that
         // reliably only appears post-commit should still wait on that directly rather than relying
         // solely on this.
-        await popup.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
+        // Best-effort only, per the comment above — the value is already confirmed committed by
+        // this point, so a timeout here (the popup taking longer than 5s to visually close under a
+        // busy run) isn't a real failure and shouldn't fail the caller.
+        try
+        {
+            await popup.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+        }
+
         await page.WaitForTimeoutAsync(250);
     }
 }

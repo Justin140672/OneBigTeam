@@ -23,19 +23,27 @@ public sealed class BulkCompensationImportDialogPage(IPage page)
     public async Task ClickImportAsync()
     {
         await Dialog.GetByRole(AriaRole.Button, new() { Name = "Import from Excel", Exact = true }).ClickAsync();
+
         // Either the dialog closes (a successful import bubbles OnImported -> EmployeeList, which
         // closes the dialog and shows its own top-level success banner) or the panel's own nested
-        // row-errors/global-error alert appears while the dialog stays open.
-        await page.WaitForSelectorAsync(
-            "[role='dialog'].bulk-compensation-import-dialog .alert-danger, " +
-            "[role='dialog'].bulk-compensation-import-dialog",
-            new() { Timeout = 15_000, State = WaitForSelectorState.Attached });
+        // row-errors/global-error alert appears while the dialog stays open. These need to be
+        // raced as two genuinely different outcomes, not folded into one WaitForSelectorAsync
+        // call: the dialog root itself is already Attached the whole time (we're clicking inside
+        // it), so a State=Attached wait against ".alert-danger, [dialog selector]" resolves on the
+        // always-already-satisfied second alternative immediately, never actually waiting for the
+        // error banner to render — which is what made the follow-up GetRowErrorsTextAsync() call
+        // race the real async import result instead of observing it.
+        var errorTask = Dialog.Locator(".alert-danger").WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        var closedTask = Dialog.WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        await Task.WhenAny(errorTask, closedTask);
     }
 
     public async Task<string?> GetRowErrorsTextAsync()
     {
         var banner = Dialog.Locator(".alert-danger");
-        return await banner.IsVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
+        return await banner.WaitUntilVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
     }
 
     public Task ClickCloseAsync() =>

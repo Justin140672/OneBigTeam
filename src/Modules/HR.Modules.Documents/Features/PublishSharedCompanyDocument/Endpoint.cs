@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using FastEndpoints;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
@@ -18,7 +17,11 @@ internal sealed class Endpoint(PublishSharedCompanyDocumentHandler handler, ICur
         PublishSharedCompanyDocumentRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var publishedBy))
+        // Reads the DB-resolved user id via ICurrentUser, not a raw ClaimTypes.NameIdentifier claim
+        // — the JWT bearer handler is configured with MapInboundClaims = false (see HR.Api's
+        // ConfigureSupabaseJwtBearer), so real Supabase-issued tokens never populate that mapped
+        // claim type; relying on it directly would Unauthorized every request unconditionally.
+        if (currentUser.UserId is not Guid publishedBy)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;

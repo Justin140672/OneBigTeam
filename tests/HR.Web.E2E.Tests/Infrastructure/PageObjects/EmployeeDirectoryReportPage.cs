@@ -31,6 +31,13 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
 
     public async Task<IReadOnlyList<string>> GetColumnHeadersAsync()
     {
+        // Callers that navigate here via a UI click (e.g. clicking a Report Catalog card) rather
+        // than GoToAsync don't get GoToAsync's own RowsRenderedSelector wait for the grid's JS
+        // render pass — an instant AllAsync() right after a URL change can run before ".e-headercell"
+        // exists at all, returning an empty list rather than racing/erroring. Wait for the grid
+        // (or its empty-state sibling) first so this method is safe to call standalone.
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+
         var headers = await page.Locator(".e-headercell").AllAsync();
         var result = new List<string>();
         foreach (var header in headers)

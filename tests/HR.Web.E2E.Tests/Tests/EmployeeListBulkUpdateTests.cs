@@ -347,12 +347,22 @@ public sealed class EmployeeListBulkUpdateTests(AppFixture fixture) : E2ETestBas
         await empList.ClickEmployeeAsync(lastName);
         var employeeId = Guid.Parse(_page.Url.TrimEnd('/').Split('/').Last());
 
+        // Acme's Employee Number Mode is shared, mutable company state — other test classes
+        // (HrSettingsPageTests, BackfillEmployeeNumbersTests) flip it between Manual and
+        // Automatic via the UI, so it can't be assumed here. FillEmployeeNumberAsync above is a
+        // documented no-op in Automatic mode (see its own doc comment), in which case the
+        // employee's real number is one the backend generated, not the local `employeeNumber`
+        // string. Read the actually-assigned number back from the page instead of assuming it
+        // matches what was typed, so this test passes regardless of the ambient mode.
+        var assignedEmployeeNumber = (await empEdit.GetEmployeeNumberHeaderTextAsync())?.TrimStart('#')
+            ?? employeeNumber;
+
         var tempFile = Path.Combine(Path.GetTempPath(), $"compensation-import-list-{unique}.xlsx");
         try
         {
             WriteImportWorkbook(tempFile,
             [
-                (employeeNumber, "60000", "Annual", "2026-06-01", "AnnualReview", "E2E list import")
+                (assignedEmployeeNumber, "60000", "Annual", "2026-06-01", "AnnualReview", "E2E list import")
             ]);
 
             await empList.GoToAsync(AcmeId);
@@ -436,6 +446,7 @@ public sealed class EmployeeListBulkUpdateTests(AppFixture fixture) : E2ETestBas
         foreach (var row in rows)
         {
             sheet.Cell(rowIndex, 1).Value = row.EmployeeNumber;
+            sheet.Cell(rowIndex, 4).Value = row.SalaryFrequency;
             sheet.Cell(rowIndex, 5).Value = row.NewSalary;
             sheet.Cell(rowIndex, 6).Value = row.EffectiveDate;
             sheet.Cell(rowIndex, 7).Value = row.Reason;

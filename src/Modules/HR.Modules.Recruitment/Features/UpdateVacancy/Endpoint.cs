@@ -1,10 +1,10 @@
-using System.Security.Claims;
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Recruitment.Features.UpdateVacancy;
 
-internal sealed class Endpoint(UpdateVacancyHandler handler)
+internal sealed class Endpoint(UpdateVacancyHandler handler, ICurrentUser currentUser)
     : Endpoint<UpdateVacancyRequest, UpdateVacancyResponse>
 {
     public override void Configure()
@@ -17,7 +17,11 @@ internal sealed class Endpoint(UpdateVacancyHandler handler)
         UpdateVacancyRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var performedBy))
+        // Reads the DB-resolved user id via ICurrentUser, not a raw ClaimTypes.NameIdentifier claim
+        // — the JWT bearer handler is configured with MapInboundClaims = false (see HR.Api's
+        // ConfigureSupabaseJwtBearer), so real Supabase-issued tokens never populate that mapped
+        // claim type; relying on it directly would Unauthorized every request unconditionally.
+        if (currentUser.UserId is not Guid performedBy)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;

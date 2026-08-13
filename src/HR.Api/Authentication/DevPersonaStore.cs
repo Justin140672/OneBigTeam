@@ -35,7 +35,7 @@ public sealed class DevPersonaStore
 
     public IReadOnlyList<DevPersona> RegisteredPersonas => _registeredPersonas;
 
-    private IEnumerable<DevPersona> AllPersonas => Personas.Concat(_registeredPersonas);
+    public IEnumerable<DevPersona> AllPersonas => Personas.Concat(_registeredPersonas);
 
     public DevPersona? FindPersona(string userId) =>
         AllPersonas.FirstOrDefault(p => p.UserId == userId);

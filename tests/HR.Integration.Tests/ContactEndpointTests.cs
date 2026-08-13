@@ -1,0 +1,266 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using HR.Integration.Tests.Infrastructure;
+
+namespace HR.Integration.Tests;
+
+/// <summary>
+/// Covers the anonymous marketing contact form relay endpoint (POST /api/contact, HR.Api/Program.cs).
+/// Validation, honeypot, and happy-path tests run against <see cref="ContactApiWebApplicationFactory"/>,
+/// which configures Marketing:ContactForm:RecipientEmail to a test value; the "recipient not
+/// configured" test instead uses the shared <see cref="ApiWebApplicationFactory"/>, whose default
+/// appsettings.json intentionally leaves that setting blank.
+/// </summary>
+public sealed class ContactEndpointTests : IAsyncLifetime
+{
+    private readonly ContactApiWebApplicationFactory _factory = new();
+
+    async Task IAsyncLifetime.InitializeAsync() => await ((IAsyncLifetime)_factory).InitializeAsync();
+
+    async Task IAsyncLifetime.DisposeAsync()
+    {
+        await ((IAsyncLifetime)_factory).DisposeAsync();
+        await _factory.DisposeAsync();
+    }
+
+    private static object ValidContactRequest(
+        string name = "Ada Lovelace",
+        string email = "ada@example.com",
+        string company = "Acme Ltd",
+        int? employeeCount = 42,
+        string message = "We'd like a demo, please.",
+        string? website = null) => new
+        {
+            name,
+            email,
+            company,
+            employeeCount,
+            message,
+            website,
+        };
+
+    [Fact]
+    public async Task Post_Contact_Returns_Ok_And_Sends_Email_For_Valid_Request()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/contact", ValidContactRequest());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var sent = Assert.Single(_factory.EmailSender.Sent);
+        Assert.Equal(ContactApiWebApplicationFactory.RecipientEmail, sent.ToEmail);
+        Assert.Contains("Acme Ltd", sent.Subject);
+        Assert.Contains("Ada Lovelace", sent.HtmlBody);
+        Assert.Contains("ada@example.com", sent.HtmlBody);
+        Assert.Contains("like a demo, please.", sent.HtmlBody);
+    }
+
+    [Fact]
+    public async Task Post_Contact_Does_Not_Require_Authentication()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/contact", ValidContactRequest());
+
+        Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_Contact_Returns_Ok_But_Does_Not_Send_Email_When_Honeypot_Is_Filled()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/contact",
+            ValidContactRequest(website: "https://spambot.example.com"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty(_factory.EmailSender.Sent);
+    }
+
+    [Theory]
+    [InlineData(null, "name")]
+    [InlineData("", "name")]
+    [InlineData("   ", "name")]
+    public async Task Post_Contact_Returns_BadRequest_When_Name_Is_Blank(string? name, string expectedField)
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/contact", ValidContactRequest(name: name!));
+
+        await AssertValidationErrorAsync(response, expectedField);
+        Assert.Empty(_factory.EmailSender.Sent);
+    }
+
+    [Fact]
+    public async Task Post_Contact_Returns_BadRequest_When_Name_Exceeds_Max_Length()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/contact",
+            ValidContactRequest(name: new string('a', 201)));
+
+        await AssertValidationErrorAsync(response, "name");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("not-an-email")]
+    [InlineData("missing-at-sign.example.com")]
+    public async Task Post_Contact_Returns_BadRequest_When_Email_Is_Invalid(string? email)
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/contact", ValidContactRequest(email: email!));
+
+        await AssertValidationErrorAsync(response, "email");
+        Assert.Empty(_factory.EmailSender.Sent);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Post_Contact_Returns_BadRequest_When_Company_Is_Blank(string? company)
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/contact", ValidContactRequest(company: company!));
+
+        await AssertValidationErrorAsync(response, "company");
+        Assert.Empty(_factory.EmailSender.Sent);
+    }
+
+    [Fact]
+    public async Task Post_Contact_Returns_BadRequest_When_Company_Exceeds_Max_Length()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/contact",
+            ValidContactRequest(company: new string('a', 201)));
+
+        await AssertValidationErrorAsync(response, "company");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task Post_Contact_Returns_BadRequest_When_EmployeeCount_Is_Invalid(int? employeeCount)
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/contact", ValidContactRequest(employeeCount: employeeCount));
+
+        await AssertValidationErrorAsync(response, "employeeCount");
+        Assert.Empty(_factory.EmailSender.Sent);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Post_Contact_Returns_BadRequest_When_Message_Is_Blank(string? message)
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/contact", ValidContactRequest(message: message!));
+
+        await AssertValidationErrorAsync(response, "message");
+        Assert.Empty(_factory.EmailSender.Sent);
+    }
+
+    [Fact]
+    public async Task Post_Contact_Returns_BadRequest_When_Message_Exceeds_Max_Length()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/contact",
+            ValidContactRequest(message: new string('a', 4001)));
+
+        await AssertValidationErrorAsync(response, "message");
+    }
+
+    [Fact]
+    public async Task Post_Contact_Returns_BadRequest_With_All_Field_Errors_When_Every_Field_Is_Missing()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/contact", new { });
+
+        var errors = await ReadValidationErrorsAsync(response);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("name", errors.Keys);
+        Assert.Contains("email", errors.Keys);
+        Assert.Contains("company", errors.Keys);
+        Assert.Contains("employeeCount", errors.Keys);
+        Assert.Contains("message", errors.Keys);
+    }
+
+    private static async Task AssertValidationErrorAsync(HttpResponseMessage response, string expectedField)
+    {
+        var errors = await ReadValidationErrorsAsync(response);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(expectedField, errors.Keys);
+    }
+
+    private static async Task<Dictionary<string, string[]>> ReadValidationErrorsAsync(HttpResponseMessage response)
+    {
+        var json = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(json);
+        var errorsElement = document.RootElement.GetProperty("errors");
+
+        var errors = new Dictionary<string, string[]>();
+        foreach (var property in errorsElement.EnumerateObject())
+        {
+            errors[property.Name] = property.Value.EnumerateArray().Select(v => v.GetString()!).ToArray();
+        }
+
+        return errors;
+    }
+}
+
+/// <summary>
+/// Covers the "contact form is not configured" branch using the shared, collection-fixtured
+/// ApiWebApplicationFactory, whose default appsettings.json leaves
+/// Marketing:ContactForm:RecipientEmail intentionally blank.
+/// </summary>
+[Collection("Integration")]
+public sealed class ContactEndpointNotConfiguredTests
+{
+    private readonly ApiWebApplicationFactory _factory;
+
+    public ContactEndpointNotConfiguredTests(ApiWebApplicationFactory factory)
+    {
+        _factory = factory;
+    }
+
+    [Fact]
+    public async Task Post_Contact_Returns_ServiceUnavailable_When_RecipientEmail_Is_Not_Configured()
+    {
+        using var client = _factory.CreateClient();
+        // The shared factory's FakeEmailSender is a singleton accumulating across the whole
+        // assembly (other tests in this collection send emails too), so compare counts before/after
+        // rather than asserting an empty collection outright.
+        var sentCountBefore = _factory.EmailSender.Sent.Count;
+
+        var response = await client.PostAsJsonAsync("/api/contact", new
+        {
+            name = "Ada Lovelace",
+            email = "ada@example.com",
+            company = "Acme Ltd",
+            employeeCount = 42,
+            message = "We'd like a demo, please.",
+        });
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal(sentCountBefore, _factory.EmailSender.Sent.Count);
+    }
+}

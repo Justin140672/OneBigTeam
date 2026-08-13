@@ -29,17 +29,20 @@
                 <div class="pricing-headline">From &pound;2</div>
                 <div class="pricing-headline">per employee</div>
 
+                <p class="tier-list-intro">
+                    Pricing is banded: each employee is charged at the rate for their band, not your whole headcount.
+                </p>
                 <ul class="tier-list">
                     <li>
-                        <span>1-50 employees</span>
+                        <span>For your 1st-50th employee</span>
                         <strong>&pound;2.00 each</strong>
                     </li>
                     <li>
-                        <span>51-150 employees</span>
+                        <span>For your 51st-150th employee</span>
                         <strong>&pound;1.75 each</strong>
                     </li>
                     <li>
-                        <span>151+ employees</span>
+                        <span>For each employee beyond 150</span>
                         <strong>&pound;1.50 each</strong>
                     </li>
                 </ul>
@@ -50,9 +53,16 @@
                 </div>
 
                 <p>All prices exclude VAT where applicable.</p>
+
+                <p class="tier-worked-example">
+                    <strong>Worked example (75 employees):</strong>
+                    50 &times; &pound;2.00 = &pound;100.00, plus 25 &times; &pound;1.75 = &pound;43.75.
+                    Total: &pound;143.75/month (before VAT and any minimum charge adjustment).
+                </p>
             </div>
 
             <form class="estimator-card"
+                  id="calculator"
                   method="get"
                   data-pricing-estimator
                   data-large-org-threshold="@PricingOptionsAccessor.Value.LargeOrganisationThreshold">
@@ -63,8 +73,8 @@
                     <div class="pricing-text" data-monthly-price><span>@FormatCurrency(Result.Monthly)/month</span></div>
                 </div>
                 <div data-effective-price>Equivalent to @FormatCurrency(Result.EffectivePricePerEmployee) per employee</div>
+                <div class="sr-only" role="status" aria-live="polite" data-price-live-region></div>
 
-                
                 <label for="employee-count">Active employees</label>
                 <div class="employee-input-row">
                     <input id="employee-count"
@@ -76,14 +86,15 @@
                            value="@DisplayEmployees"
                            aria-describedby="@(ValidationMessage is null ? "employee-count-help" : "employee-count-help employee-count-error")"
                            aria-invalid="@(ValidationMessage is not null)">
+                    <label for="employee-slider" class="sr-only">Active employees (slider)</label>
                     <input id="employee-slider"
                            type="range"
                            min="0"
                            max="1000"
                            step="1"
                            value="@DisplayEmployees"
-                           aria-hidden="true"
-                           tabindex="-1">
+                           aria-describedby="@(ValidationMessage is null ? "employee-count-help" : "employee-count-help employee-count-error")"
+                           aria-invalid="@(ValidationMessage is not null)">
                 </div>
                 <p id="employee-count-help">
                     Move the slider to estimate your monthly cost.
@@ -94,20 +105,26 @@
                     <button class="button button-secondary" type="submit">Recalculate</button>
                 </noscript>
 
-                @if (DisplayEmployees >= PricingOptionsAccessor.Value.LargeOrganisationThreshold)
-                {
-                    <div class="calculator-cta">
-                        <div class="hero-actions" data-cta-large hidden="@(!Cta.IsLargeOrganisation)">
-                            <a class="button button-primary button-large" href="/contact#contact-form" data-track-cta="contact-sales">Contact Sales</a>
-                        </div>
-                        <p class="cta-supporting-message" aria-live="polite" data-cta-message>@Cta.SupportingMessage</p>
+                <div class="calculator-cta">
+                    <div class="hero-actions" data-cta-standard hidden="@Cta.IsLargeOrganisation">
+                        <a class="button button-primary button-large" href="/signup" data-track-cta="start-trial">Start free trial</a>
                     </div>
-
-                    <p class="small-note">
-                        Estimate updates instantly as you type. Billing and payment details are
-                        handled inside One Big Team.
+                    <p class="cta-supporting-message" aria-live="polite" data-cta-standard-message hidden="@Cta.IsLargeOrganisation">
+                        No credit card required. Start using One Big Team in minutes.
                     </p>
-                }
+
+                    <div class="hero-actions" data-cta-large hidden="@(!Cta.IsLargeOrganisation)">
+                        <a class="button button-primary button-large" href="/contact#contact-form" data-track-cta="contact-sales">Contact sales</a>
+                    </div>
+                    <p class="cta-supporting-message" aria-live="polite" data-cta-large-message hidden="@(!Cta.IsLargeOrganisation)">
+                        Our team will help you set up a custom plan for your organisation.
+                    </p>
+                </div>
+
+                <p class="small-note">
+                    Estimate updates instantly as you type. Billing and payment details are
+                    handled inside One Big Team.
+                </p>
             </form>
         </div>
     </section>
@@ -201,6 +218,16 @@
             </div>
 
             <div class="faq-list">
+                <details>
+                    <summary>How do the pricing tiers work?</summary>
+                    <p>
+                        Pricing is banded, not flat-rate. Your first 50 employees cost &pound;2.00 each, your
+                        next 100 employees (51-150) cost &pound;1.75 each, and each employee beyond 150 costs
+                        &pound;1.50 each. Only the employees within a band are charged at that band's rate -
+                        for example, a 75-employee organisation pays &pound;100.00 for the first 50 plus
+                        &pound;43.75 for the next 25, totalling &pound;143.75/month before VAT.
+                    </p>
+                </details>
                 <details>
                     <summary>Who counts as an active employee?</summary>
                     <p>Employees whose employment has started and who have not left the company.</p>

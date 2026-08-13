@@ -54,7 +54,23 @@ public sealed class DataImportWizardPage(IPage page, string baseUrl)
         // element, so a ".mapping-select span[role='combobox']" descendant selector never matches
         // anything. Same role-only scoping convention as DropDownSelector.
         var combobox = row.Locator("span[role='combobox']").First;
-        return (await combobox.Locator("input").First.InputValueAsync()).Trim();
+        var input = combobox.Locator("input").First;
+
+        // The "Continue" button (waited for by UploadFileAsync) only proves the Blazor component
+        // has mounted with its server-computed suggestions bound to each SfDropDownList's Value
+        // parameter — not that Syncfusion's JS interop has finished writing that initial value into
+        // the combobox's own <input> yet (a separate, later render pass). Reading immediately can
+        // race that and see an empty input even though the correct value lands moments later. Poll
+        // instead of reading once, same class of fix as HasValidRowAsync's grid-row wait below.
+        string value = "";
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            value = (await input.InputValueAsync()).Trim();
+            if (!string.IsNullOrEmpty(value)) break;
+            await page.WaitForTimeoutAsync(250);
+        }
+
+        return value;
     }
 
     public async Task ContinueFromMappingAsync()

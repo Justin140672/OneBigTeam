@@ -1,16 +1,49 @@
 const header = document.querySelector(".site-header");
 const menuToggle = document.querySelector(".menu-toggle");
+const menuToggleLabel = menuToggle?.querySelector("[data-menu-toggle-label]");
+const siteNav = document.querySelector(".site-nav");
 const navLinks = document.querySelectorAll(".site-nav a, .header-actions a");
 
+function setMenuOpen(isOpen) {
+  header?.classList.toggle("nav-open", isOpen);
+  menuToggle?.setAttribute("aria-expanded", String(isOpen));
+  if (menuToggleLabel) {
+    menuToggleLabel.textContent = isOpen ? "Close navigation" : "Open navigation";
+  }
+}
+
+function closeMenu({ focusToggle } = {}) {
+  if (!header?.classList.contains("nav-open")) return;
+
+  setMenuOpen(false);
+
+  if (focusToggle) {
+    menuToggle?.focus();
+  }
+}
+
 menuToggle?.addEventListener("click", () => {
-  const isOpen = header.classList.toggle("nav-open");
-  menuToggle.setAttribute("aria-expanded", String(isOpen));
+  const isOpen = !header.classList.contains("nav-open");
+  setMenuOpen(isOpen);
+
+  if (isOpen) {
+    // Basic focus management: move focus into the menu so keyboard users land on the
+    // first link immediately, rather than continuing to tab from the toggle button
+    // through content that's now visually below the open menu.
+    const firstLink = siteNav?.querySelector("a");
+    firstLink?.focus();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && header?.classList.contains("nav-open")) {
+    closeMenu({ focusToggle: true });
+  }
 });
 
 navLinks.forEach((link) => {
   link.addEventListener("click", () => {
-    header.classList.remove("nav-open");
-    menuToggle?.setAttribute("aria-expanded", "false");
+    closeMenu();
   });
 });
 
@@ -110,14 +143,31 @@ if (pricingEstimator) {
   const effectivePriceElement = pricingEstimator.querySelector("[data-effective-price]");
   const ctaStandard = pricingEstimator.querySelector("[data-cta-standard]");
   const ctaLarge = pricingEstimator.querySelector("[data-cta-large]");
-  const ctaMessage = pricingEstimator.querySelector("[data-cta-message]");
+  const ctaStandardMessage = pricingEstimator.querySelector("[data-cta-standard-message]");
+  const ctaLargeMessage = pricingEstimator.querySelector("[data-cta-large-message]");
+  const priceLiveRegion = pricingEstimator.querySelector("[data-price-live-region]");
+  // Mirrors PricingCtaResolver.Resolve on the server: employees === threshold is still the
+  // "at/below threshold" (self-service) case, only employees > threshold is large-organisation.
   const largeOrganisationThreshold = Number.parseInt(pricingEstimator.dataset.largeOrgThreshold, 10) || 500;
 
   let lastValidEmployees = Number.parseInt(employeeCountInput?.value, 10) || 0;
 
-  const standardMessage = "Perfect for self-service setup. You can start your free trial today.";
-  const largeOrganisationMessage =
-    "Larger organisations often benefit from a guided implementation. We'd be happy to help you plan your rollout.";
+  // The visible price updates instantly on every input event so sighted users get immediate
+  // feedback while dragging the slider. The aria-live announcement is debounced separately so
+  // screen reader users get one coherent "final" announcement after input settles, rather than
+  // a new interruption for every pixel of slider movement.
+  let liveRegionTimeoutId;
+
+  function announcePrice(employees, monthly, effectivePricePerEmployee) {
+    if (!priceLiveRegion) return;
+
+    window.clearTimeout(liveRegionTimeoutId);
+    liveRegionTimeoutId = window.setTimeout(() => {
+      priceLiveRegion.textContent =
+        `${employees} employees: ${currencyFormatter.format(monthly)} per month, ` +
+        `equivalent to ${currencyFormatter.format(effectivePricePerEmployee)} per employee.`;
+    }, 400);
+  }
 
   function render(employees) {
     const { monthly, effectivePricePerEmployee } = calculatePricing(employees);
@@ -128,10 +178,12 @@ if (pricingEstimator) {
     if (effectivePriceElement) {
       effectivePriceElement.textContent = `Equivalent to ${currencyFormatter.format(effectivePricePerEmployee)} per employee`;
     }
+    announcePrice(employees, monthly, effectivePricePerEmployee);
 
     if (ctaStandard) ctaStandard.hidden = isLargeOrganisation;
+    if (ctaStandardMessage) ctaStandardMessage.hidden = isLargeOrganisation;
     if (ctaLarge) ctaLarge.hidden = !isLargeOrganisation;
-    if (ctaMessage) ctaMessage.textContent = isLargeOrganisation ? largeOrganisationMessage : standardMessage;
+    if (ctaLargeMessage) ctaLargeMessage.hidden = !isLargeOrganisation;
 
     return { monthly, isLargeOrganisation };
   }
@@ -144,24 +196,32 @@ if (pricingEstimator) {
       errorElement.textContent = validationMessage ?? "";
     }
     employeeCountInput?.setAttribute("aria-invalid", String(Boolean(validationMessage)));
+    employeeSlider?.setAttribute("aria-invalid", String(Boolean(validationMessage)));
 
     if (validationMessage) {
       return;
     }
 
-    lastValidEmployees = value;
+    // Clamp consistently: the number input allows values above the slider's max (e.g. very
+    // large organisations), the slider itself is clamped to its own min/max range. Both inputs
+    // share the same underlying `value` used for the price calculation, so results are
+    // identical regardless of which control produced the change.
+    const clampedValue = Math.max(0, value);
+    lastValidEmployees = clampedValue;
 
     if (source !== employeeCountInput && employeeCountInput) {
-      employeeCountInput.value = String(value);
+      employeeCountInput.value = String(clampedValue);
     }
     if (source !== employeeSlider && employeeSlider) {
-      employeeSlider.value = String(Math.min(value, Number(employeeSlider.max)));
+      const sliderMax = Number(employeeSlider.max);
+      const sliderMin = Number(employeeSlider.min);
+      employeeSlider.value = String(Math.min(Math.max(clampedValue, sliderMin), sliderMax));
     }
 
-    const { monthly, isLargeOrganisation } = render(value);
+    const { monthly, isLargeOrganisation } = render(clampedValue);
 
     trackEvent("Employee Count Changed", {
-      activeEmployees: value,
+      activeEmployees: clampedValue,
       estimatedMonthlyCost: Number(monthly.toFixed(2)),
       ctaShown: isLargeOrganisation ? "Contact Sales" : "Start Free Trial",
     });
@@ -189,61 +249,78 @@ if (pricingEstimator) {
   trackEvent("Pricing Calculator Viewed", {});
 }
 
+// The contact form is a conventional HTML <form method="post"> (see Contact.razor / HR.Marketing
+// Program.cs's /contact-submit proxy) — this app renders statically with no interactive circuit, so
+// real validation and submission happen server-side. This script only adds two client-side niceties:
+// disabling the submit button to prevent duplicate submissions while the POST + redirect is in
+// flight, and moving keyboard/screen-reader focus to the success/error status banner after a
+// server-side round trip.
 const contactForm = document.querySelector("[data-contact-form]");
-const formStatus = document.querySelector("[data-form-status]");
+const contactSubmitButton = document.querySelector("[data-contact-submit]");
 
-function markFieldValidity(field) {
-  const wrapper = field.closest(".form-field");
-  if (!wrapper) {
-    return true;
-  }
-
-  const isValid = field.checkValidity();
-  wrapper.classList.toggle("is-invalid", !isValid);
-  return isValid;
-}
-
-function validateContactForm(form) {
-  const fields = [...form.querySelectorAll("input, textarea")];
-  const invalidFields = fields.filter((field) => !markFieldValidity(field));
-  const invalidField = invalidFields[0];
-  return { isValid: !invalidField, invalidField };
-}
-
-async function submitContactPlaceholder(form) {
-  const formData = new FormData(form);
-  const payload = Object.fromEntries(formData.entries());
-
-  // TODO: Replace with the real email/CRM service when one exists.
-  return {
-    ok: true,
-    reference: `OBT-${Date.now()}`,
-    payload,
-  };
-}
-
-contactForm?.addEventListener("input", (event) => {
-  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-    markFieldValidity(event.target);
+contactForm?.addEventListener("submit", () => {
+  if (contactForm.checkValidity() && contactSubmitButton) {
+    contactSubmitButton.disabled = true;
+    contactSubmitButton.textContent = "Sending...";
   }
 });
 
-contactForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
+document.querySelector("[data-form-status]")?.focus();
 
-  const { isValid, invalidField } = validateContactForm(contactForm);
-  if (!isValid) {
-    invalidField?.focus();
-    if (formStatus) {
-      formStatus.hidden = false;
-      formStatus.textContent = "Please complete the required fields before sending.";
+// The signup form (SignUp.razor) is a conventional HTML <form method="post"> posted to the
+// /signup-submit server-side proxy — no interactive circuit, so authoritative validation happens
+// server-side. `novalidate` suppresses the browser's native validation bubble so we can instead
+// mark invalid fields accessibly (aria-invalid + an associated, visible error message via
+// aria-describedby) and move keyboard focus to the first invalid field ourselves.
+const signUpForm = document.querySelector("[data-signup-form]");
+
+signUpForm?.addEventListener("submit", (event) => {
+  const fields = Array.from(signUpForm.querySelectorAll("input[required]"));
+  let firstInvalidField = null;
+
+  fields.forEach((field) => {
+    const isValid = field.checkValidity();
+    const formField = field.closest(".form-field");
+
+    formField?.classList.toggle("is-invalid", !isValid);
+    field.setAttribute("aria-invalid", String(!isValid));
+
+    if (!isValid && !firstInvalidField) {
+      firstInvalidField = field;
     }
-    return;
-  }
+  });
 
-  const result = await submitContactPlaceholder(contactForm);
-  if (formStatus && result.ok) {
-    formStatus.hidden = false;
-    formStatus.textContent = "Thanks. Your details have been captured in this contact form. A real email service can be connected next.";
+  if (firstInvalidField) {
+    event.preventDefault();
+    firstInvalidField.focus();
+  }
+});
+
+// Password show/hide toggle: swaps the input's `type` between "password" and "text" without
+// touching its value, so autofill/password managers and pasted values are unaffected. The
+// aria-live region below only updates on blur (not on every keystroke) to avoid spamming screen
+// readers while the user is still typing.
+const passwordField = document.querySelector("[data-password-field]");
+const passwordInput = passwordField?.querySelector("#password");
+const passwordToggle = passwordField?.querySelector("[data-password-toggle]");
+const passwordLive = document.querySelector("#password-live");
+
+passwordToggle?.addEventListener("click", () => {
+  const isHidden = passwordInput.type === "password";
+  passwordInput.type = isHidden ? "text" : "password";
+  passwordToggle.setAttribute("aria-pressed", String(isHidden));
+  passwordToggle.textContent = isHidden ? "Hide password" : "Show password";
+  passwordInput.focus();
+});
+
+passwordInput?.addEventListener("blur", () => {
+  if (!passwordLive) return;
+
+  if (passwordInput.value.length === 0) {
+    passwordLive.textContent = "";
+  } else if (passwordInput.value.length < 8) {
+    passwordLive.textContent = "Password requirement not yet met: at least 8 characters.";
+  } else {
+    passwordLive.textContent = "Password meets the minimum length requirement.";
   }
 });

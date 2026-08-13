@@ -1,10 +1,10 @@
-using System.Security.Claims;
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Features.DownloadEmployeeDocument;
 
-internal sealed class Endpoint(DownloadEmployeeDocumentHandler handler)
+internal sealed class Endpoint(DownloadEmployeeDocumentHandler handler, ICurrentUser currentUser)
     : Endpoint<DownloadEmployeeDocumentRequest>
 {
     public override void Configure()
@@ -17,7 +17,11 @@ internal sealed class Endpoint(DownloadEmployeeDocumentHandler handler)
         DownloadEmployeeDocumentRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var downloadedBy))
+        // Reads the DB-resolved user id via ICurrentUser, not a raw ClaimTypes.NameIdentifier claim
+        // — the JWT bearer handler is configured with MapInboundClaims = false (see HR.Api's
+        // ConfigureSupabaseJwtBearer), so real Supabase-issued tokens never populate that mapped
+        // claim type; relying on it directly would Unauthorized every request unconditionally.
+        if (currentUser.UserId is not Guid downloadedBy)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;

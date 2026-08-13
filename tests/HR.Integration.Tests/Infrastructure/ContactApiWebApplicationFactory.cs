@@ -1,29 +1,37 @@
-using Hangfire;
 using HR.Modules.Companies.Services;
 using HR.Modules.Identity.Services;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 
 namespace HR.Integration.Tests.Infrastructure;
 
-public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
+/// <summary>
+/// Standalone (non-shared, not collection-fixtured) variant of <see cref="ApiWebApplicationFactory"/>
+/// used solely by ContactEndpointTests. The shared <see cref="ApiWebApplicationFactory"/> boots with
+/// the default appsettings.json, where Marketing:ContactForm:RecipientEmail is intentionally blank
+/// (see 503 test) — this factory overrides that setting to a configured test recipient so the
+/// happy-path/validation/honeypot tests can exercise the "recipient is configured" branch. Spins up
+/// its own Postgres container per test class instance for the same reason
+/// NonDevelopmentApiWebApplicationFactory does: it can't reuse ApiWebApplicationFactory's shared
+/// instance, since configuration is fixed at host build time.
+/// </summary>
+public sealed class ContactApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    public const string RecipientEmail = "contact-test-recipient@example.com";
+
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
-        .WithDatabase("hr_integration")
+        .WithDatabase("hr_integration_contact")
         .WithUsername("postgres")
         .WithPassword("postgres")
         .Build();
 
     public FakeEmailSender EmailSender { get; } = new FakeEmailSender();
-
-    internal FakeStripeGateway StripeGateway { get; } = new FakeStripeGateway();
-
-    internal FakeSupabaseAuthGateway SupabaseAuthGateway { get; } = new FakeSupabaseAuthGateway();
 
     async Task IAsyncLifetime.InitializeAsync()
     {
@@ -40,6 +48,14 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.ConfigureAppConfiguration((_, configBuilder) =>
+        {
+            configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Marketing:ContactForm:RecipientEmail"] = RecipientEmail,
+            });
+        });
+
         builder.ConfigureServices(services =>
         {
             services
@@ -54,25 +70,10 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
                     {
                     });
 
-            // Replace real email sender and link builder with test doubles
             services.AddSingleton<IEmailSender>(EmailSender);
             services.AddSingleton<IInviteLinkBuilder, FakeInviteLinkBuilder>();
-
-            // Replace the real Stripe gateway so no test ever calls out to Stripe's network API.
-            services.AddScoped<IStripeGateway>(_ => StripeGateway);
-
-            // Replace the real Supabase Auth gateway so no test ever calls out to Supabase's live
-            // Auth Admin API.
-            services.AddScoped<ISupabaseAuthGateway>(_ => SupabaseAuthGateway);
-
-            // Replace the real Hangfire-backed IBackgroundJobClient with a no-op fake. Registered
-            // after AddHangfireBackgroundJobs (Program.cs) has already wired up the real Hangfire
-            // server/storage against the Postgres testcontainer, so this override wins for the
-            // IBackgroundJobClient interface while leaving the Hangfire server/dashboard/health
-            // check plumbing itself intact. See FakeBackgroundJobClient for why this matters: real
-            // job execution otherwise races test-driven state (e.g. ScanUploadedFileJob vs a
-            // test's manual "mark scan clean" step).
-            services.AddSingleton<IBackgroundJobClient, FakeBackgroundJobClient>();
+            services.AddScoped<IStripeGateway>(_ => new FakeStripeGateway());
+            services.AddScoped<ISupabaseAuthGateway>(_ => new FakeSupabaseAuthGateway());
         });
     }
 }

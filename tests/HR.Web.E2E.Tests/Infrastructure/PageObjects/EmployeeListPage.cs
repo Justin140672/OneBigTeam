@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using HR.Web.E2E.Tests.Infrastructure;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -154,7 +155,7 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public async Task<string?> GetActionSuccessMessageAsync()
     {
         var banner = page.Locator(".alert-success");
-        return await banner.IsVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
+        return await banner.WaitUntilVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
     }
 
     /// <summary>
@@ -164,7 +165,7 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public async Task<string?> GetActionErrorMessageAsync()
     {
         var banner = page.Locator(".alert-danger");
-        return await banner.IsVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
+        return await banner.WaitUntilVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
     }
 
     /// <summary>
@@ -175,7 +176,7 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public async Task<string> ClickDownloadTemplateAsync()
     {
         var downloadTask = page.WaitForDownloadAsync();
-        await OpenBulkUpdateMenuItemAsync("Download Template");
+        await OpenBulkUpdateMenuItemAsync("hr-bulk-download-template");
         var download = await downloadTask;
         return download.SuggestedFilename;
     }
@@ -187,7 +188,7 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     /// </summary>
     public async Task ClickBulkImportAsync()
     {
-        await OpenBulkUpdateMenuItemAsync("Import", exact: true);
+        await OpenBulkUpdateMenuItemAsync("hr-bulk-import");
         await page.WaitForSelectorAsync(
             "[role='dialog'].bulk-compensation-import-dialog",
             new() { Timeout = 15_000 });
@@ -195,19 +196,31 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
 
     /// <summary>
     /// Clicks the "Bulk Update" toolbar button (BulkUpdateMenu.razor's SfDropDownButton) and then
-    /// the named menu item within the popup it opens. A single click on a just-mounted
-    /// SfDropDownButton can land before Syncfusion's JS interop has attached its click listener —
-    /// the click is silently swallowed, no popup ever opens, and the follow-up item click then
-    /// waits the full default timeout for an item that will never appear (same class of race
-    /// DropDownSelector.SelectAsync guards against for SfDropDownList combo boxes). Retries the
-    /// button click a few times, but only when the popup itself never opened at all — checked via
-    /// its own ".e-dropdown-popup" container rather than the specific item, since re-clicking the
-    /// trigger while the popup IS already open toggles a SfDropDownButton closed again (unlike
-    /// SfDropDownList's combobox, which stays open on a same-target re-click) — retrying past that
-    /// point would just flap the menu open/closed and never let a genuinely-slow-to-render item
-    /// catch up.
+    /// the named menu item within the popup it opens, targeted by <paramref name="itemId"/> — the
+    /// item's own DropDownMenuItem.Id (e.g. "hr-bulk-import", "hr-bulk-download-template",
+    /// "hr-bulk-selected" — see BulkUpdateMenu.razor's BuildItems), which Syncfusion renders as the
+    /// real "id" HTML attribute on the item's own &lt;li&gt;. Previously targeted by accessible
+    /// role+name instead, scoped to the ".e-dropdown-popup" container that was just confirmed
+    /// open — but EmployeeList.razor's toolbar also mounts a second SfDropDownButton (ExportMenu),
+    /// each with its own ".e-dropdown-popup", and that scoping still couldn't reliably prove which
+    /// popup instance was actually open when more than one such container exists in the DOM
+    /// (Syncfusion popups are commonly pre-rendered closed, not lazily created on first open) —
+    /// observed as "Import" never becoming visible even though its popup and item genuinely exist.
+    /// An id is unique across the whole document by definition, so targeting it directly sidesteps
+    /// the ambiguity entirely rather than needing to first prove which popup is which.
+    ///
+    /// A single click on a just-mounted SfDropDownButton can land before Syncfusion's JS interop
+    /// has attached its click listener — the click is silently swallowed, no popup ever opens, and
+    /// the follow-up item click then waits the full default timeout for an item that will never
+    /// appear (same class of race DropDownSelector.SelectAsync guards against for SfDropDownList
+    /// combo boxes). Retries the button click a few times, but only when the popup itself never
+    /// opened at all — checked via its own ".e-dropdown-popup" container rather than the specific
+    /// item, since re-clicking the trigger while the popup IS already open toggles a
+    /// SfDropDownButton closed again (unlike SfDropDownList's combobox, which stays open on a
+    /// same-target re-click) — retrying past that point would just flap the menu open/closed and
+    /// never let a genuinely-slow-to-render item catch up.
     /// </summary>
-    private async Task OpenBulkUpdateMenuItemAsync(string itemName, bool exact = false)
+    private async Task OpenBulkUpdateMenuItemAsync(string itemId)
     {
         var button = page.GetByRole(AriaRole.Button, new() { Name = "Bulk Update" });
         var popup = page.Locator(".e-dropdown-popup");
@@ -229,7 +242,7 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             }
         }
 
-        var menuItem = page.GetByRole(AriaRole.Menuitem, new() { Name = itemName, Exact = exact });
+        var menuItem = page.Locator($"#{itemId}");
         await menuItem.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await menuItem.ClickAsync();
     }

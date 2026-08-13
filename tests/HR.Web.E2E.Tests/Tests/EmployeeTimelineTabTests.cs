@@ -89,18 +89,32 @@ public sealed class EmployeeTimelineTabTests(AppFixture fixture) : E2ETestBase(f
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, startDateDdMmYyyy: "01/01/2020");
-
-        // Page size is 20 (see EmployeeTimelineTab.razor's PageSize const). 22 HR notes plus the
-        // one pre-existing "Employee joined" entry give 23 total — 20 on the first page, 3 more
-        // after "Load more".
-        await empEdit.OpenNotesTabAsync();
-        for (var i = 0; i < 22; i++)
+        // This test does one employee creation (several combobox selections) plus 22 back-to-back
+        // Add Note dialog round-trips — each individual step still completes correctly, but under
+        // that much cumulative load a single step can occasionally take longer than the suite's
+        // normal 30s default action timeout (E2ETestBase.SetDefaultTimeout) without actually being
+        // stuck. Raise the budget just for this unusually long arrange phase rather than loosening
+        // the global default, which should stay tight everywhere else to fail fast on real hangs.
+        _page.SetDefaultTimeout(60_000);
+        try
         {
-            await empEdit.ClickAddNoteAsync();
-            await empEdit.SelectAddNoteCategoryAsync("General");
-            await empEdit.FillAddNoteTextAsync($"Load more note {i} {Guid.NewGuid():N}");
-            await empEdit.SubmitAddNoteDialogAsync();
+            await CreateEmployeeAsync(empList, empEdit, startDateDdMmYyyy: "01/01/2020");
+
+            // Page size is 20 (see EmployeeTimelineTab.razor's PageSize const). 22 HR notes plus the
+            // one pre-existing "Employee joined" entry give 23 total — 20 on the first page, 3 more
+            // after "Load more".
+            await empEdit.OpenNotesTabAsync();
+            for (var i = 0; i < 22; i++)
+            {
+                await empEdit.ClickAddNoteAsync();
+                await empEdit.SelectAddNoteCategoryAsync("General");
+                await empEdit.FillAddNoteTextAsync($"Load more note {i} {Guid.NewGuid():N}");
+                await empEdit.SubmitAddNoteDialogAsync();
+            }
+        }
+        finally
+        {
+            _page.SetDefaultTimeout(30_000);
         }
 
         var urlBeforeLoadMore = _page.Url;

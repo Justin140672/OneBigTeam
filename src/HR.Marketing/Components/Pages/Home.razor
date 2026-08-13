@@ -1,8 +1,8 @@
 @page "/"
 
-<PageTitle>One Big Team | Simple HR Software for Growing Teams</PageTitle>
+<PageTitle>One Big Team | HR Software for Growing SME Teams</PageTitle>
 <HeadContent>
-    <meta name="description" content="One Big Team helps small and medium-sized businesses manage employees, leave, sickness, documents, recruitment and compliance from one simple platform.">
+    <meta name="description" content="One Big Team is HR software built for SME HR teams — manage the whole employee lifecycle from onboarding to offboarding, track sickness and absence trends, run recruitment and keep records in one shared workspace.">
 </HeadContent>
 
 <SiteHeader CurrentPage="home" />
@@ -11,10 +11,12 @@
   <section class="hero section-band">
     <div class="section-inner hero-grid">
       <div class="hero-content">
-        <h1>Simple HR software for growing teams</h1>
+        <h1>HR software built for growing SME teams — from hire to leaver.</h1>
         <p class="hero-text">
-          One Big Team brings employee records, leave, recruitment, documents and workflows
-          into one shared workspace — so managers and employees always know where things stand.
+          One Big Team brings employee records, leave, sickness tracking, recruitment,
+          onboarding and offboarding into one shared workspace — so SME HR teams spend
+          less time chasing paperwork across email and spreadsheets, and more time
+          supporting their people.
         </p>
         <div class="hero-actions">
           <a class="button button-primary button-large" href="/signup">Start free trial</a>
@@ -22,24 +24,14 @@
         </div>
       </div>
 
-      <div class="image-placeholder hero-shot">
-        <img src="/assets/dashboard_hr.png" alt="Screenshot: HR dashboard" />
-      </div>
-    </div>
-  </section>
-
-  <section id="watch" class="section section-muted">
-    <div class="section-inner two-column">
-      <div>
-        <h2>See it work before you sign up.</h2>
-        <p>
-          No sales call to book. A full walkthrough of employee records, leave,
-          recruitment and reporting — watch it whenever suits you, then start
-          your own free trial straight after.
-        </p>
-      </div>
-      <VideoCard Title="One Big Team product overview"
-                 Caption="A full walkthrough of employee records, leave, recruitment and reporting." />
+      <figure class="hero-shot-figure">
+        <div class="image-placeholder hero-shot">
+          <img src="/assets/dashboard_hr.png"
+               alt="One Big Team dashboard showing employee headcount, upcoming leave and pending approvals at a glance"
+               width="1905" height="1362" loading="eager" />
+        </div>
+        <figcaption>Your team's employee records, leave and approvals in one dashboard.</figcaption>
+      </figure>
     </div>
   </section>
 
@@ -65,7 +57,7 @@
         <a class="card" href="/features/sickness-absence">
           <span class="card-icon" aria-hidden="true"><Icon Name="heart-pulse" /></span>
           <h3>Sickness tracking</h3>
-          <p>Record absences consistently and spot patterns without digging through email.</p>
+          <p>Record absences consistently and see Bradford Factor trends, so patterns surface before they become a problem.</p>
           <span class="card-arrow" aria-hidden="true"><Icon Name="arrow-right" /></span>
         </a>
         <a class="card" href="/features/recruitment">
@@ -83,7 +75,7 @@
         <a class="card" href="/features/workflows-reminders">
           <span class="card-icon" aria-hidden="true"><Icon Name="diagram-project" /></span>
           <h3>Workflows and reminders</h3>
-          <p>Turn repeat HR tasks into reliable prompts, approvals and follow-ups.</p>
+          <p>Onboarding checklists, probation review scheduling and offboarding workflows keep every stage of employment moving, without relying on memory.</p>
           <span class="card-arrow" aria-hidden="true"><Icon Name="arrow-right" /></span>
         </a>
         <a class="card" href="/features/reporting">
@@ -96,32 +88,86 @@
     </div>
   </section>
 
+  <section id="about" class="section section-muted">
+    <div class="section-inner two-column">
+      <div>
+        <div class="section-heading">
+          <h2>Why One Big Team?</h2>
+        </div>
+
+        <div class="benefit-grid">
+          <div>
+            <strong>The whole employee lifecycle, one workspace</strong>
+            <p>Hire-to-leaver moves through one system — with a full audit trail instead of scattered emails.</p>
+          </div>
+          <div>
+            <strong>Absence insight, not just logging</strong>
+            <p>Built-in Bradford Factor scoring and absence trends help managers spot patterns early and step in with real context, not guesswork.</p>
+          </div>
+          <div>
+            <strong>Ready for growth</strong>
+            <p>Every plan includes every feature, so HR stays consistent as your team expands, restructures or hires more often.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="image-placeholder is-portrait">
+        <span class="image-placeholder-icon" aria-hidden="true"><Icon Name="image" /></span>
+        <span class="image-placeholder-label">Photo: HR admin using One Big Team</span>
+        <span class="image-placeholder-spec">Real photography, warm natural light, laptop visible on screen, no stock-look poses</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="watch" class="section">
+    <div class="section-inner two-column">
+      <div>
+        <h2>See it work before you sign up.</h2>
+        <p>
+          No sales call to book. A full walkthrough of employee records, leave,
+          recruitment and reporting — watch it whenever suits you, then start
+          your own free trial straight after.
+        </p>
+      </div>
+      <VideoCard Title="One Big Team product overview"
+                 Caption="A full walkthrough of employee records, leave, recruitment and reporting." />
+    </div>
+  </section>
+
   <section class="section section-muted">
     <div class="section-inner">
       <div class="section-heading">
         <h2>Set up your HR workspace in four clear steps.</h2>
       </div>
 
-      <ol class="steps">
+      <ol class="timeline-steps">
         <li>
-          <span>1</span>
-          <h3>Create your company</h3>
-          <p>Start with your business profile and the basics your HR system needs.</p>
+          <span class="timeline-step-index">1</span>
+          <div class="timeline-step-body">
+            <h3>Create your company</h3>
+            <p>Start with your business profile and the basics your HR system needs.</p>
+          </div>
         </li>
         <li>
-          <span>2</span>
-          <h3>Import your organisation</h3>
-          <p>Add active employees so pricing and team structure can be confirmed.</p>
+          <span class="timeline-step-index">2</span>
+          <div class="timeline-step-body">
+            <h3>Import your organisation</h3>
+            <p>Add active employees so pricing and team structure can be confirmed.</p>
+          </div>
         </li>
         <li>
-          <span>3</span>
-          <h3>Configure your HR settings</h3>
-          <p>Set leave rules, document areas, workflows and reminder preferences.</p>
+          <span class="timeline-step-index">3</span>
+          <div class="timeline-step-body">
+            <h3>Configure your HR settings</h3>
+            <p>Set leave rules, document areas, workflows and reminder preferences.</p>
+          </div>
         </li>
         <li>
-          <span>4</span>
-          <h3>Invite your team</h3>
-          <p>Bring managers and employees into a workspace built for everyday use.</p>
+          <span class="timeline-step-index">4</span>
+          <div class="timeline-step-body">
+            <h3>Invite your team</h3>
+            <p>Bring managers and employees into a workspace built for everyday use.</p>
+          </div>
         </li>
       </ol>
     </div>
@@ -134,42 +180,12 @@
       </div>
       <div>
         <p>
-          One Big Team pricing is based on the number of active employees in your
-          organisation. Your exact monthly price is confirmed after organisation import,
-          so the plan reflects the team you actually manage.
+          Use our pricing calculator to estimate your monthly price before you sign up —
+          no need to import any employee data first. Once you're set up, your billing
+          automatically reflects your active employee count, so the plan always matches
+          the team you actually manage.
         </p>
-        <a class="button button-secondary" href="/pricing">See pricing</a>
-      </div>
-    </div>
-  </section>
-
-  <section id="about" class="section">
-    <div class="section-inner two-column">
-      <div>
-        <div class="section-heading">
-          <h2>Built for SMEs that need clarity without extra complexity.</h2>
-        </div>
-
-        <div class="benefit-grid">
-          <div>
-            <strong>One source of truth</strong>
-            <p>Bring records, requests, documents and reminders into one shared workspace.</p>
-          </div>
-          <div>
-            <strong>Less manual chasing</strong>
-            <p>Give managers clearer workflows and employees a simpler route to support.</p>
-          </div>
-          <div>
-            <strong>Ready for growth</strong>
-            <p>Keep HR consistent as your team expands, restructures or hires more often.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="image-placeholder is-portrait">
-        <span class="image-placeholder-icon" aria-hidden="true"><Icon Name="image" /></span>
-        <span class="image-placeholder-label">Photo: HR admin using One Big Team</span>
-        <span class="image-placeholder-spec">Real photography, warm natural light, laptop visible on screen, no stock-look poses</span>
+        <a class="button button-secondary" href="/pricing#calculator">Try the pricing calculator</a>
       </div>
     </div>
   </section>

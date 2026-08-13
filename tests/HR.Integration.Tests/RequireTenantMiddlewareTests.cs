@@ -163,6 +163,7 @@ public class TenantRouteAuthorizationMiddlewareTests
         var context = new DefaultHttpContext();
         context.Response.Body = new MemoryStream();
         context.User = AuthenticatedUserWithCompany(companyId);
+        SetResolvedTenant(context, companyId);
         context.Request.RouteValues["companyId"] = companyId.ToString();
 
         var nextCalled = false;
@@ -179,6 +180,7 @@ public class TenantRouteAuthorizationMiddlewareTests
         var context = new DefaultHttpContext();
         context.Response.Body = new MemoryStream();
         context.User = AuthenticatedUserWithCompany(Guid.NewGuid()); // companyA
+        SetResolvedTenant(context, Guid.NewGuid()); // companyA, resolved server-side
         context.Request.RouteValues["companyId"] = Guid.NewGuid().ToString(); // companyB — mismatch
 
         var nextCalled = false;
@@ -194,5 +196,17 @@ public class TenantRouteAuthorizationMiddlewareTests
     {
         var claims = new[] { new Claim("company_id", companyId.ToString()) };
         return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test"));
+    }
+
+    // TenantRouteAuthorizationMiddleware reads the DB-resolved tenant from
+    // context.Items[SupabaseCurrentUserResolutionMiddleware.CurrentUserItemKey] (set by
+    // SupabaseCurrentUserResolutionMiddleware earlier in the real pipeline), not from the raw
+    // "company_id" claim — real Supabase tokens never carry that claim. These unit tests exercise
+    // TenantRouteAuthorizationMiddleware in isolation, so they must populate context.Items
+    // themselves to simulate what the upstream middleware would already have resolved.
+    private static void SetResolvedTenant(HttpContext context, Guid tenantId)
+    {
+        context.Items[SupabaseCurrentUserResolutionMiddleware.CurrentUserItemKey] =
+            new ResolvedCurrentUser(UserId: Guid.NewGuid(), Email: null, TenantId: tenantId.ToString(), IsAuthenticated: true);
     }
 }

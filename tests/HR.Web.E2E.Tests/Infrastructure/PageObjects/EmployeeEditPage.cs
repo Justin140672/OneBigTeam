@@ -259,11 +259,14 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         // A single instant IsVisibleAsync() snapshot can land mid-flicker — _companyEmployeeNumberMode
         // starts as Manual (the field renders) and only flips to Automatic (the field is removed)
         // once EmployeeEdit.razor's own async hrSettings fetch resolves, so a check that fires right
-        // as that swap happens can catch neither state reliably. Poll briefly instead of trusting one
+        // as that swap happens can catch neither state reliably. Poll instead of trusting one
         // snapshot — for Manual-mode companies (where the field is required) this avoids silently
         // skipping the fill and failing later with "Employee number is required."; for Automatic-mode
-        // companies it just spends a little longer confirming the field really is gone.
-        var deadline = DateTime.UtcNow.AddSeconds(2);
+        // companies it just spends a little longer confirming the field really is gone. 10s matches
+        // IsEmployeeNumberInputVisibleAsync's own wait for this identical async load — a shorter
+        // budget here (previously 2s) could still lose the race under a busy/loaded run and silently
+        // skip the fill, which is exactly the failure this poll exists to prevent.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
         var visible = await field.IsVisibleAsync();
         while (!visible && DateTime.UtcNow < deadline)
         {
@@ -1046,6 +1049,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             try
             {
                 await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 3_000 });
+                await WaitForCategoryComboboxAsync();
                 return;
             }
             catch (TimeoutException)
@@ -1055,6 +1059,18 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
 
         await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await WaitForCategoryComboboxAsync();
+
+        // The dialog root becoming visible only proves Syncfusion's SfDialog shell has opened —
+        // its own body content, including the Category SfDropDownList that
+        // SelectAddNoteCategoryAsync immediately targets next, is a separate, later render pass.
+        // Calling DropDownSelector against a combobox that hasn't mounted yet fails hard: Playwright's
+        // default (30s) actionability wait just spins waiting for an element that was never there
+        // to begin with, rather than timing out quickly the way an already-attached-but-not-yet-
+        // interactive element would. Wait for it explicitly here so callers never race this gap.
+        async Task WaitForCategoryComboboxAsync() =>
+            await dialog.Locator("span[role='combobox']").First.WaitForAsync(
+                new() { State = WaitForSelectorState.Attached, Timeout = 10_000 });
     }
 
     /// <summary>
@@ -1079,9 +1095,28 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task SubmitAddNoteDialogAsync()
     {
-        await page.Locator(".add-employee-note-dialog .e-footer-content button:has-text('Add')").ClickAsync();
-        await page.Locator("[role='dialog'].add-employee-note-dialog").WaitForAsync(
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        var dialog = page.Locator("[role='dialog'].add-employee-note-dialog");
+        var addBtn = page.Locator(".add-employee-note-dialog .e-footer-content button:has-text('Add')");
+
+        // Same race as ClickAddNoteAsync's own retry loop (see its comment), just on the submit
+        // side instead of the reopen side: a click landing while the dialog's own open/prior-close
+        // commit is still in flight server-side can be silently swallowed with no error and no
+        // client-side signal — observed as the dialog just never transitioning to Hidden, not as a
+        // late-but-eventual close. That's indistinguishable from a genuinely failed submit by
+        // waiting alone, so retry the click itself rather than only waiting longer for one attempt.
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await addBtn.ClickAsync();
+            try
+            {
+                await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = attempt < 3 ? 4_000 : 10_000 });
+                break;
+            }
+            catch (TimeoutException) when (attempt < 3)
+            {
+                // Click likely landed mid-commit and was a no-op — try again.
+            }
+        }
 
         // The dialog goes visually Hidden (Syncfusion toggles the e-popup-close class client-side)
         // ahead of the SignalR round-trip that actually commits IsOpen=false server-side — a caller

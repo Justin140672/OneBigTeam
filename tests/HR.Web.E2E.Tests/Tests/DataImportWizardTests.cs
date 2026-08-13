@@ -40,11 +40,26 @@ public sealed class DataImportWizardTests(AppFixture fixture) : E2ETestBase(fixt
 
         try
         {
-            var login  = new LoginPage(_page, _fixture.WebBaseUrl);
-            var wizard = new DataImportWizardPage(_page, _fixture.WebBaseUrl);
+            var login      = new LoginPage(_page, _fixture.WebBaseUrl);
+            var wizard     = new DataImportWizardPage(_page, _fixture.WebBaseUrl);
+            var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
             await login.GoToAsync();
             await login.LoginAsync(LauraEmail);
+
+            // Acme's Employee Number Mode is shared, mutable company state that other test
+            // classes (HrSettingsPageTests, BackfillEmployeeNumbersTests, etc.) flip between
+            // Manual and Automatic via the UI. This test's CSV row supplies an explicit
+            // "Employee Number" value, which EmployeeStagingRowValidator rejects outright when
+            // the company is in Automatic mode (see ValidateEmployeeNumberField) — so set the
+            // mode deterministically rather than assuming whatever an earlier test happened to
+            // leave it as.
+            await hrSettings.GoToAsync(AcmeId);
+            if (await hrSettings.GetEmployeeNumberModeAsync() != "Manual")
+            {
+                await hrSettings.SelectEmployeeNumberModeAsync("Manual");
+                await hrSettings.SaveAsync();
+            }
 
             await wizard.GoToAsync(AcmeId);
             await wizard.UploadFileAsync(tempFile);

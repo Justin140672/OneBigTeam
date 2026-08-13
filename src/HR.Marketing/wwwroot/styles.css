@@ -2,7 +2,7 @@
   ONE BIG TEAM — MARKETING SITE DESIGN SYSTEM
   A restrained, category-standard SaaS marketing register: a serious,
   precise tool for a warm, human subject. Neutral off-white/near-black
-  ground, one confident teal accent carries every CTA/link/active state.
+  ground, one confident blue accent carries every CTA/link/active state.
   See DESIGN.md for the full rationale.
 */
 
@@ -17,11 +17,11 @@
     --color-ink-soft: #55585f;
     --color-ink-faint: #83858c;
 
-    /* Color: accent (single committed hue, teal) */
-    --color-accent: #0ea684;
-    --color-accent-strong: #00806a;
-    --color-accent-hover: #00695a;
-    --color-accent-soft: #e1f3ee;
+    /* Color: accent / primary (single committed hue, blue) — MKT-UX-09 */
+    --color-accent: #2b38a1;
+    --color-accent-hover: #25318c;
+    --color-accent-active: #212b7a;
+    --color-accent-soft: #e8eaf8;
     --color-on-accent: #ffffff;
 
     /* Color: dark surfaces (header/footer/final CTA) */
@@ -113,6 +113,20 @@ a {
     border-radius: 4px;
 }
 
+/* Keep the sticky header from obscuring in-page anchor targets (e.g. the "/#about" nav
+   link) when navigated to via keyboard/click. Sized to roughly match .site-header's
+   height at each breakpoint; more specific selectors elsewhere (e.g. .feature-detail-section,
+   .contact-form) already set their own value and take precedence via source order. */
+section[id] {
+    scroll-margin-top: 96px;
+}
+
+@media (max-width: 640px) {
+    section[id] {
+        scroll-margin-top: 88px;
+    }
+}
+
 /* ---------------------------------------------------------------------
    Header
 --------------------------------------------------------------------- */
@@ -166,7 +180,7 @@ a {
     .site-nav a:hover,
     .login-link:hover,
     .site-nav a[aria-current="page"] {
-        color: var(--color-accent-strong);
+        color: var(--color-accent);
     }
 
 .header-actions,
@@ -228,13 +242,17 @@ a {
 
 .button-primary {
     color: var(--color-on-accent);
-    background: var(--color-accent-strong);
+    background: var(--color-accent);
     box-shadow: var(--shadow-sm);
 }
 
     .button-primary:hover {
         background: var(--color-accent-hover);
         box-shadow: var(--shadow-md);
+    }
+
+    .button-primary:active {
+        background: var(--color-accent-active);
     }
 
 .button-secondary {
@@ -244,7 +262,7 @@ a {
 }
 
     .button-secondary:hover {
-        border-color: var(--color-accent-strong);
+        border-color: var(--color-accent);
         background: var(--color-accent-soft);
     }
 
@@ -270,6 +288,19 @@ a {
 
 .section-inner-wide {
     width: min(1280px, 100%);
+}
+
+/* Homepage sections run one after another more densely than standalone
+   pages, so trim the padding a little to tighten the rhythm between them
+   without cramping any single section's content. */
+#home .section,
+#home .section-band {
+    padding-top: clamp(48px, 7vw, 84px);
+    padding-bottom: clamp(48px, 7vw, 84px);
+}
+
+#home .final-cta {
+    padding-top: clamp(40px, 6vw, 72px);
 }
 
 .section-muted {
@@ -414,6 +445,7 @@ a.card:focus-visible,
 @media (prefers-reduced-motion: reduce) {
     .card,
     .button,
+    .card-arrow,
     .video-card-play {
         transition: none;
     }
@@ -437,7 +469,7 @@ a.card:focus-visible,
     height: 40px;
     margin-bottom: 18px;
     border-radius: var(--radius-sm);
-    color: var(--color-accent-strong);
+    color: var(--color-accent);
     background: var(--color-accent-soft);
     font-size: 1.2rem;
 }
@@ -449,7 +481,7 @@ a.card:focus-visible,
     width: 24px;
     height: 24px;
     margin-top: 18px;
-    color: var(--color-accent-strong);
+    color: var(--color-accent);
     opacity: 0;
     transform: translateX(-6px);
     transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
@@ -503,7 +535,7 @@ a.card:focus-visible,
 }
 
 .hero-shot {
-    --placeholder-ratio: 1905 / 1362;
+    --placeholder-ratio: 16 / 10;
     position: relative;
     overflow: hidden;
     border-radius: var(--radius-lg);
@@ -518,10 +550,25 @@ a.card:focus-visible,
 }
 
 .image-placeholder img {
+    display: block;
     width: 100%;
     height: 100%;
+    max-width: 100%;
     object-fit: cover;
+    object-position: 50% 12%;
     border-radius: inherit;
+}
+
+.hero-shot-figure {
+    margin: 0;
+}
+
+.hero-shot-figure figcaption {
+    margin-top: 10px;
+    font-size: var(--text-label);
+    font-weight: 600;
+    color: var(--color-ink-soft);
+    text-align: center;
 }
 
 @media (max-width: 900px) {
@@ -542,7 +589,7 @@ a.card:focus-visible,
         justify-content: center;
     }
 
-    .hero-shot {
+    .hero-shot-figure {
         order: -1;
         width: min(640px, 100%);
         margin: 0 auto;
@@ -581,7 +628,7 @@ a.card:focus-visible,
         margin-bottom: 40px;
         border-radius: var(--radius-full);
         color: var(--color-on-accent);
-        background: var(--color-accent-strong);
+        background: var(--color-accent);
         font-family: var(--font-display);
         font-weight: 700;
     }
@@ -594,6 +641,66 @@ a.card:focus-visible,
         margin: 0;
         color: var(--color-ink-soft);
     }
+
+/* ---------------------------------------------------------------------
+   Timeline steps — deliberately distinct from the boxed .card-grid /
+   .benefit-grid treatment so two grids in a row don't read as one.
+   Numbered markers on a connecting line instead of bordered surfaces.
+--------------------------------------------------------------------- */
+
+.timeline-steps {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+    .timeline-steps li {
+        position: relative;
+        padding-top: 46px;
+    }
+
+    .timeline-steps li::before {
+        content: "";
+        position: absolute;
+        top: 17px;
+        left: calc(50% + 21px);
+        width: calc(100% - 21px);
+        height: 2px;
+        background: var(--color-border-strong);
+    }
+
+    .timeline-steps li:last-child::before {
+        display: none;
+    }
+
+.timeline-step-index {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-full);
+    color: var(--color-on-accent);
+    background: var(--color-accent);
+    font-family: var(--font-display);
+    font-weight: 700;
+}
+
+.timeline-step-body h3 {
+    margin-bottom: 8px;
+}
+
+.timeline-step-body p {
+    margin: 0;
+    color: var(--color-ink-soft);
+}
 
 /* ---------------------------------------------------------------------
    Pricing teaser / final CTA — dark grounded panels
@@ -731,7 +838,7 @@ a.card:focus-visible,
     width: 62px;
     height: 62px;
     border-radius: var(--radius-full);
-    background: var(--color-accent-strong);
+    background: var(--color-accent);
     box-shadow: var(--shadow-lg);
     color: var(--color-on-accent);
     font-size: 1.3rem;
@@ -824,7 +931,7 @@ a.card:focus-visible,
 .price-summary strong {
     display: block;
     margin-bottom: 18px;
-    color: var(--color-accent-strong);
+    color: var(--color-accent);
     font-family: var(--font-display);
     font-weight: 700;
     font-size: clamp(2.6rem, 5.5vw, 4rem);
@@ -905,7 +1012,7 @@ a.card:focus-visible,
     padding: 22px;
     border-radius: var(--radius-md);
     color: var(--color-on-accent);
-    background: var(--color-accent-strong);
+    background: var(--color-accent);
 }
 
     .estimate-result > div {
@@ -926,7 +1033,7 @@ a.card:focus-visible,
 
 #employee-slider {
     width: 100%;
-    accent-color: var(--color-accent-strong);
+    accent-color: var(--color-accent);
 }
 
 .field-error {
@@ -966,7 +1073,7 @@ a.card:focus-visible,
 .pricing-headline {
     display: block;
     margin: 8px 0;
-    color: var(--color-accent-strong);
+    color: var(--color-accent);
     font-family: var(--font-display);
     font-weight: 700;
     font-size: clamp(1.9rem, 2.8vw, 2.4rem);
@@ -1102,7 +1209,7 @@ a.card:focus-visible,
         background: var(--color-surface);
         border: 1px solid var(--color-border);
         border-radius: var(--radius-sm);
-        color: var(--color-accent-strong);
+        color: var(--color-accent);
         font-weight: 600;
     }
 
@@ -1139,7 +1246,7 @@ a.card:focus-visible,
     width: 56px;
     height: 56px;
     border-radius: var(--radius-md);
-    color: var(--color-accent-strong);
+    color: var(--color-accent);
     font-size: 1.6rem;
 }
 
@@ -1174,7 +1281,7 @@ a.card:focus-visible,
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: var(--color-accent-strong);
+            background: var(--color-accent);
         }
 
 /* ---------------------------------------------------------------------
@@ -1214,7 +1321,7 @@ a.card:focus-visible,
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: var(--color-accent-strong);
+        background: var(--color-accent);
     }
 
     .info-points strong {
@@ -1305,6 +1412,59 @@ a.card:focus-visible,
     display: block;
 }
 
+.field-hint {
+    margin: 0;
+    color: var(--color-ink-muted, var(--color-ink));
+    font-size: var(--text-meta);
+}
+
+.field-live {
+    margin: 0;
+    font-size: var(--text-meta);
+    font-weight: 600;
+    color: var(--color-accent);
+}
+
+.field-live:empty {
+    display: none;
+}
+
+.password-field {
+    position: relative;
+    display: flex;
+}
+
+.password-field input {
+    flex: 1;
+    padding-right: 96px;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+    transform: translateY(-50%);
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font: inherit;
+    font-size: var(--text-meta);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.password-toggle:focus-visible {
+    outline: 3px solid var(--color-accent-soft);
+    outline-offset: 2px;
+}
+
 .form-submit-row {
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
@@ -1315,8 +1475,26 @@ a.card:focus-visible,
     padding: 16px 18px;
     border-radius: var(--radius-sm);
     background: var(--color-accent-soft);
-    color: var(--color-accent-strong);
+    color: var(--color-accent);
     font-weight: 600;
+}
+
+.form-status-error {
+    background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+    color: var(--color-danger);
+}
+
+/* Honeypot field: hidden from sighted users and kept out of the tab order (tabindex="-1" on the
+   input, see Contact.razor), but still present in the DOM/accessibility tree rather than
+   display:none/type="hidden" so unsophisticated bots that scrape and fill every visible-looking
+   field still populate it. Real visitors never encounter it. */
+.form-field-honeypot {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------------
@@ -1348,7 +1526,7 @@ a.card:focus-visible,
     }
 
     .faq-list details[open] summary {
-        color: var(--color-accent-strong);
+        color: var(--color-accent);
     }
 
     .faq-list p {
@@ -1403,7 +1581,7 @@ a.card:focus-visible,
     }
 
     .legal-content a {
-        color: var(--color-accent-strong);
+        color: var(--color-accent);
         text-decoration: underline;
     }
 
@@ -1453,7 +1631,7 @@ a.card:focus-visible,
     }
 
     .plain-page a {
-        color: var(--color-accent-strong);
+        color: var(--color-accent);
         text-decoration: underline;
     }
 
@@ -1595,8 +1773,13 @@ a.card:focus-visible,
         margin: 0 auto;
     }
 
-    .steps {
+    .steps,
+    .timeline-steps {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .timeline-steps li:nth-child(2)::before {
+        display: none;
     }
 }
 
@@ -1644,10 +1827,19 @@ a.card:focus-visible,
     .benefit-grid,
     .feature-index,
     .steps,
+    .timeline-steps,
     .footer-links,
     .included-feature-grid,
     .estimate-result {
         grid-template-columns: 1fr;
+    }
+
+    .timeline-steps {
+        gap: 28px;
+    }
+
+    .timeline-steps li::before {
+        display: none;
     }
 
     .card-grid > .card:last-child:nth-child(2n + 1) {

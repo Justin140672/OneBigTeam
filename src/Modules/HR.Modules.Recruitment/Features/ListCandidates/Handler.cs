@@ -20,6 +20,7 @@ internal sealed class ListCandidatesHandler(RecruitmentDbContext db)
             query = query.Where(c =>
                 c.FirstName.ToLower().Contains(search) ||
                 c.LastName.ToLower().Contains(search) ||
+                (c.FirstName.ToLower() + " " + c.LastName.ToLower()).Contains(search) ||
                 c.Email.ToLower().Contains(search));
         }
 

@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -85,20 +86,84 @@ public sealed class GettingStartedAndExploreTests(AppFixture fixture) : E2ETestB
         // AppSession.LandingUrl sends an HR Administrator / Company Administrator straight to
         // "/getting-started" whenever ShowGettingStarted is true (i.e. the company's checklist
         // progress row hasn't been dismissed/hidden yet — see AppSession.InitialiseAsync).
-        // Because IsHidden only ever becomes true via an explicit dismissal (or a completed
-        // checklist reaching 100%, see CompanyOnboardingProgress.MarkCompleted) and Acme's
-        // progress row is shared across the whole E2E run, this assumes no earlier test in the
-        // suite has already dismissed/completed the checklist for Acme. If test ordering ever
-        // changes such that another test dismisses it first, this assertion would need Acme's
-        // onboarding progress reset out-of-band (there's no UI to "un-dismiss" it).
+        // IsHidden only ever becomes true via an explicit dismissal (or a completed checklist
+        // reaching 100%, see CompanyOnboardingProgress.MarkCompleted), and there's no UI (or,
+        // from this test project, DB access — CompanyOnboardingProgress is internal to a
+        // different module/assembly) to "un-dismiss" it. Acme's progress row is shared and
+        // mutated by many other tests across the whole E2E run (e.g. this class's own "Configure
+        // your HR settings" completion test below), so asserting this against Acme would make the
+        // result depend on test execution order. Provision a brand-new company instead — its
+        // checklist is guaranteed untouched — so this test is self-contained regardless of order.
+        var (email, password) = await ProvisionFreshCompanyAdminAsync();
+
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(HrAdminEmail);
+        await login.LoginAsync(email, password);
 
         await _page.WaitForURLAsync(new Regex("/getting-started"), new() { Timeout = 15_000 });
         Assert.Contains("/getting-started", _page.Url);
     }
+
+    /// <summary>
+    /// Provisions a brand-new company + Company Administrator via the real self-service signup
+    /// endpoint (POST /api/signup), then uses the same dev-only bypasses VerifyEmailJourneyTests
+    /// relies on to make it usable end-to-end in this environment: POST /api/dev/activate-company
+    /// (skips the real Supabase email-verification click — no live Supabase project is configured
+    /// here) and POST /api/dev/persona/register (seeds the new admin as a loggable dev Supabase
+    /// user, since the plain /api/signup user is a real pending Supabase user the dev-mode login
+    /// form can't authenticate against directly). Returns credentials for LoginPage.LoginAsync.
+    /// </summary>
+    private async Task<(string Email, string Password)> ProvisionFreshCompanyAdminAsync()
+    {
+        // NOT HR.Modules.Identity.Services.SupabaseAuthGateway.DevSupabasePassword — Login.razor's
+        // dev-mode form never reaches real Supabase auth itself. It looks the email up in
+        // DevPersonaStore.Personas (populated by /api/dev/persona/register below), requires this
+        // exact literal client-side (Login.razor: "_form.Password != \"password\""), and only then
+        // calls DevAuth.SwitchAsync server-side to establish the real Supabase session — which is
+        // where DevSupabasePassword actually gets used, transparently to the login form/caller.
+        const string devLoginPassword = "password";
+
+        using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };
+
+        var email = $"e2e-getting-started-{Guid.NewGuid():N}@example.com";
+
+        var signUpResponse = await http.PostAsJsonAsync("/api/signup", new
+        {
+            CompanyName = $"E2E Getting Started Co {Guid.NewGuid():N}",
+            AdminFirstName = "Ada",
+            AdminLastName = "Lovelace",
+            AdminEmail = email,
+            Password = "P@ssw0rd123",
+        });
+        signUpResponse.EnsureSuccessStatusCode();
+
+        var signUp = await signUpResponse.Content.ReadFromJsonAsync<SignUpResult>();
+        Assert.NotNull(signUp);
+
+        var activateResponse = await http.PostAsJsonAsync(
+            "/api/dev/activate-company", new { CompanyId = signUp!.CompanyId });
+        activateResponse.EnsureSuccessStatusCode();
+
+        var registerResponse = await http.PostAsJsonAsync("/api/dev/persona/register", new
+        {
+            UserId = signUp.UserId,
+            CompanyId = signUp.CompanyId,
+            FirstName = "Ada",
+            LastName = "Lovelace",
+            Email = email,
+        });
+        registerResponse.EnsureSuccessStatusCode();
+
+        return (email, devLoginPassword);
+    }
+
+    private sealed record SignUpResult(
+        Guid UserId,
+        Guid CompanyId,
+        string Email,
+        string FirstName,
+        string LastName);
 
     /// <summary>
     /// Getting Started has no direct create/edit form of its own, so the closest CRUD-equivalent

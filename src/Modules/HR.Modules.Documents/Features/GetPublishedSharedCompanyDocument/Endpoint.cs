@@ -1,10 +1,10 @@
-using System.Security.Claims;
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Features.GetPublishedSharedCompanyDocument;
 
-internal sealed class Endpoint(GetPublishedSharedCompanyDocumentHandler handler)
+internal sealed class Endpoint(GetPublishedSharedCompanyDocumentHandler handler, ICurrentUser currentUser)
     : Endpoint<GetPublishedSharedCompanyDocumentRequest, GetPublishedSharedCompanyDocumentResponse>
 {
     public override void Configure()
@@ -20,7 +20,11 @@ internal sealed class Endpoint(GetPublishedSharedCompanyDocumentHandler handler)
         // Self-scoped by the caller's own id (== Employee.Id, same convention as
         // GetMyEmployee/GetMyOnboardingStatus) — needed to resolve their department/location
         // for the audience check and their own acknowledgement state.
-        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var callerEmployeeId))
+        // Reads the DB-resolved user id via ICurrentUser, not a raw ClaimTypes.NameIdentifier claim
+        // — the JWT bearer handler is configured with MapInboundClaims = false (see HR.Api's
+        // ConfigureSupabaseJwtBearer), so real Supabase-issued tokens never populate that mapped
+        // claim type; relying on it directly would Unauthorized every request unconditionally.
+        if (currentUser.UserId is not Guid callerEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;

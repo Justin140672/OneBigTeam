@@ -76,4 +76,26 @@ public class PricingCalculatorTests
         Assert.Equal(0, result.ActiveEmployees);
         Assert.Equal(20.00m, result.Monthly);
     }
+
+    /// <summary>
+    /// Regression test tying the pricing page's worked example copy (Pricing.razor: "50 x £2.00 = £100.00,
+    /// plus 25 x £1.75 = £43.75, total £143.75/month") to the actual calculation service, so the two
+    /// cannot silently drift apart if tier rates or limits change.
+    /// </summary>
+    [Fact]
+    public void Calculate_SeventyFiveEmployeeWorkedExampleMatchesPricingPageCopy()
+    {
+        var firstBandCost = PricingCalculator.FirstTierLimit * PricingCalculator.FirstTierRate;
+        var secondBandEmployees = 75 - PricingCalculator.FirstTierLimit;
+        var secondBandCost = secondBandEmployees * PricingCalculator.SecondTierRate;
+
+        Assert.Equal(100.00m, firstBandCost);
+        Assert.Equal(25, secondBandEmployees);
+        Assert.Equal(43.75m, secondBandCost);
+
+        var result = PricingCalculator.Calculate(75);
+
+        Assert.Equal(143.75m, firstBandCost + secondBandCost);
+        Assert.Equal(143.75m, result.Monthly);
+    }
 }

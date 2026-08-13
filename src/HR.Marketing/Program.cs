@@ -98,6 +98,64 @@ app.MapPost("/resend-verification", async (HttpRequest request, IHttpClientFacto
     return Results.Redirect($"/check-your-email?email={Uri.EscapeDataString(email)}&resent=true");
 });
 
+// Server-side proxy for the contact form (Contact.razor) — same shape as /signup-submit: a plain
+// HTML <form> post (this app renders statically, no interactive circuit) forwarded to HR.Api's
+// public /api/contact endpoint, which relays the enquiry to Postmark. On failure, the originally
+// entered values are round-tripped back via query string so the visitor doesn't have to retype
+// everything.
+app.MapPost("/contact-submit", async (HttpRequest request, IHttpClientFactory httpClientFactory) =>
+{
+    var form = await request.ReadFormAsync();
+    var name = form["name"].ToString();
+    var email = form["email"].ToString();
+    var company = form["company"].ToString();
+    var employeeCountRaw = form["employee-count"].ToString();
+    var message = form["message"].ToString();
+    var website = form["website"].ToString(); // honeypot — real visitors never populate this
+
+    int? employeeCount = int.TryParse(employeeCountRaw, out var parsedCount) ? parsedCount : null;
+
+    string BuildRetryUrl(string errorMessage) =>
+        "/contact?status=error"
+        + $"&error={Uri.EscapeDataString(errorMessage)}"
+        + $"&name={Uri.EscapeDataString(name)}"
+        + $"&email={Uri.EscapeDataString(email)}"
+        + $"&company={Uri.EscapeDataString(company)}"
+        + $"&employeeCount={Uri.EscapeDataString(employeeCountRaw)}"
+        + $"&message={Uri.EscapeDataString(message)}"
+        + "#contact-form";
+
+    var http = httpClientFactory.CreateClient("hrapi");
+
+    HttpResponseMessage contactResponse;
+    try
+    {
+        contactResponse = await http.PostAsJsonAsync("api/contact", new
+        {
+            Name = name,
+            Email = email,
+            Company = company,
+            EmployeeCount = employeeCount,
+            Message = message,
+            Website = website,
+        });
+    }
+    catch (HttpRequestException)
+    {
+        return Results.Redirect(BuildRetryUrl("We couldn't send your message. Please try again shortly."));
+    }
+
+    if (!contactResponse.IsSuccessStatusCode)
+    {
+        var errorMessage = contactResponse.StatusCode == System.Net.HttpStatusCode.TooManyRequests
+            ? "Too many messages sent recently. Please wait a few minutes and try again."
+            : "We couldn't send your message. Please check your details and try again.";
+        return Results.Redirect(BuildRetryUrl(errorMessage));
+    }
+
+    return Results.Redirect("/contact?status=success#contact-form");
+});
+
 app.Run();
 
 internal sealed record StartTrialSignUpResult(Guid UserId, Guid CompanyId, string Email, string FirstName, string LastName);

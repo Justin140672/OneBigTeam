@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -66,6 +68,12 @@ public class GetMyProfilePhotoEndpointTests
             Assert.Equal(HttpStatusCode.OK, liveUpload.StatusCode);
         }
 
+        // Uploads are scanned asynchronously via a Hangfire job (ScanUploadedFileJob) that never
+        // actually runs inside this integration test — simulate a completed Clean scan directly so
+        // this read test doesn't need to know about ScanStatusAccessGuard (that guard itself is
+        // covered by dedicated tests).
+        await MarkCurrentPhotoScanCleanAsync(companyId, employeeId);
+
         using var client = await SelfClient(companyId, employeeId);
 
         // Employee then submits a new photo, which lands in the pending queue rather than
@@ -74,6 +82,8 @@ public class GetMyProfilePhotoEndpointTests
             $"/api/companies/{companyId}/employees/me/profile-photo",
             BuildPngUpload("pending.png"));
         Assert.Equal(HttpStatusCode.OK, pendingUpload.StatusCode);
+
+        await MarkPendingPhotoScanCleanAsync(companyId, employeeId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/me/profile-photo");
@@ -111,6 +121,26 @@ public class GetMyProfilePhotoEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, ManagerUser, SystemRoles.HrAdministrator, companyId);
         return client;
+    }
+
+    private async Task MarkCurrentPhotoScanCleanAsync(Guid companyId, Guid employeeId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
+        var photo = await db.EmployeeProfilePhotos
+            .SingleAsync(p => p.CompanyId == companyId && p.EmployeeId == employeeId);
+        photo.MarkScanClean(DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
+    }
+
+    private async Task MarkPendingPhotoScanCleanAsync(Guid companyId, Guid employeeId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
+        var pending = await db.PendingProfilePhotos
+            .SingleAsync(p => p.CompanyId == companyId && p.EmployeeId == employeeId);
+        pending.MarkScanClean(DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
     }
 
     private static MultipartFormDataContent BuildPngUpload(string fileName = "avatar.png") =>

@@ -205,15 +205,25 @@ public sealed class EmployeeOnboardingTabTests(AppFixture fixture) : E2ETestBase
         // Revisiting the employee's profile should no longer show an Onboarding tab at all.
         await empEdit.GoToAsync(AcmeId, employeeId);
 
-        Assert.False(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).IsVisibleAsync(),
-            "Expected the Onboarding tab to be hidden once the plan is Completed");
+        // Same race documented on HasNotesTabAsync/HasProfilePhotoInitialsAsync in
+        // EmployeeEditPage.cs: GoToAsync's own wait condition (the Details tab's combobox) can
+        // resolve on an earlier render pass than the Onboarding tab's own visibility, which
+        // depends on its own async plan-status load — a bare IsVisibleAsync() snapshot right after
+        // navigation can catch that transient state instead of the settled (hidden) one. Use an
+        // auto-retrying negative assertion instead of a one-shot check.
+        await Assertions.Expect(_page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }))
+            .Not.ToBeVisibleAsync(new() { Timeout = 15_000 });
 
         // The underlying data isn't deleted — HR can still find the completion in Audit history.
         await empEdit.OpenAuditTabAsync();
-        Assert.True(
-            await empEdit.AuditHistoryRow("Onboarding completed").First.IsVisibleAsync(),
-            "Expected the Audit tab to show an 'Onboarding completed' history entry");
+
+        // OpenAuditTabAsync's own wait only proves the grid container (or its empty-state
+        // sibling) attached — same class of race as the Onboarding-tab check above: the audit
+        // history rows themselves populate via a separate, later async load, so a bare
+        // IsVisibleAsync() snapshot right after the tab click can catch that transient
+        // (row-not-yet-rendered) state instead of the settled one. Use an auto-retrying assertion.
+        await Assertions.Expect(empEdit.AuditHistoryRow("Onboarding completed").First)
+            .ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     [Fact]

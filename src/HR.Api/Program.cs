@@ -1,3 +1,5 @@
+using System.Net;
+using System.Threading.RateLimiting;
 using FastEndpoints;
 using HR.Api.Authentication;
 using HR.Infrastructure;
@@ -54,6 +56,24 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
     o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
+
+// Lightweight abuse protection for the public marketing contact form (POST /api/contact below) —
+// no external captcha service exists in this codebase, so a simple per-IP fixed window limiter is
+// used instead. Keeps this endpoint from being used to spam the configured recipient inbox or hammer
+// the Postmark API.
+builder.Services.AddRateLimiter(options =>
+{
+	options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+	options.AddPolicy("contact-form", context =>
+		RateLimitPartition.GetFixedWindowLimiter(
+			partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+			factory: _ => new FixedWindowRateLimiterOptions
+			{
+				Window = TimeSpan.FromMinutes(5),
+				PermitLimit = 5,
+				QueueLimit = 0,
+			}));
+});
 
 // Supabase-backed JWT Bearer validation, shared between Development (dual-scheme below) and
 // non-Development (sole scheme). This Supabase project uses asymmetric JWT signing (JWKS), not a
@@ -556,7 +576,11 @@ app.MapGet("/health/startup-migrations", () =>
 });
 if (app.Environment.IsDevelopment())
 {
-	app.MapGet("/api/dev/personas", (DevPersonaStore store) => DevPersonaStore.Personas).AllowAnonymous();
+	// AllPersonas (seeded catalog + runtime-registered self-service signups), not the static
+	// Personas field alone — the login form's persona lookup (Login.razor) needs to find a
+	// brand-new signup admin registered via /api/dev/persona/register, which only ever lands in
+	// the instance's _registeredPersonas list, never in the static seeded catalog.
+	app.MapGet("/api/dev/personas", (DevPersonaStore store) => store.AllPersonas.ToList()).AllowAnonymous();
 	app.MapPost("/api/dev/persona/{userId}", async (string userId, DevPersonaStore store, IServiceProvider services) =>
 	{
 		// The dev persona switcher is the only real "sign-in" path in this codebase today (see
@@ -663,10 +687,114 @@ app.UseOffboardingRecurringJobs();
 app.UseDocumentsRecurringJobs();
 app.UseLoggingMiddleware();
 app.UseRouting();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseIdentityModule();
 app.UseAuthorization();
 app.UseCompaniesModule();
+
+// Public (anonymous) endpoint backing the marketing site's contact form (HR.Marketing's
+// Contact.razor posts to its own /contact-submit proxy, which calls this). This intentionally does
+// not live inside a business module: it has no company_id/tenant, persists nothing, and is a pure
+// relay to Postmark via IEmailSender (already Infrastructure-owned per the deployment architecture
+// spec — "Business modules never send emails directly"). Kept here in the host alongside the other
+// small ad hoc endpoints above (dev personas, local storage) rather than inventing a new module.
+app.MapPost("/api/contact", async (
+	ContactRequest request,
+	IEmailSender emailSender,
+	IConfiguration configuration,
+	ILogger<Program> logger,
+	CancellationToken cancellationToken) =>
+{
+	var errors = ValidateContactRequest(request);
+	if (errors.Count > 0)
+	{
+		logger.LogWarning("Contact form submission failed: {ErrorType}", "validation");
+		return Results.ValidationProblem(errors);
+	}
+
+	// Honeypot: a real visitor never populates this hidden field. Bots that blindly fill every
+	// field will. Report success (so the bot doesn't learn to avoid the field) without sending
+	// anything or touching Postmark.
+	if (!string.IsNullOrWhiteSpace(request.Website))
+	{
+		logger.LogInformation("Contact form submission discarded: {ErrorType}", "honeypot");
+		return Results.Ok();
+	}
+
+	var recipient = configuration["Marketing:ContactForm:RecipientEmail"];
+	if (string.IsNullOrWhiteSpace(recipient))
+	{
+		logger.LogWarning("Contact form submission failed: {ErrorType}", "recipient_not_configured");
+		return Results.Problem("The contact form is not available right now. Please try again later.", statusCode: StatusCodes.Status503ServiceUnavailable);
+	}
+
+	var subject = $"New contact form enquiry from {WebUtility.HtmlEncode(request.Company.Trim())}";
+	var htmlBody = $"""
+		<p><strong>Name:</strong> {WebUtility.HtmlEncode(request.Name.Trim())}</p>
+		<p><strong>Email:</strong> {WebUtility.HtmlEncode(request.Email.Trim())}</p>
+		<p><strong>Company:</strong> {WebUtility.HtmlEncode(request.Company.Trim())}</p>
+		<p><strong>Approximate employee count:</strong> {request.EmployeeCount}</p>
+		<p><strong>Message:</strong></p>
+		<p>{WebUtility.HtmlEncode(request.Message.Trim()).Replace("\n", "<br>")}</p>
+		""";
+
+	try
+	{
+		await emailSender.SendAsync(recipient, subject, htmlBody, cancellationToken);
+	}
+	catch (Exception ex)
+	{
+		// Never log the message body, email address, or other submitted PII — only the outcome and
+		// exception type, per the coding standards' logging rules.
+		logger.LogError(ex, "Contact form submission failed: {ErrorType}", ex.GetType().Name);
+		return Results.Problem("We couldn't send your message. Please try again shortly.", statusCode: StatusCodes.Status502BadGateway);
+	}
+
+	logger.LogInformation("Contact form submission succeeded");
+	return Results.Ok();
+}).AllowAnonymous().RequireRateLimiting("contact-form");
+
+static Dictionary<string, string[]> ValidateContactRequest(ContactRequest request)
+{
+	var errors = new Dictionary<string, string[]>();
+
+	if (string.IsNullOrWhiteSpace(request.Name))
+		errors["name"] = ["Enter your name."];
+	else if (request.Name.Trim().Length > 200)
+		errors["name"] = ["Name must be 200 characters or fewer."];
+
+	if (string.IsNullOrWhiteSpace(request.Email))
+	{
+		errors["email"] = ["Enter your email address."];
+	}
+	else
+	{
+		try
+		{
+			_ = new System.Net.Mail.MailAddress(request.Email.Trim());
+		}
+		catch (FormatException)
+		{
+			errors["email"] = ["Enter a valid email address."];
+		}
+	}
+
+	if (string.IsNullOrWhiteSpace(request.Company))
+		errors["company"] = ["Enter your company name."];
+	else if (request.Company.Trim().Length > 200)
+		errors["company"] = ["Company name must be 200 characters or fewer."];
+
+	if (request.EmployeeCount is null or < 1)
+		errors["employeeCount"] = ["Enter an employee count of 1 or more."];
+
+	if (string.IsNullOrWhiteSpace(request.Message))
+		errors["message"] = ["Enter a short message."];
+	else if (request.Message.Trim().Length > 4000)
+		errors["message"] = ["Message must be 4000 characters or fewer."];
+
+	return errors;
+}
 app.UseFastEndpoints(c =>
 {
 	c.Serializer.Options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
@@ -679,6 +807,17 @@ app.Run();
 public partial class Program;
 
 internal sealed record RegisterDevPersonaRequest(Guid UserId, Guid CompanyId, string FirstName, string LastName, string Email);
+
+// "Website" is the honeypot field — must stay named plausibly enough that a scripted bot fills it,
+// while a real visitor never sees or fills it (hidden via CSS in Contact.razor, not via type="hidden",
+// so autofill/accessibility tooling still treats it as a normal-looking field bots target).
+internal sealed record ContactRequest(
+	string Name,
+	string Email,
+	string Company,
+	int? EmployeeCount,
+	string Message,
+	string? Website);
 
 // Fetches and caches Supabase's JWKS (bare JSON Web Key Set, RFC 7517) document so JWT Bearer
 // validation can resolve the signing key matching a token's "kid" header. AddJwtBearer's built-in
