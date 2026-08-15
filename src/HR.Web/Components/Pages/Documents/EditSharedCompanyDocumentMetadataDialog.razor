@@ -117,6 +117,11 @@
     </DialogTemplates>
 </SfDialog>
 
+<UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                      OnSaveAndClose="ConfirmSaveInsteadOfCancelAsync"
+                      OnDiscard="ConfirmDiscardAsync"
+                      OnCancel="CancelUnsavedChangesDialog" />
+
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter] public SharedCompanyDocumentDetailResponse? Document { get; set; }

@@ -13,16 +13,6 @@ public class ImportFileValidatorTests
     }
 
     [Fact]
-    public void Validate_ValidCsv_ReturnsSuccess()
-    {
-        var validator = CreateValidator();
-
-        var result = validator.Validate("employees.csv", "text/csv", 1024);
-
-        Assert.True(result.IsSuccess);
-    }
-
-    [Fact]
     public void Validate_ValidXlsx_ReturnsSuccess()
     {
         var validator = CreateValidator();
@@ -36,14 +26,41 @@ public class ImportFileValidatorTests
     }
 
     [Fact]
-    public void Validate_CsvWithBrowserExcelContentType_ReturnsSuccess()
+    public void Validate_CsvExtension_ReturnsFailure()
     {
+        // CSV import support has been removed; only .xlsx is accepted now.
         var validator = CreateValidator();
 
-        // Some browsers send this MIME type for CSV uploads.
-        var result = validator.Validate("employees.csv", "application/vnd.ms-excel", 1024);
+        var result = validator.Validate("employees.csv", "text/csv", 1024);
 
-        Assert.True(result.IsSuccess);
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains(".csv", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Validate_CsvContentType_ReturnsFailure()
+    {
+        // Even with an allowed extension, a CSV content type must be rejected.
+        var validator = CreateValidator();
+
+        var result = validator.Validate("employees.xlsx", "text/csv", 1024);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("text/csv", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Validate_BrowserExcelContentType_ReturnsFailure()
+    {
+        // "application/vnd.ms-excel" (legacy .xls / some browsers' CSV mime type) is no longer allowed.
+        var validator = CreateValidator();
+
+        var result = validator.Validate("employees.xlsx", "application/vnd.ms-excel", 1024);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
     }
 
     [Fact]
@@ -51,7 +68,10 @@ public class ImportFileValidatorTests
     {
         var validator = CreateValidator();
 
-        var result = validator.Validate("employees.csv", "text/csv", 0);
+        var result = validator.Validate(
+            "employees.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            0);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -63,7 +83,10 @@ public class ImportFileValidatorTests
     {
         var validator = CreateValidator(o => o.MaxFileSizeBytes = 1024);
 
-        var result = validator.Validate("employees.csv", "text/csv", 2048);
+        var result = validator.Validate(
+            "employees.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            2048);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -75,7 +98,10 @@ public class ImportFileValidatorTests
     {
         var validator = CreateValidator(o => o.MaxFileSizeBytes = 1024);
 
-        var result = validator.Validate("employees.csv", "text/csv", 1024);
+        var result = validator.Validate(
+            "employees.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            1024);
 
         Assert.True(result.IsSuccess);
     }
@@ -97,7 +123,10 @@ public class ImportFileValidatorTests
     {
         var validator = CreateValidator();
 
-        var result = validator.Validate("employees", "text/csv", 1024);
+        var result = validator.Validate(
+            "employees",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            1024);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -108,7 +137,10 @@ public class ImportFileValidatorTests
     {
         var validator = CreateValidator();
 
-        var result = validator.Validate("EMPLOYEES.CSV", "text/csv", 1024);
+        var result = validator.Validate(
+            "EMPLOYEES.XLSX",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            1024);
 
         Assert.True(result.IsSuccess);
     }
@@ -116,10 +148,10 @@ public class ImportFileValidatorTests
     [Fact]
     public void Validate_DisallowedContentType_ReturnsFailure()
     {
+        // Extension is allowed but content type is not one of the accepted values.
         var validator = CreateValidator();
 
-        // Extension is allowed but content type is not one of the accepted values.
-        var result = validator.Validate("employees.csv", "application/json", 1024);
+        var result = validator.Validate("employees.xlsx", "application/json", 1024);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -131,7 +163,10 @@ public class ImportFileValidatorTests
     {
         var validator = CreateValidator();
 
-        var result = validator.Validate("employees.csv", "text/csv; charset=utf-8", 1024);
+        var result = validator.Validate(
+            "employees.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; charset=utf-8",
+            1024);
 
         Assert.True(result.IsSuccess);
     }
@@ -168,7 +203,8 @@ public class ImportFileValidatorTests
     [Fact]
     public void ValidateContent_Csv_HasNoKnownSignature_AlwaysReturnsSuccess()
     {
-        // CSV is plain text with no reliable magic byte, so it always defers to other checks.
+        // CSV has no entry in the magic-byte table (it's no longer a supported content type),
+        // so ValidateContent defers to other checks rather than failing here itself.
         var result = CreateValidator().ValidateContent(CsvTextStream(), "text/csv");
 
         Assert.True(result.IsSuccess);

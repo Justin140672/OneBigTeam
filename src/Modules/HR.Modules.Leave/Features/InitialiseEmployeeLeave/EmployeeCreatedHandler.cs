@@ -54,17 +54,35 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
         var now = _clock.UtcNowOffset();
         var policyYear = LeaveYearCalculator.GetPolicyYear(now, leaveSettings.LeaveYearStartMonth);
 
-        var balances = activeLeaveTypes.Select(lt => LeaveBalance.Create(
-            Guid.NewGuid(),
-            integrationEvent.CompanyId,
-            integrationEvent.EmployeeId,
-            lt.Id,
-            assignment.LeavePolicyId,
-            policyYear,
-            lt.Behaviour == LeaveTypeBehaviour.Toil ? 0 : lt.DefaultEntitlementDays,
-            now)).ToList();
+        // Idempotency guard (per 04-event-architecture.md — integration event consumers must
+        // tolerate repeated/duplicate delivery). Without this check, a redelivered
+        // EmployeeCreatedIntegrationEvent would add a second full set of LeaveBalance rows for the
+        // same employee/policy year, which the Leave Summary Report then silently sums together —
+        // inflating the displayed entitlement (e.g. 25 real days appearing as 50, 75, 92...
+        // depending on how many times the event was redelivered).
+        var existingLeaveTypeIds = await _dbContext.LeaveBalances
+            .Where(b => b.CompanyId == integrationEvent.CompanyId
+                     && b.EmployeeId == integrationEvent.EmployeeId
+                     && b.PolicyYear == policyYear)
+            .Select(b => b.LeaveTypeId)
+            .ToListAsync(cancellationToken);
 
-        _dbContext.LeaveBalances.AddRange(balances);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        var balances = activeLeaveTypes
+            .Where(lt => !existingLeaveTypeIds.Contains(lt.Id))
+            .Select(lt => LeaveBalance.Create(
+                Guid.NewGuid(),
+                integrationEvent.CompanyId,
+                integrationEvent.EmployeeId,
+                lt.Id,
+                assignment.LeavePolicyId,
+                policyYear,
+                lt.Behaviour == LeaveTypeBehaviour.Toil ? 0 : lt.DefaultEntitlementDays,
+                now)).ToList();
+
+        if (balances.Count > 0)
+        {
+            _dbContext.LeaveBalances.AddRange(balances);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 }

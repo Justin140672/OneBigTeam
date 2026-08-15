@@ -160,6 +160,111 @@ internal sealed class StripeGateway(IOptions<StripeOptions> options) : IStripeGa
         return session.Url;
     }
 
+    public async Task<IReadOnlyList<StripeInvoiceSummary>> ListInvoicesAsync(
+        string stripeCustomerId,
+        CancellationToken cancellationToken)
+    {
+        var requestOptions = new RequestOptions { ApiKey = options.Value.SecretKey };
+        var service = new InvoiceService();
+
+        var invoices = await service.ListAsync(
+            new InvoiceListOptions
+            {
+                Customer = stripeCustomerId,
+                Limit = 100,
+            },
+            requestOptions,
+            cancellationToken);
+
+        return invoices.Data
+            .Select(invoice => new StripeInvoiceSummary(
+                invoice.Id,
+                new DateTimeOffset(invoice.Created, TimeSpan.Zero),
+                // Stripe amounts are in the smallest currency unit (e.g. pence for GBP).
+                invoice.AmountPaid > 0 ? invoice.AmountPaid / 100m : invoice.AmountDue / 100m,
+                invoice.Currency,
+                invoice.Status ?? "unknown",
+                invoice.StatusTransitions?.PaidAt is { } paidAt
+                    ? new DateTimeOffset(paidAt, TimeSpan.Zero)
+                    : null,
+                invoice.HostedInvoiceUrl))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<FailedInvoiceSummary>> ListFailedInvoicesAsync(CancellationToken cancellationToken)
+    {
+        var requestOptions = new RequestOptions { ApiKey = options.Value.SecretKey };
+        var service = new InvoiceService();
+
+        var results = new List<FailedInvoiceSummary>();
+
+        // Two account-wide queries (open, uncollectible) rather than per-customer iteration — see
+        // IStripeGateway.ListFailedInvoicesAsync remarks. StreamAutoPagingAsync transparently
+        // follows Stripe's cursor pagination so this stays correct beyond a single page (Limit is
+        // just the page size, not a cap).
+        foreach (var status in new[] { "open", "uncollectible" })
+        {
+            var listOptions = new InvoiceListOptions
+            {
+                Status = status,
+                Limit = 100,
+            };
+
+            await foreach (var invoice in service.ListAutoPagingAsync(listOptions, requestOptions, cancellationToken))
+            {
+                if (string.IsNullOrWhiteSpace(invoice.CustomerId))
+                    continue;
+
+                results.Add(new FailedInvoiceSummary(
+                    invoice.Id,
+                    invoice.CustomerId,
+                    new DateTimeOffset(invoice.Created, TimeSpan.Zero),
+                    invoice.AmountRemaining / 100m,
+                    invoice.Currency,
+                    invoice.Status ?? "unknown",
+                    invoice.NextPaymentAttempt.HasValue
+                        ? new DateTimeOffset(invoice.NextPaymentAttempt.Value, TimeSpan.Zero)
+                        : null,
+                    invoice.HostedInvoiceUrl));
+            }
+        }
+
+        return results;
+    }
+
+    public async Task<StripeInvoiceSummary?> GetMostRecentPaidInvoiceAsync(
+        string stripeCustomerId,
+        CancellationToken cancellationToken)
+    {
+        var requestOptions = new RequestOptions { ApiKey = options.Value.SecretKey };
+        var service = new InvoiceService();
+
+        var invoices = await service.ListAsync(
+            new InvoiceListOptions
+            {
+                Customer = stripeCustomerId,
+                Status = "paid",
+                Limit = 1,
+            },
+            requestOptions,
+            cancellationToken);
+
+        var invoice = invoices.Data.FirstOrDefault();
+        if (invoice is null)
+            return null;
+
+        return new StripeInvoiceSummary(
+            invoice.Id,
+            new DateTimeOffset(invoice.Created, TimeSpan.Zero),
+            invoice.AmountPaid / 100m,
+            invoice.Currency,
+            invoice.Status ?? "unknown",
+            invoice.StatusTransitions?.PaidAt is { } paidAt
+                ? new DateTimeOffset(paidAt, TimeSpan.Zero)
+                : null,
+            invoice.HostedInvoiceUrl);
+    }
+
     private static Guid? ParseCompanyId(IDictionary<string, string>? metadata)
     {
         if (metadata is not null

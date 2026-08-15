@@ -1,0 +1,136 @@
+@page "/failed-payments"
+@inject FailedPaymentsService FailedPaymentsService
+@inject NavigationManager Navigation
+
+<PageTitle>Failed Payments — Admin Portal</PageTitle>
+
+<h1>Failed Payments</h1>
+
+<div class="customer-list-toolbar failed-payments-toolbar">
+    <SfTextBox Placeholder="Search by company name"
+               Value="@_searchTerm"
+               ValueChanged="@OnSearchChanged"
+               CssClass="customer-search-box"></SfTextBox>
+
+    <select class="failed-payments-status-filter" value="@_statusFilter" @onchange="OnStatusFilterChanged">
+        <option value="">All statuses</option>
+        <option value="open">Open (retry scheduled)</option>
+        <option value="uncollectible">Uncollectible</option>
+    </select>
+</div>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_response is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view platform-wide customer data, or the failed payments list
+        couldn't be loaded. Contact a platform administrator if you believe this is a mistake.
+    </div>
+}
+else if (!_response.StripeConfigured)
+{
+    <div class="dashboard-error">
+        Stripe is not configured in this environment, so failed payment data is unavailable.
+    </div>
+}
+else if (_response.FailedPayments.Count == 0)
+{
+    <p class="activity-empty">No failed payments found.</p>
+}
+else
+{
+    <SfGrid DataSource="@_response.FailedPayments"
+            AllowPaging="true"
+            AllowSorting="true"
+            AllowFiltering="true"
+            class="hr-grid">
+        <GridEvents TValue="FailedPaymentItem" RowSelected="OnRowSelected" />
+        <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+        <GridPageSettings PageSize="20" />
+        <GridColumns>
+            <GridColumn Field="@nameof(FailedPaymentItem.CompanyName)" HeaderText="Company" Width="200" />
+            <GridColumn Field="@nameof(FailedPaymentItem.SubscriptionStatus)" HeaderText="Customer Status" Width="150" />
+            <GridColumn Field="@nameof(FailedPaymentItem.InvoiceStatus)" HeaderText="Payment Status" Width="140" />
+            <GridColumn Field="@nameof(FailedPaymentItem.OutstandingAmount)" HeaderText="Outstanding Amount" Width="160" Format="C2" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+            <GridColumn Field="@nameof(FailedPaymentItem.InvoiceDate)" HeaderText="Invoice Date" Width="140" Format="dd MMM yyyy" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+            <GridColumn Field="@nameof(FailedPaymentItem.RetryScheduledAt)" HeaderText="Retry Scheduled" Width="150" Format="dd MMM yyyy" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+            <GridColumn Field="@nameof(FailedPaymentItem.LastSuccessfulPaymentAt)" HeaderText="Last Successful Payment" Width="180" Format="dd MMM yyyy" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+            <GridColumn HeaderText="Invoice">
+                <Template>
+                    @{
+                        var invoice = (FailedPaymentItem)context;
+                    }
+                    @if (!string.IsNullOrWhiteSpace(invoice.HostedInvoiceUrl))
+                    {
+                        <a href="@invoice.HostedInvoiceUrl" target="_blank" rel="noopener noreferrer">View in Stripe</a>
+                    }
+                </Template>
+            </GridColumn>
+        </GridColumns>
+    </SfGrid>
+}
+
+@code {
+    private FailedPaymentsResponse? _response;
+    private bool _loading = true;
+    private string? _searchTerm;
+    private string _statusFilter = "";
+    private CancellationTokenSource? _searchDebounceCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        _response = await FailedPaymentsService.GetFailedPaymentsOrNullAsync(
+            _searchTerm,
+            string.IsNullOrEmpty(_statusFilter) ? null : _statusFilter);
+        _loading = false;
+    }
+
+    // Debounced so every keystroke doesn't trigger a round trip to the API — mirrors
+    // CustomerList.razor's search debouncing.
+    private async Task OnSearchChanged(string? value)
+    {
+        _searchTerm = value;
+
+        _searchDebounceCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _searchDebounceCts = cts;
+
+        try
+        {
+            await Task.Delay(300, cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (cts.IsCancellationRequested)
+            return;
+
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnStatusFilterChanged(Microsoft.AspNetCore.Components.ChangeEventArgs args)
+    {
+        _statusFilter = args.Value?.ToString() ?? "";
+        await LoadAsync();
+    }
+
+    private void OnRowSelected(Syncfusion.Blazor.Grids.RowSelectEventArgs<FailedPaymentItem> args)
+    {
+        if (args.Data is not null)
+            Navigation.NavigateTo($"/customers/{args.Data.CompanyId}");
+    }
+}

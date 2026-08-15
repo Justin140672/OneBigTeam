@@ -1,0 +1,529 @@
+@page "/customers/{CompanyId:guid}"
+@inject CustomerDetailsService CustomerDetailsService
+
+<PageTitle>Customer details — Admin Portal</PageTitle>
+
+<h1>Customer details</h1>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_details is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view this customer's details, or the customer couldn't be found.
+        Contact a platform administrator if you believe this is a mistake.
+    </div>
+}
+else
+{
+    <p class="admin-actions-intro">
+        <a href="/customers/@CompanyId/support">Open support view</a> — a condensed,
+        troubleshooting-optimised summary of this customer.
+    </p>
+
+    <div class="stat-cards">
+        <div class="stat-card">
+            <span class="stat-value">@_details.ActiveEmployeeCount</span>
+            <span class="stat-label">Active employees</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">@_details.TotalEmployeeCount</span>
+            <span class="stat-label">Total employees</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">@FormatStorageSize(_details.TotalStorageBytes)</span>
+            <span class="stat-label">Storage used</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">@_details.StorageFileCount</span>
+            <span class="stat-label">Files stored</span>
+        </div>
+    </div>
+
+    <section class="details-panel admin-actions-panel">
+        <h2>Subscription management</h2>
+        <p class="admin-actions-intro">
+            Support intervention actions. Every action requires a reason and is recorded in the
+            audit log.
+        </p>
+        <div class="admin-actions-buttons">
+            <SfButton OnClick="@(() => OpenAction(AdminAction.ExtendTrial))">Extend trial</SfButton>
+            <SfButton OnClick="@(() => OpenAction(AdminAction.CancelAtPeriodEnd))">Cancel at period end</SfButton>
+            <SfButton OnClick="@(() => OpenAction(AdminAction.Reinstate))">Reinstate subscription</SfButton>
+            <SfButton CssClass="e-danger" OnClick="@(() => OpenAction(AdminAction.ForceReadOnly))">Force read-only mode</SfButton>
+            <SfButton OnClick="@(() => OpenAction(AdminAction.ResumeService))">Resume service</SfButton>
+            <SfButton CssClass="e-danger" OnClick="@(() => OpenAction(AdminAction.ScheduleDeletion))">Schedule deletion</SfButton>
+        </div>
+        @if (_actionMessage is not null)
+        {
+            <p class="@(_actionSucceeded ? "admin-action-success" : "admin-action-error")">@_actionMessage</p>
+        }
+    </section>
+
+    <section class="details-panel admin-actions-panel">
+        <h2>Login as customer</h2>
+        <p class="admin-actions-intro">
+            Generates a time-boxed (20-minute) support access grant for @_details.CompanyName's
+            environment. This action is fully audited and requires a reason.
+        </p>
+        <p class="admin-actions-intro">
+            Full automatic sign-in is not yet implemented — this generates and audits an access
+            grant token only; see engineering for redemption status.
+        </p>
+        <div class="admin-actions-buttons">
+            <SfButton CssClass="e-danger" OnClick="OpenLoginAsCustomer">Login as customer</SfButton>
+        </div>
+        @if (_supportSession is not null)
+        {
+            <p class="admin-action-success">
+                Redemption token (single use, expires at @_supportSession.ExpiresAt.ToString("dd MMM yyyy HH:mm")):
+                <code>@_supportSession.Token</code>
+            </p>
+        }
+        @if (_supportSessionMessage is not null)
+        {
+            <p class="admin-action-error">@_supportSessionMessage</p>
+        }
+    </section>
+
+    <div class="details-grid">
+        <section class="details-panel">
+            <h2>Company information</h2>
+            <dl class="details-kv">
+                <dt>Company name</dt>
+                <dd>@_details.CompanyName</dd>
+                <dt>Status</dt>
+                <dd>@_details.Status</dd>
+                <dt>Created</dt>
+                <dd>@_details.CreatedAt.ToString("dd MMM yyyy HH:mm")</dd>
+                <dt>Updated</dt>
+                <dd>@_details.UpdatedAt.ToString("dd MMM yyyy HH:mm")</dd>
+            </dl>
+        </section>
+
+        <section class="details-panel">
+            <h2>Subscription</h2>
+            <dl class="details-kv">
+                <dt>Status</dt>
+                <dd>@_details.SubscriptionStatus</dd>
+                <dt>Trial started</dt>
+                <dd>@FormatDate(_details.TrialStartedAt)</dd>
+                <dt>Trial expires</dt>
+                <dd>@FormatDate(_details.TrialExpiresAt)</dd>
+                <dt>Current period end</dt>
+                <dd>@FormatDate(_details.CurrentPeriodEnd)</dd>
+                <dt>Cancel at period end</dt>
+                <dd>@(_details.CancelAtPeriodEnd ? "Yes" : "No")</dd>
+                <dt>Forced read-only (admin)</dt>
+                <dd>@(_details.AdminForcedReadOnly ? "Yes" : "No")</dd>
+            </dl>
+        </section>
+
+        <section class="details-panel">
+            <h2>Current pricing</h2>
+            <dl class="details-kv">
+                <dt>Monthly charge</dt>
+                <dd>@(_details.MonthlyCharge is { } charge ? charge.ToString("C2") : "Not applicable")</dd>
+            </dl>
+        </section>
+
+        <section class="details-panel">
+            <h2>Company settings</h2>
+            @if (_details.Settings is null)
+            {
+                <p class="activity-empty">No settings configured yet.</p>
+            }
+            else
+            {
+                <dl class="details-kv">
+                    <dt>Time zone</dt>
+                    <dd>@_details.Settings.TimeZone</dd>
+                    <dt>Locale</dt>
+                    <dd>@_details.Settings.Locale</dd>
+                    <dt>Working days</dt>
+                    <dd>@_details.Settings.WorkingDays</dd>
+                    <dt>Hours per day</dt>
+                    <dd>@_details.Settings.HoursPerDay</dd>
+                    <dt>Leave year start month</dt>
+                    <dd>@_details.Settings.LeaveYearStartMonth</dd>
+                    <dt>Default holiday allowance</dt>
+                    <dd>@_details.Settings.DefaultHolidayAllowance</dd>
+                    <dt>Probation months</dt>
+                    <dd>@_details.Settings.ProbationMonths</dd>
+                    <dt>Employee number mode</dt>
+                    <dd>@_details.Settings.EmployeeNumberMode</dd>
+                    <dt>Employee number prefix</dt>
+                    <dd>@(_details.Settings.EmployeeNumberPrefix ?? "—")</dd>
+                    <dt>Next employee number</dt>
+                    <dd>@_details.Settings.NextEmployeeNumber</dd>
+                </dl>
+            }
+        </section>
+
+        <section class="details-panel billing-breakdown-panel">
+            <h2>Billing breakdown</h2>
+            @if (_billing is null)
+            {
+                <p class="details-panel-unavailable">
+                    Billing breakdown could not be loaded.
+                </p>
+            }
+            else
+            {
+                <p class="admin-actions-intro">
+                    Computed @_billing.ComputedAt.ToString("dd MMM yyyy HH:mm"). Recomputed and
+                    recorded to history each time this page is loaded.
+                </p>
+                <div class="stat-cards billing-stat-cards">
+                    <div class="stat-card">
+                        <span class="stat-value">@_billing.ActiveEmployees</span>
+                        <span class="stat-label">Active employees</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">@_billing.FutureStarters</span>
+                        <span class="stat-label">Future starters</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">@_billing.Leavers</span>
+                        <span class="stat-label">Leavers</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">@_billing.ChargeableEmployees</span>
+                        <span class="stat-label">Chargeable employees</span>
+                    </div>
+                </div>
+                <dl class="details-kv">
+                    <dt>Price per employee</dt>
+                    <dd>@_billing.PricePerEmployee.ToString("C2")</dd>
+                    <dt>Discounts</dt>
+                    <dd>@_billing.Discounts.ToString("C2")</dd>
+                    <dt>Monthly total</dt>
+                    <dd>@_billing.MonthlyTotal.ToString("C2")</dd>
+                </dl>
+                <p class="details-panel-unavailable">
+                    No discount system exists yet — discounts always show as £0.00.
+                </p>
+
+                <h3>History</h3>
+                @if (_billing.History.Count == 0)
+                {
+                    <p class="activity-empty">No billing snapshots recorded yet.</p>
+                }
+                else
+                {
+                    <table class="billing-history-table">
+                        <thead>
+                            <tr>
+                                <th>Computed</th>
+                                <th>Active</th>
+                                <th>Starters</th>
+                                <th>Leavers</th>
+                                <th>Chargeable</th>
+                                <th>Price/employee</th>
+                                <th>Discounts</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var snapshot in _billing.History)
+                            {
+                                <tr>
+                                    <td>@snapshot.ComputedAt.ToString("dd MMM yyyy HH:mm")</td>
+                                    <td>@snapshot.ActiveEmployees</td>
+                                    <td>@snapshot.FutureStarters</td>
+                                    <td>@snapshot.Leavers</td>
+                                    <td>@snapshot.ChargeableEmployees</td>
+                                    <td>@snapshot.PricePerEmployee.ToString("C2")</td>
+                                    <td>@snapshot.Discounts.ToString("C2")</td>
+                                    <td>@snapshot.MonthlyTotal.ToString("C2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            }
+        </section>
+
+        <section class="details-panel billing-breakdown-panel">
+            <h2>Billing history</h2>
+            @if (_billingHistory is null)
+            {
+                <p class="details-panel-unavailable">
+                    Billing history could not be loaded.
+                </p>
+            }
+            else if (!_billingHistory.StripeConfigured)
+            {
+                <p class="details-panel-unavailable">
+                    No Stripe API key is configured in this environment, so billing history is not
+                    available here.
+                </p>
+            }
+            else if (!_billingHistory.HasStripeCustomer)
+            {
+                <p class="details-panel-unavailable">
+                    This customer has no Stripe customer record yet (no successful checkout has
+                    occurred), so there is no billing history to show.
+                </p>
+            }
+            else if (_billingHistory.Invoices.Count == 0)
+            {
+                <p class="activity-empty">Stripe has no invoices recorded for this customer yet.</p>
+            }
+            else
+            {
+                <p class="admin-actions-intro">
+                    Real invoice data from Stripe. Employee count is estimated from the closest
+                    recorded billing snapshot at or before the invoice date, since Stripe does not
+                    track headcount directly.
+                </p>
+                <table class="billing-history-table">
+                    <thead>
+                        <tr>
+                            <th>Invoice date</th>
+                            <th>Amount</th>
+                            <th>Employee count</th>
+                            <th>Payment status</th>
+                            <th>Payment date</th>
+                            <th>Stripe invoice id</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var invoice in _billingHistory.Invoices)
+                        {
+                            <tr>
+                                <td>@invoice.InvoiceDate.ToString("dd MMM yyyy HH:mm")</td>
+                                <td>@invoice.Amount.ToString("C2") @invoice.Currency.ToUpperInvariant()</td>
+                                <td>@(invoice.EstimatedEmployeeCount?.ToString() ?? "—")</td>
+                                <td>@invoice.PaymentStatus</td>
+                                <td>@(invoice.PaymentDate is { } paidAt ? paidAt.ToString("dd MMM yyyy HH:mm") : "—")</td>
+                                <td>@invoice.StripeInvoiceId</td>
+                                <td>
+                                    @if (invoice.HostedInvoiceUrl is not null)
+                                    {
+                                        <a href="@invoice.HostedInvoiceUrl" target="_blank" rel="noopener noreferrer">Open invoice</a>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        <section class="details-panel">
+            <h2>Login history</h2>
+            <p class="details-panel-unavailable">
+                Login history is not yet available. This will show recent sign-ins once login
+                auditing is built.
+            </p>
+        </section>
+    </div>
+}
+
+<a href="/customers">Back to customers</a>
+
+<AdminActionConfirmDialog Visible="_dialogVisible"
+                           Title="@DialogTitle"
+                           Warning="@DialogWarning"
+                           ConfirmText="@DialogConfirmText"
+                           DangerConfirm="@DialogIsDanger"
+                           Busy="_actionBusy"
+                           ShowNewTrialExpiryDate="@(_activeAction == AdminAction.ExtendTrial)"
+                           OnConfirmed="OnActionConfirmedAsync"
+                           OnCancelled="CloseDialog" />
+
+<AdminActionConfirmDialog Visible="_supportSessionDialogVisible"
+                           Title="Login as customer"
+                           Warning="@($"This grants time-boxed (20-minute) support access to {_details?.CompanyName}'s environment. This action is fully audited. A reason is required.")"
+                           ConfirmText="Generate access token"
+                           DangerConfirm="true"
+                           Busy="_supportSessionBusy"
+                           OnConfirmed="OnLoginAsCustomerConfirmedAsync"
+                           OnCancelled="CloseLoginAsCustomerDialog" />
+
+@code {
+    [Parameter]
+    public Guid CompanyId { get; set; }
+
+    private CustomerDetailsResponse? _details;
+    private CustomerBillingBreakdownResponse? _billing;
+    private CustomerBillingHistoryResponse? _billingHistory;
+    private bool _loading = true;
+
+    private enum AdminAction
+    {
+        ExtendTrial,
+        CancelAtPeriodEnd,
+        Reinstate,
+        ForceReadOnly,
+        ResumeService,
+        ScheduleDeletion,
+    }
+
+    private bool _dialogVisible;
+    private AdminAction _activeAction;
+    private bool _actionBusy;
+    private string? _actionMessage;
+    private bool _actionSucceeded;
+
+    private bool _supportSessionDialogVisible;
+    private bool _supportSessionBusy;
+    private GenerateSupportSessionResponse? _supportSession;
+    private string? _supportSessionMessage;
+
+    private string DialogTitle => _activeAction switch
+    {
+        AdminAction.ExtendTrial => "Extend trial",
+        AdminAction.CancelAtPeriodEnd => "Cancel at period end",
+        AdminAction.Reinstate => "Reinstate subscription",
+        AdminAction.ForceReadOnly => "Force read-only mode",
+        AdminAction.ResumeService => "Resume service",
+        AdminAction.ScheduleDeletion => "Schedule deletion",
+        _ => "Confirm action",
+    };
+
+    private string DialogWarning => _activeAction switch
+    {
+        AdminAction.ExtendTrial =>
+            "This will move the customer's trial expiry date and, if the trial had already expired, " +
+            "immediately restore full (non-read-only) access.",
+        AdminAction.CancelAtPeriodEnd =>
+            "The customer's subscription will be scheduled to cancel at the end of the current " +
+            "billing period. They will keep access until then.",
+        AdminAction.Reinstate =>
+            "This will reverse a pending or completed cancellation and restore the subscription to " +
+            "active. If billing had already fully stopped, you must reconcile payment with the " +
+            "customer separately — this only restores application access.",
+        AdminAction.ForceReadOnly =>
+            "This will immediately block all write actions for this customer, regardless of their " +
+            "trial or billing status, until service is resumed.",
+        AdminAction.ResumeService =>
+            "This will lift a previously forced read-only override and restore normal, " +
+            "status-driven access for this customer.",
+        AdminAction.ScheduleDeletion =>
+            "This schedules a permanent deletion for this customer, 30 days from now by default. " +
+            "This is a safe, status-only action at scheduling time — it does not delete any data " +
+            "immediately, and the deletion can be cancelled from the Deletion Queue page before it " +
+            "is executed.",
+        _ => "This action will affect the customer's account.",
+    };
+
+    private string DialogConfirmText => _activeAction switch
+    {
+        AdminAction.ForceReadOnly => "Force read-only",
+        AdminAction.CancelAtPeriodEnd => "Cancel subscription",
+        AdminAction.Reinstate => "Reinstate",
+        AdminAction.ResumeService => "Resume service",
+        AdminAction.ExtendTrial => "Extend trial",
+        AdminAction.ScheduleDeletion => "Schedule deletion",
+        _ => "Confirm",
+    };
+
+    private bool DialogIsDanger => _activeAction is AdminAction.ForceReadOnly or AdminAction.CancelAtPeriodEnd or AdminAction.ScheduleDeletion;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _details = await CustomerDetailsService.GetCustomerDetailsOrNullAsync(CompanyId);
+        _billing = await CustomerDetailsService.GetBillingBreakdownOrNullAsync(CompanyId);
+        _billingHistory = await CustomerDetailsService.GetBillingHistoryOrNullAsync(CompanyId);
+        _loading = false;
+    }
+
+    private void OpenAction(AdminAction action)
+    {
+        _activeAction = action;
+        _actionMessage = null;
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogVisible = false;
+    }
+
+    private async Task OnActionConfirmedAsync((string Reason, DateTimeOffset? NewTrialExpiresAt) input)
+    {
+        _actionBusy = true;
+        try
+        {
+            var succeeded = _activeAction switch
+            {
+                AdminAction.ExtendTrial => input.NewTrialExpiresAt is { } newExpiry
+                    && await CustomerDetailsService.ExtendTrialAsync(CompanyId, newExpiry, input.Reason),
+                AdminAction.CancelAtPeriodEnd => await CustomerDetailsService.CancelSubscriptionAsync(CompanyId, input.Reason),
+                AdminAction.Reinstate => await CustomerDetailsService.ReinstateSubscriptionAsync(CompanyId, input.Reason),
+                AdminAction.ForceReadOnly => await CustomerDetailsService.ForceReadOnlyAsync(CompanyId, input.Reason),
+                AdminAction.ResumeService => await CustomerDetailsService.ResumeServiceAsync(CompanyId, input.Reason),
+                AdminAction.ScheduleDeletion => await CustomerDetailsService.ScheduleDeletionAsync(CompanyId, input.Reason),
+                _ => false,
+            };
+
+            _actionSucceeded = succeeded;
+            _actionMessage = succeeded
+                ? $"{DialogConfirmText} completed successfully."
+                : $"{DialogConfirmText} failed. Check the customer's current subscription state and try again.";
+
+            if (succeeded)
+            {
+                _details = await CustomerDetailsService.GetCustomerDetailsOrNullAsync(CompanyId);
+            }
+        }
+        finally
+        {
+            _actionBusy = false;
+            _dialogVisible = false;
+        }
+    }
+
+    private void OpenLoginAsCustomer()
+    {
+        _supportSession = null;
+        _supportSessionMessage = null;
+        _supportSessionDialogVisible = true;
+    }
+
+    private void CloseLoginAsCustomerDialog()
+    {
+        _supportSessionDialogVisible = false;
+    }
+
+    private async Task OnLoginAsCustomerConfirmedAsync((string Reason, DateTimeOffset? NewTrialExpiresAt) input)
+    {
+        _supportSessionBusy = true;
+        try
+        {
+            var result = await CustomerDetailsService.GenerateSupportSessionAsync(CompanyId, input.Reason);
+            _supportSession = result;
+            _supportSessionMessage = result is null
+                ? "Failed to generate a support session. Please try again."
+                : null;
+        }
+        finally
+        {
+            _supportSessionBusy = false;
+            _supportSessionDialogVisible = false;
+        }
+    }
+
+    private static string FormatDate(DateTimeOffset? value) =>
+        value is { } dt ? dt.ToString("dd MMM yyyy HH:mm") : "—";
+
+    private static string FormatStorageSize(long bytes)
+    {
+        const long kb = 1024;
+        const long mb = kb * 1024;
+        const long gb = mb * 1024;
+
+        return bytes switch
+        {
+            >= gb => $"{bytes / (double)gb:0.#} GB",
+            >= mb => $"{bytes / (double)mb:0.#} MB",
+            >= kb => $"{bytes / (double)kb:0.#} KB",
+            _ => $"{bytes} B",
+        };
+    }
+}

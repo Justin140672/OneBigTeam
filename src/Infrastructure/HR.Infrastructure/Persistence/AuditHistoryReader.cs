@@ -38,4 +38,46 @@ internal sealed class AuditHistoryReader(AuditDbContext context) : IAuditHistory
             .Select(e => new AuditHistoryEntry(e.OccurredAt, e.EventType, e.EntityType, e.ActorUserId, e.ActorEmployeeId, e.Summary, e.BeforeJson, e.AfterJson, e.EmployeeId, e.EntityId, e.CorrelationId))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<HR.SharedKernel.PagedResult<AuditHistoryEntry>> GetPlatformAuditLogAsync(
+        Guid? companyId,
+        IReadOnlyCollection<Guid>? actorUserIds,
+        DateTimeOffset? fromDate,
+        DateTimeOffset? toDate,
+        string? eventType,
+        HR.SharedKernel.Pagination pagination,
+        CancellationToken cancellationToken)
+    {
+        var query = context.AuditEvents.AsNoTracking().AsQueryable();
+
+        if (companyId.HasValue)
+            query = query.Where(e => e.CompanyId == companyId.Value);
+
+        if (actorUserIds is { Count: > 0 })
+            query = query.Where(e => e.ActorUserId != null && actorUserIds.Contains(e.ActorUserId.Value));
+
+        if (fromDate.HasValue)
+            query = query.Where(e => e.OccurredAt >= fromDate.Value);
+
+        if (toDate.HasValue)
+            query = query.Where(e => e.OccurredAt <= toDate.Value);
+
+        if (!string.IsNullOrWhiteSpace(eventType))
+            query = query.Where(e => e.EventType == eventType);
+
+        query = query.OrderByDescending(e => e.OccurredAt);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .Skip(pagination.Offset)
+            .Take(pagination.PageSize)
+            .Select(e => new AuditHistoryEntry(
+                e.OccurredAt, e.EventType, e.EntityType, e.ActorUserId, e.ActorEmployeeId, e.Summary,
+                e.BeforeJson, e.AfterJson, e.EmployeeId, e.EntityId, e.CorrelationId, e.CompanyId))
+            .ToListAsync(cancellationToken);
+
+        return new HR.SharedKernel.PagedResult<AuditHistoryEntry>(
+            items, totalCount, pagination.PageNumber, pagination.PageSize);
+    }
 }

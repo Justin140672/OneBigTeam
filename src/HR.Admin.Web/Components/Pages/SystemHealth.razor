@@ -1,0 +1,58 @@
+@page "/system-health"
+@inject SystemHealthService SystemHealthService
+
+<PageTitle>System Health — Admin Portal</PageTitle>
+
+<h1>System Health</h1>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_health is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view platform health data, or the health check couldn't be loaded.
+        Contact a platform administrator if you believe this is a mistake.
+    </div>
+}
+else
+{
+    <div class="details-panel health-summary-panel">
+        <span class="health-badge @StatusClass(_health.OverallStatus)">@_health.OverallStatus</span>
+        <span class="health-summary-meta">Platform version @_health.PlatformVersion</span>
+        <span class="health-summary-meta">Checked @_health.CheckedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm:ss")</span>
+    </div>
+
+    <div class="health-cards">
+        @foreach (var category in _health.Categories)
+        {
+            <div class="health-card">
+                <span class="health-card-name">@category.Name</span>
+                <span class="health-badge @StatusClass(category.Status)">@category.Status</span>
+                @if (!string.IsNullOrWhiteSpace(category.Description))
+                {
+                    <span class="health-card-description">@category.Description</span>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private SystemHealthResponse? _health;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _health = await SystemHealthService.GetSystemHealthOrNullAsync();
+        _loading = false;
+    }
+
+    private static string StatusClass(string status) => status switch
+    {
+        "Healthy" => "health-badge-healthy",
+        "Degraded" => "health-badge-degraded",
+        _ => "health-badge-unhealthy",
+    };
+}

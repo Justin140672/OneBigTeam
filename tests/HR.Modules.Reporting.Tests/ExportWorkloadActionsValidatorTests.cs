@@ -63,4 +63,26 @@ public class ExportWorkloadActionsValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(ExportWorkloadActionsRequest.GroupBy));
     }
+
+    [Fact]
+    public void Should_Have_Error_When_GroupBy_Differs_Only_By_Case()
+    {
+        var request = ValidRequest() with { GroupBy = "assigneduser" };
+
+        var result = _validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(ExportWorkloadActionsRequest.GroupBy));
+    }
+
+    [Fact]
+    public void Should_Have_Error_When_GroupBy_Is_Whitespace()
+    {
+        var request = ValidRequest() with { GroupBy = "   " };
+
+        var result = _validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(ExportWorkloadActionsRequest.GroupBy));
+    }
 }

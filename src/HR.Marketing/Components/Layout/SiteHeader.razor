@@ -18,24 +18,18 @@
     <a href="/features" aria-current="@(CurrentPage == "features" ? "page" : null)">Features</a>
     <a href="/pricing" aria-current="@(CurrentPage == "pricing" ? "page" : null)">Pricing</a>
     <a href="/#about">About</a>
-    <a href="/contact" aria-current="@(CurrentPage == "contact" ? "page" : null)">Contact</a>
+    <a href="/contact#contact-form" aria-current="@(CurrentPage == "contact" ? "page" : null)">Contact</a>
   </nav>
 
   <div class="header-actions">
     <a class="login-link" href="@LoginHref">Log in</a>
-    <a class="button button-primary" href="@TrialHref">Start free trial</a>
+    <a class="button button-primary" href="/signup">Start free trial</a>
   </div>
 </header>
 
 @code {
     /// <summary>Set by each page to highlight the matching nav link via aria-current="page".</summary>
     [Parameter] public string? CurrentPage { get; set; }
-
-    /// <summary>
-    /// "Start free trial" links to the real self-service signup page; the SignUp page itself
-    /// still exposes its own in-page form (no anchor jump needed since it *is* the destination).
-    /// </summary>
-    private string TrialHref => CurrentPage == "signup" ? "#" : "/signup";
 
     private const string FallbackWebAppBaseUrl = "http://localhost:5157";
 

@@ -307,6 +307,61 @@ public class CompleteOnboardingTaskFromTaskActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_Is_Idempotent_When_Task_Already_Skipped()
+    {
+        // Mirrors the already-Completed idempotency test, but exercises the other terminal
+        // branch of the "Completed or Skipped" check.
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OnboardingStatus.InProgress);
+        var alreadySkippedTask = SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Skipped, "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Completed, "Task B");
+        await dbContext.SaveChangesAsync();
+
+        var (action, notifications, taskCreator, _) = BuildAction(dbContext);
+        var context = BuildTaskContext(companyId, alreadySkippedTask.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedTask = await dbContext.OnboardingTasks.SingleAsync(t => t.Id == alreadySkippedTask.Id);
+        Assert.Equal(OnboardingTaskStatus.Skipped, savedTask.Status);
+        Assert.Equal(seedAt, savedTask.UpdatedAt);
+
+        var savedPlan = await dbContext.OnboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OnboardingStatus.InProgress, savedPlan.Status);
+        Assert.Equal(seedAt, savedPlan.UpdatedAt);
+        Assert.Empty(notifications.Written);
+        Assert.Empty(taskCreator.Created);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completes_Task_And_Saves_When_Owning_Plan_Is_Missing()
+    {
+        // Orphaned task (its OnboardingPlanId does not resolve to a plan): the task must still be
+        // completed and saved, and the method must return early without throwing on the null plan.
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var task = SeedTask(dbContext, companyId, Guid.NewGuid(), seedAt);
+        await dbContext.SaveChangesAsync();
+
+        var (action, notifications, taskCreator, auditPublisher) = BuildAction(dbContext);
+        var context = BuildTaskContext(companyId, task.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedTask = await dbContext.OnboardingTasks.SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(OnboardingTaskStatus.Completed, savedTask.Status);
+        Assert.Equal(Now, savedTask.UpdatedAt);
+        Assert.Empty(notifications.Written);
+        Assert.Empty(taskCreator.Created);
+        Assert.Empty(auditPublisher.Published);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_Does_Nothing_When_Task_Belongs_To_Different_Company()
     {
         await using var dbContext = BuildContext();

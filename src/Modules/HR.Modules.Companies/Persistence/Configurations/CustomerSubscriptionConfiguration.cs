@@ -49,6 +49,25 @@ internal sealed class CustomerSubscriptionConfiguration : IEntityTypeConfigurati
             .HasColumnName("cancel_at_period_end")
             .IsRequired();
 
+        builder.Property(s => s.AdminForcedReadOnly)
+            .HasColumnName("admin_forced_read_only")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(s => s.DeletionScheduledAt)
+            .HasColumnName("deletion_scheduled_at");
+
+        builder.Property(s => s.DeletionScheduledBy)
+            .HasColumnName("deletion_scheduled_by");
+
+        builder.Property(s => s.DeletionCancelledAt)
+            .HasColumnName("deletion_cancelled_at");
+
+        builder.Property(s => s.DeletionExecutedAt)
+            .HasColumnName("deletion_executed_at");
+
+        builder.Ignore(s => s.HasPendingDeletion);
+
         builder.Property(s => s.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

@@ -17,6 +17,10 @@ internal sealed class CompaniesDbContext : DbContext
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<PublicHoliday> PublicHolidays => Set<PublicHoliday>();
     public DbSet<CustomerSubscription> CustomerSubscriptions => Set<CustomerSubscription>();
+    public DbSet<CustomerBillingSnapshot> CustomerBillingSnapshots => Set<CustomerBillingSnapshot>();
+    public DbSet<SupportSession> SupportSessions => Set<SupportSession>();
+    public DbSet<PlatformMetricsSnapshot> PlatformMetricsSnapshots => Set<PlatformMetricsSnapshot>();
+    public DbSet<PlatformSettings> PlatformSettings => Set<PlatformSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

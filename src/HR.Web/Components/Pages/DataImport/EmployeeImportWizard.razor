@@ -11,7 +11,7 @@
     <div class="d-flex justify-content-between align-items-start mb-1">
         <h1 class="mb-1">Employee Data Import</h1>
     </div>
-    <p class="text-muted mb-4">Upload a CSV or XLSX file of employees, map its columns, validate, review the preview, then confirm to create the records.</p>
+    <p class="text-muted mb-4">Upload an Excel (.xlsx) file of employees, map its columns, validate, review the preview, then confirm to create the records.</p>
 
     <ul class="nav nav-pills mb-4">
         @foreach (var step in _steps)
@@ -38,7 +38,7 @@
         </div>
         <div class="card-body">
             <div class="mb-3">
-                <InputFile class="form-control" OnChange="OnFileSelected" accept=".csv,.xlsx" disabled="@(_session is not null)" />
+                <InputFile class="form-control" OnChange="OnFileSelected" accept=".xlsx" disabled="@(_session is not null)" />
             </div>
             @if (_session is not null)
             {
@@ -359,18 +359,18 @@
         ("Start Date", true, "yyyy-MM-dd or dd/MM/yyyy"),
         ("Preferred Name", false, "Free text"),
         ("Personal Email", false, "Free text"),
-        ("Nationality", false, "Free text"),
-        ("Gender", false, "Free text"),
-        ("Date Of Birth", false, "yyyy-MM-dd or dd/MM/yyyy; must be in the past"),
+        ("Nationality", true, "Free text"),
+        ("Gender", true, "Free text"),
+        ("Date Of Birth", true, "yyyy-MM-dd or dd/MM/yyyy; must be in the past"),
         ("Continuous Service Date", false, "yyyy-MM-dd or dd/MM/yyyy"),
         ("Probation End Date", false, "yyyy-MM-dd or dd/MM/yyyy"),
-        ("Employee Number", false, "Must be unique within the file and within the company, if provided"),
+        ("Employee Number", false, "Required if the company's Employee Number Mode is Manual; must be left blank if Automatic. Must be unique within the file and within the company"),
         ("Manager Reference", false, "Must match another row's Employee Number/Work Email in the file, or an existing employee's Employee Number/Work Email in the company"),
-        ("Department", false, "Name; auto-created with a warning if it doesn't already exist for the company"),
-        ("Location", false, "Name; auto-created with a warning if it doesn't already exist for the company"),
-        ("Employment Type", false, "Name; auto-created with a warning if it doesn't already exist for the company"),
-        ("Position Profile", false, "Title; auto-created with a warning if it doesn't already exist — only when both Department and Location are present and resolvable on that row"),
-        ("Salary Amount", false, "Positive number"),
+        ("Department", true, "Name; auto-created with a warning if it doesn't already exist for the company"),
+        ("Location", true, "Name; auto-created with a warning if it doesn't already exist for the company"),
+        ("Employment Type", true, "Name; auto-created with a warning if it doesn't already exist for the company"),
+        ("Position Profile", true, "Title; auto-created with a warning if it doesn't already exist — only when both Department and Location are present and resolvable on that row"),
+        ("Salary Amount", true, "Positive number"),
         ("Salary Type", false, "One of: Annual, Hourly, Daily"),
         ("Currency", false, "3-letter currency code (e.g. GBP, USD)"),
         ("Hours Per Week", false, "Positive number"),
@@ -529,7 +529,7 @@
                 return;
             }
 
-            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, "text/csv", Convert.ToBase64String(bytes));
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(bytes));
         }
         finally
         {

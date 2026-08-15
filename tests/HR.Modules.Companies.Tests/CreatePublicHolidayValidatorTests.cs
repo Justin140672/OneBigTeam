@@ -66,4 +66,18 @@ public class CreatePublicHolidayValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreatePublicHolidayRequest.CountryCode));
     }
+
+    [Fact]
+    public void Validate_Passes_When_Name_Is_At_Max_Length()
+    {
+        var result = new CreatePublicHolidayValidator().Validate(ValidRequest() with { Name = new string('N', 200) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_CountryCode_Is_At_Max_Length()
+    {
+        var result = new CreatePublicHolidayValidator().Validate(ValidRequest() with { CountryCode = new string('X', 10) });
+        Assert.True(result.IsValid);
+    }
 }

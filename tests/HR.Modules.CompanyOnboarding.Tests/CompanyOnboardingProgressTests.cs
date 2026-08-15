@@ -61,4 +61,32 @@ public class CompanyOnboardingProgressTests
         // UpdatedAt still bumps on the second call even though CompletedAt is unchanged.
         Assert.Equal(secondCompletedAt, progress.UpdatedAt);
     }
+
+    [Fact]
+    public void MarkDismissed_Twice_Keeps_Flags_But_Bumps_UpdatedAt_Each_Call()
+    {
+        var progress = CompanyOnboardingProgress.Create(Guid.NewGuid(), Now);
+        var firstDismissedAt = Now.AddDays(1);
+        var secondDismissedAt = Now.AddDays(2);
+
+        progress.MarkDismissed(firstDismissedAt);
+        progress.MarkDismissed(secondDismissedAt);
+
+        Assert.True(progress.IsDismissedEarly);
+        Assert.True(progress.IsHidden);
+        Assert.Equal(secondDismissedAt, progress.UpdatedAt);
+    }
+
+    [Fact]
+    public void MarkDismissed_Does_Not_Set_CompletedAt()
+    {
+        // MarkDismissed and MarkCompleted both flip IsHidden, but only completion should
+        // populate CompletedAt - dismissal must leave it null.
+        var progress = CompanyOnboardingProgress.Create(Guid.NewGuid(), Now);
+
+        progress.MarkDismissed(Now.AddDays(1));
+
+        Assert.True(progress.IsHidden);
+        Assert.Null(progress.CompletedAt);
+    }
 }

@@ -1,3 +1,4 @@
+using ClosedXML.Excel;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
@@ -20,32 +21,43 @@ public sealed class ImportHistoryTests(AppFixture fixture) : E2ETestBase(fixture
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var workEmail = $"e2e.history.{suffix}@example.com";
         var employeeNumber = $"E2EH{suffix}";
-        var fileName = $"e2e-history-{suffix}.csv";
+        var fileName = $"e2e-history-{suffix}.xlsx";
 
-        // Date Of Birth, Nationality, Gender, Department, Location, Employment Type, and Position
-        // Profile are all required by EmployeeStagingRowValidator.RequiredFields/
+        // Date Of Birth, Nationality, Gender, Salary Amount, Department, Location, Employment
+        // Type, and Position Profile are all required by EmployeeStagingRowValidator.RequiredFields/
         // RequiredLookupFields alongside First Name/Last Name/Work Email/Start Date/Employee
         // Number — omitting any of them fails the row before it ever reaches
         // ConfirmImportSessionHandler. Department/Location/Employment Type/Position Profile are
         // resolved by name (auto-created if they don't already exist), so using the seeded
         // "Engineering"/"London Office"/"Senior Software Engineer" values (see
         // CreateEmployeeTests) avoids an unnecessary auto-create warning.
-        var csvContent =
-            "First Name,Last Name,Work Email,Date Of Birth,Nationality,Gender,Start Date,Employee Number,Department,Location,Employment Type,Position Profile\n" +
-            $"History,Employee,{workEmail},1990-06-15,British,Male,2026-01-01,{employeeNumber},Engineering,London Office,Permanent,Senior Software Engineer\n";
+        string[] headers =
+        [
+            "First Name", "Last Name", "Work Email", "Date Of Birth", "Nationality", "Gender",
+            "Start Date", "Employee Number", "Department", "Location", "Employment Type",
+            "Position Profile", "Salary Amount"
+        ];
+        string[][] rows =
+        [
+            ["History", "Employee", workEmail, "1990-06-15", "British", "Male", "2026-01-01",
+                employeeNumber, "Engineering", "London Office", "Permanent",
+                "Senior Software Engineer", "45000"]
+        ];
 
         var tempFile = Path.Combine(Path.GetTempPath(), fileName);
-        await File.WriteAllTextAsync(tempFile, csvContent);
+        WriteImportWorkbook(tempFile, headers, rows);
 
         try
         {
-            var login   = new LoginPage(_page, _fixture.WebBaseUrl);
-            var wizard  = new DataImportWizardPage(_page, _fixture.WebBaseUrl);
-            var history = new ImportHistoryPage(_page, _fixture.WebBaseUrl);
-            var detail  = new ImportSessionDetailPage(_page, _fixture.WebBaseUrl);
+            var login      = new LoginPage(_page, _fixture.WebBaseUrl);
+            var wizard     = new DataImportWizardPage(_page, _fixture.WebBaseUrl);
+            var history    = new ImportHistoryPage(_page, _fixture.WebBaseUrl);
+            var detail     = new ImportSessionDetailPage(_page, _fixture.WebBaseUrl);
+            var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
             await login.GoToAsync();
             await login.LoginAsync(LauraEmail);
+            await EnsureManualEmployeeNumberModeAsync(hrSettings);
 
             await wizard.GoToAsync(AcmeId);
             await wizard.UploadFileAsync(tempFile);
@@ -92,29 +104,43 @@ public sealed class ImportHistoryTests(AppFixture fixture) : E2ETestBase(fixture
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var workEmail = $"e2e.historyfail.{suffix}@example.com";
         var employeeNumber = $"E2EHF{suffix}";
-        var fileName = $"e2e-history-fail-{suffix}.csv";
+        var fileName = $"e2e-history-fail-{suffix}.xlsx";
 
         // Second row is missing the required Last Name — one valid row, one failed row. Date Of
-        // Birth/Nationality/Gender/Department/Location/Employment Type/Position Profile are also
-        // required (see EmployeeStagingRowValidator.RequiredFields/RequiredLookupFields) and are
-        // included on both rows so Last Name is the only thing that fails the second one.
-        var csvContent =
-            "First Name,Last Name,Work Email,Date Of Birth,Nationality,Gender,Start Date,Employee Number,Department,Location,Employment Type,Position Profile\n" +
-            $"Valid,Employee,{workEmail},1990-06-15,British,Male,2026-01-01,{employeeNumber},Engineering,London Office,Permanent,Senior Software Engineer\n" +
-            $"Invalid,,invalid.{suffix}@example.com,1990-06-15,British,Male,2026-01-02,E2EHFX{suffix},Engineering,London Office,Permanent,Senior Software Engineer\n";
+        // Birth/Nationality/Gender/Salary Amount/Department/Location/Employment Type/Position
+        // Profile are also required (see
+        // EmployeeStagingRowValidator.RequiredFields/RequiredLookupFields) and are included on
+        // both rows so Last Name is the only thing that fails the second one.
+        string[] headers =
+        [
+            "First Name", "Last Name", "Work Email", "Date Of Birth", "Nationality", "Gender",
+            "Start Date", "Employee Number", "Department", "Location", "Employment Type",
+            "Position Profile", "Salary Amount"
+        ];
+        string[][] rows =
+        [
+            ["Valid", "Employee", workEmail, "1990-06-15", "British", "Male", "2026-01-01",
+                employeeNumber, "Engineering", "London Office", "Permanent",
+                "Senior Software Engineer", "45000"],
+            ["Invalid", "", $"invalid.{suffix}@example.com", "1990-06-15", "British", "Male",
+                "2026-01-02", $"E2EHFX{suffix}", "Engineering", "London Office", "Permanent",
+                "Senior Software Engineer", "45000"]
+        ];
 
         var tempFile = Path.Combine(Path.GetTempPath(), fileName);
-        await File.WriteAllTextAsync(tempFile, csvContent);
+        WriteImportWorkbook(tempFile, headers, rows);
 
         try
         {
-            var login   = new LoginPage(_page, _fixture.WebBaseUrl);
-            var wizard  = new DataImportWizardPage(_page, _fixture.WebBaseUrl);
-            var history = new ImportHistoryPage(_page, _fixture.WebBaseUrl);
-            var detail  = new ImportSessionDetailPage(_page, _fixture.WebBaseUrl);
+            var login      = new LoginPage(_page, _fixture.WebBaseUrl);
+            var wizard     = new DataImportWizardPage(_page, _fixture.WebBaseUrl);
+            var history    = new ImportHistoryPage(_page, _fixture.WebBaseUrl);
+            var detail     = new ImportSessionDetailPage(_page, _fixture.WebBaseUrl);
+            var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
             await login.GoToAsync();
             await login.LoginAsync(LauraEmail);
+            await EnsureManualEmployeeNumberModeAsync(hrSettings);
 
             await wizard.GoToAsync(AcmeId);
             await wizard.UploadFileAsync(tempFile);
@@ -142,5 +168,45 @@ public sealed class ImportHistoryTests(AppFixture fixture) : E2ETestBase(fixture
         {
             File.Delete(tempFile);
         }
+    }
+
+    // Acme's Employee Number Mode is shared, mutable company state that other test classes
+    // (HrSettingsPageTests, BackfillEmployeeNumbersTests, etc.) flip between Manual and
+    // Automatic via the UI. Both tests in this file supply an explicit "Employee Number" import
+    // column value, which EmployeeStagingRowValidator rejects outright when the company is in
+    // Automatic mode (see ValidateEmployeeNumberField) — so set the mode deterministically
+    // rather than assuming whatever an earlier test happened to leave it as. Same fix as
+    // DataImportWizardTests.UploadValidateConfirm_CreatesEmployees.
+    private async Task EnsureManualEmployeeNumberModeAsync(HrSettingsPage hrSettings)
+    {
+        await hrSettings.GoToAsync(AcmeId);
+        if (await hrSettings.GetEmployeeNumberModeAsync() != "Manual")
+        {
+            await hrSettings.SelectEmployeeNumberModeAsync("Manual");
+            await hrSettings.SaveAsync();
+        }
+    }
+
+    // EmployeeImportFileParser (HR.Modules.DataImport) reads uploaded files as an .xlsx workbook
+    // via ClosedXML's XLWorkbook — there is no CSV code path, so a plain-text CSV (even with a
+    // .csv extension) fails to parse as a workbook at all. Builds a minimal single-sheet workbook
+    // with the given headers and rows, mirroring EmployeeListBulkUpdateTests.WriteImportWorkbook's
+    // approach for the same reason.
+    private static void WriteImportWorkbook(string filePath, string[] headers, string[][] rows)
+    {
+        using var workbook = new XLWorkbook();
+        var sheet = workbook.Worksheets.Add("Employees");
+
+        for (var col = 0; col < headers.Length; col++)
+            sheet.Cell(1, col + 1).Value = headers[col];
+
+        for (var rowIndex = 0; rowIndex < rows.Length; rowIndex++)
+        {
+            var row = rows[rowIndex];
+            for (var col = 0; col < row.Length; col++)
+                sheet.Cell(rowIndex + 2, col + 1).Value = row[col];
+        }
+
+        workbook.SaveAs(filePath);
     }
 }

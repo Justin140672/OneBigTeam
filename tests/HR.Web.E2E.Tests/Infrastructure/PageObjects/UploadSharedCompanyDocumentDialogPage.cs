@@ -28,8 +28,11 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
 
     public Task<bool> IsOpenAsync() => Dialog.IsVisibleAsync();
 
-    public Task FillTitleAsync(string title) =>
-        Dialog.GetByPlaceholder("Document title").FillAsync(title);
+    public async Task FillTitleAsync(string title)
+    {
+        await Dialog.GetByPlaceholder("Document title").FillAsync(title);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     /// <summary>
     /// Selects a category via the Syncfusion SfDropDownList (same click-open/wait-for-popup/
@@ -81,8 +84,11 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
     public Task<string> GetAcknowledgementStatementValueAsync() =>
         AcknowledgementStatementTextArea.InputValueAsync();
 
-    public Task FillAcknowledgementStatementAsync(string value) =>
-        AcknowledgementStatementTextArea.FillAsync(value);
+    public async Task FillAcknowledgementStatementAsync(string value)
+    {
+        await AcknowledgementStatementTextArea.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     /// <summary>
     /// Text of the live "Preview — this is what employees will see:" box (.alert-info), which

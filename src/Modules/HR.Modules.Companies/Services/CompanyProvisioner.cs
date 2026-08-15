@@ -21,7 +21,7 @@ internal sealed class CompanyProvisioner(
     public async Task<Guid> ProvisionCompanyAsync(string companyName, CancellationToken cancellationToken)
     {
         var now = clock.UtcNowOffset();
-        var trialLengthDays = configuration.GetValue<int?>("Subscription:TrialLengthDays") ?? 14;
+        var trialLengthDays = await GetTrialLengthDaysAsync(now, cancellationToken);
 
         var company = Company.Create(Guid.NewGuid(), companyName.Trim(), now);
         var settings = CompanySettings.CreateDefault(company.Id, now);
@@ -49,6 +49,40 @@ internal sealed class CompanyProvisioner(
 
         company.Deactivate(clock.UtcNowOffset());
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// The platform-wide PlatformSettings singleton row (see PlatformSettings.SingletonId remarks)
+    /// is now the source of truth for trial length — platform administrators change it via the
+    /// Admin Portal without a redeploy. Lazy-seeds the row if it doesn't exist yet, same as
+    /// GetPlatformSettings/UpdatePlatformSettings' handlers. The appsettings
+    /// "Subscription:TrialLengthDays" value is kept only as a defensive fallback in case the row
+    /// can't be read for some reason.
+    /// </summary>
+    private async Task<int> GetTrialLengthDaysAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var settings = await dbContext.PlatformSettings
+                .AsNoTracking()
+                .SingleOrDefaultAsync(s => s.Id == PlatformSettings.SingletonId, cancellationToken);
+
+            if (settings is not null)
+            {
+                return settings.TrialLengthDays;
+            }
+
+            var defaults = PlatformSettings.CreateDefault(now);
+            dbContext.PlatformSettings.Add(defaults);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return defaults.TrialLengthDays;
+        }
+        catch (Exception)
+        {
+            // Defensive fallback only — the DB row is the source of truth. Falls back to
+            // appsettings if the PlatformSettings row genuinely cannot be read/seeded.
+            return configuration.GetValue<int?>("Subscription:TrialLengthDays") ?? 14;
+        }
     }
 
     public async Task<bool> IsCompanyActiveAsync(Guid companyId, CancellationToken cancellationToken)

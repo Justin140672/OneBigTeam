@@ -37,6 +37,7 @@ public sealed class PersonalDetailsTab(IPage page)
         var textarea = page.Locator("textarea#pd-notes");
         await textarea.ClearAsync();
         await textarea.FillAsync(notes);
+        await page.Keyboard.PressAsync("Tab");
     }
 
     /// <summary>

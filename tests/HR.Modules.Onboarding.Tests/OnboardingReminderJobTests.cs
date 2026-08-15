@@ -159,6 +159,27 @@ public class OnboardingReminderJobTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_Sends_No_Notification_For_Task_Due_Today()
+    {
+        // Boundary: DueDate == today must not be treated as overdue — the job only fires for
+        // DueDate strictly before "today" (task.DueDate < today).
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = SeedPlan(dbContext, companyId, employeeId);
+        SeedTask(dbContext, companyId, plan.Id, OnboardingTemplateTaskAssignTo.Manager, Today);
+        await dbContext.SaveChangesAsync();
+
+        var notifications = new FakeNotificationWriter();
+        var job = BuildJob(dbContext, notifications, Guid.NewGuid());
+
+        await job.ExecuteAsync();
+
+        Assert.Empty(notifications.Written);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_Sends_No_Notification_For_Overdue_Completed_Task()
     {
         await using var dbContext = BuildContext();

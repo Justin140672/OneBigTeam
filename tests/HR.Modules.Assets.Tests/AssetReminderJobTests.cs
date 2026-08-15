@@ -261,6 +261,54 @@ public class AssetReminderJobTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_Sends_Acknowledgement_Overdue_When_Unacknowledged_For_Exactly_7_Days()
+    {
+        await using var db = BuildContext();
+        var (assignmentId, employeeId, companyId) = await SeedActiveAssignmentAsync(db);
+
+        // Backdate AssignedAt to exactly 7 days ago — boundary is inclusive (AssignedAt <= cutoff)
+        var assignment = await db.AssetAssignments.FindAsync(assignmentId);
+        var pastDate = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero).AddDays(-7);
+        typeof(AssetAssignment)
+            .GetProperty("AssignedAt")!
+            .SetValue(assignment, pastDate);
+        await db.SaveChangesAsync();
+
+        var writer = new FakeNotificationWriter();
+        var job    = BuildJob(db, writer, new FakeClock(FixedUtcNow));
+
+        await job.ExecuteAsync();
+
+        var overdue = Assert.Single(writer.Written,
+            n => n.Type == NotificationType.AssetAcknowledgementOverdue);
+        Assert.Equal(companyId,    overdue.CompanyId);
+        Assert.Equal(employeeId,   overdue.EmployeeId);
+        Assert.Equal(assignmentId, overdue.SourceEntityId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Not_Send_Acknowledgement_Overdue_When_Unacknowledged_For_6_Days()
+    {
+        await using var db = BuildContext();
+        var (assignmentId, _, _) = await SeedActiveAssignmentAsync(db);
+
+        // Just under the 7-day cutoff — must not trigger overdue
+        var assignment = await db.AssetAssignments.FindAsync(assignmentId);
+        var pastDate = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero).AddDays(-6);
+        typeof(AssetAssignment)
+            .GetProperty("AssignedAt")!
+            .SetValue(assignment, pastDate);
+        await db.SaveChangesAsync();
+
+        var writer = new FakeNotificationWriter();
+        var job    = BuildJob(db, writer, new FakeClock(FixedUtcNow));
+
+        await job.ExecuteAsync();
+
+        Assert.DoesNotContain(writer.Written, n => n.Type == NotificationType.AssetAcknowledgementOverdue);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_Does_Not_Send_Acknowledgement_Overdue_When_Within_7_Days()
     {
         await using var db = BuildContext();

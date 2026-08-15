@@ -257,6 +257,7 @@ public class ReportingService(IHttpClientFactory httpClientFactory)
 
         query["policyYear"] = filter.PolicyYear.ToString();
         if (filter.DepartmentId is not null) query["departmentId"] = filter.DepartmentId.ToString();
+        if (filter.LeaveTypeId is not null) query["leaveTypeId"] = filter.LeaveTypeId.ToString();
         query["groupBy"] = filter.GroupBy.ToString();
 
         return query.ToString() ?? string.Empty;

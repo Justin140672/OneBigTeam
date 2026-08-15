@@ -38,11 +38,20 @@ public static class InfrastructureModule
             }));
 
         services.AddHttpContextAccessor();
+        services.AddHttpClient();
         AddProfilePhotoStorageService(services, configuration);
         AddSupportAttachmentStorageService(services, configuration);
 
         QuestPDF.Settings.License = LicenseType.Community;
         services.AddScoped<IReportExporter, ReportExporter>();
+
+        // System Health Dashboard (Platform Monitoring epic) — "email" (live Postmark reachability
+        // probe) and "storage" (live Supabase Storage reachability probe) named health checks.
+        services.Configure<PostmarkOptions>(configuration.GetSection("Infrastructure:Postmark"));
+        services.Configure<SupabaseProfilePhotoStorageOptions>(configuration.GetSection("Infrastructure:Supabase:ProfilePhotos"));
+        services.AddHealthChecks()
+            .AddCheck<PostmarkHealthCheck>("email")
+            .AddCheck<SupabaseStorageHealthCheck>("storage");
 
         return services;
     }
@@ -110,6 +119,8 @@ public static class InfrastructureModule
 
         services.AddHealthChecks()
             .AddCheck<HangfireHealthCheck>("hangfire", tags: ["ready"]);
+
+        services.AddScoped<IBackgroundJobStatusReader, HangfireJobStatusReader>();
 
         return services;
     }

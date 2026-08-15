@@ -97,8 +97,11 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     public Task<bool> IsUploadDialogFileInputVisibleAsync() =>
         UploadDocumentDialog.Locator("input[type='file']").IsVisibleAsync();
 
-    public Task FillUploadDialogTitleAsync(string value) =>
-        UploadDocumentDialog.GetByPlaceholder("Document title").FillAsync(value);
+    public async Task FillUploadDialogTitleAsync(string value)
+    {
+        await UploadDocumentDialog.GetByPlaceholder("Document title").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public Task SelectUploadDialogDocumentTypeAsync(string typeNameFragment) =>
         DropDownSelector.SelectAsync(page, UploadDocumentDialog, typeNameFragment);
@@ -432,7 +435,10 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         }
 
         if (!string.IsNullOrEmpty(comments))
+        {
             await dialog.Locator("textarea").FillAsync(comments);
+            await page.Keyboard.PressAsync("Tab");
+        }
 
         if (allowNegativeOverride)
             await dialog.Locator("#allowNegativeOverride").CheckAsync();

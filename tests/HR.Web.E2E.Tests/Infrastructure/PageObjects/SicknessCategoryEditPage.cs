@@ -10,13 +10,22 @@ public sealed class SicknessCategoryEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
-    public async Task FillNameAsync(string name) =>
+    public async Task FillNameAsync(string name)
+    {
         await page.GetByPlaceholder("e.g. Cold, Stress, Back Pain").FillAsync(name);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
+    // SfNumericTextBox: a bare FillAsync bypasses its interop entirely (see LeaveTypeEditPage.
+    // FillDefaultDaysAsync for the same pattern/explanation) — retype the value for real.
     public async Task FillDisplayOrderAsync(int order)
     {
         var input = page.Locator("input.e-numerictextbox").First;
-        await input.FillAsync(order.ToString());
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        await input.PressSequentiallyAsync(order.ToString());
+        await page.Keyboard.PressAsync("Tab");
     }
 
     public async Task SaveAsync()

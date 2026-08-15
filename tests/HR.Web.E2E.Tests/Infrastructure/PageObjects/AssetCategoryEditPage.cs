@@ -14,11 +14,17 @@ public sealed class AssetCategoryEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
-    public async Task FillNameAsync(string name) =>
+    public async Task FillNameAsync(string name)
+    {
         await page.GetByPlaceholder("e.g. Laptops, Furniture").FillAsync(name);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public async Task FillDescriptionAsync(string description) =>
+    public async Task FillDescriptionAsync(string description)
+    {
         await page.GetByPlaceholder("Optional description").FillAsync(description);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task SaveAsync()
     {

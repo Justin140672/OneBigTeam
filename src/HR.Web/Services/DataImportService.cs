@@ -224,7 +224,7 @@ public sealed class DataImportService(IHttpClientFactory httpClientFactory)
     public async Task<(byte[]? Bytes, string FileName, string? Error)> DownloadTemplateAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {
-        const string fallbackFileName = "employee-import-template.csv";
+        const string fallbackFileName = "employee-import-template.xlsx";
         try
         {
             var response = await Http.GetAsync(

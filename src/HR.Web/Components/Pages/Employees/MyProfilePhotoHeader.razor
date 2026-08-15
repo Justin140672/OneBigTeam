@@ -67,7 +67,28 @@
     private async Task HandleUploaded()
     {
         _dialogOpen = false;
-        await LoadAsync();
+        await PollForPendingPhotoAsync();
+    }
+
+    // Same race as EmployeeProfilePhotoHeader.PollForCurrentPhotoAsync — the virus scan
+    // (ScanUploadedFileJob) runs asynchronously via a background job queued during upload, and
+    // GetMyProfilePhotoAsync only reports a pending photo once that scan comes back Clean (see
+    // GetMyProfilePhotoHandler / ScanStatusAccessGuard.CheckDownloadable). A single fetch right
+    // after upload can race it and see nothing, leaving this header showing no "Pending
+    // approval" banner at all with nothing left to trigger a re-render once scanning finishes.
+    // 20 attempts / 10s total (raised from 10/5s) — under a full E2E suite run, Hangfire's queue
+    // can be busy enough with other tests' background jobs that the scan doesn't come back within
+    // 5s, which surfaced as this banner silently never appearing.
+    private async Task PollForPendingPhotoAsync()
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            await LoadAsync();
+            if (_photo?.PendingPhoto is not null)
+                return;
+
+            await Task.Delay(500);
+        }
     }
 
     private async Task CancelPendingAsync()

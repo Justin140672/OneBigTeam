@@ -111,7 +111,29 @@
         _dialogOpen = false;
         _uploadSuccessMsg = "Photo uploaded successfully.";
         await LoadPendingAsync();
-        await LoadCurrentPhotoAsync();
+        await PollForCurrentPhotoAsync();
+    }
+
+    // The virus scan (ScanUploadedFileJob) runs asynchronously via a background job queued
+    // during upload — GetEmployeeProfilePhotoAsync only returns a download URL once that scan
+    // comes back Clean (see ScanStatusAccessGuard.CheckDownloadable), so a single fetch right
+    // after upload can race it and see nothing, leaving the header stuck on the initials
+    // placeholder with nothing left to trigger a re-render once scanning actually finishes.
+    // Poll briefly instead of fetching once. 40 attempts / 20s total (raised from 20/10s, itself
+    // raised from 10/5s) — under a full E2E suite run, Hangfire's queue can be busy enough with
+    // other tests' background jobs that the scan doesn't come back within the previous window.
+    // This budget matters more than it looks: once it's exhausted, nothing else re-triggers a
+    // fetch — the header is left showing initials permanently even once the scan does finish late.
+    private async Task PollForCurrentPhotoAsync()
+    {
+        for (var attempt = 0; attempt < 40; attempt++)
+        {
+            await LoadCurrentPhotoAsync();
+            if (_currentPhotoUrl is not null)
+                return;
+
+            await Task.Delay(500);
+        }
     }
 
     private async Task ApproveAsync()

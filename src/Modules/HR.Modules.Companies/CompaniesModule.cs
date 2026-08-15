@@ -1,24 +1,50 @@
 using FluentValidation;
 
 using HR.Modules.Companies.Domain;
+using HR.Modules.Companies.Features.AdminCancelSubscription;
+using HR.Modules.Companies.Features.CancelCustomerDeletion;
 using HR.Modules.Companies.Features.CancelSubscription;
 using HR.Modules.Companies.Features.CreateBillingPortalSession;
 using HR.Modules.Companies.Features.CreateCheckoutSession;
 using HR.Modules.Companies.Features.CreateCompany;
 using HR.Modules.Companies.Features.CreatePublicHoliday;
+using HR.Modules.Companies.Features.ExecuteCustomerDeletion;
+using HR.Modules.Companies.Features.ExtendCustomerTrial;
+using HR.Modules.Companies.Features.ForceCustomerReadOnly;
 using HR.Modules.Companies.Features.GetCompany;
 using HR.Modules.Companies.Features.GetCompanySettings;
+using HR.Modules.Companies.Features.GetCustomerBillingBreakdown;
+using HR.Modules.Companies.Features.GetCustomerBillingHistory;
+using HR.Modules.Companies.Features.GetCustomerDashboard;
+using HR.Modules.Companies.Features.GetCustomerDetails;
+using HR.Modules.Companies.Features.GetDeletionQueue;
+using HR.Modules.Companies.Features.GetCustomerSupportView;
+using HR.Modules.Companies.Features.GetFailedPayments;
 using HR.Modules.Companies.Features.GetHrSettings;
 using HR.Modules.Companies.Features.GetSubscriptionDetails;
 using HR.Modules.Companies.Features.GetSubscriptionStatus;
+using HR.Modules.Companies.Features.GenerateSupportSession;
+using HR.Modules.Companies.Features.ListBackgroundJobs;
+using HR.Modules.Companies.Features.ListCustomers;
 using HR.Modules.Companies.Features.ListPublicHolidays;
+using HR.Modules.Companies.Features.RedeemSupportSession;
+using HR.Modules.Companies.Features.ReinstateCustomerSubscription;
+using HR.Modules.Companies.Features.RetryBackgroundJob;
+using HR.Modules.Companies.Features.ResumeCustomerService;
+using HR.Modules.Companies.Features.ScheduleCustomerDeletion;
 using HR.Modules.Companies.Features.ResumeSubscription;
+using HR.Modules.Companies.Features.RevokeSupportSession;
 using HR.Modules.Companies.Features.StripeWebhook;
 using HR.Modules.Companies.Features.UpdateCompany;
 using HR.Modules.Companies.Features.UpdateCompanySettings;
 using HR.Modules.Companies.Features.UpdateHrSettings;
 using HR.Modules.Companies.Features.UpdatePublicHoliday;
 using HR.Modules.Companies.Features.UploadCompanyLogo;
+using HR.Modules.Companies.Features.GetSystemHealth;
+using HR.Modules.Companies.Features.GetApplicationMetrics;
+using HR.Modules.Companies.Features.GetAuditLog;
+using HR.Modules.Companies.Features.GetPlatformSettings;
+using HR.Modules.Companies.Features.UpdatePlatformSettings;
 using HR.Modules.Companies.Persistence;
 using HR.Modules.Companies.Services;
 using HR.Modules.Companies.Services.OnboardingTasks;
@@ -57,6 +83,13 @@ public static class CompaniesModule
         services.AddDbContext<CompaniesDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "companies")));
+
+        // System Health Dashboard (Platform Monitoring epic) — "database" proxies overall Postgres
+        // connectivity (see CompaniesDatabaseHealthCheck remarks), "stripe" is a live account-balance
+        // reachability probe.
+        services.AddHealthChecks()
+            .AddCheck<CompaniesDatabaseHealthCheck>("database")
+            .AddCheck<StripeHealthCheck>("stripe");
 
         return services;
     }
@@ -176,6 +209,7 @@ public static class CompaniesModule
         services.AddScoped<GetCompanySettingsHandler>();
         services.AddScoped<GetHrSettingsHandler>();
         services.AddScoped<GetSubscriptionStatusHandler>();
+        services.AddScoped<GetCustomerDashboardHandler>();
         services.AddScoped<UpdateCompanyHandler>();
         services.AddScoped<UpdateCompanySettingsHandler>();
         services.AddScoped<UpdateHrSettingsHandler>();
@@ -217,7 +251,21 @@ public static class CompaniesModule
         services.AddScoped<IOnboardingTaskDefinition, StartSubscriptionTask>();
 
         // Phase C — Stripe checkout + webhook.
-        services.AddScoped<IStripeGateway, StripeGateway>();
+        // Real Stripe gateway swapped for a no-op fake under E2E_TESTING — same rationale/pattern
+        // as HR.Modules.Identity.IdentityModule's ISupabaseAuthGateway swap (see
+        // E2eStripeGateway's own remarks for why this was needed: E2E-reachable code paths that
+        // call Stripe were otherwise always hitting the real API, even against seeded companies'
+        // fake "dev-stub-customer" Stripe customer ids).
+        var isE2ETestingForStripe = string.Equals(
+            Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
+        if (isE2ETestingForStripe)
+        {
+            services.AddScoped<IStripeGateway, E2eStripeGateway>();
+        }
+        else
+        {
+            services.AddScoped<IStripeGateway, StripeGateway>();
+        }
         services.AddScoped<CreateCheckoutSessionHandler>();
         services.AddScoped<StripeWebhookHandler>();
 
@@ -226,5 +274,94 @@ public static class CompaniesModule
         services.AddScoped<CancelSubscriptionHandler>();
         services.AddScoped<ResumeSubscriptionHandler>();
         services.AddScoped<CreateBillingPortalSessionHandler>();
+
+        // Admin Portal customer list.
+        services.AddScoped<ListCustomersHandler>();
+        services.AddScoped<IValidator<ListCustomersRequest>, ListCustomersValidator>();
+
+        // Admin Portal customer details.
+        services.AddScoped<GetCustomerDetailsHandler>();
+
+        // Admin Portal customer billing breakdown (persists a history snapshot on each view).
+        services.AddScoped<GetCustomerBillingBreakdownHandler>();
+        services.AddScoped<IValidator<GetCustomerBillingBreakdownRequest>, GetCustomerBillingBreakdownValidator>();
+
+        // Admin Portal customer billing history (live Stripe invoice lookup, no local invoice data).
+        services.AddScoped<GetCustomerBillingHistoryHandler>();
+        services.AddScoped<IValidator<GetCustomerBillingHistoryRequest>, GetCustomerBillingHistoryValidator>();
+
+        // Admin Portal Failed Payments Dashboard (Billing epic) — platform-wide, not scoped to a
+        // single customer.
+        services.AddScoped<GetFailedPaymentsHandler>();
+        services.AddScoped<IValidator<GetFailedPaymentsRequest>, GetFailedPaymentsValidator>();
+
+        // Admin Portal customer support view (Support epic) — condensed troubleshooting summary.
+        services.AddScoped<GetCustomerSupportViewHandler>();
+        services.AddScoped<IValidator<GetCustomerSupportViewRequest>, GetCustomerSupportViewValidator>();
+
+        // Admin Portal subscription management (Subscription Management epic) — support
+        // intervention actions for a platform administrator, each audited via IAuditEventPublisher.
+        services.AddScoped<ExtendCustomerTrialHandler>();
+        services.AddScoped<IValidator<ExtendCustomerTrialRequest>, ExtendCustomerTrialValidator>();
+        services.AddScoped<AdminCancelSubscriptionHandler>();
+        services.AddScoped<IValidator<AdminCancelSubscriptionRequest>, AdminCancelSubscriptionValidator>();
+        services.AddScoped<ReinstateCustomerSubscriptionHandler>();
+        services.AddScoped<IValidator<ReinstateCustomerSubscriptionRequest>, ReinstateCustomerSubscriptionValidator>();
+        services.AddScoped<ForceCustomerReadOnlyHandler>();
+        services.AddScoped<IValidator<ForceCustomerReadOnlyRequest>, ForceCustomerReadOnlyValidator>();
+        services.AddScoped<ResumeCustomerServiceHandler>();
+        services.AddScoped<IValidator<ResumeCustomerServiceRequest>, ResumeCustomerServiceValidator>();
+
+        // Admin Portal Permanent Deletion Queue (Customer Lifecycle epic) — schedule/cancel/execute
+        // support interventions, each audited via IAuditEventPublisher, plus the platform-wide
+        // /deletion-queue list. "Execute" is a status-only, reversible-in-principle transition — see
+        // ExecuteCustomerDeletionHandler's remarks for the explicit scope line (no real data
+        // destruction here).
+        services.AddScoped<ScheduleCustomerDeletionHandler>();
+        services.AddScoped<IValidator<ScheduleCustomerDeletionRequest>, ScheduleCustomerDeletionValidator>();
+        services.AddScoped<CancelCustomerDeletionHandler>();
+        services.AddScoped<IValidator<CancelCustomerDeletionRequest>, CancelCustomerDeletionValidator>();
+        services.AddScoped<ExecuteCustomerDeletionHandler>();
+        services.AddScoped<IValidator<ExecuteCustomerDeletionRequest>, ExecuteCustomerDeletionValidator>();
+        services.AddScoped<GetDeletionQueueHandler>();
+
+        // Admin Portal "Login As Customer" support sessions (Support epic) — company-scoped,
+        // time-boxed, single-use, revocable, audited access grants for platform administrators.
+        services.AddScoped<GenerateSupportSessionHandler>();
+        services.AddScoped<IValidator<GenerateSupportSessionRequest>, GenerateSupportSessionValidator>();
+        services.AddScoped<RevokeSupportSessionHandler>();
+        services.AddScoped<IValidator<RevokeSupportSessionRequest>, RevokeSupportSessionValidator>();
+        services.AddScoped<RedeemSupportSessionHandler>();
+        services.AddScoped<IValidator<RedeemSupportSessionRequest>, RedeemSupportSessionValidator>();
+
+        // Admin Portal Job Monitoring (Background Jobs epic) — platform-wide, not scoped to a
+        // single customer. Retry is audited via IAuditEventPublisher like the other admin actions.
+        services.AddScoped<ListBackgroundJobsHandler>();
+        services.AddScoped<RetryBackgroundJobHandler>();
+        services.AddScoped<IValidator<RetryBackgroundJobRequest>, RetryBackgroundJobValidator>();
+
+        // Admin Portal System Health Dashboard (Platform Monitoring epic) — platform-wide, not
+        // scoped to a single customer. Aggregates the named health checks registered above and by
+        // the other modules/Infrastructure via the framework's HealthCheckService rather than
+        // re-implementing each check here.
+        services.AddScoped<GetSystemHealthHandler>();
+
+        // Admin Portal Application Metrics dashboard (Platform Monitoring epic) — platform-wide,
+        // not scoped to a single customer.
+        services.AddScoped<GetApplicationMetricsHandler>();
+
+        // Admin Portal Platform Audit Log (Audit epic) — platform-wide, not scoped to a single
+        // customer. Queries the existing cross-cutting IAuditHistoryReader/AuditDbContext rather
+        // than a new audit table.
+        services.AddScoped<GetAuditLogHandler>();
+        services.AddScoped<IValidator<GetAuditLogRequest>, GetAuditLogValidator>();
+
+        // Admin Portal Platform Settings (Platform Monitoring/Admin epic) — platform-wide singleton
+        // row (trial length, default pricing display, support contact, maintenance mode, feature
+        // flags), lazy-seeded on first read/write, each write audited via IAuditEventPublisher.
+        services.AddScoped<GetPlatformSettingsHandler>();
+        services.AddScoped<IValidator<GetPlatformSettingsRequest>, GetPlatformSettingsValidator>();
+        services.AddScoped<UpdatePlatformSettingsHandler>();
+        services.AddScoped<IValidator<UpdatePlatformSettingsRequest>, UpdatePlatformSettingsValidator>();
     }
 }

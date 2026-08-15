@@ -1,0 +1,33 @@
+@inject IConfiguration Configuration
+
+@* A deliberately minimal header for the signup journey: no marketing nav, no competing CTA — just
+   the logo (still linking home, in case someone lands here in error) and a single, clear route
+   back to login for people who already have an account. Keeping this separate from SiteHeader
+   avoids reintroducing "Start free trial" (a no-op) or nav items that dilute the signup form as
+   the single dominant action on the page. *@
+<header class="signup-header">
+  <a class="brand" href="/" aria-label="One Big Team home">
+    <img src="/assets/logo.png" alt="One Big Team logo" height="48" />
+  </a>
+
+  <p class="signup-header-login">
+    Already have an account? <a class="login-link" href="@LoginHref">Log in</a>
+  </p>
+</header>
+
+@code {
+    private const string FallbackWebAppBaseUrl = "http://localhost:5157";
+
+    private string LoginHref
+    {
+        get
+        {
+            var baseUrl =
+                Configuration["services:web:https:0"] ??
+                Configuration["services:web:http:0"] ??
+                FallbackWebAppBaseUrl;
+
+            return $"{baseUrl.TrimEnd('/')}/login";
+        }
+    }
+}

@@ -19,9 +19,9 @@ public class EmployeeStagingRowValidatorTests
 
     // Builds a row that otherwise satisfies all required fields, with optional extras set.
     // DateOfBirth/Nationality/Gender/EmployeeNumber/DepartmentName/LocationName/
-    // EmploymentTypeName/PositionProfileTitle all default to valid values (rather than being
-    // omitted) since they are mandatory Employee fields — tests that need to exercise a
-    // specific missing/absent scenario for one of them pass that parameter as an explicit
+    // EmploymentTypeName/PositionProfileTitle/SalaryAmount all default to valid values (rather
+    // than being omitted) since they are mandatory Employee fields — tests that need to exercise
+    // a specific missing/absent scenario for one of them pass that parameter as an explicit
     // `null` to override the default.
     private static ParsedImportRow ValidRow(
         int rowNumber,
@@ -36,7 +36,7 @@ public class EmployeeStagingRowValidatorTests
         string? gender = "Female",
         string? continuousServiceDate = null,
         string? probationEndDate = null,
-        string? salaryAmount = null,
+        string? salaryAmount = "50000",
         string? salaryType = null,
         string? currency = null,
         string? hoursPerWeek = null,
@@ -146,6 +146,71 @@ public class EmployeeStagingRowValidatorTests
         var result = Assert.Single(results);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.Contains("'StartDate' is required."));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Flags_Missing_Nationality()
+    {
+        var validator = BuildValidator();
+        var row = ValidRow(2, nationality: null);
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'Nationality' is required."));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Flags_Missing_Gender()
+    {
+        var validator = BuildValidator();
+        var row = ValidRow(2, gender: null);
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'Gender' is required."));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Flags_Missing_EmploymentTypeName()
+    {
+        var validator = BuildValidator();
+        var row = ValidRow(2, employmentTypeName: null);
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'EmploymentTypeName' is required."));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Flags_Missing_DepartmentName()
+    {
+        var validator = BuildValidator();
+        var row = ValidRow(2, departmentName: null, locationName: null, positionProfileTitle: null);
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'DepartmentName' is required."));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Flags_Missing_PositionProfileTitle()
+    {
+        var validator = BuildValidator();
+        var row = ValidRow(2, positionProfileTitle: null);
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'PositionProfileTitle' is required."));
     }
 
     [Fact]
@@ -323,18 +388,56 @@ public class EmployeeStagingRowValidatorTests
     }
 
     [Fact]
+    public async Task ValidateAsync_Flags_ManagerReference_Pointing_At_Its_Own_Row()
+    {
+        // A row referencing its own EmployeeNumber/WorkEmail must not "self-approve" via the
+        // in-file match check (which explicitly excludes r.RowNumber != row.RowNumber), and must
+        // also fail the existing-employee lookup since no such employee exists yet.
+        var validator = BuildValidator();
+        var row = ValidRow(2, workEmail: "self@example.com", employeeNumber: "SELF1", managerReference: "SELF1");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("does not match any employee"));
+    }
+
+    [Fact]
     public async Task ValidateAsync_Skips_Compensation_Validation_When_No_Compensation_Column_Mapped()
     {
         var validator = BuildValidator();
-        var row = ValidRow(2, salaryAmount: "not-a-number");
+        // SalaryAmount is unconditionally required/validated regardless of mapped columns (see
+        // ValidateAsync_Validates_SalaryAmount_Format_Even_When_No_Compensation_Column_Mapped
+        // below), so it's given a valid value here — this test is only about the *other*
+        // compensation fields (SalaryType/Currency/HoursPerWeek/FTE) still being skipped when
+        // none of them are reported as mapped.
+        var row = ValidRow(2, salaryAmount: "50000", currency: "not-a-currency");
 
-        // SalaryAmount is present on the row but not reported as a "mapped" field
-        // (simulating a column the parser found nowhere in the file's header row).
-        var mappedFields = new HashSet<string> { "FirstName", "LastName", "WorkEmail", "StartDate" };
+        // Currency is present on the row but not reported as a "mapped" field (simulating a
+        // column the parser found nowhere in the file's header row).
+        var mappedFields = new HashSet<string> { "FirstName", "LastName", "WorkEmail", "StartDate", "SalaryAmount" };
 
         var results = await validator.ValidateAsync(CompanyId, [row], mappedFields, CancellationToken.None);
 
         Assert.True(Assert.Single(results).IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Validates_SalaryAmount_Format_Even_When_No_Compensation_Column_Mapped()
+    {
+        var validator = BuildValidator();
+        var row = ValidRow(2, salaryAmount: "not-a-number");
+
+        // Unlike SalaryType/Currency/HoursPerWeek/FTE, SalaryAmount's format is checked
+        // unconditionally (ValidateSalaryAmountFormat), independent of which columns are mapped.
+        var mappedFields = new HashSet<string> { "FirstName", "LastName", "WorkEmail", "StartDate" };
+
+        var results = await validator.ValidateAsync(CompanyId, [row], mappedFields, CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'SalaryAmount'") && e.Contains("positive number"));
     }
 
     [Fact]
@@ -418,17 +521,68 @@ public class EmployeeStagingRowValidatorTests
         Assert.Contains(result.Errors, e => e.Contains("'Currency'"));
     }
 
-    [Fact]
-    public async Task ValidateAsync_Flags_Non_Positive_HoursPerWeek()
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    public async Task ValidateAsync_Flags_Non_Positive_HoursPerWeek(string hoursPerWeek)
     {
         var validator = BuildValidator();
-        var row = ValidRow(2, hoursPerWeek: "0");
+        var row = ValidRow(2, hoursPerWeek: hoursPerWeek);
 
         var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
 
         var result = Assert.Single(results);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.Contains("'HoursPerWeek'"));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Accepts_Positive_HoursPerWeek()
+    {
+        var validator = BuildValidator();
+        var row = ValidRow(2, salaryAmount: "50000", hoursPerWeek: "37.5");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        Assert.True(Assert.Single(results).IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Flags_Zero_SalaryAmount()
+    {
+        // The check is `salary <= 0`, not `< 0` — zero must be rejected too, not just negatives.
+        var validator = BuildValidator();
+        var row = ValidRow(2, salaryAmount: "0");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'SalaryAmount'") && e.Contains("positive number"));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Accepts_Valid_Currency_Case_Insensitively()
+    {
+        var validator = BuildValidator();
+        var row = ValidRow(2, salaryAmount: "50000", currency: "usd");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        Assert.True(Assert.Single(results).IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Flags_Currency_With_Too_Many_Letters()
+    {
+        var validator = BuildValidator();
+        var row = ValidRow(2, currency: "USDD");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'Currency'"));
     }
 
     [Theory]
@@ -646,6 +800,21 @@ public class EmployeeStagingRowValidatorTests
         var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
 
         Assert.True(Assert.Single(results).IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Flags_WorkingDays_That_Is_Only_Separators()
+    {
+        // After TrimEntries + RemoveEmptyEntries splitting, a value of only commas/whitespace
+        // yields zero day names — must hit the "at least one day name" branch, not silently pass.
+        var validator = BuildValidator();
+        var row = ValidRowWithWorkingPattern(2, workingDays: " , , ");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'WorkingDays' must contain at least one day name."));
     }
 
     [Fact]

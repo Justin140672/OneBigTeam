@@ -159,7 +159,8 @@ public enum LeaveSummaryGroupBy
 public record LeaveSummaryReportFilter(
     int PolicyYear,
     Guid? DepartmentId,
-    LeaveSummaryGroupBy GroupBy);
+    LeaveSummaryGroupBy GroupBy,
+    Guid? LeaveTypeId = null);
 
 public record GetLeaveSummaryReportResponse(List<LeaveSummaryGroupRowModel> Items);
 

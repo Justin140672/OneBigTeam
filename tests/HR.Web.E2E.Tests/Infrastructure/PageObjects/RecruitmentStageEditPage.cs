@@ -20,8 +20,11 @@ public sealed class RecruitmentStageEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
-    public Task FillNameAsync(string name) =>
-        page.GetByPlaceholder("e.g. Screening, Interview, Offered").FillAsync(name);
+    public async Task FillNameAsync(string name)
+    {
+        await page.GetByPlaceholder("e.g. Screening, Interview, Offered").FillAsync(name);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public Task<string> GetNameAsync() =>
         page.GetByPlaceholder("e.g. Screening, Interview, Offered").InputValueAsync();

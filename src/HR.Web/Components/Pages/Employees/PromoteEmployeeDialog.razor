@@ -4,6 +4,7 @@
 @inject PositionProfileService PositionProfileService
 @inject LocationService LocationService
 @inject EmployeeService EmployeeService
+@inject CompensationService CompensationService
 @inherits EditDialogBase<PromoteEmployeeDialog.PromoteEmployeeFormModel>
 
 <SfDialog @bind-Visible="Visible" IsModal="true" Width="640px" ShowCloseIcon="true" CssClass="promote-employee-dialog">
@@ -307,6 +308,20 @@
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "Not assigned"))
             .ToList();
+
+        // Default the compensation change step's Salary/Hours Per Week/FTE fields to the
+        // employee's current role's values, rather than leaving them blank — most promotions
+        // start from the current package and adjust from there, so pre-filling saves the reviewer
+        // re-typing figures that usually don't change (or only change slightly).
+        var currentCompensation = await CompensationService.GetCurrentCompensationAsync(CompanyId, EmployeeId);
+        if (currentCompensation is not null)
+        {
+            Model.CompensationSalaryType = currentCompensation.SalaryType;
+            Model.CompensationSalary = currentCompensation.Salary;
+            Model.CompensationCurrency = currentCompensation.Currency;
+            Model.CompensationHoursPerWeek = currentCompensation.HoursPerWeek;
+            Model.CompensationFte = currentCompensation.FTE;
+        }
     }
 
     private int _managerFilterRequestId;

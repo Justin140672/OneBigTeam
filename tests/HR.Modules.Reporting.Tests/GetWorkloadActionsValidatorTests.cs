@@ -43,4 +43,22 @@ public class GetWorkloadActionsValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(GetWorkloadActionsRequest.GroupBy));
     }
+
+    [Fact]
+    public void Validate_Fails_When_GroupBy_Differs_Only_By_Case()
+    {
+        var result = _validator.Validate(new GetWorkloadActionsRequest(Guid.NewGuid(), GroupBy: "actiontype"));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(GetWorkloadActionsRequest.GroupBy));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_GroupBy_Is_Whitespace()
+    {
+        var result = _validator.Validate(new GetWorkloadActionsRequest(Guid.NewGuid(), GroupBy: "   "));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(GetWorkloadActionsRequest.GroupBy));
+    }
 }

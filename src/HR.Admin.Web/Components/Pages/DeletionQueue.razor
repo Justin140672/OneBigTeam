@@ -1,0 +1,223 @@
+@page "/deletion-queue"
+@implements IDisposable
+@inject DeletionQueueService DeletionQueueService
+
+<PageTitle>Deletion queue — Admin Portal</PageTitle>
+
+<h1>Permanent deletion queue</h1>
+<p class="admin-actions-intro">
+    Companies that currently have, or have ever had, a permanent deletion scheduled. Executing a
+    deletion marks the company deletion-executed and revokes access — it does not destroy any
+    employee, document, or company data.
+</p>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_queue is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view the deletion queue, or it could not be loaded. Contact a
+        platform administrator if you believe this is a mistake.
+    </div>
+}
+else if (_queue.Items.Count == 0)
+{
+    <p class="activity-empty">No companies have ever had a deletion scheduled.</p>
+}
+else
+{
+    <table class="billing-history-table">
+        <thead>
+            <tr>
+                <th>Company</th>
+                <th>Scheduled</th>
+                <th>Countdown</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in _queue.Items)
+            {
+                var isPending = item.CancelledAt is null && item.ExecutedAt is null;
+                <tr>
+                    <td><a href="/customers/@item.CompanyId">@item.CompanyName</a></td>
+                    <td>@item.ScheduledAt.ToString("dd MMM yyyy HH:mm")</td>
+                    <td>@FormatCountdown(item)</td>
+                    <td>@FormatStatus(item)</td>
+                    <td>
+                        @if (isPending)
+                        {
+                            <div class="admin-actions-buttons">
+                                <SfButton OnClick="@(() => OpenAction(item, DeletionAction.Cancel))">Cancel deletion</SfButton>
+                                <SfButton CssClass="e-danger" OnClick="@(() => OpenAction(item, DeletionAction.Execute))">Execute now</SfButton>
+                            </div>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (_actionMessage is not null)
+    {
+        <p class="@(_actionSucceeded ? "admin-action-success" : "admin-action-error")">@_actionMessage</p>
+    }
+}
+
+<AdminActionConfirmDialog Visible="_dialogVisible"
+                           Title="@DialogTitle"
+                           Warning="@DialogWarning"
+                           ConfirmText="@DialogConfirmText"
+                           DangerConfirm="@DialogIsDanger"
+                           Busy="_actionBusy"
+                           OnConfirmed="OnActionConfirmedAsync"
+                           OnCancelled="CloseDialog" />
+
+@code {
+    private DeletionQueueResponse? _queue;
+    private bool _loading = true;
+    private System.Timers.Timer? _refreshTimer;
+
+    private enum DeletionAction
+    {
+        Cancel,
+        Execute,
+    }
+
+    private bool _dialogVisible;
+    private DeletionAction _activeAction;
+    private DeletionQueueItem? _activeItem;
+    private bool _actionBusy;
+    private string? _actionMessage;
+    private bool _actionSucceeded;
+
+    private string DialogTitle => _activeAction switch
+    {
+        DeletionAction.Cancel => "Cancel deletion",
+        DeletionAction.Execute => "Execute deletion now",
+        _ => "Confirm action",
+    };
+
+    private string DialogWarning => _activeAction switch
+    {
+        DeletionAction.Cancel =>
+            $"This will cancel the pending permanent deletion for {_activeItem?.CompanyName}. " +
+            "The company will keep normal access.",
+        DeletionAction.Execute =>
+            $"This marks {_activeItem?.CompanyName} as deletion-executed and forces read-only / " +
+            "revokes access immediately. This is a safe, status-only, reversible-in-principle " +
+            "action — it does NOT delete any real employee, document, or company data.",
+        _ => "This action will affect the company's deletion status.",
+    };
+
+    private string DialogConfirmText => _activeAction switch
+    {
+        DeletionAction.Cancel => "Cancel deletion",
+        DeletionAction.Execute => "Execute deletion",
+        _ => "Confirm",
+    };
+
+    private bool DialogIsDanger => _activeAction is DeletionAction.Execute;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        _loading = false;
+
+        // Live countdown display: recompute/re-render periodically. No existing polling pattern was
+        // found elsewhere in HR.Admin.Web (SystemHealth.razor/Jobs.razor are load-once pages), so a
+        // simple System.Timers.Timer driving InvokeAsync(StateHasChanged) is used here.
+        _refreshTimer = new System.Timers.Timer(TimeSpan.FromSeconds(30));
+        _refreshTimer.Elapsed += async (_, _) => await InvokeAsync(StateHasChanged);
+        _refreshTimer.AutoReset = true;
+        _refreshTimer.Start();
+    }
+
+    private async Task LoadAsync()
+    {
+        _queue = await DeletionQueueService.GetDeletionQueueOrNullAsync();
+    }
+
+    private static string FormatCountdown(DeletionQueueItem item)
+    {
+        if (item.CancelledAt is not null)
+            return "—";
+        if (item.ExecutedAt is not null)
+            return "—";
+
+        var remaining = item.ScheduledAt - DateTimeOffset.UtcNow;
+        if (remaining <= TimeSpan.Zero)
+            return "Overdue";
+
+        var days = remaining.Days;
+        var hours = remaining.Hours;
+        return days > 0
+            ? $"{days} day{(days == 1 ? "" : "s")}, {hours} hour{(hours == 1 ? "" : "s")} remaining"
+            : $"{hours} hour{(hours == 1 ? "" : "s")} remaining";
+    }
+
+    private static MarkupString FormatStatus(DeletionQueueItem item)
+    {
+        if (item.ExecutedAt is not null)
+            return new MarkupString($"<span class=\"status-pill status-pill-executed\">Executed on {item.ExecutedAt.Value:dd MMM yyyy HH:mm}</span>");
+        if (item.CancelledAt is not null)
+            return new MarkupString($"<span class=\"status-pill status-pill-cancelled\">Cancelled on {item.CancelledAt.Value:dd MMM yyyy HH:mm}</span>");
+        return new MarkupString("<span class=\"status-pill status-pill-pending\">Pending</span>");
+    }
+
+    private void OpenAction(DeletionQueueItem item, DeletionAction action)
+    {
+        _activeItem = item;
+        _activeAction = action;
+        _actionMessage = null;
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogVisible = false;
+    }
+
+    private async Task OnActionConfirmedAsync((string Reason, DateTimeOffset? NewTrialExpiresAt) input)
+    {
+        if (_activeItem is null)
+        {
+            _dialogVisible = false;
+            return;
+        }
+
+        _actionBusy = true;
+        try
+        {
+            var succeeded = _activeAction switch
+            {
+                DeletionAction.Cancel => await DeletionQueueService.CancelDeletionAsync(_activeItem.CompanyId, input.Reason),
+                DeletionAction.Execute => await DeletionQueueService.ExecuteDeletionAsync(_activeItem.CompanyId, input.Reason),
+                _ => false,
+            };
+
+            _actionSucceeded = succeeded;
+            _actionMessage = succeeded
+                ? $"{DialogConfirmText} completed successfully."
+                : $"{DialogConfirmText} failed. Check the company's current deletion state and try again.";
+
+            if (succeeded)
+            {
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _actionBusy = false;
+            _dialogVisible = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+    }
+}

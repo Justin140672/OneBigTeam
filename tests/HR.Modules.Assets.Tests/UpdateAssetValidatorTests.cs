@@ -121,6 +121,56 @@ public class UpdateAssetValidatorTests
     }
 
     [Fact]
+    public void Validate_Passes_When_AssetNumber_Is_Exactly_50_Characters()
+    {
+        var result = _validator.Validate(Valid() with { AssetNumber = new string('A', 50) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_Name_Is_Exactly_200_Characters()
+    {
+        var result = _validator.Validate(Valid() with { Name = new string('N', 200) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_Manufacturer_Is_Exactly_100_Characters()
+    {
+        var result = _validator.Validate(Valid() with { Manufacturer = new string('M', 100) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_Model_Is_Exactly_100_Characters()
+    {
+        var result = _validator.Validate(Valid() with { Model = new string('X', 100) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_SerialNumber_Is_Exactly_100_Characters()
+    {
+        var result = _validator.Validate(Valid() with { SerialNumber = new string('S', 100) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_AssetNumber_Is_Whitespace_Only()
+    {
+        var result = _validator.Validate(Valid() with { AssetNumber = "   " });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateAssetRequest.AssetNumber));
+    }
+
+    [Fact]
+    public void Validate_Passes_When_PurchasePrice_Is_Smallest_Positive_Value()
+    {
+        var result = _validator.Validate(Valid() with { PurchasePrice = 0.01m });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void Validate_Fails_When_PurchasePrice_Is_Zero()
     {
         var result = _validator.Validate(Valid() with { PurchasePrice = 0m });

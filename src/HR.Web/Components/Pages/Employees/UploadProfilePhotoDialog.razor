@@ -29,6 +29,11 @@
     </DialogTemplates>
 </SfDialog>
 
+<UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                      OnSaveAndClose="ConfirmSaveInsteadOfCancelAsync"
+                      OnDiscard="ConfirmDiscardAsync"
+                      OnCancel="CancelUnsavedChangesDialog" />
+
 @code {
     private const long MaxFileSizeBytes = 5 * 1024 * 1024;
     private static readonly HashSet<string> AllowedContentTypes = ["image/jpeg", "image/png"];

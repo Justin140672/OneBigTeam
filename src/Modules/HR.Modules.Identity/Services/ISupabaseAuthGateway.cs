@@ -17,6 +17,23 @@ internal interface ISupabaseAuthGateway
     Task ResendVerificationEmailAsync(string email, string redirectTo, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Sends a password-recovery email whose link redirects to <paramref name="redirectTo"/>.
+    /// Confirmed via live testing (see HR.Web's /verify-email remarks): Supabase uses the
+    /// implicit/fragment flow for this redirect, the same as email verification —
+    /// "{redirectTo}#access_token=...&amp;type=recovery" — not a "code" query parameter.
+    /// </summary>
+    Task RequestPasswordResetAsync(string email, string redirectTo, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sets a new password for the user identified by <paramref name="userAccessToken"/> — the
+    /// short-lived access token Supabase issues via the password-recovery redirect's fragment
+    /// (see RequestPasswordResetAsync). Calls Supabase's user-scoped PUT /auth/v1/user, which
+    /// authenticates via that token directly rather than the publishable/secret API keys used
+    /// elsewhere in this gateway.
+    /// </summary>
+    Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Exchanges the "code" query parameter from Supabase's verification redirect for a real
     /// Supabase session (access/refresh tokens).
     /// </summary>

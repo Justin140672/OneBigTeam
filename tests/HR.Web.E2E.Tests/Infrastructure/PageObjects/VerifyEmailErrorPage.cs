@@ -22,6 +22,7 @@ public sealed class VerifyEmailErrorPage(IPage page)
     public async Task ResendVerificationEmailAsync(string email)
     {
         await page.GetByPlaceholder("you@example.com").FillAsync(email);
+        await page.Keyboard.PressAsync("Tab");
         await page.GetByRole(AriaRole.Button, new() { Name = "Resend verification email" }).ClickAsync();
     }
 }

@@ -121,6 +121,30 @@ public class VacancyTests
     }
 
     [Fact]
+    public void Open_From_OnHold_Sets_Status_To_Open()
+    {
+        // Open() accepts Draft *or* OnHold — this covers the OnHold branch of that condition,
+        // which was previously only exercised via the Draft branch.
+        var vacancy = CreateVacancy();
+        var date = DateOnly.FromDateTime(Now.UtcDateTime);
+        vacancy.Open(Now, date);
+        vacancy.Hold(Now);
+
+        vacancy.Open(Now, date);
+
+        Assert.Equal(VacancyStatus.Open, vacancy.Status);
+    }
+
+    [Fact]
+    public void Open_When_Cancelled_Throws()
+    {
+        var vacancy = CreateVacancy();
+        vacancy.Cancel(Now);
+
+        Assert.Throws<InvalidOperationException>(() => vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime)));
+    }
+
+    [Fact]
     public void Hold_From_Draft_Throws()
     {
         var vacancy = CreateVacancy();
@@ -149,6 +173,49 @@ public class VacancyTests
         vacancy.Cancel(Now);
 
         Assert.Throws<InvalidOperationException>(() => vacancy.Cancel(Now));
+    }
+
+    [Fact]
+    public void Cancel_When_Closed_Throws()
+    {
+        // Cancel() rejects Closed *or* Cancelled — this covers the Closed branch of that
+        // condition, which was previously only exercised via the Cancelled branch.
+        var vacancy = CreateVacancy();
+        var date = DateOnly.FromDateTime(Now.UtcDateTime);
+        vacancy.Close(Now, date);
+
+        Assert.Throws<InvalidOperationException>(() => vacancy.Cancel(Now));
+    }
+
+    [Fact]
+    public void Cancel_From_Draft_Succeeds()
+    {
+        var vacancy = CreateVacancy();
+
+        vacancy.Cancel(Now);
+
+        Assert.Equal(VacancyStatus.Cancelled, vacancy.Status);
+    }
+
+    [Fact]
+    public void Close_When_Already_Closed_Throws()
+    {
+        var vacancy = CreateVacancy();
+        var date = DateOnly.FromDateTime(Now.UtcDateTime);
+        vacancy.Close(Now, date);
+
+        Assert.Throws<InvalidOperationException>(() => vacancy.Close(Now, date));
+    }
+
+    [Fact]
+    public void Close_When_Cancelled_Throws()
+    {
+        // Close() rejects Closed *or* Cancelled — this covers the Cancelled branch of that
+        // condition, which was previously only exercised via the Closed branch.
+        var vacancy = CreateVacancy();
+        vacancy.Cancel(Now);
+
+        Assert.Throws<InvalidOperationException>(() => vacancy.Close(Now, DateOnly.FromDateTime(Now.UtcDateTime)));
     }
 
     [Fact]

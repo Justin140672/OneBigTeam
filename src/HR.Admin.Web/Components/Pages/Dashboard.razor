@@ -1,0 +1,109 @@
+@page "/"
+@inject CustomerDashboardService DashboardService
+
+<PageTitle>Customer Dashboard — Admin Portal</PageTitle>
+
+<h1>Customer Dashboard</h1>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_dashboard is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view platform-wide customer data, or the dashboard couldn't be
+        loaded. Contact a platform administrator if you believe this is a mistake.
+    </div>
+}
+else
+{
+    <div class="stat-cards">
+        <div class="stat-card">
+            <span class="stat-value">@_dashboard.TotalCustomers</span>
+            <span class="stat-label">Total customers</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">@_dashboard.ActiveCustomers</span>
+            <span class="stat-label">Active customers</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">@_dashboard.TrialCustomers</span>
+            <span class="stat-label">Trial customers</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">@_dashboard.ReadOnlyCustomers</span>
+            <span class="stat-label">Read-only customers</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">@_dashboard.CancelledSubscriptions</span>
+            <span class="stat-label">Cancelled subscriptions</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">@_dashboard.PendingPermanentDeletions</span>
+            <span class="stat-label">Pending permanent deletions</span>
+        </div>
+    </div>
+
+    <div class="activity-panels">
+        <section class="activity-panel">
+            <h2>Recent registrations</h2>
+            @if (_dashboard.RecentRegistrations.Count == 0)
+            {
+                <p class="activity-empty">No recent registrations.</p>
+            }
+            else
+            {
+                <SfGrid DataSource="@_dashboard.RecentRegistrations">
+                    <GridColumns>
+                        <GridColumn HeaderText="Company">
+                            <Template>
+                                @{
+                                    var registration = (CustomerDashboardRegistration)context;
+                                }
+                                <a href="@($"/customers/{registration.CompanyId}")">@registration.CompanyName</a>
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Field="@nameof(CustomerDashboardRegistration.RegisteredAt)" HeaderText="Registered" Format="dd MMM yyyy HH:mm" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+                    </GridColumns>
+                </SfGrid>
+            }
+        </section>
+
+        <section class="activity-panel">
+            <h2>Recent subscription changes</h2>
+            @if (_dashboard.RecentSubscriptionChanges.Count == 0)
+            {
+                <p class="activity-empty">No recent subscription changes.</p>
+            }
+            else
+            {
+                <SfGrid DataSource="@_dashboard.RecentSubscriptionChanges">
+                    <GridColumns>
+                        <GridColumn HeaderText="Company">
+                            <Template>
+                                @{
+                                    var change = (CustomerDashboardSubscriptionChange)context;
+                                }
+                                <a href="@($"/customers/{change.CompanyId}")">@change.CompanyName</a>
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Field="@nameof(CustomerDashboardSubscriptionChange.Status)" HeaderText="Status" />
+                        <GridColumn Field="@nameof(CustomerDashboardSubscriptionChange.ChangedAt)" HeaderText="Changed" Format="dd MMM yyyy HH:mm" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+                    </GridColumns>
+                </SfGrid>
+            }
+        </section>
+    </div>
+}
+
+@code {
+    private CustomerDashboardResponse? _dashboard;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _dashboard = await DashboardService.GetDashboardOrNullAsync();
+        _loading = false;
+    }
+}

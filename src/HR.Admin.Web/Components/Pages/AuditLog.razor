@@ -1,0 +1,165 @@
+@page "/audit-log"
+@inject AuditLogService AuditLogService
+
+<PageTitle>Audit Log — Admin Portal</PageTitle>
+
+<h1>Audit Log</h1>
+
+<div class="customer-list-toolbar failed-payments-toolbar">
+    <SfTextBox Placeholder="Filter by company id"
+               Value="@_companyIdText"
+               ValueChanged="@OnCompanyIdChanged"
+               CssClass="customer-search-box"></SfTextBox>
+
+    <SfTextBox Placeholder="Filter by administrator email"
+               Value="@_administratorEmail"
+               ValueChanged="@OnAdministratorEmailChanged"
+               CssClass="customer-search-box"></SfTextBox>
+
+    <SfDatePicker TValue="DateTime?"
+                  Placeholder="From date"
+                  Value="@_fromDate"
+                  ValueChanged="@OnFromDateChanged"
+                  Format="dd/MM/yyyy"></SfDatePicker>
+
+    <SfDatePicker TValue="DateTime?"
+                  Placeholder="To date"
+                  Value="@_toDate"
+                  ValueChanged="@OnToDateChanged"
+                  Format="dd/MM/yyyy"></SfDatePicker>
+
+    <select class="failed-payments-status-filter" value="@_eventTypeFilter" @onchange="OnEventTypeFilterChanged">
+        <option value="">All actions</option>
+        @if (_response is not null)
+        {
+            @foreach (var eventType in _response.AvailableEventTypes)
+            {
+                <option value="@eventType">@eventType</option>
+            }
+        }
+    </select>
+</div>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_response is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view the platform audit log, or it couldn't be loaded. Contact a
+        platform administrator if you believe this is a mistake.
+    </div>
+}
+else if (_response.Items.Count == 0)
+{
+    <p class="activity-empty">No audit entries found for the selected filters.</p>
+}
+else
+{
+    <SfGrid DataSource="@_response.Items"
+            AllowPaging="true"
+            AllowSorting="true"
+            AllowFiltering="true"
+            class="hr-grid">
+        <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+        <GridPageSettings PageSize="20" />
+        <GridColumns>
+            <GridColumn Field="@nameof(AuditLogItem.OccurredAt)" HeaderText="Occurred At" Width="170" Format="dd MMM yyyy HH:mm" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+            <GridColumn Field="@nameof(AuditLogItem.EventType)" HeaderText="Action" Width="220" />
+            <GridColumn Field="@nameof(AuditLogItem.CompanyName)" HeaderText="Customer" Width="180" />
+            <GridColumn Field="@nameof(AuditLogItem.AdministratorEmail)" HeaderText="Administrator" Width="220" />
+            <GridColumn Field="@nameof(AuditLogItem.Summary)" HeaderText="Summary" Width="320" />
+        </GridColumns>
+    </SfGrid>
+
+    <p class="audit-log-total">Showing @_response.Items.Count of @_response.TotalCount entries.</p>
+}
+
+@code {
+    private AuditLogResponse? _response;
+    private bool _loading = true;
+
+    private string? _companyIdText;
+    private string? _administratorEmail;
+    private DateTime? _fromDate;
+    private DateTime? _toDate;
+    private string _eventTypeFilter = "";
+    private CancellationTokenSource? _filterDebounceCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        Guid? companyId = Guid.TryParse(_companyIdText, out var parsedCompanyId) ? parsedCompanyId : null;
+
+        _response = await AuditLogService.GetAuditLogOrNullAsync(
+            companyId,
+            _administratorEmail,
+            _fromDate is null ? null : new DateTimeOffset(_fromDate.Value),
+            _toDate is null ? null : new DateTimeOffset(_toDate.Value),
+            string.IsNullOrEmpty(_eventTypeFilter) ? null : _eventTypeFilter);
+
+        _loading = false;
+    }
+
+    // Debounced text filters — same "don't hammer the server on every keystroke" pattern as
+    // CustomerList.razor/FailedPayments.razor.
+    private async Task DebouncedReloadAsync()
+    {
+        _filterDebounceCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _filterDebounceCts = cts;
+
+        try
+        {
+            await Task.Delay(300, cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (cts.IsCancellationRequested)
+            return;
+
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnCompanyIdChanged(string? value)
+    {
+        _companyIdText = value;
+        await DebouncedReloadAsync();
+    }
+
+    private async Task OnAdministratorEmailChanged(string? value)
+    {
+        _administratorEmail = value;
+        await DebouncedReloadAsync();
+    }
+
+    private async Task OnFromDateChanged(DateTime? value)
+    {
+        _fromDate = value;
+        await LoadAsync();
+    }
+
+    private async Task OnToDateChanged(DateTime? value)
+    {
+        _toDate = value;
+        await LoadAsync();
+    }
+
+    private async Task OnEventTypeFilterChanged(Microsoft.AspNetCore.Components.ChangeEventArgs args)
+    {
+        _eventTypeFilter = args.Value?.ToString() ?? "";
+        await LoadAsync();
+    }
+}

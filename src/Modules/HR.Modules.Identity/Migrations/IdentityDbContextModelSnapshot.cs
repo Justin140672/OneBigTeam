@@ -241,6 +241,56 @@ namespace HR.Modules.Identity.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HR.Modules.Identity.Domain.PlatformAdministrator", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DisabledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("disabled_at");
+
+                    b.Property<Guid?>("DisabledByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("disabled_by_user_id");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("role");
+
+                    b.Property<Guid?>("SupabaseAuthUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supabase_auth_user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.ToTable("platform_administrators", "identity");
+                });
+
             modelBuilder.Entity("HR.Modules.Identity.Domain.Position", b =>
                 {
                     b.Property<Guid>("Id")

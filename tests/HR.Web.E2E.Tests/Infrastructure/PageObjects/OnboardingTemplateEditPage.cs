@@ -20,8 +20,11 @@ public sealed class OnboardingTemplateEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
-    public Task FillNameAsync(string name) =>
-        page.GetByPlaceholder("e.g. Standard Engineering Onboarding").FillAsync(name);
+    public async Task FillNameAsync(string name)
+    {
+        await page.GetByPlaceholder("e.g. Standard Engineering Onboarding").FillAsync(name);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public Task<string> GetNameAsync() =>
         page.GetByPlaceholder("e.g. Standard Engineering Onboarding").InputValueAsync();
@@ -32,14 +35,20 @@ public sealed class OnboardingTemplateEditPage(IPage page, string baseUrl)
     // Scoped to .First: the template-level description field is always the first element in the
     // DOM with this placeholder — checklist task rows (added via ClickAddTaskAsync) reuse the same
     // "Optional description" placeholder further down the page.
-    public Task FillDescriptionAsync(string description) =>
-        page.GetByPlaceholder("Optional description").First.FillAsync(description);
+    public async Task FillDescriptionAsync(string description)
+    {
+        await page.GetByPlaceholder("Optional description").First.FillAsync(description);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public Task ClickAddTaskAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "Add Task" }).ClickAsync();
 
-    public Task FillTaskTitleAsync(string title) =>
-        page.GetByPlaceholder("Task title").First.FillAsync(title);
+    public async Task FillTaskTitleAsync(string title)
+    {
+        await page.GetByPlaceholder("Task title").First.FillAsync(title);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task SaveAsync()
     {

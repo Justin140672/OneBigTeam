@@ -19,6 +19,27 @@ builder.Services.AddHttpClient("hrapi", c =>
         builder.Configuration["services:api:https:0"] ??
         builder.Configuration["services:api:http:0"] ??
         throw new InvalidOperationException("API base URL is missing. Expected services:api:https:0 or services:api:http:0."));
+})
+// SocketsHttpHandler's default PooledConnectionLifetime is infinite, so a connection idle long
+// enough (e.g. this client only calling out on an occasional signup/resend/contact submission)
+// can be silently closed server-side by Kestrel's own keep-alive timeout while the pool still
+// considers it valid — the next request reused from the pool then fails mid-flight with an
+// OperationCanceledException while the server is reading the request body. Bounding the lifetime
+// well under Kestrel's default 130s keep-alive timeout forces proactive recycling instead.
+//
+// CertificateRevocationCheckMode = NoCheck: every new connection (including the periodic
+// recycling above) re-runs the TLS handshake, which by default performs an online CRL/OCSP
+// revocation check against Aspire's local HTTPS dev certificate. That check can't complete
+// against a dev cert and stalls for ~15s before SocketsHttpHandler gives up and proceeds anyway
+// — this is purely internal service-to-service traffic on localhost, so skipping the check is
+// safe and removes that stall entirely.
+.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+{
+    PooledConnectionLifetime = TimeSpan.FromSeconds(60),
+    SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+    {
+        CertificateRevocationCheckMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck,
+    },
 });
 
 var app = builder.Build();
@@ -55,29 +76,55 @@ app.MapPost("/signup-submit", async (HttpRequest request, IHttpClientFactory htt
         Password = form["password"].ToString(),
     };
 
+    // Round-trip everything except the password on a correctable error, so the visitor doesn't
+    // have to retype the whole form (mirrors /contact-submit's retry-URL pattern below).
+    string BuildRetryUrl(string errorMessage, bool existingEmail = false) =>
+        "/signup?"
+        + $"error={Uri.EscapeDataString(errorMessage)}"
+        + (existingEmail ? "&existingEmail=true" : "")
+        + $"&companyName={Uri.EscapeDataString(model.CompanyName)}"
+        + $"&firstName={Uri.EscapeDataString(model.AdminFirstName)}"
+        + $"&lastName={Uri.EscapeDataString(model.AdminLastName)}"
+        + $"&email={Uri.EscapeDataString(model.AdminEmail)}";
+
     var http = httpClientFactory.CreateClient("hrapi");
 
-    var signUpResponse = await http.PostAsJsonAsync("api/signup", new
+    HttpResponseMessage signUpResponse;
+    try
     {
-        model.CompanyName,
-        model.AdminFirstName,
-        model.AdminLastName,
-        model.AdminEmail,
-        model.Password,
-    });
+        signUpResponse = await http.PostAsJsonAsync("api/signup", new
+        {
+            model.CompanyName,
+            model.AdminFirstName,
+            model.AdminLastName,
+            model.AdminEmail,
+            model.Password,
+        });
+    }
+    catch (HttpRequestException)
+    {
+        return Results.Redirect(BuildRetryUrl("We couldn't reach our servers. Please try again shortly."));
+    }
 
     if (!signUpResponse.IsSuccessStatusCode)
     {
-        var errorMessage = signUpResponse.StatusCode == System.Net.HttpStatusCode.Conflict
-            ? "An account with this email already exists."
-            : "We couldn't create your account. Please check your details and try again.";
-        return Results.Redirect($"/signup?error={Uri.EscapeDataString(errorMessage)}");
+        // 409 Conflict means an account/company already exists for this email — we don't reveal
+        // which, to avoid leaking account existence, but we do point the visitor at login/password
+        // recovery instead of leaving them stuck retrying signup with the same email.
+        if (signUpResponse.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            return Results.Redirect(BuildRetryUrl(
+                "We couldn't create your account with those details.",
+                existingEmail: true));
+        }
+
+        return Results.Redirect(BuildRetryUrl("We couldn't create your account. Please check your details and try again."));
     }
 
     var signUp = await signUpResponse.Content.ReadFromJsonAsync<StartTrialSignUpResult>();
     if (signUp is null)
     {
-        return Results.Redirect("/signup?error=" + Uri.EscapeDataString("Something went wrong. Please try again."));
+        return Results.Redirect(BuildRetryUrl("Something went wrong. Please try again."));
     }
 
     return Results.Redirect($"/check-your-email?email={Uri.EscapeDataString(signUp.Email)}");

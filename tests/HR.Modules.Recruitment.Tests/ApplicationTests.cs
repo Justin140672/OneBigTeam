@@ -99,6 +99,40 @@ public class ApplicationTests
     }
 
     [Fact]
+    public void Withdraw_When_InterviewOutcome_Pending_Sets_Outcome_To_Cancelled()
+    {
+        var application = CreateApplication();
+        application.SetInterviewOutcome(InterviewOutcome.Pending, Now);
+
+        application.Withdraw(Now.AddDays(1));
+
+        Assert.Equal(InterviewOutcome.Cancelled, application.InterviewOutcome);
+    }
+
+    [Fact]
+    public void Withdraw_When_InterviewOutcome_Already_Resolved_Leaves_It_Untouched()
+    {
+        // Withdraw() only overwrites a Pending outcome — an already-resolved historical outcome
+        // (e.g. Passed) must not be silently changed. This covers the negated branch of that check.
+        var application = CreateApplication();
+        application.SetInterviewOutcome(InterviewOutcome.Passed, Now);
+
+        application.Withdraw(Now.AddDays(1));
+
+        Assert.Equal(InterviewOutcome.Passed, application.InterviewOutcome);
+    }
+
+    [Fact]
+    public void Withdraw_When_No_InterviewOutcome_Set_Leaves_It_Null()
+    {
+        var application = CreateApplication();
+
+        application.Withdraw(Now.AddDays(1));
+
+        Assert.Null(application.InterviewOutcome);
+    }
+
+    [Fact]
     public void Create_With_Source_ExternalRecruiter_Sets_SourceExternalRecruiterId()
     {
         var recruiterId = Guid.NewGuid();

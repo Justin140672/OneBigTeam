@@ -13,6 +13,7 @@ public sealed class AppFixture : IAsyncLifetime
     public string    WebBaseUrl { get; private set; } = "";
     public string    MarketingBaseUrl { get; private set; } = "";
     public string    ApiBaseUrl { get; private set; } = "";
+    public string    AdminWebBaseUrl { get; private set; } = "";
     public IBrowser  Browser    => _browser!;
 
     public async Task InitializeAsync()
@@ -35,6 +36,9 @@ public sealed class AppFixture : IAsyncLifetime
         WebBaseUrl = _app.GetEndpoint("web", "http").ToString().TrimEnd('/');
         MarketingBaseUrl = _app.GetEndpoint("marketing", "http").ToString().TrimEnd('/');
         ApiBaseUrl = _app.GetEndpoint("api", "http").ToString().TrimEnd('/');
+        // "adminweb" — HR.Admin.Web, the internal Admin Portal (Customer Dashboard epic). See
+        // AppHost.cs: registered with the same E2E-pinned "http" launch profile as web/api/marketing.
+        AdminWebBaseUrl = _app.GetEndpoint("adminweb", "http").ToString().TrimEnd('/');
 
         // Probe until every app the tests navigate to directly is actually serving requests.
         // StartAsync returns as soon as Aspire begins orchestrating — Postgres migrations
@@ -47,6 +51,7 @@ public sealed class AppFixture : IAsyncLifetime
         var deadline = DateTime.UtcNow.AddMinutes(3);
         await WaitUntilRespondingAsync(http, $"{WebBaseUrl}/login", deadline);
         await WaitUntilRespondingAsync(http, $"{MarketingBaseUrl}/", deadline);
+        await WaitUntilRespondingAsync(http, $"{AdminWebBaseUrl}/login", deadline);
 
         _playwright = await Playwright.CreateAsync();
         _browser    = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
@@ -105,7 +110,7 @@ public sealed class AppFixture : IAsyncLifetime
         // it is the dead stale process, not the one this run just started, surfacing as
         // ERR_CONNECTION_REFUSED (or a hang) on navigation instead of a clear "port in use" startup
         // failure.
-        foreach (var processName in new[] { "testhost", "HR.Web", "HR.Api", "HR.Marketing" })
+        foreach (var processName in new[] { "testhost", "HR.Web", "HR.Api", "HR.Marketing", "HR.Admin.Web" })
         {
             try
             {

@@ -109,6 +109,28 @@ public class GetMyNotificationsHandlerTests
     }
 
     [Fact]
+    public async Task Limits_Results_To_Fifty_Most_Recent_Items()
+    {
+        await using var ctx = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var notifications = Enumerable.Range(0, 51)
+            .Select(i => Make(companyId, employeeId, $"Item {i}", createdAt: Now.AddMinutes(-i)))
+            .ToArray();
+        ctx.Notifications.AddRange(notifications);
+        await ctx.SaveChangesAsync();
+
+        var result = await new GetMyNotificationsHandler(ctx).HandleAsync(
+            new GetMyNotificationsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            CancellationToken.None);
+
+        Assert.Equal(50, result.Items.Count);
+        Assert.Equal("Item 0", result.Items[0].Title);
+        Assert.DoesNotContain(result.Items, i => i.Title == "Item 50");
+    }
+
+    [Fact]
     public async Task Returns_Empty_When_No_Notifications()
     {
         await using var ctx = BuildContext();

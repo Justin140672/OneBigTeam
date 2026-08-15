@@ -60,6 +60,50 @@ public class TasksOverdueWorkloadActionProvidersTests
     }
 
     [Fact]
+    public async Task EmployeeProvider_Excludes_Task_Due_Exactly_Today()
+    {
+        // The query uses a strict "<" comparison against DateTime.UtcNow.Date (not the
+        // fixed `Today` constant used elsewhere in this file), so this must use the real
+        // current date to exercise the boundary correctly.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+        var realToday = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+
+        context.TaskItems.Add(CreateOverdueTask(companyId, callerId, "Due today", realToday));
+        await context.SaveChangesAsync();
+
+        var provider = new EmployeeTasksOverdueWorkloadActionProvider(context, new FakeEmployeeDepartmentReader(), new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task EmployeeProvider_Excludes_Completed_And_Cancelled_Tasks()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+
+        var completed = CreateOverdueTask(companyId, callerId, "Completed task", Today.AddDays(-1));
+        completed.Complete(callerId, DateTimeOffset.UtcNow);
+
+        var cancelled = CreateOverdueTask(companyId, callerId, "Cancelled task", Today.AddDays(-1));
+        cancelled.Cancel(DateTimeOffset.UtcNow);
+
+        context.TaskItems.AddRange(completed, cancelled);
+        await context.SaveChangesAsync();
+
+        var provider = new EmployeeTasksOverdueWorkloadActionProvider(context, new FakeEmployeeDepartmentReader(), new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
     public async Task EmployeeProvider_CallerWithNoSubClaim_Returns_Empty_Not_Throws()
     {
         await using var context = BuildContext();
@@ -156,6 +200,53 @@ public class TasksOverdueWorkloadActionProvidersTests
         var provider = new ManagerTasksOverdueWorkloadActionProvider(
             context, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task ManagerProvider_HrCaller_Excludes_Task_Due_Exactly_Today()
+    {
+        // Uses the real current date, not the fixed `Today` constant — see the
+        // EmployeeProvider equivalent test above for why.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+        var realToday = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+
+        context.TaskItems.Add(CreateOverdueTask(companyId, Guid.NewGuid(), "Due today", realToday));
+        await context.SaveChangesAsync();
+
+        var provider = new ManagerTasksOverdueWorkloadActionProvider(
+            context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task ManagerProvider_HrCaller_Excludes_Completed_And_Cancelled_Tasks()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+
+        var completed = CreateOverdueTask(companyId, Guid.NewGuid(), "Completed task", Today.AddDays(-1));
+        completed.Complete(callerId, DateTimeOffset.UtcNow);
+
+        var cancelled = CreateOverdueTask(companyId, Guid.NewGuid(), "Cancelled task", Today.AddDays(-1));
+        cancelled.Cancel(DateTimeOffset.UtcNow);
+
+        context.TaskItems.AddRange(completed, cancelled);
+        await context.SaveChangesAsync();
+
+        var provider = new ManagerTasksOverdueWorkloadActionProvider(
+            context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 

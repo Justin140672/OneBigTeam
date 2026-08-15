@@ -114,6 +114,33 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
     }
 
     [Fact]
+    public async Task GetEffectiveRoles_Excludes_Position_Role_Expiring_Exactly_At_Now()
+    {
+        // ExpiresAt == now is excluded because the comparison is strictly ">" not ">=".
+        var (userId, roleId) = await SeedUserWithPositionRole(
+            positionExpiresAt: Now,
+            suffix: "pos-exact-now");
+
+        var svc = BuildService();
+        var roles = await svc.GetEffectiveRolesAsync(userId);
+
+        Assert.DoesNotContain(roleId, roles);
+    }
+
+    [Fact]
+    public async Task GetEffectiveRoles_Includes_Position_Role_Expiring_One_Second_After_Now()
+    {
+        var (userId, roleId) = await SeedUserWithPositionRole(
+            positionExpiresAt: Now.AddSeconds(1),
+            suffix: "pos-just-active");
+
+        var svc = BuildService();
+        var roles = await svc.GetEffectiveRolesAsync(userId);
+
+        Assert.Contains(roleId, roles);
+    }
+
+    [Fact]
     public async Task GetEffectiveRoles_Deny_Override_Removes_Position_Inherited_Role()
     {
         var (userId, roleId) = await SeedUserWithPositionRole(suffix: "deny-pos");

@@ -27,7 +27,7 @@ internal sealed class SubscriptionStatusReader(CompaniesDbContext dbContext, ICl
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        var isReadOnly = subscription.Status == SubscriptionStatus.TrialExpired;
+        var isReadOnly = subscription.Status == SubscriptionStatus.TrialExpired || subscription.AdminForcedReadOnly;
         var trialDaysRemaining = subscription.Status == SubscriptionStatus.Trial
             ? Math.Max(0, (subscription.TrialExpiresAt - now).Days)
             : 0;

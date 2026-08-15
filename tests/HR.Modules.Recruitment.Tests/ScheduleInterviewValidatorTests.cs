@@ -87,4 +87,70 @@ public class ScheduleInterviewValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(ScheduleInterviewRequest.Location));
     }
+
+    [Fact]
+    public void Validate_Passes_When_Location_Is_Exactly_Max_Length()
+    {
+        var result = _validator.Validate(new ScheduleInterviewRequest
+        {
+            CompanyId             = Guid.NewGuid(),
+            VacancyId             = Guid.NewGuid(),
+            ApplicationId         = Guid.NewGuid(),
+            InterviewerEmployeeId = Guid.NewGuid(),
+            ScheduledAt           = ScheduledAt,
+            Location              = new string('A', 200),
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_DurationMinutes_Is_Negative()
+    {
+        var result = _validator.Validate(new ScheduleInterviewRequest
+        {
+            CompanyId             = Guid.NewGuid(),
+            VacancyId             = Guid.NewGuid(),
+            ApplicationId         = Guid.NewGuid(),
+            InterviewerEmployeeId = Guid.NewGuid(),
+            ScheduledAt           = ScheduledAt,
+            DurationMinutes       = -1,
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(ScheduleInterviewRequest.DurationMinutes));
+    }
+
+    [Fact]
+    public void Validate_Passes_When_DurationMinutes_Is_One()
+    {
+        // Boundary: GreaterThan(0) — 1 is the smallest valid value.
+        var result = _validator.Validate(new ScheduleInterviewRequest
+        {
+            CompanyId             = Guid.NewGuid(),
+            VacancyId             = Guid.NewGuid(),
+            ApplicationId         = Guid.NewGuid(),
+            InterviewerEmployeeId = Guid.NewGuid(),
+            ScheduledAt           = ScheduledAt,
+            DurationMinutes       = 1,
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_DurationMinutes_Is_Null()
+    {
+        var result = _validator.Validate(new ScheduleInterviewRequest
+        {
+            CompanyId             = Guid.NewGuid(),
+            VacancyId             = Guid.NewGuid(),
+            ApplicationId         = Guid.NewGuid(),
+            InterviewerEmployeeId = Guid.NewGuid(),
+            ScheduledAt           = ScheduledAt,
+            DurationMinutes       = null,
+        });
+
+        Assert.True(result.IsValid);
+    }
 }

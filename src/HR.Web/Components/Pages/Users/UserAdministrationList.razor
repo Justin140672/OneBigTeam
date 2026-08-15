@@ -12,7 +12,6 @@
             <h1 class="mb-1">User Administration</h1>
             <p class="text-muted mb-3">Manage who can sign in to this company and what roles they hold.</p>
         </div>
-        <SfButton IsPrimary="true" OnClick="OpenInviteDialog">+ Invite Employee</SfButton>
     </div>
 
     <div class="mb-3 col-md-4 px-0">
@@ -48,9 +47,12 @@
             <HrGrid @ref="Grid"
                     TValue="UserListItemModel"
                     DataSource="@Items"
+                    Toolbar="@GridToolbar"
                     AllowPaging="true"
                     AllowSorting="true"
                     AllowFiltering="true">
+                <GridEvents TValue="UserListItemModel" OnToolbarClick="OnToolbarClick"
+                            RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
                 <GridPageSettings PageSize="20" />
                 <GridColumns>
                     <GridColumn Field="@nameof(UserListItemModel.Name)" HeaderText="Name" Width="180">
@@ -112,22 +114,6 @@
                         </Template>
                     </GridColumn>
                     <GridColumn Field="@nameof(UserListItemModel.CreatedAt)" HeaderText="Created" Width="130" Format="d" />
-                    <GridColumn HeaderText="Actions" Width="220" AllowSorting="false" AllowFiltering="false">
-                        <Template>
-                            @{
-                                var row = (context as UserListItemModel)!;
-                            }
-                            @if (row.InvitationStatus is "Pending" or "Expired" && row.InviteId is not null)
-                            {
-                                <SfButton CssClass="e-small" Disabled="@(_actionInProgressInviteId == row.InviteId)" OnClick="@(() => ResendInviteAsync(row))">Resend</SfButton>
-                                <SfButton CssClass="e-small" Disabled="@(_actionInProgressInviteId == row.InviteId)" OnClick="@(() => CancelInviteAsync(row))">Cancel</SfButton>
-                            }
-                            else
-                            {
-                                <span class="text-muted">—</span>
-                            }
-                        </Template>
-                    </GridColumn>
                 </GridColumns>
             </HrGrid>
 
@@ -136,20 +122,34 @@
     }
 </div>
 
-<InviteUserDialog CompanyId="CompanyId"
-                  IsOpen="_showInviteDialog"
-                  OnCancelled="CloseInviteDialog"
-                  OnCompleted="OnInviteCompleted" />
-
 @code {
-    private bool _showInviteDialog;
-    private Guid? _actionInProgressInviteId;
-
     protected override Task OnBeforeLoadAsync()
     {
         if (!Session.IsHrAdministrator)
             Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
         return Task.CompletedTask;
+    }
+
+    // Resend/Cancel only make sense for a still-pending (or expired-but-not-yet-cancelled)
+    // invite — an active user has already claimed theirs and has no InviteId left to act on.
+    private static bool HasActionableInvite(UserListItemModel row) =>
+        row.InviteId is not null && row.InvitationStatus is "Pending" or "Expired";
+
+    protected override void ConfigureToolbar()
+    {
+        AddToolbarAction(
+            id:      "hr-resend-invite",
+            text:    "Resend Invitation",
+            icon:    "fa-solid fa-paper-plane",
+            onClick: ResendInviteAsync,
+            tooltip: "Resend the invitation email to the selected user");
+
+        AddToolbarAction(
+            id:      "hr-cancel-invite",
+            text:    "Cancel Invitation",
+            icon:    "fa-solid fa-ban",
+            onClick: CancelInviteAsync,
+            tooltip: "Cancel the selected user's pending invitation");
     }
 
     protected override async Task<IReadOnlyList<UserListItemModel>?> FetchItemsAsync(string? search)
@@ -160,29 +160,27 @@
 
     protected override string LoadErrorMessage => "Failed to load users.";
 
-    private void OpenInviteDialog()
-    {
-        ClearActionError();
-        _showInviteDialog = true;
-    }
+    // No in-list "create user" flow exists — users are invited from the Employee edit page, not
+    // from here — so Add stays disabled rather than rendering an enabled button that no-ops.
+    protected override bool IsAddDisabled => true;
 
-    private void CloseInviteDialog() => _showInviteDialog = false;
-
-    private async Task OnInviteCompleted(InviteEmployeeUserResponse result)
-    {
-        _showInviteDialog = false;
-        Navigation.NavigateTo($"/companies/{CompanyId}/user-administration/{result.EmployeeId}", forceLoad: true);
-        await Task.CompletedTask;
-    }
+    // UserDetail.razor is a single combined view/manage page (account details plus the
+    // invite/deactivate/reactivate actions), not a separate view-only vs edit-only pair, so both
+    // default toolbar actions point at the same route the Name column link already uses.
+    protected override string? GetEditUrl(UserListItemModel item) => $"/companies/{CompanyId}/user-administration/{item.EmployeeId}";
+    protected override string? GetViewUrl(UserListItemModel item) => $"/companies/{CompanyId}/user-administration/{item.EmployeeId}";
 
     private async Task ResendInviteAsync(UserListItemModel row)
     {
-        if (row.InviteId is not { } inviteId) return;
+        if (!HasActionableInvite(row))
+        {
+            SetActionError("The selected user does not have a pending invitation to resend.");
+            return;
+        }
 
+        var inviteId = row.InviteId!.Value;
         ClearActionError();
-        _actionInProgressInviteId = inviteId;
         var (success, error) = await UserAdministrationService.ResendInviteAsync(CompanyId, inviteId);
-        _actionInProgressInviteId = null;
 
         if (!success)
         {
@@ -195,12 +193,15 @@
 
     private async Task CancelInviteAsync(UserListItemModel row)
     {
-        if (row.InviteId is not { } inviteId) return;
+        if (!HasActionableInvite(row))
+        {
+            SetActionError("The selected user does not have a pending invitation to cancel.");
+            return;
+        }
 
+        var inviteId = row.InviteId!.Value;
         ClearActionError();
-        _actionInProgressInviteId = inviteId;
         var (success, error) = await UserAdministrationService.CancelInviteAsync(CompanyId, inviteId);
-        _actionInProgressInviteId = null;
 
         if (!success)
         {

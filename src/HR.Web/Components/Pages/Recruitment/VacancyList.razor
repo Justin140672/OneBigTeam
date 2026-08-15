@@ -37,7 +37,7 @@
 
         <HrGrid @ref="Grid"
                 TValue="VacancyListItemModel"
-                DataSource="@DisplayedItems"
+                DataSource="@Items"
                 Toolbar="@GridToolbar"
                 AllowFiltering="true">
             <GridEvents TValue="VacancyListItemModel" OnToolbarClick="OnToolbarClick"
@@ -85,40 +85,28 @@
         return Task.CompletedTask;
     }
 
-    // The list endpoint has no pagination and no search support — it returns every vacancy for the
-    // company on every call, with GridPageSettings PageSize="20" doing purely client-side paging
-    // over that already-fully-loaded set. SearchPageBase's "search" parameter is therefore left
-    // unused here (same reasoning as the Show Inactive toggle below): there's nothing server-side
-    // to pass it to, so filtering by it happens client-side in DisplayedItems instead.
+    // Both search and the active/inactive ("exclude Closed") filter are now server-side (see
+    // ListVacanciesRequest.Search/ExcludeClosed) — matching every other SearchPageBase list page
+    // (e.g. EmployeeList, UserAdministrationList), which bind DataSource straight to the base
+    // class's own Items and never filter client-side. Vacancy used to be the one exception,
+    // reinventing filtering via a locally computed property bound to DataSource — a real bug, not
+    // just a style inconsistency: Syncfusion's SfGrid rebinds and silently drops its own internal
+    // row-selection state whenever DataSource's object reference changes, which a freshly
+    // recomputed "Items.Where(...).ToList()" does on every single access — including the very
+    // re-render OnRowSelected triggers right after a row is selected. The toolbar's Edit button
+    // still looked enabled (driven by the base class's separate _hasSelection field, never reset
+    // by this), but Grid.GetSelectedRecordsAsync() came back empty by click time, so
+    // OnToolbarClick's "hr-edit" case silently no-opped.
     protected override async Task<IReadOnlyList<VacancyListItemModel>?> FetchItemsAsync(string? search)
     {
-        var result = await VacancyService.ListVacanciesAsync(CompanyId);
+        var result = await VacancyService.ListVacanciesAsync(CompanyId, excludeClosed: !ShowInactive, search: search);
         return result?.Items;
     }
 
-    // Reuses the standard SearchPageBase "Show Inactive"/"Show Active" toolbar toggle rather than
-    // a bespoke checkbox — Vacancy doesn't have a plain IsActive bool like most SupportsActiveFilter
-    // entities (it has a 5-value Status), so "inactive" here specifically means Closed, and the
-    // filtering happens client-side against the already-loaded Items since the list endpoint only
-    // supports filtering to a single status, not an "active" grouping.
+    // Vacancy doesn't have a plain IsActive bool like most SupportsActiveFilter entities (it has a
+    // 5-value Status), so "inactive" here specifically means Closed — passed to the server as
+    // ExcludeClosed above, same as ListDepartmentsRequest's ShowInactive.
     protected override bool SupportsActiveFilter => true;
-
-    private IReadOnlyList<VacancyListItemModel> DisplayedItems
-    {
-        get
-        {
-            var items = ShowInactive ? Items : Items.Where(i => i.Status != "Closed");
-
-            if (!string.IsNullOrWhiteSpace(SearchTerm))
-            {
-                items = items.Where(i =>
-                    i.EffectiveTitle.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase) ||
-                    (i.PositionProfileTitle?.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase) ?? false));
-            }
-
-            return items.ToList();
-        }
-    }
 
     protected override string LoadErrorMessage => "Failed to load vacancies.";
 

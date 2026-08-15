@@ -218,8 +218,11 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
     private ILocator DefaultAcknowledgementStatementTextArea =>
         page.GetByPlaceholder("I confirm that I have read and understood this document.");
 
-    public Task SetDefaultAcknowledgementStatementAsync(string value) =>
-        DefaultAcknowledgementStatementTextArea.FillAsync(value);
+    public async Task SetDefaultAcknowledgementStatementAsync(string value)
+    {
+        await DefaultAcknowledgementStatementTextArea.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public Task<string> GetDefaultAcknowledgementStatementAsync() =>
         DefaultAcknowledgementStatementTextArea.InputValueAsync();
@@ -309,8 +312,11 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
     public Task<bool> IsEmployeeNumberAutomaticFieldsVisibleAsync() =>
         page.GetByPlaceholder("e.g. EMP-").IsVisibleAsync();
 
-    public Task SetEmployeeNumberPrefixAsync(string value) =>
-        page.GetByPlaceholder("e.g. EMP-").FillAsync(value);
+    public async Task SetEmployeeNumberPrefixAsync(string value)
+    {
+        await page.GetByPlaceholder("e.g. EMP-").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public Task<string> GetEmployeeNumberPrefixAsync() =>
         page.GetByPlaceholder("e.g. EMP-").InputValueAsync();

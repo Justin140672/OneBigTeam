@@ -84,11 +84,17 @@ public sealed class PromoteEmployeeDialog(IPage page)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    public Task FillReasonAsync(string reason) =>
-        Dialog.GetByPlaceholder("e.g. Annual review promotion").FillAsync(reason);
+    public async Task FillReasonAsync(string reason)
+    {
+        await Dialog.GetByPlaceholder("e.g. Annual review promotion").FillAsync(reason);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public Task FillNotesAsync(string notes) =>
-        Dialog.GetByPlaceholder("Optional notes…").FillAsync(notes);
+    public async Task FillNotesAsync(string notes)
+    {
+        await Dialog.GetByPlaceholder("Optional notes…").FillAsync(notes);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     // ── Step 2: Manager & Location ──────────────────────────────────────────────
 
@@ -117,17 +123,32 @@ public sealed class PromoteEmployeeDialog(IPage page)
     // can't be targeted by placeholder at all), scope by column position instead: Salary,
     // Hours Per Week and FTE are the only three ".e-numerictextbox" inputs on this step, always
     // rendered in that order (Salary Type is a dropdown, Currency is a plain text box).
-    public Task FillCompensationSalaryAsync(string value) =>
-        Dialog.Locator("input.e-numerictextbox").Nth(0).FillAsync(value);
+    // SfNumericTextBox: a bare FillAsync bypasses its interop entirely (see EmployeeEditPage.
+    // TypeIntoNumericInputAsync for the same pattern/explanation) — retype the value for real.
+    private async Task TypeIntoNumericInputAsync(ILocator input, string value)
+    {
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        if (value.Length > 0)
+            await input.PressSequentiallyAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public Task FillCompensationCurrencyAsync(string value) =>
-        Dialog.GetByPlaceholder("e.g. GBP").FillAsync(value);
+    public Task FillCompensationSalaryAsync(string value) =>
+        TypeIntoNumericInputAsync(Dialog.Locator("input.e-numerictextbox").Nth(0), value);
+
+    public async Task FillCompensationCurrencyAsync(string value)
+    {
+        await Dialog.GetByPlaceholder("e.g. GBP").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public Task FillCompensationHoursPerWeekAsync(string value) =>
-        Dialog.Locator("input.e-numerictextbox").Nth(1).FillAsync(value);
+        TypeIntoNumericInputAsync(Dialog.Locator("input.e-numerictextbox").Nth(1), value);
 
     public Task FillCompensationFteAsync(string value) =>
-        Dialog.Locator("input.e-numerictextbox").Nth(2).FillAsync(value);
+        TypeIntoNumericInputAsync(Dialog.Locator("input.e-numerictextbox").Nth(2), value);
 
     // ── Step 4: Confirmation summary ────────────────────────────────────────────
 

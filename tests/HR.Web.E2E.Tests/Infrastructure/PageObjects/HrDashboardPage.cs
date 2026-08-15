@@ -221,4 +221,52 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
             new Regex(@"/companies/[0-9a-f-]{36}/shared-documents/[0-9a-f-]{36}"),
             new() { Timeout = 15_000 });
     }
+
+    // ── Favourite Reports Widget ──────────────────────────────────────────────
+    // FavouriteReportsWidget.razor ("Favourite Reports") — mirrors ReportCatalogPage.razor's own
+    // favourites (server-persisted via ReportingService.GetReportFavouritesAsync/Add/Remove), just
+    // read-only here: this widget only lists whatever is already favourited from the Reports page,
+    // it has no star toggle of its own.
+
+    private ILocator FavouriteReportsWidget =>
+        page.Locator(".widget-card").Filter(new() { HasText = "Favourite Reports" }).First;
+
+    /// <summary>Returns the report titles shown in the Favourite Reports widget items.</summary>
+    public async Task<IReadOnlyList<string>> GetFavouriteReportTitlesAsync()
+    {
+        await FavouriteReportsWidget.Locator(".task-widget-item, .widget-empty").First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
+        var titles = await FavouriteReportsWidget.Locator(".task-widget-title").AllAsync();
+        var names  = new List<string>();
+        foreach (var t in titles)
+            names.Add((await t.TextContentAsync())?.Trim() ?? "");
+        return names;
+    }
+
+    /// <summary>
+    /// Clicks the Favourite Reports widget row whose title contains <paramref name="titleFragment"/>
+    /// (FavouriteReportsWidget.razor's OpenReport navigates straight to the report's route via
+    /// ReportRoutes.RouteFor) and waits for navigation to "/companies/{companyId}/reporting/{route}".
+    /// </summary>
+    public async Task ClickFavouriteReportItemAsync(string titleFragment)
+    {
+        await FavouriteReportsWidget.Locator(".task-widget-item, .widget-empty").First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
+        await FavouriteReportsWidget.Locator(".task-widget-item")
+            .Filter(new() { HasText = titleFragment })
+            .First
+            .ClickAsync();
+        await page.WaitForURLAsync(
+            new Regex(@"/companies/[0-9a-f-]{36}/reporting/[a-z-]+"),
+            new() { Timeout = 15_000 });
+    }
+
+    /// <summary>Clicks the "Browse all" link in the Favourite Reports widget and waits for navigation.</summary>
+    public async Task ClickFavouriteReportsBrowseAllAsync()
+    {
+        await FavouriteReportsWidget.Locator(".widget-view-all").ClickAsync();
+        await page.WaitForURLAsync(new Regex(@"/companies/[0-9a-f-]{36}/reporting$"), new() { Timeout = 15_000 });
+    }
 }

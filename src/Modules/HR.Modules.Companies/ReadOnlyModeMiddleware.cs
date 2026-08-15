@@ -27,6 +27,7 @@ internal sealed class ReadOnlyModeMiddleware(RequestDelegate next)
         "/api/companies/subscription/cancel",
         "/api/companies/subscription/resume",
         "/api/companies/subscription/billing-portal",
+        "/api/companies/admin/",
         "/api/signup",
         "/api/dev/",
     ];

@@ -432,6 +432,34 @@
     margin-top: 10px;
 }
 
+/* Fix for nested/flyout submenus (e.g. People > Employees) failing to render once the page has
+   been scrolled down. Syncfusion's SfSidebar renders as `position: fixed` (pinned to the
+   viewport, see the vendor `.e-sidebar` rule) but ALSO sets `overflow: auto` on that same fixed
+   box. A fixed-position ancestor becomes the containing block for any `position: absolute`
+   descendant rendered inside it — which is exactly how the Menu's flyout submenu popups are
+   positioned. SfMenu's positioning math (calculatePosition in sf-menu.min.js) computes a flip-
+   above-viewport offset by adding the page's scrollY, a calculation that's only correct when the
+   nearest positioned ancestor is the (unscrolled) document itself. Because the actual ancestor
+   here is the fixed sidebar, that scrollY addition pushes the flyout below the sidebar's own
+   clipped viewport-height box the moment the page is scrolled — so it silently disappears.
+   The sidebar's own `overflow: auto` is only ever needed if the top-level nav list itself grows
+   taller than the viewport, so it's moved down onto the inner `<ul>` here (scoped to this one
+   SfSidebar instance) — the flyout popups are separate sibling elements under the wrapper, not
+   nested inside that inner list, so they're no longer clipped by the fixed sidebar box while the
+   list itself keeps scrolling correctly if it's ever taller than the screen. */
+::deep .app-sidebar.e-sidebar {
+    overflow: visible;
+}
+
+::deep .app-sidebar .app-nav-menu.e-menu-wrapper > ul.e-menu {
+    max-height: calc(100vh - 56px);
+    overflow-y: auto;
+}
+
+::deep .app-nav-menu .e-menu-popup {
+    z-index: 1100;
+}
+
 
 @media (max-width: 768px) {
     .content-area {

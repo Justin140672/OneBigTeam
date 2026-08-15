@@ -72,8 +72,9 @@ public class UploadImportFileEndpointTests
     }
 
     [Fact]
-    public async Task Returns_Created_When_Valid_Csv_Is_Uploaded()
+    public async Task Returns_UnprocessableEntity_When_Csv_Is_Uploaded()
     {
+        // CSV import support has been removed; only .xlsx uploads are accepted now.
         using var client = await AdminClient();
 
         const string csv = "first_name,last_name,email\nJohn,Doe,john@example.com\nJane,Doe,jane@example.com\n";
@@ -82,15 +83,7 @@ public class UploadImportFileEndpointTests
             $"/api/companies/{AcmeCompanyId}/data-import/sessions",
             BuildCsvUpload("Employee", csv));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<UploadPayload>();
-        Assert.NotNull(payload);
-        Assert.NotEqual(Guid.Empty, payload!.Id);
-        Assert.Equal(AcmeCompanyId, payload.CompanyId);
-        Assert.Equal("Employee", payload.EntityType);
-        Assert.Equal("employees.csv", payload.FileName);
-        Assert.Equal("Pending", payload.Status);
-        Assert.Equal(2, payload.TotalRows); // header row excluded
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
     [Fact]

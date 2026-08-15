@@ -91,7 +91,7 @@ else
     {
         NoticePeriodUnit.Weeks  => "Weeks",
         NoticePeriodUnit.Months => "Months",
-        _                       => unit.ToString()
+        _                       => EnumDisplay.Humanize(unit)
     };
 
     internal static string LeavingReasonLabel(string reason) => reason switch

@@ -54,7 +54,7 @@ internal sealed class Endpoint(DownloadImportTemplateHandler handler, IAuthoriza
 
         await Send.ResultAsync(TypedResults.File(
             bytes,
-            "text/csv",
-            "employee-import-template.csv"));
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "employee-import-template.xlsx"));
     }
 }

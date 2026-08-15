@@ -18,6 +18,9 @@ internal sealed class ListVacanciesHandler(RecruitmentDbContext db, IPositionPro
         if (request.Status.HasValue)
             query = query.Where(v => v.Status == request.Status.Value);
 
+        if (request.ExcludeClosed)
+            query = query.Where(v => v.Status != Domain.VacancyStatus.Closed);
+
         if (request.PositionProfileId.HasValue)
             query = query.Where(v => v.PositionProfileId == request.PositionProfileId.Value);
 
@@ -92,6 +95,15 @@ internal sealed class ListVacanciesHandler(RecruitmentDbContext db, IPositionPro
                     applicationCounts.GetValueOrDefault(v.Id));
             })
             .ToList();
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            items = items
+                .Where(i =>
+                    i.EffectiveTitle.Contains(request.Search, StringComparison.OrdinalIgnoreCase) ||
+                    (i.PositionProfileTitle?.Contains(request.Search, StringComparison.OrdinalIgnoreCase) ?? false))
+                .ToList();
+        }
 
         return Result.Success(new ListVacanciesResponse(items));
     }

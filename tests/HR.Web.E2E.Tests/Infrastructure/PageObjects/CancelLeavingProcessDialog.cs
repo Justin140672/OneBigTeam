@@ -39,8 +39,11 @@ public sealed class CancelLeavingProcessDialog(IPage page)
     public async Task<bool> HasOffboardingTasksWarningAsync() =>
         await Dialog.Locator(".alert-warning").IsVisibleAsync();
 
-    public Task FillCancellationReasonAsync(string reason) =>
-        Dialog.Locator("textarea").FillAsync(reason);
+    public async Task FillCancellationReasonAsync(string reason)
+    {
+        await Dialog.Locator("textarea").FillAsync(reason);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     /// <summary>
     /// Clicks "Cancel Leaving Process" (the danger-styled submit button). Does not assume success

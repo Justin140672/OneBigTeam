@@ -98,8 +98,11 @@ public class GetReportCatalogEndpointTests
     }
 
     [Fact]
-    public async Task Get_Catalog_Includes_WorkloadActions_For_Recruiter()
+    public async Task Get_Catalog_Excludes_WorkloadActions_For_Recruiter()
     {
+        // Bug fix: Workload & HR Actions Report is an Hr-category report and must not appear in a
+        // pure Recruiter's (no Manager/HrAdministrator role) reports list — see
+        // reporting:view-workload-actions in IdentityModule.cs and GetReportCatalog/Endpoint.cs.
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Recruiter);
@@ -110,7 +113,7 @@ public class GetReportCatalogEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<CatalogPayload>();
         Assert.NotNull(payload);
-        Assert.Contains(payload!.Items, i => i.Id == "workload-actions");
+        Assert.DoesNotContain(payload!.Items, i => i.Id == "workload-actions");
     }
 
     [Fact]
@@ -145,12 +148,14 @@ public class GetReportCatalogEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<CatalogPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(5, payload!.Items.Count);
+        Assert.Equal(4, payload!.Items.Count);
         Assert.Contains(payload.Items, i => i.Id == "recruitment-pipeline-summary" && i.Category == "Recruitment");
         Assert.Contains(payload.Items, i => i.Id == "recruitment-pipeline-report" && i.Category == "Recruitment");
         Assert.Contains(payload.Items, i => i.Id == "vacancy-performance-report" && i.Category == "Recruitment");
         Assert.Contains(payload.Items, i => i.Id == "employee-starters" && i.Category == "Hr");
-        Assert.Contains(payload.Items, i => i.Id == "workload-actions");
+        // Bug fix: Workload & HR Actions Report must not leak into a pure Recruiter's catalog —
+        // see Get_Catalog_Excludes_WorkloadActions_For_Recruiter above for the dedicated assertion.
+        Assert.DoesNotContain(payload.Items, i => i.Id == "workload-actions");
     }
 
     [Fact]

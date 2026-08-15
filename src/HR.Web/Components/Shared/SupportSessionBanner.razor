@@ -1,0 +1,24 @@
+@inject SupportSessionState SupportSession
+
+@* Visible support banner (Support epic, "Login As Customer" acceptance criterion). Renders
+   whenever SupportSessionState reports an active support session. Placed alongside
+   ReadOnlyBanner/TrialBanner in MainLayout.razor. See SupportSessionState's remarks: nothing
+   currently activates a support session (full redemption is stubbed), so this banner is built
+   and ready but not yet reachable in a real browsing session. *@
+@if (SupportSession.IsActive)
+{
+    <div class="support-session-banner" role="alert">
+        <i class="fa-solid fa-user-shield me-2"></i>
+        <span>
+            A platform administrator (@SupportSession.IssuedByAdminEmail) is currently accessing this
+            environment for support purposes.
+            @if (SupportSession.ExpiresAt is { } expiresAt)
+            {
+                <text> This access expires at @expiresAt.ToLocalTime().ToString("t").</text>
+            }
+        </span>
+    </div>
+}
+
+@code {
+}

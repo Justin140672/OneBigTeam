@@ -133,6 +133,7 @@ else
         }
 
         <main class="main-content">
+            <SupportSessionBanner />
             <ReadOnlyBanner />
             <TrialBanner />
             <div class="top-bar">
@@ -178,7 +179,7 @@ else
                     }
                     @if (Session.IsLoaded && Session.EmployeeId.HasValue)
                     {
-                        <div class="notif-bell @(_notifOpen ? "notif-open" : "")">
+                        <div class="notif-bell @(_notifOpen ? "notif-open" : "")" @onmouseenter="CancelNotifAutoClose" @onmouseleave="ScheduleNotifAutoClose">
                             <button class="notif-btn" @onclick="ToggleNotifications" title="Notifications" aria-label="@(_unreadCount > 0 ? $"Notifications, {_unreadCount} unread" : "Notifications")" aria-haspopup="true" aria-expanded="@_notifOpen">
                                 <i class="fa-solid fa-bell"></i>
                                 @if (_unreadCount > 0)
@@ -432,10 +433,46 @@ else
 
     private async Task ToggleNotifications()
     {
+        _notifCloseCts?.Cancel();
         _notifOpen = !_notifOpen;
         if (_notifOpen)
             await LoadNotificationsAsync();
     }
+
+    private CancellationTokenSource? _notifCloseCts;
+
+    // Standard hover-dropdown UX: a short debounce so briefly leaving and re-entering the
+    // bell/dropdown area (e.g. moving the mouse from the button down into the panel) doesn't
+    // cause a visible flicker-close. Cancelled by CancelNotifAutoClose on re-entry.
+    private void ScheduleNotifAutoClose()
+    {
+        if (!_notifOpen) return;
+
+        _notifCloseCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _notifCloseCts = cts;
+
+        _ = CloseNotifAfterDelayAsync(cts.Token);
+    }
+
+    private async Task CloseNotifAfterDelayAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(500, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (token.IsCancellationRequested) return;
+
+        _notifOpen = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void CancelNotifAutoClose() => _notifCloseCts?.Cancel();
 
     private void ToggleHelp() => _helpOpen = !_helpOpen;
 
@@ -525,16 +562,38 @@ else
         await JS.InvokeVoidAsync("hardNavigate", $"/dev/persona-cookie?{query}");
     }
 
+    // Tracks whether the toggle button's IsDark state has actually been synced with app.js's
+    // getTheme() (localStorage override, or the OS preference it falls back to) — separate from
+    // Blazor's own "firstRender" flag. A single firstRender-gated attempt was fragile: if that one
+    // JS interop call raced a reconnecting circuit (JSDisconnectedException) or fired before the
+    // theme-toggle button itself had even rendered (it's inside the "else" branch of the
+    // Session.IsLoaded gate above, not guaranteed present on the very first render), IsDark was
+    // left stuck at its C# default (false/light) for the rest of the session — the page itself
+    // still looked correctly dark (App.razor's inline script sets the html attribute synchronously,
+    // before Blazor even loads), but the button's icon silently never caught up. Retrying on every
+    // render until it succeeds makes this self-healing regardless of exactly when the circuit
+    // finishes connecting.
+    private bool _themeSynced;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (_themeSynced)
+            return;
+
+        try
         {
             var stored = await JS.InvokeAsync<string>("getTheme");
-            if (stored == "dark" && !IsDark)
+            _themeSynced = true;
+
+            if (stored == "dark" != IsDark)
             {
-                IsDark = true;
+                IsDark = stored == "dark";
                 StateHasChanged();
             }
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit not ready yet — leave _themeSynced false so the next render retries.
         }
     }
 

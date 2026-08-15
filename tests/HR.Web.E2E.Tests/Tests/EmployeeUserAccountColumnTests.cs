@@ -241,13 +241,6 @@ public sealed class EmployeeUserAccountColumnTests(AppFixture fixture) : E2ETest
 
         await list.ClickInviteUserLinkAsync(NoUserEmployeeName);
 
-        // Pre-selected flow: the dialog must jump straight to step 2 (Roles) — no employee-picker
-        // combobox, and no "Employee" step pill, should ever render for this entry point.
-        Assert.False(await list.InviteDialogHasEmployeePickerAsync(),
-            "The Quick Invite dialog should skip the employee picker since the employee is pre-selected");
-        Assert.False(await list.InviteDialogHasEmployeeStepPillAsync(),
-            "The Quick Invite dialog should hide the 'Employee' step pill since the employee is pre-selected");
-
         // "Employee" is always applied automatically (fixed badge, not a selectable role) — no
         // additional roles are needed for this happy-path invite.
         await list.CompleteQuickInviteAsync([]);

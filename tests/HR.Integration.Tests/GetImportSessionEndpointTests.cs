@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
+using ClosedXML.Excel;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 
@@ -38,7 +39,7 @@ public class GetImportSessionEndpointTests
         Assert.NotNull(payload);
         Assert.Equal(sessionId, payload!.Id);
         Assert.Equal("Employee", payload.EntityType);
-        Assert.Equal("employees.csv", payload.FileName);
+        Assert.Equal("employees.xlsx", payload.FileName);
         Assert.Equal("Pending", payload.Status);
         Assert.Equal(2, payload.TotalRows);
         Assert.Equal(0, payload.SuccessfulRows);
@@ -116,11 +117,37 @@ public class GetImportSessionEndpointTests
         var content = new MultipartFormDataContent();
         content.Add(new StringContent("Employee"), "EntityType");
 
-        var fileContent = new ByteArrayContent(Encoding.UTF8.GetBytes(csvContent));
-        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("text/csv");
-        content.Add(fileContent, "File", "employees.csv");
+        var fileContent = new ByteArrayContent(BuildXlsxBytes(csvContent));
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        content.Add(fileContent, "File", "employees.xlsx");
 
         return content;
+    }
+
+    // Builds a minimal XLSX workbook (via ClosedXML) from comma-delimited "csv-shaped" header/data
+    // lines, so existing test fixtures (written as csv-style strings for readability) can still be
+    // uploaded against the now xlsx-only import endpoint.
+    private static byte[] BuildXlsxBytes(string csvShapedContent)
+    {
+        var lines = csvShapedContent
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(l => l.TrimEnd('\r'))
+            .ToList();
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Sheet1");
+
+        for (var row = 0; row < lines.Count; row++)
+        {
+            var cells = lines[row].Split(',');
+            for (var col = 0; col < cells.Length; col++)
+                worksheet.Cell(row + 1, col + 1).Value = cells[col];
+        }
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
     }
 
     private sealed record UploadPayload(

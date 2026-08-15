@@ -13,6 +13,16 @@ Your job is to do exactly these things when requested:
 2. Create or update integration tests using Aspire.Hosting.Testing.
 3. Create missing test projects when they do not already exist.
 4. Create or update architecture tests in `HR.Architecture.Tests` when a new module, entity, or DbContext is added.
+5. Ensure edge case coverage on new work, per the Edge Case Coverage checklist below.
+
+## Edge Case Coverage
+For every validator or domain rule touched by new work, don't stop at the "happy path" and one failure case — check each of the following and add a test for any that's missing:
+- **Boundary conditions**: off-by-one on dates/numbers/string lengths. If a rule uses `MaximumLength(N)`, test both `N` (passes) and `N+1` (fails), not just one side. If a rule uses a comparison operator (`>`, `>=`, `<`, `<=`), test the exact boundary value to pin whether it's inclusive or exclusive.
+- **Negated/inverted logic**: when a condition has both a true and false branch (including compound `or`/`and` conditions with multiple disjuncts/conjuncts), test each branch independently — not just the one the primary scenario happens to hit.
+- **Null/empty/whitespace inputs**: for string fields using `NotEmpty()`, test whitespace-only input in addition to `null`/`string.Empty` — FluentValidation's `NotEmpty` treats them differently from a bare length check.
+- **Idempotency/repeat-call guards**: state-machine style domain methods (e.g. `Complete()`, `Cancel()`) that guard against being called twice, or against being called from an invalid prior state, need a direct test of the guard throwing/no-opping, not just indirect coverage through a handler.
+
+This applies to new validators and domain rules as they're written, not as a separate retrofit pass.
 
 ## Architecture Test Responsibilities
 Whenever a new module or entity is introduced, add tests to `HR.Architecture.Tests` covering:

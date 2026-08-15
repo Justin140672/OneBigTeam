@@ -24,6 +24,19 @@
     --color-accent-soft: #e8eaf8;
     --color-on-accent: #ffffff;
 
+    /* Color: secondary accent — the cyan-teal from the logo mark's circles (sampled at
+       #1bb4cc), distinct from the blue wordmark color above. Defined but not yet applied
+       anywhere: this site's DESIGN.md documents a deliberate "One Accent Rule" (a single
+       committed hue everywhere), so wiring this into specific components is a real design
+       decision for whoever uses it next, not made here. #127585 is a darkened, contrast-
+       verified variant (~5.4:1 on white) — the raw sampled teal is only ~2.5:1, well under
+       the 4.5:1 AA text/UI threshold. */
+    --color-secondary: #127585;
+    --color-secondary-hover: #0e5c69;
+    --color-secondary-active: #0b474f;
+    --color-secondary-soft: #e7f1f3;
+    --color-on-secondary: #ffffff;
+
     /* Color: dark surfaces (header/footer/final CTA) */
     --color-dark: #14151a;
     --color-dark-surface: #1d1e25;
@@ -1694,6 +1707,203 @@ a.card:focus-visible,
     border-top: 1px solid var(--color-dark-border);
     color: var(--color-dark-ink-soft);
     font-size: var(--text-meta);
+}
+
+/* ---------------------------------------------------------------------
+   Signup journey (simplified header/panel/footer — deliberately not the
+   full marketing chrome, so the signup form is the one dominant action)
+--------------------------------------------------------------------- */
+
+.signup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 20px clamp(20px, 5vw, 72px);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+}
+
+.signup-header-login {
+    margin: 0;
+    color: var(--color-ink-soft);
+    font-size: var(--text-meta);
+}
+
+    .signup-header-login .login-link {
+        font-weight: 700;
+        color: var(--color-accent);
+        text-decoration: underline;
+    }
+
+.signup-main {
+    display: flex;
+    justify-content: center;
+    padding: clamp(32px, 6vw, 64px) clamp(16px, 5vw, 40px);
+    background: var(--color-bg-muted);
+    min-height: calc(100vh - 160px);
+}
+
+.signup-panel-section {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.signup-panel {
+    width: 100%;
+    max-width: 640px;
+    display: grid;
+    gap: 28px;
+}
+
+.signup-panel-intro h1 {
+    font-size: clamp(1.7rem, 4vw, 2.1rem);
+    margin-bottom: 10px;
+}
+
+.signup-reassurance-list {
+    margin: 16px 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+    color: var(--color-ink-soft);
+    font-size: var(--text-meta);
+}
+
+    .signup-reassurance-list li {
+        padding-left: 22px;
+        position: relative;
+    }
+
+    .signup-reassurance-list li::before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        color: var(--color-accent);
+        font-weight: 700;
+    }
+
+.signup-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.signup-submit-block {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 14px;
+    justify-items: start;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border);
+}
+
+.signup-trial-note {
+    margin: 0;
+    font-size: var(--text-meta);
+    color: var(--color-ink-soft);
+    width: 100%;
+}
+
+    .signup-trial-note strong {
+        color: var(--color-ink);
+    }
+
+.signup-submit-block .button-large {
+    width: 100%;
+}
+
+@media (min-width: 640px) {
+    .signup-submit-block .button-large {
+        width: auto;
+        min-width: 220px;
+    }
+}
+
+.signup-fieldset {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+    .signup-fieldset + .signup-fieldset {
+        padding-top: 22px;
+        border-top: 1px solid var(--color-border);
+    }
+
+    .signup-fieldset legend {
+        grid-column: 1 / -1;
+        padding: 0 0 4px;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--color-ink);
+    }
+
+.signup-footer {
+    padding: 24px clamp(20px, 5vw, 72px);
+    text-align: center;
+    color: var(--color-ink-soft);
+    font-size: var(--text-meta);
+    background: var(--color-bg-muted);
+    border-top: 1px solid var(--color-border);
+}
+
+    .signup-footer a {
+        margin-left: 6px;
+        color: var(--color-accent);
+        text-decoration: underline;
+    }
+
+/* ---------------------------------------------------------------------
+   Homepage trust/reassurance section
+--------------------------------------------------------------------- */
+
+.trust-section {
+    background: var(--color-bg-muted);
+}
+
+.trust-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 28px;
+    margin-top: 28px;
+}
+
+.trust-card {
+    padding: 24px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+    .trust-card h3 {
+        margin: 0 0 10px;
+        font-size: 1.05rem;
+    }
+
+    .trust-card p {
+        margin: 0 0 12px;
+        color: var(--color-ink-soft);
+    }
+
+    .trust-card a {
+        color: var(--color-accent);
+        font-weight: 600;
+        text-decoration: underline;
+    }
+
+.trust-terms-note {
+    margin-top: 28px;
+    padding: 16px 20px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-ink-soft);
 }
 
 /* ---------------------------------------------------------------------

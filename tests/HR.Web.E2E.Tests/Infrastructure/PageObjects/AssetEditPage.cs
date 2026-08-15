@@ -16,11 +16,17 @@ public sealed class AssetEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
     }
 
-    public async Task FillAssetNumberAsync(string value) =>
+    public async Task FillAssetNumberAsync(string value)
+    {
         await page.GetByPlaceholder("e.g. ASSET-001").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public async Task FillNameAsync(string value) =>
+    public async Task FillNameAsync(string value)
+    {
         await page.GetByPlaceholder("e.g. Dell Laptop").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     /// <summary>
     /// Selects a category from the Category dropdown (no filtering support on this field). Scoped

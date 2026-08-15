@@ -43,6 +43,17 @@ web
 	.WithReference(api)
 	.WaitFor(api);
 
+// Internal Admin Portal — platform-staff-only cross-tenant tooling (Customer Dashboard epic).
+// References api directly for the "platform:admin" endpoints; deliberately does not reference web
+// (no cross-app navigation needed yet).
+var adminWeb = isE2ETesting
+	? builder.AddProject<Projects.HR_Admin_Web>("adminweb", launchProfileName: "http")
+	: builder.AddProject<Projects.HR_Admin_Web>("adminweb");
+
+adminWeb
+	.WithReference(api)
+	.WaitFor(api);
+
 // Public marketing site — static content, plus a server-side "Start free trial" signup proxy
 // (Phase B of the Getting Started + Subscription/Billing epic) that calls HR.Api's public /api/signup
 // endpoint directly, avoiding any need for browser-side CORS. References web to resolve its URL for
@@ -55,5 +66,12 @@ marketing
 	.WithReference(web)
 	.WithReference(api)
 	.WaitFor(api);
+
+// Reverse reference so HR.Web gets Aspire's own "services:marketing:https:0"/"...:http:0"
+// service-discovery config keys injected — needed for VerifyEmailError.razor's "resend
+// verification" bridge back to the marketing site's /check-your-email page, which previously had
+// no way to resolve marketing's actual (dynamically-assigned) URL and fell back to a hardcoded,
+// frequently-wrong "http://localhost:5166" (Marketing:BaseUrl in appsettings.Development.json).
+web.WithReference(marketing);
 
 builder.Build().Run();

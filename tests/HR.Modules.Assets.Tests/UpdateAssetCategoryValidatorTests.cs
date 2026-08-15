@@ -65,4 +65,26 @@ public class UpdateAssetCategoryValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateAssetCategoryRequest.Description));
     }
+
+    [Fact]
+    public void Validate_Passes_When_Name_Is_Exactly_100_Characters()
+    {
+        var result = _validator.Validate(Valid() with { Name = new string('A', 100) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_Description_Is_Exactly_500_Characters()
+    {
+        var result = _validator.Validate(Valid() with { Description = new string('D', 500) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Name_Is_Whitespace_Only()
+    {
+        var result = _validator.Validate(Valid() with { Name = "   " });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateAssetCategoryRequest.Name));
+    }
 }

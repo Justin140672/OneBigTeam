@@ -105,24 +105,38 @@ public sealed class ReportCatalogTests(AppFixture fixture) : E2ETestBase(fixture
         // "HR Headcount Summary" should move it ahead of "Employee Directory".
         Assert.False(await catalog.IsFavouritedAsync("HR Headcount Summary"));
 
-        await catalog.ClickFavouriteAsync("HR Headcount Summary");
-        Assert.True(await catalog.IsFavouritedAsync("HR Headcount Summary"));
+        try
+        {
+            await catalog.ClickFavouriteAsync("HR Headcount Summary");
+            Assert.True(await catalog.IsFavouritedAsync("HR Headcount Summary"));
 
-        var titlesAfterFavouriting = await catalog.GetCardTitlesInCategoryAsync("Hr");
-        Assert.Equal("HR Headcount Summary", titlesAfterFavouriting.FirstOrDefault());
+            var titlesAfterFavouriting = await catalog.GetCardTitlesInCategoryAsync("Hr");
+            Assert.Equal("HR Headcount Summary", titlesAfterFavouriting.FirstOrDefault());
 
-        // Reload — favourites now round-trip through the server (ReportingService.AddReportFavouriteAsync
-        // / GetReportFavouritesAsync), not localStorage, so a plain reload (not just client-side
-        // navigation) proves the toggle actually persisted server-side rather than only updating
-        // in-memory component state.
-        await _page.ReloadAsync();
-        await _page.WaitForSelectorAsync(".report-catalog-card, .hr-empty-state", new() { Timeout = 20_000 });
+            // Reload — favourites now round-trip through the server (ReportingService.AddReportFavouriteAsync
+            // / GetReportFavouritesAsync), not localStorage, so a plain reload (not just client-side
+            // navigation) proves the toggle actually persisted server-side rather than only updating
+            // in-memory component state.
+            await _page.ReloadAsync();
+            await _page.WaitForSelectorAsync(".report-catalog-card, .hr-empty-state", new() { Timeout = 20_000 });
 
-        Assert.True(await catalog.IsFavouritedAsync("HR Headcount Summary"),
-            "Expected the favourite to survive a page reload");
+            Assert.True(await catalog.IsFavouritedAsync("HR Headcount Summary"),
+                "Expected the favourite to survive a page reload");
 
-        var titlesAfterReload = await catalog.GetCardTitlesInCategoryAsync("Hr");
-        Assert.Equal("HR Headcount Summary", titlesAfterReload.FirstOrDefault());
+            var titlesAfterReload = await catalog.GetCardTitlesInCategoryAsync("Hr");
+            Assert.Equal("HR Headcount Summary", titlesAfterReload.FirstOrDefault());
+        }
+        finally
+        {
+            // Leaves LauraEmail's favourites clean for other tests relying on the seeded dev
+            // database — e.g. HrDashboardTests.FavouriteReportsWidget_ShowsEmptyState_WhenNothingFavourited
+            // asserts this persona has no favourites at all, same convention as
+            // HrDashboardTests.FavouriteReportsWidget_ShowsFavouritedReport_AndNavigatesToItOnClick's
+            // own cleanup.
+            await catalog.GoToAsync(AcmeId);
+            if (await catalog.IsFavouritedAsync("HR Headcount Summary"))
+                await catalog.ClickFavouriteAsync("HR Headcount Summary");
+        }
     }
 
     [Fact]

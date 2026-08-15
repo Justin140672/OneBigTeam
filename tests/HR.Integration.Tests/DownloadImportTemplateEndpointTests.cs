@@ -1,4 +1,5 @@
 using System.Net;
+using ClosedXML.Excel;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 
@@ -21,7 +22,7 @@ public class DownloadImportTemplateEndpointTests
     }
 
     [Fact]
-    public async Task Returns_Ok_With_Csv_Content_Type_And_Header_Row()
+    public async Task Returns_Ok_With_Xlsx_Content_Type_And_Header_Row()
     {
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
@@ -29,12 +30,25 @@ public class DownloadImportTemplateEndpointTests
         var response = await client.GetAsync(TemplateUrl(companyId));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("text/csv", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            response.Content.Headers.ContentType?.MediaType);
 
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("First Name", body);
-        Assert.Contains("Last Name", body);
-        Assert.Contains("Work Email", body);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        using var workbook = new XLWorkbook(new MemoryStream(bytes));
+        var sheet = workbook.Worksheet("Employee Import");
+
+        var usedRange = sheet.RangeUsed();
+        Assert.NotNull(usedRange);
+        var lastColumn = usedRange!.LastColumn().ColumnNumber();
+
+        var headerCells = new List<string>();
+        for (var col = 1; col <= lastColumn; col++)
+            headerCells.Add(sheet.Cell(1, col).GetString());
+
+        Assert.Contains("First Name", headerCells);
+        Assert.Contains("Last Name", headerCells);
+        Assert.Contains("Work Email", headerCells);
     }
 
     [Fact]

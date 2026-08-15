@@ -21,7 +21,7 @@
         </div>
     }
 
-    <ReportFilterPanel CompanyId="CompanyId" ReportId="employee-directory" OnFilterChanged="OnFilterChangedAsync" />
+    <ReportFilterPanel CompanyId="CompanyId" ReportId="employee-directory" OnFilterChanged="OnFilterChangedAsync" OnViewDeleted="LoadAsync" />
 
     @if (_isLoading)
     {

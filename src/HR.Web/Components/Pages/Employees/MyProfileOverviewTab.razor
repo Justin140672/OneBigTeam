@@ -242,7 +242,11 @@ else
 
         <!-- Actions -->
         <div class="overview-sidebar">
-            @if (!Session.IsManager)
+            @* Hidden for a plain Employee (no elevated/manager+ role) — mirrors TeamReportsWidget's
+               access gating, since the underlying report catalog is only populated for
+               Manager/HR Administrator/Recruiter roles and a plain employee would just see an
+               empty widget. *@
+            @if (Session.IsHrAdministrator || Session.IsManager || Session.IsRecruiter)
             {
                 <div class="mb-3">
                     <FavouriteReportsWidget />

@@ -31,7 +31,7 @@ internal sealed class GetImportSessionColumnsHandler(
         try
         {
             await using var fileStream = await storage.OpenReadAsync(session.StorageKey, cancellationToken);
-            detectedHeaders = parser.ParseHeaders(fileStream, session.FileName);
+            detectedHeaders = parser.ParseHeaders(fileStream);
         }
         catch (Exception ex)
         {

@@ -1,4 +1,3 @@
-using System.Text;
 using ClosedXML.Excel;
 using HR.Modules.DataImport.Services;
 
@@ -14,18 +13,51 @@ public class EmployeeImportFileParserTests
         ["Notes"] = "Notes",
     });
 
-    private static Stream ToStream(string content) => new MemoryStream(Encoding.UTF8.GetBytes(content));
+    private static Stream ToXlsxStream(string[] headers, IEnumerable<string?[]> rows)
+    {
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Sheet1");
+
+        for (var col = 0; col < headers.Length; col++)
+            worksheet.Cell(1, col + 1).Value = headers[col];
+
+        var rowIndex = 2;
+        foreach (var row in rows)
+        {
+            for (var col = 0; col < row.Length; col++)
+                worksheet.Cell(rowIndex, col + 1).Value = row[col];
+            rowIndex++;
+        }
+
+        var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+        return stream;
+    }
+
+    private static Stream EmptyXlsxStream()
+    {
+        using var workbook = new XLWorkbook();
+        workbook.Worksheets.Add("Sheet1");
+
+        var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+        return stream;
+    }
 
     [Fact]
-    public void Parse_Csv_Maps_Headers_And_Rows_With_Correct_RowNumbers()
+    public void Parse_Xlsx_Maps_Headers_And_Rows_With_Correct_RowNumbers_And_Values()
     {
-        var csv =
-            "First Name,Last Name,Work Email,Notes\n" +
-            "Alice,Smith,alice@example.com,\"Likes coffee, tea\"\n" +
-            "Bob,Jones,bob@example.com,No notes\n";
+        var stream = ToXlsxStream(
+            ["First Name", "Last Name", "Work Email", "Notes"],
+            [
+                ["Alice", "Smith", "alice@example.com", "Likes coffee, tea"],
+                ["Bob", "Jones", "bob@example.com", "No notes"],
+            ]);
 
         var parser = new EmployeeImportFileParser();
-        var result = parser.Parse(ToStream(csv), "employees.csv", Mapping);
+        var result = parser.Parse(stream, Mapping);
 
         Assert.Equal(new HashSet<string> { "FirstName", "LastName", "WorkEmail", "Notes" }, result.MappedFields);
         Assert.Equal(2, result.Rows.Count);
@@ -35,7 +67,7 @@ public class EmployeeImportFileParserTests
         Assert.Equal("Alice", row1.Fields["FirstName"]);
         Assert.Equal("Smith", row1.Fields["LastName"]);
         Assert.Equal("alice@example.com", row1.Fields["WorkEmail"]);
-        Assert.Equal("Likes coffee, tea", row1.Fields["Notes"]); // quoted field containing a comma
+        Assert.Equal("Likes coffee, tea", row1.Fields["Notes"]);
 
         var row2 = result.Rows[1];
         Assert.Equal(3, row2.RowNumber);
@@ -46,16 +78,18 @@ public class EmployeeImportFileParserTests
     }
 
     [Fact]
-    public void Parse_Csv_Column_Missing_From_Header_Is_Absent_From_MappedFields_And_Every_Row()
+    public void Parse_Xlsx_Column_Missing_From_Header_Is_Absent_From_MappedFields_And_Every_Row()
     {
-        // "Work Email" header is not present anywhere in the file.
-        var csv =
-            "First Name,Last Name\n" +
-            "Alice,Smith\n" +
-            "Bob,Jones\n";
+        // "Work Email" and "Notes" headers are not present anywhere in the file.
+        var stream = ToXlsxStream(
+            ["First Name", "Last Name"],
+            [
+                ["Alice", "Smith"],
+                ["Bob", "Jones"],
+            ]);
 
         var parser = new EmployeeImportFileParser();
-        var result = parser.Parse(ToStream(csv), "employees.csv", Mapping);
+        var result = parser.Parse(stream, Mapping);
 
         Assert.DoesNotContain("WorkEmail", result.MappedFields);
         Assert.DoesNotContain("Notes", result.MappedFields);
@@ -64,15 +98,17 @@ public class EmployeeImportFileParserTests
     }
 
     [Fact]
-    public void Parse_Csv_Empty_Or_Whitespace_Cells_Become_Null()
+    public void Parse_Xlsx_Empty_Or_Whitespace_Cells_Become_Null()
     {
-        var csv =
-            "First Name,Last Name,Work Email,Notes\n" +
-            "Alice,Smith,alice@example.com,   \n" +
-            "Bob,Jones,,\n";
+        var stream = ToXlsxStream(
+            ["First Name", "Last Name", "Work Email", "Notes"],
+            [
+                ["Alice", "Smith", "alice@example.com", "   "],
+                ["Bob", "Jones", "", ""],
+            ]);
 
         var parser = new EmployeeImportFileParser();
-        var result = parser.Parse(ToStream(csv), "employees.csv", Mapping);
+        var result = parser.Parse(stream, Mapping);
 
         Assert.Null(result.Rows[0].Fields["Notes"]);
         Assert.Null(result.Rows[1].Fields["WorkEmail"]);
@@ -80,7 +116,7 @@ public class EmployeeImportFileParserTests
     }
 
     [Fact]
-    public void Parse_Xlsx_Maps_Headers_And_Rows_With_Correct_RowNumbers()
+    public void Parse_Xlsx_Blank_Rows_Are_Skipped()
     {
         using var workbook = new XLWorkbook();
         var worksheet = workbook.Worksheets.Add("Sheet1");
@@ -93,67 +129,34 @@ public class EmployeeImportFileParserTests
         worksheet.Cell(2, 2).Value = "Smith";
         worksheet.Cell(2, 3).Value = "alice@example.com";
 
-        worksheet.Cell(3, 1).Value = "Bob";
-        worksheet.Cell(3, 2).Value = "Jones";
-        worksheet.Cell(3, 3).Value = "bob@example.com";
+        // Row 3 is entirely blank.
+
+        worksheet.Cell(4, 1).Value = "Bob";
+        worksheet.Cell(4, 2).Value = "Jones";
+        worksheet.Cell(4, 3).Value = "bob@example.com";
 
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
         stream.Position = 0;
 
         var parser = new EmployeeImportFileParser();
-        var result = parser.Parse(stream, "employees.xlsx", Mapping);
+        var result = parser.Parse(stream, Mapping);
 
-        Assert.Equal(new HashSet<string> { "FirstName", "LastName", "WorkEmail" }, result.MappedFields);
         Assert.Equal(2, result.Rows.Count);
-
-        var row1 = result.Rows[0];
-        Assert.Equal(2, row1.RowNumber);
-        Assert.Equal("Alice", row1.Fields["FirstName"]);
-        Assert.Equal("Smith", row1.Fields["LastName"]);
-        Assert.Equal("alice@example.com", row1.Fields["WorkEmail"]);
-
-        var row2 = result.Rows[1];
-        Assert.Equal(3, row2.RowNumber);
-        Assert.Equal("Bob", row2.Fields["FirstName"]);
-        Assert.Equal("Jones", row2.Fields["LastName"]);
-        Assert.Equal("bob@example.com", row2.Fields["WorkEmail"]);
+        Assert.Equal(2, result.Rows[0].RowNumber);
+        Assert.Equal(4, result.Rows[1].RowNumber);
     }
 
     [Fact]
-    public void Parse_Xlsx_Column_Missing_From_Header_Is_Absent_From_MappedFields_And_Every_Row()
+    public void Parse_Empty_Workbook_Returns_No_MappedFields_And_No_Rows()
     {
-        using var workbook = new XLWorkbook();
-        var worksheet = workbook.Worksheets.Add("Sheet1");
-
-        worksheet.Cell(1, 1).Value = "First Name";
-        worksheet.Cell(1, 2).Value = "Last Name";
-
-        worksheet.Cell(2, 1).Value = "Alice";
-        worksheet.Cell(2, 2).Value = "Smith";
-
-        using var stream = new MemoryStream();
-        workbook.SaveAs(stream);
-        stream.Position = 0;
+        var stream = EmptyXlsxStream();
 
         var parser = new EmployeeImportFileParser();
-        var result = parser.Parse(stream, "employees.xlsx", Mapping);
+        var result = parser.Parse(stream, Mapping);
 
-        Assert.DoesNotContain("WorkEmail", result.MappedFields);
-        Assert.All(result.Rows, r => Assert.False(r.Fields.ContainsKey("WorkEmail")));
-    }
-
-    [Fact]
-    public void ParseHeaders_Csv_Returns_Header_Row_Split_Correctly()
-    {
-        var csv =
-            "First Name,Last Name,Work Email,Notes\n" +
-            "Alice,Smith,alice@example.com,Likes coffee\n";
-
-        var parser = new EmployeeImportFileParser();
-        var headers = parser.ParseHeaders(ToStream(csv), "employees.csv");
-
-        Assert.Equal(new[] { "First Name", "Last Name", "Work Email", "Notes" }, headers);
+        Assert.Empty(result.MappedFields);
+        Assert.Empty(result.Rows);
     }
 
     [Fact]
@@ -171,16 +174,18 @@ public class EmployeeImportFileParserTests
         stream.Position = 0;
 
         var parser = new EmployeeImportFileParser();
-        var headers = parser.ParseHeaders(stream, "employees.xlsx");
+        var headers = parser.ParseHeaders(stream);
 
         Assert.Equal(new[] { "First Name", "Last Name", "Work Email" }, headers);
     }
 
     [Fact]
-    public void ParseHeaders_Empty_File_Returns_Empty_List()
+    public void ParseHeaders_Empty_Workbook_Returns_Empty_List()
     {
+        var stream = EmptyXlsxStream();
+
         var parser = new EmployeeImportFileParser();
-        var headers = parser.ParseHeaders(ToStream(string.Empty), "employees.csv");
+        var headers = parser.ParseHeaders(stream);
 
         Assert.Empty(headers);
     }

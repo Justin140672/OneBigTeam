@@ -8,14 +8,20 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// </summary>
 public sealed class LocationTypeEditPage(IPage page, string baseUrl)
 {
-    public Task FillNameAsync(string name) =>
-        page.GetByPlaceholder("e.g. Office, Warehouse").FillAsync(name);
+    public async Task FillNameAsync(string name)
+    {
+        await page.GetByPlaceholder("e.g. Office, Warehouse").FillAsync(name);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public Task<string> GetNameAsync() =>
         page.GetByPlaceholder("e.g. Office, Warehouse").InputValueAsync();
 
-    public Task FillDescriptionAsync(string description) =>
-        page.GetByPlaceholder("Optional description").FillAsync(description);
+    public async Task FillDescriptionAsync(string description)
+    {
+        await page.GetByPlaceholder("Optional description").FillAsync(description);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task SaveAsync()
     {

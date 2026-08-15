@@ -223,6 +223,11 @@
     </DialogTemplates>
 </SfDialog>
 
+<UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                      OnSaveAndClose="ConfirmSaveInsteadOfCancelAsync"
+                      OnDiscard="ConfirmDiscardAsync"
+                      OnCancel="CancelUnsavedChangesDialog" />
+
 @code {
     [Inject] public DepartmentService DepartmentService { get; set; } = null!;
     [Inject] public LocationService LocationService { get; set; } = null!;

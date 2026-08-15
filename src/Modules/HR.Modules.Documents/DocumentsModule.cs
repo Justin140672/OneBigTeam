@@ -88,8 +88,19 @@ public static class DocumentsModule
         services.Configure<FileUploadOptions>(configuration.GetSection("Documents:FileUpload"));
         services.AddScoped<IFileUploadValidator, FileUploadValidator>();
 
+        // E2E_TESTING always forces the no-op scanner, same as FakeSupabaseAuthGateway/
+        // FakeStripeGateway elsewhere in this app — HR.AppHost injects Documents__ClamAv__Host/Port
+        // unconditionally (not gated by E2E_TESTING, unlike the Supabase/Stripe fakes' own env
+        // checks), so without this the E2E suite would always attempt a real ClamAV scan. ClamAV's
+        // container can take well over a minute to finish loading its virus-definition database on
+        // a cold start — long past Aspire's own container-health WaitFor — during which every scan
+        // attempt fails/hangs, leaving every pending-photo/document row stuck on ScanStatus.Pending
+        // (or eventually Failed) no matter how long a test polls for it.
+        var isE2ETestingForVirusScan = string.Equals(
+            Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
+
         var clamAvSection = configuration.GetSection("Documents:ClamAv");
-        if (clamAvSection.Exists() && !string.IsNullOrWhiteSpace(clamAvSection["Host"]))
+        if (!isE2ETestingForVirusScan && clamAvSection.Exists() && !string.IsNullOrWhiteSpace(clamAvSection["Host"]))
         {
             services.Configure<ClamAvOptions>(clamAvSection);
             services.AddScoped<IVirusScanService, ClamAvVirusScanService>();
@@ -247,6 +258,12 @@ public static class DocumentsModule
         services.AddScoped<IProfilePhotoReader, ProfilePhotoReader>();
         services.AddScoped<IDocumentComplianceReportReader, DocumentComplianceReportReader>();
         services.AddScoped<ICompanyDocumentAcknowledgementReportReader, CompanyDocumentAcknowledgementReportReader>();
+        services.AddScoped<IDocumentStorageReader, DocumentStorageReader>();
+
+        // Admin Portal Application Metrics dashboard (Platform Monitoring epic) — platform-wide,
+        // not scoped to a single customer. Consumed by HR.Modules.Companies via this
+        // Infrastructure.Abstractions interface.
+        services.AddScoped<IPlatformDocumentActivityReader, PlatformDocumentActivityReader>();
 
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
 

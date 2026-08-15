@@ -53,6 +53,51 @@ public class CreateProbationReviewValidatorTests
     }
 
     [Fact]
+    public async Task Empty_CompanyId_Fails()
+    {
+        var result = await _validator.ValidateAsync(new CreateProbationReviewRequest
+        {
+            CompanyId = Guid.Empty,
+            ProbationRecordId = Guid.NewGuid(),
+            ReviewType = "ManagerCheckIn",
+            DueDate = new DateOnly(2026, 7, 1)
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateProbationReviewRequest.CompanyId));
+    }
+
+    [Fact]
+    public async Task Whitespace_ReviewType_Fails()
+    {
+        var result = await _validator.ValidateAsync(new CreateProbationReviewRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            ProbationRecordId = Guid.NewGuid(),
+            ReviewType = "   ",
+            DueDate = new DateOnly(2026, 7, 1)
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateProbationReviewRequest.ReviewType));
+    }
+
+    [Fact]
+    public async Task DefaultDueDate_Fails()
+    {
+        var result = await _validator.ValidateAsync(new CreateProbationReviewRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            ProbationRecordId = Guid.NewGuid(),
+            ReviewType = "ManagerCheckIn",
+            DueDate = default
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateProbationReviewRequest.DueDate));
+    }
+
+    [Fact]
     public async Task Empty_ProbationRecordId_Fails()
     {
         var result = await _validator.ValidateAsync(new CreateProbationReviewRequest

@@ -314,8 +314,15 @@ public sealed class EmployeeListBulkUpdateTests(AppFixture fixture) : E2ETestBas
         Assert.Null(await empList.GetActionErrorMessageAsync());
     }
 
+    // ImportCompensationChangesHandler intentionally requires an existing open compensation
+    // record to import into — Salary Frequency is never taken from the import row itself, only
+    // inherited from that existing record (see the handler's own comment: "Employees with no
+    // existing open compensation record ... cannot be processed via this import"). So unlike the
+    // other Import_* tests below, this one must give the employee an initial compensation record
+    // via the UI first (CreateEmployeeWithCompensationAsync) — a brand-new hire with no
+    // compensation at all is correctly rejected by the API, not a bug in the import feature.
     [Fact]
-    public async Task Import_ValidRow_FromBulkUpdateDropdown_CreatesCompensationRecordForNewEmployee()
+    public async Task Import_ValidRow_FromBulkUpdateDropdown_UpdatesCompensationRecordForEmployee()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
@@ -326,36 +333,18 @@ public sealed class EmployeeListBulkUpdateTests(AppFixture fixture) : E2ETestBas
         await login.LoginAsync(LauraEmail);
 
         var unique = Guid.NewGuid().ToString("N")[..8];
-        var lastName = $"ListImport{unique}";
-        var workEmail = $"e2e.listimport{unique}@acme.example";
-        var employeeNumber = $"E2E-LIM-{unique}";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
-        await empEdit.FillEmployeeNumberAsync(employeeNumber);
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
-        await empEdit.SaveNewEmployeeAsync();
-
-        await empList.ClickEmployeeAsync(lastName);
-        var employeeId = Guid.Parse(_page.Url.TrimEnd('/').Split('/').Last());
+        var (_, employeeId) = await CreateEmployeeWithCompensationAsync(empList, empEdit, unique, 50000);
 
         // Acme's Employee Number Mode is shared, mutable company state — other test classes
         // (HrSettingsPageTests, BackfillEmployeeNumbersTests) flip it between Manual and
-        // Automatic via the UI, so it can't be assumed here. FillEmployeeNumberAsync above is a
-        // documented no-op in Automatic mode (see its own doc comment), in which case the
-        // employee's real number is one the backend generated, not the local `employeeNumber`
-        // string. Read the actually-assigned number back from the page instead of assuming it
-        // matches what was typed, so this test passes regardless of the ambient mode.
+        // Automatic via the UI, so it can't be assumed here. CreateEmployeeWithCompensationAsync's
+        // FillEmployeeNumberAsync is a documented no-op in Automatic mode (see its own doc
+        // comment), in which case the employee's real number is one the backend generated, not
+        // the local `E2E-BLC-{unique}` string. Read the actually-assigned number back from the
+        // page instead of assuming it matches what was typed, so this test passes regardless of
+        // the ambient mode.
         var assignedEmployeeNumber = (await empEdit.GetEmployeeNumberHeaderTextAsync())?.TrimStart('#')
-            ?? employeeNumber;
+            ?? $"E2E-BLC-{unique}";
 
         var tempFile = Path.Combine(Path.GetTempPath(), $"compensation-import-list-{unique}.xlsx");
         try

@@ -121,6 +121,23 @@ public class CreateDocumentTypeHandlerTests
         Assert.Equal("Some description", result.Value.Description);
     }
 
+    [Fact]
+    public async Task HandleAsync_Sets_Description_Null_When_Whitespace_Only()
+    {
+        await using var db = BuildContext();
+        var result = await handler(db).HandleAsync(
+            new CreateDocumentTypeRequest
+            {
+                CompanyId   = Guid.NewGuid(),
+                Name        = "Contract",
+                Description = "   "
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.Description);
+    }
+
     private static CreateDocumentTypeHandler handler(DocumentsDbContext db) =>
         new(db, new FakeClock(FixedUtcNow));
 

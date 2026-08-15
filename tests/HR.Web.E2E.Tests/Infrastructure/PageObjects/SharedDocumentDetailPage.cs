@@ -118,7 +118,9 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
         await EditMetadataDialog.GetByPlaceholder("Document title").FillAsync(title);
+        await page.Keyboard.PressAsync("Tab");
         await EditMetadataDialog.GetByPlaceholder("Optional description").FillAsync(description);
+        await page.Keyboard.PressAsync("Tab");
 
         var categoryGroup = EditMetadataDialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
         await DropDownSelector.SelectAsync(page, categoryGroup, categoryLabel);
@@ -213,10 +215,16 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
         if (customMonths.HasValue)
         {
+            // SfNumericTextBox: a bare FillAsync bypasses its interop entirely — retype for real
+            // (same convention as EmployeeEditPage.TypeIntoNumericInputAsync).
             var monthsInput = EditMetadataDialog.Locator(".col-md-6")
                 .Filter(new() { HasText = "Custom Frequency" })
                 .Locator("input");
-            await monthsInput.FillAsync(customMonths.Value.ToString());
+            await monthsInput.ClickAsync();
+            await page.Keyboard.PressAsync("Control+A");
+            await page.Keyboard.PressAsync("Delete");
+            await monthsInput.PressSequentiallyAsync(customMonths.Value.ToString());
+            await page.Keyboard.PressAsync("Tab");
         }
 
         await EditMetadataDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
@@ -448,8 +456,38 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public Task<string> GetAcknowledgementStatementValueAsync() =>
         AcknowledgementStatementTextArea.InputValueAsync();
 
-    public Task FillAcknowledgementStatementAsync(string value) =>
-        AcknowledgementStatementTextArea.FillAsync(value);
+    public async Task FillAcknowledgementStatementAsync(string value)
+    {
+        await AcknowledgementStatementTextArea.FillAsync(value);
+
+        // HrTextBox (SfTextBox under the hood) only round-trips its bound value over the Blazor
+        // Server circuit on blur/change — same reasoning as CompanyEditPage.TypeIntoTextBoxAsync
+        // elsewhere in this suite. A page-level Tab keypress is the wrong way to trigger that blur
+        // here, though: this textarea isn't recognized by SfDialog's own focus trap, so Tab can
+        // carry focus straight out of the dialog entirely — which SfDialog treats as an
+        // outside-focus/close event, firing its own Closed handler
+        // (EditSharedCompanyDocumentAcknowledgementDialog's DialogEvents Closed="HandleDialogClosed")
+        // and popping the "Unsaved Changes" confirmation dialog on top instead of just committing
+        // the value (surfaced as the Save button becoming permanently unclickable/the dialog never
+        // closing afterward). Click the Due Date field instead — a genuinely focusable element that
+        // stays inside the dialog's own DOM subtree, so it blurs the textarea without ever handing
+        // focus outside the dialog. Only rendered alongside the statement field, gated by the same
+        // Model.RequiresAcknowledgement condition, so it's always present when this method is.
+        var dueDateInput = EditAcknowledgementDialog.Locator(".e-date-wrapper input.e-input");
+        await dueDateInput.ClickAsync();
+
+        // That commit also causes Syncfusion to destroy and recreate the textarea's own DOM node
+        // (rather than patch it in place), so polling a *freshly re-resolved* locator each time —
+        // rather than holding a single ElementHandle across the round-trip — avoids racing that
+        // teardown. Same class of fix as DataImportWizardPage.GetMappingSelectionAsync's poll.
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            if (await AcknowledgementStatementTextArea.InputValueAsync() == value)
+                return;
+
+            await page.WaitForTimeoutAsync(250);
+        }
+    }
 
     /// <summary>
     /// True once the document's Status is no longer "Draft" — EditSharedCompanyDocumentAcknowledgementDialog.razor
@@ -507,7 +545,11 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
     public Task<bool> IsArchiveDialogOpenAsync() => ArchiveDialog.IsVisibleAsync();
 
-    public Task FillArchiveReasonAsync(string reason) => page.Locator("#archive-reason").FillAsync(reason);
+    public async Task FillArchiveReasonAsync(string reason)
+    {
+        await page.Locator("#archive-reason").FillAsync(reason);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     /// <summary>Clicks the dialog's own "Archive"/"Archiving…" footer button (does not wait for the dialog to close, since an empty reason keeps it open).</summary>
     public Task ClickArchiveConfirmAsync() =>
@@ -632,7 +674,11 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         return (await row.InnerTextAsync()).Trim();
     }
 
-    public Task FillReviewNotesAsync(string notes) => page.Locator("#review-notes").FillAsync(notes);
+    public async Task FillReviewNotesAsync(string notes)
+    {
+        await page.Locator("#review-notes").FillAsync(notes);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     /// <summary>Clicks the dialog's own "Complete Review"/"Saving…" footer button (does not wait for the dialog to close, since blank/whitespace notes keeps it open).</summary>
     public Task ClickReviewConfirmAsync() =>
@@ -702,7 +748,7 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// SharedDocumentReviewRenewalTests.
     /// </summary>
     public Task<bool> IsReviewReacknowledgementCheckboxVisibleAsync() =>
-        ReviewReacknowledgementCheckbox.IsVisibleAsync();
+        ReviewReacknowledgementCheckbox.WaitUntilVisibleAsync();
 
     /// <summary>
     /// Checks the Complete Review dialog's "Requires employees to acknowledge this version
@@ -832,6 +878,7 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
         await dialog.GetByPlaceholder("What changed in this version?").FillAsync(versionNote);
+        await page.Keyboard.PressAsync("Tab");
         await dialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
 
         await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();

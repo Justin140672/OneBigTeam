@@ -10,6 +10,9 @@
 
 <div class="card mb-3">
     <div class="card-body">
+        <div class="report-filter-toolbar d-flex justify-content-end mb-2">
+            <SfButton CssClass="e-primary e-small" IconCss="e-icons e-save" OnClick="@(() => _showSaveAs = true)">Save</SfButton>
+        </div>
         <div class="row g-3 align-items-end mb-2">
             <div class="col-md-4">
                 <label class="form-label">Saved Views</label>
@@ -32,9 +35,6 @@
                     <SfButton CssClass="e-outline e-small e-danger" OnClick="DeleteSelectedViewAsync">Delete</SfButton>
                 </div>
             }
-            <div class="col-md-auto pb-1">
-                <SfButton CssClass="e-flat e-small" OnClick="@(() => _showSaveAs = true)">Save current filters as view</SfButton>
-            </div>
         </div>
 
         @if (_showSaveAs)
@@ -199,6 +199,10 @@
     // (e.g. the Employee Starters report defaults this to the 1st of the current month). A saved
     // default view, if one is applied during that same initial load, takes precedence.
     [Parameter] public DateOnly? DefaultDateRangeStart { get; set; }
+
+    // Invoked after a saved view is successfully deleted, so the host page can refresh its grid data
+    // (deleting a view does not, by itself, change the applied filters/grid contents).
+    [Parameter] public EventCallback OnViewDeleted { get; set; }
 
     private List<DepartmentListItemModel> _departments = [];
     private List<LocationListItemModel> _locations = [];
@@ -404,10 +408,23 @@
             return;
         }
 
+        // The deleted view was the currently-applied filter set, so reset to a cleared state
+        // rather than leaving stale filters from a now-deleted view applied.
         _selectedViewId = null;
         _selectedView = null;
         _showRename = false;
+        _departmentId = null;
+        _locationId = null;
+        _positionProfileId = null;
+        _managerId = null;
+        _employmentTypeId = null;
+        _employeeStatus = null;
+        _dateRangeStart = null;
+        _dateRangeEnd = null;
         await LoadSavedViewsAsync();
+        await OnFilterChanged.InvokeAsync(BuildFilter());
+        await OnCriteriaChanged.InvokeAsync(BuildCriteria());
+        await OnViewDeleted.InvokeAsync();
     }
 
     private int _managerFilterRequestId;

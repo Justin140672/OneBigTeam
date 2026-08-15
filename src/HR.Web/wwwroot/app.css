@@ -15,6 +15,17 @@
     --hr-color-primary-active: #134e4a;
     --hr-color-primary-subtle: rgba(15, 118, 110, 0.12);
 
+    /* Secondary accent — the cyan-teal from the logo mark's circles (distinct from the
+       green-leaning primary teal above, sampled at #1bb4cc). That raw value is only ~2.5:1
+       against white — well under the 4.5:1 AA text/UI threshold — so, same as primary,
+       light mode uses a darkened, contrast-verified variant (#127585 is ~5.4:1 on white)
+       and the raw brighter logo teal is reserved for dark mode below. */
+    --hr-color-secondary: #127585;
+    --hr-color-secondary-rgb: 18, 117, 133;
+    --hr-color-secondary-hover: #0e5c69;
+    --hr-color-secondary-active: #0b474f;
+    --hr-color-secondary-subtle: rgba(18, 117, 133, 0.12);
+
     /* Neutral gray scale */
     --hr-gray-900: #111827;
     --hr-gray-800: #1f2937;
@@ -53,6 +64,13 @@
     --bs-link-hover-color: var(--hr-color-primary-hover);
     --bs-link-hover-color-rgb: 17, 94, 89;
     --bs-font-sans-serif: var(--hr-font-sans);
+
+    /* Same flow-through for the secondary accent (btn-secondary, bg-secondary, text-secondary,
+       badge.bg-secondary, etc.) — NOT --bs-secondary-color/--bs-secondary-bg, which are
+       Bootstrap's unrelated muted-text/muted-background tokens and stay gray for readability. */
+    --bs-secondary: var(--hr-color-secondary);
+    --bs-secondary-rgb: var(--hr-color-secondary-rgb);
+    --bs-secondary-text-emphasis: var(--hr-color-secondary-active);
 }
 
 html[data-theme="dark"] {
@@ -63,6 +81,15 @@ html[data-theme="dark"] {
     --hr-color-primary-active: #0d9488;
     --hr-color-primary-rgb: 45, 212, 191;
     --hr-color-primary-subtle: rgba(45, 212, 191, 0.16);
+
+    /* The raw sampled logo teal (#1bb4cc, ~6:1 against gray-900/gray-800 surfaces) — no
+       light-mode-style darkening needed here since dark surfaces give it plenty of contrast. */
+    --hr-color-secondary: #1bb4cc;
+    --hr-color-secondary-rgb: 27, 180, 204;
+    --hr-color-secondary-hover: #18a2b8;
+    --hr-color-secondary-active: #158c9f;
+    --hr-color-secondary-subtle: rgba(27, 180, 204, 0.16);
+
     --hr-color-danger: #f87171;
     --hr-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.4);
     --hr-shadow-md: 0 8px 20px rgba(0, 0, 0, 0.35);
@@ -147,6 +174,19 @@ html, body {
     color: var(--hr-color-success) !important;
 }
 
+/* SfBreadcrumb (Components/Pages/*Edit.razor headers) — same Bootstrap/Syncfusion default-blue
+   link color as the tabs above, re-pointed at the brand teal token. Covers both the non-active
+   crumb links and the hover state; the current/active crumb (.e-breadcrumb-text.e-active) is
+   plain body text by Syncfusion's own default and is left alone. */
+.e-breadcrumb .e-breadcrumb-link,
+.e-breadcrumb .e-breadcrumb-item .e-icons {
+    color: var(--hr-color-primary);
+}
+
+.e-breadcrumb .e-breadcrumb-link:hover {
+    color: var(--hr-color-primary-hover);
+}
+
 .e-frame.e-check,
 .e-css.e-checkbox-wrapper .e-frame.e-check {
     background-color: var(--hr-color-primary);
@@ -182,6 +222,18 @@ html, body {
        anchored relative to the grid's own box — opens fully inside the visible page instead
        of past the bottom of a grid that's only a couple of rows tall, which otherwise forces
        the user to scroll the page down just to see the filter dropdown they just opened. */
+    min-height: 320px;
+}
+
+/* Top-level list-page grids (rendered directly in a page's ".container-fluid", not nested
+   inside a card, dialog, or tab panel) should fill the remaining viewport height so the
+   Excel-style column filter popup and its results are visible without scrolling the page
+   itself. Scoped away from cards/dialogs/tabs so nested grids (e.g. review-history grids
+   inside a two-column card, or grids inside a dialog) keep sizing to their natural content
+   height instead of stretching to fill the viewport. */
+.container-fluid > .hr-grid,
+.container-fluid > div:not(.card):not(.e-dialog) > .hr-grid {
+    height: calc(100vh - 320px);
     min-height: 320px;
 }
 

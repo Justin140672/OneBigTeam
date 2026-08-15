@@ -50,13 +50,13 @@ internal sealed class GetReportCatalogHandler
         ("asset-assignment", "Asset Assignment Report", ReportCategory.Hr,
             "Assets assigned to employees including serial number, assigned date and return status.", false, false, false, false, false),
 
-        // Reporting Dashboard epic, OBT-721. Unlike every other entry above, this report is
-        // relevant to all three baseline reporting:view roles (Manager, Recruiter, HrAdministrator)
-        // at once — a plain Category-based Hr/Recruitment split would wrongly hide it from a
-        // Manager who has neither role. RequiresWorkloadActionsAccess is gated on the same
-        // reporting:view policy that already gates the whole catalog endpoint, so effectively every
-        // caller who can open the catalog at all sees this entry; the real per-category filtering
-        // happens inside GetWorkloadActions/Handler.cs via each IWorkloadActionProvider.
+        // Reporting Dashboard epic, OBT-721. RequiresWorkloadActionsAccess is gated on the
+        // dedicated reporting:view-workload-actions policy (Manager, HrAdministrator) rather than
+        // the Category-based Hr/Recruitment split — a plain Category split would wrongly hide it
+        // from a Manager who has neither role. Recruiters do not see this catalog entry (bug fix —
+        // it previously leaked into the Recruitment reports list); the report's row content still
+        // adapts per-role via GetWorkloadActions/Handler.cs's IWorkloadActionProvider scoping for
+        // callers who reach it directly.
         ("workload-actions", "Workload & HR Actions Report", ReportCategory.Hr,
             "Consolidated outstanding people-related actions across leave, sickness, probation, onboarding, offboarding, documents, assets, identity, recruitment and tasks, scoped to what the caller is permitted to see.", false, false, false, false, true),
     ];

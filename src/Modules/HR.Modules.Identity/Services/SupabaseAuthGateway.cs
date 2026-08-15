@@ -84,6 +84,31 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         }
     }
 
+    public async Task RequestPasswordResetAsync(string email, string redirectTo, CancellationToken cancellationToken)
+    {
+        // Uses the PUBLISHABLE key, not the secret key — Supabase's /auth/v1/recover is the
+        // client-facing password-recovery endpoint (same tier as the sign-in/token endpoints),
+        // not an Admin API call. UNVERIFIED: redirect_to nested under "options", mirroring
+        // CreateUserAsync/ResendVerificationEmailAsync's shape above — not confirmed against a
+        // live project for this specific endpoint.
+        var http = CreateClient(options.Value.PublishableKey);
+
+        var requestBody = new
+        {
+            email,
+            options = new { redirect_to = redirectTo },
+        };
+
+        using var response = await http.PostAsJsonAsync("/auth/v1/recover", requestBody, JsonOptions, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase password-recovery request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+        }
+    }
+
     public async Task<SupabaseSession> ExchangeCodeForSessionAsync(string code, CancellationToken cancellationToken)
     {
         // Uses the PUBLISHABLE key (not the secret key) — this is the client-facing token exchange,
@@ -220,6 +245,22 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         return new SupabaseSession(payload.AccessToken, payload.RefreshToken, userId, expiresAt);
     }
 
+    public async Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken)
+    {
+        var http = CreateUserScopedClient(userAccessToken);
+
+        var requestBody = new { password = newPassword };
+
+        using var response = await http.PutAsJsonAsync("/auth/v1/user", requestBody, JsonOptions, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase update-password request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+        }
+    }
+
     private HttpClient CreateClient(string apiKey)
     {
         var http = httpClientFactory.CreateClient(nameof(SupabaseAuthGateway));
@@ -227,6 +268,23 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         http.DefaultRequestHeaders.Remove("apikey");
         http.DefaultRequestHeaders.Add("apikey", apiKey);
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        return http;
+    }
+
+    /// <summary>
+    /// Unlike CreateClient above (which sends the same value as both "apikey" and the Bearer
+    /// token — the publishable/secret keys authenticate the *caller* to Supabase's Auth API),
+    /// a user-scoped endpoint like PUT /auth/v1/user needs "apikey" to stay the publishable key
+    /// while Authorization carries the *user's own* access token, so Supabase knows which
+    /// account's password to update.
+    /// </summary>
+    private HttpClient CreateUserScopedClient(string userAccessToken)
+    {
+        var http = httpClientFactory.CreateClient(nameof(SupabaseAuthGateway));
+        http.BaseAddress = new Uri(options.Value.ProjectUrl);
+        http.DefaultRequestHeaders.Remove("apikey");
+        http.DefaultRequestHeaders.Add("apikey", options.Value.PublishableKey);
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", userAccessToken);
         return http;
     }
 

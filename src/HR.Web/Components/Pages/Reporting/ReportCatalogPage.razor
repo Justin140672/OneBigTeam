@@ -119,11 +119,12 @@
     private void OnSearchChanged(string value) => _searchTerm = value;
 
     // ReportCategory.Hr.ToString() yields "Hr" (PascalCase enum name) rather than the correct
-    // "HR" capitalisation — map it explicitly rather than relying on the raw enum name for display.
+    // "HR" capitalisation — map that one exception explicitly, then fall back to the shared
+    // humanizer for everything else instead of showing the raw enum name.
     private static string CategoryLabel(string category) => category switch
     {
         "Hr" => "HR",
-        _ => category,
+        _ => EnumDisplay.Humanize(category),
     };
 
     private static bool IsClickable(ReportCatalogItemModel item) => ReportRoutes.IsClickable(item.Id);

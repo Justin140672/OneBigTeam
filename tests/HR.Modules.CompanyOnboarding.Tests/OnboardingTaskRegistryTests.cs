@@ -16,4 +16,24 @@ public class OnboardingTaskRegistryTests
 
         Assert.Equal(["first", "second", "third"], registry.Tasks.Select(t => t.Key).ToArray());
     }
+
+    [Fact]
+    public void Tasks_Is_Empty_When_No_Definitions_Are_Registered()
+    {
+        var registry = new OnboardingTaskRegistry([]);
+
+        Assert.Empty(registry.Tasks);
+    }
+
+    [Fact]
+    public void Tasks_With_Duplicate_Order_Preserves_Original_Registration_Order()
+    {
+        // OrderBy is a stable sort, so equal keys must retain their input order.
+        var first = new FakeOnboardingTaskDefinition("first", order: 1, isCompleted: false);
+        var second = new FakeOnboardingTaskDefinition("second", order: 1, isCompleted: false);
+
+        var registry = new OnboardingTaskRegistry([first, second]);
+
+        Assert.Equal(["first", "second"], registry.Tasks.Select(t => t.Key).ToArray());
+    }
 }

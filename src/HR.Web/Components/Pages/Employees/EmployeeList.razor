@@ -118,13 +118,16 @@
                                       OnClosed="HandleImportDialogClosed"
                                       OnImported="HandleImportDialogImported" />
 
-        <InviteUserDialog CompanyId="CompanyId"
-                          IsOpen="_showInviteUserDialog"
-                          PreselectedEmployeeId="_inviteEmployeeId"
-                          PreselectedEmployeeName="@_inviteEmployeeName"
-                          PreselectedEmployeeEmail="@_inviteEmployeeEmail"
-                          OnCancelled="HandleInviteUserDialogCancelled"
-                          OnCompleted="HandleInviteUserDialogCompleted" />
+        @if (_inviteEmployeeId is not null)
+        {
+            <InviteUserDialog CompanyId="CompanyId"
+                              IsOpen="_showInviteUserDialog"
+                              PreselectedEmployeeId="_inviteEmployeeId.Value"
+                              PreselectedEmployeeName="@(_inviteEmployeeName ?? string.Empty)"
+                              PreselectedEmployeeEmail="@_inviteEmployeeEmail"
+                              OnCancelled="HandleInviteUserDialogCancelled"
+                              OnCompleted="HandleInviteUserDialogCompleted" />
+        }
     }
 </div>
 

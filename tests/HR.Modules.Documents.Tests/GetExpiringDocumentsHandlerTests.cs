@@ -238,6 +238,27 @@ public class GetExpiringDocumentsHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_ExpiryStatus_Is_ExpiringSoon_When_Expiry_Is_Today()
+    {
+        // ExpiryDate == today is not "< today" so it must not be Expired; it must be ExpiringSoon.
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var employeeId     = Guid.NewGuid();
+        var dt             = SeedDocumentType(db, companyId);
+        var doc            = SeedDocument(db, companyId, employeeId, dt.Id);
+        SeedEmployeeDocument(db, companyId, employeeId, doc.Id, expiryDate: Today);
+        await db.SaveChangesAsync();
+
+        var result = await BuildHandler(db).HandleAsync(
+            new GetExpiringDocumentsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value!.Items);
+        Assert.Equal(DocumentExpiryStatus.ExpiringSoon, result.Value.Items[0].ExpiryStatus);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_Documents_Across_Multiple_Employees()
     {
         await using var db = BuildContext();

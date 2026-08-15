@@ -65,6 +65,34 @@ internal sealed class FakeStripeGateway : IStripeGateway
         return Task.FromResult(PortalUrlToReturn);
     }
 
+    public IReadOnlyList<StripeInvoiceSummary> InvoicesToReturn { get; set; } = [];
+
+    public string? LastListInvoicesStripeCustomerId { get; private set; }
+
+    public Task<IReadOnlyList<StripeInvoiceSummary>> ListInvoicesAsync(string stripeCustomerId, CancellationToken cancellationToken)
+    {
+        LastListInvoicesStripeCustomerId = stripeCustomerId;
+        return Task.FromResult(InvoicesToReturn);
+    }
+
+    public IReadOnlyList<FailedInvoiceSummary> FailedInvoicesToReturn { get; set; } = [];
+
+    public Dictionary<string, StripeInvoiceSummary?> MostRecentPaidInvoiceByStripeCustomerId { get; set; } = [];
+
+    public List<string> GetMostRecentPaidInvoiceCalls { get; } = [];
+
+    public Task<IReadOnlyList<FailedInvoiceSummary>> ListFailedInvoicesAsync(CancellationToken cancellationToken)
+    {
+        return Task.FromResult(FailedInvoicesToReturn);
+    }
+
+    public Task<StripeInvoiceSummary?> GetMostRecentPaidInvoiceAsync(string stripeCustomerId, CancellationToken cancellationToken)
+    {
+        GetMostRecentPaidInvoiceCalls.Add(stripeCustomerId);
+        MostRecentPaidInvoiceByStripeCustomerId.TryGetValue(stripeCustomerId, out var invoice);
+        return Task.FromResult(invoice);
+    }
+
     public void Reset()
     {
         CheckoutUrlToReturn = "https://checkout.stripe.com/test-session";
@@ -75,5 +103,10 @@ internal sealed class FakeStripeGateway : IStripeGateway
         LastCancelAtPeriodEnd = null;
         LastResumedStripeSubscriptionId = null;
         LastBillingPortalStripeCustomerId = null;
+        InvoicesToReturn = [];
+        LastListInvoicesStripeCustomerId = null;
+        FailedInvoicesToReturn = [];
+        MostRecentPaidInvoiceByStripeCustomerId = [];
+        GetMostRecentPaidInvoiceCalls.Clear();
     }
 }

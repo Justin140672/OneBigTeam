@@ -85,4 +85,16 @@ public class UpdateLeaveTypeValidatorTests
     {
         Assert.True(Validator.Validate(ValidRequest() with { DefaultEntitlementDays = 0 }).IsValid);
     }
+
+    [Fact]
+    public void Validate_NameExactly100Characters_Passes()
+    {
+        Assert.True(Validator.Validate(ValidRequest() with { Name = new string('x', 100) }).IsValid);
+    }
+
+    [Fact]
+    public void Validate_CodeExactly20Characters_Passes()
+    {
+        Assert.True(Validator.Validate(ValidRequest() with { Code = new string('x', 20) }).IsValid);
+    }
 }

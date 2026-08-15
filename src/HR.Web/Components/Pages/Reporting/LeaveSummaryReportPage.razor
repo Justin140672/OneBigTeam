@@ -5,6 +5,7 @@
 @using HR.Web.Services
 @inject ReportingService ReportingService
 @inject DepartmentService DepartmentService
+@inject LeaveTypeService LeaveTypeService
 @inject IJSRuntime JS
 
 <PageTitle>Leave Summary Report</PageTitle>
@@ -35,6 +36,17 @@
                                     DataSource="@_departments"
                                     @bind-Value="_departmentId"
                                     Placeholder="All Departments"
+                                    AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Leave Type</label>
+                    <SfDropDownList TValue="Guid?"
+                                    TItem="LeaveTypeListItemModel"
+                                    DataSource="@_leaveTypes"
+                                    @bind-Value="_leaveTypeId"
+                                    Placeholder="All Leave Types"
                                     AllowFiltering="true">
                         <DropDownListFieldSettings Value="Id" Text="Name" />
                     </SfDropDownList>
@@ -89,12 +101,14 @@
 
     private List<LeaveSummaryGroupRowModel> _items = [];
     private List<DepartmentListItemModel> _departments = [];
+    private List<LeaveTypeListItemModel> _leaveTypes = [];
 
     private bool _isLoading = true;
     private string? _error;
 
     private int _policyYear = DateTime.UtcNow.Year;
     private Guid? _departmentId;
+    private Guid? _leaveTypeId;
     private LeaveSummaryGroupBy _groupBy = LeaveSummaryGroupBy.Employee;
 
     private bool _exporting;
@@ -125,13 +139,16 @@
     private LeaveSummaryReportFilter BuildFilter() => new(
         PolicyYear: _policyYear,
         DepartmentId: _departmentId,
-        GroupBy: _groupBy);
+        GroupBy: _groupBy,
+        LeaveTypeId: _leaveTypeId);
 
     private async Task LoadAsync()
     {
         _isLoading = true;
         _error = null;
         StateHasChanged();
+
+        _leaveTypes = (await LeaveTypeService.ListLeaveTypesAsync(CompanyId))?.Items ?? [];
 
         var response = await ReportingService.GetLeaveSummaryReportAsync(CompanyId, BuildFilter());
         if (response is null)

@@ -182,6 +182,26 @@ public class UpdateDocumentTypeHandlerTests
         Assert.Equal("Some description", result.Value.Description);
     }
 
+    [Fact]
+    public async Task HandleAsync_Sets_Description_Null_When_Whitespace_Only()
+    {
+        await using var db = BuildContext();
+        var (companyId, typeId) = await SeedDocumentType(db, "Contract", "Old description");
+
+        var result = await Handler(db).HandleAsync(
+            new UpdateDocumentTypeRequest
+            {
+                CompanyId      = companyId,
+                DocumentTypeId = typeId,
+                Name           = "Contract",
+                Description    = "   "
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.Description);
+    }
+
     private static UpdateDocumentTypeHandler Handler(DocumentsDbContext db) =>
         new(db, new FakeClock(FixedUtcNow));
 

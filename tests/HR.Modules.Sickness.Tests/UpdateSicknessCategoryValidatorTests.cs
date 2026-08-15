@@ -53,6 +53,21 @@ public class UpdateSicknessCategoryValidatorTests
     }
 
     [Fact]
+    public void Validate_Succeeds_When_Name_Is_Exactly_100_Characters()
+    {
+        var result = _validator.Validate(Valid() with { Name = new string('A', 100) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Name_Is_Whitespace_Only()
+    {
+        var result = _validator.Validate(Valid() with { Name = "   " });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateSicknessCategoryRequest.Name));
+    }
+
+    [Fact]
     public void Validate_Succeeds_When_DisplayOrder_Is_Zero()
     {
         var result = _validator.Validate(Valid() with { DisplayOrder = 0 });

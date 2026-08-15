@@ -7,7 +7,9 @@ public class UploadImportFileValidatorTests
 {
     private static readonly UploadImportFileValidator Validator = new();
 
-    private static IFormFile FakeFile(string fileName = "employees.csv", string contentType = "text/csv") =>
+    private static IFormFile FakeFile(
+        string fileName = "employees.xlsx",
+        string contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") =>
         new FormFile(new MemoryStream([1, 2, 3]), 0, 3, "File", fileName)
         {
             Headers     = new HeaderDictionary(),

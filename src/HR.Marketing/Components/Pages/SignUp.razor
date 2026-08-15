@@ -6,92 +6,158 @@
     <meta name="description" content="Start your free 14-day trial of One Big Team — no credit card required.">
 </HeadContent>
 
-<SiteHeader CurrentPage="signup" />
+<SignupHeader />
 
-<main>
-  <section class="pricing-hero section-band">
-    <div class="section-inner hero-copy">
-      <h1>Set up your company in a couple of minutes.</h1>
-      <p class="hero-text">
-        Create your company and admin account to start your free 14-day trial.
-        No credit card required — you'll land straight in the app to get set up.
-      </p>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section-inner contact-grid">
-      <div>
-        <h2>Tell us about your company.</h2>
-        <p class="estimator-intro">
-          All fields are required.
+<main class="signup-main">
+  <section class="signup-panel-section">
+    <div class="signup-panel">
+      <div class="signup-panel-intro">
+        <h1>Set up your company in a couple of minutes.</h1>
+        <p class="hero-text">
+          Create your company and admin account to start your free 14-day trial.
         </p>
-        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
-        {
-          <p class="field-error" style="display:block" role="alert">@ErrorMessage</p>
-        }
+        <ul class="signup-reassurance-list">
+          <li>14-day free trial</li>
+          <li>No credit card required</li>
+          <li>You can add employees later — just your company and admin account for now</li>
+        </ul>
       </div>
 
-      <form method="post" action="/signup-submit" class="contact-form" novalidate data-signup-form>
-        <div class="form-field form-field-full">
-          <label for="companyName">Company name</label>
-          <input id="companyName" name="companyName" type="text" autocomplete="organization" autofocus required
-                 aria-required="true" aria-describedby="companyName-error">
-          <p class="field-error" id="companyName-error" data-error-for="companyName">Enter your company name.</p>
+      @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+      {
+        <div class="form-status form-status-error" role="alert" tabindex="-1" data-form-status data-status="error">
+          @ErrorMessage
+          @if (ShowLoginSuggestion)
+          {
+            <span> <a href="@LoginHref">Log in instead</a> or <a href="@ForgotPasswordHref">reset your password</a>.</span>
+          }
         </div>
+      }
 
-        <div class="form-field">
-          <label for="firstName">First name</label>
-          <input id="firstName" name="firstName" type="text" autocomplete="given-name" required
-                 aria-required="true" aria-describedby="firstName-error">
-          <p class="field-error" id="firstName-error" data-error-for="firstName">Enter your first name.</p>
-        </div>
+      <form method="post" action="/signup-submit" class="contact-form signup-form" novalidate data-signup-form>
+        <fieldset class="signup-fieldset form-field-full">
+          <legend>Company details</legend>
 
-        <div class="form-field">
-          <label for="lastName">Last name</label>
-          <input id="lastName" name="lastName" type="text" autocomplete="family-name" required
-                 aria-required="true" aria-describedby="lastName-error">
-          <p class="field-error" id="lastName-error" data-error-for="lastName">Enter your last name.</p>
-        </div>
-
-        <div class="form-field form-field-full">
-          <label for="email">Work email</label>
-          <input id="email" name="email" type="email" autocomplete="email"
-                 pattern="[^\s@@]+@@[^\s@@]+\.[^\s@@]+" title="Enter a valid email address, e.g. name@@company.com" required
-                 aria-required="true" aria-describedby="email-error">
-          <p class="field-error" id="email-error" data-error-for="email">Enter a valid work email address.</p>
-        </div>
-
-        <div class="form-field form-field-full">
-          <label for="password">Password</label>
-          <p class="field-hint" id="password-hint">At least 8 characters.</p>
-          <div class="password-field" data-password-field>
-            <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required
-                   aria-required="true" aria-describedby="password-hint password-error password-live">
-            <button type="button" class="password-toggle" data-password-toggle aria-pressed="false" aria-controls="password">
-              Show password
-            </button>
+          <div class="form-field form-field-full">
+            <label for="companyName">Company name</label>
+            <input id="companyName" name="companyName" type="text" autocomplete="organization" autofocus required
+                   value="@CompanyName"
+                   aria-required="true" aria-describedby="companyName-error">
+            <p class="field-error" id="companyName-error" data-error-for="companyName">Enter your company name.</p>
           </div>
-          <p class="field-live" id="password-live" aria-live="polite"></p>
-          <p class="field-error" id="password-error" data-error-for="password">Enter a password with at least 8 characters.</p>
-        </div>
+        </fieldset>
 
-        <div class="form-submit-row">
-          <button class="button button-primary button-large" type="submit">Start free trial</button>
-          <p class="small-note">
-            We'll send a confirmation link to your email — you'll need to confirm your
-            account before you can start using One Big Team.
+        <fieldset class="signup-fieldset form-field-full">
+          <legend>Your admin account</legend>
+
+          <div class="form-field">
+            <label for="firstName">First name</label>
+            <input id="firstName" name="firstName" type="text" autocomplete="given-name" required
+                   value="@FirstName"
+                   aria-required="true" aria-describedby="firstName-error">
+            <p class="field-error" id="firstName-error" data-error-for="firstName">Enter your first name.</p>
+          </div>
+
+          <div class="form-field">
+            <label for="lastName">Last name</label>
+            <input id="lastName" name="lastName" type="text" autocomplete="family-name" required
+                   value="@LastName"
+                   aria-required="true" aria-describedby="lastName-error">
+            <p class="field-error" id="lastName-error" data-error-for="lastName">Enter your last name.</p>
+          </div>
+
+          <div class="form-field form-field-full">
+            <label for="email">Work email</label>
+            <input id="email" name="email" type="email" autocomplete="email"
+                   value="@Email"
+                   pattern="[^\s@@]+@@[^\s@@]+\.[^\s@@]+" title="Enter a valid email address, e.g. name@@company.com" required
+                   aria-required="true" aria-describedby="email-error">
+            <p class="field-error" id="email-error" data-error-for="email">Enter a valid work email address.</p>
+          </div>
+
+          <div class="form-field form-field-full">
+            <label for="password">Password</label>
+            <p class="field-hint" id="password-hint">At least 8 characters.</p>
+            <div class="password-field" data-password-field>
+              <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required
+                     aria-required="true" aria-describedby="password-hint password-error password-live">
+              <button type="button" class="password-toggle" data-password-toggle aria-pressed="false" aria-controls="password">
+                Show password
+              </button>
+            </div>
+            <p class="field-live" id="password-live" aria-live="polite"></p>
+            <p class="field-error" id="password-error" data-error-for="password">Enter a password with at least 8 characters.</p>
+          </div>
+        </fieldset>
+
+        <div class="signup-submit-block">
+          <p class="signup-trial-note">
+            <strong>14-day free trial &middot; No credit card required.</strong> We'll send a
+            confirmation link to your email — you'll need to confirm your account before you can
+            sign in and start using One Big Team.
           </p>
-          <p class="small-note">By continuing you agree to our Terms of Service and Privacy Policy.</p>
+          <button class="button button-primary button-large" type="submit" data-signup-submit>Start free trial</button>
+          <p class="small-note">
+            By continuing you agree to our
+            <a href="/terms-of-service">Terms of Service</a> and <a href="/privacy-policy">Privacy Policy</a>.
+          </p>
         </div>
       </form>
     </div>
   </section>
 </main>
 
-<SiteFooter />
+<SignupFooter />
 
 @code {
     [SupplyParameterFromQuery(Name = "error")]
     public string? ErrorMessage { get; set; }
+
+    [SupplyParameterFromQuery(Name = "existingEmail")]
+    public bool ShowLoginSuggestion { get; set; }
+
+    // Round-tripped on a correctable error so the visitor doesn't have to retype everything —
+    // mirrors the pattern already used by Contact.razor's /contact-submit proxy. Password is
+    // deliberately never round-tripped.
+    [SupplyParameterFromQuery(Name = "companyName")]
+    public string? CompanyName { get; set; }
+
+    [SupplyParameterFromQuery(Name = "firstName")]
+    public string? FirstName { get; set; }
+
+    [SupplyParameterFromQuery(Name = "lastName")]
+    public string? LastName { get; set; }
+
+    [SupplyParameterFromQuery(Name = "email")]
+    public string? Email { get; set; }
+
+    [Inject] private IConfiguration Configuration { get; set; } = default!;
+
+    private const string FallbackWebAppBaseUrl = "http://localhost:5157";
+
+    private string LoginHref
+    {
+        get
+        {
+            var baseUrl =
+                Configuration["services:web:https:0"] ??
+                Configuration["services:web:http:0"] ??
+                FallbackWebAppBaseUrl;
+
+            return $"{baseUrl.TrimEnd('/')}/login";
+        }
+    }
+
+    private string ForgotPasswordHref
+    {
+        get
+        {
+            var baseUrl =
+                Configuration["services:web:https:0"] ??
+                Configuration["services:web:http:0"] ??
+                FallbackWebAppBaseUrl;
+
+            return $"{baseUrl.TrimEnd('/')}/forgot-password";
+        }
+    }
 }

@@ -322,11 +322,70 @@ namespace HR.Modules.Companies.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HR.Modules.Companies.Domain.CustomerBillingSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ActiveEmployees")
+                        .HasColumnType("integer")
+                        .HasColumnName("active_employees");
+
+                    b.Property<int>("ChargeableEmployees")
+                        .HasColumnType("integer")
+                        .HasColumnName("chargeable_employees");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("ComputedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("computed_at");
+
+                    b.Property<decimal>("Discounts")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("discounts");
+
+                    b.Property<int>("FutureStarters")
+                        .HasColumnType("integer")
+                        .HasColumnName("future_starters");
+
+                    b.Property<int>("Leavers")
+                        .HasColumnType("integer")
+                        .HasColumnName("leavers");
+
+                    b.Property<decimal>("MonthlyTotal")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("monthly_total");
+
+                    b.Property<decimal>("PricePerEmployee")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("price_per_employee");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId")
+                        .HasDatabaseName("ix_customer_billing_snapshots_company_id");
+
+                    b.HasIndex("CompanyId", "ComputedAt")
+                        .HasDatabaseName("ix_customer_billing_snapshots_company_id_computed_at");
+
+                    b.ToTable("customer_billing_snapshots", "companies");
+                });
+
             modelBuilder.Entity("HR.Modules.Companies.Domain.CustomerSubscription", b =>
                 {
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
+
+                    b.Property<bool>("AdminForcedReadOnly")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("admin_forced_read_only");
 
                     b.Property<bool>("CancelAtPeriodEnd")
                         .HasColumnType("boolean")
@@ -339,6 +398,22 @@ namespace HR.Modules.Companies.Migrations
                     b.Property<DateTimeOffset?>("CurrentPeriodEnd")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("current_period_end");
+
+                    b.Property<DateTimeOffset?>("DeletionCancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deletion_cancelled_at");
+
+                    b.Property<DateTimeOffset?>("DeletionExecutedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deletion_executed_at");
+
+                    b.Property<DateTimeOffset?>("DeletionScheduledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deletion_scheduled_at");
+
+                    b.Property<Guid?>("DeletionScheduledBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletion_scheduled_by");
 
                     b.Property<string>("PriceId")
                         .HasMaxLength(100)
@@ -422,6 +497,103 @@ namespace HR.Modules.Companies.Migrations
                     b.ToTable("outbox_messages", "companies");
                 });
 
+            modelBuilder.Entity("HR.Modules.Companies.Domain.PlatformMetricsSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ActiveCompanies")
+                        .HasColumnType("integer")
+                        .HasColumnName("active_companies");
+
+                    b.Property<int>("ActiveUsers")
+                        .HasColumnType("integer")
+                        .HasColumnName("active_users");
+
+                    b.Property<int>("BackgroundJobsSucceededTotal")
+                        .HasColumnType("integer")
+                        .HasColumnName("background_jobs_succeeded_total");
+
+                    b.Property<DateTimeOffset>("ComputedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("computed_at");
+
+                    b.Property<DateOnly>("SnapshotDate")
+                        .HasColumnType("date")
+                        .HasColumnName("snapshot_date");
+
+                    b.Property<long>("StorageConsumedBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("storage_consumed_bytes");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SnapshotDate")
+                        .IsUnique()
+                        .HasDatabaseName("ix_platform_metrics_snapshots_snapshot_date");
+
+                    b.ToTable("platform_metrics_snapshots", "companies");
+                });
+
+            modelBuilder.Entity("HR.Modules.Companies.Domain.PlatformSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("DefaultMonthlyPriceGbp")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("default_monthly_price_gbp");
+
+                    b.Property<string>("FeatureFlagsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("{}")
+                        .HasColumnName("feature_flags_json");
+
+                    b.Property<bool>("MaintenanceModeEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("maintenance_mode_enabled");
+
+                    b.Property<string>("MaintenanceModeMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("maintenance_mode_message");
+
+                    b.Property<string>("SupportEmail")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasDefaultValue("support@hrplatform.com")
+                        .HasColumnName("support_email");
+
+                    b.Property<int>("TrialLengthDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(14)
+                        .HasColumnName("trial_length_days");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_user_id");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("platform_settings", "companies");
+                });
+
             modelBuilder.Entity("HR.Modules.Companies.Domain.PublicHoliday", b =>
                 {
                     b.Property<Guid>("Id")
@@ -458,6 +630,66 @@ namespace HR.Modules.Companies.Migrations
                         .HasDatabaseName("IX_public_holidays_company_id_date");
 
                     b.ToTable("public_holidays", "companies");
+                });
+
+            modelBuilder.Entity("HR.Modules.Companies.Domain.SupportSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("IssuedByAdminEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("issued_by_admin_email");
+
+                    b.Property<Guid>("IssuedByAdminUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issued_by_admin_user_id");
+
+                    b.Property<DateTimeOffset?>("RedeemedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("redeemed_at");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("token_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId")
+                        .HasDatabaseName("ix_support_sessions_company_id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_support_sessions_token_hash");
+
+                    b.ToTable("support_sessions", "companies");
                 });
 
             modelBuilder.Entity("HR.Modules.Companies.Domain.CompanyAddress", b =>

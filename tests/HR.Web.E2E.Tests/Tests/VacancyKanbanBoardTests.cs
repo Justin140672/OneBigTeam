@@ -20,10 +20,10 @@ namespace HR.Web.E2E.Tests.Tests;
 /// pre-block "invalid" drags before ever calling the server was deleted as part of #99/#101 — stage
 /// order is now arbitrary per company and the server (MoveApplicationStageHandler) only rejects a
 /// move when the application is currently on a terminal stage, or the target stage is inactive/not
-/// found. The invalid-move test below exercises the "target stage is inactive" case (the only one
-/// reachable purely through the UI, since reaching a terminal stage via the board removes the
-/// "move off it" case from being a normal drag scenario without leaving Applied) and asserts a real
-/// request round-trip (error banner from server error text) rather than an instant client no-op.
+/// found. There is no remaining E2E coverage for the "target stage is inactive" rejection path:
+/// GetRecruitmentKanbanHandler filters its Columns to IsActive stages only, so deactivating a stage
+/// removes its column from the board entirely rather than leaving it there-but-rejecting — there is
+/// no way to drag onto an inactive stage through the UI anymore to exercise that server-side check.
 ///
 /// Uses the seeded Acme company (00000000-0000-0000-0000-000000000001) and Marcus Diallo
 /// (Recruiter role) throughout, the same persona used by ApplicationToEmployeeFlowTests and
@@ -128,54 +128,6 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
     }
 
     [Fact]
-    public async Task DragCard_ToInactiveStage_IsRejectedByServer_CardStaysPut_AndShowsError()
-    {
-        var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
-
-        // Deactivate the "Interview" stage via the Recruitment Stages settings page first — with the
-        // client-side transition graph gone, this is the only "invalid move" a plain drag on the
-        // board can still reach; MoveApplicationStageHandler rejects a move whose target stage is
-        // inactive. Requires a real request round-trip (no client-side pre-check exists anymore).
-        var stageList = new RecruitmentStageListPage(_page, _fixture.WebBaseUrl);
-        await stageList.GoToAsync(AcmeId);
-        if (await stageList.IsActiveAsync("Interview"))
-            await stageList.DeactivateAsync("Interview");
-
-        try
-        {
-            // Deactivating the stage above navigated the browser away to the Recruitment Stages
-            // settings page — return to the vacancy's Kanban board before dragging. Which tab is
-            // active is purely client-side Blazor state (VacancyDetail.razor has no "?tab=" query
-            // param support, unlike e.g. EmployeeEdit.razor), never reflected in the URL — so
-            // _kanbanUrl is just the plain vacancy URL, and a fresh GotoAsync to it lands on the
-            // default first tab, not Kanban. Re-open the Kanban tab explicitly rather than assuming
-            // the captured URL alone restores it.
-            var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
-            await _page.GotoAsync(_kanbanUrl!);
-            await vacancyDetail.OpenKanbanTabAsync();
-            await kanban.WaitForLoadedAsync();
-
-            await kanban.DragCardToColumnAsync(candidateLast, "Interview");
-
-            Assert.True(await kanban.IsErrorVisibleAsync(),
-                "Expected an error banner after attempting to move an applicant to an inactive stage");
-            var errorText = await kanban.GetErrorTextAsync();
-            Assert.Contains("Interview", errorText ?? "");
-
-            // The card must still be in its original column, not the rejected target.
-            Assert.Equal(InitialStage, await kanban.GetCardStatusBadgeTextAsync(candidateLast));
-        }
-        finally
-        {
-            // Restore shared seeded state for other tests/classes sharing this database.
-            await stageList.GoToAsync(AcmeId);
-            await stageList.ShowInactiveAsync();
-            if (!await stageList.IsActiveAsync("Interview"))
-                await stageList.ActivateAsync("Interview");
-        }
-    }
-
-    [Fact]
     public async Task RecruitmentDashboard_TogglingBetweenBoardAndList_RemembersBoardSearchFilter()
     {
         var (candidateLast, _) = await ArrangeAppliedApplicationAsync();
@@ -219,7 +171,6 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
     /// last name and the ready-to-use board page object.
     /// </summary>
     private string? _vacancyTitle;
-    private string? _kanbanUrl;
 
     private async Task<(string CandidateLast, VacancyKanbanBoardPage Kanban)> ArrangeAppliedApplicationAsync()
     {
@@ -268,7 +219,6 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
 
         var kanban = new VacancyKanbanBoardPage(_page, _fixture.WebBaseUrl);
         await kanban.WaitForLoadedAsync();
-        _kanbanUrl = _page.Url;
 
         return (candidateLast, kanban);
     }

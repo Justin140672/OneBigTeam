@@ -127,4 +127,46 @@ public class ListSupportRequestsHandlerTests
 
         Assert.Null(Assert.Single(result).LatestResponseSnippet);
     }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Truncate_Snippet_When_Exactly_160_Characters()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var request = CreateRequest(companyId, "SUP-1");
+        db.SupportRequests.Add(request);
+        await db.SaveChangesAsync();
+
+        var body = new string('A', 160);
+        db.SupportResponses.Add(SupportResponse.Create(
+            Guid.NewGuid(), request.Id, companyId, Guid.NewGuid(), true, body, Now));
+        await db.SaveChangesAsync();
+
+        var handler = new ListSupportRequestsHandler(db);
+        var result = await handler.HandleAsync(new ListSupportRequestsRequest { CompanyId = companyId }, CancellationToken.None);
+
+        var item = Assert.Single(result);
+        Assert.Equal(body, item.LatestResponseSnippet);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Truncates_Snippet_When_161_Characters()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var request = CreateRequest(companyId, "SUP-1");
+        db.SupportRequests.Add(request);
+        await db.SaveChangesAsync();
+
+        var body = new string('A', 161);
+        db.SupportResponses.Add(SupportResponse.Create(
+            Guid.NewGuid(), request.Id, companyId, Guid.NewGuid(), true, body, Now));
+        await db.SaveChangesAsync();
+
+        var handler = new ListSupportRequestsHandler(db);
+        var result = await handler.HandleAsync(new ListSupportRequestsRequest { CompanyId = companyId }, CancellationToken.None);
+
+        var item = Assert.Single(result);
+        Assert.Equal(new string('A', 160) + "…", item.LatestResponseSnippet);
+    }
 }

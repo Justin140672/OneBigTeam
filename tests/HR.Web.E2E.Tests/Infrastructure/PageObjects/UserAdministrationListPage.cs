@@ -4,7 +4,8 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 /// <summary>
 /// Interacts with UserAdministrationList.razor (the "/companies/{CompanyId}/user-administration"
-/// grid) and the InviteUserDialog.razor wizard it opens.
+/// grid). Inviting an employee is done from the Employee List's row-level "Invite User" action
+/// (see EmployeeListPage) — this page no longer has its own invite entry point.
 /// </summary>
 public sealed class UserAdministrationListPage(IPage page, string baseUrl)
 {
@@ -74,100 +75,43 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
         await page.WaitForURLAsync("**/user-administration/*", new() { Timeout = 15_000 });
     }
 
-    public async Task OpenInviteDialogAsync()
+    // ── Resend/Cancel Invitation toolbar actions ──────────────────────────────
+    // UserAdministrationList.razor (SearchPageBase<UserListItemModel>) — selecting a row (clicking
+    // it, same as DepartmentListPage.DeactivateDepartmentAsync) enables the "Resend Invitation"/
+    // "Cancel Invitation" toolbar buttons; the handlers themselves no-op with an inline error
+    // (surfaced in ".alert-danger") if the selected row isn't an actionable pending/expired invite.
+
+    /// <summary>Clicks the row containing <paramref name="nameOrEmailFragment"/> to select it for a toolbar action.</summary>
+    public async Task SelectRowAsync(string nameOrEmailFragment)
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "+ Invite Employee" }).ClickAsync();
-        await InviteDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        await SearchAsync(nameOrEmailFragment);
+
+        var row = page.Locator(".e-row")
+            .Filter(new() { HasText = nameOrEmailFragment })
+            .First;
+        await row.ClickAsync();
     }
 
-    /// <summary>
-    /// Dialog header is "Invite Employee" (InviteUserDialog.razor) — not "Invite Employee User",
-    /// which is a distinct, older label that used to render here.
-    /// </summary>
-    public ILocator InviteDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Invite Employee" });
-
-    /// <summary>
-    /// Runs the full 3-step invite wizard from this entry point (no pre-selected employee, so
-    /// step 1 — "Employee" — is shown): selects the employee by name (Step 1) — this auto-derives
-    /// the email from the employee's own work email — then checks any additional (non-Employee)
-    /// role(s) in the plain checkbox table (Step 2; the mandatory "Employee" role itself is shown
-    /// as a fixed, non-removable badge above the table and cannot be selected/deselected —
-    /// see <see cref="IsEmployeeRoleBadgeVisibleAsync"/>), then confirms (Step 3, which shows no
-    /// separate Email row — see <see cref="HasConfirmEmailRowAsync"/>). The employee combobox is a
-    /// Syncfusion SfDropDownList (single-select popup, click item to choose and auto-close); the
-    /// roles field is a plain HTML checkbox table (no popup), same pattern as
-    /// UserDetailPage.ToggleRolesAndSaveAsync uses for ManageUserRolesDialog.
-    /// </summary>
-    public async Task InviteEmployeeAsync(string employeeName, IReadOnlyList<string> additionalRoleNames)
+    public async Task ClickResendInvitationAsync()
     {
-        // Step 1: Employee picker (Syncfusion SfDropDownList, AllowFiltering="true").
-        // DropDownSelector itself confirms Blazor's ValueChanged round-trip (InviteUserDialog's
-        // own OnEmployeeChanged, which populates _email from the selected employee) actually
-        // committed before returning — see its own doc comment. Without that, clicking "Next"
-        // can race the round-trip: _selectedEmployeeId is already set (step 1's own check
-        // passes) but _email hasn't been populated yet, surfacing a bogus "no work email on
-        // file" error on step 2 for an employee who genuinely has one.
-        await DropDownSelector.SelectAsync(page, InviteDialog, employeeName);
-
-        await InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
-
-        // DropDownSelector only proves the combobox's own displayed text updated client-side —
-        // not that the SignalR round trip invoking InviteUserDialog's OnEmployeeChanged (which
-        // populates _email) has landed server-side yet (see DropDownSelector's own doc comment).
-        // If "Next" above raced ahead of that commit, the dialog surfaces a spurious "no work
-        // email on file" step error even for an employee who genuinely has one. Self-heal: step
-        // back and retry — by then the round trip will have committed.
-        var noEmailError = InviteDialog.GetByText("This employee has no work email on file", new() { Exact = false });
-        if (await noEmailError.IsVisibleAsync())
-        {
-            await InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Back" }).ClickAsync();
-            await page.WaitForTimeoutAsync(500);
-            await InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
-        }
-
-        // Step 2: additional roles only — "Employee" is a fixed badge, never a selectable item
-        // (see InviteUserDialog.razor's _additionalRoleOptions, which excludes it entirely). Plain
-        // checkbox table, same pattern as UserDetailPage.ToggleRolesAndSaveAsync for ManageRolesDialog.
-        foreach (var roleName in additionalRoleNames)
-        {
-            await InviteDialog.Locator("tr", new() { HasText = roleName })
-                .Locator("input[type='checkbox']")
-                .First
-                .ClickAsync();
-        }
-
-        await InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
-
-        // Step 3: Confirm.
-        await InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Send Invite" }).ClickAsync();
-
-        // Successful submission navigates away to the new user's detail page.
-        await page.WaitForURLAsync("**/user-administration/*", new() { Timeout = 20_000 });
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Resend Invitation" });
+        await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await btn.ClickAsync();
     }
 
-    /// <summary>
-    /// True if the (currently open, step 2) dialog shows the mandatory "Employee" role as a fixed
-    /// badge rather than a removable multiselect item.
-    /// </summary>
-    public Task<bool> IsEmployeeRoleBadgeVisibleAsync() =>
-        InviteDialog.Locator("span.badge", new() { HasText = "Employee" }).IsVisibleAsync();
+    public async Task ClickCancelInvitationAsync()
+    {
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Cancel Invitation" });
+        await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await btn.ClickAsync();
+    }
 
-    /// <summary>
-    /// Returns whether the "Employee" step pill (VisibleSteps' "1. Employee") is shown in the
-    /// wizard's step nav — false when the dialog was launched with a pre-selected employee (see
-    /// InviteUserDialog.razor's VisibleSteps).
-    /// </summary>
-    public Task<bool> HasEmployeeStepPillAsync() =>
-        InviteDialog.GetByText("Employee", new() { Exact = false })
-            .Locator("xpath=ancestor::li[contains(@class,'nav-item')]")
-            .First
-            .IsVisibleAsync();
-
-    /// <summary>
-    /// True if the (currently open, step 3 Confirm) dialog shows a separate "Email" row in its
-    /// summary — expected false, since InviteUserDialog.razor's step 3 summary only ever shows
-    /// Employee/Roles rows, not Email.
-    /// </summary>
-    public Task<bool> HasConfirmEmailRowAsync() =>
-        InviteDialog.Locator("dt", new() { HasText = "Email" }).IsVisibleAsync();
+    /// <summary>Returns the inline action-error alert text, or null if it isn't showing.</summary>
+    public async Task<string?> GetActionErrorAsync()
+    {
+        var alert = page.Locator(".alert-danger.alert-dismissible");
+        if (!await alert.IsVisibleAsync())
+            return null;
+        return (await alert.InnerTextAsync()).Trim();
+    }
 }

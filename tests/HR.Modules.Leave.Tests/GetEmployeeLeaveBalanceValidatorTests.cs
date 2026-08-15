@@ -52,6 +52,36 @@ public class GetEmployeeLeaveBalanceValidatorTests
     }
 
     [Fact]
+    public void Validate_Passes_When_PolicyYear_Is_Exactly_2000()
+    {
+        var validator = new GetEmployeeLeaveBalanceValidator();
+
+        var result = validator.Validate(new GetEmployeeLeaveBalanceRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            EmployeeId = Guid.NewGuid(),
+            PolicyYear = 2000
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_PolicyYear_Is_Exactly_2100()
+    {
+        var validator = new GetEmployeeLeaveBalanceValidator();
+
+        var result = validator.Validate(new GetEmployeeLeaveBalanceRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            EmployeeId = Guid.NewGuid(),
+            PolicyYear = 2100
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void Validate_Fails_When_PolicyYear_Is_Above_2100()
     {
         var validator = new GetEmployeeLeaveBalanceValidator();

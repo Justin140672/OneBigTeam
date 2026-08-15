@@ -94,6 +94,23 @@ public class UploadCompanyLogoValidatorTests
     }
 
     [Fact]
+    public void Validate_Passes_When_FileSizeBytes_Is_Exactly_2MB()
+    {
+        var validator = new UploadCompanyLogoValidator();
+
+        var result = validator.Validate(new UploadCompanyLogoRequest
+        {
+            Id = Guid.NewGuid(),
+            AssetType = BrandingAssetType.PrimaryLogo,
+            FileName = "logo.png",
+            ContentType = "image/png",
+            FileSizeBytes = 2 * 1024 * 1024,
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void Validate_Fails_When_File_Exceeds_2MB()
     {
         var validator = new UploadCompanyLogoValidator();

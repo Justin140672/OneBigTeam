@@ -2,12 +2,11 @@
 
   <ItemGroup>
     <Content Remove="wwwroot\favicon.png" />
-    <Content Remove="wwwroot\images\logo-icon.png" />
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="wwwroot\favicon-dark.png" />
     <None Include="wwwroot\favicon.png" />
-    <None Include="wwwroot\images\logo-icon.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -17,16 +16,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Syncfusion.Blazor.Buttons" Version="34.1.33" />
-    <PackageReference Include="Syncfusion.Blazor.Charts" Version="34.1.33" />
-    <PackageReference Include="Syncfusion.Blazor.Diagram" Version="34.1.33" />
-    <PackageReference Include="Syncfusion.Blazor.DropDowns" Version="34.1.33" />
-    <PackageReference Include="Syncfusion.Blazor.Grid" Version="34.1.33" />
-    <PackageReference Include="Syncfusion.Blazor.Inputs" Version="34.1.33" />
-    <PackageReference Include="Syncfusion.Blazor.Kanban" Version="34.1.33" />
-    <PackageReference Include="Syncfusion.Blazor.Popups" Version="34.1.33" />
-    <PackageReference Include="Syncfusion.Blazor.SplitButtons" Version="34.1.33" />
-    <PackageReference Include="Syncfusion.Blazor.Themes" Version="34.1.33" />
+    <PackageReference Include="Syncfusion.Blazor.Buttons" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Charts" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Diagram" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.DropDowns" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Grid" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Inputs" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Kanban" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Popups" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.SplitButtons" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Themes" Version="34.2.3" />
   </ItemGroup>
 
   <PropertyGroup>

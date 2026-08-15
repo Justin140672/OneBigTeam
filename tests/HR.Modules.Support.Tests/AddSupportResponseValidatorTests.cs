@@ -56,6 +56,18 @@ public class AddSupportResponseValidatorTests
     }
 
     [Fact]
+    public void Validate_Fails_When_BodyHtml_Is_Whitespace_Only()
+    {
+        var request = Valid();
+        request = request with { BodyHtml = "   " };
+
+        var result = _validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(AddSupportResponseRequest.BodyHtml));
+    }
+
+    [Fact]
     public void Validate_Fails_When_BodyHtml_Exceeds_8000_Characters()
     {
         var request = Valid();

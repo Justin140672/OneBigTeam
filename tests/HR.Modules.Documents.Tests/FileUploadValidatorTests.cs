@@ -207,4 +207,25 @@ public class FileUploadValidatorTests
         var result = CreateValidator().ValidateContent(PdfStream(), "application/pdf; charset=utf-8");
         Assert.True(result.IsSuccess);
     }
+
+    [Fact]
+    public void ValidateContent_StreamShorterThanMagicByteHeader_ReturnsFailure()
+    {
+        // Fewer than 4 bytes available — can't even read a full magic-byte header.
+        var result = CreateValidator().ValidateContent(new MemoryStream([0x25, 0x50]), "application/pdf");
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("too short", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ValidateContent_EmptyStream_ReturnsFailure()
+    {
+        var result = CreateValidator().ValidateContent(new MemoryStream(), "application/pdf");
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("too short", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }

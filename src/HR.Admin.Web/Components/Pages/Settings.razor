@@ -1,0 +1,233 @@
+@page "/settings"
+@inject PlatformSettingsService PlatformSettingsService
+
+<PageTitle>Platform Settings — Admin Portal</PageTitle>
+
+<h1>Platform Settings</h1>
+<p class="admin-actions-intro">
+    Global platform configuration. Changes here affect every customer immediately and are recorded
+    in the audit log.
+</p>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_settings is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view platform settings, or they couldn't be loaded.
+    </div>
+}
+else
+{
+    <section class="details-panel admin-actions-panel">
+        <h2>General</h2>
+
+        <div class="admin-action-field">
+            <label for="trial-length-days">Trial length (days) <span class="text-danger">*</span></label>
+            <SfNumericTextBox TValue="int" @bind-Value="_trialLengthDays" Min="1" Format="n0"
+                               HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "trial-length-days" })" />
+        </div>
+
+        <div class="admin-action-field">
+            <label for="default-monthly-price">Default monthly price (GBP) <span class="text-danger">*</span></label>
+            <SfNumericTextBox TValue="decimal" @bind-Value="_defaultMonthlyPriceGbp" Min="0" Format="c2"
+                               HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "default-monthly-price" })" />
+        </div>
+
+        <div class="admin-action-field">
+            <label for="support-email">Support email <span class="text-danger">*</span></label>
+            <SfTextBox @bind-Value="_supportEmail" Placeholder="support@example.com"
+                       HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "support-email" })" />
+        </div>
+    </section>
+
+    <section class="details-panel admin-actions-panel">
+        <h2>Maintenance mode</h2>
+
+        <div class="admin-action-field settings-checkbox-field">
+            <SfCheckBox @bind-Checked="_maintenanceModeEnabled" Label="Maintenance mode enabled" />
+        </div>
+
+        @if (_maintenanceModeEnabled)
+        {
+            <div class="admin-action-field">
+                <label for="maintenance-message">Maintenance message (shown to users)</label>
+                <SfTextBox @bind-Value="_maintenanceModeMessage" Multiline="true"
+                           Placeholder="We're performing scheduled maintenance and will be back shortly."
+                           HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "maintenance-message" })" />
+            </div>
+        }
+    </section>
+
+    <section class="details-panel admin-actions-panel">
+        <h2>Feature flags</h2>
+
+        @if (_featureFlags.Count == 0)
+        {
+            <p class="activity-empty">No feature flags configured.</p>
+        }
+        else
+        {
+            @for (var i = 0; i < _featureFlags.Count; i++)
+            {
+                var index = i;
+                <div class="settings-flag-row">
+                    <SfTextBox @bind-Value="_featureFlags[index].Name" Placeholder="flag-name"
+                               CssClass="settings-flag-name" />
+                    <SfCheckBox @bind-Checked="_featureFlags[index].Enabled" Label="Enabled" />
+                    <SfButton CssClass="e-danger" OnClick="@(() => RemoveFlag(index))">Remove</SfButton>
+                </div>
+            }
+        }
+
+        <div class="admin-actions-buttons settings-add-flag-button">
+            <SfButton OnClick="AddFlag">+ Add flag</SfButton>
+        </div>
+    </section>
+
+    <section class="details-panel">
+        <h2>Last updated</h2>
+        <dl class="details-kv">
+            <dt>When</dt>
+            <dd>@_settings.UpdatedAt.ToString("dd MMM yyyy HH:mm")</dd>
+            <dt>By</dt>
+            <dd>@(_settings.UpdatedByUserId?.ToString() ?? "system")</dd>
+        </dl>
+    </section>
+
+    @if (_saveErrors is { Count: > 0 })
+    {
+        <ul class="admin-action-error">
+            @foreach (var error in _saveErrors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    }
+
+    @if (_saveSucceeded)
+    {
+        <p class="admin-action-success">Platform settings saved successfully.</p>
+    }
+
+    <div class="admin-actions-buttons">
+        <SfButton IsPrimary="true" OnClick="OpenConfirmDialog">Save changes</SfButton>
+    </div>
+}
+
+<AdminActionConfirmDialog Visible="_dialogVisible"
+                           Title="Save platform settings"
+                           Warning="This will update global platform configuration for all customers immediately."
+                           ConfirmText="Save changes"
+                           DangerConfirm="true"
+                           Busy="_saving"
+                           OnConfirmed="OnConfirmedAsync"
+                           OnCancelled="CloseDialog" />
+
+@code {
+    private PlatformSettingsModel? _settings;
+    private bool _loading = true;
+
+    private int _trialLengthDays;
+    private decimal _defaultMonthlyPriceGbp;
+    private string _supportEmail = string.Empty;
+    private bool _maintenanceModeEnabled;
+    private string? _maintenanceModeMessage;
+    private List<FeatureFlagRow> _featureFlags = [];
+
+    private bool _dialogVisible;
+    private bool _saving;
+    private bool _saveSucceeded;
+    private List<string>? _saveErrors;
+
+    private sealed class FeatureFlagRow
+    {
+        public string Name { get; set; } = string.Empty;
+        public bool Enabled { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        _settings = await PlatformSettingsService.GetSettingsOrNullAsync();
+        if (_settings is null)
+            return;
+
+        _trialLengthDays = _settings.TrialLengthDays;
+        _defaultMonthlyPriceGbp = _settings.DefaultMonthlyPriceGbp;
+        _supportEmail = _settings.SupportEmail;
+        _maintenanceModeEnabled = _settings.MaintenanceModeEnabled;
+        _maintenanceModeMessage = _settings.MaintenanceModeMessage;
+        _featureFlags = _settings.FeatureFlags
+            .Select(kv => new FeatureFlagRow { Name = kv.Key, Enabled = kv.Value })
+            .ToList();
+    }
+
+    private void AddFlag()
+    {
+        _featureFlags.Add(new FeatureFlagRow());
+    }
+
+    private void RemoveFlag(int index)
+    {
+        _featureFlags.RemoveAt(index);
+    }
+
+    private void OpenConfirmDialog()
+    {
+        _saveErrors = null;
+        _saveSucceeded = false;
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogVisible = false;
+    }
+
+    private async Task OnConfirmedAsync((string Reason, DateTimeOffset? NewTrialExpiresAt) input)
+    {
+        _saving = true;
+        try
+        {
+            var flags = _featureFlags
+                .Where(f => !string.IsNullOrWhiteSpace(f.Name))
+                .ToDictionary(f => f.Name.Trim(), f => f.Enabled);
+
+            var request = new UpdatePlatformSettingsRequest(
+                _trialLengthDays,
+                _defaultMonthlyPriceGbp,
+                _supportEmail.Trim(),
+                _maintenanceModeEnabled,
+                _maintenanceModeEnabled ? _maintenanceModeMessage : null,
+                flags);
+
+            var result = await PlatformSettingsService.UpdateSettingsAsync(request);
+
+            if (result.Settings is not null)
+            {
+                _saveSucceeded = true;
+                _saveErrors = null;
+                _settings = result.Settings;
+                await LoadAsync();
+            }
+            else
+            {
+                _saveSucceeded = false;
+                _saveErrors = result.Errors?.ToList() ?? ["Could not save platform settings."];
+            }
+        }
+        finally
+        {
+            _saving = false;
+            _dialogVisible = false;
+        }
+    }
+}

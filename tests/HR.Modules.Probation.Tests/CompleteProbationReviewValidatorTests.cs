@@ -109,6 +109,82 @@ public class CompleteProbationReviewValidatorTests
     }
 
     [Fact]
+    public async Task Extend_Outcome_With_NewExpectedEndDate_Today_Fails()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var result = await _validator.ValidateAsync(new CompleteProbationReviewRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            ProbationRecordId = Guid.NewGuid(),
+            ReviewId = Guid.NewGuid(),
+            CompletedByEmployeeId = Guid.NewGuid(),
+            Outcome = ProbationOutcome.Extend,
+            DecisionDate = today,
+            NewExpectedEndDate = today,
+            ExtensionReason = "Needs more time to meet targets."
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CompleteProbationReviewRequest.NewExpectedEndDate));
+    }
+
+    [Fact]
+    public async Task Extend_Outcome_With_NewExpectedEndDate_Tomorrow_Passes()
+    {
+        var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+
+        var result = await _validator.ValidateAsync(new CompleteProbationReviewRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            ProbationRecordId = Guid.NewGuid(),
+            ReviewId = Guid.NewGuid(),
+            CompletedByEmployeeId = Guid.NewGuid(),
+            Outcome = ProbationOutcome.Extend,
+            DecisionDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            NewExpectedEndDate = tomorrow,
+            ExtensionReason = "Needs more time to meet targets."
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Extend_Outcome_With_Whitespace_ExtensionReason_Fails()
+    {
+        var result = await _validator.ValidateAsync(new CompleteProbationReviewRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            ProbationRecordId = Guid.NewGuid(),
+            ReviewId = Guid.NewGuid(),
+            CompletedByEmployeeId = Guid.NewGuid(),
+            Outcome = ProbationOutcome.Extend,
+            DecisionDate = new DateOnly(2026, 9, 1),
+            NewExpectedEndDate = new DateOnly(2026, 12, 1),
+            ExtensionReason = "   "
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CompleteProbationReviewRequest.ExtensionReason));
+    }
+
+    [Fact]
+    public async Task Fail_Outcome_Without_NewExpectedEndDate_Passes()
+    {
+        var result = await _validator.ValidateAsync(new CompleteProbationReviewRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            ProbationRecordId = Guid.NewGuid(),
+            ReviewId = Guid.NewGuid(),
+            CompletedByEmployeeId = Guid.NewGuid(),
+            Outcome = ProbationOutcome.Fail,
+            DecisionDate = new DateOnly(2026, 9, 1)
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public async Task ExtensionReason_Exceeding_MaxLength_Fails()
     {
         var result = await _validator.ValidateAsync(new CompleteProbationReviewRequest

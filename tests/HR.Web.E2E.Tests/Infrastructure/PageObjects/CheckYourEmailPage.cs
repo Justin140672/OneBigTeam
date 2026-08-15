@@ -49,6 +49,21 @@ public sealed class CheckYourEmailPage(IPage page, string marketingBaseUrl)
     public Task<bool> IsResentConfirmationVisibleAsync() =>
         page.GetByText("We've sent a new verification email.").IsVisibleAsync();
 
-    public Task ClickChangeEmailAddressAsync() =>
-        page.GetByRole(AriaRole.Link, new() { Name = "Change email address" }).ClickAsync();
+    public async Task ClickChangeEmailAddressAsync()
+    {
+        var link = page.GetByRole(AriaRole.Link, new() { Name = "Change email address" });
+
+        // .site-header is `position: sticky; top: 0; z-index: 20` (see styles.css). The site has a
+        // documented `section[id] { scroll-margin-top: 96px; }` rule elsewhere specifically to
+        // keep that sticky header from covering scroll targets, but it only applies to sections
+        // with an id (in-page anchor targets) — CheckYourEmail.razor's <section>s have none. Left
+        // to its default auto-scroll, Playwright can bring this link to rest right under the
+        // sticky header, which then intercepts the click's pointer-event target check and the
+        // click never registers. Scroll it into view first, then nudge the page back down past the
+        // header's height before clicking.
+        await link.ScrollIntoViewIfNeededAsync();
+        await page.Mouse.WheelAsync(0, -120);
+
+        await link.ClickAsync();
+    }
 }

@@ -156,4 +156,63 @@ public class SignUpValidatorTests
 
         Assert.True(result.IsValid);
     }
+
+    [Fact]
+    public void Validate_Passes_When_CompanyName_Is_Exactly_MaxLength()
+    {
+        var validator = new SignUpValidator();
+        var request = ValidRequest() with { CompanyName = new string('a', 200) };
+
+        var result = validator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_AdminFirstName_Is_Exactly_MaxLength()
+    {
+        var validator = new SignUpValidator();
+        var request = ValidRequest() with { AdminFirstName = new string('a', 100) };
+
+        var result = validator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_AdminLastName_Is_Exactly_MaxLength()
+    {
+        var validator = new SignUpValidator();
+        var request = ValidRequest() with { AdminLastName = new string('a', 100) };
+
+        var result = validator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_AdminEmail_Is_Exactly_MaxLength()
+    {
+        var validator = new SignUpValidator();
+        var localPart = new string('a', 256 - "@example.com".Length);
+        var request = ValidRequest() with { AdminEmail = $"{localPart}@example.com" };
+
+        Assert.Equal(256, request.AdminEmail.Length);
+
+        var result = validator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Password_Is_Whitespace_Only()
+    {
+        var validator = new SignUpValidator();
+        var request = ValidRequest() with { Password = "        " };
+
+        var result = validator.Validate(request);
+
+        // NotEmpty() rejects whitespace-only strings in FluentValidation.
+        Assert.False(result.IsValid);
+    }
 }

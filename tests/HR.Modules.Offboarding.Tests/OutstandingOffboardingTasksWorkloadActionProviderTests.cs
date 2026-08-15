@@ -91,6 +91,29 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
     }
 
     [Fact]
+    public async Task Status_Is_Outstanding_Not_Overdue_When_LastWorkingDay_Is_Exactly_Today()
+    {
+        // Boundary: the provider computes Status via `item.LastWorkingDay < today`, so a
+        // LastWorkingDay equal to today must land on the "Outstanding" side, not "Overdue".
+        // The provider reads DateTime.UtcNow.Date directly (no injected clock), so this test
+        // must use the real current date rather than the fixture's fixed `Today` constant.
+        var actualToday = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        var employeeId = Guid.NewGuid();
+        var reader = new FakeOffboardingReportReader(
+        [
+            BuildItem(employeeId, actualToday, "Return laptop"),
+        ]);
+
+        var provider = new OutstandingOffboardingTasksWorkloadActionProvider(
+            reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.Equal("Outstanding", action.Status);
+    }
+
+    [Fact]
     public async Task Maps_ActionType_Category_DeepLink_And_Overdue_Status()
     {
         var employeeId = Guid.NewGuid();

@@ -33,6 +33,11 @@ internal sealed class GetLeaveSummaryReportHandler(
         var rows = await leaveSummaryReader.GetLeaveSummaryAsync(
             request.CompanyId, employeeIds, policyYear, cancellationToken);
 
+        if (request.LeaveTypeId is not null)
+        {
+            rows = rows.Where(r => r.LeaveTypeId == request.LeaveTypeId.Value).ToList();
+        }
+
         var allEmployeeIds = rows.Select(r => r.EmployeeId).ToHashSet();
         var departments = allEmployeeIds.Count > 0
             ? await employeeDepartmentReader.GetDepartmentsAsync(request.CompanyId, allEmployeeIds, cancellationToken)

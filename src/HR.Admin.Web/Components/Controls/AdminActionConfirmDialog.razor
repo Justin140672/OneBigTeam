@@ -1,0 +1,103 @@
+@* Confirmation dialog for Subscription Management admin actions (support intervention). Mirrors
+   HR.Web's HrConfirmDialog shape (plain SfDialog + parameter-driven content/callbacks, danger
+   styling for destructive actions) — same "consistent Yes/No confirmation" convention, extended
+   with a mandatory reason field and an optional new-trial-expiry date picker for the Extend Trial
+   action. The Reason field doubles as the acceptance criteria's "warning acknowledged" record: the
+   admin must type a justification after reading the warning before the action can be submitted. *@
+
+@if (Visible)
+{
+    <SfDialog Visible="Visible" IsModal="true" Width="480px" ShowCloseIcon="false">
+        <DialogTemplates>
+            <Header>@Title</Header>
+            <Content>
+                <p class="admin-action-warning">@Warning</p>
+
+                @if (ShowNewTrialExpiryDate)
+                {
+                    <div class="admin-action-field">
+                        <label for="new-trial-expiry">New trial expiry date</label>
+                        <SfDatePicker TValue="DateTime?" @bind-Value="_newTrialExpiryDate" Min="DateTime.UtcNow.Date.AddDays(1)" />
+                    </div>
+                }
+
+                <div class="admin-action-field">
+                    <label for="admin-action-reason">Reason (required)</label>
+                    <SfTextBox @bind-Value="_reason" Multiline="true" Placeholder="Explain why this action is being taken"
+                               HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "admin-action-reason" })" />
+                </div>
+
+                @if (_validationError is not null)
+                {
+                    <p class="admin-action-error">@_validationError</p>
+                }
+            </Content>
+            <FooterTemplate>
+                <SfButton IsPrimary="true" CssClass="@(DangerConfirm ? "e-danger" : "")" Disabled="Busy" OnClick="OnConfirmClicked">
+                    @if (Busy)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    @ConfirmText
+                </SfButton>
+                <SfButton Disabled="Busy" OnClick="OnCancelClicked">Cancel</SfButton>
+            </FooterTemplate>
+        </DialogTemplates>
+    </SfDialog>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string Title { get; set; } = "Confirm action";
+    [Parameter] public string Warning { get; set; } = "This action will affect the customer's account.";
+    [Parameter] public string ConfirmText { get; set; } = "Confirm";
+    [Parameter] public bool DangerConfirm { get; set; } = true;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool ShowNewTrialExpiryDate { get; set; }
+    [Parameter] public EventCallback<(string Reason, DateTimeOffset? NewTrialExpiresAt)> OnConfirmed { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private string _reason = string.Empty;
+    private DateTime? _newTrialExpiryDate;
+    private string? _validationError;
+
+    protected override void OnParametersSet()
+    {
+        if (!Visible)
+        {
+            // Reset transient dialog state whenever it's hidden, so re-opening it for a different
+            // action (or the same action again) starts from a clean slate.
+            _reason = string.Empty;
+            _newTrialExpiryDate = null;
+            _validationError = null;
+        }
+    }
+
+    private async Task OnConfirmClicked()
+    {
+        if (string.IsNullOrWhiteSpace(_reason) || _reason.Trim().Length < 5)
+        {
+            _validationError = "Please provide a reason of at least 5 characters.";
+            return;
+        }
+
+        if (ShowNewTrialExpiryDate && _newTrialExpiryDate is null)
+        {
+            _validationError = "Please choose a new trial expiry date.";
+            return;
+        }
+
+        _validationError = null;
+
+        DateTimeOffset? newExpiry = ShowNewTrialExpiryDate && _newTrialExpiryDate is { } date
+            ? new DateTimeOffset(date, TimeSpan.Zero)
+            : null;
+
+        await OnConfirmed.InvokeAsync((_reason.Trim(), newExpiry));
+    }
+
+    private async Task OnCancelClicked()
+    {
+        await OnCancelled.InvokeAsync();
+    }
+}

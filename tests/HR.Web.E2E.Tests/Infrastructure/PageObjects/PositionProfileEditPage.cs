@@ -1,3 +1,4 @@
+using HR.Web.E2E.Tests.Infrastructure;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -22,11 +23,17 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
     }
 
-    public async Task FillTitleAsync(string title) =>
+    public async Task FillTitleAsync(string title)
+    {
         await page.GetByPlaceholder("e.g. Senior Software Engineer").FillAsync(title);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public async Task FillDescriptionAsync(string description) =>
+    public async Task FillDescriptionAsync(string description)
+    {
         await page.GetByPlaceholder("Optional description").FillAsync(description);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task SaveAsync()
     {
@@ -53,13 +60,26 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     public async Task<string> GetTitleAsync() =>
         await page.GetByPlaceholder("e.g. Senior Software Engineer").InputValueAsync();
 
-    public async Task FillProbationMonthsOverrideAsync(int months) =>
-        await page.GetByPlaceholder("Use company default").FillAsync(months.ToString());
+    // SfNumericTextBox fields (ProbationMonthsOverride, SalaryMin, SalaryMax): a bare FillAsync
+    // bypasses their interop entirely (see EmployeeEditPage.TypeIntoNumericInputAsync for the same
+    // pattern/explanation) — retype the value for real via click, select-all, delete, type, Tab.
+    private async Task TypeIntoNumericInputAsync(ILocator input, string value)
+    {
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        if (value.Length > 0)
+            await input.PressSequentiallyAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public Task FillProbationMonthsOverrideAsync(int months) =>
+        TypeIntoNumericInputAsync(page.GetByPlaceholder("Use company default"), months.ToString());
 
     public async Task FillSalaryRangeAsync(decimal min, decimal max)
     {
-        await page.GetByPlaceholder("Min").FillAsync(min.ToString());
-        await page.GetByPlaceholder("Max").FillAsync(max.ToString());
+        await TypeIntoNumericInputAsync(page.GetByPlaceholder("Min"), min.ToString());
+        await TypeIntoNumericInputAsync(page.GetByPlaceholder("Max"), max.ToString());
     }
 
     /// <summary>Selects a value from the Department dropdown on the position profile create/edit form.</summary>
@@ -138,7 +158,7 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
 
     /// <summary>Sets the notice period override's Length numeric field. Only present once the override checkbox is checked.</summary>
     public Task FillNoticePeriodLengthOverrideAsync(int length) =>
-        NoticePeriodOverrideRow.Locator("input.e-numerictextbox").First.FillAsync(length.ToString());
+        TypeIntoNumericInputAsync(NoticePeriodOverrideRow.Locator("input.e-numerictextbox").First, length.ToString());
 
     /// <summary>Returns the current value of the notice period override's Length numeric field.</summary>
     public async Task<int> GetNoticePeriodLengthOverrideAsync()
@@ -216,7 +236,7 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     }
 
     public async Task<bool> HasRequiredDocumentsTabAsync() =>
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Required Documents" }).IsVisibleAsync();
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Required Documents" }).WaitUntilVisibleAsync();
 
     public async Task ClickAddRequiredDocumentAsync() =>
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();

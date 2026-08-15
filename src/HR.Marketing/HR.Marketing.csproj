@@ -5,6 +5,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Remove="wwwroot\favicon.png" />
+    <Content Remove="wwwroot\favicon-dark.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="wwwroot\favicon.png" />
+    <None Include="wwwroot\favicon-dark.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Documents\*.md" />
   </ItemGroup>
 

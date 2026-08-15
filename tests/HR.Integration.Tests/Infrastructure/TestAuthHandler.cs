@@ -14,6 +14,7 @@ internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSche
     public const string SchemeName = "TestAuth";
     public const string UserHeader = "X-Test-User";
     public const string TenantHeader = "X-Test-Tenant";
+    public const string EmailHeader = "X-Test-Email";
 
     public TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -35,6 +36,11 @@ internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSche
             new Claim(ClaimTypes.NameIdentifier, userIdValues.ToString()),
             new Claim("sub", userIdValues.ToString())
         };
+
+        if (Request.Headers.TryGetValue(EmailHeader, out var emailValues) && !string.IsNullOrWhiteSpace(emailValues))
+        {
+            claims.Add(new Claim("email", emailValues.ToString()));
+        }
 
         if (Request.Headers.TryGetValue(TenantHeader, out var tenantIdValues) && !string.IsNullOrWhiteSpace(tenantIdValues))
         {

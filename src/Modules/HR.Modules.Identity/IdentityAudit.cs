@@ -1,3 +1,4 @@
+using HR.Modules.Identity.Domain;
 using HR.SharedKernel;
 
 namespace HR.Modules.Identity;
@@ -153,5 +154,135 @@ internal sealed record UserEnabledAuditEvent(
     string? IAuditEvent.Summary        => "User account re-enabled";
     object? IAuditEvent.Before         => new { IsActive = false };
     object? IAuditEvent.After          => new { IsActive = true };
+    object? IAuditEvent.Metadata       => null;
+}
+
+// Platform administrator management (Admin Portal "administrator management" screen). These
+// events cover a platform-level concept with no company relationship — CompanyId is always
+// Guid.Empty since IAuditEvent requires a non-nullable CompanyId.
+
+// Published when a new platform administrator account is created (Features/CreatePlatformAdministrator).
+internal sealed record PlatformAdministratorCreatedAuditEvent(
+    Guid AdministratorId,
+    string Email,
+    PlatformAdministratorRole Role,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    Guid    IAuditEvent.CompanyId      => Guid.Empty;
+    string  IAuditEvent.EventType      => "platform-administrator.created";
+    string  IAuditEvent.EntityType     => "PlatformAdministrator";
+    Guid    IAuditEvent.EntityId       => AdministratorId;
+    Guid?   IAuditEvent.ActorUserId    => ActorUserId;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId  => null;
+    string? IAuditEvent.Summary        => $"Created platform administrator account for {Email}";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => new { Email, Role };
+    object? IAuditEvent.Metadata       => null;
+}
+
+// Published when a platform administrator account is disabled (Features/DisablePlatformAdministrator).
+internal sealed record PlatformAdministratorDisabledAuditEvent(
+    Guid AdministratorId,
+    string Email,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    Guid    IAuditEvent.CompanyId      => Guid.Empty;
+    string  IAuditEvent.EventType      => "platform-administrator.disabled";
+    string  IAuditEvent.EntityType     => "PlatformAdministrator";
+    Guid    IAuditEvent.EntityId       => AdministratorId;
+    Guid?   IAuditEvent.ActorUserId    => ActorUserId;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId  => null;
+    string? IAuditEvent.Summary        => $"Disabled platform administrator account for {Email}";
+    object? IAuditEvent.Before         => new { IsEnabled = true };
+    object? IAuditEvent.After          => new { IsEnabled = false };
+    object? IAuditEvent.Metadata       => null;
+}
+
+// Published when a platform administrator account is re-enabled (Features/EnablePlatformAdministrator).
+internal sealed record PlatformAdministratorEnabledAuditEvent(
+    Guid AdministratorId,
+    string Email,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    Guid    IAuditEvent.CompanyId      => Guid.Empty;
+    string  IAuditEvent.EventType      => "platform-administrator.enabled";
+    string  IAuditEvent.EntityType     => "PlatformAdministrator";
+    Guid    IAuditEvent.EntityId       => AdministratorId;
+    Guid?   IAuditEvent.ActorUserId    => ActorUserId;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId  => null;
+    string? IAuditEvent.Summary        => $"Re-enabled platform administrator account for {Email}";
+    object? IAuditEvent.Before         => new { IsEnabled = false };
+    object? IAuditEvent.After          => new { IsEnabled = true };
+    object? IAuditEvent.Metadata       => null;
+}
+
+// Published when a platform administrator's role changes (Features/AssignPlatformAdministratorRole).
+internal sealed record PlatformAdministratorRoleAssignedAuditEvent(
+    Guid AdministratorId,
+    string Email,
+    PlatformAdministratorRole BeforeRole,
+    PlatformAdministratorRole AfterRole,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    Guid    IAuditEvent.CompanyId      => Guid.Empty;
+    string  IAuditEvent.EventType      => "platform-administrator.role-assigned";
+    string  IAuditEvent.EntityType     => "PlatformAdministrator";
+    Guid    IAuditEvent.EntityId       => AdministratorId;
+    Guid?   IAuditEvent.ActorUserId    => ActorUserId;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId  => null;
+    string? IAuditEvent.Summary        => $"Changed platform administrator role for {Email}";
+    object? IAuditEvent.Before         => new { Role = BeforeRole };
+    object? IAuditEvent.After          => new { Role = AfterRole };
+    object? IAuditEvent.Metadata       => null;
+}
+
+// Published when a password reset email is requested for a platform administrator
+// (Features/ResetPlatformAdministratorPassword).
+internal sealed record PlatformAdministratorPasswordResetRequestedAuditEvent(
+    Guid AdministratorId,
+    string Email,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    Guid    IAuditEvent.CompanyId      => Guid.Empty;
+    string  IAuditEvent.EventType      => "platform-administrator.password-reset-requested";
+    string  IAuditEvent.EntityType     => "PlatformAdministrator";
+    Guid    IAuditEvent.EntityId       => AdministratorId;
+    Guid?   IAuditEvent.ActorUserId    => ActorUserId;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId  => null;
+    string? IAuditEvent.Summary        => $"Requested password reset for platform administrator {Email}";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => null;
+    object? IAuditEvent.Metadata       => null;
+}
+
+// Published when an MFA reset is requested for a platform administrator
+// (Features/ResetPlatformAdministratorMfa). Deliberately stubbed — see the handler's remarks —
+// so the Summary makes clear the underlying action is not yet actually wired up.
+internal sealed record PlatformAdministratorMfaResetRequestedAuditEvent(
+    Guid AdministratorId,
+    string Email,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    Guid    IAuditEvent.CompanyId      => Guid.Empty;
+    string  IAuditEvent.EventType      => "platform-administrator.mfa-reset-requested";
+    string  IAuditEvent.EntityType     => "PlatformAdministrator";
+    Guid    IAuditEvent.EntityId       => AdministratorId;
+    Guid?   IAuditEvent.ActorUserId    => ActorUserId;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId  => null;
+    string? IAuditEvent.Summary        => $"MFA reset requested (not yet implemented) for platform administrator {Email}";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => null;
     object? IAuditEvent.Metadata       => null;
 }

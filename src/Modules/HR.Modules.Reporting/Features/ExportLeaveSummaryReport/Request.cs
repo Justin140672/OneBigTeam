@@ -8,4 +8,5 @@ internal sealed record ExportLeaveSummaryReportRequest(
     int? PolicyYear,
     Guid? DepartmentId,
     LeaveSummaryGroupBy GroupBy = LeaveSummaryGroupBy.Employee,
+    Guid? LeaveTypeId = null,
     ReportExportFormat Format = ReportExportFormat.Csv);

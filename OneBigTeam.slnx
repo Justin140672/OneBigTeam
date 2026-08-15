@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/HR.Admin.Web/HR.Admin.Web.csproj" />
     <Project Path="src/HR.Api/HR.Api.csproj" />
     <Project Path="src/HR.AppHost/HR.AppHost.csproj" />
     <Project Path="src/HR.Marketing/HR.Marketing.csproj" />

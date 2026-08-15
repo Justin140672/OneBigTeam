@@ -343,9 +343,10 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     /// <summary>
     /// Clicks the row-level "Invite User" link for the row matching <paramref name="nameFragment"/>
     /// (only present on "No User" rows) and waits for the resulting InviteUserDialog to open.
-    /// Because EmployeeList.OnInviteUserClicked pre-populates PreselectedEmployeeId/Name/Email, the
-    /// dialog opens straight on step 2 ("Email & Roles") rather than the employee-picker step.
-    /// Searches first via <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
+    /// EmployeeList.OnInviteUserClicked pre-populates PreselectedEmployeeId/Name/Email, so the
+    /// dialog opens directly on its single Roles + Confirm screen — there is no employee-picker
+    /// step (InviteUserDialog.razor is no longer a multi-step wizard). Searches first via
+    /// <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
     /// </summary>
     public async Task ClickInviteUserLinkAsync(string nameFragment)
     {
@@ -355,74 +356,36 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// The InviteUserDialog opened via <see cref="ClickInviteUserLinkAsync"/> — same component as
-    /// UserAdministrationListPage's invite wizard (shares the "Invite Employee" dialog title), just
-    /// parameterised with PreselectedEmployeeId/Name/Email so it skips straight to step 2 (Roles).
+    /// The InviteUserDialog opened via <see cref="ClickInviteUserLinkAsync"/> — a single-screen
+    /// dialog (no wizard steps) that always requires a pre-selected employee.
     /// </summary>
     public ILocator InviteUserDialog =>
         page.GetByRole(AriaRole.Dialog, new() { Name = "Invite Employee" });
 
     /// <summary>
-    /// Returns true if the (open) InviteUserDialog is still showing the step-1 employee-picker
-    /// combobox — expected to be false for the pre-selected Quick Invite flow, which jumps
-    /// straight to step 2 and never renders the picker at all.
-    /// </summary>
-    public async Task<bool> InviteDialogHasEmployeePickerAsync() =>
-        await InviteUserDialog.Locator("span[role='combobox']").CountAsync() > 0;
-
-    /// <summary>
-    /// Returns true if the (open) InviteUserDialog's step nav shows an "Employee" step pill —
-    /// expected false for the pre-selected Quick Invite flow, which hides that step entirely (see
-    /// InviteUserDialog.razor's VisibleSteps, gated on PreselectedEmployeeId being set).
-    /// </summary>
-    public Task<bool> InviteDialogHasEmployeeStepPillAsync() =>
-        InviteUserDialog.Locator(".nav-link", new() { HasText = "Employee" }).IsVisibleAsync();
-
-    /// <summary>
-    /// Completes the pre-selected Quick Invite flow from step 2 (Roles) onward: selects the given
-    /// additional role(s) (beyond the always-applied, non-selectable "Employee" role — see
-    /// InviteUserDialog.razor's fixed badge) via the SfMultiSelect checkbox popup, advances to step
-    /// 3 (Confirm), and submits. Mirrors the step 2/3 portion of
-    /// UserAdministrationListPage.InviteEmployeeAsync (same InviteUserDialog component, same
-    /// Syncfusion widgets/interaction patterns), but skips step 1 entirely since the employee is
-    /// already pre-selected. Waits for the dialog to close.
+    /// Completes the Quick Invite flow: selects the given additional role(s) (beyond the
+    /// always-applied, non-selectable "Employee" role — see InviteUserDialog.razor's fixed badge)
+    /// via the plain checkbox table, then confirms. Waits for the dialog to close.
     /// </summary>
     public async Task CompleteQuickInviteAsync(IReadOnlyList<string> additionalRoleNames)
     {
-        if (additionalRoleNames.Count > 0)
+        foreach (var roleName in additionalRoleNames)
         {
-            await InviteUserDialog.Locator("input[placeholder='Select additional roles (optional)']").ClickAsync();
-            await page.WaitForSelectorAsync(".e-popup:visible", new() { Timeout = 10_000 });
-            foreach (var roleName in additionalRoleNames)
-            {
-                await page.Locator(".e-popup .e-list-item")
-                    .Filter(new() { HasText = roleName })
-                    .First
-                    .ClickAsync();
-            }
-            // Checkbox-mode multiselect popups stay open to allow further selections, and being an
-            // overlay it can sit visually on top of (and intercept clicks intended for) whatever sits
-            // beneath it, including the dialog's own "Next" button — clicking a "neutral" element
-            // underneath it is not reliable. Escape is the standard, unambiguous way to close a
-            // Syncfusion dropdown/multiselect popup without depending on its rendered size/position —
-            // same reasoning as UserDetailPage.ToggleRolesAndSaveAsync for the equivalent widget.
-            await page.Keyboard.PressAsync("Escape");
-            await page.WaitForSelectorAsync(".e-popup:visible", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+            await InviteUserDialog.Locator("tr", new() { HasText = roleName })
+                .Locator("input[type='checkbox']")
+                .First
+                .ClickAsync();
         }
 
-        await InviteUserDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
-
-        // Step 3: Confirm.
         await InviteUserDialog.GetByRole(AriaRole.Button, new() { Name = "Send Invite" }).ClickAsync();
 
         await InviteUserDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
     }
 
     /// <summary>
-    /// Returns the trimmed "Employee" summary value shown on the dialog's step 3 (Confirm) screen —
-    /// used to assert the pre-selected employee's name is what's actually being invited, not a
-    /// picker-driven selection. Call after advancing to step 3 but before
-    /// <see cref="CompleteQuickInviteAsync"/> submits.
+    /// Returns the trimmed "Employee" summary value shown on the dialog — used to assert the
+    /// pre-selected employee's name is what's actually being invited. Call after
+    /// <see cref="ClickInviteUserLinkAsync"/> but before <see cref="CompleteQuickInviteAsync"/> submits.
     /// </summary>
     public async Task<string?> GetInviteDialogConfirmEmployeeNameAsync()
     {

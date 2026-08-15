@@ -1,0 +1,20 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font-size",
+        "value": "2rem",
+        "createdAt": "2026-08-13T20:58:21.740Z",
+        "reason": "User confirmed: matches Bootstrap's fs-2 default, which HR.Web's design system explicitly relies on instead of a custom type ramp"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "0.875rem",
+        "createdAt": "2026-08-13T20:58:22.016Z",
+        "reason": "User confirmed: matches Bootstrap's .small default, which HR.Web's design system explicitly relies on instead of a custom type ramp"
+      }
+    ]
+  }
+}

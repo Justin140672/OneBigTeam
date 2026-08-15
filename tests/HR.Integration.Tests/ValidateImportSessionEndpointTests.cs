@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
+using ClosedXML.Excel;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 
@@ -62,9 +63,9 @@ public class ValidateImportSessionEndpointTests
         // Type/Position Profile lookups) is present on both rows so "Last Name" is the only
         // reason the second row fails.
         const string csv =
-            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n" +
-            "Jane,,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer\n";
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n" +
+            "Jane,,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer,50000\n";
 
         await EnsureDefaultLeavePolicyAsync(client, companyId);
         var sessionId = await UploadAsync(client, companyId, csv);
@@ -90,9 +91,9 @@ public class ValidateImportSessionEndpointTests
         // now — Location/Employment Type/Position Profile use pre-existing values here so the
         // only *new* reference data this row creates is the Department itself.
         const string csv =
-            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n" +
-            "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer\n";
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n" +
+            "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer,50000\n";
 
         await EnsureDefaultLeavePolicyAsync(client, companyId);
         var sessionId = await UploadAsync(client, companyId, csv);
@@ -118,8 +119,8 @@ public class ValidateImportSessionEndpointTests
         // Location are the only ones deliberately missing, so the row's single failure is
         // attributable to the Position Profile requiring both to be resolvable.
         const string csv =
-            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Employment Type,Position Profile\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Permanent,Software Developer\n";
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Employment Type,Position Profile,Salary Amount\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Permanent,Software Developer,50000\n";
 
         var sessionId = await UploadAsync(client, companyId, csv);
 
@@ -141,8 +142,8 @@ public class ValidateImportSessionEndpointTests
         using var _ = client;
 
         const string csv =
-            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n";
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n";
 
         await EnsureDefaultLeavePolicyAsync(client, companyId);
         var sessionId = await UploadAsync(client, companyId, csv);
@@ -169,8 +170,8 @@ public class ValidateImportSessionEndpointTests
         // the required FirstName/LastName fields. Every other column uses its standard header
         // name (no override needed for those targets).
         const string csv =
-            "Given Name,Family Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n";
+            "Given Name,Family Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n";
 
         await EnsureDefaultLeavePolicyAsync(client, companyId);
         var sessionId = await UploadAsync(client, companyId, csv);
@@ -199,8 +200,8 @@ public class ValidateImportSessionEndpointTests
         // Same non-standard headers as the mapping-override test above, but posted with no
         // override — proves the override in that test is actually doing something, not a no-op.
         const string csv =
-            "Given Name,Family Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n";
+            "Given Name,Family Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n";
 
         var sessionId = await UploadAsync(client, companyId, csv);
 
@@ -364,9 +365,9 @@ public class ValidateImportSessionEndpointTests
         $"/api/companies/{companyId}/data-import/sessions/{sessionId}/validate";
 
     private static string ValidCsv() =>
-        "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
-        "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n" +
-        "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer\n";
+        "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
+        "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n" +
+        "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer,50000\n";
 
     private static async Task<Guid> UploadAsync(HttpClient client, Guid companyId, string csvContent)
     {
@@ -385,11 +386,37 @@ public class ValidateImportSessionEndpointTests
         var content = new MultipartFormDataContent();
         content.Add(new StringContent("Employee"), "EntityType");
 
-        var fileContent = new ByteArrayContent(Encoding.UTF8.GetBytes(csvContent));
-        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("text/csv");
-        content.Add(fileContent, "File", "employees.csv");
+        var fileContent = new ByteArrayContent(BuildXlsxBytes(csvContent));
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        content.Add(fileContent, "File", "employees.xlsx");
 
         return content;
+    }
+
+    // Builds a minimal XLSX workbook (via ClosedXML) from comma-delimited "csv-shaped" header/data
+    // lines, so existing test fixtures (written as csv-style strings for readability) can still be
+    // uploaded against the now xlsx-only import endpoint.
+    private static byte[] BuildXlsxBytes(string csvShapedContent)
+    {
+        var lines = csvShapedContent
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(l => l.TrimEnd('\r'))
+            .ToList();
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Sheet1");
+
+        for (var row = 0; row < lines.Count; row++)
+        {
+            var cells = lines[row].Split(',');
+            for (var col = 0; col < cells.Length; col++)
+                worksheet.Cell(row + 1, col + 1).Value = cells[col];
+        }
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
     }
 
     private sealed record UploadPayload(

@@ -43,14 +43,23 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     // ── New Employee — Personal Information ───────────────────────────────────
 
-    public async Task FillFirstNameAsync(string value) =>
+    public async Task FillFirstNameAsync(string value)
+    {
         await page.GetByPlaceholder("First name", new() { Exact = true }).FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public async Task FillLastNameAsync(string value) =>
+    public async Task FillLastNameAsync(string value)
+    {
         await page.GetByPlaceholder("Last name").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public async Task FillWorkEmailAsync(string value) =>
+    public async Task FillWorkEmailAsync(string value)
+    {
         await page.GetByPlaceholder("work@company.com").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task FillStartDateAsync(string ddMMyyyy)
     {
@@ -102,14 +111,17 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Reads the plain-text value of the Employment tab's read-only "Hours"/"FTE"/"Effective
-    /// From" fields, which render alongside "Current Salary" (see EmployeeEmploymentTab.razor's
-    /// CurrentHoursDisplay/CurrentFteDisplay/CurrentEffectiveFromDisplay).
+    /// Reads the plain-text value of the "Current Compensation" card's read-only "Current
+    /// Salary"/"Hours"/"FTE"/"Effective From" rows (see EmployeeEmploymentTab.razor's
+    /// CurrentSalaryDisplay/CurrentHoursDisplay/CurrentFteDisplay/CurrentEffectiveFromDisplay) —
+    /// rendered as a plain &lt;table&gt; of &lt;th&gt;/&lt;td&gt; rows, not the form-control-plaintext
+    /// fields used elsewhere on this page.
     /// </summary>
     public async Task<string?> GetEmploymentTabReadOnlyFieldAsync(string labelText)
     {
-        var group = page.Locator(".col-md-6, .col-md-4").Filter(new() { HasText = labelText }).First;
-        var value = group.Locator("p.form-control-plaintext").First;
+        var row = page.Locator("table.table-sm tr").Filter(new() { HasText = labelText }).First;
+        if (await row.CountAsync() == 0) return null;
+        var value = row.Locator("td").First;
         return await value.IsVisibleAsync() ? (await value.TextContentAsync())?.Trim() : null;
     }
 
@@ -277,6 +289,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         if (visible)
         {
             await field.FillAsync(value);
+            await page.Keyboard.PressAsync("Tab");
         }
     }
 
@@ -402,7 +415,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     /// <summary>Sets the notice period override's Length numeric field. Only present once the override checkbox is checked.</summary>
     public Task FillNoticePeriodLengthAsync(int length) =>
-        NoticePeriodOverrideRow.Locator("input.e-numerictextbox").First.FillAsync(length.ToString());
+        TypeIntoNumericInputAsync(NoticePeriodOverrideRow.Locator("input.e-numerictextbox").First, length.ToString());
 
     /// <summary>Returns the current value of the notice period override's Length numeric field.</summary>
     public async Task<int> GetNoticePeriodLengthAsync()
@@ -513,8 +526,11 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task FillAddCompensationSalaryAsync(string value) =>
         FillNumericAndVerifyAsync(page.Locator(".add-compensation-dialog input.e-numerictextbox").First, value, decimal.Parse(value));
 
-    public Task FillAddCompensationCurrencyAsync(string value) =>
-        page.Locator(".add-compensation-dialog").GetByPlaceholder("e.g. GBP").FillAsync(value);
+    public async Task FillAddCompensationCurrencyAsync(string value)
+    {
+        await page.Locator(".add-compensation-dialog").GetByPlaceholder("e.g. GBP").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task SubmitAddCompensationDialogAsync()
     {
@@ -1087,8 +1103,11 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     // so filling by that selector can silently write into an element that isn't bound to
     // Model.NoteText at all. GetByPlaceholder targets the real input directly, matching the
     // pattern already used successfully elsewhere (e.g. PromoteEmployeeDialog.FillReasonAsync).
-    public Task FillAddNoteTextAsync(string text) =>
-        page.GetByPlaceholder("Enter note details…").FillAsync(text);
+    public async Task FillAddNoteTextAsync(string text)
+    {
+        await page.GetByPlaceholder("Enter note details…").FillAsync(text);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public Task CheckAddNoteImportantAsync() =>
         page.Locator(".add-employee-note-dialog").GetByLabel("Important").CheckAsync();
@@ -1129,6 +1148,14 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task<bool> HasAddNoteDialogErrorAsync() =>
         page.Locator(".add-employee-note-dialog .alert-danger").IsVisibleAsync();
 
+    /// <summary>
+    /// True if the Notes tab's grid rendered a pager at all — Syncfusion's SfGrid doesn't render
+    /// ".e-pagercontainer" when every row already fits on one page. Same convention as
+    /// EmployeeDirectoryReportPage.IsPagerVisibleAsync.
+    /// </summary>
+    public Task<bool> IsNotesGridPagerVisibleAsync() =>
+        page.Locator("[data-testid='employee-notes-grid'] .e-pagercontainer").IsVisibleAsync();
+
     /// <summary>Returns the notes grid row whose rendered text contains <paramref name="textFragment"/>.</summary>
     public ILocator NoteCard(string textFragment) =>
         page.Locator("[data-testid='employee-notes-grid'] .e-row").Filter(new() { HasText = textFragment });
@@ -1142,8 +1169,11 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
-    public Task FillSupersedeNoteTextAsync(string text) =>
-        page.Locator("[data-testid='supersede-note-text']").FillAsync(text);
+    public async Task FillSupersedeNoteTextAsync(string text)
+    {
+        await page.Locator("[data-testid='supersede-note-text']").FillAsync(text);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public Task SelectSupersedeNoteCategoryAsync(string categoryLabel) =>
         DropDownSelector.SelectAsync(page, page.Locator(".supersede-employee-note-dialog"), categoryLabel);

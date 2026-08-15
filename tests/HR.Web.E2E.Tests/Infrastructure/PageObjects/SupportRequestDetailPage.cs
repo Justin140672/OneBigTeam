@@ -34,8 +34,11 @@ public sealed class SupportRequestDetailPage(IPage page, string baseUrl)
     public Task<bool> IsDiagnosticsSectionVisibleAsync() =>
         page.Locator(".card").Filter(new() { HasText = "Diagnostics" }).IsVisibleAsync();
 
-    public Task FillReplyAsync(string text) =>
-        ConversationCard.GetByPlaceholder("Write a reply…").FillAsync(text);
+    public async Task FillReplyAsync(string text)
+    {
+        await ConversationCard.GetByPlaceholder("Write a reply…").FillAsync(text);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task SendReplyAsync()
     {

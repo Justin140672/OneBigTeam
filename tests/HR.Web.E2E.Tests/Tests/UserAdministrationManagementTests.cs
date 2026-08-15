@@ -9,8 +9,9 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - The list page renders for an HR Administrator with expected grid data.
 /// - A plain Employee has no nav link and is redirected away from the page (same access-control
 ///   convention as EmploymentTypeManagementTests / SicknessCategoryManagementTests).
-/// - Inviting an eligible employee end-to-end through the 3-step wizard, and the new row shows up
-///   with "Pending" invitation status.
+/// - Inviting an eligible employee end-to-end via the Employee List's row-level "Invite User"
+///   Quick Invite action (User Administration no longer has its own invite entry point — see
+///   InviteUserDialog.razor), and the new row shows up with "Pending" invitation status.
 /// - Navigating into a user's detail page and reading its audit history.
 /// - Editing an active user's roles via "Manage Roles".
 /// - Disabling then re-enabling an active user's account (the deactivate/reactivate coverage this
@@ -31,11 +32,17 @@ public sealed class UserAdministrationManagementTests(AppFixture fixture) : E2ET
     private const string PlainEmployeeEmail = "tom.williams@acme.example";
 
     // Seeded Acme employee with no dev-persona user account, used as the invite target. If the
-    // seed data ever changes so that both "Emma Jones" and "Sophie Laurent" gain accounts, the
-    // invite wizard's employee picker will render its "every employee already has an account"
-    // empty state and InviteEmployee_EndToEnd_ShowsPendingInvitation below will fail fast on the
-    // dropdown click — pick a different unlinked seeded employee at that point.
+    // seed data ever changes so this employee gains an account, the Employee List's row-level
+    // "Invite User" link will no longer render for them and
+    // InviteEmployee_EndToEnd_ShowsPendingInvitation below will fail fast — pick a different
+    // unlinked seeded employee at that point.
     private const string UninvitedEmployeeName = "Emma Jones";
+
+    // Second seeded no-account employee (see the class doc comment) — a distinct invite target
+    // for the Resend/Cancel toolbar tests below, so they don't collide with
+    // InviteEmployee_EndToEnd_ShowsPendingInvitationInGrid's use of Emma Jones (which leaves her
+    // permanently Pending on the shared dev database).
+    private const string SecondUninvitedEmployeeName = "Sophie Laurent";
 
     [Fact]
     public async Task HrAdministrator_SeesUserAdministrationGrid()
@@ -83,20 +90,19 @@ public sealed class UserAdministrationManagementTests(AppFixture fixture) : E2ET
     public async Task InviteEmployee_EndToEnd_ShowsPendingInvitationInGrid()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var employees = new EmployeeListPage(_page, _fixture.WebBaseUrl);
         var list  = new UserAdministrationListPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(HrAdminEmail);
 
-        await list.GoToAsync(AcmeId);
-        await list.OpenInviteDialogAsync();
+        // Inviting is only reachable from the Employee List's row-level "Invite User" action.
+        await employees.GoToAsync(AcmeId);
+        await employees.ClickInviteUserLinkAsync(UninvitedEmployeeName);
 
         // "Employee" is always applied automatically (fixed badge, not a selectable role) — no
         // additional roles are needed for this happy-path invite.
-        await list.InviteEmployeeAsync(UninvitedEmployeeName, []);
-
-        // A successful invite navigates to the new user's detail page.
-        Assert.Contains("/user-administration/", _page.Url);
+        await employees.CompleteQuickInviteAsync([]);
 
         await list.GoToAsync(AcmeId);
 
@@ -105,6 +111,71 @@ public sealed class UserAdministrationManagementTests(AppFixture fixture) : E2ET
 
         var invitationStatus = await list.GetInvitationStatusAsync(UninvitedEmployeeName);
         Assert.Equal("Pending", invitationStatus);
+    }
+
+    // ── Resend/Cancel Invitation toolbar actions ──────────────────────────────
+    // UserAdministrationList.razor — the two toolbar buttons added alongside the standard
+    // Add/Edit/View trio, selection-dependent like every other custom toolbar action
+    // (SearchPageBase.AddToolbarAction), but the handlers themselves additionally guard on the
+    // selected row actually having a pending/expired invite (HasActionableInvite) — an active
+    // user has no InviteId left to act on, so clicking either button on one is a no-op with an
+    // inline error rather than silently succeeding.
+
+    [Fact]
+    public async Task ResendThenCancelInvitation_FromToolbar_UpdatesInvitationStatus()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var employees = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var list  = new UserAdministrationListPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(HrAdminEmail);
+
+        await employees.GoToAsync(AcmeId);
+        await employees.ClickInviteUserLinkAsync(SecondUninvitedEmployeeName);
+        await employees.CompleteQuickInviteAsync([]);
+
+        await list.GoToAsync(AcmeId);
+        Assert.Equal("Pending", await list.GetInvitationStatusAsync(SecondUninvitedEmployeeName));
+
+        await list.SelectRowAsync(SecondUninvitedEmployeeName);
+        await list.ClickResendInvitationAsync();
+
+        Assert.Null(await list.GetActionErrorAsync());
+        Assert.Equal("Pending", await list.GetInvitationStatusAsync(SecondUninvitedEmployeeName));
+
+        await list.SelectRowAsync(SecondUninvitedEmployeeName);
+        await list.ClickCancelInvitationAsync();
+
+        Assert.Null(await list.GetActionErrorAsync());
+        Assert.Equal("Cancelled", await list.GetInvitationStatusAsync(SecondUninvitedEmployeeName));
+    }
+
+    [Theory]
+    [InlineData(true)]  // Resend
+    [InlineData(false)] // Cancel
+    public async Task InvitationToolbarAction_OnActiveUser_ShowsInlineError(bool resend)
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var list  = new UserAdministrationListPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(HrAdminEmail);
+
+        await list.GoToAsync(AcmeId);
+        // David Park is a seeded active account with no invite left to act on (see
+        // UserDetail_ShowsAccountDetailsAndAuditHistory's own reasoning for using him as an
+        // untouched-by-other-tests active persona).
+        await list.SelectRowAsync("David Park");
+
+        if (resend)
+            await list.ClickResendInvitationAsync();
+        else
+            await list.ClickCancelInvitationAsync();
+
+        var error = await list.GetActionErrorAsync();
+        Assert.NotNull(error);
+        Assert.Contains("does not have a pending invitation", error);
     }
 
     [Fact]

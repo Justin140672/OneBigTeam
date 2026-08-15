@@ -17,4 +17,14 @@ internal sealed class FakeAuditHistoryReader(IReadOnlyList<AuditHistoryEntry> en
         Guid companyId, string entityType, Guid entityId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<AuditHistoryEntry>>(
             entries.Where(e => e.EntityType == entityType && e.EntityId == entityId).ToList());
+
+    public Task<PagedResult<AuditHistoryEntry>> GetPlatformAuditLogAsync(
+        Guid? companyId,
+        IReadOnlyCollection<Guid>? actorUserIds,
+        DateTimeOffset? fromDate,
+        DateTimeOffset? toDate,
+        string? eventType,
+        Pagination pagination,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new PagedResult<AuditHistoryEntry>([], 0, pagination.PageNumber, pagination.PageSize));
 }

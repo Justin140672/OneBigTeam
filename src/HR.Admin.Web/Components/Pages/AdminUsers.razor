@@ -1,0 +1,315 @@
+@page "/admin-users"
+@inject AdminUsersService AdminUsersService
+@using Syncfusion.Blazor.DropDowns
+
+<PageTitle>Administrators — Admin Portal</PageTitle>
+
+<h1>Administrators</h1>
+<p class="admin-actions-intro">
+    Platform administrator accounts (SupportStaff and PlatformOwner). Every sensitive action below
+    (disable, enable, role change, MFA reset, password reset) is recorded in the audit log.
+</p>
+
+<section class="details-panel admin-actions-panel">
+    <h2>Create administrator</h2>
+    <div class="admin-action-field">
+        <label for="new-admin-email">Email</label>
+        <SfTextBox @bind-Value="_newEmail" Placeholder="name@example.com"
+                   HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "new-admin-email" })" />
+    </div>
+    <div class="admin-action-field">
+        <label for="new-admin-role">Role</label>
+        <SfDropDownList TValue="string" TItem="string" @bind-Value="_newRole" DataSource="@_roleOptions"
+                         AllowFiltering="true"
+                         HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "new-admin-role" })" />
+    </div>
+    @if (_createError is not null)
+    {
+        <p class="admin-action-error">@_createError</p>
+    }
+    <div class="admin-actions-buttons">
+        <SfButton IsPrimary="true" Disabled="_creating" OnClick="CreateAdministratorAsync">
+            @if (_creating)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            Create administrator
+        </SfButton>
+    </div>
+</section>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_administrators is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view platform administrators, or the list couldn't be loaded.
+        Contact a platform owner if you believe this is a mistake.
+    </div>
+}
+else if (_administrators.Count == 0)
+{
+    <p class="activity-empty">No administrator accounts found.</p>
+}
+else
+{
+    <table class="billing-history-table">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var admin in _administrators)
+            {
+                <tr>
+                    <td>@admin.Email</td>
+                    <td>@admin.Role</td>
+                    <td>@FormatStatus(admin)</td>
+                    <td>@admin.CreatedAt.ToString("dd MMM yyyy HH:mm")</td>
+                    <td>
+                        <div class="admin-actions-buttons">
+                            @if (admin.IsEnabled)
+                            {
+                                <SfButton CssClass="e-danger" OnClick="@(() => OpenAction(admin, AdminUserAction.Disable))">Disable</SfButton>
+                            }
+                            else
+                            {
+                                <SfButton OnClick="@(() => OpenAction(admin, AdminUserAction.Enable))">Enable</SfButton>
+                            }
+                            <SfButton OnClick="@(() => OpenAssignRole(admin))">Assign role</SfButton>
+                            <SfButton OnClick="@(() => OpenAction(admin, AdminUserAction.ResetMfa))">Reset MFA</SfButton>
+                            <SfButton OnClick="@(() => OpenAction(admin, AdminUserAction.ResetPassword))">Reset password</SfButton>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p>@_administrators.Count administrator(s)</p>
+
+    @if (_actionMessage is not null)
+    {
+        <p class="@(_actionSucceeded ? "admin-action-success" : "admin-action-error")">@_actionMessage</p>
+    }
+}
+
+@if (_assignRoleDialogVisible)
+{
+    <section class="details-panel admin-actions-panel">
+        <h2>Assign role for @_activeAdmin?.Email</h2>
+        <div class="admin-action-field">
+            <label for="assign-role-select">New role</label>
+            <SfDropDownList TValue="string" TItem="string" @bind-Value="_assignRoleValue" DataSource="@_roleOptions"
+                             AllowFiltering="true"
+                             HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "assign-role-select" })" />
+        </div>
+        <div class="admin-actions-buttons">
+            <SfButton IsPrimary="true" OnClick="ConfirmAssignRoleSelection">Continue</SfButton>
+            <SfButton OnClick="@(() => _assignRoleDialogVisible = false)">Cancel</SfButton>
+        </div>
+    </section>
+}
+
+<AdminActionConfirmDialog Visible="_dialogVisible"
+                           Title="@DialogTitle"
+                           Warning="@DialogWarning"
+                           ConfirmText="@DialogConfirmText"
+                           DangerConfirm="@DialogIsDanger"
+                           Busy="_actionBusy"
+                           OnConfirmed="OnActionConfirmedAsync"
+                           OnCancelled="CloseDialog" />
+
+@code {
+    private ListPlatformAdministratorsResponse? _listResponse;
+    private IReadOnlyList<PlatformAdministratorSummary>? _administrators => _listResponse?.Administrators;
+    private bool _loading = true;
+
+    private readonly List<string> _roleOptions = ["SupportStaff", "PlatformOwner"];
+
+    private string _newEmail = string.Empty;
+    private string _newRole = "SupportStaff";
+    private bool _creating;
+    private string? _createError;
+
+    private enum AdminUserAction
+    {
+        Disable,
+        Enable,
+        AssignRole,
+        ResetMfa,
+        ResetPassword,
+    }
+
+    private bool _dialogVisible;
+    private AdminUserAction _activeAction;
+    private PlatformAdministratorSummary? _activeAdmin;
+    private bool _actionBusy;
+    private string? _actionMessage;
+    private bool _actionSucceeded;
+
+    private bool _assignRoleDialogVisible;
+    private string _assignRoleValue = "SupportStaff";
+    private string? _pendingAssignRole;
+
+    private string DialogTitle => _activeAction switch
+    {
+        AdminUserAction.Disable => "Disable administrator",
+        AdminUserAction.Enable => "Enable administrator",
+        AdminUserAction.AssignRole => "Assign role",
+        AdminUserAction.ResetMfa => "Reset MFA",
+        AdminUserAction.ResetPassword => "Reset password",
+        _ => "Confirm action",
+    };
+
+    private string DialogWarning => _activeAction switch
+    {
+        AdminUserAction.Disable =>
+            $"This will disable {_activeAdmin?.Email}'s administrator account. They will immediately lose access to the Admin Portal.",
+        AdminUserAction.Enable =>
+            $"This will re-enable {_activeAdmin?.Email}'s administrator account, restoring their Admin Portal access.",
+        AdminUserAction.AssignRole =>
+            $"This will change {_activeAdmin?.Email}'s role to {_pendingAssignRole}. This is a security-sensitive permission change.",
+        AdminUserAction.ResetMfa =>
+            $"IMPORTANT: this is a deliberate STUB. Confirming will only record an audit event for " +
+            $"{_activeAdmin?.Email} — it does NOT perform a real Supabase MFA reset yet.",
+        AdminUserAction.ResetPassword =>
+            $"This will send a real Supabase password-recovery email to {_activeAdmin?.Email}.",
+        _ => "This action will affect the administrator account.",
+    };
+
+    private string DialogConfirmText => _activeAction switch
+    {
+        AdminUserAction.Disable => "Disable",
+        AdminUserAction.Enable => "Enable",
+        AdminUserAction.AssignRole => "Assign role",
+        AdminUserAction.ResetMfa => "Reset MFA (stub)",
+        AdminUserAction.ResetPassword => "Reset password",
+        _ => "Confirm",
+    };
+
+    private bool DialogIsDanger => _activeAction is AdminUserAction.Disable or AdminUserAction.AssignRole;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        _listResponse = await AdminUsersService.GetAdministratorsOrNullAsync();
+    }
+
+    private static MarkupString FormatStatus(PlatformAdministratorSummary admin)
+    {
+        return admin.IsEnabled
+            ? new MarkupString("<span class=\"status-pill status-pill-enabled\">Enabled</span>")
+            : new MarkupString("<span class=\"status-pill status-pill-disabled\">Disabled</span>");
+    }
+
+    private async Task CreateAdministratorAsync()
+    {
+        _createError = null;
+
+        if (string.IsNullOrWhiteSpace(_newEmail))
+        {
+            _createError = "Please enter an email address.";
+            return;
+        }
+
+        _creating = true;
+        try
+        {
+            var created = await AdminUsersService.CreateAdministratorAsync(_newEmail.Trim(), _newRole);
+            if (created is null)
+            {
+                _createError = "Could not create the administrator. The email may already be in use, or you may not be authorised to perform this action.";
+                return;
+            }
+
+            _newEmail = string.Empty;
+            _newRole = "SupportStaff";
+            await LoadAsync();
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    private void OpenAction(PlatformAdministratorSummary admin, AdminUserAction action)
+    {
+        _activeAdmin = admin;
+        _activeAction = action;
+        _actionMessage = null;
+        _dialogVisible = true;
+    }
+
+    private void OpenAssignRole(PlatformAdministratorSummary admin)
+    {
+        _activeAdmin = admin;
+        _assignRoleValue = admin.Role;
+        _assignRoleDialogVisible = true;
+    }
+
+    private void ConfirmAssignRoleSelection()
+    {
+        _pendingAssignRole = _assignRoleValue;
+        _assignRoleDialogVisible = false;
+        OpenAction(_activeAdmin!, AdminUserAction.AssignRole);
+    }
+
+    private void CloseDialog()
+    {
+        _dialogVisible = false;
+    }
+
+    private async Task OnActionConfirmedAsync((string Reason, DateTimeOffset? NewTrialExpiresAt) input)
+    {
+        if (_activeAdmin is null)
+        {
+            _dialogVisible = false;
+            return;
+        }
+
+        _actionBusy = true;
+        try
+        {
+            var succeeded = _activeAction switch
+            {
+                AdminUserAction.Disable => await AdminUsersService.DisableAdministratorAsync(_activeAdmin.Id),
+                AdminUserAction.Enable => await AdminUsersService.EnableAdministratorAsync(_activeAdmin.Id),
+                AdminUserAction.AssignRole => await AdminUsersService.AssignRoleAsync(_activeAdmin.Id, _pendingAssignRole ?? _activeAdmin.Role),
+                AdminUserAction.ResetMfa => await AdminUsersService.ResetMfaAsync(_activeAdmin.Id),
+                AdminUserAction.ResetPassword => await AdminUsersService.ResetPasswordAsync(_activeAdmin.Id),
+                _ => false,
+            };
+
+            _actionSucceeded = succeeded;
+            _actionMessage = succeeded
+                ? _activeAction == AdminUserAction.ResetMfa
+                    ? "Audit event recorded. Reminder: no real MFA reset was performed (stub)."
+                    : $"{DialogConfirmText} completed successfully."
+                : $"{DialogConfirmText} failed. Check the administrator's current state and try again.";
+
+            if (succeeded)
+            {
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _actionBusy = false;
+            _dialogVisible = false;
+            _pendingAssignRole = null;
+        }
+    }
+}

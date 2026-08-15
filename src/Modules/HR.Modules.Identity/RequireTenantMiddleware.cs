@@ -20,7 +20,20 @@ internal sealed class RequireTenantMiddleware(RequestDelegate next)
         // should ever be blocked here.
         var allowsAnonymous = context.GetEndpoint()?.Metadata.GetMetadata<IAllowAnonymous>() is not null;
 
-        if (!allowsAnonymous && context.User.Identity?.IsAuthenticated == true)
+        // "platform:admin"-policy endpoints (Admin Portal: PlatformAdministrator management, System
+        // Health, Application Metrics, Audit Log, and now Platform Settings) are deliberately
+        // company-agnostic — see the policy's own remarks in IdentityModule.AddRolePolicies ("a
+        // platform administrator manages the whole platform and may have no employee/company
+        // relationship at all"). Without this exemption, RequireTenantMiddleware 403s every such
+        // request unconditionally (no tenant claim is ever presented for a platform-admin caller),
+        // which pre-dates this fix and was silently breaking every platform:admin endpoint's
+        // integration tests. Mirrors the existing AllowAnonymous exemption above rather than
+        // introducing a new mechanism.
+        var isPlatformAdminPolicy = context.GetEndpoint()?.Metadata
+            .GetOrderedMetadata<IAuthorizeData>()
+            .Any(a => a.Policy == "platform:admin") == true;
+
+        if (!allowsAnonymous && !isPlatformAdminPolicy && context.User.Identity?.IsAuthenticated == true)
         {
             var resolved = context.Items[SupabaseCurrentUserResolutionMiddleware.CurrentUserItemKey]
                 as ResolvedCurrentUser;

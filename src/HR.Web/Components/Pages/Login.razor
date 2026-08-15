@@ -2,7 +2,7 @@
 @layout HR.Web.Components.Layout.LoginLayout
 @rendermode InteractiveServer
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
-@inject DevAuthService DevAuth
+@inject AuthService Auth
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
@@ -35,7 +35,10 @@
         </div>
 
         <div class="login-field">
-            <label class="login-label">Password</label>
+            <div class="login-password-row">
+                <label class="login-label">Password</label>
+                <a href="/forgot-password" class="login-forgot-link" data-testid="forgot-password-link">Forgot password?</a>
+            </div>
             <SfTextBox @bind-Value="_form.Password"
                        Placeholder="••••••••"
                        Type="InputType.Password" />
@@ -65,21 +68,10 @@
         _error = null;
         _busy  = true;
 
-        var personas = await DevAuth.GetPersonasAsync();
-        var match    = personas.FirstOrDefault(p =>
-            string.Equals(p.Email, _form.Email, StringComparison.OrdinalIgnoreCase));
-
-        if (match is null || _form.Password != "password")
-        {
-            _error = "Invalid email or password.";
-            _busy  = false;
-            return;
-        }
-
-        var session = await DevAuth.SwitchAsync(match.UserId);
+        var (session, error) = await Auth.LoginAsync(_form.Email, _form.Password);
         if (session is null)
         {
-            _error = "Sign in failed. Please try again.";
+            _error = error;
             _busy  = false;
             return;
         }
@@ -88,7 +80,7 @@
         // OnPersonaSwitchAsync remarks for why NavigationManager.NavigateTo(forceLoad: true) isn't
         // reliable enough here.
         var query = $"accessToken={Uri.EscapeDataString(session.AccessToken)}&expiresIn={session.ExpiresIn}";
-        await JS.InvokeVoidAsync("hardNavigate", $"/dev/persona-cookie?{query}");
+        await JS.InvokeVoidAsync("hardNavigate", $"/login-complete?{query}");
     }
 
     private sealed class LoginForm

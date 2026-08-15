@@ -82,6 +82,25 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
     }
 
     [Fact]
+    public async Task ManagerCaller_With_No_Resolved_CurrentUserId_Returns_Empty()
+    {
+        // currentUser.UserId is null even though the caller passes the manager policy — must not
+        // throw or fall through to the HR-wide branch, must simply return empty.
+        var reader = new FakeOnboardingReportReader(
+        [
+            BuildItem(Guid.NewGuid(), new OnboardingReportTaskItem("Task A", null, "Manager", false)),
+        ]);
+
+        var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
+            reader, new FakeDirectReportsReader([Guid.NewGuid()]), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-onboarding"), new FakeCurrentUser(null));
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
     public async Task CallerWithNoRecognisedRole_Returns_Empty_Not_Throws()
     {
         var callerId = Guid.NewGuid();

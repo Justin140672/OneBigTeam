@@ -83,6 +83,11 @@
     </DialogTemplates>
 </SfDialog>
 
+<UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                      OnSaveAndClose="ConfirmSaveInsteadOfCancelAsync"
+                      OnDiscard="ConfirmDiscardAsync"
+                      OnCancel="CancelUnsavedChangesDialog" />
+
 @code {
     [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }

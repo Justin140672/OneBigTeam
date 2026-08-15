@@ -282,6 +282,78 @@ public class UpdateEmploymentDetailsEndpointTests
     }
 
     [Fact]
+    public async Task Put_Profile_Then_Put_Employment_With_Same_Location_Does_Not_Revert_Location()
+    {
+        // Locks in last-write-wins persistence at the API layer, matching the EmployeeEmploymentTab
+        // fix: EmployeeEdit.razor's combined Save flow calls UpdateEmployeeProfile (which correctly
+        // saves a new Location) and then immediately calls the Employment tab's SaveAsync, which
+        // now synchronises its own Model.LocationId to the just-saved value before submitting
+        // UpdateEmploymentDetailsRequest, instead of resubmitting a stale copy that silently
+        // reverted the just-saved Location.
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
+
+        var employee = await CreateEmployeeAsync(client, companyId);
+
+        var locTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType {Guid.NewGuid():N}" });
+        locTypeResp.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResp.Content.ReadFromJsonAsync<EmployeeRef>())!.Id;
+
+        var newLocResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"NewLoc {Guid.NewGuid():N}", locationTypeId });
+        newLocResp.EnsureSuccessStatusCode();
+        var newLocationId = (await newLocResp.Content.ReadFromJsonAsync<EmployeeRef>())!.Id;
+
+        // Step 1: UpdateEmployeeProfile saves the new Location (simulates EmployeeEdit.razor's
+        // SaveCoreAsync calling UpdateEmployeeProfileAsync first).
+        var profileResponse = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employee.Id}/profile",
+            new
+            {
+                companyId,
+                id = employee.Id,
+                locationId = newLocationId,
+                firstName = "Test",
+                lastName = "Employee",
+                workEmail = $"test.{Guid.NewGuid():N}@example.com",
+                startDate = "2026-01-15"
+            });
+        Assert.Equal(HttpStatusCode.OK, profileResponse.StatusCode);
+
+        // Step 2: UpdateEmploymentDetails is called immediately after with the SAME location value
+        // — matching what the fixed EmployeeEmploymentTab.SyncSharedAssignmentFields now does —
+        // rather than a stale/older LocationId that would silently revert step 1's change.
+        var employmentResponse = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employee.Id}/employment",
+            new
+            {
+                companyId,
+                id = employee.Id,
+                locationId = newLocationId,
+                employeeNumber = "EMP-001",
+                employmentTypeId = (Guid?)null,
+                status = "Active",
+                startDate = "2026-01-15"
+            });
+        Assert.Equal(HttpStatusCode.OK, employmentResponse.StatusCode);
+
+        var payload = await employmentResponse.Content.ReadFromJsonAsync<EmploymentPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(newLocationId, payload!.LocationId);
+
+        // Re-fetch the profile to double-check the location wasn't reverted on the profile side either.
+        var profilePayload = await profileResponse.Content.ReadFromJsonAsync<EmployeeProfilePayload>();
+        Assert.NotNull(profilePayload);
+        Assert.Equal(newLocationId, profilePayload!.LocationId);
+    }
+
+    [Fact]
     public async Task Put_Employment_Returns_NotFound_For_Unknown_Employee()
     {
         using var client = _factory.CreateClient();
@@ -326,10 +398,25 @@ public class UpdateEmploymentDetailsEndpointTests
         Guid CompanyId,
         string? EmployeeNumber,
         Guid? EmploymentTypeId,
+        Guid? LocationId,
         string Status,
         DateOnly StartDate,
         DateOnly? ContinuousServiceDate,
         string? NoticePeriodUnitOverride,
         int? NoticePeriodLengthOverride,
+        DateTimeOffset UpdatedAt);
+
+    private sealed record EmployeeProfilePayload(
+        Guid Id,
+        Guid CompanyId,
+        Guid? DepartmentId,
+        Guid? LocationId,
+        string FirstName,
+        string LastName,
+        string WorkEmail,
+        string? PersonalEmail,
+        DateOnly StartDate,
+        string Status,
+        bool HasSystemAccess,
         DateTimeOffset UpdatedAt);
 }

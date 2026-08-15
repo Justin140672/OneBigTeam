@@ -20,7 +20,7 @@ internal sealed class ExportLeaveSummaryReportHandler(
         CancellationToken cancellationToken)
     {
         var getResult = await getHandler.HandleAsync(
-            new GetLeaveSummaryReportRequest(request.CompanyId, request.PolicyYear, request.DepartmentId, request.GroupBy),
+            new GetLeaveSummaryReportRequest(request.CompanyId, request.PolicyYear, request.DepartmentId, request.LeaveTypeId, request.GroupBy),
             callerIsHr,
             callerEmployeeId,
             cancellationToken);

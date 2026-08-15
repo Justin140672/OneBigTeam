@@ -9,7 +9,12 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
     public async Task<ListVacanciesResponse?> ListVacanciesAsync(
-        Guid companyId, string? status = null, Guid? positionProfileId = null, Guid? departmentId = null)
+        Guid companyId,
+        string? status = null,
+        Guid? positionProfileId = null,
+        Guid? departmentId = null,
+        bool excludeClosed = false,
+        string? search = null)
     {
         try
         {
@@ -18,6 +23,8 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
             if (!string.IsNullOrWhiteSpace(status)) query.Add($"status={status}");
             if (positionProfileId is not null) query.Add($"positionProfileId={positionProfileId}");
             if (departmentId is not null) query.Add($"departmentId={departmentId}");
+            if (excludeClosed) query.Add("excludeClosed=true");
+            if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
             if (query.Count > 0) url += "?" + string.Join("&", query);
 
             return await Http.GetFromJsonAsync<ListVacanciesResponse>(url, HrApiJsonOptions.Default);

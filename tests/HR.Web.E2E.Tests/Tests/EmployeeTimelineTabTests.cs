@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -89,34 +90,20 @@ public sealed class EmployeeTimelineTabTests(AppFixture fixture) : E2ETestBase(f
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // This test does one employee creation (several combobox selections) plus 22 back-to-back
-        // Add Note dialog round-trips — each individual step still completes correctly, but under
-        // that much cumulative load a single step can occasionally take longer than the suite's
-        // normal 30s default action timeout (E2ETestBase.SetDefaultTimeout) without actually being
-        // stuck. Raise the budget just for this unusually long arrange phase rather than loosening
-        // the global default, which should stay tight everywhere else to fail fast on real hangs.
-        _page.SetDefaultTimeout(60_000);
-        try
-        {
-            await CreateEmployeeAsync(empList, empEdit, startDateDdMmYyyy: "01/01/2020");
+        var (employeeId, _) = await CreateEmployeeAsync(empList, empEdit, startDateDdMmYyyy: "01/01/2020");
 
-            // Page size is 20 (see EmployeeTimelineTab.razor's PageSize const). 22 HR notes plus the
-            // one pre-existing "Employee joined" entry give 23 total — 20 on the first page, 3 more
-            // after "Load more".
-            await empEdit.OpenNotesTabAsync();
-            for (var i = 0; i < 22; i++)
-            {
-                await empEdit.ClickAddNoteAsync();
-                await empEdit.SelectAddNoteCategoryAsync("General");
-                await empEdit.FillAddNoteTextAsync($"Load more note {i} {Guid.NewGuid():N}");
-                await empEdit.SubmitAddNoteDialogAsync();
-            }
-        }
-        finally
-        {
-            _page.SetDefaultTimeout(30_000);
-        }
+        // Page size is 20 (see EmployeeTimelineTab.razor's PageSize const). 22 HR notes plus the
+        // one pre-existing "Employee joined" entry give 23 total — 20 on the first page, 3 more
+        // after "Load more". Only this test's OWN Timeline-pagination behaviour is under test here
+        // — the Notes tab's dialog/UI is already covered by EmployeeNotesTabTests — so these 22
+        // notes are seeded via a direct authenticated call to the same CreateEmployeeNote endpoint
+        // the Add Note dialog itself calls (still a real handler round trip, still writes a real
+        // "HR note added" timeline entry via the real domain event — not a DB-seeding shortcut,
+        // see this file's own header comment) rather than 22 slow, repeated Syncfusion dialog
+        // round-trips through the browser.
+        await SeedNotesAsync(employeeId, count: 22);
 
+        await empEdit.GoToAsync(AcmeId, employeeId);
         var urlBeforeLoadMore = _page.Url;
 
         await timeline.OpenAsync();
@@ -273,4 +260,50 @@ public sealed class EmployeeTimelineTabTests(AppFixture fixture) : E2ETestBase(f
 
         return (id, lastName);
     }
+
+    /// <summary>
+    /// Creates <paramref name="count"/> HR notes for <paramref name="employeeId"/> via direct
+    /// authenticated calls to the same POST /api/companies/{companyId}/employees/{employeeId}/notes
+    /// endpoint the Add Note dialog itself calls (HR.Modules.Employees' CreateEmployeeNote feature)
+    /// — a real handler round trip that still writes a real "HR note added" timeline entry via the
+    /// real domain event, not a DB-seeding shortcut (see this file's own header comment on why one
+    /// was deliberately avoided). Only the transport changes: HTTP instead of 22 repeated Syncfusion
+    /// dialog round-trips through the browser, which is what made this test's arrange phase slow.
+    ///
+    /// Laura (LauraEmail, already logged in via the UI for the rest of the test) is also used here
+    /// as the note-creating actor, via the same dev-only "obtain a real Supabase session for a
+    /// known persona" endpoint the persona switcher and DevAuthService.SwitchAsync use — see
+    /// Program.cs's POST /api/dev/persona/{userId}.
+    /// </summary>
+    private async Task SeedNotesAsync(Guid employeeId, int count)
+    {
+        const string lauraUserId = "30000000-0000-0000-0000-000000000005";
+
+        using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };
+
+        var sessionResponse = await http.PostAsync($"/api/dev/persona/{lauraUserId}", content: null);
+        sessionResponse.EnsureSuccessStatusCode();
+        var session = await sessionResponse.Content.ReadFromJsonAsync<DevPersonaSessionResult>();
+        Assert.NotNull(session);
+
+        http.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session!.AccessToken);
+
+        for (var i = 0; i < count; i++)
+        {
+            var response = await http.PostAsJsonAsync(
+                $"/api/companies/{AcmeId}/employees/{employeeId}/notes",
+                new
+                {
+                    CompanyId = AcmeId,
+                    EmployeeId = employeeId,
+                    Category = "General",
+                    NoteText = $"Load more note {i} {Guid.NewGuid():N}",
+                    IsImportant = false,
+                });
+            response.EnsureSuccessStatusCode();
+        }
+    }
+
+    private sealed record DevPersonaSessionResult(string AccessToken, string RefreshToken, int ExpiresIn);
 }

@@ -30,11 +30,11 @@ internal sealed class Endpoint(
         var canViewProbation = (await authorizationService.AuthorizeAsync(User, "reporting:view-probation")).Succeeded;
         var canViewOnboarding = (await authorizationService.AuthorizeAsync(User, "reporting:view-onboarding")).Succeeded;
 
-        // Every caller reaching this endpoint has already passed the reporting:view policy above
-        // (Manager, Recruiter or HrAdministrator), which is exactly the set of roles the Workload &
-        // HR Actions Report is relevant to — see the RequiresWorkloadActionsAccess comment in
-        // Handler.cs.
-        var canViewWorkloadActions = true;
+        // Bug fix: this was previously hardcoded to true for every caller who passed the baseline
+        // reporting:view policy, which meant a Recruiter with no HR/Manager role saw this HR-category
+        // report in their Recruitment reports list. Gated on a dedicated Manager/HrAdministrator-only
+        // policy instead — see reporting:view-workload-actions in IdentityModule.cs.
+        var canViewWorkloadActions = (await authorizationService.AuthorizeAsync(User, "reporting:view-workload-actions")).Succeeded;
 
         var result = await handler.HandleAsync(request, canViewRecruitment, canViewHr, canViewEmployeeStarter, canViewLeaveSummary, canViewProbation, canViewOnboarding, canViewWorkloadActions, cancellationToken);
 

@@ -273,6 +273,7 @@ document.querySelector("[data-form-status]")?.focus();
 // mark invalid fields accessibly (aria-invalid + an associated, visible error message via
 // aria-describedby) and move keyboard focus to the first invalid field ourselves.
 const signUpForm = document.querySelector("[data-signup-form]");
+const signUpSubmitButton = document.querySelector("[data-signup-submit]");
 
 signUpForm?.addEventListener("submit", (event) => {
   const fields = Array.from(signUpForm.querySelectorAll("input[required]"));
@@ -293,8 +294,19 @@ signUpForm?.addEventListener("submit", (event) => {
   if (firstInvalidField) {
     event.preventDefault();
     firstInvalidField.focus();
+    return;
+  }
+
+  // Prevent duplicate submissions while the signup + real Supabase Auth round trip is in flight —
+  // disabling before the browser's own navigation kicks off still lets the (already-valid) POST
+  // go through once.
+  if (signUpSubmitButton) {
+    signUpSubmitButton.disabled = true;
+    signUpSubmitButton.textContent = "Creating your account...";
   }
 });
+
+document.querySelector("[data-form-status][data-status='error']")?.focus();
 
 // Password show/hide toggle: swaps the input's `type` between "password" and "text" without
 // touching its value, so autofill/password managers and pasted values are unaffected. The

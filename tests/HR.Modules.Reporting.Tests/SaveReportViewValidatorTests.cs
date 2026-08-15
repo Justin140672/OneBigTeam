@@ -73,6 +73,59 @@ public class SaveReportViewValidatorTests
     }
 
     [Fact]
+    public void Should_Not_Have_Error_When_Name_Is_At_MaxLength()
+    {
+        var request = ValidRequest() with { Name = new string('a', 200) };
+
+        var result = _validator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Should_Not_Have_Error_When_ReportId_Is_At_MaxLength()
+    {
+        var request = ValidRequest() with { ReportId = new string('a', 200) };
+
+        var result = _validator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Should_Have_Error_When_ReportId_Is_Whitespace()
+    {
+        var request = ValidRequest() with { ReportId = "   " };
+
+        var result = _validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(SaveReportViewRequest.ReportId));
+    }
+
+    [Fact]
+    public void Should_Have_Error_When_Name_Is_Whitespace()
+    {
+        var request = ValidRequest() with { Name = "   " };
+
+        var result = _validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(SaveReportViewRequest.Name));
+    }
+
+    [Fact]
+    public void Should_Have_Error_When_FilterCriteriaJson_Is_Whitespace()
+    {
+        var request = ValidRequest() with { FilterCriteriaJson = "   " };
+
+        var result = _validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(SaveReportViewRequest.FilterCriteriaJson));
+    }
+
+    [Fact]
     public void Should_Have_Error_When_FilterCriteriaJson_Is_Empty()
     {
         var request = ValidRequest() with { FilterCriteriaJson = string.Empty };

@@ -82,4 +82,48 @@ public class CreateLeavePolicyValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateLeavePolicyRequest.CarryOverDays));
     }
+
+    [Fact]
+    public void Validate_Passes_When_CarryOverDays_Is_Zero()
+    {
+        var validator = new CreateLeavePolicyValidator();
+
+        var result = validator.Validate(new CreateLeavePolicyRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            Name = "Standard Policy",
+            CarryOverDays = 0
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_CarryOverDays_Is_Exactly_365()
+    {
+        var validator = new CreateLeavePolicyValidator();
+
+        var result = validator.Validate(new CreateLeavePolicyRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            Name = "Standard Policy",
+            CarryOverDays = 365
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_Name_Is_Exactly_200_Characters()
+    {
+        var validator = new CreateLeavePolicyValidator();
+
+        var result = validator.Validate(new CreateLeavePolicyRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            Name = new string('A', 200)
+        });
+
+        Assert.True(result.IsValid);
+    }
 }

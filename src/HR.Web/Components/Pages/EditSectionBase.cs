@@ -19,11 +19,18 @@ public abstract class EditSectionBase<TModel> : ComponentBase where TModel : cla
     protected string? SuccessMsg { get; set; }
 
     private string? _baselineSnapshot;
+    private object? _loadedKey;
+    private bool _hasLoaded;
 
     // Public so an orchestrating parent page (e.g. EmployeeEdit, CompanyEdit) can fold this
     // section's unsaved state into its own Close/unsaved-changes check.
     public bool HasUnsavedChanges =>
         _baselineSnapshot is not null && _baselineSnapshot != System.Text.Json.JsonSerializer.Serialize(Model);
+
+    // Identifies which entity this section is currently editing (e.g. a CompanyId parameter).
+    // Overridden by sections whose parent can hand them a different entity across the section's
+    // lifetime; left null (the default) for sections that only ever load once.
+    protected virtual object? LoadKey => null;
 
     protected override void OnInitialized()
     {
@@ -31,8 +38,15 @@ public abstract class EditSectionBase<TModel> : ComponentBase where TModel : cla
         base.OnInitialized();
     }
 
+    // Blazor invokes OnParametersSetAsync every time the parent re-renders, not only when a
+    // parameter value actually changes — so without this guard, an unrelated parent StateHasChanged
+    // (e.g. toggling a Saving flag) would re-run LoadAsync and clobber whatever the user just typed
+    // with a fresh fetch from the server, right before the parent's own save reads this Model.
     protected override async Task OnParametersSetAsync()
     {
+        if (_hasLoaded && Equals(_loadedKey, LoadKey))
+            return;
+
         IsLoading = true;
         GlobalError = null;
         SuccessMsg = null;
@@ -40,6 +54,8 @@ public abstract class EditSectionBase<TModel> : ComponentBase where TModel : cla
         await LoadAsync();
         CaptureBaseline();
 
+        _loadedKey = LoadKey;
+        _hasLoaded = true;
         IsLoading = false;
     }
 

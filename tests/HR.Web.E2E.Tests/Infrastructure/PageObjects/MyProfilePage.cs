@@ -1,3 +1,4 @@
+using HR.Web.E2E.Tests.Infrastructure;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -62,7 +63,7 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
 
     /// <summary>Returns true if the "Pending approval" banner is visible on the profile photo header.</summary>
     public Task<bool> HasPendingProfilePhotoBannerAsync() =>
-        page.Locator(".alert-warning").Filter(new() { HasText = "Pending approval" }).First.IsVisibleAsync();
+        page.Locator(".alert-warning").Filter(new() { HasText = "Pending approval" }).First.WaitUntilVisibleAsync();
 
     // ── Tab navigation ────────────────────────────────────────────────────────
 
@@ -141,9 +142,13 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         // "Render Company Documents As Grid" story), not the older icon-card layout. ".e-grid"'s
         // own row selector (or its empty-row/"no documents" text sibling) is the only wait
         // actually tied to the async document fetch having completed, same reasoning as
-        // VacancyListPage.RowsRenderedSelector.
+        // VacancyListPage.RowsRenderedSelector. Deliberately excludes ".overview-card" — the four
+        // summary tiles render in the same Blazor commit as <HrGrid> mounting, but Syncfusion
+        // builds the actual .e-grid/.e-headercell DOM asynchronously afterward via its own JS
+        // interop, so waiting on ".overview-card" resolves before the grid has actually finished
+        // rendering (e.g. GetCompanyDocumentsGridColumnHeadersAsync reading zero header cells).
         await page.WaitForSelectorAsync(
-            ".overview-card, .e-grid .e-row, .e-grid .e-emptyrow, p.text-muted",
+            ".e-grid .e-row, .e-grid .e-emptyrow, p.text-muted",
             new() { Timeout = 15_000 });
     }
 
@@ -185,7 +190,26 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     public async Task<string?> GetCompanyDocumentAcknowledgementBadgeTextAsync(string title)
     {
         var row = CompanyDocumentRow(title);
+
+        // CountAsync() below reads the DOM synchronously — it does not auto-wait like Playwright's
+        // action methods do. OpenCompanyDocumentsTabAsync only waits for *some* row to exist, not
+        // specifically this document's row, so without first waiting for this row to actually be
+        // visible, a call made right after opening the tab can read the badge before this row (and
+        // its Acknowledgement-column template) has rendered at all — a false "no badge" negative,
+        // not a genuine one.
+        await row.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+
         var badge = row.Locator(".badge").Filter(new() { HasText = "Acknowledg" });
+        var placeholder = row.Locator(".text-muted", new() { HasTextString = "—" });
+
+        // The Acknowledgement column itself renders in the same pass as the rest of the row, but
+        // wait for whichever of its two possible states (badge or "no acknowledgement needed"
+        // placeholder) shows up rather than assuming the row being visible is enough — same
+        // reasoning as the row-visibility wait above.
+        await Task.WhenAny(
+            badge.First.WaitForAsync(new() { Timeout = 15_000 }),
+            placeholder.First.WaitForAsync(new() { Timeout = 15_000 }));
+
         if (await badge.CountAsync() == 0) return null;
         return (await badge.First.InnerTextAsync()).Trim();
     }
@@ -430,6 +454,7 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         {
             var reasonInput = dialog.GetByPlaceholder("Reason for leave request");
             await reasonInput.FillAsync(reason);
+            await page.Keyboard.PressAsync("Tab");
         }
     }
 

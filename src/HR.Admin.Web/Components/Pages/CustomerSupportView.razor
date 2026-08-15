@@ -1,0 +1,194 @@
+@page "/customers/{CompanyId:guid}/support"
+@inject CustomerSupportViewService CustomerSupportViewService
+
+<PageTitle>Support view — Admin Portal</PageTitle>
+
+<h1>Support view</h1>
+<p class="admin-actions-intro">
+    Condensed, troubleshooting-optimised summary. For full company/billing detail see the
+    <a href="/customers/@CompanyId">customer details page</a>.
+</p>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_view is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view this customer's support data, or the customer couldn't be
+        found. Contact a platform administrator if you believe this is a mistake.
+    </div>
+}
+else
+{
+    <div class="stat-cards">
+        <div class="stat-card">
+            <span class="stat-value">@_view.SubscriptionStatus</span>
+            <span class="stat-label">Subscription status</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">@FormatDate(_view.TrialExpiresAt)</span>
+            <span class="stat-label">Trial expires</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">@_view.UserCount</span>
+            <span class="stat-label">Portal users</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">@_view.ActiveEmployeeCount / @_view.TotalEmployeeCount</span>
+            <span class="stat-label">Active / total employees</span>
+        </div>
+    </div>
+
+    <div class="details-grid">
+        <section class="details-panel">
+            <h2>Subscription &amp; trial</h2>
+            <dl class="details-kv">
+                <dt>Company</dt>
+                <dd>@_view.CompanyName</dd>
+                <dt>Company status</dt>
+                <dd>@_view.Status</dd>
+                <dt>Subscription status</dt>
+                <dd>@_view.SubscriptionStatus</dd>
+                <dt>Trial started</dt>
+                <dd>@FormatDate(_view.TrialStartedAt)</dd>
+                <dt>Trial expires</dt>
+                <dd>@FormatDate(_view.TrialExpiresAt)</dd>
+                <dt>Current period end</dt>
+                <dd>@FormatDate(_view.CurrentPeriodEnd)</dd>
+                <dt>Cancel at period end</dt>
+                <dd>@(_view.CancelAtPeriodEnd ? "Yes" : "No")</dd>
+                <dt>Forced read-only (admin)</dt>
+                <dd>@(_view.AdminForcedReadOnly ? "Yes" : "No")</dd>
+            </dl>
+        </section>
+
+        <section class="details-panel">
+            <h2>Users &amp; employees</h2>
+            <p class="admin-actions-intro">
+                Portal users (login accounts) and HR employee records are distinct — a portal user
+                is not always tied 1:1 to an employee record.
+            </p>
+            <dl class="details-kv">
+                <dt>Portal users</dt>
+                <dd>@_view.UserCount</dd>
+                <dt>Active employees</dt>
+                <dd>@_view.ActiveEmployeeCount</dd>
+                <dt>Total employees</dt>
+                <dd>@_view.TotalEmployeeCount</dd>
+            </dl>
+        </section>
+
+        <section class="details-panel">
+            <h2>Recent invoices</h2>
+            <p class="details-panel-unavailable">
+                No real invoice/payment record exists yet. Showing the most recent recorded billing
+                snapshots as the closest available substitute.
+            </p>
+            @if (_view.RecentBillingSnapshots.Count == 0)
+            {
+                <p class="activity-empty">No billing snapshots recorded yet.</p>
+            }
+            else
+            {
+                <table class="billing-history-table">
+                    <thead>
+                        <tr>
+                            <th>Computed</th>
+                            <th>Chargeable employees</th>
+                            <th>Monthly total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var snapshot in _view.RecentBillingSnapshots)
+                        {
+                            <tr>
+                                <td>@snapshot.ComputedAt.ToString("dd MMM yyyy HH:mm")</td>
+                                <td>@snapshot.ChargeableEmployees</td>
+                                <td>@snapshot.MonthlyTotal.ToString("C2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        <section class="details-panel">
+            <h2>Outstanding background jobs</h2>
+            <p class="admin-actions-intro">
+                Platform-wide job queue health — background jobs are not tagged per customer, so
+                this cannot be scoped to this company specifically.
+            </p>
+            @if (!_view.BackgroundJobsAvailable)
+            {
+                <p class="details-panel-unavailable">
+                    Background job status could not be retrieved.
+                </p>
+            }
+            else
+            {
+                <dl class="details-kv">
+                    <dt>Servers running</dt>
+                    <dd>@_view.BackgroundJobServerCount</dd>
+                    <dt>Enqueued</dt>
+                    <dd>@_view.BackgroundJobsEnqueued</dd>
+                    <dt>Processing</dt>
+                    <dd>@_view.BackgroundJobsProcessing</dd>
+                    <dt>Scheduled</dt>
+                    <dd>@_view.BackgroundJobsScheduled</dd>
+                    <dt>Failed</dt>
+                    <dd>@_view.BackgroundJobsFailed</dd>
+                    <dt>Succeeded</dt>
+                    <dd>@_view.BackgroundJobsSucceeded</dd>
+                    <dt>Recurring</dt>
+                    <dd>@_view.BackgroundJobsRecurring</dd>
+                </dl>
+            }
+        </section>
+
+        <section class="details-panel">
+            <h2>Recent errors</h2>
+            <p class="details-panel-unavailable">
+                Recent errors are not yet available. No error/exception log table exists in the
+                platform yet — this will show recent application errors once error logging is built.
+            </p>
+        </section>
+
+        <section class="details-panel">
+            <h2>Recent emails</h2>
+            <p class="details-panel-unavailable">
+                Recent emails are not yet available. Transactional email is sent via Postmark, but
+                no record of sent emails is persisted anywhere yet — this will show a recent send
+                history once an email log is built.
+            </p>
+        </section>
+
+        <section class="details-panel">
+            <h2>Recent login activity</h2>
+            <p class="details-panel-unavailable">
+                Recent login activity is not yet available. No login/sign-in audit trail exists yet
+                — this will show recent sign-ins once login auditing is built.
+            </p>
+        </section>
+    </div>
+}
+
+<a href="/customers/@CompanyId">Back to customer details</a>
+
+@code {
+    [Parameter]
+    public Guid CompanyId { get; set; }
+
+    private CustomerSupportViewResponse? _view;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _view = await CustomerSupportViewService.GetSupportViewOrNullAsync(CompanyId);
+        _loading = false;
+    }
+
+    private static string FormatDate(DateTimeOffset? value) =>
+        value is { } dt ? dt.ToString("dd MMM yyyy HH:mm") : "—";
+}

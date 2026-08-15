@@ -1,4 +1,4 @@
-using System.Text;
+using ClosedXML.Excel;
 using HR.Modules.DataImport.Domain;
 using HR.Modules.DataImport.Features.ValidateImportSession;
 using HR.Modules.DataImport.Persistence;
@@ -14,11 +14,12 @@ public class ValidateImportSessionHandlerTests
     private static readonly DateTimeOffset FixedNowOffset = new(FixedUtcNow, TimeSpan.Zero);
 
     private const string StandardHeader =
-        "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile";
+        "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount";
 
     // Appended to a data row (after Employee Number) to satisfy the mandatory
-    // DateOfBirth/Nationality/Gender/Department/Location/EmploymentType/PositionProfile fields.
-    private const string MandatoryFieldSuffix = "1990-01-01,British,Female,Engineering,London,Permanent,Developer";
+    // DateOfBirth/Nationality/Gender/Department/Location/EmploymentType/PositionProfile/
+    // SalaryAmount fields.
+    private const string MandatoryFieldSuffix = "1990-01-01,British,Female,Engineering,London,Permanent,Developer,50000";
 
     private static DataImportDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<DataImportDbContext>()
@@ -53,29 +54,56 @@ public class ValidateImportSessionHandlerTests
         return resolver;
     }
 
+    private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    // Builds a minimal XLSX workbook (via ClosedXML) from comma-delimited "csv-shaped" header/data
+    // lines, so existing test fixtures (written as csv-style strings for readability) can still be
+    // used against the now xlsx-only parser.
+    private static byte[] BuildXlsxBytes(string csvShapedContent)
+    {
+        var lines = csvShapedContent
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(l => l.TrimEnd('\r'))
+            .ToList();
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Sheet1");
+
+        for (var row = 0; row < lines.Count; row++)
+        {
+            var cells = lines[row].Split(',');
+            for (var col = 0; col < cells.Length; col++)
+                worksheet.Cell(row + 1, col + 1).Value = cells[col];
+        }
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
     private static async Task<ImportSession> SeedPendingSessionAsync(
         DataImportDbContext db,
         FakeImportFileStorageService storage,
         Guid companyId,
-        string csvContent,
+        string csvShapedContent,
         int totalRows,
-        string storageKey = "sessions/abc/employees.csv")
+        string storageKey = "sessions/abc/employees.xlsx")
     {
         var session = ImportSession.Create(
             Guid.NewGuid(),
             companyId,
             "Employees",
-            "employees.csv",
+            "employees.xlsx",
             totalRows,
             Guid.NewGuid(),
             storageKey,
-            "text/csv",
+            XlsxContentType,
             FixedNowOffset);
 
         db.ImportSessions.Add(session);
         await db.SaveChangesAsync();
 
-        storage.SeedContent(storageKey, Encoding.UTF8.GetBytes(csvContent));
+        storage.SeedContent(storageKey, BuildXlsxBytes(csvShapedContent));
 
         return session;
     }
@@ -231,7 +259,7 @@ public class ValidateImportSessionHandlerTests
         // File uses "Given Name" instead of the standard "First Name" header, and no
         // ColumnMapping is supplied, so FirstName is never mapped from this file.
         var csv =
-            $"Given Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+            $"Given Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
             $"John,Doe,john.doe@example.com,2026-01-01,EMP001,{MandatoryFieldSuffix}\n";
 
         var session = await SeedPendingSessionAsync(db, storage, companyId, csv, totalRows: 1);
@@ -260,7 +288,7 @@ public class ValidateImportSessionHandlerTests
         // Same nonstandard "Given Name" header as above, but this time a ColumnMapping override
         // redirects FirstName to read from that header instead of the default "First Name".
         var csv =
-            $"Given Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+            $"Given Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
             $"John,Doe,john.doe@example.com,2026-01-01,EMP001,{MandatoryFieldSuffix}\n";
 
         var session = await SeedPendingSessionAsync(db, storage, companyId, csv, totalRows: 1);

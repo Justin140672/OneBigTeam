@@ -21,6 +21,25 @@ public interface IAuditHistoryReader
     /// </summary>
     Task<IReadOnlyList<AuditHistoryEntry>> GetEntityAuditHistoryAsync(
         Guid companyId, string entityType, Guid entityId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Platform-wide (cross-company) paged audit log for the Admin Portal's Platform Audit Log
+    /// story. Unlike every overload above, this is not scoped to a single company — companyId here
+    /// is an optional filter, not a mandatory tenant boundary, because the caller is always a
+    /// platform administrator (gated by the "platform:admin" policy + PlatformAdmin:AllowedEmails
+    /// allow-list at the handler level, same as every other Admin Portal platform-wide read).
+    /// actorUserIds, when supplied, restricts results to audit rows whose ActorUserId is in the
+    /// set (used to implement "filter by administrator", since email isn't stored on the audit row
+    /// itself — see IUserEmailDirectoryReader).
+    /// </summary>
+    Task<PagedResult<AuditHistoryEntry>> GetPlatformAuditLogAsync(
+        Guid? companyId,
+        IReadOnlyCollection<Guid>? actorUserIds,
+        DateTimeOffset? fromDate,
+        DateTimeOffset? toDate,
+        string? eventType,
+        Pagination pagination,
+        CancellationToken cancellationToken);
 }
 
 public sealed record AuditHistoryEntry(
@@ -39,4 +58,10 @@ public sealed record AuditHistoryEntry(
     // GetEmployeeAuditHistoryHandler. Null (the default) means the entry is never merged with
     // anything else, which is the correct behaviour for every existing audit event that doesn't
     // set a CorrelationId.
-    Guid? CorrelationId = null);
+    Guid? CorrelationId = null,
+    // Populated by GetPlatformAuditLogAsync (the only caller that needs it — the per-employee/
+    // per-entity overloads above already know the company from their own input parameter). Default
+    // (Guid.Empty) for every other overload/existing caller, matching the "trailing optional
+    // parameter added without disturbing existing positional callers" convention already used for
+    // EmployeeId/EntityId/CorrelationId above.
+    Guid CompanyId = default);

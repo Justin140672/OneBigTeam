@@ -41,11 +41,17 @@ public sealed class RecruitmentPipelineReportPage(IPage page, string baseUrl)
     private ILocator FilterField(string labelText) =>
         page.Locator(".card-body .col-md-3").Filter(new() { HasText = labelText }).First;
 
-    public async Task FillDateRangeStartAsync(string ddMMyyyy) =>
+    public async Task FillDateRangeStartAsync(string ddMMyyyy)
+    {
         await FilterField("Start Date From").Locator(".e-date-wrapper input.e-input").FillAsync(ddMMyyyy);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public async Task FillDateRangeEndAsync(string ddMMyyyy) =>
+    public async Task FillDateRangeEndAsync(string ddMMyyyy)
+    {
         await FilterField("Start Date To").Locator(".e-date-wrapper input.e-input").FillAsync(ddMMyyyy);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task ApplyFiltersAsync()
     {

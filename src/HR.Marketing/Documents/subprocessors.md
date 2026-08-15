@@ -1,6 +1,6 @@
 ---
 title: Subprocessors
-lastUpdated: 28 July 2026
+lastUpdated: 14 August 2026
 ---
 
 # Subprocessors
@@ -8,7 +8,7 @@ lastUpdated: 28 July 2026
 | Provider | Purpose |
 |----------|---------|
 | Supabase | Authentication, database and storage |
-| Microsoft Azure | Hosting and infrastructure |
+| Railway | Hosting and infrastructure |
 | Stripe | Subscription billing |
 | Postmark | Transactional email |
 

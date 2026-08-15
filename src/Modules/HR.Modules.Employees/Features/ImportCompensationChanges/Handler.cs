@@ -93,11 +93,11 @@ internal sealed class ImportCompensationChangesHandler(
             if (string.IsNullOrWhiteSpace(row.NewSalary) || !decimal.TryParse(row.NewSalary, out salary) || salary <= 0)
                 errors.Add("New Salary must be a number greater than 0.");
 
-            // Salary Frequency is normally inherited from the employee's existing open compensation
-            // record rather than taken from the uploaded row — HR can only change the salary amount
-            // via bulk import for employees who already have a record, not the pay frequency. For an
-            // employee with no existing record (e.g. a brand-new hire), there's nothing to inherit
-            // from, so the row's own Salary Frequency column is used instead.
+            // Salary Frequency is inherited from the employee's existing open compensation record —
+            // HR can only change the salary amount via bulk import, never the pay frequency, and the
+            // row's own Salary Frequency column is reference-only and never validated as user input.
+            // Employees with no existing open compensation record (e.g. a brand-new hire) have no
+            // frequency to inherit from and cannot be processed via this import.
             var salaryType = default(SalaryType);
             if (employeeId != Guid.Empty)
             {
@@ -105,10 +105,9 @@ internal sealed class ImportCompensationChangesHandler(
                 {
                     salaryType = existingForFrequency.SalaryType;
                 }
-                else if (string.IsNullOrWhiteSpace(row.SalaryFrequency) ||
-                         !Enum.TryParse(row.SalaryFrequency, ignoreCase: true, out salaryType))
+                else
                 {
-                    errors.Add($"Salary Frequency must be one of: {string.Join(", ", Enum.GetNames<SalaryType>())}.");
+                    errors.Add("Employee has no existing compensation record to determine salary frequency from.");
                 }
             }
 

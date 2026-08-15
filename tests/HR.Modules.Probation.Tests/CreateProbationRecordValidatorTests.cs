@@ -54,6 +54,54 @@ public class CreateProbationRecordValidatorTests
     }
 
     [Fact]
+    public async Task EmptyEmployeeId_Fails_Validation()
+    {
+        var result = await _validator.ValidateAsync(new CreateProbationRecordRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            EmployeeId = Guid.Empty,
+            ManagerEmployeeId = Guid.NewGuid(),
+            StartDate = new DateOnly(2026, 6, 25),
+            ExpectedEndDate = new DateOnly(2026, 9, 25)
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateProbationRecordRequest.EmployeeId));
+    }
+
+    [Fact]
+    public async Task DefaultStartDate_Fails_Validation()
+    {
+        var result = await _validator.ValidateAsync(new CreateProbationRecordRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            EmployeeId = Guid.NewGuid(),
+            ManagerEmployeeId = Guid.NewGuid(),
+            StartDate = default,
+            ExpectedEndDate = new DateOnly(2026, 9, 25)
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateProbationRecordRequest.StartDate));
+    }
+
+    [Fact]
+    public async Task DefaultExpectedEndDate_Fails_Validation()
+    {
+        var result = await _validator.ValidateAsync(new CreateProbationRecordRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            EmployeeId = Guid.NewGuid(),
+            ManagerEmployeeId = Guid.NewGuid(),
+            StartDate = new DateOnly(2026, 6, 25),
+            ExpectedEndDate = default
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateProbationRecordRequest.ExpectedEndDate));
+    }
+
+    [Fact]
     public async Task Notes_ExceedingMaxLength_Fails_Validation()
     {
         var result = await _validator.ValidateAsync(new CreateProbationRecordRequest

@@ -254,6 +254,12 @@ catch (Exception exception)
 try
 {
 	await app.Services.MigrateIdentityAsync();
+	// Bootstrap PlatformAdministrator rows from the PlatformAdmin:AllowedEmails config allow-list
+	// (see IdentityModule.SeedPlatformAdministratorsFromConfigAsync remarks). Runs in every
+	// environment, not just Development, since the allow-list itself is configured per-environment
+	// (appsettings.json / appsettings.Staging.json / production config) and admin accounts must
+	// exist as real PlatformAdministrator rows wherever the Admin Portal is reachable. Idempotent.
+	await app.Services.SeedPlatformAdministratorsFromConfigAsync(app.Configuration);
 	if (app.Environment.IsDevelopment())
 	{
 		await app.Services.SeedDevUserAsync();

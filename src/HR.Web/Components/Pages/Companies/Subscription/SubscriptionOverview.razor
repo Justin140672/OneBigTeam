@@ -36,7 +36,7 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Status</label>
-                        <p class="mb-0">@(_status?.Status.ToString() ?? "Unknown")</p>
+                        <p class="mb-0">@(_status is not null ? EnumDisplay.Humanize(_status.Status) : "Unknown")</p>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Active Employees</label>

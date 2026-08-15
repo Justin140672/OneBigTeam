@@ -56,6 +56,18 @@
     margin-bottom: 6px;
 }
 
+.login-password-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+}
+
+.login-forgot-link {
+    font-size: 0.8rem;
+    /* DESIGN.md's accent-strong — the documented, contrast-verified color for links/accented text. */
+    color: #00806a;
+}
+
 .login-validation {
     display: block;
     font-size: 0.8rem;
@@ -88,4 +100,22 @@
 ::deep .e-float-input input {
     background: #fff !important;
     color: #111827 !important;
+}
+
+/* A password manager/passkey autofill (e.g. filling email+password after a passkey prompt)
+   applies the browser's own ":-webkit-autofill" styling, which is a separate mechanism from the
+   plain background/color rules above — Chromium in particular renders it with a light
+   (yellow/gray) background of its own and, in this dark-theme-detected context, can leave the
+   text at whatever color the surrounding dark theme set (white), which then renders unreadable
+   on that light autofill background. A plain "background" override doesn't beat it; the
+   inset box-shadow trick (filling the input with the intended background color) plus an explicit
+   -webkit-text-fill-color are the only overrides that actually take effect on autofilled fields. */
+::deep .e-input-group input.e-input:-webkit-autofill,
+::deep .e-float-input input:-webkit-autofill,
+::deep .e-input-group input.e-input:-webkit-autofill:focus,
+::deep .e-float-input input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #111827 !important;
+    -webkit-box-shadow: inset 0 0 0px 1000px #fff !important;
+    box-shadow: inset 0 0 0px 1000px #fff !important;
+    caret-color: #111827;
 }

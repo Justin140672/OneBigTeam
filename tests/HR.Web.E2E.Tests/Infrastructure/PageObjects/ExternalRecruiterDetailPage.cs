@@ -21,11 +21,17 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
-    public Task FillAgencyNameAsync(string value) =>
-        page.GetByPlaceholder("e.g. Acme Recruiting").FillAsync(value);
+    public async Task FillAgencyNameAsync(string value)
+    {
+        await page.GetByPlaceholder("e.g. Acme Recruiting").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public Task FillContactNameAsync(string value) =>
-        page.GetByPlaceholder("Primary contact").FillAsync(value);
+    public async Task FillContactNameAsync(string value)
+    {
+        await page.GetByPlaceholder("Primary contact").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     /// <summary>
     /// True if the "Contact Name" field sits alone on its own full-width row (".col-12" — see
@@ -39,11 +45,17 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
         return await column.CountAsync() > 0;
     }
 
-    public Task FillContactEmailAsync(string value) =>
-        page.GetByPlaceholder("contact@agency.com").FillAsync(value);
+    public async Task FillContactEmailAsync(string value)
+    {
+        await page.GetByPlaceholder("contact@agency.com").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public Task FillContactTelephoneAsync(string value) =>
-        page.GetByPlaceholder("e.g. 07700 900000").FillAsync(value);
+    public async Task FillContactTelephoneAsync(string value)
+    {
+        await page.GetByPlaceholder("e.g. 07700 900000").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public Task<string> GetAgencyNameAsync() =>
         page.GetByPlaceholder("e.g. Acme Recruiting").InputValueAsync();

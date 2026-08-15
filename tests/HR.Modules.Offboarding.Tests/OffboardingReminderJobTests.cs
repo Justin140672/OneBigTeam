@@ -160,6 +160,27 @@ public class OffboardingReminderJobTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_Sends_No_Notification_For_Task_Due_Exactly_Today()
+    {
+        // Boundary: DueDate == today must NOT count as overdue — the job only notifies for
+        // task.DueDate < today (strictly less than), not <=.
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = SeedPlan(dbContext, companyId, employeeId);
+        SeedTask(dbContext, companyId, plan.Id, OffboardingTaskAssignTo.Manager, Today);
+        await dbContext.SaveChangesAsync();
+
+        var notifications = new FakeNotificationWriter();
+        var job = BuildJob(dbContext, notifications, Guid.NewGuid());
+
+        await job.ExecuteAsync();
+
+        Assert.Empty(notifications.Written);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_Sends_No_Notification_For_Overdue_Completed_Task()
     {
         await using var dbContext = BuildContext();

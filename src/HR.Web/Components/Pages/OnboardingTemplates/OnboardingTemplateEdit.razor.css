@@ -1,0 +1,18 @@
+/* Checklist task row: move/remove buttons sit in a column alongside the task's fields.
+   Stretching the row (align-items-stretch on the parent) and pushing this column's
+   content to the bottom aligns the buttons level with the bottom-most field (Assign To)
+   instead of floating at the top of a row that's taller than they are. */
+.task-row-actions {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 0.375rem;
+}
+
+/* Bumped up from e-small so these are comfortably clickable targets, matching the row's
+   overall larger touch/click area rather than icon-only e-small buttons. */
+.task-row-action-btn.e-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+}

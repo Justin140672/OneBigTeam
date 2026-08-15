@@ -280,7 +280,7 @@
     {
         NoticePeriodUnit.Weeks  => "Weeks",
         NoticePeriodUnit.Months => "Months",
-        _                       => unit.ToString()
+        _                       => EnumDisplay.Humanize(unit)
     };
 
     private async Task ConfirmAsync()

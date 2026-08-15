@@ -35,7 +35,7 @@ internal sealed class UploadImportFileHandler(
         int totalRows;
         try
         {
-            totalRows = CountDataRows(fileStream, file.FileName);
+            totalRows = CountXlsxDataRows(fileStream);
         }
         catch (Exception ex)
         {
@@ -88,28 +88,7 @@ internal sealed class UploadImportFileHandler(
             session.CreatedAt));
     }
 
-    // Determines the file's data row count (excluding the header row), based on its extension.
-    private static int CountDataRows(Stream content, string fileName)
-    {
-        return ImportFileFormat.IsXlsx(fileName)
-            ? CountXlsxDataRows(content)
-            : CountCsvDataRows(content);
-    }
-
-    private static int CountCsvDataRows(Stream content)
-    {
-        using var reader = new StreamReader(content, leaveOpen: true);
-        var lineCount = 0;
-
-        while (reader.ReadLine() is { } line)
-        {
-            if (!string.IsNullOrWhiteSpace(line))
-                lineCount++;
-        }
-
-        return Math.Max(0, lineCount - 1); // exclude header row
-    }
-
+    // Determines the workbook's data row count (excluding the header row).
     private static int CountXlsxDataRows(Stream content)
     {
         using var workbook = new XLWorkbook(content);

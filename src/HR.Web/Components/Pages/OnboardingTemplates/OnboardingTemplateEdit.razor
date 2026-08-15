@@ -75,7 +75,7 @@
                                     var index = i;
                                     var task = Model.Tasks[index];
                                     <div class="border rounded p-3 mb-3">
-                                        <div class="d-flex align-items-start gap-2">
+                                        <div class="d-flex align-items-stretch gap-2 task-row">
                                             <div class="flex-grow-1">
                                                 <div class="row g-2">
                                                     <div class="col-md-8">
@@ -112,14 +112,14 @@
                                             </div>
                                             @if (!IsViewMode)
                                             {
-                                                <div class="d-flex flex-column gap-1">
-                                                    <SfButton CssClass="e-small e-outline" Disabled="@(index == 0)" OnClick="@(() => MoveUp(index))" title="Move up">
+                                                <div class="task-row-actions">
+                                                    <SfButton CssClass="e-outline task-row-action-btn" Disabled="@(index == 0)" OnClick="@(() => MoveUp(index))" title="Move up">
                                                         <i class="fa-solid fa-arrow-up"></i>
                                                     </SfButton>
-                                                    <SfButton CssClass="e-small e-outline" Disabled="@(index == Model.Tasks.Count - 1)" OnClick="@(() => MoveDown(index))" title="Move down">
+                                                    <SfButton CssClass="e-outline task-row-action-btn" Disabled="@(index == Model.Tasks.Count - 1)" OnClick="@(() => MoveDown(index))" title="Move down">
                                                         <i class="fa-solid fa-arrow-down"></i>
                                                     </SfButton>
-                                                    <SfButton CssClass="e-small e-danger e-outline" OnClick="@(() => RemoveTask(index))" title="Remove">
+                                                    <SfButton CssClass="e-danger e-outline task-row-action-btn" OnClick="@(() => RemoveTask(index))" title="Remove">
                                                         <i class="fa-solid fa-trash"></i>
                                                     </SfButton>
                                                 </div>

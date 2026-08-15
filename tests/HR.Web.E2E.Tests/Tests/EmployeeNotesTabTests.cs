@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
@@ -130,6 +131,82 @@ public sealed class EmployeeNotesTabTests(AppFixture fixture) : E2ETestBase(fixt
             await empEdit.NoteCard(replacementText).First.IsVisibleAsync(),
             "Expected the replacement note's text to be visible");
     }
+
+    [Fact]
+    public async Task NotesGrid_ShowsPager_WhenNotesExceedPageSize()
+    {
+        // EmployeeNotesGrid.razor's PageSize is 10 (HrGrid default AllowPaging=true). The first 10
+        // are seeded via a direct authenticated call to the same CreateEmployeeNote endpoint the
+        // Add Note dialog itself calls (still a real handler round trip, still a real note — not a
+        // DB-seeding shortcut) so this test isn't paying for 11 slow Syncfusion dialog round-trips
+        // just to get past one page. The 11th note — the one that actually needs to push the grid
+        // past a page and surface the pager — is added through the real dialog, so this still
+        // proves the genuine UI path triggers pagination correctly, not just that seeded data does.
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToAsync(AcmeId, TomWilliams);
+
+        Assert.False(await empEdit.IsNotesGridPagerVisibleAsync(),
+            "Did not expect a pager before adding enough notes to exceed one page");
+
+        await SeedNotesAsync(TomWilliams, count: 10);
+
+        await empEdit.GoToAsync(AcmeId, TomWilliams);
+        Assert.False(await empEdit.IsNotesGridPagerVisibleAsync(),
+            "Did not expect a pager with exactly 10 notes (the page size)");
+
+        await empEdit.OpenNotesTabAsync();
+        await empEdit.ClickAddNoteAsync();
+        await empEdit.SelectAddNoteCategoryAsync("General");
+        await empEdit.FillAddNoteTextAsync($"Paging check note {Guid.NewGuid():N}");
+        await empEdit.SubmitAddNoteDialogAsync();
+
+        Assert.True(await empEdit.IsNotesGridPagerVisibleAsync(),
+            "Expected a pager once an 11th note exceeds the grid's page size");
+    }
+
+    /// <summary>
+    /// Creates <paramref name="count"/> HR notes for <paramref name="employeeId"/> via a direct
+    /// authenticated call to POST /api/companies/{companyId}/employees/{employeeId}/notes — the
+    /// same endpoint the Add Note dialog itself calls. See
+    /// EmployeeTimelineTabTests.SeedNotesAsync's doc comment for the full rationale (not a
+    /// DB-seeding shortcut, just a faster transport than repeated Syncfusion dialog round-trips).
+    /// </summary>
+    private async Task SeedNotesAsync(Guid employeeId, int count)
+    {
+        const string lauraUserId = "30000000-0000-0000-0000-000000000005";
+
+        using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };
+
+        var sessionResponse = await http.PostAsync($"/api/dev/persona/{lauraUserId}", content: null);
+        sessionResponse.EnsureSuccessStatusCode();
+        var session = await sessionResponse.Content.ReadFromJsonAsync<DevPersonaSessionResult>();
+        Assert.NotNull(session);
+
+        http.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session!.AccessToken);
+
+        for (var i = 0; i < count; i++)
+        {
+            var response = await http.PostAsJsonAsync(
+                $"/api/companies/{AcmeId}/employees/{employeeId}/notes",
+                new
+                {
+                    CompanyId = AcmeId,
+                    EmployeeId = employeeId,
+                    Category = "General",
+                    NoteText = $"Paging check seed note {i} {Guid.NewGuid():N}",
+                    IsImportant = false,
+                });
+            response.EnsureSuccessStatusCode();
+        }
+    }
+
+    private sealed record DevPersonaSessionResult(string AccessToken, string RefreshToken, int ExpiresIn);
 
     // Note: a "non-HR personas can't reach the Notes tab" test was deliberately not added here.
     // The Notes tab is wrapped in @if(Session.IsHrAdministrator) inside EmployeeEdit.razor, but

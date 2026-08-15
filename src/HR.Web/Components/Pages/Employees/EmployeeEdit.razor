@@ -1193,8 +1193,17 @@
             // Save Employment tab's data (including any working pattern override change) second,
             // so it has the final say over the shared working-pattern fields. Pass the same
             // correlationId through so its audit event merges with the profile update above.
+            //
+            // Bug fix: Department/Location are edited on *this* (Employee/Profile) tab, but the
+            // Employment tab also carries its own independent copy of Model.DepartmentId/LocationId
+            // (loaded once when the page opened and never refreshed). Calling SaveAsync() without
+            // syncing those fields first would resubmit the Employment tab's stale values via
+            // UpdateEmploymentDetailsRequest, silently reverting the change just made above — and
+            // since EmploymentDetailsSnapshot doesn't track Department/Location, that revert was
+            // never even visible in the audit trail (e.g. Location edits appeared to be "dropped").
             if (_employmentTab is not null)
             {
+                _employmentTab.SyncSharedAssignmentFields(Model.DepartmentId, Model.LocationId);
                 _employmentTab.CorrelationId = correlationId;
                 var employmentError = await _employmentTab.SaveAsync();
                 if (employmentError is not null)

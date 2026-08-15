@@ -57,14 +57,29 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     /// </summary>
     private ILocator TimeZoneInput => page.GetByPlaceholder("Time Zone");
 
-    public Task SetTimeZoneAsync(string value) => TimeZoneInput.FillAsync(value);
+    // FillAsync sets a Syncfusion SfTextBox's DOM value through CDP directly, which bypasses the
+    // component's own JS keyup/input listeners that sync the typed value back to the Blazor-bound
+    // model — so a value that visually "fills" never actually round-trips to the server (see
+    // EmployeeEditPage.TypeIntoNumericInputAsync for the same issue on SfNumericTextBox). Click-to-
+    // focus, select-all, delete, then type each character for real, then Tab to blur/commit.
+    private async Task TypeIntoTextBoxAsync(ILocator input, string value)
+    {
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        if (value.Length > 0)
+            await input.PressSequentiallyAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public Task SetTimeZoneAsync(string value) => TypeIntoTextBoxAsync(TimeZoneInput, value);
 
     public Task<string> GetTimeZoneAsync() => TimeZoneInput.InputValueAsync();
 
     /// <summary>The "Locale" HrTextBox in the Regional section.</summary>
     private ILocator LocaleInput => page.GetByPlaceholder("Locale");
 
-    public Task SetLocaleAsync(string value) => LocaleInput.FillAsync(value);
+    public Task SetLocaleAsync(string value) => TypeIntoTextBoxAsync(LocaleInput, value);
 
     public Task<string> GetLocaleAsync() => LocaleInput.InputValueAsync();
 
@@ -105,8 +120,11 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>Fills the company Name field on the Profile tab.</summary>
-    public Task FillCompanyNameInputAsync(string value) =>
-        page.GetByPlaceholder("Company name").FillAsync(value);
+    public async Task FillCompanyNameInputAsync(string value)
+    {
+        await page.GetByPlaceholder("Company name").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task<string> GetCompanyNameInputValueAsync() =>
         await page.GetByPlaceholder("Company name").InputValueAsync();

@@ -1,0 +1,438 @@
+/* Reuses HR.Web's documented "Operate mode" tokens (see DESIGN.md's HR.Web section) rather than
+   inventing a new arbitrary palette for this app — the Admin Portal is the same signed-in
+   internal-tooling class of app as HR.Web (Bootstrap 5 + Syncfusion), so it borrows those same
+   token values as plain CSS custom properties instead of introducing new ones. */
+:root {
+    --admin-bg: #f9fafb;
+    --admin-surface: #ffffff;
+    --admin-border: #e5e7eb;
+    --admin-ink: #111827;
+    --admin-ink-strong: #1f2937;
+    --admin-ink-soft: #6b7280;
+    --admin-dark: #011f3a;
+    --admin-dark-ink: #ffffff;
+    --admin-danger: #dc2626;
+    --admin-danger-soft: #fee2e2;
+    --admin-success: #15803d;
+    --admin-success-soft: #dcfce7;
+    --admin-warning: #b45309;
+    --admin-warning-soft: #fef3c7;
+    --admin-shadow-sm: 0 1px 4px rgba(0, 0, 0, .06);
+    --admin-radius-md: 8px;
+    --admin-radius-lg: 12px;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--admin-bg);
+    color: var(--admin-ink);
+    margin: 0;
+}
+
+.admin-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.admin-header {
+    background: var(--admin-dark);
+    color: var(--admin-dark-ink);
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.admin-brand {
+    font-weight: 600;
+}
+
+.admin-nav {
+    display: flex;
+    gap: 1rem;
+}
+
+.admin-nav-link {
+    color: var(--admin-dark-ink);
+    opacity: 0.75;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.admin-nav-link:hover {
+    opacity: 1;
+}
+
+.admin-nav-link.active {
+    opacity: 1;
+    font-weight: 600;
+}
+
+.customer-list-toolbar {
+    margin-bottom: 1rem;
+    max-width: 420px;
+}
+
+.customer-search-box {
+    width: 100%;
+}
+
+.failed-payments-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: none;
+}
+
+.failed-payments-toolbar .customer-search-box {
+    max-width: 420px;
+}
+
+.failed-payments-status-filter {
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius-md);
+    padding: 0.4rem 0.6rem;
+    color: var(--admin-ink);
+    background: var(--admin-surface);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+}
+
+.admin-main {
+    padding: 1.5rem;
+}
+
+.stat-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--admin-surface);
+    border-radius: var(--admin-radius-md);
+    padding: 1rem 1.25rem;
+    box-shadow: var(--admin-shadow-sm);
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--admin-ink-strong);
+}
+
+.stat-label {
+    color: var(--admin-ink-soft);
+    font-size: 0.875rem;
+}
+
+.activity-panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 1.5rem;
+}
+
+.activity-panel {
+    background: var(--admin-surface);
+    border-radius: var(--admin-radius-md);
+    padding: 1rem 1.25rem;
+    box-shadow: var(--admin-shadow-sm);
+}
+
+.activity-empty {
+    color: var(--admin-ink-soft);
+}
+
+.audit-log-total {
+    color: var(--admin-ink-soft);
+    margin-top: 0.75rem;
+}
+
+.admin-login-shell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: var(--admin-ink-strong);
+}
+
+.login-card {
+    background: var(--admin-surface);
+    border-radius: var(--admin-radius-md);
+    padding: 2rem;
+    width: 360px;
+}
+
+.login-heading {
+    margin-top: 0;
+}
+
+.login-subheading {
+    color: var(--admin-ink-soft);
+    font-size: 0.875rem;
+}
+
+.login-field {
+    margin-bottom: 1rem;
+}
+
+.login-label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.login-error {
+    background: var(--admin-danger-soft);
+    color: var(--admin-danger);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--admin-radius-md);
+    margin-bottom: 1rem;
+}
+
+.login-btn {
+    width: 100%;
+}
+
+.dashboard-error {
+    background: var(--admin-danger-soft);
+    color: var(--admin-danger);
+    padding: 1rem;
+    border-radius: var(--admin-radius-md);
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.details-panel {
+    background: var(--admin-surface);
+    border-radius: var(--admin-radius-md);
+    padding: 1rem 1.25rem;
+    box-shadow: var(--admin-shadow-sm);
+}
+
+.details-panel h2 {
+    margin-top: 0;
+}
+
+.details-kv {
+    display: grid;
+    grid-template-columns: minmax(140px, auto) 1fr;
+    row-gap: 0.5rem;
+    column-gap: 1rem;
+}
+
+.details-kv dt {
+    color: var(--admin-ink-soft);
+    font-size: 0.875rem;
+}
+
+.details-kv dd {
+    margin: 0;
+    color: var(--admin-ink-strong);
+    font-weight: 600;
+}
+
+.details-panel-unavailable {
+    color: var(--admin-ink-soft);
+}
+
+.admin-actions-panel {
+    background: var(--admin-surface);
+    border-radius: var(--admin-radius-md);
+    padding: 1rem 1.25rem;
+    box-shadow: var(--admin-shadow-sm);
+    margin-bottom: 1.5rem;
+}
+
+.admin-actions-panel h2 {
+    margin-top: 0;
+}
+
+.admin-actions-intro {
+    color: var(--admin-ink-soft);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.admin-actions-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.admin-action-warning {
+    color: var(--admin-ink-strong);
+    margin-bottom: 1rem;
+}
+
+.admin-action-field {
+    margin-bottom: 1rem;
+}
+
+.admin-action-field label {
+    display: block;
+    color: var(--admin-ink-soft);
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+
+.admin-action-error {
+    color: var(--admin-danger);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+}
+
+.admin-action-success {
+    color: var(--admin-ink-strong);
+    font-size: 0.875rem;
+    margin-top: 0.75rem;
+}
+
+.status-pill {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: var(--admin-radius-lg);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-pill-pending {
+    background: var(--admin-warning-soft);
+    color: var(--admin-warning);
+}
+
+.status-pill-cancelled {
+    background: var(--admin-ink-soft);
+    color: var(--admin-surface);
+}
+
+.status-pill-executed {
+    background: var(--admin-danger-soft);
+    color: var(--admin-danger);
+}
+
+.status-pill-enabled {
+    background: var(--admin-success-soft);
+    color: var(--admin-success);
+}
+
+.status-pill-disabled {
+    background: var(--admin-danger-soft);
+    color: var(--admin-danger);
+}
+
+.deletion-countdown {
+    font-size: 0.8rem;
+    color: var(--admin-ink-soft);
+}
+
+.deletion-countdown-overdue {
+    color: var(--admin-danger);
+    font-weight: 600;
+}
+
+.billing-breakdown-panel h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
+.billing-stat-cards {
+    margin-bottom: 1.25rem;
+}
+
+.billing-history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.billing-history-table th,
+.billing-history-table td {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.billing-history-table th {
+    color: var(--admin-ink-soft);
+    font-weight: 600;
+}
+
+.billing-history-table td {
+    color: var(--admin-ink-strong);
+}
+
+.health-summary-panel {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.health-summary-meta {
+    color: var(--admin-ink-soft);
+    font-size: 0.875rem;
+}
+
+.health-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.health-card {
+    background: var(--admin-surface);
+    border-radius: var(--admin-radius-md);
+    padding: 1rem 1.25rem;
+    box-shadow: var(--admin-shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.health-card-name {
+    font-weight: 600;
+    color: var(--admin-ink-strong);
+}
+
+.health-card-description {
+    color: var(--admin-ink-soft);
+    font-size: 0.8125rem;
+}
+
+.health-badge {
+    display: inline-block;
+    width: fit-content;
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--admin-radius-lg);
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.health-badge-healthy {
+    background: var(--admin-success-soft);
+    color: var(--admin-success);
+}
+
+.health-badge-degraded {
+    background: var(--admin-warning-soft);
+    color: var(--admin-warning);
+}
+
+.health-badge-unhealthy {
+    background: var(--admin-danger-soft);
+    color: var(--admin-danger);
+}

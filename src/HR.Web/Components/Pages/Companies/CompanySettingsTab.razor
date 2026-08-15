@@ -55,6 +55,8 @@ else
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
 
+    protected override object? LoadKey => CompanyId;
+
     private bool _timelineBackfillDialogOpen;
 
     private void OpenTimelineBackfillDialog() => _timelineBackfillDialogOpen = true;

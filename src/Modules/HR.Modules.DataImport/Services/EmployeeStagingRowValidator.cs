@@ -33,7 +33,7 @@ internal sealed class EmployeeStagingRowValidator(
     ICompanyEmployeeNumberSettingsReader employeeNumberSettingsReader)
 {
     private static readonly string[] RequiredFields =
-        ["FirstName", "LastName", "WorkEmail", "StartDate", "DateOfBirth", "Nationality", "Gender"];
+        ["FirstName", "LastName", "WorkEmail", "StartDate", "DateOfBirth", "Nationality", "Gender", "SalaryAmount"];
 
     // Lookup-by-name fields that resolve to a mandatory Employee foreign key (Department,
     // Location, EmploymentType, PositionProfile). These are validated for presence here in
@@ -42,7 +42,12 @@ internal sealed class EmployeeStagingRowValidator(
     private static readonly string[] RequiredLookupFields =
         ["DepartmentName", "LocationName", "EmploymentTypeName", "PositionProfileTitle"];
     private static readonly string[] DateFields = ["StartDate", "DateOfBirth", "ContinuousServiceDate", "ProbationEndDate"];
-    private static readonly string[] CompensationFields = ["SalaryAmount", "SalaryType", "Currency", "HoursPerWeek", "FTE"];
+    // SalaryAmount itself is unconditionally mandatory (see RequiredFields) — an employee can never
+    // have an opening compensation record with no salary figure, regardless of which other
+    // compensation columns happen to be mapped for this import. It stays out of this array
+    // (which only gates the fields that remain optional-if-mapped) but its numeric-format check
+    // still lives in ValidateCompensationFields below, run unconditionally per row.
+    private static readonly string[] CompensationFields = ["SalaryType", "Currency", "HoursPerWeek", "FTE"];
     private static readonly string[] LeaveFields = ["LeaveTypeCode", "LeaveBalanceDays"];
     private static readonly string[] WorkingPatternFields = ["WorkingDays", "HoursPerDay"];
 
@@ -103,6 +108,7 @@ internal sealed class EmployeeStagingRowValidator(
             ValidateRequiredFields(row, rowErrors);
             ValidateEmployeeNumberField(row, employeeNumberMode, rowErrors);
             ValidateDateFields(row, rowErrors);
+            ValidateSalaryAmountFormat(row, rowErrors);
 
             if (employeeNumberMode == EmployeeNumberMode.Manual)
                 await ValidateDuplicateAgainstExistingEmployeesAsync(companyId, row, rowErrors, cancellationToken);
@@ -333,20 +339,21 @@ internal sealed class EmployeeStagingRowValidator(
             rowErrors.Add($"Manager reference '{managerReference}' does not match any employee in this file or company.");
     }
 
-    private static void ValidateCompensationFields(ParsedImportRow row, List<string> rowErrors)
+    // SalaryAmount's presence is enforced by ValidateRequiredFields (it's unconditionally
+    // mandatory); this only checks the format of whatever value was supplied, and runs on every
+    // row regardless of which other compensation columns were mapped.
+    private static void ValidateSalaryAmountFormat(ParsedImportRow row, List<string> rowErrors)
     {
         var salaryAmount = GetField(row, "SalaryAmount");
         if (string.IsNullOrWhiteSpace(salaryAmount))
-        {
-            // Once any compensation column is mapped for the import, SalaryAmount is mandatory —
-            // an employee can't have an opening compensation record with no salary figure.
-            rowErrors.Add("'SalaryAmount' is required.");
-        }
-        else if (!decimal.TryParse(salaryAmount, NumberStyles.Number, CultureInfo.InvariantCulture, out var salary) || salary <= 0)
-        {
-            rowErrors.Add($"'SalaryAmount' value '{salaryAmount}' must be a positive number.");
-        }
+            return;
 
+        if (!decimal.TryParse(salaryAmount, NumberStyles.Number, CultureInfo.InvariantCulture, out var salary) || salary <= 0)
+            rowErrors.Add($"'SalaryAmount' value '{salaryAmount}' must be a positive number.");
+    }
+
+    private static void ValidateCompensationFields(ParsedImportRow row, List<string> rowErrors)
+    {
         var salaryType = GetField(row, "SalaryType");
         if (!string.IsNullOrWhiteSpace(salaryType) && !ValidSalaryTypes.Contains(salaryType.Trim()))
             rowErrors.Add($"'SalaryType' value '{salaryType}' is not valid. Expected one of: {string.Join(", ", ValidSalaryTypes)}.");

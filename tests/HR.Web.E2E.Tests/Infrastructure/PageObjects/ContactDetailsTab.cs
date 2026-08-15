@@ -21,6 +21,7 @@ public sealed class ContactDetailsTab(IPage page)
         var input = page.GetByPlaceholder("e.g. name@personal.com");
         await input.ClearAsync();
         await input.FillAsync(email);
+        await page.Keyboard.PressAsync("Tab");
     }
 
     public async Task FillMobilePhoneAsync(string phone)
@@ -28,6 +29,7 @@ public sealed class ContactDetailsTab(IPage page)
         var input = page.GetByPlaceholder("e.g. 07700 900000");
         await input.ClearAsync();
         await input.FillAsync(phone);
+        await page.Keyboard.PressAsync("Tab");
     }
 
     public async Task FillHomePhoneAsync(string phone)
@@ -35,6 +37,7 @@ public sealed class ContactDetailsTab(IPage page)
         var input = page.GetByPlaceholder("e.g. 01234 567890");
         await input.ClearAsync();
         await input.FillAsync(phone);
+        await page.Keyboard.PressAsync("Tab");
     }
 
     public async Task FillAddressLine1Async(string value)
@@ -42,6 +45,7 @@ public sealed class ContactDetailsTab(IPage page)
         var input = page.GetByPlaceholder("Street address");
         await input.ClearAsync();
         await input.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
     }
 
     public async Task FillCityAsync(string value)
@@ -49,6 +53,7 @@ public sealed class ContactDetailsTab(IPage page)
         var input = page.GetByPlaceholder("e.g. London");
         await input.ClearAsync();
         await input.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
     }
 
     public async Task FillPostCodeAsync(string value)
@@ -56,6 +61,7 @@ public sealed class ContactDetailsTab(IPage page)
         var input = page.GetByPlaceholder("e.g. SW1A 1AA");
         await input.ClearAsync();
         await input.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
     }
 
     public async Task FillCountryAsync(string value)
@@ -63,6 +69,7 @@ public sealed class ContactDetailsTab(IPage page)
         var input = page.GetByPlaceholder("e.g. United Kingdom");
         await input.ClearAsync();
         await input.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
     }
 
     // ── Actions ────────────────────────────────────────────────────────────────

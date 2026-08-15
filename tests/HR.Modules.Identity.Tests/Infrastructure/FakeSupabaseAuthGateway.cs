@@ -6,6 +6,7 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
 {
     public List<(string Email, string RedirectTo)> CreatedUsers { get; } = [];
     public List<(string Email, string RedirectTo)> ResentEmails { get; } = [];
+    public List<(string Email, string RedirectTo)> PasswordResetRequests { get; } = [];
 
     public Guid? UserIdToReturn { get; set; }
     public bool ShouldThrowOnCreate { get; set; }
@@ -31,6 +32,15 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         ResentEmails.Add((email, redirectTo));
         return Task.CompletedTask;
     }
+
+    public Task RequestPasswordResetAsync(string email, string redirectTo, CancellationToken cancellationToken)
+    {
+        PasswordResetRequests.Add((email, redirectTo));
+        return Task.CompletedTask;
+    }
+
+    public Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
 
     public Task<SupabaseSession> ExchangeCodeForSessionAsync(string code, CancellationToken cancellationToken)
     {

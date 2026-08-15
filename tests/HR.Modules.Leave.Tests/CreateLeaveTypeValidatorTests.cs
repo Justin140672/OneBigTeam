@@ -77,4 +77,26 @@ public class CreateLeaveTypeValidatorTests
         var result = _validator.Validate(Valid() with { DefaultEntitlementDays = 0 });
         Assert.True(result.IsValid);
     }
+
+    [Fact]
+    public void Validate_Passes_When_Name_Is_Exactly_100_Characters()
+    {
+        var result = _validator.Validate(Valid() with { Name = new string('A', 100) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_Code_Is_Exactly_20_Characters()
+    {
+        var result = _validator.Validate(Valid() with { Code = new string('A', 20) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Name_Is_Whitespace_Only()
+    {
+        var result = _validator.Validate(Valid() with { Name = "   " });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateLeaveTypeRequest.Name));
+    }
 }

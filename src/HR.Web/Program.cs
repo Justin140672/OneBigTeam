@@ -13,6 +13,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<SupabaseSessionAccessor>();
+builder.Services.AddScoped<SupportSessionState>();
 builder.Services.AddTransient<SupabaseAuthDelegatingHandler>();
 
 builder.Services.AddHttpClient("hrapi", c =>
@@ -27,7 +28,27 @@ builder.Services.AddHttpClient("hrapi", c =>
 // Attaches a real Supabase access token (once one has been established via /verify-email) as a
 // Bearer token on every outgoing hrapi request — see SupabaseAuthDelegatingHandler/
 // SupabaseSessionAccessor remarks. No-op for the existing Development dev-persona flow.
-.AddHttpMessageHandler<SupabaseAuthDelegatingHandler>();
+.AddHttpMessageHandler<SupabaseAuthDelegatingHandler>()
+// SocketsHttpHandler's default PooledConnectionLifetime is infinite, so a connection idle long
+// enough can be silently closed server-side by Kestrel's own keep-alive timeout while the pool
+// still considers it valid — the next request reused from the pool then fails mid-flight with an
+// OperationCanceledException while the server is reading the request body. Bounding the lifetime
+// well under Kestrel's default 130s keep-alive timeout forces proactive recycling instead.
+//
+// CertificateRevocationCheckMode = NoCheck: every new connection (including the periodic
+// recycling above) re-runs the TLS handshake, which by default performs an online CRL/OCSP
+// revocation check against Aspire's local HTTPS dev certificate. That check can't complete
+// against a dev cert and stalls for ~15s before SocketsHttpHandler gives up and proceeds anyway
+// — this is purely internal service-to-service traffic on localhost, so skipping the check is
+// safe and removes that stall entirely.
+.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+{
+    PooledConnectionLifetime = TimeSpan.FromSeconds(60),
+    SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+    {
+        CertificateRevocationCheckMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck,
+    },
+});
 
 builder.Services.AddScoped<CompanyService>();
 builder.Services.AddScoped<DepartmentService>();
@@ -64,6 +85,8 @@ builder.Services.AddScoped<OrganisationHierarchyBuilder>();
 builder.Services.AddScoped<OrganisationChartService>();
 builder.Services.AddScoped<SicknessService>();
 builder.Services.AddScoped<DevAuthService>();
+builder.Services.AddScoped<PasswordResetService>();
+builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<VacancyService>();
 builder.Services.AddScoped<CandidateService>();
 builder.Services.AddScoped<ApplicationService>();
@@ -228,6 +251,46 @@ app.MapGet("/verify-email-complete", async (
     return Results.Redirect($"/getting-started?st={Uri.EscapeDataString(access_token)}&se={expiresInSeconds}");
 }).AllowAnonymous();
 
+// Handles Supabase's password-recovery redirect — same implicit/fragment flow as /verify-email
+// above (Supabase uses the identical redirect mechanism for both — see that endpoint's remarks).
+// Unlike /verify-email-complete, the next hop here (/reset-password-complete) needs to render an
+// actual form (the new password), not just set a cookie and redirect — so it's a normal Blazor
+// page reached via plain navigation, rather than another raw minimal-API hop. A missing token is
+// still forwarded there (as an empty query value) rather than redirected elsewhere, so that page
+// can show its own "this link is invalid or has expired" message with reset-password-specific
+// copy and a link back to /forgot-password, instead of reusing /verify-email-error's mismatched
+// wording.
+app.MapGet("/reset-password", () => Results.Content("""
+    <!DOCTYPE html>
+    <html>
+    <head><title>Confirming your request…</title></head>
+    <body>
+    <script>
+        var params = new URLSearchParams(window.location.hash.slice(1));
+        var accessToken = params.get('access_token') || '';
+        window.location.replace('/reset-password-complete?access_token=' + encodeURIComponent(accessToken));
+    </script>
+    </body>
+    </html>
+    """, "text/html")).AllowAnonymous();
+
+// The real (non-dev-gated) counterpart to /dev/persona-cookie below, for Login.razor's genuine
+// Supabase sign-in (HR.Modules.Identity's Login feature, POST /api/login). Same constraint as
+// /verify-email-complete/dev/persona-cookie: Blazor Server's interactive circuit can't set cookies
+// mid-render, so this must be a real browser navigation reached via hardNavigate — Login.razor
+// already has the tokens by the time it calls this, having gotten them from api/login itself.
+app.MapGet("/login-complete", (HttpContext context, string accessToken, int expiresIn) =>
+{
+    if (string.IsNullOrWhiteSpace(accessToken))
+        return Results.BadRequest();
+
+    SupabaseSessionAccessor.SetSessionCookie(context, accessToken, expiresIn);
+
+    // See /dev/persona-cookie's remarks (and Routes.razor) for why the token is also carried one
+    // hop further via the URL, not just the cookie.
+    return Results.Redirect($"/?st={Uri.EscapeDataString(accessToken)}&se={expiresIn}");
+}).AllowAnonymous();
+
 // Development-only: establishes a real Supabase session cookie for the dev persona switcher.
 // Blazor Server's interactive circuit (a live SignalR connection, not a normal HTTP
 // request/response) cannot set cookies mid-render — same constraint as /verify-email-complete
@@ -256,6 +319,93 @@ if (app.Environment.IsDevelopment())
         return Results.Redirect($"/?st={Uri.EscapeDataString(accessToken)}&se={expiresIn}");
     }).AllowAnonymous();
 }
+
+// "Login As Customer" support-session redemption (Support epic). A platform administrator
+// generates a support session from the Admin Portal (HR.Modules.Companies's
+// GenerateSupportSession feature — POST /api/companies/admin/customers/{companyId}/support-session,
+// platform:admin policy, requires a typed reason, 20-minute single-use token) and is given a link
+// to this endpoint.
+//
+// STUB — DELIBERATE, NOT AN OVERSIGHT: this endpoint validates and consumes the token (via
+// HR.Modules.Companies's RedeemSupportSession endpoint) and confirms/audits that redemption, but
+// it does NOT establish an authenticated HR.Web session as the customer's company. Doing so safely
+// requires either:
+//   (a) a genuine Supabase Admin API-driven session mint for a real customer user (true user
+//       impersonation) — a materially larger, higher-risk change to the auth surface, or
+//   (b) teaching HR.Api's authorization pipeline (SupabaseCurrentUserResolutionMiddleware,
+//       RequireTenantMiddleware, TenantRouteAuthorizationMiddleware — see HR.Modules.Identity) a
+//       new "support-scoped, company-only, not-a-real-user" identity shape, which is itself a
+//       security-sensitive change to code shared by every authenticated request in the system.
+// Both are out of scope for this pass. Building either without a focused security review of that
+// shared middleware would risk silently weakening authentication/authorization for every tenant,
+// which is a materially worse outcome than shipping "the safe half" of this feature. See
+// SupportSessionState's remarks for the same reasoning from the client-side half (the visible
+// support banner), which is built and ready to be driven by whichever mechanism above is chosen.
+app.MapGet("/support-session/redeem", async (
+    HttpContext context,
+    string? token,
+    IHttpClientFactory httpClientFactory) =>
+{
+    if (string.IsNullOrWhiteSpace(token))
+    {
+        return Results.Content("""
+            <!DOCTYPE html>
+            <html><head><title>Invalid support session link</title></head>
+            <body><h1>Invalid support session link</h1>
+            <p>No token was supplied.</p></body></html>
+            """, "text/html");
+    }
+
+    var http = httpClientFactory.CreateClient("hrapi");
+
+    HttpResponseMessage response;
+    try
+    {
+        response = await http.PostAsJsonAsync(
+            "api/companies/admin/support-session/redeem",
+            new { Token = token },
+            context.RequestAborted);
+    }
+    catch (HttpRequestException)
+    {
+        return Results.Content("""
+            <!DOCTYPE html>
+            <html><head><title>Support session error</title></head>
+            <body><h1>Something went wrong</h1>
+            <p>Could not reach the support-session service. Please try again.</p></body></html>
+            """, "text/html");
+    }
+
+    if (!response.IsSuccessStatusCode)
+    {
+        return Results.Content("""
+            <!DOCTYPE html>
+            <html><head><title>Support session link expired or invalid</title></head>
+            <body><h1>This support session link is no longer valid</h1>
+            <p>It may have expired, already been used, or been revoked. Generate a new one from the
+            Admin Portal.</p></body></html>
+            """, "text/html");
+    }
+
+    // Token was valid and is now consumed (single-use — RedeemSupportSession marks it redeemed
+    // server-side and this call cannot succeed a second time). The redemption itself is fully
+    // real, audited, and functional; only the "establish an authenticated HR.Web session as this
+    // customer" half is intentionally not implemented — see the remarks above this endpoint.
+    return Results.Content($"""
+        <!DOCTYPE html>
+        <html><head><title>Support session validated</title></head>
+        <body>
+        <h1>Support session validated</h1>
+        <p>The support session token was valid and has now been consumed. This confirms the
+        platform administrator's access grant was genuine and has been recorded in the audit log.</p>
+        <p><strong>Full automatic sign-in into the customer's environment is not implemented in
+        this build.</strong> Establishing a real authenticated session safely requires a dedicated
+        follow-up change to HR.Api's shared authentication/authorization middleware, which was
+        deliberately deferred rather than rushed — see Program.cs's remarks on this endpoint for the
+        full reasoning.</p>
+        </body></html>
+        """, "text/html");
+}).AllowAnonymous();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

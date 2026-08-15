@@ -1,4 +1,4 @@
-using System.Text;
+using ClosedXML.Excel;
 using HR.Modules.DataImport.Domain;
 using HR.Modules.DataImport.Features.GetImportSessionColumns;
 using HR.Modules.DataImport.Persistence;
@@ -21,28 +21,55 @@ public class GetImportSessionColumnsHandlerTests
         DataImportDbContext db, FakeImportFileStorageService storage) =>
         new(db, storage, new EmployeeImportFileParser());
 
+    private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    // Builds a minimal XLSX workbook (via ClosedXML) from comma-delimited "csv-shaped" header/data
+    // lines, so existing test fixtures (written as csv-style strings for readability) can still be
+    // used against the now xlsx-only parser.
+    private static byte[] BuildXlsxBytes(string csvShapedContent)
+    {
+        var lines = csvShapedContent
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(l => l.TrimEnd('\r'))
+            .ToList();
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Sheet1");
+
+        for (var row = 0; row < lines.Count; row++)
+        {
+            var cells = lines[row].Split(',');
+            for (var col = 0; col < cells.Length; col++)
+                worksheet.Cell(row + 1, col + 1).Value = cells[col];
+        }
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
     private static async Task<ImportSession> SeedSessionAsync(
         DataImportDbContext db,
         FakeImportFileStorageService storage,
         Guid companyId,
-        string csvContent,
-        string storageKey = "sessions/abc/employees.csv")
+        string csvShapedContent,
+        string storageKey = "sessions/abc/employees.xlsx")
     {
         var session = ImportSession.Create(
             Guid.NewGuid(),
             companyId,
             "Employees",
-            "employees.csv",
+            "employees.xlsx",
             totalRows: 1,
             Guid.NewGuid(),
             storageKey,
-            "text/csv",
+            XlsxContentType,
             FixedNowOffset);
 
         db.ImportSessions.Add(session);
         await db.SaveChangesAsync();
 
-        storage.SeedContent(storageKey, Encoding.UTF8.GetBytes(csvContent));
+        storage.SeedContent(storageKey, BuildXlsxBytes(csvShapedContent));
 
         return session;
     }

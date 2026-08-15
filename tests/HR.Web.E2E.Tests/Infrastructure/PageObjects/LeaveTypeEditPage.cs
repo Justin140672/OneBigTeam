@@ -16,16 +16,30 @@ public sealed class LeaveTypeEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
-    public async Task FillNameAsync(string name) =>
+    public async Task FillNameAsync(string name)
+    {
         await page.GetByPlaceholder("e.g. Annual Leave").FillAsync(name);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public async Task FillCodeAsync(string code) =>
+    public async Task FillCodeAsync(string code)
+    {
         await page.GetByPlaceholder("e.g. ANNUAL", new() { Exact = true }).FillAsync(code);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
+    // SfNumericTextBox: FillAsync's CDP-driven value never round-trips to the Blazor-bound model
+    // via its interop, unlike plain SfTextBox fields where a trailing Tab alone is enough — click,
+    // select-all, delete, then type each character for real (same convention as
+    // EmployeeEditPage.TypeIntoNumericInputAsync / CompanyEditPage.TypeIntoNumericInputAsync).
     public async Task FillDefaultDaysAsync(int days)
     {
         var input = page.Locator("input.e-numerictextbox").First;
-        await input.FillAsync(days.ToString());
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        await input.PressSequentiallyAsync(days.ToString());
+        await page.Keyboard.PressAsync("Tab");
     }
 
     public async Task SaveAsync()

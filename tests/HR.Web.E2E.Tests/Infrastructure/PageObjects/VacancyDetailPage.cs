@@ -33,8 +33,11 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// field is now genuinely optional — leaving it blank no longer produces a validation error;
     /// see CreateVacancy_WithoutAdvertTitle_UsesPositionProfileTitleAsEffectiveTitle.
     /// </summary>
-    public Task FillTitleAsync(string value) =>
-        page.GetByPlaceholder("e.g. Senior Software Engineer").FillAsync(value);
+    public async Task FillTitleAsync(string value)
+    {
+        await page.GetByPlaceholder("e.g. Senior Software Engineer").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     // NOTE: Vacancy.Location was removed entirely (domain, API, UI) as part of the
     // "Vacancy - Position Profile relationship" epic's location correction — location is now
@@ -45,8 +48,11 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     // Schedule Interview dialog's free-text Location field (see SelectInterviewerAsync's sibling
     // FillScheduledAtAsync region below), which is not this page's concern.
 
-    public Task FillDescriptionAsync(string value) =>
-        page.Locator("textarea.e-input").FillAsync(value);
+    public async Task FillDescriptionAsync(string value)
+    {
+        await page.Locator("textarea.e-input").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     /// <summary>
     /// Selects a value from the Hiring Manager dropdown (AllowFiltering enabled). Scoped to
@@ -211,7 +217,11 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     public Task<bool> IsCorrectionReasonFieldVisibleAsync() => CorrectionReasonInput.IsVisibleAsync();
 
-    public Task FillCorrectionReasonAsync(string value) => CorrectionReasonInput.FillAsync(value);
+    public async Task FillCorrectionReasonAsync(string value)
+    {
+        await CorrectionReasonInput.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     // ── Linked Position Profile card (existing vacancy only) ─────────────────────
     // "Derive Vacancy Role Information from Position Profile" story: read-only card
@@ -223,8 +233,24 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     private ILocator LinkedPositionProfileCard => page.Locator("[data-testid='linked-position-profile-card']");
 
-    public Task<bool> IsLinkedPositionProfileCardVisibleAsync() =>
-        LinkedPositionProfileCard.IsVisibleAsync();
+    public async Task<bool> IsLinkedPositionProfileCardVisibleAsync()
+    {
+        // IsVisibleAsync() reads the DOM synchronously with no auto-wait/retry — the same race as
+        // GetLinkedPositionProfileTitleAsync/IsViewPositionProfileLinkVisibleAsync below. A caller
+        // right after navigating to a freshly (re)loaded vacancy detail page can otherwise sample
+        // the DOM before this card has finished rendering at all, reading "not visible yet" as
+        // "genuinely absent".
+        try
+        {
+            await LinkedPositionProfileCard.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+
+        return await LinkedPositionProfileCard.IsVisibleAsync();
+    }
 
     /// <summary>
     /// Reads the linked profile's Title, rendered as a plain "span.fw-semibold" (not an input —
@@ -234,6 +260,15 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task<string?> GetLinkedPositionProfileTitleAsync()
     {
         var span = LinkedPositionProfileCard.Locator("span.fw-semibold");
+
+        // VacancyListPage.ClickVacancyAsync's own post-navigation wait (".e-tab, span[role=
+        // 'combobox']") is satisfied by the Position Profile dropdown itself, not specifically by
+        // this card — so on a freshly (re)loaded detail page this card can still be mid-render
+        // when callers reach this method. IsVisibleAsync() below doesn't auto-wait/retry the way
+        // Playwright's action methods do, so without waiting for the card first, a call made right
+        // after navigating can read "not visible yet" as "genuinely absent".
+        await span.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+
         return await span.IsVisibleAsync() ? (await span.TextContentAsync())?.Trim() : null;
     }
 
@@ -278,8 +313,25 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// only when the vacancy has a linked Position Profile (_vacancy.PositionProfileId is not
     /// null). Navigates to /companies/{CompanyId}/position-profiles/{PositionProfileId}/view.
     /// </summary>
-    public Task<bool> IsViewPositionProfileLinkVisibleAsync() =>
-        LinkedPositionProfileCard.GetByRole(AriaRole.Link, new() { Name = "View Position Profile" }).IsVisibleAsync();
+    public async Task<bool> IsViewPositionProfileLinkVisibleAsync()
+    {
+        var link = LinkedPositionProfileCard.GetByRole(AriaRole.Link, new() { Name = "View Position Profile" });
+
+        // IsVisibleAsync() reads the DOM synchronously with no auto-wait/retry — the same class of
+        // race as GetLinkedPositionProfileTitleAsync above. A caller right after navigating to a
+        // freshly (re)loaded vacancy detail page can otherwise sample the DOM before this card has
+        // finished rendering at all, reading "not visible yet" as "genuinely absent".
+        try
+        {
+            await link.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+
+        return await link.IsVisibleAsync();
+    }
 
     public Task ClickViewPositionProfileLinkAsync() =>
         LinkedPositionProfileCard.GetByRole(AriaRole.Link, new() { Name = "View Position Profile" }).ClickAsync();
@@ -862,8 +914,11 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         DropDownSelector.SelectAsync(page, page.Locator(".hire-candidate-dialog"), gender, index: 1);
 
     /// <summary>Fills the Employee Number field in the (currently open) Hire Candidate dialog.</summary>
-    public Task FillHireEmployeeNumberAsync(string value) =>
-        page.Locator(".hire-candidate-dialog").GetByPlaceholder("e.g. EMP-001").FillAsync(value);
+    public async Task FillHireEmployeeNumberAsync(string value)
+    {
+        await page.Locator(".hire-candidate-dialog").GetByPlaceholder("e.g. EMP-001").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     /// <summary>
     /// Selects a value from a Syncfusion SfDropDownList in the (currently open) Hire Candidate
@@ -1001,8 +1056,20 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     public async Task<string?> GetInterviewOutcomeAsync(string candidateNameFragment)
     {
+        // Polls rather than checking IsVisibleAsync() instantly — same reasoning as
+        // GetApplicationStatusAsync above: OpenInterviewsTabAsync's wait only confirms the tab
+        // panel container is present, not that the async interviews grid has finished populating
+        // its rows, so an instant check can read the badge before it exists.
         var badge = InterviewRow(candidateNameFragment).First.Locator(".badge").First;
-        return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
+        try
+        {
+            await badge.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
+        return (await badge.TextContentAsync())?.Trim();
     }
 
     public Task ClickRecordOutcomeForAsync(string candidateNameFragment) =>

@@ -24,11 +24,17 @@ public sealed class PublicHolidayEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    public async Task FillNameAsync(string name) =>
+    public async Task FillNameAsync(string name)
+    {
         await page.GetByPlaceholder("e.g. Christmas Day").FillAsync(name);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public async Task FillCountryCodeAsync(string code) =>
+    public async Task FillCountryCodeAsync(string code)
+    {
         await page.GetByPlaceholder("e.g. GB").FillAsync(code);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task SaveAsync()
     {

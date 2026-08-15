@@ -2,15 +2,25 @@ using FluentValidation;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Identity.Authorization;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Identity.Features.AssignPlatformAdministratorRole;
 using HR.Modules.Identity.Features.CancelInvite;
+using HR.Modules.Identity.Features.CreatePlatformAdministrator;
+using HR.Modules.Identity.Features.DisablePlatformAdministrator;
 using HR.Modules.Identity.Features.DisableUser;
+using HR.Modules.Identity.Features.EnablePlatformAdministrator;
 using HR.Modules.Identity.Features.EnableUser;
 using HR.Modules.Identity.Features.GetUserAuditHistory;
 using HR.Modules.Identity.Features.GetUserDetails;
 using HR.Modules.Identity.Features.InviteEmployeeUser;
+using HR.Modules.Identity.Features.ListPlatformAdministrators;
 using HR.Modules.Identity.Features.ListUsers;
+using HR.Modules.Identity.Features.Login;
+using HR.Modules.Identity.Features.RequestPasswordReset;
 using HR.Modules.Identity.Features.ResendInvite;
 using HR.Modules.Identity.Features.ResendVerification;
+using HR.Modules.Identity.Features.ResetPassword;
+using HR.Modules.Identity.Features.ResetPlatformAdministratorMfa;
+using HR.Modules.Identity.Features.ResetPlatformAdministratorPassword;
 using HR.Modules.Identity.Features.SignUp;
 using HR.Modules.Identity.Features.UpdateUserRoles;
 using HR.Modules.Identity.Features.VerifyEmail;
@@ -55,6 +65,13 @@ public static class IdentityModule
         {
             services.AddScoped<ISupabaseAuthGateway, SupabaseAuthGateway>();
         }
+
+        // System Health Dashboard (Platform Monitoring epic) — "auth" named health check, live
+        // reachability probe against Supabase Auth's public settings endpoint (see
+        // SupabaseAuthHealthCheck remarks).
+        services.AddHealthChecks()
+            .AddCheck<SupabaseAuthHealthCheck>("auth");
+
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
         services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();
         services.AddScoped<HR.SharedKernel.IAuthorizationService, IdentityAuthorizationService>();
@@ -63,6 +80,18 @@ public static class IdentityModule
 
         services.AddScoped<IEmployeeUserAccountStatusReader, EmployeeUserAccountStatusReader>();
         services.AddScoped<IUserEmailReader, UserEmailReader>();
+        services.AddScoped<ICompanyUserEmailSearchReader, CompanyUserEmailSearchReader>();
+        services.AddScoped<ICompanyUserCountReader, CompanyUserCountReader>();
+
+        // Platform Audit Log (Audit epic) — resolves ActorUserId -> administrator email for the
+        // Admin Portal's audit log grid/filter. Consumed by HR.Modules.Companies via this
+        // Infrastructure.Abstractions interface, same pattern as ICompanyUserEmailSearchReader above.
+        services.AddScoped<IUserEmailDirectoryReader, UserEmailDirectoryReader>();
+
+        // Admin Portal Application Metrics dashboard (Platform Monitoring epic) — platform-wide,
+        // not scoped to a single customer. Consumed by HR.Modules.Companies via this
+        // Infrastructure.Abstractions interface.
+        services.AddScoped<IPlatformUserActivityReader, PlatformUserActivityReader>();
 
         services.AddScoped<ListUsersHandler>();
         services.AddScoped<IValidator<ListUsersRequest>, ListUsersValidator>();
@@ -86,7 +115,32 @@ public static class IdentityModule
         services.AddScoped<IValidator<SignUpRequest>, SignUpValidator>();
         services.AddScoped<ResendVerificationHandler>();
         services.AddScoped<IValidator<ResendVerificationRequest>, ResendVerificationValidator>();
+
+        services.AddScoped<LoginHandler>();
+        services.AddScoped<IValidator<LoginRequest>, LoginValidator>();
+
+        services.AddScoped<RequestPasswordResetHandler>();
+        services.AddScoped<IValidator<RequestPasswordResetRequest>, RequestPasswordResetValidator>();
+
+        services.AddScoped<ResetPasswordHandler>();
+        services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordValidator>();
         services.AddScoped<VerifyEmailHandler>();
+
+        // Admin User Management (Admin Portal "administrator management" screen).
+        services.AddScoped<CreatePlatformAdministratorHandler>();
+        services.AddScoped<IValidator<CreatePlatformAdministratorRequest>, CreatePlatformAdministratorValidator>();
+        services.AddScoped<DisablePlatformAdministratorHandler>();
+        services.AddScoped<IValidator<DisablePlatformAdministratorRequest>, DisablePlatformAdministratorValidator>();
+        services.AddScoped<EnablePlatformAdministratorHandler>();
+        services.AddScoped<IValidator<EnablePlatformAdministratorRequest>, EnablePlatformAdministratorValidator>();
+        services.AddScoped<AssignPlatformAdministratorRoleHandler>();
+        services.AddScoped<IValidator<AssignPlatformAdministratorRoleRequest>, AssignPlatformAdministratorRoleValidator>();
+        services.AddScoped<ListPlatformAdministratorsHandler>();
+        services.AddScoped<IValidator<ListPlatformAdministratorsRequest>, ListPlatformAdministratorsValidator>();
+        services.AddScoped<ResetPlatformAdministratorPasswordHandler>();
+        services.AddScoped<IValidator<ResetPlatformAdministratorPasswordRequest>, ResetPlatformAdministratorPasswordValidator>();
+        services.AddScoped<ResetPlatformAdministratorMfaHandler>();
+        services.AddScoped<IValidator<ResetPlatformAdministratorMfaRequest>, ResetPlatformAdministratorMfaValidator>();
 
         services.AddScoped<
             IIntegrationEventHandler<OffboardingPlanCompletedIntegrationEvent>,
@@ -137,6 +191,19 @@ public static class IdentityModule
 
     public static AuthorizationBuilder AddRolePolicies(this AuthorizationBuilder builder)
     {
+        // Platform-admin policy — used exclusively by the new cross-tenant Admin Portal (Customer
+        // Dashboard epic). Deliberately NOT built on RolePolicy/RoleRequirement: those require a
+        // company-scoped RoleAssignment, but a platform administrator manages the whole platform
+        // and may have no employee/company relationship at all. This policy only asserts "the
+        // caller is an authenticated Supabase user" — the actual allow-list check (is this specific
+        // user permitted to see cross-tenant data) happens in the handler via configuration
+        // (PlatformAdmin:AllowedEmails), which is deliberately conservative until a real
+        // platform-admin identity model exists. No dedicated "platform staff" role/table exists yet
+        // in SystemRoles/Identity (see support:manage's remarks above making the same observation) —
+        // revisit this with a first-class model once the Admin Portal grows beyond a single
+        // read-only dashboard.
+        builder.AddPolicy("platform:admin", policy => policy.RequireAuthenticatedUser());
+
         // Individual role policies
         builder.AddPolicy("role:employee",             RolePolicy(SystemRoles.Employee));
         builder.AddPolicy("role:manager",              RolePolicy(SystemRoles.Manager));
@@ -348,6 +415,18 @@ public static class IdentityModule
             SystemRoles.HrAdministrator,
             SystemRoles.Manager));
 
+        // Workload & HR Actions Report catalog visibility (bug fix — this report was previously
+        // shown to every "reporting:view" caller, including a Recruiter with no HR/Manager role,
+        // which surfaced an HR-category report in the Recruitment area alongside Employee Starter
+        // Report. Employee Starter Report intentionally stays visible to Recruiters (see
+        // reporting:view-employee-starter above); this report should not. Matches the
+        // Manager/HrAdministrator shape already used by reporting:view-leave-summary etc. — the
+        // report's actual content still adapts per-role via GetWorkloadActions' IWorkloadActionProvider
+        // scoping, this policy only controls whether the catalog entry is shown.
+        builder.AddPolicy("reporting:view-workload-actions", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.Manager));
+
         return builder;
     }
 
@@ -421,6 +500,40 @@ public static class IdentityModule
     }
 
     /// <summary>
+    /// Bootstrap-seeds PlatformAdministrator rows from the PlatformAdmin:AllowedEmails config
+    /// allow-list (the same config key the pre-existing, now out-of-scope allow-list handlers
+    /// elsewhere already read — this seeding does not touch or remove those checks). Idempotent
+    /// and safe to call on every startup: for each configured email not already present
+    /// (case-insensitive), creates an enabled PlatformOwner row with CreatedByUserId = null
+    /// (system-seeded). Not wired into any startup call-site yet — a separate step will do that.
+    /// </summary>
+    public static async Task SeedPlatformAdministratorsFromConfigAsync(
+        this IServiceProvider services, IConfiguration configuration)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        var now = DateTimeOffset.UtcNow;
+
+        var allowedEmails = configuration.GetSection("PlatformAdmin:AllowedEmails").Get<string[]>() ?? [];
+
+        foreach (var email in allowedEmails)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                continue;
+
+            var normalizedEmail = email.Trim().ToLowerInvariant();
+            var exists = await db.PlatformAdministrators.AnyAsync(a => a.Email == normalizedEmail);
+            if (exists)
+                continue;
+
+            db.PlatformAdministrators.Add(PlatformAdministrator.Create(
+                normalizedEmail, PlatformAdministratorRole.PlatformOwner, now, createdByUserId: null));
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
     /// Idempotently ensures a matching, login-ready Supabase Auth user AND a linked UserProfile row
     /// exist for every dev persona supplied (see HR.Api's DevPersonaStore.Personas), so the dev
     /// persona switcher can perform a real Supabase password-grant login for any of them and HR.Api
@@ -486,6 +599,20 @@ public static class IdentityModule
         {
             db.UserProfiles.Add(UserProfile.Create(
                 id, supabaseUserId, companyId, email, firstName, lastName, DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        else if (profile.SupabaseAuthUserId != supabaseUserId)
+        {
+            // A profile row can already exist here with a stale/fake SupabaseAuthUserId — e.g. a
+            // self-service SignUp's UserProfile is created with whatever id CreateUserAsync
+            // returned (a random Guid.NewGuid() under E2E's FakeSupabaseAuthGateway, which never
+            // calls real Supabase), and this call is the first time a REAL Supabase user id is
+            // obtained for that email. Without this self-heal (the same one
+            // SeedDevSupabaseUsersAsync already applies for regular seeded personas), the stored
+            // id never matches the "sub" claim on tokens actually issued for this account, and
+            // every later login attempt fails to resolve a UserProfile despite Supabase itself
+            // authenticating successfully.
+            profile.UpdateSupabaseAuthUserId(supabaseUserId, DateTimeOffset.UtcNow);
             await db.SaveChangesAsync(cancellationToken);
         }
     }

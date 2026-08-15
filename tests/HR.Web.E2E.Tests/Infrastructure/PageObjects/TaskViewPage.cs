@@ -108,8 +108,11 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     public async Task<bool> HasLeaveReviewPanelAsync() =>
         await Dialog.Locator(".card-header").Filter(new() { HasText = "Review Leave Request" }).IsVisibleAsync();
 
-    public async Task EnterDecisionReasonAsync(string reason) =>
+    public async Task EnterDecisionReasonAsync(string reason)
+    {
         await Dialog.GetByPlaceholder("Enter a reason for your decision…").FillAsync(reason);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task ApproveAsync()
     {
@@ -136,6 +139,7 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
         var input = panel.GetByPlaceholder("Document title");
         await input.ClearAsync();
         await input.FillAsync(title);
+        await page.Keyboard.PressAsync("Tab");
     }
 
     /// <summary>Sets the file to be uploaded via the document upload panel's file input.</summary>
@@ -219,8 +223,11 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     }
 
     /// <summary>Fills the review notes textarea.</summary>
-    public async Task EnterReviewNotesAsync(string notes) =>
+    public async Task EnterReviewNotesAsync(string notes)
+    {
         await Dialog.GetByPlaceholder("Enter your review notes…").FillAsync(notes);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     /// <summary>Clicks "Complete Review", dismisses the confirmation, and waits for the task to become Completed.</summary>
     public async Task CompleteReviewAsync()

@@ -1,0 +1,103 @@
+@page "/customers"
+@inject CustomerListService CustomerListService
+@inject NavigationManager Navigation
+
+<PageTitle>Customers — Admin Portal</PageTitle>
+
+<h1>Customers</h1>
+
+<div class="customer-list-toolbar">
+    <SfTextBox Placeholder="Search by company name, email or company id"
+               Value="@_searchTerm"
+               ValueChanged="@OnSearchChanged"
+               CssClass="customer-search-box"></SfTextBox>
+</div>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_customers is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view platform-wide customer data, or the customer list couldn't be
+        loaded. Contact a platform administrator if you believe this is a mistake.
+    </div>
+}
+else
+{
+    <SfGrid @ref="_grid"
+            DataSource="@_customers"
+            AllowPaging="true"
+            AllowSorting="true"
+            AllowFiltering="true"
+            class="hr-grid">
+        <GridEvents TValue="CustomerListItem" RowSelected="OnRowSelected" />
+        <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+        <GridPageSettings PageSize="20" />
+        <GridColumns>
+            <GridColumn Field="@nameof(CustomerListItem.CompanyName)" HeaderText="Company" Width="220" />
+            <GridColumn Field="@nameof(CustomerListItem.SubscriptionStatus)" HeaderText="Subscription Status" Width="170" />
+            <GridColumn Field="@nameof(CustomerListItem.CurrentEmployeeCount)" HeaderText="Current Employees" Width="160" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+            <GridColumn Field="@nameof(CustomerListItem.MonthlyCharge)" HeaderText="Monthly Charge" Width="150" Format="C2" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+            <GridColumn Field="@nameof(CustomerListItem.TrialEndsAt)" HeaderText="Trial Ends" Width="150" Format="dd MMM yyyy" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+            <GridColumn Field="@nameof(CustomerListItem.CreatedAt)" HeaderText="Created" Width="150" Format="dd MMM yyyy" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+        </GridColumns>
+    </SfGrid>
+}
+
+@code {
+    private SfGrid<CustomerListItem>? _grid;
+    private IReadOnlyList<CustomerListItem>? _customers;
+    private bool _loading = true;
+    private string? _searchTerm;
+    private CancellationTokenSource? _searchDebounceCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync(null);
+    }
+
+    private async Task LoadAsync(string? search)
+    {
+        _loading = true;
+        StateHasChanged();
+
+        var response = await CustomerListService.GetCustomersOrNullAsync(search);
+        _customers = response?.Customers;
+        _loading = false;
+    }
+
+    // Debounced so every keystroke doesn't trigger a round trip to the API — matches the
+    // "search by name/email/company id" acceptance criterion without hammering the server on
+    // large lists.
+    private async Task OnSearchChanged(string? value)
+    {
+        _searchTerm = value;
+
+        _searchDebounceCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _searchDebounceCts = cts;
+
+        try
+        {
+            await Task.Delay(300, cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (cts.IsCancellationRequested)
+            return;
+
+        await LoadAsync(_searchTerm);
+        StateHasChanged();
+    }
+
+    private void OnRowSelected(Syncfusion.Blazor.Grids.RowSelectEventArgs<CustomerListItem> args)
+    {
+        if (args.Data is not null)
+            Navigation.NavigateTo($"/customers/{args.Data.CompanyId}");
+    }
+}

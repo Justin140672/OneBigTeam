@@ -167,6 +167,32 @@ public class SicknessCalculatorTests
     }
 
     [Fact]
+    public void CalculateTotalDays_EndDate_Before_StartDate_Returns_Zero()
+    {
+        // Loop condition current <= endDate never true — should return 0, not throw
+        var result = SicknessCalculator.CalculateTotalDays(
+            new DateOnly(2026, 7, 3), SicknessDayPart.FullDay,
+            new DateOnly(2026, 7, 1), SicknessDayPart.FullDay,
+            StandardPattern);
+
+        Assert.Equal(0m, result);
+    }
+
+    [Fact]
+    public void CalculateTotalDays_ZeroHoursPerDayPattern_Returns_Zero_Without_DivideByZero()
+    {
+        var pattern = new WorkingPattern(WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+            WorkingDays.Thursday | WorkingDays.Friday, 0m);
+
+        var result = SicknessCalculator.CalculateTotalDays(
+            new DateOnly(2026, 7, 1), SicknessDayPart.FullDay,
+            new DateOnly(2026, 7, 1), SicknessDayPart.FullDay,
+            pattern);
+
+        Assert.Equal(0m, result);
+    }
+
+    [Fact]
     public void CalculateTotalDays_TwoWeeks_Returns_Ten_WorkingDays()
     {
         // Mon 29 Jun to Fri 10 Jul 2026 = 10 working days

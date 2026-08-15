@@ -192,4 +192,28 @@ public class CancelDocumentRequestHandlerTests
         Assert.True(result.IsFailure);
         Assert.Equal("conflict", result.Error.Code);
     }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Already_Cancelled()
+    {
+        await using var db   = BuildContext();
+        var companyId        = Guid.NewGuid();
+        var employeeId       = Guid.NewGuid();
+        var (_, req)         = await SeedRequestAsync(db, companyId, employeeId);
+
+        req.Cancel(DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
+
+        var (handler, _, _)  = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new CancelDocumentRequestRequest
+            {
+                CompanyId = companyId, EmployeeId = employeeId, DocumentRequestId = req.Id,
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+    }
 }

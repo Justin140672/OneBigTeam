@@ -63,27 +63,39 @@ else
                                 </SfDropDownList>
                                 <ValidationMessage For="@(() => Model.EmploymentTypeId)" />
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Current Salary</label>
-                                <p class="form-control-plaintext mb-0">@CurrentSalaryDisplay()</p>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Hours</label>
-                                <p class="form-control-plaintext mb-0">@CurrentHoursDisplay()</p>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">FTE</label>
-                                <p class="form-control-plaintext mb-0">@CurrentFteDisplay()</p>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Effective From</label>
-                                <p class="form-control-plaintext mb-0">@CurrentEffectiveFromDisplay()</p>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Working Pattern</label>
-                                <p class="form-control-plaintext mb-0">@WorkingPatternSummary()</p>
-                            </div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Current Compensation</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <tr>
+                                    <th class="text-muted fw-normal" style="width: 220px">Current Salary</th>
+                                    <td>@CurrentSalaryDisplay()</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted fw-normal">Hours</th>
+                                    <td>@CurrentHoursDisplay()</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted fw-normal">FTE</th>
+                                    <td>@CurrentFteDisplay()</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted fw-normal">Effective From</th>
+                                    <td>@CurrentEffectiveFromDisplay()</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted fw-normal">Working Pattern</th>
+                                    <td>@WorkingPatternSummary()</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -303,12 +315,28 @@ else
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
 
+    protected override object? LoadKey => (CompanyId, EmployeeId);
+
     // Set by EmployeeEdit.razor's SaveCoreAsync (via its @ref to this component) immediately
     // before calling SaveAsync(), so this tab's UpdateEmploymentDetailsRequest carries the same
     // CorrelationId as the Employee Profile tab's own save — letting
     // GetEmployeeAuditHistoryHandler merge the two resulting audit rows into one entry. Left null
     // (the default) whenever this tab is saved on its own, so its audit entry stays separate.
     public Guid? CorrelationId { get; set; }
+
+    // Called by EmployeeEdit.razor's SaveCoreAsync (via its @ref to this component) immediately
+    // before calling SaveAsync(), whenever the user also changed Department/Location on the
+    // Employee/Profile tab. Model.DepartmentId/LocationId here are loaded once when this tab
+    // mounts and never refreshed from the sibling tab, so without this sync SaveAsync() would
+    // resubmit these stale values via UpdateEmploymentDetailsRequest and silently revert the
+    // change the Profile tab just saved (bug fix — Department/Location edits were being reverted,
+    // and since EmploymentDetailsSnapshot doesn't audit these fields, the revert never showed up
+    // in Employee Audit History either).
+    public void SyncSharedAssignmentFields(Guid? departmentId, Guid? locationId)
+    {
+        Model.DepartmentId = departmentId;
+        Model.LocationId = locationId;
+    }
 
     private List<DepartmentListItemModel> _departments = [];
     private List<LocationListItemModel> _locations = [];

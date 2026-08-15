@@ -23,17 +23,29 @@ public sealed class EmergencyContactsTab(IPage page)
         await page.WaitForSelectorAsync("input[placeholder='Full name']", new() { Timeout = 10_000 });
     }
 
-    public async Task FillContactNameAsync(string name) =>
+    public async Task FillContactNameAsync(string name)
+    {
         await page.GetByPlaceholder("Full name").FillAsync(name);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public async Task FillContactRelationshipAsync(string relationship) =>
+    public async Task FillContactRelationshipAsync(string relationship)
+    {
         await page.GetByPlaceholder("e.g. Spouse, Parent, Sibling").FillAsync(relationship);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public async Task FillContactPhoneAsync(string phone) =>
+    public async Task FillContactPhoneAsync(string phone)
+    {
         await page.GetByPlaceholder("e.g. 07700 900000").Last.FillAsync(phone);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public async Task FillContactEmailAsync(string email) =>
+    public async Task FillContactEmailAsync(string email)
+    {
         await page.GetByPlaceholder("e.g. name@example.com").FillAsync(email);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     /// <summary>Submits the add-contact form and waits for the success banner.</summary>
     public async Task SaveContactAsync()

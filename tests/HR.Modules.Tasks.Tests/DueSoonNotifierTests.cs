@@ -160,4 +160,90 @@ public class DueSoonNotifierTests
 
         Assert.Empty(harness.NotificationWriter.Written);
     }
+
+    [Fact]
+    public async Task CheckTaskAlertsAsync_Notifies_When_Due_Exactly_At_DueSoon_Cutoff()
+    {
+        // DueSoonDays is 2 — the cutoff comparison is "<=", so a task due exactly on
+        // Today+2 must still be treated as due-soon (off-by-one boundary check).
+        var companyId = Guid.NewGuid();
+        var assignedEmployeeId = Guid.NewGuid();
+
+        using var harness = BuildHarness(Guid.NewGuid().ToString("N"));
+
+        var task = CreateTask(
+            companyId, Today.AddDays(2),
+            TaskSource.Recruitment, TaskActionType.Complete,
+            assignedEmployeeId: assignedEmployeeId);
+
+        await using (var scope = harness.Provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+            db.TaskItems.Add(task);
+            await db.SaveChangesAsync();
+        }
+
+        await harness.Notifier.CheckTaskAlertsAsync(CancellationToken.None);
+
+        Assert.Contains(harness.NotificationWriter.Written, w =>
+            w.EmployeeId == assignedEmployeeId &&
+            w.Type == NotificationType.TaskDueSoon &&
+            w.SourceEntityId == task.Id);
+    }
+
+    [Fact]
+    public async Task CheckTaskAlertsAsync_Does_Not_Notify_When_Due_One_Day_Past_DueSoon_Cutoff()
+    {
+        // One day beyond the Today+2 cutoff must not trigger a due-soon notification.
+        var companyId = Guid.NewGuid();
+
+        using var harness = BuildHarness(Guid.NewGuid().ToString("N"));
+
+        var task = CreateTask(
+            companyId, Today.AddDays(3),
+            TaskSource.Recruitment, TaskActionType.Complete);
+
+        await using (var scope = harness.Provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+            db.TaskItems.Add(task);
+            await db.SaveChangesAsync();
+        }
+
+        await harness.Notifier.CheckTaskAlertsAsync(CancellationToken.None);
+
+        Assert.Empty(harness.NotificationWriter.Written);
+    }
+
+    [Fact]
+    public async Task CheckTaskAlertsAsync_Treats_Due_Today_As_Due_Soon_Not_Overdue()
+    {
+        // DueDate == today must go down the "due soon / due today" branch, not the
+        // strictly-less-than "overdue" branch, and the message should say "today".
+        var companyId = Guid.NewGuid();
+        var assignedEmployeeId = Guid.NewGuid();
+
+        using var harness = BuildHarness(Guid.NewGuid().ToString("N"));
+
+        var task = CreateTask(
+            companyId, Today,
+            TaskSource.Recruitment, TaskActionType.Complete,
+            assignedEmployeeId: assignedEmployeeId);
+
+        await using (var scope = harness.Provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+            db.TaskItems.Add(task);
+            await db.SaveChangesAsync();
+        }
+
+        await harness.Notifier.CheckTaskAlertsAsync(CancellationToken.None);
+
+        Assert.Contains(harness.NotificationWriter.Written, w =>
+            w.EmployeeId == assignedEmployeeId &&
+            w.Type == NotificationType.TaskDueSoon &&
+            w.Title.Contains("today", StringComparison.OrdinalIgnoreCase) &&
+            w.Body != null && w.Body.Contains("due today", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(harness.NotificationWriter.Written, w => w.Type == NotificationType.TaskOverdue);
+    }
 }

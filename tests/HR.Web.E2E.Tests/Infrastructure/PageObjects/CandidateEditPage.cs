@@ -20,17 +20,29 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("input[placeholder='First name']", new() { Timeout = 20_000 });
     }
 
-    public Task FillFirstNameAsync(string value) =>
-        page.GetByPlaceholder("First name").FillAsync(value);
+    public async Task FillFirstNameAsync(string value)
+    {
+        await page.GetByPlaceholder("First name").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public Task FillLastNameAsync(string value) =>
-        page.GetByPlaceholder("Last name").FillAsync(value);
+    public async Task FillLastNameAsync(string value)
+    {
+        await page.GetByPlaceholder("Last name").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public Task FillEmailAsync(string value) =>
-        page.GetByPlaceholder("candidate@example.com").FillAsync(value);
+    public async Task FillEmailAsync(string value)
+    {
+        await page.GetByPlaceholder("candidate@example.com").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public Task FillPhoneAsync(string value) =>
-        page.GetByPlaceholder("e.g. 07700 900000").FillAsync(value);
+    public async Task FillPhoneAsync(string value)
+    {
+        await page.GetByPlaceholder("e.g. 07700 900000").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task SaveNewCandidateAsync()
     {

@@ -94,12 +94,12 @@ public sealed class GettingStartedAndExploreTests(AppFixture fixture) : E2ETestB
         // your HR settings" completion test below), so asserting this against Acme would make the
         // result depend on test execution order. Provision a brand-new company instead — its
         // checklist is guaranteed untouched — so this test is self-contained regardless of order.
-        var (email, password) = await ProvisionFreshCompanyAdminAsync();
+        var email = await ProvisionFreshCompanyAdminAsync();
 
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(email, password);
+        await login.LoginAsync(email);
 
         await _page.WaitForURLAsync(new Regex("/getting-started"), new() { Timeout = 15_000 });
         Assert.Contains("/getting-started", _page.Url);
@@ -110,20 +110,15 @@ public sealed class GettingStartedAndExploreTests(AppFixture fixture) : E2ETestB
     /// endpoint (POST /api/signup), then uses the same dev-only bypasses VerifyEmailJourneyTests
     /// relies on to make it usable end-to-end in this environment: POST /api/dev/activate-company
     /// (skips the real Supabase email-verification click — no live Supabase project is configured
-    /// here) and POST /api/dev/persona/register (seeds the new admin as a loggable dev Supabase
-    /// user, since the plain /api/signup user is a real pending Supabase user the dev-mode login
-    /// form can't authenticate against directly). Returns credentials for LoginPage.LoginAsync.
+    /// here) and POST /api/dev/persona/register, which seeds the new admin as a real, loggable
+    /// Supabase user — under SupabaseAuthGateway.DevSupabasePassword (LoginPage.DevPersonaPassword
+    /// here), NOT the "P@ssw0rd123" passed to /api/signup below, since that plain-signup password
+    /// never reaches real Supabase (E2E's FakeSupabaseAuthGateway.CreateUserAsync fakes that call
+    /// entirely). Returns the email for LoginPage.LoginAsync — its own default password already
+    /// matches what /api/dev/persona/register actually sets.
     /// </summary>
-    private async Task<(string Email, string Password)> ProvisionFreshCompanyAdminAsync()
+    private async Task<string> ProvisionFreshCompanyAdminAsync()
     {
-        // NOT HR.Modules.Identity.Services.SupabaseAuthGateway.DevSupabasePassword — Login.razor's
-        // dev-mode form never reaches real Supabase auth itself. It looks the email up in
-        // DevPersonaStore.Personas (populated by /api/dev/persona/register below), requires this
-        // exact literal client-side (Login.razor: "_form.Password != \"password\""), and only then
-        // calls DevAuth.SwitchAsync server-side to establish the real Supabase session — which is
-        // where DevSupabasePassword actually gets used, transparently to the login form/caller.
-        const string devLoginPassword = "password";
-
         using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };
 
         var email = $"e2e-getting-started-{Guid.NewGuid():N}@example.com";
@@ -155,7 +150,7 @@ public sealed class GettingStartedAndExploreTests(AppFixture fixture) : E2ETestB
         });
         registerResponse.EnsureSuccessStatusCode();
 
-        return (email, devLoginPassword);
+        return email;
     }
 
     private sealed record SignUpResult(

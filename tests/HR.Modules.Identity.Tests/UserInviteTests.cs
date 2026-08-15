@@ -84,4 +84,64 @@ public class UserInviteTests
 
         Assert.Null(invite.CreatedByUserId);
     }
+
+    [Fact]
+    public void IsExpired_Is_False_Immediately_After_Create()
+    {
+        var invite = UserInvite.Create(
+            Guid.NewGuid(), Guid.NewGuid(), "test@example.com", DateTimeOffset.UtcNow);
+
+        Assert.False(invite.IsExpired);
+    }
+
+    [Fact]
+    public void IsExpired_Is_True_Once_The_7_Day_Window_Has_Elapsed()
+    {
+        var invite = UserInvite.Create(
+            Guid.NewGuid(), Guid.NewGuid(), "test@example.com", DateTimeOffset.UtcNow.AddDays(-8));
+
+        Assert.True(invite.IsExpired);
+    }
+
+    [Fact]
+    public void IsExpired_Is_False_Just_Before_The_7_Day_Window_Elapses()
+    {
+        var invite = UserInvite.Create(
+            Guid.NewGuid(), Guid.NewGuid(), "test@example.com", DateTimeOffset.UtcNow.AddDays(-6));
+
+        Assert.False(invite.IsExpired);
+    }
+
+    [Fact]
+    public void Resend_Resets_IsExpired_To_False()
+    {
+        var invite = UserInvite.Create(
+            Guid.NewGuid(), Guid.NewGuid(), "test@example.com", DateTimeOffset.UtcNow.AddDays(-8));
+        Assert.True(invite.IsExpired);
+
+        invite.Resend(DateTimeOffset.UtcNow);
+
+        Assert.False(invite.IsExpired);
+    }
+
+    [Fact]
+    public void IsClaimed_Is_False_Before_Claim_And_True_After()
+    {
+        var invite = UserInvite.Create(Guid.NewGuid(), Guid.NewGuid(), "test@example.com", Now);
+        Assert.False(invite.IsClaimed);
+
+        invite.Claim(Now.AddHours(1));
+
+        Assert.True(invite.IsClaimed);
+        Assert.Equal(Now.AddHours(1), invite.ClaimedAt);
+    }
+
+    [Fact]
+    public void IsCancelled_Is_False_When_Never_Cancelled()
+    {
+        var invite = UserInvite.Create(Guid.NewGuid(), Guid.NewGuid(), "test@example.com", Now);
+
+        Assert.False(invite.IsCancelled);
+        Assert.Null(invite.CancelledAt);
+    }
 }

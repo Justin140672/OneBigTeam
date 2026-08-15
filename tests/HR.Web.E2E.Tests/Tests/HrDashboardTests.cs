@@ -15,8 +15,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Widgets covered: HeadcountByDepartmentChart, HrInboxWidget, LeaveRequestsWidget,
 /// UpcomingProbationReviewsWidget, the sickness trio (CurrentSicknessAbsenceWidget,
 /// OverdueReturnToWorkReviewsWidget, MissingFitNotesWidget), ComplianceDocumentExpiryWidget
-/// ("Document Compliance"), DocumentReviewsWidget ("Document Reviews"), and
-/// RecentEmployeeChangesWidget.
+/// ("Document Compliance"), DocumentReviewsWidget ("Document Reviews"),
+/// RecentEmployeeChangesWidget, and FavouriteReportsWidget ("Favourite Reports").
 ///
 /// Uses seeded personas: Laura Bennett (HR Administrator only) and Tom Williams (plain Employee).
 /// </summary>
@@ -68,6 +68,7 @@ public sealed class HrDashboardTests(AppFixture fixture) : E2ETestBase(fixture)
         Assert.True(await dashboard.HasWidgetAsync("Document Compliance"));
         Assert.True(await dashboard.HasWidgetAsync("Document Reviews"));
         Assert.True(await dashboard.HasWidgetAsync("Recent Employee Changes"));
+        Assert.True(await dashboard.HasWidgetAsync("Favourite Reports"));
     }
 
     [Fact]
@@ -372,5 +373,77 @@ public sealed class HrDashboardTests(AppFixture fixture) : E2ETestBase(fixture)
         var bytes = new byte[magic.Length + 500];
         magic.CopyTo(bytes, 0);
         return bytes;
+    }
+
+    // ── Favourite Reports Widget ──────────────────────────────────────────────
+    // FavouriteReportsWidget.razor ("Favourite Reports") — lists whatever's been favourited from
+    // the Reports catalog (ReportCatalogPage.razor's star toggle, see ReportCatalogTests.cs),
+    // server-persisted via ReportingService's favourites endpoints. No favouriting UI of its own on
+    // the dashboard, so these tests favourite via the catalog page first, same as
+    // ReportCatalogTests.FavouriteToggle_PersistsAcrossReload_AndSortsFirstInCategory.
+
+    [Fact]
+    public async Task FavouriteReportsWidget_ShowsEmptyState_WhenNothingFavourited()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await dashboard.GoToAsync();
+
+        var titles = await dashboard.GetFavouriteReportTitlesAsync();
+        Assert.Empty(titles);
+    }
+
+    [Fact]
+    public async Task FavouriteReportsWidget_ShowsFavouritedReport_AndNavigatesToItOnClick()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var catalog   = new ReportCatalogPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await catalog.GoToAsync(AcmeId);
+        Assert.False(await catalog.IsFavouritedAsync("Employee Starter Report"));
+        await catalog.ClickFavouriteAsync("Employee Starter Report");
+        Assert.True(await catalog.IsFavouritedAsync("Employee Starter Report"));
+
+        try
+        {
+            await dashboard.GoToAsync();
+
+            var titles = await dashboard.GetFavouriteReportTitlesAsync();
+            Assert.Contains(titles, t => t.Contains("Employee Starter Report", StringComparison.Ordinal));
+
+            await dashboard.ClickFavouriteReportItemAsync("Employee Starter Report");
+
+            await _page.WaitForURLAsync("**/reporting/employee-starters", new() { Timeout = 15_000 });
+        }
+        finally
+        {
+            // Leaves the persona's favourites clean for any other test relying on the seeded
+            // dev database, mirroring the "no lingering test data" convention used elsewhere.
+            await catalog.GoToAsync(AcmeId);
+            if (await catalog.IsFavouritedAsync("Employee Starter Report"))
+                await catalog.ClickFavouriteAsync("Employee Starter Report");
+        }
+    }
+
+    [Fact]
+    public async Task FavouriteReportsWidget_BrowseAll_NavigatesToReportCatalog()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await dashboard.GoToAsync();
+
+        await dashboard.ClickFavouriteReportsBrowseAllAsync();
+
+        Assert.Contains($"/companies/{AcmeId}/reporting", _page.Url);
     }
 }

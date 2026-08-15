@@ -42,7 +42,16 @@
 
     private void SubmitAsync()
     {
-        var marketingBaseUrl = Configuration["Marketing:BaseUrl"] ?? "http://localhost:5166";
+        // Aspire's own service-discovery config keys (see AppHost.cs's "web.WithReference(marketing)")
+        // — not the old hardcoded "Marketing:BaseUrl" appsettings fallback, which never tracked
+        // marketing's actual (dynamically-assigned per launch) URL and was frequently wrong,
+        // surfacing as ERR_CONNECTION_REFUSED on this exact navigation. Matches the
+        // "services:web:https:0"/"...:http:0" pattern already used elsewhere in this codebase
+        // (e.g. ResendVerificationHandler).
+        var marketingBaseUrl =
+            Configuration["services:marketing:https:0"] ??
+            Configuration["services:marketing:http:0"] ??
+            "http://localhost:5166";
         var url = $"{marketingBaseUrl}/check-your-email?email={Uri.EscapeDataString(_form.Email)}";
         Navigation.NavigateTo(url, forceLoad: true);
     }

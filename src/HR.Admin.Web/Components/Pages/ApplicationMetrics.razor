@@ -1,0 +1,180 @@
+@page "/metrics"
+@inject ApplicationMetricsService ApplicationMetricsService
+
+<PageTitle>Application Metrics — Admin Portal</PageTitle>
+
+<h1>Application Metrics</h1>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_metrics is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view application metrics, or the metrics couldn't be loaded.
+        Contact a platform administrator if you believe this is a mistake.
+    </div>
+}
+else
+{
+    <div class="metrics-charts-grid">
+        <div class="details-panel metrics-chart-panel">
+            <h2>Daily Signups (Last 30 Days)</h2>
+            @if (_dailySignups.Count == 0)
+            {
+                <p class="details-panel-unavailable">No signup data yet.</p>
+            }
+            else
+            {
+                <SfChart Title="" Height="280px" Background="transparent">
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
+                        <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
+                    </ChartPrimaryXAxis>
+                    <ChartPrimaryYAxis Minimum="0">
+                        <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
+                    </ChartPrimaryYAxis>
+                    <ChartTooltipSettings Enable="true"></ChartTooltipSettings>
+                    <ChartSeriesCollection>
+                        <ChartSeries DataSource="@_dailySignups"
+                                     XName="@nameof(ChartPoint.Label)"
+                                     YName="@nameof(ChartPoint.Count)"
+                                     Type="ChartSeriesType.Column"
+                                     Fill="#0f766e">
+                        </ChartSeries>
+                    </ChartSeriesCollection>
+                </SfChart>
+            }
+        </div>
+
+        <div class="details-panel metrics-chart-panel">
+            <h2>Documents Uploaded (Last 30 Days)</h2>
+            @if (_dailyDocumentsUploaded.Count == 0)
+            {
+                <p class="details-panel-unavailable">No document upload data yet.</p>
+            }
+            else
+            {
+                <SfChart Title="" Height="280px" Background="transparent">
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
+                        <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
+                    </ChartPrimaryXAxis>
+                    <ChartPrimaryYAxis Minimum="0">
+                        <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
+                    </ChartPrimaryYAxis>
+                    <ChartTooltipSettings Enable="true"></ChartTooltipSettings>
+                    <ChartSeriesCollection>
+                        <ChartSeries DataSource="@_dailyDocumentsUploaded"
+                                     XName="@nameof(ChartPoint.Label)"
+                                     YName="@nameof(ChartPoint.Count)"
+                                     Type="ChartSeriesType.Column"
+                                     Fill="#0f766e">
+                        </ChartSeries>
+                    </ChartSeriesCollection>
+                </SfChart>
+            }
+        </div>
+    </div>
+
+    <div class="details-panel metrics-chart-panel metrics-active-companies-panel">
+        <h2>Active Companies Trend</h2>
+        <p class="metrics-caption">
+            This trend accumulates one data point per day starting from when this dashboard first ran —
+            history may be short for a new deployment.
+        </p>
+        @if (_activeCompaniesTrend.Count == 0)
+        {
+            <p class="details-panel-unavailable">No trend data yet — check back tomorrow.</p>
+        }
+        else
+        {
+            <SfChart Title="" Height="280px" Background="transparent">
+                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
+                    <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
+                </ChartPrimaryXAxis>
+                <ChartPrimaryYAxis Minimum="0">
+                    <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
+                </ChartPrimaryYAxis>
+                <ChartTooltipSettings Enable="true"></ChartTooltipSettings>
+                <ChartSeriesCollection>
+                    <ChartSeries DataSource="@_activeCompaniesTrend"
+                                 XName="@nameof(ChartPoint.Label)"
+                                 YName="@nameof(ChartPoint.Count)"
+                                 Type="ChartSeriesType.Column"
+                                 Fill="#0f766e">
+                    </ChartSeries>
+                </ChartSeriesCollection>
+            </SfChart>
+        }
+    </div>
+
+    <div class="health-cards metrics-stat-cards">
+        <div class="health-card">
+            <span class="health-card-name">Active Companies</span>
+            <span class="metrics-stat-value">@_metrics.CurrentActiveCompanies</span>
+            <span class="metrics-stat-caption">Current value — no historical trend available</span>
+        </div>
+        <div class="health-card">
+            <span class="health-card-name">Active Users</span>
+            <span class="metrics-stat-value">@_metrics.CurrentActiveUsers</span>
+            <span class="metrics-stat-caption">Current value — no historical trend available</span>
+        </div>
+        <div class="health-card">
+            <span class="health-card-name">Storage Consumed</span>
+            <span class="metrics-stat-value">@FormatBytes(_metrics.CurrentStorageConsumedBytes)</span>
+            <span class="metrics-stat-caption">Current value — no historical trend available</span>
+        </div>
+        <div class="health-card">
+            <span class="health-card-name">Background Jobs Succeeded</span>
+            <span class="metrics-stat-value">@_metrics.CurrentBackgroundJobsSucceededTotal</span>
+            <span class="metrics-stat-caption">Current value — no historical trend available</span>
+        </div>
+    </div>
+
+    <div class="metrics-gap-panel">
+        <h2>Emails Sent</h2>
+        <p>@_metrics.EmailsSentGapReason</p>
+    </div>
+}
+
+@code {
+    private ApplicationMetricsResponse? _metrics;
+    private bool _loading = true;
+    private List<ChartPoint> _dailySignups = [];
+    private List<ChartPoint> _dailyDocumentsUploaded = [];
+    private List<ChartPoint> _activeCompaniesTrend = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _metrics = await ApplicationMetricsService.GetApplicationMetricsOrNullAsync();
+
+        if (_metrics is not null)
+        {
+            _dailySignups = ToChartPoints(_metrics.DailySignups);
+            _dailyDocumentsUploaded = ToChartPoints(_metrics.DailyDocumentsUploaded);
+            _activeCompaniesTrend = ToChartPoints(_metrics.ActiveCompaniesTrend);
+        }
+
+        _loading = false;
+    }
+
+    private static List<ChartPoint> ToChartPoints(IReadOnlyList<DailyMetricPoint> points) =>
+        points.Select(p => new ChartPoint(p.Date.ToString("dd MMM"), p.Count)).ToList();
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        double value = bytes;
+        var unitIndex = 0;
+
+        while (value >= 1024 && unitIndex < units.Length - 1)
+        {
+            value /= 1024;
+            unitIndex++;
+        }
+
+        return $"{value:0.##} {units[unitIndex]}";
+    }
+
+    private sealed record ChartPoint(string Label, int Count);
+}

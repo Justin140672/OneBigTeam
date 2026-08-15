@@ -1,0 +1,172 @@
+@page "/jobs"
+@inject BackgroundJobsService BackgroundJobsService
+
+<PageTitle>Background Jobs — Admin Portal</PageTitle>
+
+<h1>Background Jobs</h1>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_response is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view platform-wide job data, or the job list couldn't be loaded.
+        Contact a platform administrator if you believe this is a mistake.
+    </div>
+}
+else if (!_response.Available)
+{
+    <div class="dashboard-error">
+        Background job storage is currently unavailable, so job data cannot be shown.
+    </div>
+}
+else
+{
+    <section class="details-panel admin-actions-panel">
+        <h2>Scheduled jobs</h2>
+        @if (_response.Scheduled.Count == 0)
+        {
+            <p class="activity-empty">No scheduled jobs.</p>
+        }
+        else
+        {
+            <SfGrid DataSource="@_response.Scheduled" AllowPaging="true" AllowSorting="true" class="hr-grid">
+                <GridPageSettings PageSize="20" />
+                <GridColumns>
+                    <GridColumn Field="@nameof(BackgroundJobItem.JobName)" HeaderText="Job" Width="220" />
+                    <GridColumn Field="@nameof(BackgroundJobItem.JobId)" HeaderText="Job Id" Width="120" />
+                    <GridColumn Field="@nameof(BackgroundJobItem.NextExecutionAt)" HeaderText="Next Execution" Width="170" Format="dd MMM yyyy HH:mm" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+                    <GridColumn Field="@nameof(BackgroundJobItem.RetryCount)" HeaderText="Retry Count" Width="110" />
+                </GridColumns>
+            </SfGrid>
+        }
+    </section>
+
+    <section class="details-panel admin-actions-panel">
+        <h2>Running jobs</h2>
+        @if (_response.Running.Count == 0)
+        {
+            <p class="activity-empty">No jobs currently running.</p>
+        }
+        else
+        {
+            <SfGrid DataSource="@_response.Running" AllowPaging="true" AllowSorting="true" class="hr-grid">
+                <GridPageSettings PageSize="20" />
+                <GridColumns>
+                    <GridColumn Field="@nameof(BackgroundJobItem.JobName)" HeaderText="Job" Width="220" />
+                    <GridColumn Field="@nameof(BackgroundJobItem.JobId)" HeaderText="Job Id" Width="120" />
+                    <GridColumn Field="@nameof(BackgroundJobItem.LastExecutedAt)" HeaderText="Started At" Width="170" Format="dd MMM yyyy HH:mm" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+                    <GridColumn Field="@nameof(BackgroundJobItem.RetryCount)" HeaderText="Retry Count" Width="110" />
+                </GridColumns>
+            </SfGrid>
+        }
+    </section>
+
+    <section class="details-panel admin-actions-panel">
+        <h2>Failed jobs</h2>
+        @if (_actionMessage is not null)
+        {
+            <p class="@(_actionSucceeded ? "admin-action-success" : "admin-action-error")">@_actionMessage</p>
+        }
+        @if (_response.Failed.Count == 0)
+        {
+            <p class="activity-empty">No failed jobs.</p>
+        }
+        else
+        {
+            <SfGrid DataSource="@_response.Failed" AllowPaging="true" AllowSorting="true" class="hr-grid">
+                <GridPageSettings PageSize="20" />
+                <GridColumns>
+                    <GridColumn Field="@nameof(BackgroundJobItem.JobName)" HeaderText="Job" Width="200" />
+                    <GridColumn Field="@nameof(BackgroundJobItem.JobId)" HeaderText="Job Id" Width="110" />
+                    <GridColumn Field="@nameof(BackgroundJobItem.LastExecutedAt)" HeaderText="Last Execution" Width="160" Format="dd MMM yyyy HH:mm" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+                    <GridColumn Field="@nameof(BackgroundJobItem.RetryCount)" HeaderText="Retry Count" Width="100" />
+                    <GridColumn Field="@nameof(BackgroundJobItem.FailureReason)" HeaderText="Failure Reason" Width="260" />
+                    <GridColumn HeaderText="Actions" Width="120">
+                        <Template>
+                            @{
+                                var job = (BackgroundJobItem)context;
+                            }
+                            <SfButton CssClass="e-danger" OnClick="@(() => OpenRetry(job))">Retry</SfButton>
+                        </Template>
+                    </GridColumn>
+                </GridColumns>
+            </SfGrid>
+        }
+    </section>
+}
+
+<AdminActionConfirmDialog Visible="_dialogVisible"
+                           Title="Retry failed job"
+                           Warning="@($"This will requeue '{_jobToRetry?.JobName}' ({_jobToRetry?.JobId}) for immediate re-execution. This action is fully audited. A reason is required.")"
+                           ConfirmText="Retry job"
+                           DangerConfirm="true"
+                           Busy="_retryBusy"
+                           OnConfirmed="OnRetryConfirmedAsync"
+                           OnCancelled="CloseDialog" />
+
+@code {
+    private BackgroundJobsResponse? _response;
+    private bool _loading = true;
+
+    private bool _dialogVisible;
+    private BackgroundJobItem? _jobToRetry;
+    private bool _retryBusy;
+    private string? _actionMessage;
+    private bool _actionSucceeded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        _response = await BackgroundJobsService.GetBackgroundJobsOrNullAsync();
+        _loading = false;
+    }
+
+    private void OpenRetry(BackgroundJobItem job)
+    {
+        _jobToRetry = job;
+        _actionMessage = null;
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogVisible = false;
+    }
+
+    private async Task OnRetryConfirmedAsync((string Reason, DateTimeOffset? NewTrialExpiresAt) input)
+    {
+        if (_jobToRetry is null)
+            return;
+
+        _retryBusy = true;
+        try
+        {
+            var succeeded = await BackgroundJobsService.RetryJobAsync(_jobToRetry.JobId, input.Reason);
+
+            _actionSucceeded = succeeded;
+            _actionMessage = succeeded
+                ? $"Job '{_jobToRetry.JobName}' was requeued successfully."
+                : $"Retrying job '{_jobToRetry.JobName}' failed. It may no longer be in a failed state.";
+
+            if (succeeded)
+            {
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _retryBusy = false;
+            _dialogVisible = false;
+        }
+    }
+}

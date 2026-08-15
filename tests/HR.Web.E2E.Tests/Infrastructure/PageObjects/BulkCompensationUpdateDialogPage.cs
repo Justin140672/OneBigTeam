@@ -60,8 +60,11 @@ public sealed class BulkCompensationUpdateDialogPage(IPage page)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    public Task FillNotesAsync(string value) =>
-        Dialog.Locator("textarea").FillAsync(value);
+    public async Task FillNotesAsync(string value)
+    {
+        await Dialog.Locator("textarea").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public async Task ClickBuildPreviewAsync()
     {

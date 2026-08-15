@@ -6,14 +6,11 @@ internal sealed class ImportFileUploadOptions
 
     public List<string> AllowedExtensions { get; set; } =
     [
-        ".csv",
         ".xlsx",
     ];
 
     public List<string> AllowedContentTypes { get; set; } =
     [
-        "text/csv",
-        "application/vnd.ms-excel", // some browsers send this for CSV
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ];
 }

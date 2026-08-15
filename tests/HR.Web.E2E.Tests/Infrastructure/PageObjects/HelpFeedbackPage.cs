@@ -26,11 +26,17 @@ public sealed class HelpFeedbackPage(IPage page, string baseUrl)
     public Task SelectPriorityAsync(string priority) =>
         DropDownSelector.SelectAsync(page, SubmissionForm, priority, index: 1);
 
-    public Task FillTitleAsync(string title) =>
-        SubmissionForm.GetByPlaceholder("Short summary").FillAsync(title);
+    public async Task FillTitleAsync(string title)
+    {
+        await SubmissionForm.GetByPlaceholder("Short summary").FillAsync(title);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
-    public Task FillDescriptionAsync(string description) =>
-        SubmissionForm.GetByPlaceholder("Please describe the problem, feature, or question in detail").FillAsync(description);
+    public async Task FillDescriptionAsync(string description)
+    {
+        await SubmissionForm.GetByPlaceholder("Please describe the problem, feature, or question in detail").FillAsync(description);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     public Task<bool> IsIncludeDiagnosticsCheckedAsync() =>
         page.Locator("#includeDiagnostics").IsCheckedAsync();

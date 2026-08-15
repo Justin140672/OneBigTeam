@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\HR.ServiceDefaults\HR.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="wwwroot\favicon.png" />
+    <Content Remove="wwwroot\favicon-dark.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="wwwroot\favicon.png" />
+    <None Include="wwwroot\favicon-dark.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Syncfusion.Blazor.Buttons" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Calendars" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Charts" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Grid" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Inputs" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Popups" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Themes" Version="34.2.3" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>2f1c8a4e-9b3d-4a7c-8e21-9d6f0c5b7a11</UserSecretsId>
+  </PropertyGroup>
+
+</Project>

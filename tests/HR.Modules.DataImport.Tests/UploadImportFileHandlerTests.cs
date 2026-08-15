@@ -35,8 +35,10 @@ public class UploadImportFileHandlerTests
             ContentType = contentType,
         };
 
-    // A CSV with a header row and N data rows.
-    private static byte[] CsvBytes(int dataRowCount)
+    // Plain text content that is neither valid CSV nor a valid XLSX/ZIP container — used only to
+    // exercise the "declared type doesn't match content" and "wrong extension/content type" rejection
+    // paths, which happen before any file parsing takes place.
+    private static byte[] PlainTextBytes(int dataRowCount)
     {
         var lines = new List<string> { "first_name,last_name,email" };
         for (var i = 1; i <= dataRowCount; i++)
@@ -67,6 +69,9 @@ public class UploadImportFileHandlerTests
         return stream.ToArray();
     }
 
+    private static readonly string XlsxContentType =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
     private static UploadImportFileRequest BuildRequest(
         Guid companyId,
         string entityType = "Employees",
@@ -74,11 +79,11 @@ public class UploadImportFileHandlerTests
     {
         CompanyId  = companyId,
         EntityType = entityType,
-        File       = file ?? FakeFile("employees.csv", "text/csv", CsvBytes(3)),
+        File       = file ?? FakeFile("employees.xlsx", XlsxContentType, XlsxBytes(3)),
     };
 
     [Fact]
-    public async Task HandleAsync_ValidCsv_CreatesSession_With_Correct_TotalRows_And_Pending_Status()
+    public async Task HandleAsync_ValidXlsx_CreatesSession_With_Correct_TotalRows_And_Pending_Status()
     {
         await using var db = BuildContext();
         var storage        = new FakeImportFileStorageService();
@@ -87,14 +92,14 @@ public class UploadImportFileHandlerTests
         var handler        = BuildHandler(db, storage);
 
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, file: FakeFile("employees.csv", "text/csv", CsvBytes(3))),
+            BuildRequest(companyId, file: FakeFile("employees.xlsx", XlsxContentType, XlsxBytes(3))),
             initiatedBy,
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(companyId, result.Value!.CompanyId);
         Assert.Equal("Employees", result.Value.EntityType);
-        Assert.Equal("employees.csv", result.Value.FileName);
+        Assert.Equal("employees.xlsx", result.Value.FileName);
         Assert.Equal(3, result.Value.TotalRows); // header row excluded
         Assert.Equal(nameof(ImportStatus.Pending), result.Value.Status);
 
@@ -103,38 +108,30 @@ public class UploadImportFileHandlerTests
         Assert.Equal(3, saved.TotalRows);
         Assert.Equal(ImportStatus.Pending, saved.Status);
         Assert.Equal(initiatedBy, saved.InitiatedByUserId);
-        Assert.Equal("text/csv", saved.ContentType);
+        Assert.Equal(XlsxContentType, saved.ContentType);
         Assert.False(string.IsNullOrWhiteSpace(saved.StorageKey));
 
         Assert.Single(storage.Uploads);
-        Assert.Equal("employees.csv", storage.Uploads[0].FileName);
+        Assert.Equal("employees.xlsx", storage.Uploads[0].FileName);
     }
 
     [Fact]
-    public async Task HandleAsync_ValidXlsx_CreatesSession_With_Correct_TotalRows()
+    public async Task HandleAsync_Returns_Validation_When_Csv_Extension_No_Longer_Allowed()
     {
+        // CSV import support has been removed; only .xlsx is accepted now.
         await using var db = BuildContext();
-        var storage        = new FakeImportFileStorageService();
-        var companyId      = Guid.NewGuid();
-        var handler        = BuildHandler(db, storage);
-
-        var file = FakeFile(
-            "employees.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            XlsxBytes(5));
+        var handler        = BuildHandler(db);
 
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, file: file),
+            BuildRequest(Guid.NewGuid(), file: FakeFile("employees.csv", "text/csv", PlainTextBytes(3))),
             Guid.NewGuid(),
             CancellationToken.None);
 
-        Assert.True(result.IsSuccess);
-        Assert.Equal(5, result.Value!.TotalRows); // header row excluded
-        Assert.Equal("employees.xlsx", result.Value.FileName);
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains(".csv", result.Error.Message, StringComparison.OrdinalIgnoreCase);
 
-        var saved = await db.ImportSessions.SingleAsync();
-        Assert.Equal(5, saved.TotalRows);
-        Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", saved.ContentType);
+        Assert.Empty(await db.ImportSessions.ToListAsync());
     }
 
     [Fact]
@@ -144,7 +141,7 @@ public class UploadImportFileHandlerTests
         var handler        = BuildHandler(db, options: new ImportFileUploadOptions { MaxFileSizeBytes = 10 });
 
         var result = await handler.HandleAsync(
-            BuildRequest(Guid.NewGuid(), file: FakeFile("employees.csv", "text/csv", CsvBytes(3))),
+            BuildRequest(Guid.NewGuid(), file: FakeFile("employees.xlsx", XlsxContentType, XlsxBytes(3))),
             Guid.NewGuid(),
             CancellationToken.None);
 
@@ -162,7 +159,7 @@ public class UploadImportFileHandlerTests
         var handler        = BuildHandler(db);
 
         var result = await handler.HandleAsync(
-            BuildRequest(Guid.NewGuid(), file: FakeFile("employees.txt", "text/plain", CsvBytes(3))),
+            BuildRequest(Guid.NewGuid(), file: FakeFile("employees.txt", "text/plain", PlainTextBytes(3))),
             Guid.NewGuid(),
             CancellationToken.None);
 
@@ -180,7 +177,7 @@ public class UploadImportFileHandlerTests
         var handler        = BuildHandler(db);
 
         var result = await handler.HandleAsync(
-            BuildRequest(Guid.NewGuid(), file: FakeFile("employees.csv", "application/json", CsvBytes(3))),
+            BuildRequest(Guid.NewGuid(), file: FakeFile("employees.xlsx", "application/json", PlainTextBytes(3))),
             Guid.NewGuid(),
             CancellationToken.None);
 
@@ -196,11 +193,11 @@ public class UploadImportFileHandlerTests
         await using var db = BuildContext();
         var handler        = BuildHandler(db);
 
-        // Named and declared as XLSX but the bytes are not a ZIP/OOXML container (spoofed/renamed CSV).
+        // Named and declared as XLSX but the bytes are not a ZIP/OOXML container (spoofed/renamed file).
         var spoofedFile = FakeFile(
             "employees.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            CsvBytes(3));
+            XlsxContentType,
+            PlainTextBytes(3));
 
         var result = await handler.HandleAsync(
             BuildRequest(Guid.NewGuid(), file: spoofedFile),
@@ -215,12 +212,12 @@ public class UploadImportFileHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Empty_Csv_Produces_Zero_TotalRows()
+    public async Task HandleAsync_Empty_Xlsx_Produces_Zero_TotalRows()
     {
         await using var db = BuildContext();
         var handler        = BuildHandler(db);
 
-        var file = FakeFile("employees.csv", "text/csv", CsvBytes(0)); // header row only
+        var file = FakeFile("employees.xlsx", XlsxContentType, XlsxBytes(0)); // header row only
 
         var result = await handler.HandleAsync(
             BuildRequest(Guid.NewGuid(), file: file),
@@ -249,7 +246,7 @@ public class UploadImportFileHandlerTests
         var handler = BuildHandler(db, storage);
 
         await Assert.ThrowsAnyAsync<Exception>(() => handler.HandleAsync(
-            BuildRequest(Guid.NewGuid(), file: FakeFile("employees.csv", "text/csv", CsvBytes(3))),
+            BuildRequest(Guid.NewGuid(), file: FakeFile("employees.xlsx", XlsxContentType, XlsxBytes(3))),
             Guid.NewGuid(),
             CancellationToken.None));
 

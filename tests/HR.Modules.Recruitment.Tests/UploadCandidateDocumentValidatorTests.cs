@@ -59,6 +59,50 @@ public class UploadCandidateDocumentValidatorTests
     }
 
     [Fact]
+    public void Validate_Fails_When_Title_Is_Whitespace_Only()
+    {
+        var result = _validator.Validate(new UploadCandidateDocumentRequest
+        {
+            CompanyId   = Guid.NewGuid(),
+            CandidateId = Guid.NewGuid(),
+            Title       = "   ",
+            File        = FakeFile(),
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UploadCandidateDocumentRequest.Title));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Title_Exceeds_Max_Length()
+    {
+        var result = _validator.Validate(new UploadCandidateDocumentRequest
+        {
+            CompanyId   = Guid.NewGuid(),
+            CandidateId = Guid.NewGuid(),
+            Title       = new string('A', 201),
+            File        = FakeFile(),
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UploadCandidateDocumentRequest.Title));
+    }
+
+    [Fact]
+    public void Validate_Passes_When_Title_Is_Exactly_Max_Length()
+    {
+        var result = _validator.Validate(new UploadCandidateDocumentRequest
+        {
+            CompanyId   = Guid.NewGuid(),
+            CandidateId = Guid.NewGuid(),
+            Title       = new string('A', 200),
+            File        = FakeFile(),
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void Validate_Fails_When_File_Is_Null()
     {
         var result = _validator.Validate(new UploadCandidateDocumentRequest

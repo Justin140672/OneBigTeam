@@ -93,10 +93,34 @@ public class SubmitSupportRequestValidatorTests
     }
 
     [Fact]
+    public void Validate_Fails_When_Title_Is_Whitespace_Only()
+    {
+        var request = Valid();
+        request = request with { Title = "   " };
+
+        var result = _validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(SubmitSupportRequestRequest.Title));
+    }
+
+    [Fact]
     public void Validate_Fails_When_Description_Is_Empty()
     {
         var request = Valid();
         request = request with { Description = string.Empty };
+
+        var result = _validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(SubmitSupportRequestRequest.Description));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Description_Is_Whitespace_Only()
+    {
+        var request = Valid();
+        request = request with { Description = "   " };
 
         var result = _validator.Validate(request);
 
