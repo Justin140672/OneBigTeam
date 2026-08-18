@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
@@ -35,8 +36,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// test below asserts the actual (stronger) behavior: James is redirected away before the tab, and
 /// therefore the Adjust control, ever renders.
 /// </summary>
-[Collection("E2E")]
-public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");
@@ -167,6 +167,48 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
         Assert.Contains("non-zero", error, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Creates a fresh, uniquely-named Acme employee (who — per the class remarks above — always
+    /// resolves a real leave policy, and therefore an Annual Leave balance, at creation) and
+    /// returns their employee ID.
+    ///
+    /// AdjustDialog_NegativeBelowZero_RejectedWithoutOverride_ThenSucceedsWithOverride used to run
+    /// against the shared seeded Sarah Chen, deliberately driving her Annual Leave balance to
+    /// roughly -1030 days via an unconditional override adjustment. That's a real, irreversible
+    /// mutation of shared seed data: ProfileAssetsTabTests, EmployeeAssetsTabTests,
+    /// LeaveBalanceAdjustmentTests' own AdminLeaveTab_AdjustButton_VisibleToHrAdministrator_ForBalanceRow,
+    /// and other files reuse Sarah and could observe her balance mid-run or after this test has
+    /// already wrecked it. A fresh employee has no other test relying on their balance, so driving
+    /// it deeply negative here is safe.
+    /// </summary>
+    private async Task<Guid> CreateFreshEmployeeWithLeaveBalanceAsync()
+    {
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"LeaveAdj{unique}";
+        var workEmail = $"e2e.leaveadj{unique}@acme.example";
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SaveNewEmployeeAsync();
+        await empList.ClickEmployeeAsync(lastName);
+
+        var match = Regex.Match(_page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
+        return Guid.Parse(match.Groups[1].Value);
+    }
+
     // ── 5. Negative adjustment below zero rejected without override, then succeeds with override ──
 
     [Fact]
@@ -178,7 +220,9 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await empAdmin.GoToAsync(AcmeId, SarahId);
+        var freshEmployeeId = await CreateFreshEmployeeWithLeaveBalanceAsync();
+
+        await empAdmin.GoToAsync(AcmeId, freshEmployeeId);
         await empAdmin.OpenLeaveTabAsync();
 
         await empAdmin.OpenAdjustDialogAsync("Annual Leave");
@@ -320,7 +364,14 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
         // UnauthorizedAccessTests.Employee_CannotAccess_AnotherEmployeesAdminProfile. This
         // confirms a Manager cannot reach the Adjust control for another employee via this page.
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees/{TomId}");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        // The redirect is issued from EmployeeEdit.razor's LoadAsync (Navigation.NavigateTo(...,
+        // replace: true)) over the Blazor Server SignalR circuit, not via an HTTP navigation —
+        // Playwright's NetworkIdle only tracks HTTP requests, so it can (and reliably did) resolve
+        // before the WebSocket-driven redirect actually lands, making this assertion race against
+        // a navigation that hasn't happened yet. Wait for the actual URL change instead of a
+        // network-idle proxy for it.
+        await _page.WaitForURLAsync(url => !url.Contains($"/employees/{TomId}"), new() { Timeout = 15_000 });
 
         var finalUrl = _page.Url;
         Assert.DoesNotContain($"/employees/{TomId}", finalUrl);

@@ -10,8 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// only — Manager and Status filters are hidden on this page), and export. Catalog-page coverage
 /// (card visibility/navigation) lives in <see cref="ReportCatalogTests"/>.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeStarterReportTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeStarterReportTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

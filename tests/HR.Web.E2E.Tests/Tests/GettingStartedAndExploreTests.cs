@@ -28,8 +28,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// incomplete state non-deterministic from this test's point of view except immediately after
 /// this test itself changes the underlying data. See individual test comments below.
 /// </summary>
-[Collection("E2E")]
-public sealed class GettingStartedAndExploreTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

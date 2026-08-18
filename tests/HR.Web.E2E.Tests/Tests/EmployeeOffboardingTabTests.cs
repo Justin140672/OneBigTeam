@@ -23,8 +23,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// active plan is needed, drives them through the Start Leaving Process wizard
 /// (StartLeavingProcessDialog) exactly as EmployeeLeavingProcessTests.cs does.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeOffboardingTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

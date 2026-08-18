@@ -10,8 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// via the "Save current filters as view" flow rather than depending on shared seeded data, since
 /// dev/E2E seed data isn't guaranteed to include saved views.
 /// </summary>
-[Collection("E2E")]
-public sealed class SavedReportViewsTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SavedReportViewsTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

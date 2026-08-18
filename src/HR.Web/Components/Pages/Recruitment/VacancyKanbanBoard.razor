@@ -237,10 +237,18 @@
         var moved = args.Data?.FirstOrDefault();
         var previous = args.PreviousCardData?.FirstOrDefault();
 
-        if (moved is null || previous is null || moved.StageId == previous.StageId)
+        if (moved is null || previous is null)
             return;
 
-        var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, moved.ApplicationId, moved.StageId);
+        // SfKanban mutates the dropped card's bound KeyField (StageKey) to the target column's key
+        // on drop — moved.StageId itself is never touched by the widget and still reflects the
+        // *source* stage at this point, so the actual target must be read back out of StageKey
+        // instead (see KanbanApplicantModel.StageKey's remarks for why it was silently unsettable
+        // before, which made every drag a no-op that only looked like it worked client-side).
+        if (!Guid.TryParse(moved.StageKey, out var targetStageId) || targetStageId == previous.StageId)
+            return;
+
+        var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, moved.ApplicationId, targetStageId);
 
         if (result is null)
         {

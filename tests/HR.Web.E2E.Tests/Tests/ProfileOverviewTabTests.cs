@@ -8,8 +8,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Verifies that the Overview tab on the self-service My Profile page
 /// renders the employee's employment details and action buttons.
 /// </summary>
-[Collection("E2E")]
-public sealed class ProfileOverviewTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");

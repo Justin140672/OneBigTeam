@@ -61,7 +61,27 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
     public async Task CheckRequiresAcknowledgementAsync()
     {
         await RequiresAcknowledgementCheckboxWrapper.Locator("label").ClickAsync();
-        await Dialog.Locator("textarea").First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        var textArea = Dialog.Locator("textarea").First;
+        await textArea.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        // The textarea appearing only proves the field itself has rendered — the auto-populate
+        // from the company's default statement (OnRequiresAcknowledgementChangedAsync) is a
+        // separate, subsequent server round-trip. Callers reading the statement value/preview
+        // immediately after this method can otherwise race that round-trip and observe the field
+        // still blank. Give it a short window to actually populate; if the field is meant to stay
+        // blank (no default configured), this simply times out harmlessly and callers read "".
+        try
+        {
+            await page.WaitForFunctionAsync(
+                "el => el.value.trim().length > 0",
+                await textArea.ElementHandleAsync(),
+                new PageWaitForFunctionOptions { Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            // No default configured, or genuinely still empty — leave it to the caller's own
+            // assertion to surface that.
+        }
     }
 
     private ILocator AcknowledgementDueDateInput =>
@@ -106,7 +126,16 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
     public async Task<string?> GetAcknowledgementStatementValidationErrorAsync()
     {
         var error = Dialog.Locator(".text-danger.small").Filter(new() { HasText = "acknowledgement statement is required" });
-        if (!await error.IsVisibleAsync()) return null;
+        // Same "read before it settles" race as GetGlobalErrorAsync below — checking
+        // IsVisibleAsync() immediately after a blocked save attempt can race the render tick.
+        try
+        {
+            await error.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
         return (await error.InnerTextAsync()).Trim();
     }
 
@@ -114,7 +143,16 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
     public async Task<string?> GetGlobalErrorAsync()
     {
         var error = Dialog.Locator(".alert-danger");
-        if (!await error.IsVisibleAsync()) return null;
+        // ValidateExtra's error only renders after the click handler's state update completes —
+        // checking IsVisibleAsync() immediately after ClickUploadAsync can race that render tick.
+        try
+        {
+            await error.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
         return (await error.InnerTextAsync()).Trim();
     }
 

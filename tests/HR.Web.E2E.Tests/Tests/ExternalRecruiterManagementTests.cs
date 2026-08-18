@@ -16,8 +16,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// ExternalRecruiterDetail.razor's OnLoadedAsync), mirroring VacancyManagementTests' reasoning for
 /// using Marcus rather than Laura Bennett (HR Administrator).
 /// </summary>
-[Collection("E2E")]
-public sealed class ExternalRecruiterManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class ExternalRecruiterManagementTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

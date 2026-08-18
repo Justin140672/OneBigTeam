@@ -8,8 +8,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// mark a policy as the company's default (the "Is Default" checkbox on the edit form, and the
 /// "Set as Default" toolbar action on the list).
 /// </summary>
-[Collection("E2E")]
-public sealed class LeavePolicyManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class LeavePolicyManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

@@ -17,8 +17,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// task), not the positive (Beta Corp HR does see it) — the negative assertion is the actual
 /// security property in question.
 /// </summary>
-[Collection("E2E")]
-public sealed class ProfilePhotoTaskTenantIsolationTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class ProfilePhotoTaskTenantIsolationTests(CrossUserFixture fixture) : CrossUserTenantAndMiscTestBase(fixture)
 {
     // ── Company 1 — Acme Corporation ─────────────────────────────────────────
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");

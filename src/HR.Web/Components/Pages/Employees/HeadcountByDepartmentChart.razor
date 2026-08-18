@@ -8,7 +8,7 @@
             <i class="fa-solid fa-chart-pie widget-icon"></i>
             <span class="widget-title">Headcount by Department</span>
             <a href="/companies/@Session.CompanyId/employees" class="widget-view-all ms-auto">
-                View all <i class="fa-solid fa-arrow-right fa-xs"></i>
+                View all employees <i class="fa-solid fa-arrow-right fa-xs"></i>
             </a>
         </div>
 
@@ -26,20 +26,23 @@
             }
             else
             {
-                <SfAccumulationChart Title="" Height="280px" Background="transparent">
-                    <AccumulationChartLegendSettings Visible="true" Position="LegendPosition.Right" />
-                    <AccumulationChartSeriesCollection>
-                        <AccumulationChartSeries DataSource="@_data"
-                                                  XName="@nameof(ChartSlice.Label)"
-                                                  YName="@nameof(ChartSlice.Value)"
-                                                  PointColorMapping="@nameof(ChartSlice.Fill)"
-                                                  Type="AccumulationType.Pie"
-                                                  InnerRadius="55%">
-                            <AccumulationDataLabelSettings Visible="true" Name="@nameof(ChartSlice.Value)" />
-                        </AccumulationChartSeries>
-                    </AccumulationChartSeriesCollection>
-                    <AccumulationChartEvents OnPointClick="OnSliceClicked" />
-                </SfAccumulationChart>
+                <div class="hbar-chart-interactive">
+                    @foreach (var slice in _data)
+                    {
+                        var s = slice;
+                        var max = _data.Max(d => d.Value);
+                        var pct = max <= 0 ? 0 : (double)s.Value / max * 100;
+                        <button type="button" class="hbar-row hbar-row--button"
+                                aria-label="@($"View {s.Value} employees in {s.Label}")"
+                                @onclick="() => OnSliceSelected(s)">
+                            <span class="hbar-label">@s.Label</span>
+                            <div class="hbar-track">
+                                <div class="hbar-fill" style="width:@(pct.ToString("0.##"))%; background:@s.Fill;"></div>
+                            </div>
+                            <span class="hbar-value">@s.Value</span>
+                        </button>
+                    }
+                </div>
             }
         </div>
     </div>
@@ -86,11 +89,8 @@
         _loading = false;
     }
 
-    private void OnSliceClicked(AccumulationPointEventArgs args)
+    private void OnSliceSelected(ChartSlice slice)
     {
-        if (args.PointIndex < 0 || args.PointIndex >= _data.Count) return;
-
-        var slice = _data[args.PointIndex];
         _selectedDepartmentId = slice.DepartmentId;
         _selectedDepartmentName = slice.Label;
         _dialogOpen = true;

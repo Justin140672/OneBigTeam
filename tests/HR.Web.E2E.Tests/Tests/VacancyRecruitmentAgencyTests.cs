@@ -10,8 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// DataSource is active-recruiters-only, with a prepended "Not assigned" sentinel item rather
 /// than Syncfusion's ShowClearButton.
 /// </summary>
-[Collection("E2E")]
-public sealed class VacancyRecruitmentAgencyTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class VacancyRecruitmentAgencyTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

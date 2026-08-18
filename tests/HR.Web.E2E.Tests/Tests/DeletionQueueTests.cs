@@ -26,8 +26,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// candidate for its own dedicated third seeded company if Beta Corp's mutated state ever
 /// conflicts with other suites — see remarks in the class-level test report.
 /// </summary>
-[Collection("E2E")]
-public sealed class DeletionQueueTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class DeletionQueueTests(CrossUserFixture fixture) : CrossUserTenantAndMiscTestBase(fixture)
 {
     private static readonly Guid BetaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
 

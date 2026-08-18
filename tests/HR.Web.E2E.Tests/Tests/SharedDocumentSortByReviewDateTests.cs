@@ -39,8 +39,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// that follow are the actual source of truth for each test, independent of whether the indicator
 /// wait succeeds.
 /// </summary>
-[Collection("E2E")]
-public sealed class SharedDocumentSortByReviewDateTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SharedDocumentSortByReviewDateTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -222,16 +221,55 @@ public sealed class SharedDocumentSortByReviewDateTests(AppFixture fixture) : E2
     // own tracked titles" strategy: the review-date range filter narrows the dataset but can't
     // guarantee it's the *only* thing on screen, since the backend database is shared and
     // persists across every test in the "E2E" collection.
+    //
+    // The grid paginates (AllowPaging="true", PageSize="20" — see SharedDocuments.razor) and this
+    // page has no search/filter bar to narrow the dataset (removed in a later product change — see
+    // class remarks). Our own 3 tracked documents use Next Review Date offsets of 150-180 days
+    // specifically to stay out of most OTHER tests' review-date ranges, but as the shared,
+    // long-lived E2E dev database accumulates more and more shared documents across the whole
+    // suite over time, even that window can end up sorting well past page 1 (ascending sort in
+    // particular: any of the many other documents with a nearer/overdue review date sorts ahead).
+    // Reading only page 1 used to occasionally miss some of our 3 titles; it now reliably misses
+    // ALL of them. Walk every page instead of just the first, so this stays correct regardless of
+    // how large the shared dataset has grown — sort order is server-side/global, so collecting
+    // matches page-by-page in pager order still preserves the overall relative ordering asserted
+    // on by callers.
     private async Task<List<string>> GetRelativeOrderOfTitlesAsync(IReadOnlyCollection<string> titles)
     {
-        var rows = _page.Locator(".e-row");
-        var count = await rows.CountAsync();
         var order = new List<string>();
-        for (var i = 0; i < count; i++)
+        var remaining = new HashSet<string>(titles);
+
+        // Bounded by wall-clock time rather than a fixed page count — the shared, long-lived E2E
+        // dev database's document count keeps growing as more of the suite runs over time (a fixed
+        // 50-page/1000-row cap here was itself observed going stale as that happened, the exact
+        // same class of "assumed-generous constant becomes insufficient later" issue this whole
+        // page-walk replaced a fixed page-1-only read for in the first place). 60s comfortably
+        // covers many hundreds of pages at ~200ms/page even if the dataset keeps growing further.
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        while (remaining.Count > 0 && DateTime.UtcNow < deadline)
         {
-            var cellText = (await rows.Nth(i).Locator(".e-rowcell").First.InnerTextAsync()).Trim();
-            if (titles.Contains(cellText))
-                order.Add(cellText);
+            var rows = _page.Locator(".e-row");
+            var count = await rows.CountAsync();
+            for (var i = 0; i < count; i++)
+            {
+                var cellText = (await rows.Nth(i).Locator(".e-rowcell").First.InnerTextAsync()).Trim();
+                if (remaining.Remove(cellText))
+                    order.Add(cellText);
+            }
+
+            if (remaining.Count == 0) break;
+
+            var nextButton = _page.Locator(".e-pagenextdiv, .e-nextpage").First;
+            if (await nextButton.CountAsync() == 0) break;
+            var isDisabled = (await nextButton.GetAttributeAsync("class"))?.Contains("e-disable") == true
+                || (await nextButton.GetAttributeAsync("aria-disabled")) == "true";
+            if (isDisabled) break;
+
+            await nextButton.ClickAsync();
+            await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 15_000 });
+            // Give the page's own re-render a moment to settle before reading — same
+            // "container before content" race fixed elsewhere in this suite for grid reloads.
+            await _page.WaitForTimeoutAsync(200);
         }
 
         return order;

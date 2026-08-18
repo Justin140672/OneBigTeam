@@ -33,190 +33,197 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
     }
 
     // ── Headcount by Department Chart ────────────────────────────────────────
+    // Converted from a Syncfusion donut chart to clickable horizontal-bar rows
+    // (HeadcountByDepartmentChart.razor, class "hbar-chart-interactive" / "hbar-row hbar-row--button").
+    // Each row is a real <button> with an aria-label ("View {n} employees in {dept}") and opens
+    // EmployeesByDepartmentDialog on click, same as before.
 
-    /// <summary>Waits for the Headcount by Department chart tile to finish loading.</summary>
-    public async Task WaitForHeadcountChartLoadedAsync()
-    {
-        var widget = page.Locator(".widget-card").Filter(new() { HasText = "Headcount by Department" });
-        // SfAccumulationChart renders its pie as an <svg>, not a ".e-accumulationchart-series"
-        // element (that class doesn't exist in Syncfusion's actual DOM output) — "svg" is a
-        // reliable signal the chart itself has rendered, regardless of its internal series markup.
-        await widget.Locator("svg, .widget-empty").First
+    private ILocator HeadcountWidget =>
+        page.Locator(".widget-card").Filter(new() { HasText = "Headcount by Department" }).First;
+
+    /// <summary>Waits for the Headcount by Department chart tile to finish loading (bar rows or empty state).</summary>
+    public async Task WaitForHeadcountChartLoadedAsync() =>
+        await HeadcountWidget.Locator(".hbar-row--button, .widget-empty").First
             .WaitForAsync(new() { Timeout = 15_000 });
+
+    /// <summary>Returns the department labels shown as plain text next to each bar, in DOM order.</summary>
+    public async Task<IReadOnlyList<string>> GetHeadcountDepartmentLabelsAsync()
+    {
+        await WaitForHeadcountChartLoadedAsync();
+        var labels = await HeadcountWidget.Locator(".hbar-row--button .hbar-label").AllAsync();
+        var names  = new List<string>();
+        foreach (var l in labels)
+            names.Add((await l.TextContentAsync())?.Trim() ?? "");
+        return names;
+    }
+
+    /// <summary>Clicks the "View all employees" link and waits for navigation to the employees list.</summary>
+    public async Task ClickHeadcountViewAllEmployeesAsync()
+    {
+        await HeadcountWidget.GetByRole(AriaRole.Link, new() { Name = "View all employees" }).ClickAsync();
+        await page.WaitForURLAsync(new Regex(@"/companies/[0-9a-f-]{36}/employees$"), new() { Timeout = 15_000 });
     }
 
     // ── Gender Split Chart ───────────────────────────────────────────────────
-    // GenderSplitChart.razor ("Gender Split") — same non-interactive
-    // SfAccumulationChart pattern as the headcount chart above (renders an <svg>
-    // once loaded, or ".widget-empty" with "No employee data available." when
-    // there are no active employees).
+    // GenderSplitChart.razor ("Gender Split") — converted from a Syncfusion donut chart to the
+    // shared HorizontalBarChart control (Components/Controls/HorizontalBarChart.razor). Renders
+    // ".hbar-chart" with plain-text ".hbar-label" spans (no hover/tooltip required to read a
+    // category), or ".widget-empty" with "No employee data available." when there are no active
+    // employees.
 
     private ILocator GenderSplitWidget =>
         page.Locator(".widget-card").Filter(new() { HasText = "Gender Split" }).First;
 
-    /// <summary>Waits for the Gender Split chart tile to finish loading (chart svg or empty state).</summary>
+    /// <summary>Waits for the Gender Split chart tile to finish loading (bar chart or empty state).</summary>
     public async Task WaitForGenderSplitChartLoadedAsync() =>
-        await GenderSplitWidget.Locator("svg, .widget-empty").First
+        await GenderSplitWidget.Locator(".hbar-chart, .widget-empty").First
             .WaitForAsync(new() { Timeout = 15_000 });
 
     /// <summary>Returns true once loaded if the Gender Split widget is showing its empty state.</summary>
     public async Task<bool> GenderSplitChartIsEmptyAsync() =>
         await GenderSplitWidget.Locator(".widget-empty").IsVisibleAsync();
 
+    /// <summary>Returns the visible category labels rendered as plain text (not requiring hover) in the bar chart.</summary>
+    public async Task<IReadOnlyList<string>> GetGenderSplitLabelsAsync()
+    {
+        await WaitForGenderSplitChartLoadedAsync();
+        var labels = await GenderSplitWidget.Locator(".hbar-label").AllAsync();
+        var names  = new List<string>();
+        foreach (var l in labels)
+            names.Add((await l.TextContentAsync())?.Trim() ?? "");
+        return names;
+    }
+
     // ── Employment Type Split Chart ──────────────────────────────────────────
     // EmploymentTypeSplitChart.razor ("Employment Type") — identical structure/behavior
-    // to GenderSplitChart above, grouped by employment type instead of gender.
+    // to GenderSplitChart above (shared HorizontalBarChart control), grouped by employment
+    // type instead of gender.
 
     private ILocator EmploymentTypeSplitWidget =>
         page.Locator(".widget-card").Filter(new() { HasText = "Employment Type" }).First;
 
-    /// <summary>Waits for the Employment Type chart tile to finish loading (chart svg or empty state).</summary>
+    /// <summary>Waits for the Employment Type chart tile to finish loading (bar chart or empty state).</summary>
     public async Task WaitForEmploymentTypeSplitChartLoadedAsync() =>
-        await EmploymentTypeSplitWidget.Locator("svg, .widget-empty").First
+        await EmploymentTypeSplitWidget.Locator(".hbar-chart, .widget-empty").First
             .WaitForAsync(new() { Timeout = 15_000 });
 
     /// <summary>Returns true once loaded if the Employment Type widget is showing its empty state.</summary>
     public async Task<bool> EmploymentTypeSplitChartIsEmptyAsync() =>
         await EmploymentTypeSplitWidget.Locator(".widget-empty").IsVisibleAsync();
 
-    // ── HR Inbox Widget ───────────────────────────────────────────────────────
-
-    private ILocator HrInboxWidget => page.Locator(".widget-card").Filter(new() { HasText = "HR Inbox" }).First;
-
-    public async Task<IReadOnlyList<string>> GetHrInboxTaskTitlesAsync()
+    /// <summary>Returns the visible category labels rendered as plain text (not requiring hover) in the bar chart.</summary>
+    public async Task<IReadOnlyList<string>> GetEmploymentTypeSplitLabelsAsync()
     {
-        await HrInboxWidget.Locator(".task-widget-item, .widget-empty").First.WaitForAsync(new() { Timeout = 15_000 });
-
-        var titles = await HrInboxWidget.Locator(".task-widget-title").AllAsync();
+        await WaitForEmploymentTypeSplitChartLoadedAsync();
+        var labels = await EmploymentTypeSplitWidget.Locator(".hbar-label").AllAsync();
         var names  = new List<string>();
-        foreach (var t in titles)
-            names.Add((await t.TextContentAsync())?.Trim() ?? "");
+        foreach (var l in labels)
+            names.Add((await l.TextContentAsync())?.Trim() ?? "");
         return names;
     }
 
-    /// <summary>Clicks the "View all" link in the HR Inbox widget and waits for navigation.</summary>
-    public async Task ClickHrInboxViewAllAsync()
+    /// <summary>Returns the bounding boxes of the three analytics chart tiles (Headcount, Gender, Employment Type), in DOM order.</summary>
+    public async Task<IReadOnlyList<LayoutRect>> GetAnalyticsGridTileBoundsAsync()
     {
-        await HrInboxWidget.Locator(".widget-view-all").ClickAsync();
-        await page.WaitForURLAsync(new Regex("/hr/inbox"), new() { Timeout = 15_000 });
+        var tiles = page.Locator(".dashboard-analytics-grid > .widget-card, .dashboard-analytics-grid > .chart-tile");
+        var count = await tiles.CountAsync();
+        var bounds = new List<LayoutRect>();
+        for (var i = 0; i < count; i++)
+        {
+            var box = await tiles.Nth(i).BoundingBoxAsync();
+            if (box is not null)
+                bounds.Add(new LayoutRect(box.X, box.Y, box.Width, box.Height));
+        }
+        return bounds;
     }
 
-    // ── Leave Requests Widget ─────────────────────────────────────────────────
+    public readonly record struct LayoutRect(float X, float Y, float Width, float Height);
 
-    private ILocator LeaveRequestsWidget =>
-        page.Locator(".widget-card").Filter(new() { HasText = "Leave Requests" }).First;
+    // ── "Needs your attention" unified queue (AttentionQueueWidget.razor) ────────
+    // Replaced the standalone HrInboxWidget / LeaveRequestsWidget / UpcomingProbationReviewsWidget
+    // / OverdueReturnToWorkReviewsWidget / ComplianceDocumentExpiryWidget / DocumentReviewsWidget
+    // widgets on this page with a single merged, priority-sorted queue. Rows are <button>
+    // elements (class "task-widget-item attention-queue-item", plus "attention-queue-item--overdue"
+    // when overdue) with a descriptive aria-label built from Subject/Category/StatusLabel/DueLabel/
+    // ActionLabel (see AttentionItem.AccessibleLabel) rather than a generic "View all"-style name.
 
-    public async Task<IReadOnlyList<string>> GetLeaveRequestEmployeeNamesAsync()
-    {
-        await LeaveRequestsWidget.Locator(".task-widget-item, .widget-empty").First
+    private ILocator AttentionQueueWidget =>
+        page.Locator(".widget-card.attention-queue-card").First;
+
+    /// <summary>Waits for the attention queue to finish loading (items rendered or "All clear" shown).</summary>
+    public async Task WaitForAttentionQueueLoadedAsync() =>
+        await AttentionQueueWidget.Locator(".attention-queue-item, .attention-queue-all-clear").First
             .WaitForAsync(new() { Timeout = 15_000 });
 
-        var titles = await LeaveRequestsWidget.Locator(".task-widget-title").AllAsync();
+    /// <summary>Returns the subject text (task-widget-title) of every currently visible queue row, in DOM order.</summary>
+    public async Task<IReadOnlyList<string>> GetAttentionQueueSubjectsAsync()
+    {
+        await WaitForAttentionQueueLoadedAsync();
+        var titles = await AttentionQueueWidget.Locator(".attention-queue-item .task-widget-title").AllAsync();
         var names  = new List<string>();
         foreach (var t in titles)
             names.Add((await t.TextContentAsync())?.Trim() ?? "");
         return names;
     }
 
+    /// <summary>Returns true once loaded if any queue row for the given subject fragment is marked overdue.</summary>
+    public async Task<bool> IsAttentionQueueItemOverdueAsync(string subjectFragment)
+    {
+        await WaitForAttentionQueueLoadedAsync();
+        var row = AttentionQueueWidget.Locator(".attention-queue-item").Filter(new() { HasText = subjectFragment }).First;
+        var classes = await row.GetAttributeAsync("class") ?? "";
+        return classes.Contains("attention-queue-item--overdue");
+    }
+
+    /// <summary>Returns true if the "All clear" compact empty-state summary is showing instead of any queue rows.</summary>
+    public async Task<bool> AttentionQueueIsAllClearAsync() =>
+        await AttentionQueueWidget.Locator(".attention-queue-all-clear").IsVisibleAsync();
+
     /// <summary>
-    /// Clicks the Leave Requests widget row whose employee name contains
-    /// <paramref name="nameFragment"/> (LeaveRequestsWidget.razor's OnRequestClicked). Only a
-    /// Pending request is actionable — clicking it opens TaskViewDialog in place for its open
-    /// leave-approval task (use TaskViewPage to interact with it). Any other status (Approved,
-    /// Declined, Rejected, etc.) renders as a static, non-clickable row (CSS class
-    /// "task-widget-item--static") with no dialog or navigation — clicking it is a deliberate
-    /// no-op. Callers should assert on whichever outcome they expect.
-    ///
-    /// <paramref name="dateFragment"/> optionally narrows further by the row's rendered date
-    /// range text (e.g. "14 Sep"). Several tests in this suite create more than one leave
-    /// request for the same employee against the shared dev database (some deliberately left
-    /// with an open task), so a name-only match can land on the wrong row — pass this whenever
-    /// more than one request for the same employee might be visible.
+    /// Clicks the first queue row whose accessible name/text contains <paramref name="subjectFragment"/>.
+    /// Task-backed rows (HR tasks, leave requests with an open review task, probation/return-to-work
+    /// reviews with a generated task) open TaskViewDialog in place; other rows navigate away to the
+    /// relevant employee/document page. Callers should assert on whichever outcome they expect.
     /// </summary>
-    public async Task ClickLeaveRequestItemAsync(string nameFragment, string? dateFragment = null)
+    public async Task ClickAttentionQueueItemAsync(string subjectFragment)
     {
-        await LeaveRequestsWidget.Locator(".task-widget-item, .widget-empty").First
-            .WaitForAsync(new() { Timeout = 15_000 });
-
-        var locator = LeaveRequestsWidget.Locator(".task-widget-item")
-            .Filter(new() { HasText = nameFragment });
-
-        if (dateFragment is not null)
-            locator = locator.Filter(new() { HasText = dateFragment });
-
-        await locator.First.ClickAsync();
-    }
-
-    // ── Upcoming Probation Reviews Widget ─────────────────────────────────────
-
-    private ILocator UpcomingProbationWidget =>
-        page.Locator(".widget-card").Filter(new() { HasText = "Upcoming Probation Reviews" }).First;
-
-    /// <summary>Returns the employee names shown in the Upcoming Probation Reviews widget items.</summary>
-    public async Task<IReadOnlyList<string>> GetUpcomingProbationEmployeeNamesAsync()
-    {
-        await UpcomingProbationWidget.Locator(".task-widget-item, .widget-empty").First
-            .WaitForAsync(new() { Timeout = 15_000 });
-
-        var titles = await UpcomingProbationWidget.Locator(".task-widget-title").AllAsync();
-        var names  = new List<string>();
-        foreach (var t in titles)
-            names.Add((await t.TextContentAsync())?.Trim() ?? "");
-        return names;
+        await WaitForAttentionQueueLoadedAsync();
+        await AttentionQueueWidget.Locator(".attention-queue-item")
+            .Filter(new() { HasText = subjectFragment })
+            .First
+            .ClickAsync();
     }
 
     /// <summary>
-    /// Clicks the first item in the Upcoming Probation Reviews widget. UpcomingProbationReviewsWidget.
-    /// razor's OnReviewClicked opens the review's task dialog in place when one exists — which
-    /// GenerateDueProbationReviewsJob always creates, so this is the normal case for any seeded
-    /// review — falling back to navigating to the employee's Probation tab only for the rare
-    /// review that predates task creation and has no open task. Does not itself wait for either
-    /// outcome; callers should follow up with TaskViewPage.WaitForLoadedAsync() (dialog case) or
-    /// page.WaitForURLAsync (navigation fallback case) as appropriate.
+    /// Returns true if the "Show resolved leave requests" checkbox toggle is present. Only rendered
+    /// once at least one resolved (Approved/Declined/Rejected) leave request exists for the company.
     /// </summary>
-    public async Task ClickFirstUpcomingProbationReviewAsync()
-    {
-        await UpcomingProbationWidget.Locator(".task-widget-item, .widget-empty").First
-            .WaitForAsync(new() { Timeout = 15_000 });
+    public async Task<bool> HasShowResolvedLeaveToggleAsync() =>
+        await AttentionQueueWidget.Locator(".attention-queue-toggle").IsVisibleAsync();
 
-        await UpcomingProbationWidget.Locator(".task-widget-item").First.ClickAsync();
+    /// <summary>Checks (or unchecks) the "Show resolved leave requests" toggle and waits for the queue to re-render.</summary>
+    public async Task SetShowResolvedLeaveRequestsAsync(bool show)
+    {
+        var checkbox = AttentionQueueWidget.Locator(".attention-queue-toggle input[type='checkbox']");
+        var isChecked = await checkbox.IsCheckedAsync();
+        if (isChecked != show)
+            await checkbox.SetCheckedAsync(show);
     }
 
-    // ── Document Reviews Widget ────────────────────────────────────────────────
-    // DocumentReviewsWidget.razor — gated on Session.CanManageEmployees (redundant with the
-    // route guard, same as the sickness trio above), header title "Document Reviews".
-
-    private ILocator DocumentReviewsWidget =>
-        page.Locator(".widget-card").Filter(new() { HasText = "Document Reviews" }).First;
-
-    /// <summary>Returns the document titles shown in the Document Reviews widget items.</summary>
-    public async Task<IReadOnlyList<string>> GetDocumentReviewTitlesAsync()
-    {
-        await DocumentReviewsWidget.Locator(".task-widget-item, .widget-empty").First
-            .WaitForAsync(new() { Timeout = 15_000 });
-
-        var titles = await DocumentReviewsWidget.Locator(".task-widget-title").AllAsync();
-        var names  = new List<string>();
-        foreach (var t in titles)
-            names.Add((await t.TextContentAsync())?.Trim() ?? "");
-        return names;
-    }
+    // ── Document review rows within the attention queue ──────────────────────
+    // Company document reviews (formerly the standalone DocumentReviewsWidget) now render as
+    // "Document review" category rows inside AttentionQueueWidget — subject is the document
+    // title, action label is "Review document", and clicking navigates straight to the
+    // SharedCompanyDocument detail route.
 
     /// <summary>
-    /// Clicks the Document Reviews widget row whose title contains <paramref name="titleFragment"/>
-    /// (DocumentReviewsWidget.razor navigates straight to the SharedDocumentDetail route on click,
-    /// unlike LeaveRequestsWidget's dual outcome) and waits for navigation to
+    /// Clicks the attention-queue row whose subject contains <paramref name="titleFragment"/>
+    /// (a "Document review" category row) and waits for navigation to
     /// "/companies/{companyId}/shared-documents/{documentId}".
     /// </summary>
     public async Task ClickDocumentReviewItemAsync(string titleFragment)
     {
-        await DocumentReviewsWidget.Locator(".task-widget-item, .widget-empty").First
-            .WaitForAsync(new() { Timeout = 15_000 });
-
-        await DocumentReviewsWidget.Locator(".task-widget-item")
-            .Filter(new() { HasText = titleFragment })
-            .First
-            .ClickAsync();
+        await ClickAttentionQueueItemAsync(titleFragment);
         await page.WaitForURLAsync(
             new Regex(@"/companies/[0-9a-f-]{36}/shared-documents/[0-9a-f-]{36}"),
             new() { Timeout = 15_000 });

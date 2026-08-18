@@ -19,8 +19,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (mirroring CreateEmployeeTests.cs), which reliably produces a NotStarted plan with three
 /// default checklist tasks.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeOnboardingTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid LauraId = Guid.Parse("30000000-0000-0000-0000-000000000005");

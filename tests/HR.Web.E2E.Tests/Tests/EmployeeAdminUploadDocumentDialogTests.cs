@@ -12,8 +12,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// company documents (UploadSharedCompanyDocumentDialog.razor, no tabs) covered by
 /// CompanyDocumentsTabTests — those are separate, unrelated dialogs sharing a similar name.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeAdminUploadDocumentDialogTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeAdminUploadDocumentDialogTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");

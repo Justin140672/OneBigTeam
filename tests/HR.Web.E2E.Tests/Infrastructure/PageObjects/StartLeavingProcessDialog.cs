@@ -17,10 +17,17 @@ public sealed class StartLeavingProcessDialog(IPage page)
 {
     private ILocator Dialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Start Leaving Process" });
 
-    /// <summary>Clicks the header "Start Leaving Process" button and waits for the dialog to open.</summary>
+    /// <summary>
+    /// Opens the "More actions" overflow menu and clicks its "Start offboarding" item, waiting for
+    /// the (still internally/dialog-titled "Start Leaving Process") dialog to open. The header
+    /// action itself was moved into the "More actions" dropdown and renamed "Start offboarding" —
+    /// see EmployeeEdit.razor's BuildMoreActionsItems/HandleMoreActionSelected — but the dialog's
+    /// own <c>&lt;Header&gt;</c> text is unchanged.
+    /// </summary>
     public async Task OpenAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Start Leaving Process" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "More actions" }).ClickAsync();
+        await page.GetByRole(AriaRole.Menuitem, new() { Name = "Start offboarding" }).ClickAsync();
         await Dialog.WaitForAsync(new() { Timeout = 15_000 });
     }
 

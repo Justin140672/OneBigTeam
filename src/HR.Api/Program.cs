@@ -25,12 +25,33 @@ using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
+// Raises the .NET ThreadPool's minimum worker/IOCP thread counts above their (low, core-count-based)
+// defaults. The default pool only grows one thread roughly every 500ms once demand exceeds the
+// minimum, so a sudden burst of concurrent work — many parallel E2E Playwright sessions all hitting
+// this API's async DB/HTTP-bound endpoints at once after being comparatively idle — can queue up
+// faster than the pool ramps up, surfacing as request latency/timeouts that look like app overload
+// even when CPU and DB connections both have headroom. This is a well-known ASP.NET Core scaling
+// gotcha for bursty, I/O-bound workloads (see Microsoft's own "ThreadPool starvation" guidance) and
+// is safe in every environment: it only raises the floor the pool starts warm at, never a ceiling.
+ThreadPool.SetMinThreads(Environment.ProcessorCount * 12, Environment.ProcessorCount * 12);
+
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.Host.UseSerilogWithDefaults();
 
 var connectionString = builder.Configuration.GetConnectionString("hr")
 	?? throw new InvalidOperationException("Connection string 'hr' was not found.");
+
+// Npgsql's own defaults (Maximum Pool Size=100, Minimum Pool Size=0) mean the pool starts cold and
+// grows lazily under load, then caps out at 100 real connections shared across every module's
+// DbContext (they all use this same connection string, so Npgsql pools them together). Under this
+// suite's concurrent E2E load that shared pool is one of several plausible contributors to the
+// "shared Aspire-hosted app gets busy" timeouts already documented throughout the E2E test
+// infrastructure (see E2ETestBase's own remarks) — raised here to rule it out / relieve it as a
+// bottleneck: a higher ceiling and a small warm floor so connections don't need to be established
+// from scratch on every burst. Harmless for a normal single-app-instance deployment against its own
+// dedicated Postgres — this isn't shared across unrelated services.
+connectionString += ";Maximum Pool Size=300;Minimum Pool Size=10";
 
 builder.Services.AddCompaniesModule(connectionString, builder.Configuration);
 builder.Services.AddCompanyOnboardingModule(connectionString);
@@ -83,6 +104,14 @@ void ConfigureSupabaseJwtBearer(JwtBearerOptions options)
 	var supabaseProjectUrl = builder.Configuration["SupabaseAuth:ProjectUrl"] ?? "";
 	var supabaseJwksUrl = builder.Configuration["SupabaseAuth:JwksUrl"] ?? "";
 
+	// Same E2E_TESTING flag that swaps in FakeSupabaseAuthGateway (HR.Modules.Identity.IdentityModule)
+	// — read here too so this process's own JWT validation can accept the locally-signed tokens that
+	// gateway now mints for E2E sign-in (see HR.Modules.Identity.Services.E2eFakeSupabaseJwt's remarks
+	// for why: real Supabase Auth rate-limits sign-in under this suite's login volume). Both checks
+	// read the exact same env var, so they can never disagree about which mode the process is in.
+	var isE2ETesting = string.Equals(
+		Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
+
 	// Without this, JwtBearerHandler silently remaps short JWT claim names to legacy long-form
 	// ClaimTypes URIs (e.g. "sub" -> ClaimTypes.NameIdentifier, "email" -> ClaimTypes.Email) via
 	// JwtSecurityTokenHandler's default inbound claim mapping. CurrentUserClaims/
@@ -100,8 +129,36 @@ void ConfigureSupabaseJwtBearer(JwtBearerOptions options)
 		// issued access tokens.
 		ValidAudience = "authenticated",
 		ValidateLifetime = true,
+		// Only ever returns more than the real JWKS keys when E2E_TESTING=true — every other
+		// environment (Development without that flag, and Production, which never sets it) resolves
+		// signing keys exactly as before, unchanged. JwtBearerHandler tries every candidate key
+		// returned here against the token's signature, so appending one extra, fixed, non-secret
+		// symmetric key under E2E_TESTING doesn't weaken or alter validation against real
+		// Supabase-issued tokens in any environment — it only additionally allows tokens actually
+		// signed with that same key, which only HR.Modules.Identity.Services.E2eFakeSupabaseJwt
+		// (itself only reachable via FakeSupabaseAuthGateway, itself only registered under this same
+		// flag) ever mints.
 		IssuerSigningKeyResolver = (_, _, kid, _) =>
-			SupabaseJwksKeyResolver.ResolveSigningKeys(supabaseJwksUrl, kid),
+		{
+			// Under E2E_TESTING, every token actually presented to this API was minted locally by
+			// E2eFakeSupabaseJwt (see FakeSupabaseAuthGateway) — it is never signed by the real
+			// Supabase project, so a real key from SupabaseJwksKeyResolver could never match it
+			// anyway. Skip the real JWKS fetch entirely in this mode: SupabaseJwksKeyResolver.GetKeySet
+			// blocks the calling thread synchronously on an HttpClient.GetStringAsync(...).GetAwaiter()
+			// .GetResult() call under a SemaphoreSlim.Wait() lock (IssuerSigningKeyResolver has no
+			// async form), and the E2E environment's SupabaseAuth:JwksUrl target may be slow,
+			// rate-limited, or unreachable — every authenticated request's JWT validation (i.e. every
+			// page load past login) would otherwise pay that synchronous network cost once per 10-minute
+			// cache window, which is consistent with the app shell repeatedly failing to load within
+			// the E2E suite's 40-45s waits. Real (non-E2E) environments are completely unaffected —
+			// this branch only ever runs when E2E_TESTING=true.
+			if (isE2ETesting)
+			{
+				return [HR.Modules.Identity.Services.E2eFakeSupabaseJwt.SigningKey];
+			}
+
+			return SupabaseJwksKeyResolver.ResolveSigningKeys(supabaseJwksUrl, kid);
+		},
 	};
 
 	// The default Serilog MinimumLevel.Override for "Microsoft" (Warning) swallows JwtBearerHandler's

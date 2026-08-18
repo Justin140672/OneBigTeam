@@ -15,8 +15,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// tests and from seed data (seed data is inserted directly into the database and does not go
 /// through the audited handlers).
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeNotesTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeNotesTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomWilliams = Guid.Parse("30000000-0000-0000-0000-000000000004");
@@ -182,8 +181,26 @@ public sealed class EmployeeNotesTabTests(AppFixture fixture) : E2ETestBase(fixt
 
         using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };
 
-        var sessionResponse = await http.PostAsync($"/api/dev/persona/{lauraUserId}", content: null);
-        sessionResponse.EnsureSuccessStatusCode();
+        // /api/dev/persona/{userId} performs a real, network-dependent Supabase password-grant
+        // login (see HR.Api's Program.cs remarks on that endpoint) — unlike most other E2E auth
+        // paths, which are faked under E2E_TESTING=true. A genuine transient failure/rate-limit
+        // response under this suite's concurrency can surface as a 500 here (same root cause
+        // already identified for /api/dev/ensure-employee-login — see AssetAcknowledgementTaskTests'
+        // EnsureEmployeeLoginAsync). Retry a couple of times, and surface the response body on a
+        // final failure so a genuine server bug is immediately diagnosable.
+        HttpResponseMessage? sessionResponse = null;
+        string? sessionBody = null;
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            sessionResponse = await http.PostAsync($"/api/dev/persona/{lauraUserId}", content: null);
+            if (sessionResponse.IsSuccessStatusCode) break;
+
+            sessionBody = await sessionResponse.Content.ReadAsStringAsync();
+            if (attempt < 3) await Task.Delay(1000 * attempt);
+        }
+
+        Assert.True(sessionResponse!.IsSuccessStatusCode,
+            $"Expected /api/dev/persona/{{userId}} to succeed, got {sessionResponse.StatusCode}. Response body: {sessionBody}");
         var session = await sessionResponse.Content.ReadFromJsonAsync<DevPersonaSessionResult>();
         Assert.NotNull(session);
 

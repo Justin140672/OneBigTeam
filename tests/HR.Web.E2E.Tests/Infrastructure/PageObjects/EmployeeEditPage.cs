@@ -100,6 +100,134 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
+    // ── View mode / Edit mode (2026-08 profile redesign) ────────────────────────
+    // Existing employees now open read-only at ".../{Id}/view"; "Edit details" drops the
+    // suffix and reloads into the editable route. See EditPageBase.IsViewMode (URL-derived)
+    // and EmployeeEdit.razor's EnterEditMode/CancelEdit.
+
+    public bool IsInViewModeUrl => page.Url.Contains("/view", StringComparison.OrdinalIgnoreCase);
+
+    public Task<bool> IsEditDetailsButtonVisibleAsync() =>
+        page.Locator("[data-testid='edit-details-button']").IsVisibleAsync();
+
+    /// <summary>Clicks "Edit details" and waits for the resulting forceLoad reload to land on the editable route.</summary>
+    public async Task ClickEditDetailsButtonAsync()
+    {
+        await page.Locator("[data-testid='edit-details-button']").ClickAsync();
+        await page.WaitForURLAsync(url => !url.Contains("/view", StringComparison.OrdinalIgnoreCase), new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+    }
+
+    public Task<bool> IsBackToEmployeesButtonVisibleAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Back to employees" }).IsVisibleAsync();
+
+    public async Task ClickBackToEmployeesButtonAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Back to employees" }).ClickAsync();
+        await page.WaitForURLAsync("**/employees", new() { Timeout = 15_000 });
+    }
+
+    /// <summary>The sticky Save/Cancel action bar (".employee-edit-sticky-bar") — only rendered in edit mode.</summary>
+    public Task<bool> IsStickyActionBarVisibleAsync() =>
+        page.Locator(".employee-edit-sticky-bar").IsVisibleAsync();
+
+    /// <summary>
+    /// Clicks the sticky bar's "Cancel" button (existing-employee edit mode) — discards edits and
+    /// forceLoad-reloads back to the view route. Same visible label as <see cref="ClickCloseAsync"/>'s
+    /// "Cancel" (RequestClose), but this one is CancelEdit — there is only ever one such button
+    /// rendered at a time per mode, so the locator is unambiguous.
+    /// </summary>
+    public async Task ClickCancelEditButtonAsync()
+    {
+        await page.Locator(".employee-edit-sticky-bar").GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+        await page.WaitForURLAsync(url => url.Contains("/view", StringComparison.OrdinalIgnoreCase), new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+    }
+
+    /// <summary>
+    /// Returns the accessible success confirmation banner's text (role="status" aria-live="polite",
+    /// shown for ~700ms after a successful save before the redirect navigates away — see
+    /// EmployeeEdit.razor's OnSavedAsync), or null if not currently visible.
+    /// </summary>
+    public async Task<string?> GetSaveSuccessBannerTextAsync()
+    {
+        var banner = page.Locator("[role='status'][aria-live='polite'].alert-success");
+        return await banner.IsVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
+    }
+
+    // ── "More actions" dropdown (Organisation Chart / Start offboarding) ───────
+
+    public Task<bool> IsMoreActionsMenuVisibleAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "More actions" }).IsVisibleAsync();
+
+    public Task OpenMoreActionsMenuAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "More actions" }).ClickAsync();
+
+    public async Task ClickViewOrganisationChartMenuItemAsync()
+    {
+        await OpenMoreActionsMenuAsync();
+        await page.GetByRole(AriaRole.Menuitem, new() { Name = "View Organisation Chart" }).ClickAsync();
+        await page.WaitForURLAsync(new System.Text.RegularExpressions.Regex(@"/organisation-chart\?employeeId="), new() { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// True if the "Start offboarding" item is present in the (currently closed) "More actions"
+    /// menu — only rendered while no leaving process is active (see EmployeeEdit.razor's
+    /// BuildMoreActionsItems / `!_showLeavingTab`). Opens the menu to check, then closes it again
+    /// via Escape so callers aren't left with an open popup. Replaces the old header
+    /// "Start Leaving Process" button check now that the action lives in this overflow menu and
+    /// is labelled "Start offboarding".
+    /// </summary>
+    public async Task<bool> HasStartOffboardingMenuItemAsync()
+    {
+        if (!await IsMoreActionsMenuVisibleAsync())
+            return false;
+
+        await OpenMoreActionsMenuAsync();
+        bool visible;
+        try
+        {
+            await page.GetByRole(AriaRole.Menuitem, new() { Name = "Start offboarding" })
+                .WaitForAsync(new() { Timeout = 3_000 });
+            visible = true;
+        }
+        catch (TimeoutException)
+        {
+            visible = false;
+        }
+
+        await page.Keyboard.PressAsync("Escape");
+        return visible;
+    }
+
+    public async Task ClickStartOffboardingMenuItemAsync()
+    {
+        await OpenMoreActionsMenuAsync();
+        await page.GetByRole(AriaRole.Menuitem, new() { Name = "Start offboarding" }).ClickAsync();
+    }
+
+    // ── Details tab field access (view-mode read-only checks / accessible labels) ─
+
+    /// <summary>True if the given Details-tab text input (by its `id`, e.g. "employee-first-name") carries the HTML `readonly` attribute.</summary>
+    public async Task<bool> IsTextFieldReadOnlyAsync(string fieldId) =>
+        await page.Locator($"#{fieldId}").GetAttributeAsync("readonly") is not null;
+
+    public Task<string> GetTextFieldValueAsync(string fieldId) =>
+        page.Locator($"#{fieldId}").InputValueAsync();
+
+    public Task FillTextFieldByIdAsync(string fieldId, string value) =>
+        page.Locator($"#{fieldId}").FillAsync(value);
+
+    /// <summary>True if the "Fields marked * are required." explanatory note is visible on the Details tab.</summary>
+    public Task<bool> HasRequiredFieldsNoteAsync() =>
+        page.Locator("p").Filter(new() { HasText = "Fields marked" }).Filter(new() { HasText = "are required" }).First.IsVisibleAsync();
+
+    public Task<bool> IsUsersAndAccessCardVisibleAsync() =>
+        page.Locator(".card-header:has-text('Users & Access')").IsVisibleAsync();
+
+    public Task<bool> HasInviteExpiryNoteAsync() =>
+        page.Locator("p").Filter(new() { HasText = "Invite links expire after 7 days" }).First.IsVisibleAsync();
+
     // ── Employment Tab ─────────────────────────────────────────────────────────
 
     public async Task OpenEmploymentTabAsync()
@@ -148,7 +276,15 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         var managerGroup = page.Locator(".col-md-4, .col-12")
             .Filter(new() { HasText = "Manager" })
             .First;
-        await DropDownSelector.SelectAsync(page, managerGroup, managerNameFragment);
+        // This combobox only mounts once the Employment tab's own async data load completes, so
+        // its "aria-owns" attribute can take longer to attach than DropDownSelector's narrow
+        // default budget (5s) — observed as "waiting for '.e-popup.e-ddl' to be visible" against
+        // the unscoped fallback selector (which can resolve to a *different*, already-open-but-
+        // hidden dropdown's popup on a page with more than one). Widen the attach budget for this
+        // specific call site (60 attempts = 15s) rather than raising DropDownSelector's default for
+        // every combobox in the suite — see that method's own remarks for why a blanket raise was
+        // already tried and reverted.
+        await DropDownSelector.SelectAsync(page, managerGroup, managerNameFragment, ariaOwnsAttempts: 60);
     }
 
     /// <summary>
@@ -196,8 +332,12 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task SaveNewEmployeeAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        // Navigates to the employee list on success.
-        await page.WaitForURLAsync("**/employees", new() { Timeout = 20_000 });
+        // Navigates to the employee list on success. Bumped 20s -> 40s: under the higher
+        // concurrent load from the many tests that now create fresh employees via this same
+        // full-form UI flow, this genuinely (not a logic bug — flow is identical to the
+        // long-established working pattern) takes longer than 20s often enough to time out.
+        // Same fix already applied to the equivalent signup-navigation timeout.
+        await page.WaitForURLAsync("**/employees", new() { Timeout = 40_000 });
         // With prerender:false the circuit connects after navigation, wait for the grid. ".e-grid"
         // alone isn't enough — Syncfusion populates ".e-row"/".e-rowcell" on a separate JS tick
         // after the grid element mounts, so callers that immediately click the new row (e.g.
@@ -451,8 +591,11 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
 
+    // RequestClose's button label changed from "Close" to "Cancel" on both the new-employee form
+    // and the existing-employee edit mode (see EmployeeEdit.razor) — method name kept as-is since
+    // many existing callers already depend on it, only the underlying locator text changed.
     public Task ClickCloseAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+        page.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
 
     public Task<bool> IsUnsavedChangesDialogVisibleAsync() =>
         UnsavedChangesDialog.WaitUntilVisibleAsync();
@@ -537,6 +680,14 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.Locator(".add-compensation-dialog .e-footer-content button:has-text('Add')").ClickAsync();
         await page.Locator("[role='dialog'].add-compensation-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+
+        // Same "dialog closing doesn't prove the grid's own reload has landed" race as
+        // SubmitEditCompensationDialogAsync above — callers that immediately read/act on the
+        // history grid (e.g. the newly added row, or a subsequent Delete) can race it.
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
+        await page.WaitForTimeoutAsync(300);
     }
 
     public Task<bool> HasAddCompensationDialogErrorAsync() =>
@@ -577,6 +728,16 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.Locator(".edit-future-compensation-dialog .e-footer-content button:has-text('Save')").ClickAsync();
         await page.Locator("[role='dialog'].edit-future-compensation-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+
+        // The dialog closing only proves the save request was accepted, not that the
+        // Compensation History grid's own async reload has actually landed yet — a caller that
+        // immediately reads the row's text (e.g. to check the edited salary) can race that reload
+        // and still see the pre-edit value. Same class of race already fixed on
+        // ConfirmDeleteCompensationAsync just below.
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
+        await page.WaitForTimeoutAsync(300);
     }
 
     // FillAsync sets a Syncfusion SfNumericTextBox's DOM value through CDP directly, which
@@ -589,8 +750,15 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await input.ClickAsync();
         await page.Keyboard.PressAsync("Control+A");
         await page.Keyboard.PressAsync("Delete");
+        // Give the clear a moment to actually land before typing — observed corruption (e.g.
+        // "40000.00420004200042000") is consistent with Ctrl+A/Delete not reliably clearing the
+        // field before PressSequentially starts, so each retry of FillNumericAndVerifyAsync's
+        // wrapper just appends more text onto the still-present old value instead of replacing it.
+        // Same mitigation already applied to the equivalent race in
+        // BulkCompensationUpdateDialogPage.SetProposedSalaryAsync.
+        await page.WaitForTimeoutAsync(150);
         if (value.Length > 0)
-            await input.PressSequentiallyAsync(value);
+            await input.PressSequentiallyAsync(value, new() { Delay = 30 });
         await page.Keyboard.PressAsync("Tab");
     }
 
@@ -654,13 +822,32 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(
             "[data-testid='audit-history-grid'], .alert-secondary",
             new() { Timeout = 15_000 });
+
+        // The grid container above mounts before Syncfusion populates its ".e-row" data on a
+        // separate JS tick (same "container before content" race fixed elsewhere in this suite) —
+        // a caller that immediately checks AuditHistoryRow(...).IsVisibleAsync() can otherwise see
+        // no rows for an employee who genuinely has audit history. Only applies when the grid
+        // itself rendered (not the ".alert-secondary" empty state, which never has any rows).
+        if (await page.Locator("[data-testid='audit-history-grid']").IsVisibleAsync())
+        {
+            await page.WaitForSelectorAsync(
+                "[data-testid='audit-history-grid'] .e-row, [data-testid='audit-history-grid'] .e-emptyrow",
+                new() { Timeout = 15_000 });
+        }
     }
 
     public ILocator AuditHistoryRow(string actionFragment) =>
         page.Locator("[data-testid='audit-history-grid'] .e-row").Filter(new() { HasText = actionFragment });
 
-    public Task ClickViewAuditRowAsync(string actionFragment) =>
-        AuditHistoryRow(actionFragment).First.GetByText("View").ClickAsync();
+    public async Task ClickViewAuditRowAsync(string actionFragment)
+    {
+        await AuditHistoryRow(actionFragment).First.GetByText("View").ClickAsync();
+        // Ensure the resulting dialog has actually opened before returning, rather than leaving
+        // callers that immediately check HasAuditDetailDialogAsync() to race the open animation
+        // with a bare instant check.
+        await page.Locator("[role='dialog'].audit-history-detail-dialog").WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
 
     public async Task<bool> HasAuditDetailDialogAsync() =>
         await page.Locator("[role='dialog'].audit-history-detail-dialog").IsVisibleAsync();

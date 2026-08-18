@@ -28,7 +28,17 @@ public static class DropDownSelector
     /// dialog locator, or the page itself when there's only one combobox in scope.
     /// </param>
     /// <param name="index">Which combobox within <paramref name="scope"/>, when it contains more than one (defaults to the first).</param>
-    public static async Task SelectAsync(IPage page, ILocator scope, string text, int index = 0)
+    /// <param name="ariaOwnsAttempts">
+    /// Number of 250ms polls for this combobox's "aria-owns" attribute to attach before falling
+    /// back to the unscoped ".e-popup.e-ddl" selector (see the remarks below on why that fallback
+    /// is risky on a page with more than one dropdown). Deliberately kept at a narrow default
+    /// (20 = 5s) rather than a broad, suite-wide increase — see this file's own history: a prior
+    /// blanket raise to 60 (15s) taxed every combobox selection across the whole suite to fix one
+    /// narrow case. Override only at the specific call site that's actually slow to attach (e.g.
+    /// EmployeeEditPage.SelectManagerAsync, whose combobox mounts only after the Employment tab's
+    /// own async data load, same root cause already documented in this file's popupId remarks).
+    /// </param>
+    public static async Task SelectAsync(IPage page, ILocator scope, string text, int index = 0, int ariaOwnsAttempts = 20)
     {
         var combobox = scope.Locator("span[role='combobox']").Nth(index);
 
@@ -63,7 +73,7 @@ public static class DropDownSelector
         // to the original, known-good 5s budget. If a genuinely slow-to-attach case turns up again,
         // fix it narrowly at that call site rather than taxing every combobox selection here.
         string? popupId = null;
-        for (var attempt = 0; attempt < 20 && popupId is null; attempt++)
+        for (var attempt = 0; attempt < ariaOwnsAttempts && popupId is null; attempt++)
         {
             popupId = await combobox.GetAttributeAsync("aria-owns");
             if (popupId is null) await page.WaitForTimeoutAsync(250);

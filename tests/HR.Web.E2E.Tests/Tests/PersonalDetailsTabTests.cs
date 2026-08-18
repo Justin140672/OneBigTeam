@@ -10,8 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - Submitting a change request shows a success banner
 /// - Empty submission shows a validation error
 /// </summary>
-[Collection("E2E")]
-public sealed class PersonalDetailsTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class PersonalDetailsTabTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");

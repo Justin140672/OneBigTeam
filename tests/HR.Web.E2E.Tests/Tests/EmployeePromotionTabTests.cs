@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
@@ -10,13 +11,21 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Uses several seeded Acme employees so each test can freely add promotion records without
 /// affecting the others (see EmployeesModule's dev seed): Sarah Chen (CTO, untouched — used only
 /// for the empty-state assertion), Tom Williams (Software Engineer, reports to James Okafor —
-/// used for the plain single-step promotion), Marcus Diallo (HR Advisor, reports to Laura
-/// Bennett — used for the manager/location step), Priya Sharma (Senior Software Engineer — used
-/// for the compensation validation test) and David Park (Sales Manager — used for the
-/// cancel-mid-wizard test).
+/// used only for the read-only dropdown-options test, which depends on his position profile
+/// staying "Software Engineer"), Marcus Diallo (HR Advisor, reports to Laura Bennett — used for
+/// the manager/location step, cancelled rather than submitted), Priya Sharma (Senior Software
+/// Engineer — used for the compensation validation test, cancelled rather than submitted) and
+/// David Park (Sales Manager — used for the cancel-mid-wizard test).
+///
+/// The one test that actually SUBMITS a promotion (PromoteEmployee_WithPositionStepOnly_AppearsInHistoryGrid)
+/// used to submit it against Tom Williams, permanently changing his position profile from
+/// "Software Engineer" to "Senior Software Engineer" — an irreversible mutation that would have
+/// broken PromoteEmployeeDialog_NewPositionProfileDropdown_OnlyOffersVacantProfiles in this same
+/// file (which asserts Tom's *current* position is still plain "Software Engineer") under real
+/// parallel/re-run execution. It now creates its own fresh employee instead — see that test's own
+/// comment for why a fresh "Software Engineer" employee is a safe, valid target.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeePromotionTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -27,6 +36,42 @@ public sealed class EmployeePromotionTabTests(AppFixture fixture) : E2ETestBase(
     private static readonly Guid DavidPark = Guid.Parse("30000000-0000-0000-0000-000000000008");
 
     private const string LauraEmail = "laura.bennett@acme.example";
+
+    /// <summary>
+    /// Creates a fresh, uniquely-named Acme employee on the "Software Engineer" position profile
+    /// (the same profile Tom Williams occupies — multiple employees can share a position profile;
+    /// the promotion dialog's "only vacant profiles" dropdown filter only excludes profiles held by
+    /// *other* employees when promoting a specific employee, it isn't a creation-time uniqueness
+    /// constraint — see EmployeeEmploymentTabNoticePeriodOverrideTests and EmployeeTimelineTabTests,
+    /// which already create fresh employees on this same profile) and returns their employee ID.
+    /// </summary>
+    private async Task<Guid> CreateFreshSoftwareEngineerAsync()
+    {
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"Promo{unique}";
+        var workEmail = $"e2e.promo{unique}@acme.example";
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Software Engineer");
+        await empEdit.SaveNewEmployeeAsync();
+        await empList.ClickEmployeeAsync(lastName);
+
+        var match = Regex.Match(_page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
+        return Guid.Parse(match.Groups[1].Value);
+    }
 
     [Fact]
     public async Task PromotionHistoryTab_ShowsEmptyState_ForEmployeeWithNoPromotions()
@@ -84,7 +129,9 @@ public sealed class EmployeePromotionTabTests(AppFixture fixture) : E2ETestBase(
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await empEdit.GoToAsync(AcmeId, TomWilliams);
+        var freshEmployeeId = await CreateFreshSoftwareEngineerAsync();
+
+        await empEdit.GoToAsync(AcmeId, freshEmployeeId);
         await empEdit.OpenPromotionHistoryTabAsync();
 
         await wizard.OpenAsync();
@@ -196,9 +243,13 @@ public sealed class EmployeePromotionTabTests(AppFixture fixture) : E2ETestBase(
         await wizard.CheckCreateCompensationChangeAsync();
 
         // Salary type defaults to "Annual" and currency defaults to "GBP" (see
-        // PromoteEmployeeDialog.ResetForm), so leaving Salary itself empty is enough to trigger
+        // PromoteEmployeeDialog.ResetForm), but Salary itself is NOT left blank here: OnOpenedAsync
+        // pre-fills Model.CompensationSalary from the employee's current compensation (Priya
+        // Sharma has an existing salary) as a UX convenience so reviewers don't have to re-type
+        // figures that usually don't change. Explicitly clear it to actually exercise
         // ValidateCompensation's "Please enter a salary greater than 0." rule when attempting to
         // advance to the Confirm step.
+        await wizard.FillCompensationSalaryAsync("");
         await wizard.ClickNextAsync();
 
         Assert.Equal("3. Compensation", await wizard.GetActiveStepLabelAsync());

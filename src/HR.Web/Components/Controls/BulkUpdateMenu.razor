@@ -1,6 +1,6 @@
 @using Syncfusion.Blazor.SplitButtons
 
-<SfDropDownButton Content="Bulk Update" IconCss="fa-solid fa-money-bill-wave" CssClass="e-flat hr-toolbar-bulk-update-btn" Items="_items">
+<SfDropDownButton Content="@ButtonText" IconCss="fa-solid fa-money-bill-wave" CssClass="e-flat hr-toolbar-bulk-update-btn" Items="_items">
     <DropDownButtonEvents ItemSelected="HandleItemSelected" />
 </SfDropDownButton>
 
@@ -11,6 +11,12 @@
     // require any row selection, only "Selected Employees" does (it operates on whatever rows are
     // currently checked in the grid), so only that one item is conditionally disabled.
     [Parameter] public bool HasSelection { get; set; }
+
+    // Number of rows currently checked — shown in the button label so the count of employees
+    // that "Selected Employees" would act on is visible without opening the dropdown.
+    [Parameter] public int SelectedCount { get; set; }
+
+    private string ButtonText => SelectedCount > 0 ? $"Update selected ({SelectedCount})" : "Update selected";
 
     private List<DropDownMenuItem> _items = BuildItems(hasSelection: false);
     private bool _lastHasSelection;

@@ -46,11 +46,38 @@ public sealed class ReportCatalogPage(IPage page, string baseUrl)
         // HrTextBox (SfTextBox) only raises ValueChanged on blur/change — an explicit blur is
         // needed for the search filter (client-side, computed off _searchTerm) to actually apply.
         await searchInput.PressAsync("Tab");
+        // The filtered re-render happens on the next Blazor render tick after the blur-triggered
+        // ValueChanged callback — reading GetVisibleCardCountAsync() immediately after PressAsync
+        // can race that and still see the pre-filter card count (same reasoning as
+        // VacancyListPage.SearchAsync's post-search settle wait).
+        await page.WaitForTimeoutAsync(300);
     }
 
     public async Task ClickFavouriteAsync(string nameFragment)
     {
-        await Card(nameFragment).Locator(".report-catalog-favourite").ClickAsync();
+        var button = Card(nameFragment).Locator(".report-catalog-favourite");
+        var wasActive = (await button.GetAttributeAsync("class"))?.Contains("report-catalog-favourite--active") == true;
+
+        await button.ClickAsync();
+
+        // Favourites round-trip through the server (ReportingService's Add/RemoveReportFavouriteAsync,
+        // not localStorage — see class remarks elsewhere in this suite), so the click dispatching is
+        // not proof the toggle has actually committed yet. A caller that immediately re-reads
+        // IsFavouritedAsync() right after (in particular the self-heal checks at the top of
+        // FavouriteToggle_PersistsAcrossReload_AndSortsFirstInCategory /
+        // FavouritingNewReportCard_PersistsAcrossNavigationAwayAndBack, which click-then-immediately-
+        // assert to repair a possibly-already-polluted starting state) can otherwise race the
+        // round-trip and see the pre-toggle state, making the self-heal itself silently a no-op
+        // under load. Poll until the CSS class has actually flipped before returning.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (true)
+        {
+            var nowActive = (await button.GetAttributeAsync("class"))?.Contains("report-catalog-favourite--active") == true;
+            if (nowActive != wasActive) return;
+            if (DateTime.UtcNow > deadline)
+                throw new TimeoutException($"Timed out waiting for the favourite toggle on '{nameFragment}' to commit.");
+            await page.WaitForTimeoutAsync(150);
+        }
     }
 
     public async Task<bool> IsFavouritedAsync(string nameFragment)

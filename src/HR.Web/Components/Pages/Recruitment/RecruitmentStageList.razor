@@ -275,18 +275,32 @@
         ClearActionError();
 
         // Reorder must operate on the full set (active + inactive) in true DisplayOrder, regardless
-        // of the current "show inactive" filter applied to Items.
+        // of the current "show inactive" filter applied to Items — the endpoint requires every one
+        // of the company's stages to be present in the submitted list, with no omissions.
         var all = await RecruitmentStageService.ListStagesAsync(CompanyId);
         if (all?.Items is null) return;
 
-        var ordered = all.Items.OrderBy(i => i.DisplayOrder).Select(i => i.Id).ToList();
-        var index = ordered.IndexOf(item.Id);
-        var newIndex = index + delta;
-        if (index < 0 || newIndex < 0 || newIndex >= ordered.Count) return;
+        var ordered = all.Items.OrderBy(i => i.DisplayOrder).ToList();
+        var index = ordered.FindIndex(i => i.Id == item.Id);
+        if (index < 0) return;
 
-        (ordered[index], ordered[newIndex]) = (ordered[newIndex], ordered[index]);
+        // The swap target must be the nearest neighbour that's actually VISIBLE in the current grid
+        // (active-only unless "Show inactive" is on), not simply the physically adjacent stage in
+        // raw DisplayOrder. Otherwise, when an inactive stage happens to sit immediately next to this
+        // one, swapping with it silently reassigns DisplayOrder server-side while leaving the visible
+        // grid's row order completely unchanged — "Move up"/"Move down" then appears to do nothing.
+        bool IsVisible(RecruitmentStageListItem candidate) => ShowInactive || candidate.IsActive;
 
-        var (result, error) = await RecruitmentStageService.ReorderAsync(CompanyId, ordered);
+        var targetIndex = index + delta;
+        while (targetIndex >= 0 && targetIndex < ordered.Count && !IsVisible(ordered[targetIndex]))
+            targetIndex += delta;
+
+        if (targetIndex < 0 || targetIndex >= ordered.Count) return;
+
+        var orderedIds = ordered.Select(i => i.Id).ToList();
+        (orderedIds[index], orderedIds[targetIndex]) = (orderedIds[targetIndex], orderedIds[index]);
+
+        var (result, error) = await RecruitmentStageService.ReorderAsync(CompanyId, orderedIds);
         if (result is null)
             SetActionError(error);
         else

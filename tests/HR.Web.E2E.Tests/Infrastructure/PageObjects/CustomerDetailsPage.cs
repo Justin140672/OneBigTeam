@@ -86,7 +86,11 @@ public sealed class CustomerDetailsPage(IPage page, string baseUrl)
     public ILocator ScheduleDeletionButton =>
         page.GetByRole(AriaRole.Button, new() { Name = "Schedule deletion" });
 
-    public Task ClickScheduleDeletionAsync() => ScheduleDeletionButton.ClickAsync();
+    public async Task ClickScheduleDeletionAsync()
+    {
+        await ScheduleDeletionButton.ClickAsync();
+        await ScheduleDeletionDialog.WaitForAsync(new() { Timeout = 15_000 });
+    }
 
     private ILocator ScheduleDeletionDialog =>
         page.GetByRole(AriaRole.Dialog, new() { Name = "Schedule deletion" });
@@ -113,7 +117,11 @@ public sealed class CustomerDetailsPage(IPage page, string baseUrl)
     public ILocator LoginAsCustomerButton =>
         page.GetByRole(AriaRole.Button, new() { Name = "Login as customer" });
 
-    public Task ClickLoginAsCustomerAsync() => LoginAsCustomerButton.ClickAsync();
+    public async Task ClickLoginAsCustomerAsync()
+    {
+        await LoginAsCustomerButton.ClickAsync();
+        await LoginAsCustomerDialog.WaitForAsync(new() { Timeout = 15_000 });
+    }
 
     private ILocator LoginAsCustomerDialog =>
         page.GetByRole(AriaRole.Dialog, new() { Name = "Login as customer" });

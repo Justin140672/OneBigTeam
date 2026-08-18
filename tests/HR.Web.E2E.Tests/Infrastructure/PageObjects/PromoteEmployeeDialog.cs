@@ -110,8 +110,19 @@ public sealed class PromoteEmployeeDialog(IPage page)
 
     // ── Step 3: Compensation ─────────────────────────────────────────────────────
 
-    public Task CheckCreateCompensationChangeAsync() =>
-        Dialog.GetByLabel("Create compensation change").CheckAsync();
+    public async Task CheckCreateCompensationChangeAsync()
+    {
+        await Dialog.GetByLabel("Create compensation change").CheckAsync();
+        // Syncfusion's SfCheckBox round-trips its bound value to the server via its own change
+        // event a tick after the native input's checked state flips — without waiting for that
+        // round-trip, an immediately-following ClickNextAsync can race the Blazor circuit and
+        // submit before Model.CreateCompensationChange has actually updated server-side,
+        // skipping the compensation-required validation entirely (step 3 -> step 4 in one
+        // click). Rather than a fixed sleep (unreliable under concurrent full-suite load), wait
+        // for the conditional "Salary Type" field that only renders once
+        // Model.CreateCompensationChange is true — a direct signal the round-trip completed.
+        await Dialog.GetByText("Salary Type").WaitForAsync(new() { Timeout = 5_000 });
+    }
 
     public Task SelectCompensationSalaryTypeAsync(string salaryType) =>
         DropDownSelector.SelectAsync(page, Dialog.Locator(".col-6").Filter(new() { HasText = "Salary Type" }).First, salaryType);
@@ -211,6 +222,7 @@ public sealed class PromoteEmployeeDialog(IPage page)
         try
         {
             await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+            await WaitForOverlayToClearAsync();
         }
         catch (TimeoutException)
         {
@@ -228,7 +240,29 @@ public sealed class PromoteEmployeeDialog(IPage page)
             {
                 await confirmButton.ClickAsync();
                 await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+                await WaitForOverlayToClearAsync();
             }
+        }
+    }
+
+    /// <summary>
+    /// Syncfusion's modal overlay (".e-dlg-overlay") is a DOM sibling of the dialog itself, not a
+    /// descendant, and its close animation can still be mid-fade (still intercepting pointer
+    /// events) for a short moment after the dialog role element itself already reports "Hidden" to
+    /// Playwright (not visible/detached). A caller that immediately clicks something else (e.g. a
+    /// tab) right after this dialog closes can otherwise hit "subtree intercepts pointer events" on
+    /// the stale overlay. Best-effort: if no overlay is present at all, this is a no-op.
+    /// </summary>
+    private async Task WaitForOverlayToClearAsync()
+    {
+        try
+        {
+            await page.Locator(".e-dlg-overlay").WaitForAsync(
+                new() { State = WaitForSelectorState.Detached, Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            // Ignore — best-effort settle only.
         }
     }
 

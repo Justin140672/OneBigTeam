@@ -24,8 +24,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// EmployeeOffboardingTabTests.cs's CreateEmployeeAsync), which reliably has no leaving process
 /// yet and a resolvable effective notice period (falling back to the company default).
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeLeavingProcessTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

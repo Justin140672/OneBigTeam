@@ -52,13 +52,21 @@ public sealed class FailedPaymentsPage(IPage page, string baseUrl)
     {
         await SearchBox.FillAsync(term);
         await page.WaitForTimeoutAsync(500);
+        // SettledSelector matches any of several possible end states (error banner, empty state,
+        // or a real grid) — a caller re-searching/re-filtering can have this resolve against a
+        // transient loading-state grid container that appears briefly before the page settles
+        // into its true final state (e.g. the Stripe-not-configured error banner), same "resolves
+        // against stale/transient content" race documented elsewhere in this suite. A short settle
+        // after the match gives the real final state a moment to land.
         await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 15_000 });
+        await page.WaitForTimeoutAsync(300);
     }
 
     public async Task SelectStatusFilterAsync(string value)
     {
         await StatusFilterSelect.SelectOptionAsync(new SelectOptionValue { Value = value });
         await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 15_000 });
+        await page.WaitForTimeoutAsync(300);
     }
 
     public async Task<bool> HasCompanyAsync(string companyNameFragment)

@@ -12,8 +12,8 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   2. The new homepage trust/reassurance section (Home.razor), inserted between the hero and
 ///      the #features section, with its heading, four trust-card headings, and outbound links.
 /// </summary>
-[Collection("E2E")]
-public sealed class MarketingContactAndTrustSectionTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class MarketingContactAndTrustSectionTests(ParallelBlankPersonaFixture fixture)
+    : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
     [Fact]
     public async Task HeaderContactLink_NavigatesToContactFormAnchor()

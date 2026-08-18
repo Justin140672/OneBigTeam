@@ -16,8 +16,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (infra:manage) belongs to an HR Administrator (Laura Bennett) — tests switch accounts via
 /// LoginPage.SwitchAccountAsync as needed.
 /// </summary>
-[Collection("E2E")]
-public sealed class VacancyLinkedPositionProfileTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) : CrossUserVacancyTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

@@ -58,6 +58,13 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
         var input = Board.Locator("input[data-testid='kanban-search-box'], [data-testid='kanban-search-box'] input").First;
         await input.FillAsync(text);
         await input.PressAsync("Tab");
+
+        // ValueChange only fires on blur (see comment above), and the resulting FilteredCards
+        // re-render is a server round-trip (InteractiveServer render mode) rather than an instant
+        // client-side re-filter — CountVisibleCardsAsync/HasCardForNameAsync read the DOM
+        // synchronously with no auto-retry, so a caller right after this method returns can
+        // otherwise race the pre-filter card set.
+        await Board.Page.WaitForTimeoutAsync(400);
     }
 
     public async Task<int> CountVisibleCardsAsync() =>

@@ -67,9 +67,29 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
         await input.ClickAsync();
         await page.Keyboard.PressAsync("Control+A");
         await page.Keyboard.PressAsync("Delete");
+        // Give the clear a moment to actually land before typing — same mitigation applied to
+        // EmployeeEditPage.TypeIntoNumericInputAsync for the same observed corruption (old value
+        // still present, new text appended rather than replacing it).
+        await page.WaitForTimeoutAsync(150);
         if (value.Length > 0)
-            await input.PressSequentiallyAsync(value);
+            await input.PressSequentiallyAsync(value, new() { Delay = 30 });
         await page.Keyboard.PressAsync("Tab");
+        // Tab blurs the Syncfusion SfTextBox, which raises its change event and round-trips the
+        // new value to the server over the Blazor Server circuit — that round-trip is async and
+        // not complete the instant PressAsync("Tab") returns. A caller that immediately clicks
+        // Close (as Close_SaveFromUnsavedChangesDialog_PersistsAndNavigatesAway does) can open the
+        // "unsaved changes" dialog and choose Save before Model.TimeZone/Model.Locale have
+        // actually been updated server-side, silently saving the pre-edit value (observed:
+        // "UTC-edited" typed and blurred, but "UTC" persisted).
+        //
+        // NOTE: an earlier fix here waited on Assertions.Expect(input).ToHaveValueAsync(value) as
+        // a proxy for the round-trip, but that assertion is trivially satisfied the instant
+        // PressSequentiallyAsync finishes typing — real keystrokes already update the input's DOM
+        // value synchronously, well before Tab is even pressed. It does not observe the blur ->
+        // change event -> SignalR round-trip -> Model update at all, so the race it was meant to
+        // close was never actually closed. There's no DOM-observable signal that the server-side
+        // bound property has been updated, so give the round-trip a fixed settling window instead.
+        await page.WaitForTimeoutAsync(300);
     }
 
     public Task SetTimeZoneAsync(string value) => TypeIntoTextBoxAsync(TimeZoneInput, value);
@@ -154,7 +174,14 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     public async Task ConfirmDiscardChangesAsync(string baseUrl, Guid companyId)
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
-        await page.WaitForURLAsync($"{baseUrl}/companies/{companyId}/edit", new() { Timeout = 15_000 });
+        // Close navigates to "/" first (CompanyEdit has no dedicated list page — see
+        // CloseAndWaitForDashboardAsync's own remarks), which then immediately redirects a
+        // CompanyAdministrator back to this same /companies/{id}/edit page via Home.razor's
+        // role-based landing redirect (AppSession.LandingUrl). That's two navigations in
+        // sequence, not one — under load the intermediate "/" landing can take longer to redirect
+        // than this was originally budgeted for, observed as the caller reading _page.Url and
+        // finding the bare "/" root instead of the final destination.
+        await page.WaitForURLAsync($"{baseUrl}/companies/{companyId}/edit", new() { Timeout = 20_000 });
     }
 
     /// <summary>
@@ -163,7 +190,14 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     /// </summary>
     public async Task ConfirmSaveFromUnsavedChangesDialogAsync(string baseUrl, Guid companyId)
     {
+        // The "Save from unsaved changes" flow lands back on the SAME /edit URL it started from,
+        // so WaitForURLAsync's pattern already matches the current URL before the click even
+        // happens — it resolves instantly rather than actually waiting for the save round-trip to
+        // complete, letting the caller re-navigate (GoToAsync) and read stale, unsaved data. Wait
+        // for the confirmation dialog to actually close first, which only happens once the save
+        // (and subsequent client-side navigation) has gone through.
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await UnsavedChangesDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
         await page.WaitForURLAsync($"{baseUrl}/companies/{companyId}/edit", new() { Timeout = 15_000 });
     }
 

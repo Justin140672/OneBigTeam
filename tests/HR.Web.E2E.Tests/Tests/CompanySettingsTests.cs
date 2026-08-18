@@ -17,8 +17,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// the page after saving to confirm the values persist server-side rather than just checking
 /// in-memory Blazor state.
 /// </summary>
-[Collection("E2E")]
-public sealed class CompanySettingsTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class CompanySettingsTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

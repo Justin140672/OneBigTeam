@@ -15,8 +15,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// seeded document categories (Policy, Handbook, Procedure, Form, Guidance, Health and Safety,
 /// Other — see DocumentsModule.SeedDocumentsAsync) to pick from.
 /// </summary>
-[Collection("E2E")]
-public sealed class SharedDocumentUploadTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SharedDocumentUploadTests(ParallelBlankPersonaFixture fixture)
+    : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
     private const string HrEmail      = "laura.bennett@acme.example";
     private const string ManagerEmail = "james.okafor@acme.example";

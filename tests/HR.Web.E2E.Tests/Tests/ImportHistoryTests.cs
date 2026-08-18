@@ -8,8 +8,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Verifies that a completed employee data import appears in the import history list, and that
 /// its session detail page shows the completed status and row counts.
 /// </summary>
-[Collection("E2E")]
-public sealed class ImportHistoryTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class ImportHistoryTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

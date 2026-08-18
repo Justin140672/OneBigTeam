@@ -61,7 +61,11 @@ public sealed class OnboardingProgressReportPage(IPage page, string baseUrl)
     public async Task ApplyAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Apply" }).ClickAsync();
+        // RowsRenderedSelector can resolve against rows/emptyrow still left over from before the
+        // click — same stale-content race already fixed on WorkloadActionsReportPage/
+        // LeaveSummaryReportPage's equivalent Apply flows.
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.WaitForTimeoutAsync(300);
     }
 
     // ── Export ─────────────────────────────────────────────────────────────────

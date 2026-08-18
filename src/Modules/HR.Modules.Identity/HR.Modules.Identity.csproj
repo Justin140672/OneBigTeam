@@ -12,6 +12,9 @@
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="12.1.1" />
     <PackageReference Include="FastEndpoints" Version="8.2.0" />
+    <!-- Only used by E2eFakeSupabaseJwt (E2E_TESTING=true only) to mint a locally-signed token
+         shaped like the real Supabase-issued JWTs this app otherwise validates via JWKS. -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
       <PrivateAssets>all</PrivateAssets>
@@ -24,6 +27,7 @@
     <InternalsVisibleTo Include="HR.Architecture.Tests" />
     <InternalsVisibleTo Include="HR.Modules.Identity.Tests" />
     <InternalsVisibleTo Include="HR.Integration.Tests" />
+    <InternalsVisibleTo Include="HR.Api" />
   </ItemGroup>
 
   <PropertyGroup>

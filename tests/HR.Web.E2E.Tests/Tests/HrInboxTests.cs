@@ -10,8 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// The HR Manager can then claim it, after which it disappears from the inbox
 /// and appears in their own task list.
 /// </summary>
-[Collection("E2E")]
-public sealed class HrInboxTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class HrInboxTests(CrossUserFixture fixture) : CrossUserDocumentsAndRequestsTestBase(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");
@@ -61,11 +60,26 @@ public sealed class HrInboxTests(AppFixture fixture) : E2ETestBase(fixture)
             t.Contains("Tom Williams",    StringComparison.OrdinalIgnoreCase) ||
             t.Contains("Personal Details",StringComparison.OrdinalIgnoreCase));
 
+        // This title is fixed/generic with no per-request suffix, so — same risk already
+        // documented on HrInboxPage.ClaimAsync — more than one stray/unclaimed card elsewhere in
+        // the shared inbox (e.g. from PersonalDetailsChangeRequestTests/PersonalDetailsTabTests,
+        // which also submit personal-details change requests for Tom and don't necessarily claim
+        // their own) can match the same titleFragment. Capture the count before claiming so Step
+        // 5 below can assert it dropped by exactly one, rather than naively asserting "no match at
+        // all" — which would incorrectly fail if any OTHER same-titled stray card is still sitting
+        // unclaimed in the inbox.
+        var matchingCountBefore = titles.Count(t =>
+            t.Contains("Tom Williams",    StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Personal Details",StringComparison.OrdinalIgnoreCase));
+
         await inbox.ClaimAsync(taskTitle);
 
-        // ── Step 5: After claiming, the card must be gone from the inbox ───────
-        Assert.False(await inbox.HasTaskAsync(taskTitle),
-            "Task should be removed from inbox after being claimed");
+        // ── Step 5: After claiming, exactly one fewer matching card should remain ──
+        var titlesAfterClaim = await inbox.GetTaskTitlesAsync();
+        var matchingCountAfter = titlesAfterClaim.Count(t =>
+            t.Contains("Tom Williams",    StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("Personal Details",StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(matchingCountBefore - 1, matchingCountAfter);
 
         // ── Step 6: The claimed task appears in Laura's own Tasks tab ──────────
         // The old dashboard "My Tasks" widget (MyTasksWidget.razor) this used to check is dead

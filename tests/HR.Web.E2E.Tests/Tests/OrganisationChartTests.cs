@@ -8,11 +8,10 @@ namespace HR.Web.E2E.Tests.Tests;
 /// <summary>
 /// Verifies the Organisation Chart page: HR sees the nav link and the rendered chart contains a
 /// seeded employee's card (Name/Job Title/Department), a plain Employee is redirected away,
-/// clicking a card opens that employee's profile, and the Employee page's "View Org Chart"
-/// button opens the chart centred on and highlighting that employee.
+/// clicking a card opens that employee's profile, and the Employee page's "More actions" &gt;
+/// "View Organisation Chart" menu item opens the chart centred on and highlighting that employee.
 /// </summary>
-[Collection("E2E")]
-public sealed class OrganisationChartTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -103,7 +102,10 @@ public sealed class OrganisationChartTests(AppFixture fixture) : E2ETestBase(fix
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees/{LauraId}");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
-        await _page.GetByRole(AriaRole.Button, new() { Name = "View Org Chart" }).ClickAsync();
+        // "View Org Chart" moved into the "More actions" overflow menu and was renamed
+        // "View Organisation Chart" — see EmployeeEdit.razor's BuildMoreActionsItems.
+        await _page.GetByRole(AriaRole.Button, new() { Name = "More actions" }).ClickAsync();
+        await _page.GetByRole(AriaRole.Menuitem, new() { Name = "View Organisation Chart" }).ClickAsync();
         await _page.WaitForURLAsync(
             new Regex(@"/organisation-chart\?employeeId="), new() { Timeout = 15_000 });
 
@@ -200,7 +202,9 @@ public sealed class OrganisationChartTests(AppFixture fixture) : E2ETestBase(fix
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/organisation-chart");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // See WaitForUrlToStopContainingAsync's doc comment: the redirect is a client-side Blazor
+        // NavigateTo, not a full navigation, so NetworkIdle is not a reliable completion signal.
+        await WaitForUrlToStopContainingAsync("/organisation-chart");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/organisation-chart"),

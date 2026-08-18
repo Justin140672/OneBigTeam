@@ -9,8 +9,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - A deactivated location type is hidden from the default active-only list and appears
 ///   again once "Show inactive" is enabled.
 /// </summary>
-[Collection("E2E")]
-public sealed class LocationTypeManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class LocationTypeManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

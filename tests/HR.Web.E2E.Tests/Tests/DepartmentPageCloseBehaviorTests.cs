@@ -9,8 +9,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// via the Department edit page as a representative host — the behavior under test lives in
 /// the shared base class, not in DepartmentEdit itself.
 /// </summary>
-[Collection("E2E")]
-public sealed class DepartmentPageCloseBehaviorTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class DepartmentPageCloseBehaviorTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

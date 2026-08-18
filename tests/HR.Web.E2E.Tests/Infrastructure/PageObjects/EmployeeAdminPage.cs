@@ -225,6 +225,18 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         await page.WaitForSpinnerToClearAsync();
         await page.WaitForSelectorAsync("[data-testid='employee-assets-grid'], .text-muted",
             new() { Timeout = 15_000 });
+
+        // The grid container above mounts before Syncfusion populates its ".e-row"/".e-rowcell"
+        // data on a separate JS tick (same race documented on EmployeeEditPage.SaveNewEmployeeAsync
+        // and EmployeeListPage's row-rendered wait) — a caller that immediately checks
+        // HasAssetsGridRowsAsync can otherwise see zero rows even for an employee with seeded
+        // assets. Only applies when the grid itself rendered (not the ".text-muted" empty state).
+        if (await page.Locator("[data-testid='employee-assets-grid']").IsVisibleAsync())
+        {
+            await page.WaitForSelectorAsync(
+                "[data-testid='employee-assets-grid'] .e-row, [data-testid='employee-assets-grid'] .e-emptyrow",
+                new() { Timeout = 15_000 });
+        }
     }
 
     /// <summary>Returns true if the assets grid has at least one data row.</summary>
@@ -296,6 +308,33 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Assign Asset" });
         await dialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
         await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    /// <summary>
+    /// Opens the Return Asset dialog (header "Request Return" — see EmployeeAssetsTab.razor's
+    /// _showReturnDialog). Only enabled once at least one of the employee's assigned assets has
+    /// been acknowledged (IsReturnAssetButtonDisabledAsync / the "Return Asset" button's Disabled
+    /// binding), so call this only after the target assignment has already been acknowledged.
+    /// </summary>
+    public async Task OpenReturnAssetDialogAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Return Asset" }).ClickAsync();
+        await page.GetByRole(AriaRole.Dialog, new() { Name = "Request Return" })
+            .WaitForAsync(new() { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Selects the assignment matching <paramref name="assetFragment"/> in the Return Asset
+    /// dialog and clicks "Request Return". Waits for the dialog to close. Call
+    /// <see cref="OpenReturnAssetDialogAsync"/> first.
+    /// </summary>
+    public async Task SelectAssetAndConfirmReturnAsync(string assetFragment)
+    {
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Request Return" });
+        await DropDownSelector.SelectAsync(page, dialog, assetFragment);
+        await page.GetByRole(AriaRole.Button, new() { Name = "Request Return", Exact = true }).ClickAsync();
+        await page.GetByRole(AriaRole.Dialog, new() { Name = "Request Return" })
+            .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
     // ── Leave tab ─────────────────────────────────────────────────────────────

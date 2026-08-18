@@ -20,8 +20,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// VacancyList.razor OnBeforeLoadAsync), so she's still redirected away from it in the UI —
 /// this file exercises the write path throughout, so Marcus is used for the CRUD tests.
 /// </summary>
-[Collection("E2E")]
-public sealed class VacancyManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class VacancyManagementTests(CrossUserFixture fixture) : CrossUserVacancyTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

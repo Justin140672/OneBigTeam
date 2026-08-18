@@ -16,8 +16,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// This page is explicitly view-only (see CustomerDetails.razor) — there is no create/edit/delete
 /// flow to cover here.
 /// </summary>
-[Collection("E2E")]
-public sealed class CustomerDetailsPageTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     // Acme Corporation — the standing seeded dev/E2E tenant (see CompaniesModule.SeedCompaniesAsync).
     // It always has a persisted CompanySettings row (CreateDefault, guarded by Settings being null)

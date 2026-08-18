@@ -4,8 +4,7 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-[Collection("E2E")]
-public sealed class SicknessCategoryManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SicknessCategoryManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -143,7 +142,10 @@ public sealed class SicknessCategoryManagementTests(AppFixture fixture) : E2ETes
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/sickness-categories");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // See E2ETestBase.WaitForUrlToStopContainingAsync's doc comment: the redirect is a
+        // client-side Blazor NavigateTo, not a full page navigation, so NetworkIdle after the
+        // initial GET is not a reliable signal that the redirect has completed.
+        await WaitForUrlToStopContainingAsync("/sickness-categories");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/sickness-categories"),

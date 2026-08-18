@@ -1,5 +1,6 @@
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
+using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
@@ -24,8 +25,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (infra:manage), switching accounts via LoginPage.SwitchAccountAsync as needed — same pattern
 /// as the sibling test files above.
 /// </summary>
-[Collection("E2E")]
-public sealed class VacancyDetailsAndListScreensUpdateTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fixture) : CrossUserVacancyTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -116,6 +116,15 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(AppFixture fixture) 
 
         Assert.Contains($"/companies/{AcmeId}/position-profiles/", _page.Url);
         Assert.EndsWith("/view", _page.Url);
+
+        // The URL changes as soon as client-side routing kicks in — well before the page's own
+        // async load (fetching the Position Profile and populating Model.Title) has finished, so
+        // reading the title input immediately after the URL wait can race an empty/default value
+        // (same reasoning as VacancyListPage.ClickVacancyAsync's post-navigation wait).
+        await _page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await Assertions.Expect(_page.GetByPlaceholder("e.g. Senior Software Engineer").First)
+            .ToHaveValueAsync(profileTitle, new() { Timeout = 15_000 });
+
         Assert.Equal(profileTitle, await ppEdit.GetTitleAsync());
     }
 

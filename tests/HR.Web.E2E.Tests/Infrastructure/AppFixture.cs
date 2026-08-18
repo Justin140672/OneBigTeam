@@ -56,19 +56,18 @@ public sealed class AppFixture : IAsyncLifetime
         _playwright = await Playwright.CreateAsync();
         _browser    = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
-            //Headless = true,
-            Headless = false,
-            SlowMo = 100, // ms pause between actions — makes the run watchable
-
-            // Headless Chromium treats every page as backgrounded/unfocused (there's no real
-            // window to hold focus), which triggers Chrome's normal power-saving throttling of
-            // background-tab timers — setTimeout/rAF-based work can be delayed to as little as
-            // once per second. Headed runs don't hit this because the page is a real, focused
-            // window. Syncfusion's AllowFiltering debounce (and other internal JS timers) rely on
-            // exactly this kind of timer, so filtering/popup state that updates promptly in a
-            // headed run can stall for seconds in headless — surfacing as the combobox item-list
-            // waits in DropDownSelector timing out even though nothing is actually broken. These
-            // flags disable that throttling so headless behaves like a normal focused tab.
+            // Headless is now the default — see the E2E speedup plan (2026-08-15). Headless
+            // Chromium treats every page as backgrounded/unfocused (there's no real window to hold
+            // focus), which triggers Chrome's normal power-saving throttling of background-tab
+            // timers — setTimeout/rAF-based work can be delayed to as little as once per second.
+            // Syncfusion's AllowFiltering debounce (and other internal JS timers) rely on exactly
+            // this kind of timer, so filtering/popup state that updates promptly in a headed run
+            // could stall for seconds in headless. The launch args below disable that throttling so
+            // headless behaves like a normal focused tab; verified stable (including
+            // combobox-heavy tests) as part of the same speedup pass, so SlowMo is no longer needed
+            // either. If headless flakiness ever reappears, flip Headless back to false here as a
+            // quick diagnostic, but the throttling args should mean that's no longer necessary.
+            Headless = true,
             Args =
             [
                 "--disable-background-timer-throttling",

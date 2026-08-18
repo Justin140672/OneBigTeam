@@ -1,0 +1,36 @@
+@* Lightweight horizontal-bar chart used in place of Syncfusion donut/accumulation charts on the
+   HR dashboard. Category labels render as plain text next to each bar, so they are always fully
+   readable without depending on chart-legend truncation or hover/tooltip interaction. *@
+
+@if (Bars.Count == 0)
+{
+    <div class="widget-empty">
+        <i class="fa-solid fa-chart-simple fa-lg mb-2"></i>
+        <p class="mb-0">@EmptyText</p>
+    </div>
+}
+else
+{
+    var max = Bars.Max(b => b.Value);
+    <div class="hbar-chart" role="img" aria-label="@AriaLabel">
+        @foreach (var bar in Bars)
+        {
+            var pct = max <= 0 ? 0 : (double)bar.Value / max * 100;
+            <div class="hbar-row">
+                <span class="hbar-label">@bar.Label</span>
+                <div class="hbar-track">
+                    <div class="hbar-fill" style="width:@(pct.ToString("0.##"))%; background:@bar.Color;"></div>
+                </div>
+                <span class="hbar-value">@bar.Value</span>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<HorizontalBarDatum> Bars { get; set; } = [];
+    [Parameter] public string EmptyText { get; set; } = "No data available.";
+    [Parameter] public string AriaLabel { get; set; } = "Chart";
+
+    public sealed record HorizontalBarDatum(string Label, int Value, string Color);
+}

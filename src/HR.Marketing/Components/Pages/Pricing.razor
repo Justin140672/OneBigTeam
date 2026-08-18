@@ -70,7 +70,10 @@
                 <span class="pricing-section">Monthly price</span>
 
                 <div>
-                    <div class="pricing-text" data-monthly-price><span>@FormatCurrency(Result.Monthly)/month</span></div>
+                    <div class="pricing-text" data-monthly-price>
+                        <span class="sr-only">Estimated monthly price: </span>
+                        <span data-monthly-price-value>@FormatCurrency(Result.Monthly)/month</span>
+                    </div>
                 </div>
                 <div data-effective-price>Equivalent to @FormatCurrency(Result.EffectivePricePerEmployee) per employee</div>
                 <div class="sr-only" role="status" aria-live="polite" data-price-live-region></div>

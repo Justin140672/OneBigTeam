@@ -9,8 +9,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - Seeded public holidays appear in the list.
 /// - A new holiday can be created and appears in the list.
 /// </summary>
-[Collection("E2E")]
-public sealed class PublicHolidayManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class PublicHolidayManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -96,7 +95,9 @@ public sealed class PublicHolidayManagementTests(AppFixture fixture) : E2ETestBa
         await login.LoginAsync(tomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/public-holidays");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // See WaitForUrlToStopContainingAsync's doc comment: the redirect is a client-side Blazor
+        // NavigateTo, not a full navigation, so NetworkIdle is not a reliable completion signal.
+        await WaitForUrlToStopContainingAsync("/public-holidays");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/public-holidays"),

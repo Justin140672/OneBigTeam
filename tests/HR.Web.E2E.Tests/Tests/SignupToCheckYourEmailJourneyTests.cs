@@ -31,8 +31,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (no Blazor circuit/interactivity wait needed). CheckYourEmail.razor and the
 /// /resend-verification proxy are likewise static forms.
 /// </summary>
-[Collection("E2E")]
-public sealed class SignupToCheckYourEmailJourneyTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SignupToCheckYourEmailJourneyTests(ParallelBlankPersonaFixture fixture)
+    : SupabaseAuthSerialBlankTestBase(fixture)
 {
     private async Task<string> SignUpAsync()
     {
@@ -49,7 +49,11 @@ public sealed class SignupToCheckYourEmailJourneyTests(AppFixture fixture) : E2E
 
         await _page.GetByRole(AriaRole.Button, new() { Name = "Start free trial" }).ClickAsync();
 
-        await _page.WaitForURLAsync(new Regex("/check-your-email"), new() { Timeout = 20_000 });
+        // /signup-submit now makes a real Supabase Auth account-creation call before it can
+        // redirect (see the "fixing supabase auth" work) — a genuine external network round trip,
+        // not a local render, so it needs more headroom than the 20s that was enough for the old
+        // dev-stub signup.
+        await _page.WaitForURLAsync(new Regex("/check-your-email"), new() { Timeout = 40_000 });
 
         return email;
     }

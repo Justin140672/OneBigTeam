@@ -18,8 +18,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Admin user: Laura Bennett (laura.bennett@acme.example) who holds the
 /// asset:view permission via the HrAdministrator role.
 /// </summary>
-[Collection("E2E")]
-public sealed class AssetAssignmentsSectionTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class AssetAssignmentsSectionTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId      = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomAssetId  = Guid.Parse("c0000000-0000-0000-0000-000000000002");

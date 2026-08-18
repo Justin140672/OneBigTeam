@@ -8,8 +8,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Verifies that an employee can manage their own emergency contacts
 /// from the self-service My Profile page.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmergencyContactsTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmergencyContactsTabTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");

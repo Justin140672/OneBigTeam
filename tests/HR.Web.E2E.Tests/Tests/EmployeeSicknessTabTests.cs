@@ -14,8 +14,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// A sickness category is created fresh in each test that needs one, since categories
 /// are not seeded by default (see SicknessCategoryManagementTests.cs for the same pattern).
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeSicknessTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeSicknessTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId      = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomWilliams = Guid.Parse("30000000-0000-0000-0000-000000000004");

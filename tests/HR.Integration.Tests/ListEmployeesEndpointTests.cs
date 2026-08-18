@@ -89,6 +89,31 @@ public class ListEmployeesEndpointTests
     }
 
     [Fact]
+    public async Task Get_Employees_Returns_EmployeeNumber_Matching_Created_Employee()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ListEmpUser1, SystemRoles.HrAdministrator, companyId);
+
+        var employeeNumber = $"EMP-{Guid.NewGuid():N}";
+        await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com", employeeNumber);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/employees");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        Assert.NotNull(payload);
+        var item = payload!.Items.Single(i => i.FirstName == "Alice");
+        // Employee.NormalizeEmployeeNumber upper-cases the value on create (see Employee.cs), so
+        // the value round-tripped through the list endpoint is the normalized form, not the raw
+        // input casing.
+        Assert.Equal(employeeNumber.ToUpperInvariant(), item.EmployeeNumber);
+    }
+
+    [Fact]
     public async Task Get_Employees_Filters_By_Search()
     {
         using var client = _factory.CreateClient();
@@ -260,7 +285,7 @@ public class ListEmployeesEndpointTests
         return (departmentId, locationId, positionProfileId, employmentTypeId);
     }
 
-    private static async Task CreateEmployeeAsync(HttpClient client, Guid companyId, string firstName, string lastName, string workEmail)
+    private static async Task CreateEmployeeAsync(HttpClient client, Guid companyId, string firstName, string lastName, string workEmail, string? employeeNumber = null)
     {
         var refData = await CreateReferenceDataAsync(client, companyId);
 
@@ -274,7 +299,7 @@ public class ListEmployeesEndpointTests
             dateOfBirth = "1990-01-01",
             nationality = "British",
             gender = "Male",
-            employeeNumber = $"EMP-{Guid.NewGuid():N}",
+            employeeNumber = employeeNumber ?? $"EMP-{Guid.NewGuid():N}",
             employmentTypeId = refData.EmploymentTypeId,
             departmentId = refData.DepartmentId,
             locationId = refData.LocationId,
@@ -304,6 +329,7 @@ public class ListEmployeesEndpointTests
         string FirstName,
         string LastName,
         string WorkEmail,
+        string? EmployeeNumber,
         string Status,
         string UserAccountStatus);
 }

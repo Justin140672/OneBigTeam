@@ -14,8 +14,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - A staff persona can reply on a request's detail/conversation page.
 /// - A staff persona can load the feedback dashboard.
 /// </summary>
-[Collection("E2E")]
-public sealed class SupportAndFeedbackTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SupportAndFeedbackTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -158,7 +157,9 @@ public sealed class SupportAndFeedbackTests(AppFixture fixture) : E2ETestBase(fi
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/support");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // See WaitForUrlToStopContainingAsync's doc comment: the redirect is a client-side Blazor
+        // NavigateTo, not a full navigation, so NetworkIdle is not a reliable completion signal.
+        await WaitForUrlToStopContainingAsync("/support");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.TrimEnd('/').EndsWith("/support"),
@@ -205,7 +206,9 @@ public sealed class SupportAndFeedbackTests(AppFixture fixture) : E2ETestBase(fi
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/support/admin/queue");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // See WaitForUrlToStopContainingAsync's doc comment: the redirect is a client-side Blazor
+        // NavigateTo, not a full navigation, so NetworkIdle is not a reliable completion signal.
+        await WaitForUrlToStopContainingAsync("/support/admin/queue");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/support/admin/queue"),
@@ -221,7 +224,13 @@ public sealed class SupportAndFeedbackTests(AppFixture fixture) : E2ETestBase(fi
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/support/admin/dashboard");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        // SupportDashboard.razor's OnParametersSetAsync guard redirects via Blazor's client-side
+        // Navigation.NavigateTo, not a full navigation, so NetworkIdle is not a reliable completion
+        // signal — same fix already applied to the sibling
+        // PlainEmployee_IsRedirectedAway_FromSupportQueuePage test above; this one was still using
+        // the old, known-unreliable WaitForLoadStateAsync(NetworkIdle) pattern.
+        await WaitForUrlToStopContainingAsync("/support/admin/dashboard");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/support/admin/dashboard"),

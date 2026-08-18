@@ -19,8 +19,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// This page is explicitly view-only/reporting (see FailedPayments.razor) — there is no
 /// create/edit/delete flow to cover here, only load/search/filter/navigate behavior.
 /// </summary>
-[Collection("E2E")]
-public sealed class FailedPaymentsDashboardTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class FailedPaymentsDashboardTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     // Seeded platform-admin allow-listed persona — see appsettings.Development.json's
     // "PlatformAdmin:AllowedEmails" and DevPersonaStore, and AdminLoginPage's remarks on the

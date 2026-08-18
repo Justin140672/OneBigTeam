@@ -278,6 +278,214 @@ html[data-theme="dark"] .hr-toolbar-bulk-update-btn.e-btn.e-flat {
     color: #fff;
 }
 
+.hr-toolbar-more-btn.e-btn.e-flat {
+    color: var(--hr-gray-900);
+}
+
+html[data-theme="dark"] .hr-toolbar-more-btn.e-btn.e-flat {
+    color: #fff;
+}
+
+/* ── Toolbar target sizes ──────────────────────────────────────────────
+   Every grid toolbar button (native e-tbar-btn plus the SfDropDownButton
+   templates mounted alongside them) meets a 40px minimum hit target. */
+.hr-grid .e-toolbar .e-tbar-btn,
+.hr-grid .e-toolbar .e-btn {
+    min-height: 40px;
+    min-width: 40px;
+}
+
+/* ── Employee list page: search / filters / result summary ─────────────
+   Scoped to the Employee list's own wrapper classes — not shared with
+   other SearchPageBase-derived list pages. */
+.employee-list-controls {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.employee-search-wrap {
+    position: relative;
+    flex: 1 1 420px;
+    max-width: 480px;
+}
+
+.employee-search-input {
+    width: 100%;
+}
+
+.employee-search-clear {
+    position: absolute;
+    right: 0.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0.25rem 0.5rem;
+    min-width: 40px;
+    min-height: 40px;
+    color: var(--hr-gray-700);
+}
+
+.employee-filters-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 40px;
+}
+
+.employee-filters-count {
+    font-size: 0.7rem;
+}
+
+.employee-filters-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--hr-gray-50);
+    border: 1px solid var(--hr-gray-200, #e5e7eb);
+    border-radius: 0.375rem;
+}
+
+.employee-filter-field {
+    min-width: 220px;
+}
+
+.employee-filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.employee-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 999px;
+    background: var(--hr-color-primary-subtle);
+    color: var(--hr-color-primary);
+    font-size: 0.85rem;
+}
+
+.employee-filter-chip-remove {
+    border: none;
+    background: transparent;
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0;
+    cursor: pointer;
+}
+
+.employee-filter-chip-remove:focus-visible,
+.employee-filters-toggle:focus-visible,
+.employee-search-clear:focus-visible {
+    outline: 3px solid var(--hr-color-primary);
+    outline-offset: 2px;
+}
+
+.employee-list-summary {
+    font-weight: 600;
+    color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .employee-list-summary {
+    color: var(--hr-gray-200);
+}
+
+html[data-theme="dark"] .employee-filters-panel {
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
+}
+
+/* ── Employee identity cell (avatar + name + employee number) ─────────── */
+.employee-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-decoration: none;
+    color: inherit;
+    min-height: 40px;
+    padding: 0.25rem 0;
+}
+
+.employee-cell:hover .employee-cell-name,
+.employee-cell:focus-visible .employee-cell-name {
+    text-decoration: underline;
+    color: var(--hr-color-primary);
+}
+
+.employee-cell:focus-visible {
+    outline: 3px solid var(--hr-color-primary);
+    outline-offset: 2px;
+}
+
+.employee-cell-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    overflow: hidden;
+}
+
+.employee-cell-name {
+    font-weight: 600;
+    color: var(--hr-gray-900);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+html[data-theme="dark"] .employee-cell-name {
+    color: var(--hr-gray-100, #f3f4f6);
+}
+
+.employee-cell-number {
+    font-size: 0.75rem;
+    color: var(--hr-gray-500, #6b7280);
+}
+
+/* ── Responsive column priority ─────────────────────────────────────────
+   Column order (see EmployeeList.razor GridColumns): 1 checkbox, 2 Employee,
+   3 Work Email, 4 Department, 5 Position, 6 Manager, 7 Start Date, 8 Status,
+   9 User Account. Lower-priority columns are visually hidden at narrower
+   widths rather than removed — the grid's own horizontal scroll (.hr-grid,
+   above) and its "Columns" chooser (now in the toolbar's "More" overflow
+   menu) both remain available as accessible ways to reveal them, satisfying
+   "no content clipped without an accessible way to reveal it" without
+   relying on any column API whose availability wasn't confirmed. */
+@media (max-width: 991.98px) {
+    .employee-grid .e-headercell:nth-child(6),
+    .employee-grid .e-rowcell:nth-child(6),
+    .employee-grid .e-headercell:nth-child(7),
+    .employee-grid .e-rowcell:nth-child(7),
+    .employee-grid .e-headercell:nth-child(9),
+    .employee-grid .e-rowcell:nth-child(9) {
+        display: none;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .employee-grid .e-headercell:nth-child(3),
+    .employee-grid .e-rowcell:nth-child(3),
+    .employee-grid .e-headercell:nth-child(5),
+    .employee-grid .e-rowcell:nth-child(5) {
+        display: none;
+    }
+
+    .employee-list-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .employee-search-wrap {
+        max-width: none;
+    }
+}
+
 .hr-textbox.e-input-focus:not(.e-success):not(.e-warning):not(.e-error),
 .hr-textbox.e-input-group.e-control-wrapper.e-input-focus:not(.e-success):not(.e-warning):not(.e-error) {
     border-color: var(--hr-color-primary);
@@ -619,9 +827,15 @@ html[data-theme="dark"] .card-header {
     display: flex;
     align-items: center;
     gap: 10px;
+    width: 100%;
     padding: 10px 16px;
     cursor: pointer;
+    border: none;
     border-bottom: 1px solid var(--hr-gray-50);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
     transition: background 0.1s;
 }
 
@@ -639,6 +853,16 @@ html[data-theme="dark"] .card-header {
 
 .task-widget-item--static:hover {
     background: transparent;
+}
+
+/* Visible keyboard focus indicator for every interactive dashboard row/link/button. */
+.task-widget-item:focus-visible,
+.widget-view-all:focus-visible,
+.widget-kpi--link:focus-visible,
+.hbar-row--button:focus-visible {
+    outline: 2px solid var(--hr-color-primary);
+    outline-offset: -2px;
+    background: var(--hr-gray-50);
 }
 
 /* ── Priority dot ────────────────────────────────────── */
@@ -663,13 +887,15 @@ html[data-theme="dark"] .card-header {
 }
 
 .task-widget-title {
-    display: block;
+    display: -webkit-box;
     font-size: 0.875rem;
     font-weight: 500;
     color: var(--hr-gray-900);
-    white-space: nowrap;
+    white-space: normal;
     overflow: hidden;
     text-overflow: ellipsis;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 
 .task-widget-meta {
@@ -703,6 +929,136 @@ html[data-theme="dark"] .card-header {
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 1.25rem;
     margin-bottom: 2rem;
+}
+
+/* Balanced 3-up analytics grid for the HR dashboard's headcount/gender/employment-type widgets —
+   fixed thirds (instead of auto-fit) so the row never leaves a large unused gap at desktop
+   widths, only collapsing at narrower breakpoints. */
+.dashboard-analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+    align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+    .dashboard-analytics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .dashboard-analytics-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Needs your attention (unified action queue) ──────── */
+
+.attention-queue-card {
+    margin-bottom: 2rem;
+}
+
+.attention-queue-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--hr-gray-500);
+    cursor: pointer;
+    font-weight: 400;
+}
+
+.attention-queue-item {
+    gap: 12px;
+}
+
+.attention-queue-item--overdue {
+    background: rgba(220, 38, 38, 0.04);
+}
+
+.attention-queue-action {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--hr-color-primary);
+    white-space: nowrap;
+}
+
+.attention-queue-all-clear {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 20px 16px;
+    color: var(--hr-color-success);
+}
+
+.attention-queue-all-clear p.text-muted {
+    color: var(--hr-gray-400) !important;
+    font-size: 0.85rem;
+}
+
+/* ── Horizontal bar chart (replaces donut/accumulation charts) ───────────
+   Category labels render as plain text beside each bar so they're always fully readable without
+   depending on hover/tooltip or a truncated legend. */
+
+.hbar-chart,
+.hbar-chart-interactive {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+.hbar-row {
+    display: grid;
+    grid-template-columns: minmax(90px, 35%) 1fr auto;
+    align-items: center;
+    gap: 10px;
+}
+
+.hbar-row--button {
+    border: none;
+    background: transparent;
+    padding: 4px;
+    border-radius: var(--hr-radius-sm);
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    width: 100%;
+}
+
+.hbar-row--button:hover {
+    background: var(--hr-gray-50);
+}
+
+.hbar-label {
+    font-size: 0.8rem;
+    color: var(--hr-gray-700);
+    overflow-wrap: break-word;
+}
+
+.hbar-track {
+    height: 10px;
+    background: var(--hr-gray-100);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.hbar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.3s ease;
+}
+
+.hbar-value {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--hr-gray-900);
+    min-width: 24px;
+    text-align: right;
 }
 
 .chart-tile {
@@ -951,6 +1307,31 @@ html[data-theme="dark"] .due-badge--soon     { background: rgba(202,138,4,0.18);
 html[data-theme="dark"] .due-badge--normal   { background: var(--hr-gray-700);    color: var(--hr-gray-300); }
 html[data-theme="dark"] .due-badge--approved { background: rgba(22,163,74,0.18);  color: #4ade80; }
 
+html[data-theme="dark"] .attention-queue-item--overdue {
+    background: rgba(220, 38, 38, 0.08);
+}
+
+html[data-theme="dark"] .attention-queue-toggle {
+    color: var(--hr-gray-400);
+}
+
+html[data-theme="dark"] .attention-queue-all-clear p.text-muted {
+    color: var(--hr-gray-500) !important;
+}
+
+html[data-theme="dark"] .hbar-label,
+html[data-theme="dark"] .hbar-value {
+    color: var(--hr-gray-300);
+}
+
+html[data-theme="dark"] .hbar-track {
+    background: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .hbar-row--button:hover {
+    background: rgba(255,255,255,0.04);
+}
+
 /* ── Dashboard shell (Home.razor redirect spinner + Dashboards/*.razor greeting) ── */
 /* Global copies of rules also scoped locally in MainLayout.razor.css/Home.razor.css —
    needed here so Home.razor's redirect spinner and the new role dashboard pages
@@ -1111,4 +1492,26 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
 
 #blazor-error-ui .dismiss:hover {
     opacity: 1;
+}
+
+/* ── Employee profile edit: sticky Save/Cancel bar ───────── */
+/* Only rendered while the employee page is in edit mode (see EmployeeEdit.razor); keeps Save
+   and Cancel reachable while scrolling through the tabs below without needing to jump back
+   to the top of the page. */
+.employee-edit-sticky-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    background: #fff;
+    border-top: 1px solid #dee2e6;
+    box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* Thin visual separator between the personal-information cards and the Users & Access
+   section on the employee Details tab (AC9 — kept structurally distinct without adding a
+   new top-level tab, since this page's tab indices are hand-computed elsewhere in the file). */
+.employee-section-divider {
+    border-top: 2px solid #dee2e6;
 }

@@ -45,7 +45,7 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
     public async Task ClickNewVacancyAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/vacancies/new", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/vacancies/new", new() { Timeout = 30_000 });
     }
 
     /// <summary>
@@ -56,7 +56,12 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<bool> HasVacancyAsync(string titleFragment)
     {
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        // The list endpoint has no pagination and GridPageSettings caps the grid at 20 rows/page —
+        // on this shared, long-lived E2E database, older seeded/created vacancies (e.g. "HR
+        // Business Partner") can easily be pushed past page 1 by newly-created ones. Search first
+        // so the grid narrows to just this vacancy regardless of how many others exist (same
+        // reasoning as ClickVacancyAsync/EmployeeListPage.HasEmployeeAsync).
+        await SearchAsync(titleFragment);
 
         return await page.Locator(".e-rowcell")
             .Filter(new() { HasText = titleFragment })
@@ -95,7 +100,7 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
             .Filter(new() { HasText = titleFragment })
             .First;
         await link.ClickAsync();
-        await page.WaitForURLAsync("**/vacancies/**", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/vacancies/**", new() { Timeout = 30_000 });
 
         // The URL changes as soon as client-side routing kicks in — well before the vacancy detail
         // page's own async load (_vacancy, Linked Position Profile card, etc.) has actually
@@ -112,7 +117,9 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<string> GetRowCellAsync(string titleFragment, int columnIndex)
     {
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        // See HasVacancyAsync/ClickVacancyAsync — search first so the target row isn't hidden on
+        // a later grid page than the one currently displayed.
+        await SearchAsync(titleFragment);
 
         var row = page.Locator(".e-row").Filter(new() { HasText = titleFragment }).First;
         return (await row.Locator(".e-rowcell").Nth(columnIndex).InnerTextAsync()).Trim();
@@ -140,7 +147,9 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<bool> HasTitleColumnPositionProfileFallbackIndicatorAsync(string titleFragment)
     {
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        // See HasVacancyAsync/ClickVacancyAsync — search first so the target row isn't hidden on
+        // a later grid page than the one currently displayed.
+        await SearchAsync(titleFragment);
 
         // Scoped to the Title cell (column 0) specifically, not "row contains this text anywhere"
         // — the Position Profile column (column 1) can independently contain the same text as
@@ -151,6 +160,11 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
             .Filter(new() { Has = page.Locator(".e-rowcell:first-child", new() { HasText = titleFragment }) })
             .First;
         var titleCell = row.Locator(".e-rowcell").Nth(0);
+        // Give the title cell a brief moment to settle before reading — SearchAsync's own wait
+        // only proves the grid has re-rendered with the filtered row set, not that this
+        // conditionally-rendered fallback-indicator span (versus the plain title text) has
+        // finished its own render pass.
+        await row.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         return await titleCell.Locator("span.fst-italic", new() { HasText = "(from Position Profile)" }).IsVisibleAsync();
     }
 

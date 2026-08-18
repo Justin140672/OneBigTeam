@@ -23,6 +23,7 @@ internal sealed record EmployeeListItem(
     string FirstName,
     string LastName,
     string WorkEmail,
+    string? EmployeeNumber,
     DateOnly StartDate,
     EmploymentStatus Status,
     DateTimeOffset CreatedAt,

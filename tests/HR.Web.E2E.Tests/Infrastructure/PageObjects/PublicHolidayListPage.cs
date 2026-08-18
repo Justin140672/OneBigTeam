@@ -7,14 +7,18 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// </summary>
 public sealed class PublicHolidayListPage(IPage page, string baseUrl)
 {
+    // Waiting for ".e-grid" alone is NOT sufficient to guarantee the toolbar's "Add" button is
+    // interactive: Syncfusion's EJ2 grid does its own JS render pass to populate rows/toolbar into
+    // the DOM on a separate tick after the Blazor component itself has mounted. Waiting for the
+    // row selector (or its empty-state sibling) directly, plus the error state, is the only wait
+    // that's actually tied to the grid being fully rendered — see the same pattern in
+    // DepartmentListPage/EmployeeListPage/VacancyListPage etc.
+    private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow, .alert-danger";
+
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/public-holidays");
-        await page.WaitForSelectorAsync(".e-grid, .spinner-border, .alert-danger",
-            new() { Timeout = 20_000 });
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 20_000 });
     }
 
     public async Task ClickNewPublicHolidayAsync()

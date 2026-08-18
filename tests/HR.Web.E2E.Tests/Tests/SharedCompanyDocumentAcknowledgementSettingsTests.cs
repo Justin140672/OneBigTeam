@@ -26,8 +26,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Company Settings (CompanyAdministrator-only) but has since moved to the standalone HR Settings
 /// page, which only an HrAdministrator can reach.
 /// </summary>
-[Collection("E2E")]
-public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

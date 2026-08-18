@@ -18,8 +18,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Uses Laura Bennett (laura.bennett@acme.example, HrAdministrator) against the seeded Acme
 /// company, matching SharedDocumentUploadTests.
 /// </summary>
-[Collection("E2E")]
-public sealed class SharedDocumentVersionHistoryTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

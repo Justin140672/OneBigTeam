@@ -10,8 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - A new department can be created and appears in the list.
 /// - A department can be deactivated.
 /// </summary>
-[Collection("E2E")]
-public sealed class DepartmentManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class DepartmentManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

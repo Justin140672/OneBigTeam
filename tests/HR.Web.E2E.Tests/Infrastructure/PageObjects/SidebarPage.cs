@@ -49,8 +49,23 @@ public sealed class SidebarPage(IPage page)
     /// "Vacancies"/"Candidates" entries and the dashboard links), false for anything still
     /// nested under a collapsed parent (e.g. "Organisation Chart" under "People").
     /// </summary>
-    public async Task<bool> HasTopLevelMenuItemAsync(string text) =>
-        await NavMenu.GetByText(text, new() { Exact = true }).IsVisibleAsync();
+    public async Task<bool> HasTopLevelMenuItemAsync(string text)
+    {
+        // Same race as IsSidebarVisibleAsync above (AppSession's async /api/me round-trip has to
+        // complete before ShowSidebar/the menu items exist at all) — an instant IsVisibleAsync()
+        // snapshot can read false before that round-trip lands. Bound-wait for the specific item
+        // instead of just the container, then fall through to false on genuine absence.
+        try
+        {
+            await NavMenu.GetByText(text, new() { Exact = true }).First.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Clicks a top-level menu item by its exact text. Does not itself wait for the resulting

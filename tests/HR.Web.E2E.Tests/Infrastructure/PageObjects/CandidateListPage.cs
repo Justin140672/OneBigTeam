@@ -22,7 +22,7 @@ public sealed class CandidateListPage(IPage page, string baseUrl)
     public async Task ClickNewCandidateAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/candidates/new", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/candidates/new", new() { Timeout = 30_000 });
     }
 
     public async Task<bool> HasCandidateAsync(string nameFragment)

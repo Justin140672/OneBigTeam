@@ -11,8 +11,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (ID: a0000000-0000-0000-0000-000000000005), which is a ManagerCheckIn review
 /// assigned to Sarah Chen.
 /// </summary>
-[Collection("E2E")]
-public sealed class ProbationReviewTaskTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class ProbationReviewTaskTests(SarahChenPersonaFixture fixture)
+    : RoleE2ETestBase<SarahChenPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid SarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");

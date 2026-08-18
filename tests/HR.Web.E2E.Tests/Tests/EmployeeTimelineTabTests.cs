@@ -30,8 +30,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// an "Employee joined" entry) — the empty-state rendering path (HrEmptyState when the response
 /// has zero items) exists in EmployeeTimelineTab.razor but is currently unexercised by this suite.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeTimelineTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomWilliams = Guid.Parse("30000000-0000-0000-0000-000000000004");

@@ -63,6 +63,10 @@ public sealed class SettingsPage(IPage page, string baseUrl)
     {
         await TrialLengthInput.FillAsync(value);
         await page.Keyboard.PressAsync("Tab");
+
+        // Syncfusion's Min clamp (and the general Blazor Server round-trip) rewrites the
+        // input's value asynchronously after blur; give it a moment before callers read it back.
+        await page.WaitForTimeoutAsync(200);
     }
 
     public async Task SetDefaultMonthlyPriceAsync(string value)
@@ -90,6 +94,10 @@ public sealed class SettingsPage(IPage page, string baseUrl)
     public async Task ToggleMaintenanceModeAsync()
     {
         await MaintenanceModeCheckbox.ClickAsync();
+
+        // Checking the box conditionally renders the maintenance message field via Blazor;
+        // give the re-render a moment before callers check checked-state/field visibility.
+        await page.WaitForTimeoutAsync(200);
     }
 
     public Task<bool> IsMaintenanceMessageVisibleAsync() => MaintenanceMessageInput.IsVisibleAsync();
@@ -108,8 +116,20 @@ public sealed class SettingsPage(IPage page, string baseUrl)
 
     public Task<int> GetFeatureFlagRowCountAsync() => FeatureFlagRows.CountAsync();
 
-    public Task ClickAddFlagAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "+ Add flag" }).ClickAsync();
+    public async Task ClickAddFlagAsync()
+    {
+        var countBefore = await GetFeatureFlagRowCountAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "+ Add flag" }).ClickAsync();
+
+        // Adding a row re-renders the Blazor component tree asynchronously; wait for the new
+        // row to actually attach before callers immediately assert on the new row count/index.
+        for (var attempt = 0; attempt < 25; attempt++)
+        {
+            if (await GetFeatureFlagRowCountAsync() > countBefore)
+                return;
+            await page.WaitForTimeoutAsync(100);
+        }
+    }
 
     public async Task SetFlagNameAsync(int index, string name)
     {
@@ -129,8 +149,18 @@ public sealed class SettingsPage(IPage page, string baseUrl)
         await FeatureFlagRows.Nth(index).Locator(".e-checkbox-wrapper").ClickAsync();
     }
 
-    public Task RemoveFlagAsync(int index) =>
-        FeatureFlagRows.Nth(index).GetByRole(AriaRole.Button, new() { Name = "Remove" }).ClickAsync();
+    public async Task RemoveFlagAsync(int index)
+    {
+        var countBefore = await GetFeatureFlagRowCountAsync();
+        await FeatureFlagRows.Nth(index).GetByRole(AriaRole.Button, new() { Name = "Remove" }).ClickAsync();
+
+        for (var attempt = 0; attempt < 25; attempt++)
+        {
+            if (await GetFeatureFlagRowCountAsync() < countBefore)
+                return;
+            await page.WaitForTimeoutAsync(100);
+        }
+    }
 
     /// <summary>Finds a feature flag row's index by its current name value, or -1 if not found.</summary>
     public async Task<int> FindFlagRowIndexAsync(string name)

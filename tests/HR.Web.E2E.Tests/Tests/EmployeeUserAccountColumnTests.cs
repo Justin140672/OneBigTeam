@@ -16,11 +16,9 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   arrangement so as not to permanently disable a persona another test might rely on.
 /// - "Sophie Laurent" — seeded Acme employee with no corresponding dev-persona user account (see
 ///   EmployeesModule's MakeAcme seed list vs. IdentityModule.SeedDevUserAsync's persona list) ->
-///   UserAccountStatus "NoUser". Deliberately distinct from "Emma Jones" (used by
-///   UserAdministrationManagementTests.InviteEmployee_EndToEnd_ShowsPendingInvitationInGrid) so the
-///   two suites' invite side effects can't collide. As with Emma Jones there, if the seed data
-///   ever changes so Sophie Laurent gains an account, QuickInvite_ForNoUserEmployee... below will
-///   fail fast (no "Invite User" link to click) rather than silently passing against the wrong row.
+///   UserAccountStatus "NoUser". Only ever READ here (never invited) — the invite-mutation test
+///   below (QuickInvite_ForNoUserEmployee...) creates its own fresh employee instead; see
+///   CreateFreshUninvitedEmployeeAsync's doc comment for why.
 ///
 /// "InvitationExpired" is not covered here: reaching that state requires a genuinely expired
 /// invitation (time-based), which can't be arranged through the UI within a single test run
@@ -28,8 +26,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// what can't genuinely be verified" convention. The icon/label mapping for it lives in
 /// EmployeeList.UserAccountStatusDisplay alongside the other four covered here.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeUserAccountColumnTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -215,15 +212,64 @@ public sealed class EmployeeUserAccountColumnTests(AppFixture fixture) : E2ETest
         // The "User Account" column must actually be part of the grid the export button targets.
         Assert.True(await _page.Locator(".e-headercell").Filter(new() { HasText = "User Account" }).IsVisibleAsync());
 
-        var exportButton = _page.GetByRole(AriaRole.Button, new() { Name = "Export" });
-        Assert.True(await exportButton.IsVisibleAsync());
-        Assert.False(await exportButton.IsDisabledAsync());
+        // EmployeeList.razor's EmployeeToolbar now folds the base toolbar's separate Print/
+        // Export/Columns buttons into a single "More" overflow menu (OverflowActionsMenu,
+        // rendered via OverflowMenuTemplate) — there is no longer a standalone "Export" button to
+        // find directly. "Export to Excel/CSV/PDF" are items inside that dropdown instead.
+        var moreButton = _page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
+        Assert.True(await moreButton.IsVisibleAsync());
+        Assert.False(await moreButton.IsDisabledAsync());
+
+        await moreButton.ClickAsync();
+        var exportToExcelItem = _page.GetByRole(AriaRole.Menuitem, new() { Name = "Export to Excel" });
+        await exportToExcelItem.WaitForAsync(new() { Timeout = 10_000 });
+        Assert.True(await exportToExcelItem.IsVisibleAsync());
 
         // NOTE: whether the exported Excel/CSV/PDF file's contents actually include the User
         // Account column can't practically be asserted here — Playwright would need to download
         // and parse a binary spreadsheet/PDF, which this suite's conventions avoid faking. This
         // test is limited to confirming the export entrypoint is present/enabled while the column
         // itself is part of the grid it operates on.
+    }
+
+    /// <summary>
+    /// Creates a fresh, uniquely-named Acme employee with no linked user account, to use as the
+    /// invite target for QuickInvite_ForNoUserEmployee_OpensPreselectedDialog_AndCompletesToPendingInvitation.
+    ///
+    /// That test used to invite the shared seeded "Sophie Laurent" (NoUserEmployeeName) directly,
+    /// which is also read (as an expected "No User" row) by
+    /// UserAccountColumn_ShowsNoUserIconLabelAndInviteLink_ForEmployeeWithoutAccount in this same
+    /// class, and was invited by UserAdministrationManagementTests' Resend/Cancel toolbar test too
+    /// — under real parallel execution those tests race to invite/resend/cancel her, leaving her
+    /// status unpredictable depending on run order. A freshly created employee has no linked user
+    /// account (employee creation does not provision one), so it satisfies the same "eligible
+    /// NoUser invite target" precondition without mutating shared seed data. The read-only tests
+    /// above still use Sophie Laurent directly since they never mutate her.
+    /// </summary>
+    private async Task<string> CreateFreshUninvitedEmployeeAsync()
+    {
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"Invite{unique}";
+        var workEmail = $"e2e.invite{unique}@acme.example";
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SaveNewEmployeeAsync();
+
+        return lastName;
     }
 
     [Fact]
@@ -234,12 +280,15 @@ public sealed class EmployeeUserAccountColumnTests(AppFixture fixture) : E2ETest
 
         await login.GoToAsync();
         await login.LoginAsync(HrAdminEmail);
+
+        var targetName = await CreateFreshUninvitedEmployeeAsync();
+
         await list.GoToAsync(AcmeId);
 
-        Assert.True(await list.HasInviteUserLinkAsync(NoUserEmployeeName),
-            $"Expected '{NoUserEmployeeName}' (seeded with no linked user account) to show the 'Invite User' link");
+        Assert.True(await list.HasInviteUserLinkAsync(targetName),
+            $"Expected '{targetName}' (freshly created with no linked user account) to show the 'Invite User' link");
 
-        await list.ClickInviteUserLinkAsync(NoUserEmployeeName);
+        await list.ClickInviteUserLinkAsync(targetName);
 
         // "Employee" is always applied automatically (fixed badge, not a selectable role) — no
         // additional roles are needed for this happy-path invite.
@@ -253,10 +302,10 @@ public sealed class EmployeeUserAccountColumnTests(AppFixture fixture) : E2ETest
         var successMessage = await list.GetActionSuccessMessageAsync();
         Assert.Equal("Invitation sent.", successMessage);
 
-        var text = await list.GetUserAccountStatusTextAsync(NoUserEmployeeName);
+        var text = await list.GetUserAccountStatusTextAsync(targetName);
         Assert.Contains("Pending Invitation", text);
 
-        Assert.False(await list.HasInviteUserLinkAsync(NoUserEmployeeName),
+        Assert.False(await list.HasInviteUserLinkAsync(targetName),
             "The 'Invite User' link should no longer render once the employee has a pending invitation");
     }
 }

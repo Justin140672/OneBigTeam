@@ -45,7 +45,17 @@ public sealed record KanbanApplicantModel(
 
     // SfKanban's KeyField needs a string — StageId (Guid) is the real identity, this is purely a
     // rendering/wiring convenience for the Kanban column KeyField match.
-    public string StageKey => StageId.ToString();
+    //
+    // Must be a real settable property, not a computed one derived from StageId: on drag-and-drop,
+    // SfKanban mutates the dropped card's bound KeyField property (StageKey) in place to match the
+    // target column's key — it never touches StageId itself. A get-only `=> StageId.ToString()`
+    // silently ate that mutation (nothing to set), so after a drop, args.Data.StageId in DragStop
+    // was always still the *source* stage, making `moved.StageId == previous.StageId` true and
+    // OnDragStopAsync return early without ever calling MoveApplicationStageAsync — the card
+    // appeared to move (Syncfusion's own client-side reflow) but nothing was persisted, and the
+    // next full reload snapped it back to its real (unchanged) stage. See OnDragStopAsync, which
+    // reads the post-drop StageId back out of this property instead of the stale StageId field.
+    public string StageKey { get; set; } = StageId.ToString();
 }
 
 // ── MOVE STAGE ────────────────────────────────────────────────────────────────

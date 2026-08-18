@@ -1,11 +1,7 @@
 @page "/dashboard/hr"
 @rendermode InteractiveServer
-@using HR.Web.Components.Pages.Tasks
-@using HR.Web.Components.Pages.Probation
 @using HR.Web.Components.Pages.Sickness
-@using HR.Web.Components.Pages.Leave
 @using HR.Web.Components.Pages.Employees
-@using HR.Web.Components.Pages.Documents
 @using HR.Web.Components.Pages.Reporting
 @inject AppSession Session
 @inject NavigationManager Navigation
@@ -22,45 +18,32 @@
 
         <DashboardSwitcher />
 
-        <div class="dashboard-overview-row">
-            <HeadcountByDepartmentChart />
-            <GenderSplitChart />
-            <EmploymentTypeSplitChart />
-        </div>
+        <section class="dashboard-section" aria-label="Needs your attention">
+            <AttentionQueueWidget />
+        </section>
 
         <section class="dashboard-section">
-            <h2 class="dashboard-section-title">Tasks, Leave &amp; Compliance</h2>
+            <h2 class="dashboard-section-title">Analytics</h2>
+            <div class="dashboard-analytics-grid">
+                <HeadcountByDepartmentChart />
+                <GenderSplitChart />
+                <EmploymentTypeSplitChart />
+            </div>
+        </section>
+
+        <section class="dashboard-section">
+            <h2 class="dashboard-section-title">More</h2>
             <div class="dashboard-grid-3col">
-                <HrInboxWidget />
-                <LeaveRequestsWidget OnOpenTask="OpenTask" />
-                <UpcomingProbationReviewsWidget OnOpenTask="OpenTask" />
                 <CurrentSicknessAbsenceWidget />
-                <OverdueReturnToWorkReviewsWidget />
                 <MissingFitNotesWidget />
-                <ComplianceDocumentExpiryWidget />
-                <DocumentReviewsWidget />
                 <RecentEmployeeChangesWidget />
                 <FavouriteReportsWidget />
             </div>
         </section>
     </div>
-
-    <TaskViewDialog CompanyId="Session.CompanyId"
-                    TaskId="_openTaskId"
-                    IsOpen="_taskDialogOpen"
-                    OnClosed="@(() => _taskDialogOpen = false)" />
 }
 
 @code {
-    private Guid? _openTaskId;
-    private bool _taskDialogOpen;
-
-    private void OpenTask(Guid taskId)
-    {
-        _openTaskId = taskId;
-        _taskDialogOpen = true;
-    }
-
     // Guarded like CompanyEdit.razor: URL-typing into this dashboard without the
     // HR Administrator role bounces to MyProfileUrl. The switcher/redirect only pick a default.
     private bool _ready;

@@ -5,6 +5,7 @@
 @using HR.Web.Services
 @using HR.Web.Components.Pages.Users
 @inject EmployeeService EmployeeService
+@inject DepartmentService DepartmentService
 @inject UserService UserService
 @inject AppSession Session
 @inject CompensationService CompensationService
@@ -16,11 +17,93 @@
     <h1 class="mb-1">Employees</h1>
     <p class="text-muted mb-3">View and manage everyone employed at your company.</p>
 
-    <div class="mb-3 col-md-4 px-0">
-        <HrTextBox Value="@SearchTerm"
-                   ValueChanged="@OnSearchChanged"
-                   Placeholder="Search by name, email or employee number" />
+    <div class="employee-list-controls mb-2">
+        <div class="employee-search-wrap">
+            <HrTextBox Value="@SearchTerm"
+                       ValueChanged="@OnSearchChanged"
+                       CssClass="employee-search-input"
+                       Placeholder="Search by name, email or employee number" />
+            @if (!string.IsNullOrEmpty(SearchTerm))
+            {
+                <button type="button"
+                        class="btn btn-link employee-search-clear"
+                        aria-label="Clear search"
+                        title="Clear search"
+                        @onclick="@(() => OnSearchChanged(string.Empty))">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            }
+        </div>
+
+        <button type="button"
+                class="btn btn-outline-secondary employee-filters-toggle"
+                aria-expanded="@_showFilters"
+                aria-label="@($"Filters{(ActiveFilterCount > 0 ? $", {ActiveFilterCount} active" : string.Empty)}")"
+                @onclick="@(() => _showFilters = !_showFilters)">
+            <i class="fa-solid fa-filter" aria-hidden="true"></i>
+            Filters
+            @if (ActiveFilterCount > 0)
+            {
+                <span class="badge rounded-pill text-bg-primary employee-filters-count">@ActiveFilterCount</span>
+            }
+        </button>
     </div>
+
+    @if (_showFilters)
+    {
+        <div class="employee-filters-panel mb-2" role="region" aria-label="Filter employees">
+            <div class="employee-filter-field">
+                <label for="employee-filter-department" class="form-label small mb-1">Department</label>
+                <select id="employee-filter-department"
+                        class="form-select form-select-sm"
+                        @bind="_filterDepartmentIdText"
+                        @bind:after="OnFilterChangedAsync">
+                    <option value="">All departments</option>
+                    @foreach (var department in _departments)
+                    {
+                        <option value="@department.Id">@department.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="employee-filter-field">
+                <label for="employee-filter-status" class="form-label small mb-1">Status</label>
+                <select id="employee-filter-status"
+                        class="form-select form-select-sm"
+                        @bind="_filterStatus"
+                        @bind:after="OnFilterChangedAsync">
+                    <option value="">All statuses</option>
+                    @foreach (var status in StatusOptions)
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+            </div>
+        </div>
+    }
+
+    @if (ActiveFilterCount > 0)
+    {
+        <div class="employee-filter-chips mb-2" aria-label="Active filters">
+            @if (_selectedDepartmentName is not null)
+            {
+                <span class="employee-filter-chip">
+                    Department: @_selectedDepartmentName
+                    <button type="button" class="employee-filter-chip-remove" aria-label="@($"Remove department filter: {_selectedDepartmentName}")" @onclick="RemoveDepartmentFilterAsync">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </span>
+            }
+            @if (!string.IsNullOrEmpty(_filterStatus))
+            {
+                <span class="employee-filter-chip">
+                    Status: @_filterStatus
+                    <button type="button" class="employee-filter-chip-remove" aria-label="@($"Remove status filter: {_filterStatus}")" @onclick="RemoveStatusFilterAsync">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </span>
+            }
+        </div>
+    }
 
     @if (IsLoading)
     {
@@ -48,34 +131,40 @@
             </div>
         }
 
+        <div class="employee-list-summary mb-2">
+            @ResultSummaryText
+        </div>
+
         <HrGrid @ref="Grid"
                 TValue="EmployeeListItemModel"
                 DataSource="@Items"
                 Toolbar="@EmployeeToolbar"
+                class="employee-grid"
                 AllowFiltering="true">
             <GridEvents TValue="EmployeeListItemModel" OnToolbarClick="OnToolbarClick"
-                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
+                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected"
+                        OnRecordClick="OnRecordClick" OnActionComplete="OnGridActionComplete" />
             <GridSelectionSettings Type="Syncfusion.Blazor.Grids.SelectionType.Multiple" Mode="Syncfusion.Blazor.Grids.SelectionMode.Row"></GridSelectionSettings>
             <GridPageSettings PageSize="20" />
             <GridColumns>
                 <GridColumn Type="Syncfusion.Blazor.Grids.ColumnType.CheckBox" Width="50"></GridColumn>
-                <GridColumn HeaderText="" Width="50" AllowSorting="false" AllowFiltering="false">
+                <GridColumn Field="@nameof(EmployeeListItemModel.LastName)" HeaderText="Employee" Width="260" AllowFiltering="false">
                     <Template>
                         @{
                             var row = (context as EmployeeListItemModel)!;
-                            <ProfilePhotoAvatar PhotoUrl="@row.ProfilePhotoUrl" Initials="@GetInitials(row)" SizePx="32" />
+                            <a class="employee-cell" href="/companies/@CompanyId/employees/@row.Id" aria-label="@($"Open profile for {row.FullName}")">
+                                <ProfilePhotoAvatar PhotoUrl="@row.ProfilePhotoUrl" Initials="@GetInitials(row)" SizePx="32" />
+                                <span class="employee-cell-text">
+                                    <span class="employee-cell-name">@row.FullName</span>
+                                    @if (!string.IsNullOrEmpty(row.EmployeeNumber))
+                                    {
+                                        <span class="employee-cell-number">@row.EmployeeNumber</span>
+                                    }
+                                </span>
+                            </a>
                         }
                     </Template>
                 </GridColumn>
-                <GridColumn Field="@nameof(EmployeeListItemModel.LastName)" HeaderText="Last Name" Width="140">
-                    <Template>
-                        @{
-                            var row = (context as EmployeeListItemModel)!;
-                            <a href="/companies/@CompanyId/employees/@row.Id">@row.LastName</a>
-                        }
-                    </Template>
-                </GridColumn>
-                <GridColumn Field="@nameof(EmployeeListItemModel.FirstName)" HeaderText="First Name" Width="130" />
                 <GridColumn Field="@nameof(EmployeeListItemModel.WorkEmail)" HeaderText="Work Email" Width="220" />
                 <GridColumn Field="@nameof(EmployeeListItemModel.DepartmentName)" HeaderText="Department" Width="160" />
                 <GridColumn Field="@nameof(EmployeeListItemModel.PositionProfileTitle)" HeaderText="Position" Width="180" />
@@ -99,7 +188,7 @@
                             </span>
                             @if (row.UserAccountStatus == "No User")
                             {
-                                <a href="javascript:void(0)" class="ms-2" @onclick="@(() => OnInviteUserClicked(row))">&nbsp;Invite User</a>
+                                <a href="javascript:void(0)" class="ms-2" @onclick="@(() => OnInviteUserClicked(row))" @onclick:stopPropagation="true">&nbsp;Invite User</a>
                             }
                         }
                     </Template>
@@ -132,6 +221,8 @@
 </div>
 
 @code {
+    private static readonly string[] StatusOptions = ["Active", "Suspended", "Leaving", "FormerEmployee"];
+
     private bool _canCreateEmployee;
     private bool _showBulkUpdateDialog;
     private bool _showImportDialog;
@@ -144,6 +235,38 @@
     private string? _inviteEmployeeName;
     private string? _inviteEmployeeEmail;
 
+    private bool _showFilters;
+    private List<DepartmentListItemModel> _departments = [];
+    private string _filterDepartmentIdText = string.Empty;
+    private string _filterStatus = string.Empty;
+    private int _totalCount;
+    private int _currentPage = 1;
+
+    private Guid? FilterDepartmentId =>
+        Guid.TryParse(_filterDepartmentIdText, out var id) ? id : null;
+
+    private string? _selectedDepartmentName =>
+        FilterDepartmentId is { } id ? _departments.FirstOrDefault(d => d.Id == id)?.Name : null;
+
+    private int ActiveFilterCount =>
+        (FilterDepartmentId is not null ? 1 : 0) + (!string.IsNullOrEmpty(_filterStatus) ? 1 : 0);
+
+    private string ResultSummaryText
+    {
+        get
+        {
+            if (_totalCount == 0)
+                return "0 employees";
+
+            if (Items.Count >= _totalCount)
+                return $"{_totalCount} employee{(_totalCount == 1 ? "" : "s")}";
+
+            var start = ((_currentPage - 1) * 20) + 1;
+            var end = Math.Min(_currentPage * 20, Items.Count);
+            return $"{start}–{end} of {_totalCount} employees";
+        }
+    }
+
     protected override async Task OnBeforeLoadAsync()
     {
         if (!Session.CanManageEmployees)
@@ -152,16 +275,24 @@
             return;
         }
         _canCreateEmployee = await UserService.HasPermissionAsync(SystemPermissions.EmployeeCreate);
+
+        if (_departments.Count == 0)
+        {
+            var departments = await DepartmentService.ListDepartmentsAsync(CompanyId);
+            _departments = departments?.Items ?? [];
+        }
     }
+
+    protected override string AddButtonText => "Add employee";
 
     protected override void ConfigureToolbar()
     {
         AddToolbarAction(
             id:      "hr-bulk-update",
-            text:    "Bulk Update",
+            text:    "Update selected",
             icon:    "fa-solid fa-money-bill-wave",
             onClick: OnBulkUpdateClicked,
-            tooltip: "Bulk update compensation for selected employees",
+            tooltip: "Update compensation for selected employees",
             // The dropdown itself also offers "Import" and "Download Template", neither of which
             // needs a row selected — only the "Selected Employees" item does (see
             // BulkUpdateMenuTemplate/HandleBulkUpdateMenuItemSelected below, which itself
@@ -186,18 +317,30 @@
     // AddToolbarAction with selectionDependent: false, so the dropdown itself is always enabled —
     // "Import" and "Download Template" don't need a selection, only "Selected Employees" does,
     // which BulkUpdateMenu disables itself via its own HasSelection parameter, passed through here)
-    // for a Template-based dropdown mounting BulkUpdateMenu, mirroring how GridToolbar itself
-    // mounts ExportMenu for "hr-export".
+    // for a Template-based dropdown mounting BulkUpdateMenu, and replaces the base toolbar's plain
+    // Print/Export/Columns buttons with a single "More" overflow menu (OverflowActionsMenu) so the
+    // toolbar keeps visual priority on the frequently-used actions (search, filters, Add, Update
+    // selected) — mirroring how GridToolbar itself mounts ExportMenu for "hr-export".
     private IEnumerable<object> EmployeeToolbar =>
-        GridToolbar.Select(item => item is Syncfusion.Blazor.Navigations.ItemModel im && im.Id == "hr-bulk-update"
-            ? new Syncfusion.Blazor.Navigations.ItemModel
+        GridToolbar
+            .Where(item => item is not Syncfusion.Blazor.Navigations.ItemModel im
+                || (im.Id != "hr-print" && im.Id != "hr-export" && im.Id != "hr-columns"))
+            .Select(item => item is Syncfusion.Blazor.Navigations.ItemModel im && im.Id == "hr-bulk-update"
+                ? new Syncfusion.Blazor.Navigations.ItemModel
+                {
+                    Id          = "hr-bulk-update",
+                    Type        = Syncfusion.Blazor.Navigations.ItemType.Input,
+                    Template    = BulkUpdateMenuTemplate,
+                    TooltipText = "Update compensation for selected employees",
+                }
+                : item)
+            .Append(new Syncfusion.Blazor.Navigations.ItemModel
             {
-                Id          = "hr-bulk-update",
+                Id          = "hr-more",
                 Type        = Syncfusion.Blazor.Navigations.ItemType.Input,
-                Template    = BulkUpdateMenuTemplate,
-                TooltipText = "Bulk update compensation for selected employees",
-            }
-            : item);
+                Template    = OverflowMenuTemplate,
+                TooltipText = "More actions",
+            });
 
     private RenderFragment BulkUpdateMenuTemplate => builder =>
     {
@@ -205,8 +348,41 @@
         builder.AddAttribute(1, nameof(HR.Web.Components.Controls.BulkUpdateMenu.OnItemSelected),
             EventCallback.Factory.Create<string>(this, HandleBulkUpdateMenuItemSelected));
         builder.AddAttribute(2, nameof(HR.Web.Components.Controls.BulkUpdateMenu.HasSelection), _hasSelection);
+        builder.AddAttribute(3, nameof(HR.Web.Components.Controls.BulkUpdateMenu.SelectedCount), SelectedCount);
         builder.CloseComponent();
     };
+
+    private RenderFragment OverflowMenuTemplate => builder =>
+    {
+        builder.OpenComponent<HR.Web.Components.Controls.OverflowActionsMenu>(0);
+        builder.AddAttribute(1, nameof(HR.Web.Components.Controls.OverflowActionsMenu.OnItemSelected),
+            EventCallback.Factory.Create<string>(this, HandleOverflowMenuItemSelected));
+        builder.CloseComponent();
+    };
+
+    private async Task HandleOverflowMenuItemSelected(string id)
+    {
+        if (Grid is null) return;
+
+        switch (id)
+        {
+            case "hr-print":
+                await Grid.PrintAsync();
+                break;
+            case "hr-excel":
+                await Grid.ExportToExcelAsync(new Syncfusion.Blazor.Grids.ExcelExportProperties());
+                break;
+            case "hr-csv":
+                await Grid.ExportToCsvAsync(new Syncfusion.Blazor.Grids.ExcelExportProperties());
+                break;
+            case "hr-pdf":
+                await Grid.ExportToPdfAsync(new Syncfusion.Blazor.Grids.PdfExportProperties());
+                break;
+            case "hr-columns":
+                await Grid.OpenColumnChooserAsync(0, 0);
+                break;
+        }
+    }
 
     private async Task HandleBulkUpdateMenuItemSelected(string id)
     {
@@ -269,9 +445,46 @@
         _showImportDialog = false;
     }
 
+    private async Task OnFilterChangedAsync()
+    {
+        _currentPage = 1;
+        await LoadAsync();
+    }
+
+    // Tracks the grid's own client-side paging (over the up-to-100 rows already fetched for the
+    // current search/filter) so ResultSummaryText's "X–Y of Z" range reflects whichever page the
+    // user has actually paged to, not just the page the last server fetch happened to land on.
+    private void OnGridActionComplete(Syncfusion.Blazor.Grids.ActionEventArgs<EmployeeListItemModel> args)
+    {
+        if (args.RequestType == Syncfusion.Blazor.Grids.Action.Paging)
+        {
+            _currentPage = args.CurrentPage;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveDepartmentFilterAsync()
+    {
+        _filterDepartmentIdText = string.Empty;
+        await OnFilterChangedAsync();
+    }
+
+    private async Task RemoveStatusFilterAsync()
+    {
+        _filterStatus = string.Empty;
+        await OnFilterChangedAsync();
+    }
+
     protected override async Task<IReadOnlyList<EmployeeListItemModel>?> FetchItemsAsync(string? search)
     {
-        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: search, pageSize: 100);
+        var result = await EmployeeService.ListEmployeesAsync(
+            CompanyId,
+            search: search,
+            pageSize: 100,
+            departmentId: FilterDepartmentId,
+            status: string.IsNullOrEmpty(_filterStatus) ? null : _filterStatus);
+
+        _totalCount = result?.TotalCount ?? 0;
         return result?.Items;
     }
 
@@ -287,6 +500,17 @@
 
     protected override string? GetViewUrl(EmployeeListItemModel item) =>
         $"/companies/{CompanyId}/employees/{item.Id}/view";
+
+    // Clicking anywhere in a row (other than the checkbox-selection column, whose own toggle must
+    // stay purely a selection gesture) opens that employee's profile — not just the "Employee"
+    // identity cell's own link — so row navigation doesn't rely on users noticing which cell is
+    // clickable. The identity cell's <a> already stops propagation on its own inner "Invite User"
+    // link (see @onclick:stopPropagation above) so that action isn't hijacked by this handler.
+    private void OnRecordClick(Syncfusion.Blazor.Grids.RecordClickEventArgs<EmployeeListItemModel> args)
+    {
+        if (args.Column?.Type == Syncfusion.Blazor.Grids.ColumnType.CheckBox) return;
+        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{args.RowData.Id}");
+    }
 
     private static string GetInitials(EmployeeListItemModel row)
     {

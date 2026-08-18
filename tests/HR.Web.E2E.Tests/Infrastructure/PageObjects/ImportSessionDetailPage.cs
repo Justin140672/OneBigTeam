@@ -24,7 +24,18 @@ public sealed class ImportSessionDetailPage(IPage page, string baseUrl)
     public async Task<string?> GetDetailAsync(string label)
     {
         var dt = page.Locator("dl.row dt").Filter(new() { HasText = label }).First;
-        if (!await dt.IsVisibleAsync()) return null;
+        // A bare instant IsVisibleAsync() right after OpenSessionAsync's navigation can race the
+        // session detail page's own async data load (same "container before content" pattern
+        // fixed elsewhere in this suite) and return null before the detail list has actually
+        // rendered. Give it a bounded wait instead of failing fast.
+        try
+        {
+            await dt.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
         return (await dt.Locator("~ dd").First.InnerTextAsync())?.Trim();
     }
 

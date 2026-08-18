@@ -27,6 +27,16 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
 
     protected bool _hasSelection;
 
+    // Number of rows currently checked in the grid's checkbox-selection column. Kept alongside
+    // _hasSelection (rather than replacing it) so existing callers that only care about "is
+    // anything selected" are unaffected; pages that want to show the count (e.g. EmployeeList's
+    // "Update selected (N)" bulk-action label) can read this directly.
+    protected int SelectedCount { get; private set; }
+
+    // Override to customise the "Add" toolbar button's label — e.g. EmployeeList uses
+    // "Add employee" so the primary action reads unambiguously rather than a bare "Add".
+    protected virtual string AddButtonText => "Add";
+
     private record ToolbarAction(string Id, string Text, string Icon, Func<TItem, Task> OnClick, string? Tooltip = null, bool SelectionDependent = true);
     private readonly List<ToolbarAction> _customActions = new();
 
@@ -56,7 +66,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
         {
             var items = new List<object>
             {
-                new ItemModel { Id = "hr-add",  Text = "Add",  PrefixIcon = "fa-solid fa-plus", TooltipText = "Add", Disabled = IsAddDisabled },
+                new ItemModel { Id = "hr-add",  Text = AddButtonText,  PrefixIcon = "fa-solid fa-plus", TooltipText = AddButtonText, Disabled = IsAddDisabled },
                 new ItemModel { Id = "hr-edit", Text = "Edit", PrefixIcon = "fa-solid fa-pen",  TooltipText = "Edit selected", Disabled = !_hasSelection },
                 new ItemModel { Id = "hr-view", Text = "View", PrefixIcon = "fa-solid fa-eye",  TooltipText = "View selected", Disabled = !_hasSelection },
             };
@@ -151,7 +161,17 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
     {
         _hasSelection = true;
         if (Grid is not null)
+        {
             await Grid.EnableToolbarItemsAsync(SelectionDependentToolbarIds, true);
+            SelectedCount = (await Grid.GetSelectedRecordsAsync()).Count;
+        }
+
+        // This handler is invoked directly by the SfGrid component's own EventCallback
+        // dispatch (a component event, not a native DOM UI event routed through Blazor's
+        // renderer), so nothing triggers a re-render automatically afterwards. Without this,
+        // SelectedCount/_hasSelection update in memory but the "Update selected (N)" button
+        // template (BulkUpdateMenuTemplate) never repaints to reflect it.
+        StateHasChanged();
     }
 
     protected async Task OnRowDeselected(RowDeselectEventArgs<TItem> args)
@@ -164,7 +184,11 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
         // single-select, where deselecting the one selected row always left none behind).
         var remaining = await Grid.GetSelectedRecordsAsync();
         _hasSelection = remaining.Count > 0;
+        SelectedCount = remaining.Count;
         await Grid.EnableToolbarItemsAsync(SelectionDependentToolbarIds, _hasSelection);
+
+        // See comment in OnRowSelected — same missing-render issue applies here too.
+        StateHasChanged();
     }
 
     protected async Task OnToolbarClick(ClickEventArgs args)

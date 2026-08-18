@@ -20,8 +20,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// company, and Marcus Diallo as a review owner candidate (a seeded Acme employee — see
 /// EmployeesModule), matching the other Shared Documents E2E tests.
 /// </summary>
-[Collection("E2E")]
-public sealed class SharedDocumentListReviewColumnsTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SharedDocumentListReviewColumnsTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

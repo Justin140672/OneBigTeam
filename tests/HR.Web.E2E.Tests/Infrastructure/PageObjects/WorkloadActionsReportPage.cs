@@ -83,13 +83,23 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
     public async Task ApplyFiltersAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Apply Filters" }).ClickAsync();
+        // LoadedSelector can resolve against grid rows (or the info alert) Blazor is still
+        // reusing from *before* the click, same "resolves against stale content" race already
+        // documented on GetGroupHeadingsAsync below — callers that immediately check
+        // IsEmptyStateVisibleAsync()/GetRowCountAsync() right after this can otherwise briefly
+        // read a state that hasn't caught up with the new filter yet. A short settle after the
+        // selector-level wait gives the new render a tick to actually land.
         await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
+        await page.WaitForTimeoutAsync(300);
     }
 
     public async Task ClearFiltersAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Clear" }).ClickAsync();
+        // Same stale-content race as ApplyFiltersAsync above — LoadedSelector can resolve against
+        // rows/alert still left over from before the click.
         await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
+        await page.WaitForTimeoutAsync(300);
     }
 
     // ── Grid / grouping ────────────────────────────────────────────────────────

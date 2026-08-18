@@ -13,8 +13,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// current compensation record (see EmployeeCompensationTabTests' own header comment), so her
 /// Hours/FTE/Effective From fields are populated rather than showing the "—" empty-state.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeEmploymentTabUiUpdatesTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeEmploymentTabUiUpdatesTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId    = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid SarahChen = Guid.Parse("30000000-0000-0000-0000-000000000001");

@@ -131,6 +131,7 @@ internal sealed class ListEmployeesHandler
                 e.FirstName,
                 e.LastName,
                 e.WorkEmail,
+                e.EmployeeNumber,
                 e.StartDate,
                 e.Status,
                 e.CreatedAt,

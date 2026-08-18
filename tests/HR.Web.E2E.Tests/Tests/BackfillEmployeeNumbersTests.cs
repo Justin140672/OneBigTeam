@@ -18,8 +18,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// but not call the endpoints behind it) no longer applies — Laura Bennett (HrAdministrator) can
 /// do both.
 /// </summary>
-[Collection("E2E")]
-public sealed class BackfillEmployeeNumbersTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class BackfillEmployeeNumbersTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

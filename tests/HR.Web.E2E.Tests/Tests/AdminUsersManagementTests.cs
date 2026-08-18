@@ -33,8 +33,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// rather than creating a fresh administrator per action, to keep the list from growing unbounded
 /// across repeated runs.
 /// </summary>
-[Collection("E2E")]
-public sealed class AdminUsersManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixture)
+    : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
     private const string AllowListedAdminEmail = "priya.shah@acme.example";
 

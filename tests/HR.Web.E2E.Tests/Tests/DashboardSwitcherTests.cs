@@ -19,8 +19,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// specifically to exercise this scenario — he also manages real direct reports (Emma Jones,
 /// Carlos Rivera) so the Manager Dashboard he switches to isn't empty.
 /// </summary>
-[Collection("E2E")]
-public sealed class DashboardSwitcherTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class DashboardSwitcherTests(ManagerPersonaFixture fixture) : RoleE2ETestBase<ManagerPersonaFixture>(fixture)
 {
     private const string HrAndManagerEmail = "david.park@acme.example";
     private const string HrOnlyEmail       = "laura.bennett@acme.example";

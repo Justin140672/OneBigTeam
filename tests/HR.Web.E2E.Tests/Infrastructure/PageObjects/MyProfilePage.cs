@@ -62,8 +62,11 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     }
 
     /// <summary>Returns true if the "Pending approval" banner is visible on the profile photo header.</summary>
+    // Bumped from the 5s default — photo upload + pending-review-task creation is a heavier
+    // server round-trip (file write + task/notification creation) than most banner checks in this
+    // suite, and can exceed 5s under load.
     public Task<bool> HasPendingProfilePhotoBannerAsync() =>
-        page.Locator(".alert-warning").Filter(new() { HasText = "Pending approval" }).First.WaitUntilVisibleAsync();
+        page.Locator(".alert-warning").Filter(new() { HasText = "Pending approval" }).First.WaitUntilVisibleAsync(15_000);
 
     // ── Tab navigation ────────────────────────────────────────────────────────
 
@@ -222,6 +225,11 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     /// </summary>
     public async Task<IReadOnlyList<string>> GetCompanyDocumentsGridColumnHeadersAsync()
     {
+        // See OpenCompanyDocumentsTabAsync's doc comment — its own row/empty-state wait doesn't
+        // guarantee the header cells have finished their own separate Syncfusion JS render pass,
+        // so an instant AllAsync() here can read zero headers. Wait for at least one before reading.
+        await page.WaitForSelectorAsync(".e-grid .e-headercell", new() { Timeout = 15_000 });
+
         var headers = await page.Locator(".e-grid .e-headercell").AllAsync();
         var result = new List<string>();
         foreach (var header in headers)
@@ -273,7 +281,14 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     /// </summary>
     public async Task ClickTaskAsync(string titleFragment)
     {
-        await page.Locator(".task-title").Filter(new() { HasText = titleFragment }).First.ClickAsync();
+        var row = page.Locator(".task-title").Filter(new() { HasText = titleFragment }).First;
+        // OpenTasksTabAsync's own wait only proves *some* row/empty-row rendered, not that this
+        // specific task's row has landed yet — a task created moments earlier (e.g. by a document
+        // request on a different page/login) can still be a tick behind the grid's initial
+        // render. Without an explicit wait here, a locator matching zero elements falls through to
+        // Playwright's default 30s actionability wait on ClickAsync with no useful diagnostic.
+        await row.WaitForAsync(new() { Timeout = 15_000 });
+        await row.ClickAsync();
         await page.WaitForSelectorAsync("[role='dialog'].task-view-dialog", new() { Timeout = 15_000 });
     }
 
@@ -300,6 +315,18 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border')",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+
+        // The ".e-grid" container mounts before Syncfusion populates its ".e-row"/".e-rowcell"
+        // data on a separate JS tick (same race documented on EmployeeEditPage.SaveNewEmployeeAsync
+        // and EmployeeAdminPage.OpenAssetsTabAsync) — a caller that immediately checks
+        // HasAssetsTableAsync/GetAssetRowCountAsync can otherwise see zero rows even for an
+        // employee with seeded assets. Only wait when a grid actually rendered (not the
+        // empty-state placeholder, which never has ".e-grid" at all).
+        if (await page.Locator(".e-grid").First.IsVisibleAsync())
+        {
+            await page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow",
+                new() { Timeout = 15_000 });
+        }
     }
 
     /// <summary>Returns true if the assets grid has at least one data row.</summary>
@@ -396,11 +423,34 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
             .Filter(new() { HasText = reasonFragment })
             .First;
 
+        // Callers typically only wait for *some* "table tbody tr" to exist after submitting a
+        // request (proving the table itself has rendered), not specifically for this new,
+        // uniquely-reasoned row to have appeared among them — the table can still be mid-reload a
+        // tick later, same "container before content" race fixed elsewhere on the asset/task
+        // grids. A bare instant IsVisibleAsync() here raced that and returned null under load
+        // instead of waiting for the row to actually show up.
+        try
+        {
+            await row.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException) when (altFragment is not null)
+        {
+            // Fall through to the alt-fragment lookup below.
+        }
+
         if (!await row.IsVisibleAsync() && altFragment is not null)
         {
             row = page.Locator("table tbody tr")
                 .Filter(new() { HasText = altFragment })
                 .First;
+            try
+            {
+                await row.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            }
+            catch (TimeoutException)
+            {
+                // Neither fragment matched a row in time — fall through to the null return below.
+            }
         }
 
         if (!await row.IsVisibleAsync()) return null;
@@ -443,11 +493,16 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         await dateInputs.Nth(0).ClickAsync();
         await dateInputs.Nth(0).FillAsync(startDate);
         await page.Keyboard.PressAsync("Tab"); // commit the date
+        // Wait for the Blazor round-trip that commits the date into component state
+        // (ValueChanged fires after blur) before touching the next field — otherwise
+        // a fast test runner can click Submit before _startDateSet flips to true.
+        await Assertions.Expect(dateInputs.Nth(0)).ToHaveValueAsync(startDate);
 
         // End date.
         await dateInputs.Nth(1).ClickAsync();
         await dateInputs.Nth(1).FillAsync(endDate);
         await page.Keyboard.PressAsync("Tab");
+        await Assertions.Expect(dateInputs.Nth(1)).ToHaveValueAsync(endDate);
 
         // Optional reason.
         if (!string.IsNullOrEmpty(reason))

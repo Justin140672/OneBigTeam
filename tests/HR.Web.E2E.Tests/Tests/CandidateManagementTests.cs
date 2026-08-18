@@ -16,8 +16,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// and recruitment:manage are Recruiter-only (see IdentityModule.AddRolePolicies); an HR
 /// Administrator does not automatically get recruitment access.
 /// </summary>
-[Collection("E2E")]
-public sealed class CandidateManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class CandidateManagementTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -105,7 +104,11 @@ public sealed class CandidateManagementTests(AppFixture fixture) : E2ETestBase(f
         await login.LoginAsync(tomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/candidates");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // The redirect for an unauthorised plain employee is a client-side Blazor NavigateTo
+        // (OnBeforeLoadAsync), not a full page navigation, so NetworkIdle after the initial GET
+        // is not a reliable signal that the redirect has completed — poll the URL directly with a
+        // generous timeout instead (avoids flakiness under heavy parallel load on shared personas).
+        await WaitForUrlToStopContainingAsync("/candidates");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/candidates"),
@@ -127,7 +130,10 @@ public sealed class CandidateManagementTests(AppFixture fixture) : E2ETestBase(f
         await login.LoginAsync(lauraEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/candidates");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // See WaitForUrlToStopContainingAsync's doc comment: the redirect is a client-side Blazor
+        // NavigateTo (OnBeforeLoadAsync), not a full page navigation, so NetworkIdle after the
+        // initial GET is not a reliable signal that the redirect has completed.
+        await WaitForUrlToStopContainingAsync("/candidates");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/candidates"),

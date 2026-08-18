@@ -22,8 +22,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// The dashboard-widget check (<see cref="Dashboard_ShowsGeneralTasksForEmployee"/>) uses Laura
 /// Bennett instead, since Sarah is redirected away from "/" and can never reach it.
 /// </summary>
-[Collection("E2E")]
-public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class GeneralTaskCompletionTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid SarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");

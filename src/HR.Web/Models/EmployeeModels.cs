@@ -27,6 +27,7 @@ public record EmployeeListItemModel(
     string FirstName,
     string LastName,
     string WorkEmail,
+    string? EmployeeNumber,
     DateOnly StartDate,
     string Status,
     DateTimeOffset CreatedAt,

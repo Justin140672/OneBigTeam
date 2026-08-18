@@ -19,8 +19,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// full sidebar and land on her role-specific dashboard ("/dashboard/hr") rather than the
 /// Company edit screen — unaffected by this change.
 /// </summary>
-[Collection("E2E")]
-public sealed class CompanyAdministratorAccessTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class CompanyAdministratorAccessTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -86,7 +85,10 @@ public sealed class CompanyAdministratorAccessTests(AppFixture fixture) : E2ETes
         // redirect), not merely hidden from the sidebar UI — same pattern as
         // CompanyAdministrator_CannotAccess_EmployeeList/HrSettingsPage above.
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/user-administration");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // See E2ETestBase.WaitForUrlToStopContainingAsync's doc comment: the redirect is a
+        // client-side Blazor NavigateTo, not a full page navigation, so NetworkIdle after the
+        // initial GET is not a reliable signal that the redirect has completed.
+        await WaitForUrlToStopContainingAsync("/user-administration");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.TrimEnd('/').EndsWith($"/companies/{AcmeId}/user-administration", StringComparison.OrdinalIgnoreCase),
@@ -107,7 +109,16 @@ public sealed class CompanyAdministratorAccessTests(AppFixture fixture) : E2ETes
         // Proves the employee:manage policy narrowing is enforced end-to-end (backend),
         // not merely hidden from the sidebar UI.
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // The redirect is a client-side Blazor NavigateTo (OnBeforeLoadAsync), not a full page
+        // navigation, so NetworkIdle after the initial GET is not a reliable completion signal
+        // (same reasoning as E2ETestBase.WaitForUrlToStopContainingAsync). That shared helper's
+        // plain substring check doesn't work here though: the redirect target
+        // (Session.MyProfileUrl) is itself "/companies/{id}/employees/{empId}/profile", which
+        // still *contains* the bare "/companies/{id}/employees" route as a prefix, so polling for
+        // that substring to disappear would never resolve early. Poll for the URL no longer being
+        // exactly the bare list route instead.
+        var bareListUrl = $"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees".TrimEnd('/');
+        await _page.WaitForURLAsync(url => url.TrimEnd('/') != bareListUrl, new() { Timeout = 15_000 });
 
         // ── Step 3: Must be redirected away from the bare employee list route ──
         var finalUrl = _page.Url;
@@ -136,6 +147,15 @@ public sealed class CompanyAdministratorAccessTests(AppFixture fixture) : E2ETes
             "Expected the top-bar avatar link to My Profile to be visible for Priya (Company Administrator, but also an employee)");
 
         await avatarLink.ClickAsync();
+
+        // MyProfilePage.WaitForLoadAsync only waits for ".e-tab" to exist, which the Company Edit
+        // page (Profile/Settings tabs) we're navigating away FROM also has — so it can resolve
+        // against tabs still left over from the pre-navigation page without proving the click
+        // actually navigated anywhere yet, and Url could still read the stale /companies/{id}/edit
+        // address a beat after the click. Wait for the URL to actually land on the profile route
+        // first, so a slow/failed navigation surfaces as a clear timeout here rather than a
+        // confusing "wrong URL" assertion failure below.
+        await _page.WaitForURLAsync(new Regex(@"/employees/[0-9a-fA-F-]{36}/profile"), new() { Timeout = 15_000 });
         await profile.WaitForLoadAsync();
 
         Assert.Contains($"/employees/", _page.Url);
@@ -177,7 +197,12 @@ public sealed class CompanyAdministratorAccessTests(AppFixture fixture) : E2ETes
 
         // ── Step 2: Full HR sidebar is unaffected by the Company-Administrator-only
         // narrowing — she still sees the full menu, including HR-only groups like "People".
+        // IsVisibleAsync() (unlike Playwright's auto-retrying Expect assertions) checks the DOM
+        // once with no wait/retry — right after LoginAsync returns, the post-login redirect to
+        // the role-specific dashboard (and the sidebar it renders) may not have completed yet, so
+        // asserting immediately can race the render. Wait for the element to actually appear first.
         var navMenu = _page.Locator(".app-nav-menu");
+        await navMenu.WaitForAsync(new() { Timeout = 15_000 });
         Assert.True(await navMenu.IsVisibleAsync(),
             "Laura (HrAdministrator) should see the full admin navigation menu in the sidebar");
 

@@ -267,7 +267,17 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
     /// <summary>Clicks "Save current filters as view" and waits for the resulting modal dialog to open.</summary>
     public async Task OpenSaveViewDialogAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Save current filters as view" }).ClickAsync();
+        // The toolbar button's own visible text is just "Save" (ReportFilterPanel.razor line ~14,
+        // <SfButton ... IconCss="e-icons e-save" OnClick="@(() => _showSaveAs = true)">Save</SfButton>)
+        // — "Save current filters as view" is only the resulting dialog's Header text, not the
+        // trigger button's accessible name. This is the only IconCss+text SfButton in the app: the
+        // icon span's CSS ::before glyph content gets folded into Chromium's computed accessible
+        // name alongside the visible "Save" text, so a role locator with an exact "Save" name never
+        // resolves (a real 30s timeout, not a flaky race). The dialog's own confirm button has no
+        // icon and its accessible name really is exactly "Save", so scope this click to the
+        // toolbar's containing element instead of the button's accessible name to sidestep the
+        // icon-name quirk entirely (also naturally avoids any ambiguity with that dialog button).
+        await page.Locator(".report-filter-toolbar button").ClickAsync();
         await SaveViewDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 

@@ -63,7 +63,14 @@ public sealed class BackfillEmployeeNumbersDialogPage(IPage page, string baseUrl
     public async Task<string?> GetPredictedEmployeeNumberForAsync(string lastNameFragment)
     {
         var row = Dialog.Locator(".e-row").Filter(new() { HasText = lastNameFragment }).First;
-        if (!await row.IsVisibleAsync()) return null;
+        try
+        {
+            await row.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
         return (await row.Locator(".e-rowcell").Last.TextContentAsync())?.Trim();
     }
 

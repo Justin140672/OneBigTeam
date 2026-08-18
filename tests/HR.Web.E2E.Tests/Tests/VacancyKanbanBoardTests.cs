@@ -31,12 +31,35 @@ namespace HR.Web.E2E.Tests.Tests;
 /// names per run) via the Applications tab's "Add Candidate" flow, rather than reusing the seeded
 /// data, so runs don't collide with each other or with other test classes sharing this database.
 /// </summary>
-[Collection("E2E")]
-public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string MarcusEmail = "marcus.diallo@acme.example";
+
+    // Every test here asserts against the exact seeded stage set/order for Acme (see class doc
+    // comment) — that races RecruitmentStageManagementTests, which mutates the same shared,
+    // DisplayOrder-ranked stage list (create/reorder/deactivate). This class can't join
+    // CrossUserVacancyTestBase directly (different fixture — RecruiterPersonaFixture, not
+    // CrossUserFixture), so it serializes against that group's shared static gate instance
+    // directly instead. See RecruitmentStageManagementTests' own remarks for the full rationale.
+    public override async Task InitializeAsync()
+    {
+        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
+        await base.InitializeAsync();
+    }
+
+    public override async Task DisposeAsync()
+    {
+        try
+        {
+            await base.DisposeAsync();
+        }
+        finally
+        {
+            CrossUserVacancyTestBase.GateInstance.Release();
+        }
+    }
 
     // RecruitmentStageSeeder.BuildDefaultStages — the default stage set every company gets the first
     // time recruitment data exists for it. A freshly created Application always starts on the first

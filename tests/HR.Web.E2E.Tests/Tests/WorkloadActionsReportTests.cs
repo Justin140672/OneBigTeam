@@ -14,8 +14,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// navigation coverage for every report (including this one's slug) lives in
 /// <see cref="ReportCatalogTests"/>; this file focuses on the report page's own behavior.
 /// </summary>
-[Collection("E2E")]
-public sealed class WorkloadActionsReportTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -242,7 +241,10 @@ public sealed class WorkloadActionsReportTests(AppFixture fixture) : E2ETestBase
         // Session.MyProfileUrl redirect-on-unauthorized convention used by every other
         // permission-gated list page (see DepartmentList.razor, LocationList.razor, etc.).
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/reporting");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // See E2ETestBase.WaitForUrlToStopContainingAsync's doc comment: the redirect is a
+        // client-side Blazor NavigateTo, not a full navigation, so NetworkIdle is not a reliable
+        // completion signal.
+        await WaitForUrlToStopContainingAsync("/reporting");
 
         Assert.False(_page.Url.Contains("/reporting"),
             "Expected a persona with no baseline reporting role to be redirected away from the report catalog, not shown an empty/error catalog page");

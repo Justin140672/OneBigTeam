@@ -10,8 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - Deactivate an employment type.
 /// - A plain Employee is redirected away from the employment types page (no manage access).
 /// </summary>
-[Collection("E2E")]
-public sealed class EmploymentTypeManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmploymentTypeManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -121,7 +120,9 @@ public sealed class EmploymentTypeManagementTests(AppFixture fixture) : E2ETestB
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employment-types");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // See WaitForUrlToStopContainingAsync's doc comment: the redirect is a client-side Blazor
+        // NavigateTo, not a full navigation, so NetworkIdle is not a reliable completion signal.
+        await WaitForUrlToStopContainingAsync("/employment-types");
 
         // Tom has no manage permissions, so the page should redirect (e.g. to /login or home)
         var finalUrl = _page.Url;

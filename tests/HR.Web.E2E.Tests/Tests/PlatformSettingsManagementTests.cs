@@ -24,8 +24,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// to a valid value by the time it finishes changing shared global state, since Platform Settings
 /// is a true singleton shared across the whole fixture (unlike per-row admin-user tests).
 /// </summary>
-[Collection("E2E")]
-public sealed class PlatformSettingsManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class PlatformSettingsManagementTests(ParallelBlankPersonaFixture fixture)
+    : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
     private const string AllowListedAdminEmail = "priya.shah@acme.example";
 

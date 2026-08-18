@@ -13,8 +13,7 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   - Tom Williams (30000000-0000-0000-0000-000000000004) has a MacBook Pro 14"
 ///     assigned (ASSET-0001, assignment c0000000-0000-0000-0000-000000000003).
 /// </summary>
-[Collection("E2E")]
-public sealed class ProfileAssetsTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class ProfileAssetsTabTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId   = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid SarahId  = Guid.Parse("30000000-0000-0000-0000-000000000001");

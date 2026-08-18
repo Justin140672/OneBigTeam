@@ -10,8 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - A location can be edited and the change persists across a reload.
 /// Uses the seeded "Office" location type on the Acme company (see EmployeesModule dev seed).
 /// </summary>
-[Collection("E2E")]
-public sealed class LocationManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class LocationManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

@@ -344,7 +344,13 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
     public async Task<string?> GetEmployeeNumberPreviewAsync()
     {
         var paragraph = page.Locator("p").Filter(new() { HasText = "Preview:" }).First;
-        return await paragraph.IsVisibleAsync() ? (await paragraph.TextContentAsync())?.Trim() : null;
+        if (!await paragraph.IsVisibleAsync())
+            return null;
+
+        // The preview text is recomputed by Blazor after the numeric fields' OnChange/blur
+        // handlers fire; give it a moment to re-render before reading the DOM.
+        await page.WaitForTimeoutAsync(200);
+        return (await paragraph.TextContentAsync())?.Trim();
     }
 
     private ILocator BackfillEmployeeNumbersButton =>

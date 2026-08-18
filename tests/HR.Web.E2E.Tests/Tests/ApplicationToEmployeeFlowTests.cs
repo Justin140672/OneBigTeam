@@ -22,8 +22,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// not hold, so that one step switches to Laura Bennett (HR Administrator) — mirroring the real
 /// handoff: a Recruiter hires someone, an HR Administrator manages their employee record after.
 /// </summary>
-[Collection("E2E")]
-public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : CrossUserVacancyTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

@@ -17,6 +17,14 @@ public sealed class NotificationPanel(IPage page)
     {
         await page.Locator(".notif-btn").ClickAsync();
         await page.WaitForSelectorAsync(".notif-dropdown", new() { Timeout = 10_000 });
+
+        // The dropdown container mounting doesn't prove its notification list has finished
+        // loading (MainLayout.razor fetches the list async and shows either real ".notif-item"
+        // rows or the ".notif-empty" placeholder once done) — same "container before content"
+        // race fixed elsewhere in this suite. A caller that immediately calls
+        // GetNotificationTitlesAsync() can otherwise read an empty list for a persona who
+        // genuinely has notifications.
+        await page.WaitForSelectorAsync(".notif-item, .notif-empty", new() { Timeout = 10_000 });
     }
 
     public async Task CloseAsync()

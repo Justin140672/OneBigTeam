@@ -112,15 +112,31 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// list items (e.g. "Handbook") — same click-open/wait-for-popup/click-item pattern as
     /// SetReviewFrequencyAsync above.
     /// </summary>
+    // See the remarks on the FillAsync -> ClearAndTypeAsync switch in EditTitleDescriptionCategoryAsync.
+    private async Task ClearAndTypeAsync(ILocator input, string value)
+    {
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        await page.WaitForTimeoutAsync(150);
+        if (value.Length > 0)
+            await input.PressSequentiallyAsync(value, new() { Delay = 30 });
+        await page.Keyboard.PressAsync("Tab");
+    }
+
     public async Task EditTitleDescriptionCategoryAsync(string title, string description, string categoryLabel)
     {
         await EditMetadataHeaderButton.ClickAsync();
         await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
-        await EditMetadataDialog.GetByPlaceholder("Document title").FillAsync(title);
-        await page.Keyboard.PressAsync("Tab");
-        await EditMetadataDialog.GetByPlaceholder("Optional description").FillAsync(description);
-        await page.Keyboard.PressAsync("Tab");
+        // Plain FillAsync sets the native input's value and fires a single "input" event, which
+        // doesn't reliably replace a Syncfusion SfTextBox's own tracked value — observed as the
+        // saved title being the *old* title with the new one appended (e.g. "Test Policy
+        // <guid>Updated Handbook <guid>") rather than replaced. Select-all + delete first, same
+        // mitigation already applied to CompanyEditPage.TypeIntoTextBoxAsync and
+        // EmployeeEditPage.TypeIntoNumericInputAsync for the identical class of race.
+        await ClearAndTypeAsync(EditMetadataDialog.GetByPlaceholder("Document title"), title);
+        await ClearAndTypeAsync(EditMetadataDialog.GetByPlaceholder("Optional description"), description);
 
         var categoryGroup = EditMetadataDialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
         await DropDownSelector.SelectAsync(page, categoryGroup, categoryLabel);
@@ -229,6 +245,21 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
         await EditMetadataDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+
+        // The spinner-clear wait below is a best-effort proxy that's a no-op if the page's own
+        // detail-card reload never shows a spinner at all (e.g. a fast/instant re-render) — a
+        // caller that immediately reads GetReviewFrequencyTextAsync() right after can still race
+        // the actual reload landing (observed: "Yearly" not found right after setting it). Assert
+        // directly on the frequency row's own content instead, same pattern already used for
+        // EditTitleDescriptionCategoryAsync's title check above, which auto-retries until the real
+        // reload lands rather than trusting a loading-state heuristic. "None" has no dt/dd row at
+        // all (SharedDocumentDetail.razor only renders it for a non-None frequency), so only assert
+        // when setting a real frequency.
+        if (frequencyLabel != "None")
+        {
+            await Assertions.Expect(page.Locator("dt:has-text('Review Frequency') + dd"))
+                .ToContainTextAsync(frequencyLabel == "Custom" ? "Custom" : frequencyLabel, new() { Timeout = 15_000 });
+        }
 
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
@@ -359,13 +390,26 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             .Filter(new() { HasText = "Requires employee acknowledgement" });
         await checkboxWrapper.Locator("label").ClickAsync();
 
+        // Checking this box flips EditSharedCompanyDocumentAcknowledgementDialog.razor's
+        // "@if (Model.RequiresAcknowledgement)" block from unmounted to mounted — the date picker,
+        // statement field, etc. don't exist in the DOM at all until this Blazor re-render lands,
+        // and Syncfusion's SfDatePicker then does its own follow-up JS-interop initialization pass
+        // on top of that. Clicking immediately can catch the element mid-(re)creation and get
+        // "element was detached from the DOM, retrying" — Playwright's own retry loop usually
+        // recovers from a single such hand-off, but back-to-back re-renders (Blazor mount, then
+        // Syncfusion's own init) can outlast even its default retry window under load. Wait for
+        // the date input to exist and settle before interacting.
         var dateInput = EditAcknowledgementDialog.Locator(".e-date-wrapper input.e-input");
+        await dateInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await page.WaitForTimeoutAsync(300);
+
         await dateInput.ClickAsync();
         await dateInput.FillAsync(dueDate.ToString("dd/MM/yyyy"));
         await page.Keyboard.PressAsync("Tab");
 
         await EditAcknowledgementDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await EditAcknowledgementDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        await WaitForOverlayToClearAsync();
 
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
@@ -385,6 +429,15 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     {
         await AuditHistoryHeaderButton.ClickAsync();
         await AuditHistoryDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        // The dialog container mounting doesn't prove its grid has populated yet — Syncfusion
+        // populates ".e-row"/".e-rowcell" data on a separate JS tick (same "container before
+        // content" race fixed elsewhere in this suite, e.g. EmployeeAdminPage's asset grids). A
+        // caller that immediately calls GetAuditHistoryRowCountAsync can otherwise read 0 for a
+        // document that genuinely has audit entries.
+        await AuditHistoryDialog.Locator(
+            "[data-testid='document-audit-history-grid'] .e-row, [data-testid='document-audit-history-grid'] .e-emptyrow")
+            .First.WaitForAsync(new() { Timeout = 10_000 });
     }
 
     public Task<bool> IsAuditHistoryDialogOpenAsync() => AuditHistoryDialog.IsVisibleAsync();
@@ -447,6 +500,29 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await EditAcknowledgementDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
+    /// <summary>
+    /// Syncfusion's modal overlay (".e-dlg-overlay") is a DOM sibling of the dialog itself, not a
+    /// descendant, and its close-fade animation can still be intercepting pointer events for a
+    /// short moment after the dialog role element itself already reports "Hidden" to Playwright.
+    /// A caller that immediately re-clicks the same "Edit" button to reopen the dialog (e.g.
+    /// RequireAcknowledgementAsync followed by OpenEditAcknowledgementDialogAsync, or
+    /// SaveEditAcknowledgementDialogAsync followed by another OpenEditAcknowledgementDialogAsync)
+    /// can otherwise hit "subtree intercepts pointer events" on the stale overlay. Best-effort: if
+    /// no overlay is present at all, this is a no-op.
+    /// </summary>
+    private async Task WaitForOverlayToClearAsync()
+    {
+        try
+        {
+            await page.Locator(".e-dlg-overlay").WaitForAsync(
+                new() { State = WaitForSelectorState.Detached, Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            // Ignore — best-effort settle only.
+        }
+    }
+
     public Task<bool> IsEditAcknowledgementDialogOpenAsync() => EditAcknowledgementDialog.IsVisibleAsync();
 
     // The Acknowledgement Statement field is the only HrTextBox (Multiline, so a <textarea>)
@@ -502,8 +578,31 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public Task<bool> IsResetAcknowledgementStatementButtonDisabledAsync() =>
         ResetAcknowledgementStatementButton.IsDisabledAsync();
 
-    public Task ClickResetAcknowledgementStatementToDefaultAsync() =>
-        ResetAcknowledgementStatementButton.ClickAsync();
+    /// <summary>
+    /// Clicks "Reset to Default" in the Edit Acknowledgement Settings dialog. Immediately after
+    /// the dialog opens, Syncfusion is still settling its own re-render of the dialog body (same
+    /// destroy/recreate-on-bind churn documented on FillAcknowledgementStatementAsync above), which
+    /// can detach the button out from under a single ClickAsync's actionability wait — surfaced as
+    /// "element is not stable"/"was detached from the DOM, retrying" — Playwright's own built-in
+    /// retry only covers the current element handle, not the button being torn down and rebuilt.
+    /// Re-resolving the locator per attempt and retrying the click itself rides out that churn.
+    /// </summary>
+    public async Task ClickResetAcknowledgementStatementToDefaultAsync()
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (true)
+        {
+            try
+            {
+                await ResetAcknowledgementStatementButton.ClickAsync(new() { Timeout = 5_000 });
+                return;
+            }
+            catch (Exception) when (DateTime.UtcNow < deadline)
+            {
+                await page.WaitForTimeoutAsync(250);
+            }
+        }
+    }
 
     /// <summary>
     /// Whether the "Locked after publishing — upload a new version to change the wording." note is
@@ -518,6 +617,7 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     {
         await EditAcknowledgementDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await EditAcknowledgementDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        await WaitForOverlayToClearAsync();
 
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
@@ -533,8 +633,11 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
     public Task<bool> IsPublishDialogOpenAsync() => PublishDialog.IsVisibleAsync();
 
-    public Task ClickPublishCancelAsync() =>
-        PublishDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+    public async Task ClickPublishCancelAsync()
+    {
+        await PublishDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+        await PublishDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
 
     /// <summary>Opens the Archive confirmation dialog via the header "Archive" button.</summary>
     public async Task OpenArchiveDialogAsync()
@@ -562,7 +665,18 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public async Task<string?> GetArchiveErrorAsync()
     {
         var error = ArchiveDialog.Locator(".alert-danger");
-        if (!await error.IsVisibleAsync()) return null;
+        // A bare instant IsVisibleAsync() right after ClickArchiveConfirmAsync() can race the
+        // client-side validation render (same "read before it settles" class of race fixed
+        // elsewhere in this suite) and return null before the message has actually appeared. Give
+        // it a bounded wait instead of failing fast.
+        try
+        {
+            await error.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
         return (await error.InnerTextAsync()).Trim();
     }
 
@@ -612,14 +726,27 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public Task ClickExpireConfirmAsync() =>
         ExpireDialog.GetByRole(AriaRole.Button, new() { Name = "Mark Expired", Exact = true }).ClickAsync();
 
-    public Task ClickExpireCancelAsync() =>
-        ExpireDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+    public async Task ClickExpireCancelAsync()
+    {
+        await ExpireDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+        await ExpireDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
 
     /// <summary>The inline error text shown inside the Expire dialog when the server rejects the request (e.g. already Expired/Archived), or null if none is shown.</summary>
     public async Task<string?> GetExpireErrorAsync()
     {
         var error = ExpireDialog.Locator(".alert-danger");
-        if (!await error.IsVisibleAsync()) return null;
+        // Same "read before it settles" race as GetArchiveErrorAsync/GetReviewValidationErrorAsync
+        // above — a bare instant IsVisibleAsync() right after confirming can race the error
+        // banner's render and return null before it has actually appeared.
+        try
+        {
+            await error.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
         return (await error.InnerTextAsync()).Trim();
     }
 
@@ -684,14 +811,27 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public Task ClickReviewConfirmAsync() =>
         ReviewDialog.GetByRole(AriaRole.Button, new() { Name = "Complete Review", Exact = true }).ClickAsync();
 
-    public Task ClickReviewCancelAsync() =>
-        ReviewDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+    public async Task ClickReviewCancelAsync()
+    {
+        await ReviewDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+        await ReviewDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
 
     /// <summary>The inline validation message shown inside the Complete Review dialog when notes are blank/whitespace (e.g. "Review notes are required."), or null if none is shown.</summary>
     public async Task<string?> GetReviewValidationErrorAsync()
     {
         var error = ReviewDialog.Locator(".text-danger.small.mt-1");
-        if (!await error.IsVisibleAsync()) return null;
+        // Same "read before it settles" race as GetArchiveErrorAsync above — a bare instant
+        // IsVisibleAsync() right after ClickReviewConfirmAsync() can race the client-side
+        // validation render and return null before the message has actually appeared.
+        try
+        {
+            await error.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
         return (await error.InnerTextAsync()).Trim();
     }
 

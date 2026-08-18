@@ -9,8 +9,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - Seeded profiles appear in the list.
 /// - A new profile can be created and appears in the list.
 /// </summary>
-[Collection("E2E")]
-public sealed class PositionProfileManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

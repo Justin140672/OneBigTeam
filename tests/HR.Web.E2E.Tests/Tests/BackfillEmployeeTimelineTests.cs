@@ -33,8 +33,8 @@ namespace HR.Web.E2E.Tests.Tests;
 ///    HrSettingsPage.razor), so there's no longer any Numbering Mode state on this tab to even
 ///    couple to.
 /// </summary>
-[Collection("E2E")]
-public sealed class BackfillEmployeeTimelineTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class BackfillEmployeeTimelineTests(PriyaShahPersonaFixture fixture)
+    : RoleE2ETestBase<PriyaShahPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

@@ -24,8 +24,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// company-wide, all-statuses view keeps showing the request (with a null TaskId) after James
 /// approves it.
 /// </summary>
-[Collection("E2E")]
-public sealed class LeaveRequestsWidgetTaskDialogTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class LeaveRequestsWidgetTaskDialogTests(CrossUserFixture fixture) : CrossUserLeaveNotificationsTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");
@@ -122,23 +121,36 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(AppFixture fixture) : E2E
         await task.ApproveAsync();
         await task.CloseAsync();
 
-        // ── Step 3: Switch to Laura (HR Administrator) — her Leave Requests widget shows
-        // all statuses company-wide, so Tom's now-Approved request (with its task completed,
-        // and therefore no open task) is still listed. ──────────────────────────────────
+        // ── Step 3: Switch to Laura (HR Administrator) — the HR dashboard's leave requests are
+        // now folded into AttentionQueueWidget ("Needs your attention"), which hides resolved
+        // (Approved/Declined/Rejected) leave requests by default (see AttentionQueueWidget.razor's
+        // _resolvedLeaveItems / "Show resolved leave requests" toggle) — a behavior change from
+        // the old standalone LeaveRequestsWidget, which always listed every status company-wide
+        // for an HR Administrator. ────────────────────────────────────────────────────────────
         await login.SwitchAccountAsync(LauraEmail);
         await hrDash.GoToAsync();
 
-        var names = await hrDash.GetLeaveRequestEmployeeNamesAsync();
-        Assert.Contains(names, n => n.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
+        var subjectsBeforeToggle = await hrDash.GetAttentionQueueSubjectsAsync();
+        var tomRowsBeforeToggle = subjectsBeforeToggle.Count(n => n.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
 
-        // ── Step 4: Only a Pending request is actionable (LeaveRequestsWidget.razor's
-        // IsActionable) — Tom's now-Approved request renders as a static, non-clickable row and
-        // clicking it does nothing: no dialog, no navigation. Disambiguate by date ("14 Sep") —
+        // ── Step 4: Enable the toggle — the now-Approved request should appear. Only a Pending
+        // request is actionable (AttentionQueueWidget's IsPending check); Tom's now-Approved
+        // request renders with OnActivate as a no-op, so clicking it neither opens a dialog nor
+        // navigates. ──────────────────────────────────────────────────────────────────────────
+        await hrDash.SetShowResolvedLeaveRequestsAsync(true);
+        var subjectsAfterToggle = await hrDash.GetAttentionQueueSubjectsAsync();
+        var tomRowsAfterToggle = subjectsAfterToggle.Count(n => n.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
+        Assert.True(tomRowsAfterToggle > tomRowsBeforeToggle,
+            "Expected enabling 'Show resolved leave requests' to reveal Tom's now-Approved request.");
+
+        // Disambiguate by date ("14 Sep", from this test's own request) rather than name alone —
         // the sibling ClickingPendingLeaveRequest_... test deliberately leaves its own Tom
-        // Williams request with an open task, so a name-only match could land on that row
-        // instead. ─────────────────────────────────────────────────────────────────────────
+        // Williams request (with a different date) with an open task, so a name-only match could
+        // land on that row instead. ClickAttentionQueueItemAsync filters on the row's full text
+        // content, which includes the rendered date range, so "14 Sep" alone is enough to target
+        // this specific row uniquely.
         var urlBeforeClick = _page.Url;
-        await hrDash.ClickLeaveRequestItemAsync("Tom Williams", "14 Sep");
+        await hrDash.ClickAttentionQueueItemAsync("14 Sep");
 
         // No dialog and no navigation — give any (incorrect) async effect a moment to surface
         // before asserting its absence.

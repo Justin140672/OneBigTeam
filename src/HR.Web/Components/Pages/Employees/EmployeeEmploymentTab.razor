@@ -39,7 +39,7 @@ else
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">Employee Number <span class="text-danger">*</span></label>
-                                <HrTextBox @bind-Value="Model.EmployeeNumber" Placeholder="e.g. EMP-001" />
+                                <HrTextBox @bind-Value="Model.EmployeeNumber" Placeholder="e.g. EMP-001" ReadOnly="@IsViewMode" />
                                 <ValidationMessage For="@(() => Model.EmployeeNumber)" />
                             </div>
                             <div class="col-md-6">
@@ -48,7 +48,8 @@ else
                                                 TItem="Option"
                                                 DataSource="@_statusOptions"
                                                 @bind-Value="Model.Status"
-                                                Placeholder="Select status">
+                                                Placeholder="Select status"
+                                                Enabled="@(!IsViewMode)">
                                     <DropDownListFieldSettings Value="Value" Text="Label" />
                                 </SfDropDownList>
                             </div>
@@ -58,7 +59,8 @@ else
                                                 TItem="EmploymentTypeListItemModel"
                                                 DataSource="@_employmentTypes"
                                                 @bind-Value="Model.EmploymentTypeId"
-                                                Placeholder="Select type">
+                                                Placeholder="Select type"
+                                                Enabled="@(!IsViewMode)">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                 </SfDropDownList>
                                 <ValidationMessage For="@(() => Model.EmploymentTypeId)" />
@@ -112,7 +114,8 @@ else
                                                 DataSource="@_positionProfiles"
                                                 @bind-Value="Model.PositionProfileId"
                                                 Placeholder="None"
-                                                AllowFiltering="true">
+                                                AllowFiltering="true"
+                                                Enabled="@(!IsViewMode)">
                                     <DropDownListFieldSettings Value="Id" Text="Title" />
                                     <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?" ValueChange="OnPositionProfileChanged" />
                                 </SfDropDownList>
@@ -124,7 +127,8 @@ else
                                                 DataSource="@_departments"
                                                 @bind-Value="Model.DepartmentId"
                                                 Placeholder="None"
-                                                AllowFiltering="true">
+                                                AllowFiltering="true"
+                                                Enabled="@(!IsViewMode)">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                 </SfDropDownList>
                             </div>
@@ -136,7 +140,8 @@ else
                                                 @bind-Value="Model.LocationId"
                                                 Placeholder="None"
                                                 AllowFiltering="true"
-                                                ShowClearButton="true">
+                                                ShowClearButton="true"
+                                                Enabled="@(!IsViewMode)">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                 </SfDropDownList>
                             </div>
@@ -148,7 +153,8 @@ else
                                                 DataSource="@_managerOptions"
                                                 @bind-Value="Model.ManagerId"
                                                 Placeholder="None"
-                                                AllowFiltering="true">
+                                                AllowFiltering="true"
+                                                Enabled="@(!IsViewMode)">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                     <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
                                 </SfDropDownList>
@@ -165,15 +171,15 @@ else
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                                <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" Format="dd/MM/yyyy" />
+                                <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" Format="dd/MM/yyyy" Enabled="@(!IsViewMode)" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Continuous Service Date</label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ContinuousServiceDate" Format="dd/MM/yyyy" ShowClearButton="true" />
+                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ContinuousServiceDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="@(!IsViewMode)" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Probation End Date</label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ProbationEndDate" Format="dd/MM/yyyy" ShowClearButton="true" />
+                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ProbationEndDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="@(!IsViewMode)" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Leaving Date</label>
@@ -189,7 +195,8 @@ else
                                 <SfCheckBox TChecked="bool"
                                             Label="Override notice period"
                                             Checked="@Model.OverrideNoticePeriod"
-                                            CheckedChanged="@((bool v) => Model.OverrideNoticePeriod = v)" />
+                                            CheckedChanged="@((bool v) => Model.OverrideNoticePeriod = v)"
+                                            Enabled="@(!IsViewMode)" />
                                 @if (Model.OverrideNoticePeriod)
                                 {
                                     <div class="row g-3 mt-2">
@@ -197,7 +204,8 @@ else
                                             <label class="form-label">Length</label>
                                             <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
                                                               ShowSpinButton="false"
-                                                              Min="1" />
+                                                              Min="1"
+                                                              Enabled="@(!IsViewMode)" />
                                             <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
                                         </div>
                                         <div class="col-md-6">
@@ -205,7 +213,8 @@ else
                                             <SfDropDownList TValue="NoticePeriodUnit" TItem="NoticePeriodUnitChoice"
                                                             DataSource="@NoticePeriodUnitOptions"
                                                             @bind-Value="Model.NoticePeriodUnit"
-                                                            Placeholder="Unit">
+                                                            Placeholder="Unit"
+                                                            Enabled="@(!IsViewMode)">
                                                 <DropDownListFieldSettings Value="Value" Text="Label" />
                                             </SfDropDownList>
                                         </div>
@@ -232,7 +241,8 @@ else
                         <SfCheckBox TChecked="bool"
                                     Label="Use company working pattern"
                                     Checked="@Model.UseCompanyWorkingPattern"
-                                    CheckedChanged="@((bool v) => Model.UseCompanyWorkingPattern = v)" />
+                                    CheckedChanged="@((bool v) => Model.UseCompanyWorkingPattern = v)"
+                                    Enabled="@(!IsViewMode)" />
                         @if (!Model.UseCompanyWorkingPattern)
                         {
                             <div class="row g-3 mt-2">
@@ -243,7 +253,8 @@ else
                                         {
                                             <SfCheckBox TChecked="bool" Label="@day"
                                                         Checked="@Model.WorkingWeek.Contains(day)"
-                                                        CheckedChanged="@(e => ToggleWorkingDay(day, e))" />
+                                                        CheckedChanged="@(e => ToggleWorkingDay(day, e))"
+                                                        Enabled="@(!IsViewMode)" />
                                         }
                                     </div>
                                 </div>
@@ -252,7 +263,8 @@ else
                                                       Placeholder="Hours Per Day"
                                                       FloatLabelType="FloatLabelType.Auto"
                                                       ShowSpinButton="false"
-                                                      Min="0.5m" Max="24m" Step="0.5m" />
+                                                      Min="0.5m" Max="24m" Step="0.5m"
+                                                      Enabled="@(!IsViewMode)" />
                                     <ValidationMessage For="@(() => Model.HoursPerDay)" />
                                 </div>
                             </div>
@@ -270,7 +282,8 @@ else
                                    Multiline="true"
                                    Rows="4"
                                    Placeholder="Optional internal notes visible to HR only"
-                                   Maxlength="4000" />
+                                   Maxlength="4000"
+                                   ReadOnly="@IsViewMode" />
                         @if (!string.IsNullOrEmpty(Model.Notes))
                         {
                             <div class="text-muted small mt-1">@Model.Notes.Length / 4000</div>
@@ -314,6 +327,12 @@ else
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    // Set by EmployeeEdit.razor from its own IsViewMode (URL-derived). Genuinely disables every
+    // interactive control below rather than relying on CSS alone — see the AC1 fix in
+    // EmployeeEdit.razor for why: pointer-events:none only prevented mouse interaction, not
+    // keyboard/programmatic edits.
+    [Parameter] public bool IsViewMode { get; set; }
 
     protected override object? LoadKey => (CompanyId, EmployeeId);
 

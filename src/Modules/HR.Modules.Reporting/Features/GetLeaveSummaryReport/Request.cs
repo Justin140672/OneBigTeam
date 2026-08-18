@@ -1,13 +1,13 @@
 namespace HR.Modules.Reporting.Features.GetLeaveSummaryReport;
 
-public enum LeaveSummaryGroupBy
+internal enum LeaveSummaryGroupBy
 {
     Employee = 1,
     Department = 2,
     LeaveType = 3,
 }
 
-public sealed record GetLeaveSummaryReportRequest(
+internal sealed record GetLeaveSummaryReportRequest(
     Guid CompanyId,
     int? PolicyYear = null,
     Guid? DepartmentId = null,

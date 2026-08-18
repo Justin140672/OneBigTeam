@@ -13,8 +13,8 @@ namespace HR.Web.E2E.Tests.Tests;
 ///
 /// Sarah Chen has seeded notifications (task assigned / due soon / overdue).
 /// </summary>
-[Collection("E2E")]
-public sealed class IndividualNotificationTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class IndividualNotificationTests(SarahChenPersonaFixture fixture)
+    : RoleE2ETestBase<SarahChenPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

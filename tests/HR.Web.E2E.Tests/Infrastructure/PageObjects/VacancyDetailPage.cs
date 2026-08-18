@@ -205,6 +205,26 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             await CorrectionCheckbox.CheckAsync();
         else
             await CorrectionCheckbox.UncheckAsync();
+
+        // The doc comment above promises a settle wait against OnAuthorisedCorrectionToggled's
+        // re-render, but none previously existed — Check/UncheckAsync only guarantee the native
+        // input's checked state flipped, not that the Blazor circuit has processed the resulting
+        // @onchange and re-rendered the Correction Reason field / Position Profile dropdown yet.
+        // Wait for the reason field to actually match the expected reveal/hide state before
+        // returning so callers don't race that re-render.
+        if (value)
+            await CorrectionReasonInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+        else
+        {
+            try
+            {
+                await CorrectionReasonInput.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
+            }
+            catch (TimeoutException)
+            {
+                // Fall through to the caller's own assertion for a clearer failure message.
+            }
+        }
     }
 
     /// <summary>
@@ -440,7 +460,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task SaveNewVacancyAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        await page.WaitForURLAsync("**/vacancies", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/vacancies", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
@@ -499,14 +519,14 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task ConfirmDiscardChangesAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
-        await page.WaitForURLAsync("**/vacancies", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/vacancies", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
     public async Task ConfirmSaveFromUnsavedChangesDialogAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-        await page.WaitForURLAsync("**/vacancies", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/vacancies", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
@@ -516,7 +536,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task CloseAndWaitForListAsync()
     {
         await ClickCloseAsync();
-        await page.WaitForURLAsync("**/vacancies", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/vacancies", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 

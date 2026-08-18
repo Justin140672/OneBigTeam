@@ -13,8 +13,11 @@ namespace HR.Web.E2E.Tests.Tests;
 /// choosing "Save" from that prompt must navigate away even though the page's own Save button
 /// doesn't.
 /// </summary>
-[Collection("E2E")]
-public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestBase(fixture)
+// Moved from "CrossUser" to "HrSettingsSerial": this file mutates the same single shared
+// CompanySettings.TimeZone row (Regional section) that the HrSettingsSerial collection exists to
+// serialize — see HrSettingsSerialCollection. Putting it here avoids forcing an entire CrossUser
+// subgroup to block on an unrelated (Settings-row) concern.
+public sealed class CompanyEditCloseBehaviorTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

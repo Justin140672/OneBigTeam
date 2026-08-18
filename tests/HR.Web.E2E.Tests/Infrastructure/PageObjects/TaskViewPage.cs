@@ -38,6 +38,28 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     }
 
     /// <summary>
+    /// Navigates to the given employee's own Tasks tab and opens whichever task row's title
+    /// exactly matches <paramref name="taskTitle"/>, rather than a known task id. Used when the
+    /// task was just created as a side effect of another action (e.g. CreateAssetAssignmentHandler
+    /// auto-creating an "Acknowledge receipt of asset" task) so its id isn't known ahead of time —
+    /// TaskList.razor's row title span always renders the task's exact Title text (see its
+    /// data-testid="task-view-btn-{item.Id}" sibling attribute), so matching on title is reliable
+    /// as long as the title is unique among the employee's current tasks, same assumption
+    /// GoToAsync's per-id lookup makes about there being exactly one matching row.
+    /// The employee must be the currently logged-in user (this is the self-service route).
+    /// </summary>
+    public async Task GoToByTitleAsync(Guid companyId, Guid employeeId, string taskTitle)
+    {
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}/profile?tab=tasks");
+
+        var row = page.GetByRole(AriaRole.Button, new() { Name = taskTitle, Exact = true });
+        await row.WaitForAsync(new() { Timeout = 20_000 });
+        await row.ClickAsync();
+
+        await WaitForLoadedAsync();
+    }
+
+    /// <summary>
     /// Waits for the dialog to be visible and its content to finish loading — the header shows
     /// a "Task" placeholder while the task detail is still being fetched, so this waits for the
     /// title to become anything else. Call this after opening the dialog via any entry point
@@ -49,6 +71,20 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
         await page.WaitForFunctionAsync(
             "document.querySelector('.task-view-dialog [data-testid=\"task-title\"]')?.textContent?.trim() !== 'Task'",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+
+        // The title flipping away from the "Task" placeholder above only proves the task's own
+        // header data has loaded — the type-specific panel below it (acknowledgement, return,
+        // document upload, leave review, probation review, etc.) is a separate conditional render
+        // that can still mount a tick later, same Syncfusion/Blazor "container before content"
+        // race already fixed on EmployeeAdminPage/MyProfilePage's asset grids and
+        // EmployeeEditPage's new-employee save. Callers that immediately call a Has*PanelAsync
+        // check right after GoToAsync/GoToByTitleAsync can otherwise see "not visible" for a panel
+        // that's genuinely there a moment later. Wait for whichever panel actually renders for
+        // this task's type, or the plain "Mark as Complete" button for a general task with no
+        // dedicated panel at all.
+        await page.WaitForSelectorAsync(
+            ".task-view-dialog [data-testid$='-panel'], .task-view-dialog [data-testid='complete-task-btn'], .task-view-dialog .card-header",
+            new() { Timeout = 15_000 });
     }
 
     /// <summary>Returns the task title shown in the dialog header.</summary>
@@ -66,7 +102,18 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     public async Task<string?> GetDetailAsync(string label)
     {
         var dt = Dialog.Locator("dl.row dt").Filter(new() { HasText = label }).First;
-        if (!await dt.IsVisibleAsync()) return null;
+        // A bare instant IsVisibleAsync() right after opening the dialog can race the detail
+        // list's own render (the same panel-content race WaitForLoadedAsync now waits for at the
+        // panel level, but individual dt/dd rows can still land a tick later) and return null
+        // before the row has actually appeared. Give it a bounded wait instead of failing fast.
+        try
+        {
+            await dt.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
         // The corresponding dd follows the dt in DOM order.
         return (await dt.Locator("~ dd").First.TextContentAsync())?.Trim();
     }

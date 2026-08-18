@@ -12,13 +12,15 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         string? search = null,
         int pageNumber = 1,
         int pageSize = 20,
-        Guid? departmentId = null)
+        Guid? departmentId = null,
+        string? status = null)
     {
         var query = HttpUtility.ParseQueryString(string.Empty);
         if (!string.IsNullOrWhiteSpace(search)) query["search"] = search;
         query["pageNumber"] = pageNumber.ToString();
         query["pageSize"] = pageSize.ToString();
         if (departmentId is not null) query["departmentId"] = departmentId.ToString();
+        if (!string.IsNullOrWhiteSpace(status)) query["status"] = status;
 
         try
         {

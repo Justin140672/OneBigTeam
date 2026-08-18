@@ -8,8 +8,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Verifies that an HR Administrator can create a new employee and that
 /// the employee appears in the employee list afterwards.
 /// </summary>
-[Collection("E2E")]
-public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId        = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid JamesOkaforId = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -211,7 +210,17 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
 
         await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
 
-        var departmentTextBeforeSave = await empEdit.GetSelectedDepartmentTextAsync();
+        // Changing Position Profile auto-populates Department/Location from the newly-selected
+        // profile via a server round-trip — reading the Department field immediately can race that
+        // update and observe the previous profile's ("Account Executive" -> "Sales") stale value.
+        // Poll for the expected post-change value rather than asserting instantly.
+        string? departmentTextBeforeSave = null;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            departmentTextBeforeSave = await empEdit.GetSelectedDepartmentTextAsync();
+            if (departmentTextBeforeSave == "Engineering") break;
+            await _page.WaitForTimeoutAsync(250);
+        }
         Assert.Equal("Engineering", departmentTextBeforeSave);
 
         var locationTextBeforeSave = await empEdit.GetSelectedLocationTextAsync();

@@ -20,10 +20,30 @@ public sealed class LeaveSummaryReportPage(IPage page, string baseUrl)
 
     public async Task<IReadOnlyList<string>> GetColumnHeadersAsync()
     {
-        var headers = await page.Locator(".e-headercell").AllAsync();
-        var result = new List<string>();
-        foreach (var header in headers)
-            result.Add((await header.TextContentAsync())?.Trim() ?? "");
+        // Same race as MyProfilePage.GetCompanyDocumentsGridColumnHeadersAsync — the row/empty
+        // wait after Apply/GroupBy doesn't guarantee the header cells' own separate Syncfusion JS
+        // render pass has finished, so an instant AllAsync() can read zero headers. A single
+        // point-in-time WaitForSelectorAsync(".e-headercell") isn't enough on its own either: a
+        // GroupBy change can trigger a second reload shortly after the first header cells appear
+        // (detach + re-render), so the momentary "at least one exists" check can still be
+        // immediately followed by reading a stale/emptied collection. Poll until a genuinely
+        // non-empty set of header texts is observed instead of trusting a single snapshot.
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        List<string> result;
+        do
+        {
+            await page.WaitForSelectorAsync(".e-headercell", new() { Timeout = 15_000 });
+            var headers = await page.Locator(".e-headercell").AllAsync();
+            result = new List<string>();
+            foreach (var header in headers)
+                result.Add((await header.TextContentAsync())?.Trim() ?? "");
+
+            if (result.Any(h => !string.IsNullOrWhiteSpace(h)))
+                return result;
+
+            await page.WaitForTimeoutAsync(200);
+        } while (DateTime.UtcNow < deadline);
+
         return result;
     }
 

@@ -25,8 +25,7 @@ namespace HR.Web.E2E.Tests.Tests;
 ///     Carlos Rivera directly.
 ///   - Tom Williams (tom.williams@acme.example) — plain Employee, used for the denial test.
 /// </summary>
-[Collection("E2E")]
-public sealed class ManagerDashboardTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE2ETestBase<ManagerPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

@@ -8,8 +8,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Verifies that the TOIL balance card is visible on the admin employee leave tab
 /// and that the admin leave tab renders all expected balance sections.
 /// </summary>
-[Collection("E2E")]
-public sealed class ToilBalanceDisplayTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class ToilBalanceDisplayTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");

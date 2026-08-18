@@ -25,8 +25,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// SharedDocumentCompleteReviewTests' own "Last reviewed by Laura Bennett" assertion), so the
 /// Reviewer column is asserted against that same fixed name throughout.
 /// </summary>
-[Collection("E2E")]
-public sealed class SharedDocumentReviewHistoryTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SharedDocumentReviewHistoryTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

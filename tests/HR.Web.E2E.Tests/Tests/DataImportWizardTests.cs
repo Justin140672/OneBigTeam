@@ -10,8 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// create employee records. Also covers the Download Template and Download Error Report
 /// affordances on the Upload and Preview &amp; Confirm steps.
 /// </summary>
-[Collection("E2E")]
-public sealed class DataImportWizardTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

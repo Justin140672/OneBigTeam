@@ -13,8 +13,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// ApplicationToEmployeeFlowTests. Creates a fresh candidate, vacancy and external recruiter each
 /// run (unique names) to avoid colliding with previous runs' data.
 /// </summary>
-[Collection("E2E")]
-public sealed class ApplicationSourceExternalRecruiterTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class ApplicationSourceExternalRecruiterTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

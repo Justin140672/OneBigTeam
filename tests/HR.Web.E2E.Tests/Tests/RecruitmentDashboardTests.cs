@@ -19,8 +19,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Engineer' vacancy" since other E2E tests in this suite create additional open vacancies
 /// against the same shared Acme company.
 /// </summary>
-[Collection("E2E")]
-public sealed class RecruitmentDashboardTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class RecruitmentDashboardTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail  = "laura.bennett@acme.example";

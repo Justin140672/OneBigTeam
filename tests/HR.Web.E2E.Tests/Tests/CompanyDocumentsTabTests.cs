@@ -20,8 +20,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Williams (tom.williams@acme.example, employee ID 30000000-...-004), the employee persona used
 /// throughout, without needing any explicit audience configuration.
 /// </summary>
-[Collection("E2E")]
-public sealed class CompanyDocumentsTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class CompanyDocumentsTabTests(CrossUserFixture fixture) : CrossUserDocumentsAndRequestsTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");

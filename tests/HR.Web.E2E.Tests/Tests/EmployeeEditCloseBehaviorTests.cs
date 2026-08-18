@@ -10,8 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Employment tab's own independently-saved model — so an edit made purely on the Employment
 /// tab must still trigger the Close prompt, and Discard/Save from that prompt must cover both.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeEditCloseBehaviorTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeEditCloseBehaviorTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     // Marcus Diallo — seeded HR Advisor with no manager set (also used by AssignManagerTests).

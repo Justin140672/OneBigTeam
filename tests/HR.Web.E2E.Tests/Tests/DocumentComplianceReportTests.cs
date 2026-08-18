@@ -9,8 +9,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// loading (summary stat cards and grid columns), the Position Profile dropdown filter, and
 /// export. Catalog-page navigation coverage lives in <see cref="ReportCatalogTests"/>.
 /// </summary>
-[Collection("E2E")]
-public sealed class DocumentComplianceReportTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class DocumentComplianceReportTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

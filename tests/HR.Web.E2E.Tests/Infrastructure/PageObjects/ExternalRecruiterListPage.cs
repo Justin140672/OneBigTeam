@@ -24,7 +24,7 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
     public async Task ClickNewAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/external-recruiters/new", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/external-recruiters/new", new() { Timeout = 30_000 });
     }
 
     public async Task<bool> HasItemAsync(string agencyNameFragment)

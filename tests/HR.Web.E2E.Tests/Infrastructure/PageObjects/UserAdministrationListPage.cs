@@ -110,8 +110,18 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
     public async Task<string?> GetActionErrorAsync()
     {
         var alert = page.Locator(".alert-danger.alert-dismissible");
-        if (!await alert.IsVisibleAsync())
+        // The alert only appears after the server round-trip from the Resend/Cancel click
+        // completes — checking IsVisibleAsync() immediately races that round-trip and returns
+        // null before the alert has had a chance to render. Give it a short window to appear;
+        // a genuine "no error" case (Assert.Null callers) will simply time out and fall through.
+        try
+        {
+            await alert.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
             return null;
+        }
         return (await alert.InnerTextAsync()).Trim();
     }
 }

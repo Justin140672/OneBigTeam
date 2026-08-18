@@ -14,8 +14,8 @@ namespace HR.Web.E2E.Tests.Tests;
 ///
 /// Like SignupToCheckYourEmailJourneyTests, this drives a plain HTML form (no Blazor circuit).
 /// </summary>
-[Collection("E2E")]
-public sealed class SignupPageRedesignTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SignupPageRedesignTests(ParallelBlankPersonaFixture fixture)
+    : SupabaseAuthSerialBlankTestBase(fixture)
 {
     [Fact]
     public async Task SignupHeader_LoginLink_PointsAtWebLogin_NotHash()
@@ -80,7 +80,12 @@ public sealed class SignupPageRedesignTests(AppFixture fixture) : E2ETestBase(fi
         await signUp.FillAsync(companyName, firstName, lastName, email, password);
         await signUp.SubmitAsync();
 
-        await _page.WaitForURLAsync(new Regex("/check-your-email"), new() { Timeout = 20_000 });
+        // /signup-submit now makes a real Supabase Auth account-creation call (see the
+        // "fixing supabase auth" work) before it can redirect — that's a genuine external network
+        // round trip, not a local Blazor/grid render, so it needs materially more headroom than
+        // the 20s that was enough for the old dev-stub signup. 40s matches the margin used
+        // elsewhere in this suite for other real-network-call waits.
+        await _page.WaitForURLAsync(new Regex("/check-your-email"), new() { Timeout = 40_000 });
 
         return (companyName, firstName, lastName, email);
     }
@@ -98,7 +103,10 @@ public sealed class SignupPageRedesignTests(AppFixture fixture) : E2ETestBase(fi
         await signUp.FillAsync(companyName, firstName, lastName, email, "AnotherP@ss123");
         await signUp.SubmitAsync();
 
-        await _page.WaitForURLAsync(new Regex("/signup\\?"), new() { Timeout = 20_000 });
+        // Same real-Supabase-call reasoning as SignUpAsync's own wait above — this second submit
+        // also round-trips to Supabase (to discover the email already exists) before /signup-submit
+        // can redirect back.
+        await _page.WaitForURLAsync(new Regex("/signup\\?"), new() { Timeout = 40_000 });
         Assert.Contains("existingEmail=true", _page.Url);
 
         Assert.True(await signUp.IsExistingAccountMessageVisibleAsync());
@@ -124,7 +132,8 @@ public sealed class SignupPageRedesignTests(AppFixture fixture) : E2ETestBase(fi
         await signUp.FillAsync(companyName, firstName, lastName, email, "AnotherP@ss123");
         await signUp.SubmitAsync();
 
-        await _page.WaitForURLAsync(new Regex("/signup\\?"), new() { Timeout = 20_000 });
+        // Same real-Supabase-call reasoning as above.
+        await _page.WaitForURLAsync(new Regex("/signup\\?"), new() { Timeout = 40_000 });
 
         Assert.Equal(companyName, await signUp.GetCompanyNameValueAsync());
         Assert.Equal(firstName, await signUp.GetFirstNameValueAsync());

@@ -18,13 +18,14 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   project's convention expects for every list+edit page pair).
 ///
 /// Uses Laura Bennett (HR Administrator) and Tom Williams (plain Employee) against the seeded
-/// Acme company, matching the personas described for this feature. "Emma Jones" and "Sophie
-/// Laurent" are seeded Acme employees with no corresponding dev-persona user account (see
-/// EmployeesModule's MakeAcme seed list vs. IdentityModule.SeedDevUserAsync's persona list), so
-/// they are the "NoAccount" candidates the invite wizard's employee picker exercises.
+/// Acme company, matching the personas described for this feature. "Emma Jones" is a seeded Acme
+/// employee with no corresponding dev-persona user account (see EmployeesModule's MakeAcme seed
+/// list vs. IdentityModule.SeedDevUserAsync's persona list), so she is the "NoAccount" invite
+/// target for the happy-path test below. The Resend/Cancel toolbar tests create their own fresh
+/// employee per run instead of reusing another shared seeded "no account" employee (see
+/// CreateFreshUninvitedEmployeeAsync's doc comment for why).
 /// </summary>
-[Collection("E2E")]
-public sealed class UserAdministrationManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -38,11 +39,47 @@ public sealed class UserAdministrationManagementTests(AppFixture fixture) : E2ET
     // unlinked seeded employee at that point.
     private const string UninvitedEmployeeName = "Emma Jones";
 
-    // Second seeded no-account employee (see the class doc comment) — a distinct invite target
-    // for the Resend/Cancel toolbar tests below, so they don't collide with
-    // InviteEmployee_EndToEnd_ShowsPendingInvitationInGrid's use of Emma Jones (which leaves her
-    // permanently Pending on the shared dev database).
-    private const string SecondUninvitedEmployeeName = "Sophie Laurent";
+    /// <summary>
+    /// Creates a fresh, uniquely-named Acme employee with no linked user account, to use as an
+    /// invite target for the Resend/Cancel toolbar tests below.
+    ///
+    /// Previously these tests used the shared seeded "Sophie Laurent" employee as their invite
+    /// target. That collided with EmployeeUserAccountColumnTests.
+    /// QuickInvite_ForNoUserEmployee_OpensPreselectedDialog_AndCompletesToPendingInvitation, which
+    /// also invites Sophie Laurent (to prove the row-level Quick Invite flow) — under real
+    /// parallel execution the two tests race to invite/resend/cancel the same seeded employee,
+    /// leaving her in an unpredictable Pending/Cancelled state depending on run order, and
+    /// EmployeeUserAccountColumnTests.UserAccountColumn_ShowsNoUserIconLabelAndInviteLink_ForEmployeeWithoutAccount
+    /// (a read-only test that still expects her to be "No User") would then fail too. A freshly
+    /// created employee has no linked user account (employee creation does not provision one), so
+    /// it satisfies the same "eligible NoUser invite target" precondition without touching shared
+    /// seed data.
+    /// </summary>
+    private async Task<string> CreateFreshUninvitedEmployeeAsync()
+    {
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"Invite{unique}";
+        var workEmail = $"e2e.invite{unique}@acme.example";
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SaveNewEmployeeAsync();
+
+        return lastName;
+    }
 
     [Fact]
     public async Task HrAdministrator_SeesUserAdministrationGrid()
@@ -79,7 +116,10 @@ public sealed class UserAdministrationManagementTests(AppFixture fixture) : E2ET
             "A plain Employee should not see the 'User Administration' nav link");
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/user-administration");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // See E2ETestBase.WaitForUrlToStopContainingAsync's doc comment: the redirect is a
+        // client-side Blazor NavigateTo, not a full page navigation, so NetworkIdle after the
+        // initial GET is not a reliable signal that the redirect has completed.
+        await WaitForUrlToStopContainingAsync("/user-administration");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/user-administration"),
@@ -131,24 +171,26 @@ public sealed class UserAdministrationManagementTests(AppFixture fixture) : E2ET
         await login.GoToAsync();
         await login.LoginAsync(HrAdminEmail);
 
+        var targetName = await CreateFreshUninvitedEmployeeAsync();
+
         await employees.GoToAsync(AcmeId);
-        await employees.ClickInviteUserLinkAsync(SecondUninvitedEmployeeName);
+        await employees.ClickInviteUserLinkAsync(targetName);
         await employees.CompleteQuickInviteAsync([]);
 
         await list.GoToAsync(AcmeId);
-        Assert.Equal("Pending", await list.GetInvitationStatusAsync(SecondUninvitedEmployeeName));
+        Assert.Equal("Pending", await list.GetInvitationStatusAsync(targetName));
 
-        await list.SelectRowAsync(SecondUninvitedEmployeeName);
+        await list.SelectRowAsync(targetName);
         await list.ClickResendInvitationAsync();
 
         Assert.Null(await list.GetActionErrorAsync());
-        Assert.Equal("Pending", await list.GetInvitationStatusAsync(SecondUninvitedEmployeeName));
+        Assert.Equal("Pending", await list.GetInvitationStatusAsync(targetName));
 
-        await list.SelectRowAsync(SecondUninvitedEmployeeName);
+        await list.SelectRowAsync(targetName);
         await list.ClickCancelInvitationAsync();
 
         Assert.Null(await list.GetActionErrorAsync());
-        Assert.Equal("Cancelled", await list.GetInvitationStatusAsync(SecondUninvitedEmployeeName));
+        Assert.Equal("Cancelled", await list.GetInvitationStatusAsync(targetName));
     }
 
     [Theory]

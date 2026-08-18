@@ -21,8 +21,8 @@ namespace HR.Web.E2E.Tests.Tests;
 ///      local/E2E testing can get a company into the Active state without a live Supabase
 ///      verification click.
 /// </summary>
-[Collection("E2E")]
-public sealed class VerifyEmailJourneyTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class VerifyEmailJourneyTests(ParallelBlankPersonaFixture fixture)
+    : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
     [Fact]
     public async Task VerifyEmail_WithMissingCode_RedirectsToVerifyEmailError()

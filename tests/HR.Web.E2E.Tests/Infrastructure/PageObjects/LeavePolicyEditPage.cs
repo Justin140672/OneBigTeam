@@ -29,7 +29,7 @@ public sealed class LeavePolicyEditPage(IPage page, string baseUrl)
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        await page.WaitForURLAsync("**/leave-policies", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/leave-policies", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
@@ -71,14 +71,14 @@ public sealed class LeavePolicyEditPage(IPage page, string baseUrl)
     public async Task ConfirmDiscardChangesAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
-        await page.WaitForURLAsync("**/leave-policies", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/leave-policies", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
     public async Task ConfirmSaveFromUnsavedChangesDialogAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-        await page.WaitForURLAsync("**/leave-policies", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/leave-policies", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
@@ -88,7 +88,7 @@ public sealed class LeavePolicyEditPage(IPage page, string baseUrl)
     public async Task CloseAndWaitForListAsync()
     {
         await ClickCloseAsync();
-        await page.WaitForURLAsync("**/leave-policies", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/leave-policies", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 }

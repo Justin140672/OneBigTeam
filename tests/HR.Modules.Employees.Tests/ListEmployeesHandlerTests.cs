@@ -172,6 +172,28 @@ public class ListEmployeesHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_EmployeeNumber_Matching_The_Employee()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-1234", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
+
+        var result = await handler.HandleAsync(
+            new ListEmployeesRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = result.Value!.Items.Single();
+        Assert.Equal("EMP-1234", item.EmployeeNumber);
+    }
+
+    [Fact]
     public async Task HandleAsync_Filters_By_DepartmentId()
     {
         await using var context = BuildContext();

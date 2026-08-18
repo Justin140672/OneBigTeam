@@ -27,8 +27,8 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   - James Okafor (james.okafor@acme.example) — Manager only, not HrAdministrator or Recruiter
 ///     (see ManagerDashboardTests).
 /// </summary>
-[Collection("E2E")]
-public sealed class SidebarNavigationTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SidebarNavigationTests(ParallelBlankPersonaFixture fixture)
+    : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail  = "laura.bennett@acme.example";

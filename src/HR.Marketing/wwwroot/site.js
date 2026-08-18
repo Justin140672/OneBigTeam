@@ -102,10 +102,14 @@ function calculatePricing(employees) {
       (employees - secondTierLimit) * thirdTierRate;
   }
 
+  // Mirrors PricingCalculator.Calculate on the server: capture whether the tier-based total
+  // fell below the minimum charge *before* the floor is applied, so callers can announce the
+  // minimum-charge state distinctly rather than just showing the floored total.
+  const minimumChargeApplied = monthly < minimumMonthlyCharge;
   monthly = Math.max(monthly, minimumMonthlyCharge);
   const effectivePricePerEmployee = employees > 0 ? monthly / employees : 0;
 
-  return { monthly, effectivePricePerEmployee };
+  return { monthly, effectivePricePerEmployee, minimumChargeApplied };
 }
 
 function parseEmployeeCount(rawValue) {
@@ -139,7 +143,8 @@ if (pricingEstimator) {
   const employeeSlider = pricingEstimator.querySelector("#employee-slider");
   const errorElement = pricingEstimator.querySelector("#employee-count-error");
   const activeEmployeesElement = pricingEstimator.querySelector("[data-active-employees]");
-  const monthlyPriceElement = pricingEstimator.querySelector("[data-monthly-price]");  
+  const monthlyPriceElement = pricingEstimator.querySelector("[data-monthly-price]");
+  const monthlyPriceValueElement = pricingEstimator.querySelector("[data-monthly-price-value]");
   const effectivePriceElement = pricingEstimator.querySelector("[data-effective-price]");
   const ctaStandard = pricingEstimator.querySelector("[data-cta-standard]");
   const ctaLarge = pricingEstimator.querySelector("[data-cta-large]");
@@ -158,27 +163,47 @@ if (pricingEstimator) {
   // a new interruption for every pixel of slider movement.
   let liveRegionTimeoutId;
 
-  function announcePrice(employees, monthly, effectivePricePerEmployee) {
+  // Announces the *settled* price to screen readers via the polite role="status" region.
+  // Distinct from the always-on-screen result (see monthlyPriceElement/monthlyPriceValueElement),
+  // which updates instantly on every input event so sighted users see live feedback while
+  // dragging the slider. The three possible states below (custom pricing, minimum charge,
+  // standard tiered price) mirror PricingCtaResolver.Resolve and PricingCalculator.Calculate
+  // on the server.
+  function announcePrice(employees, monthly, effectivePricePerEmployee, isLargeOrganisation, minimumChargeApplied) {
     if (!priceLiveRegion) return;
 
     window.clearTimeout(liveRegionTimeoutId);
     liveRegionTimeoutId = window.setTimeout(() => {
-      priceLiveRegion.textContent =
-        `${employees} employees: ${currencyFormatter.format(monthly)} per month, ` +
-        `equivalent to ${currencyFormatter.format(effectivePricePerEmployee)} per employee.`;
+      if (isLargeOrganisation) {
+        priceLiveRegion.textContent =
+          `${employees} active employees is a larger organisation — custom pricing applies. ` +
+          `Contact sales for a tailored plan.`;
+      } else if (minimumChargeApplied) {
+        priceLiveRegion.textContent =
+          `${employees} active employees: minimum charge of ${currencyFormatter.format(monthly)} ` +
+          `per month applies, before VAT.`;
+      } else {
+        priceLiveRegion.textContent =
+          `${employees} active employees: ${currencyFormatter.format(monthly)} per month before VAT, ` +
+          `equivalent to ${currencyFormatter.format(effectivePricePerEmployee)} per employee.`;
+      }
     }, 400);
   }
 
   function render(employees) {
-    const { monthly, effectivePricePerEmployee } = calculatePricing(employees);
+    const { monthly, effectivePricePerEmployee, minimumChargeApplied } = calculatePricing(employees);
     const isLargeOrganisation = employees > largeOrganisationThreshold;
 
     if (activeEmployeesElement) activeEmployeesElement.textContent = String(employees);
-    if (monthlyPriceElement) monthlyPriceElement.textContent = `${currencyFormatter.format(monthly)}/month`;
+    if (monthlyPriceValueElement) {
+      monthlyPriceValueElement.textContent = `${currencyFormatter.format(monthly)}/month`;
+    } else if (monthlyPriceElement) {
+      monthlyPriceElement.textContent = `${currencyFormatter.format(monthly)}/month`;
+    }
     if (effectivePriceElement) {
       effectivePriceElement.textContent = `Equivalent to ${currencyFormatter.format(effectivePricePerEmployee)} per employee`;
     }
-    announcePrice(employees, monthly, effectivePricePerEmployee);
+    announcePrice(employees, monthly, effectivePricePerEmployee, isLargeOrganisation, minimumChargeApplied);
 
     if (ctaStandard) ctaStandard.hidden = isLargeOrganisation;
     if (ctaStandardMessage) ctaStandardMessage.hidden = isLargeOrganisation;

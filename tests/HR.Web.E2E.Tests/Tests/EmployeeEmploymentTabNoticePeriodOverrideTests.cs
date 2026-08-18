@@ -22,8 +22,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// employee assigned to it that doesn't set its own override resolves straight through to
 /// the company default (Months / 1, unmodified from CompanySettings' seeded default).
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

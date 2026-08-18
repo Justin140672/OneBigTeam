@@ -1,0 +1,58 @@
+@page "/coming-soon"
+@using HR.Marketing.Services
+
+<PageTitle>Coming Soon | One Big Team</PageTitle>
+<HeadContent>
+    <meta name="description" content="See what's coming next to One Big Team, including AI-powered position profiles, employee webhooks and an AI help assistant.">
+</HeadContent>
+
+<SiteHeader CurrentPage="coming-soon" />
+
+<main>
+    <section class="pricing-hero section-band">
+        <div class="section-inner hero-copy">
+            <h1>More is coming to One Big Team</h1>
+            <p class="hero-text">
+                We're continually improving One Big Team. Here's a look at some of the features we're planning next.
+            </p>
+        </div>
+    </section>
+
+    @foreach (var group in StatusGroups)
+    {
+        var items = UpcomingFeatureCatalog.All.Where(f => f.Status == group.Status).ToList();
+        if (items.Count == 0)
+        {
+            continue;
+        }
+
+        <section class="section @(group.Muted ? "section-muted" : "")">
+            <div class="section-inner">
+                <div class="section-heading">
+                    <h2>@group.Heading</h2>
+                </div>
+                <div class="card-grid">
+                    @foreach (var feature in items)
+                    {
+                        <div class="card">
+                            <span class="card-icon" aria-hidden="true"><Icon Name="@feature.IconName" /></span>
+                            <h3>@feature.Title</h3>
+                            <p>@feature.Description</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </section>
+    }
+</main>
+
+<SiteFooter />
+
+@code {
+    private static readonly (UpcomingFeatureStatus Status, string Heading, bool Muted)[] StatusGroups =
+    {
+        (UpcomingFeatureStatus.ComingSoon, "Coming soon", false),
+        (UpcomingFeatureStatus.Planned, "Planned", true),
+        (UpcomingFeatureStatus.Exploring, "Exploring", false),
+    };
+}

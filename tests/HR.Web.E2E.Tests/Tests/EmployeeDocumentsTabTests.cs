@@ -8,8 +8,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Verifies that the admin employee Documents tab shows the seeded documents
 /// and that HR can see document titles in the grid.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeDocumentsTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeDocumentsTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");
@@ -124,7 +123,11 @@ public sealed class EmployeeDocumentsTabTests(AppFixture fixture) : E2ETestBase(
         // to avoid a false pass/fail if these tests run against the same shared Tom Williams row.
         await empAdmin.OpenRequestDocumentDialogSelectTypeThenCancelAsync("Right To Work");
 
-        Assert.False(await _page.Locator(".request-document-dialog").IsVisibleAsync(),
+        // ".request-document-dialog" matches multiple elements (the SfDialog container, the
+        // role="dialog" element itself, and its close-icon button all carry this CssClass), so an
+        // unscoped IsVisibleAsync() throws a Playwright strict-mode violation rather than
+        // resolving. .First mirrors EmployeeAdminPage's own scoping convention for this selector.
+        Assert.False(await _page.Locator(".request-document-dialog").First.IsVisibleAsync(),
             "Expected the Request Document dialog to actually close after Cancel + Discard Changes");
 
         // No request should have been created for the cancelled attempt.

@@ -13,8 +13,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// audit event present — avoiding interference from other tests and from seed data (seed data is
 /// inserted directly into the database and does not go through the audited handlers).
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeAuditHistoryTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeAuditHistoryTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomWilliams = Guid.Parse("30000000-0000-0000-0000-000000000004");

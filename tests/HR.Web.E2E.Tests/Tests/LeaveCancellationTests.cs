@@ -9,8 +9,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// request is removed from the table — balance is unaffected because the request
 /// was never approved.
 /// </summary>
-[Collection("E2E")]
-public sealed class LeaveCancellationTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class LeaveCancellationTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");

@@ -47,7 +47,7 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
     public async Task SaveNewCandidateAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        await page.WaitForURLAsync("**/candidates", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/candidates", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
@@ -65,8 +65,23 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>Returns true if the "hired and linked to an employee" banner is visible on the candidate detail page.</summary>
-    public async Task<bool> HasHiredBannerAsync() =>
-        await page.Locator(".alert-success:has-text('hired and linked')").IsVisibleAsync();
+    // A bare IsVisibleAsync() snapshot right after navigating in can catch a transient
+    // pre-load render pass — the "hired and linked" banner depends on the candidate detail
+    // page's own async load of the just-created hire link, which can still be in flight the
+    // instant after GoToAsync's wait condition (the First name input) is satisfied. Retry.
+    public async Task<bool> HasHiredBannerAsync()
+    {
+        try
+        {
+            await Assertions.Expect(page.Locator(".alert-success:has-text('hired and linked')"))
+                .ToBeVisibleAsync(new() { Timeout = 15_000 });
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
+    }
 
     public Task<string> GetFirstNameAsync() =>
         page.GetByPlaceholder("First name").InputValueAsync();
@@ -84,14 +99,14 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
     public async Task ConfirmDiscardChangesAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
-        await page.WaitForURLAsync("**/candidates", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/candidates", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
     public async Task ConfirmSaveFromUnsavedChangesDialogAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-        await page.WaitForURLAsync("**/candidates", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/candidates", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
@@ -101,7 +116,7 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
     public async Task CloseAndWaitForListAsync()
     {
         await ClickCloseAsync();
-        await page.WaitForURLAsync("**/candidates", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/candidates", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 }

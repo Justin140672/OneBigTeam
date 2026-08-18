@@ -9,14 +9,17 @@ namespace HR.Web.E2E.Tests.Tests;
 ///
 /// Uses the seeded "Sarah Chen" employee (ID: 30000000-0000-0000-0000-000000000001) who has two
 /// seeded Annual compensation records: a closed starting salary of 120,000 GBP (6 Jan 2020 to
-/// 31 Dec 2022) and the current, open-ended 145,000 GBP record effective 1 Jan 2023.
+/// 31 Dec 2022) and the current, open-ended 145,000 GBP record effective 1 Jan 2023. Sarah is
+/// only ever READ here, never mutated.
+///
+/// The future-dated add/edit/delete tests below each create their own fresh, uniquely-named
+/// employee instead of reusing the shared Tom Williams — Tom is mutated by ~40+ other test files
+/// running in parallel, so adding/editing/deleting his compensation rows here would race those.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId     = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid SarahChen  = Guid.Parse("30000000-0000-0000-0000-000000000001");
-    private static readonly Guid TomWilliams = Guid.Parse("30000000-0000-0000-0000-000000000004");
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
@@ -144,19 +147,54 @@ public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBa
             "Expected a single unified empty-state message when there is no compensation data at all");
     }
 
+    /// <summary>
+    /// Creates a fresh, uniquely-named Acme employee and navigates to their Compensation History
+    /// tab. Used by the mutating future-compensation tests below instead of the shared Tom
+    /// Williams: Tom is reused by ~40+ other test files (job-title mutation, document/task status,
+    /// etc.), so tests that add/edit/delete compensation rows against him race those other tests
+    /// under real parallel execution even when the specific dates used don't literally collide.
+    /// A fresh employee has no seeded compensation record at all (unlike every seeded Acme
+    /// employee including Tom — see EmployeesModule's newHireCompensation seed array), which is
+    /// exactly what these "add a future record" tests need to start from.
+    /// </summary>
+    private async Task<EmployeeEditPage> CreateFreshEmployeeOnCompensationTabAsync(string labelSuffix)
+    {
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"Comp{labelSuffix}{unique}";
+        var workEmail = $"e2e.comp{labelSuffix.ToLowerInvariant()}{unique}@acme.example";
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SaveNewEmployeeAsync();
+
+        await empList.ClickEmployeeAsync(lastName);
+        await empEdit.OpenCompensationTabAsync();
+
+        return empEdit;
+    }
+
     [Fact]
     public async Task AddCompensation_WithFutureEffectiveDate_AppearsInHistoryWithEditAndDeleteActions()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
-        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Tom Williams has no existing records, so a future-dated add here can't collide with
-        // any auto-close/overlap logic exercised by other tests.
-        await empEdit.GoToAsync(AcmeId, TomWilliams);
-        await empEdit.OpenCompensationTabAsync();
+        var empEdit = await CreateFreshEmployeeOnCompensationTabAsync("Add");
 
         await empEdit.ClickAddCompensationAsync();
         await empEdit.FillAddCompensationEffectiveFromAsync("01/01/2030");
@@ -178,13 +216,11 @@ public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBa
     public async Task EditFutureCompensation_UpdatesSalary_WithoutChangingEffectiveDate()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
-        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await empEdit.GoToAsync(AcmeId, TomWilliams);
-        await empEdit.OpenCompensationTabAsync();
+        var empEdit = await CreateFreshEmployeeOnCompensationTabAsync("Edit");
 
         await empEdit.ClickAddCompensationAsync();
         await empEdit.FillAddCompensationEffectiveFromAsync("01/06/2030");
@@ -206,13 +242,11 @@ public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBa
     public async Task DeleteFutureCompensation_RemovesRecordFromHistory()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
-        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await empEdit.GoToAsync(AcmeId, TomWilliams);
-        await empEdit.OpenCompensationTabAsync();
+        var empEdit = await CreateFreshEmployeeOnCompensationTabAsync("Delete");
 
         await empEdit.ClickAddCompensationAsync();
         await empEdit.FillAddCompensationEffectiveFromAsync("01/12/2030");

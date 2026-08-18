@@ -8,8 +8,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Verifies that an HR Administrator can assign a manager to an employee
 /// via the Employment tab on the admin employee profile.
 /// </summary>
-[Collection("E2E")]
-public sealed class AssignManagerTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class AssignManagerTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     // Marcus Diallo — seeded HR Advisor with no manager set, suitable as the target for this test.

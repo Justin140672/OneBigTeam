@@ -62,11 +62,17 @@ public sealed class DeletionQueuePage(IPage page, string baseUrl)
         return cell.TextContentAsync();
     }
 
-    public Task ClickCancelDeletionAsync(string companyNameFragment) =>
-        RowByCompany(companyNameFragment).GetByRole(AriaRole.Button, new() { Name = "Cancel deletion" }).ClickAsync();
+    public async Task ClickCancelDeletionAsync(string companyNameFragment)
+    {
+        await RowByCompany(companyNameFragment).GetByRole(AriaRole.Button, new() { Name = "Cancel deletion" }).ClickAsync();
+        await CancelDeletionDialog.WaitForAsync(new() { Timeout = 15_000 });
+    }
 
-    public Task ClickExecuteNowAsync(string companyNameFragment) =>
-        RowByCompany(companyNameFragment).GetByRole(AriaRole.Button, new() { Name = "Execute now" }).ClickAsync();
+    public async Task ClickExecuteNowAsync(string companyNameFragment)
+    {
+        await RowByCompany(companyNameFragment).GetByRole(AriaRole.Button, new() { Name = "Execute now" }).ClickAsync();
+        await ExecuteDeletionDialog.WaitForAsync(new() { Timeout = 15_000 });
+    }
 
     // The shared AdminActionConfirmDialog, addressed by its per-action title so tests can
     // disambiguate "Cancel deletion" from "Execute deletion now" — see AdminActionConfirmDialog.razor

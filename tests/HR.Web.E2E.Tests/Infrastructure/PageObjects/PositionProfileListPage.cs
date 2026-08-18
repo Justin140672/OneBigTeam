@@ -19,7 +19,7 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
     public async Task ClickNewPositionProfileAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/position-profiles/new", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/position-profiles/new", new() { Timeout = 30_000 });
     }
 
     public Task<bool> HasPositionProfileAsync(string titleFragment) =>

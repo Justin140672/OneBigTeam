@@ -122,9 +122,27 @@ public sealed class BulkCompensationUpdateDialogPage(IPage page)
         await input.ClickAsync();
         await page.Keyboard.PressAsync("Control+A");
         await page.Keyboard.PressAsync("Delete");
+
+        // Unlike a plain numeric field, this one's ValueChanged recalculates the row's
+        // Difference/% Change cells on every change, so it's doing meaningfully more work per
+        // keystroke than e.g. EmployeeEditPage's notice-period-length field, which uses this exact
+        // same Click/Ctrl+A/Delete/PressSequentially sequence without issue. Observed corrupted
+        // results (e.g. "55000.008000" instead of "58000" — the pre-existing value with only part
+        // of the typed text appended) point at Delete's clear not having fully landed/settled
+        // before typing starts, and/or the per-keystroke recalculation re-rendering the input out
+        // from under a too-fast PressSequentiallyAsync. Give Delete a moment to land, then type
+        // with an explicit per-character delay (same mitigation already used for the equivalent
+        // "typing outruns a live-recalculating Syncfusion field" race in DropDownSelector).
+        await page.WaitForTimeoutAsync(150);
         if (value.Length > 0)
-            await input.PressSequentiallyAsync(value);
+            await input.PressSequentiallyAsync(value, new() { Delay = 50 });
         await page.Keyboard.PressAsync("Tab");
+
+        // Confirm the value actually committed rather than trusting the keystrokes landed —
+        // same "assert the round-trip actually happened" convention used throughout this suite.
+        await Assertions.Expect(input).ToHaveValueAsync(
+            new System.Text.RegularExpressions.Regex(System.Text.RegularExpressions.Regex.Escape(value)),
+            new() { Timeout = 10_000 });
     }
 
     /// <summary>

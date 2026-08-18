@@ -72,7 +72,20 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
 
     private ILocator DuplicateWarning => page.Locator("[data-testid='agency-name-duplicate-warning']");
 
-    public Task<bool> IsDuplicateWarningVisibleAsync() => DuplicateWarning.IsVisibleAsync();
+    public async Task<bool> IsDuplicateWarningVisibleAsync()
+    {
+        // The duplicate-name check is an async server round-trip triggered on blur — checking
+        // IsVisibleAsync() immediately after BlurAgencyNameAsync races that round-trip.
+        try
+        {
+            await DuplicateWarning.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     public async Task<string?> GetDuplicateWarningTextAsync() =>
         await DuplicateWarning.IsVisibleAsync() ? (await DuplicateWarning.TextContentAsync())?.Trim() : null;

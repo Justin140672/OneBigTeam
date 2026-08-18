@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
@@ -11,13 +12,13 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   - Seeded uploaded docs: Employment Contract, Offer Letter
 ///   - Seeded document request: Passport (b0000000-...-001, task a0000000-...-010)
 /// </summary>
-[Collection("E2E")]
-public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : SupabaseAuthSerialEmployeeTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");
 
     private const string TomEmail = "tom.williams@acme.example";
+    private const string HrAdminEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task SelfServiceDocumentsTab_ShowsSeededDocuments()
@@ -120,38 +121,128 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
         Assert.Contains("Passport", content, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Creates a brand-new employee via the standard New Employee form and returns their id and
+    /// work email, captured from the URL after navigating back into their profile from the
+    /// employee list. Caller must already be logged in as an HR administrator.
+    /// </summary>
+    private async Task<(Guid EmployeeId, string Email, string LastName)> CreateEmployeeAsync(
+        EmployeeListPage empList, EmployeeEditPage empEdit)
+    {
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"SelfDoc{unique}";
+        var workEmail = $"e2e.selfdoc.{unique}@acme.example";
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+
+        await empEdit.SaveNewEmployeeAsync();
+        await empList.ClickEmployeeAsync(lastName);
+
+        var match = System.Text.RegularExpressions.Regex.Match(_page.Url,
+            @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
+        return (Guid.Parse(match.Groups[1].Value), workEmail, lastName);
+    }
+
+    /// <summary>
+    /// Gives a freshly-created employee a real, working Supabase login via the dev-only
+    /// POST /api/dev/ensure-employee-login endpoint — see AssetAcknowledgementTaskTests'
+    /// EnsureEmployeeLoginAsync for the full rationale (a brand-new Employee row has no linked
+    /// UserProfile by construction). 404s outside Development.
+    /// </summary>
+    private async Task EnsureEmployeeLoginAsync(Guid employeeId, string email, string lastName)
+    {
+        using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };
+
+        // This endpoint's EnsureDevSupabaseUserAsync makes a real, network-dependent call to
+        // Supabase's Admin API (unlike most other E2E auth paths, which are faked under
+        // E2E_TESTING=true — see FakeSupabaseAuthGateway's own remarks) — a genuine transient
+        // failure/rate-limit response under this suite's concurrency can surface as a 500 here.
+        // Retry a couple of times before failing outright, and capture the response body on
+        // failure so a real, non-transient error is immediately diagnosable.
+        HttpResponseMessage? response = null;
+        string? body = null;
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            response = await http.PostAsJsonAsync("/api/dev/ensure-employee-login", new
+            {
+                EmployeeId = employeeId,
+                CompanyId  = AcmeId,
+                Email      = email,
+                FirstName  = "E2E",
+                LastName   = lastName,
+            });
+
+            if (response.IsSuccessStatusCode) return;
+
+            body = await response.Content.ReadAsStringAsync();
+            if (attempt < 3) await Task.Delay(1000 * attempt);
+        }
+
+        Assert.True(response!.IsSuccessStatusCode,
+            $"Expected /api/dev/ensure-employee-login to succeed, got {response.StatusCode}. Response body: {body}");
+    }
+
     [Fact]
     public async Task SelfServiceDocumentsTab_UploadRequestedDocument_CompletesTheRequest()
     {
-        // Tom's seeded Passport request is "Requested" — uploading against it via the grid row's
-        // new "Upload" button (EmployeeDocumentsTab.razor, EmployeeSelfUpload branch) should mark
-        // it Uploaded and remove the row's "Upload" action.
-        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
-        var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
+        // This used to upload against Tom Williams' seeded Passport request directly. That's
+        // irreversible (no "un-upload" action) and permanently flips the seeded request from
+        // "Requested" to "Uploaded" on the shared, long-lived E2E dev database — colliding with
+        // every other read-only test in this file and in EmployeeDocumentsTabTests that expects
+        // Tom's Passport request to still show "Requested"
+        // (Admin_Documents_Tab_Shows_Requested_Status_Badge_For_Outstanding_Request in particular).
+        // Same fix pattern as AssetAcknowledgementTaskTests/AssetReturnTaskTests: use a fresh
+        // employee (with a fresh "Certificate" document request) instead of Tom.
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList  = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit  = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
+        var profile  = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(TomEmail);
+        await login.LoginAsync(HrAdminEmail);
 
-        await profile.GoToAsync(AcmeId, TomId);
+        var (employeeId, email, lastName) = await CreateEmployeeAsync(empList, empEdit);
+
+        await empAdmin.GoToAsync(AcmeId, employeeId);
+        await empAdmin.OpenDocumentsTabAsync();
+        await empAdmin.RequestDocumentAsync("Certificate");
+
+        await EnsureEmployeeLoginAsync(employeeId, email, lastName);
+
+        await login.LoginAsync(email);
+        await profile.GoToAsync(AcmeId, employeeId);
         await profile.OpenDocumentsTabAsync();
 
         await _page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
-        Assert.True(await profile.HasUploadButtonForDocumentRequestAsync("Passport"),
-            "Expected an 'Upload' button on Tom's outstanding Passport request row");
+        Assert.True(await profile.HasUploadButtonForDocumentRequestAsync("Certificate"),
+            "Expected an 'Upload' button on the fresh employee's outstanding Certificate request row");
 
-        var tempFile = Path.Combine(Path.GetTempPath(), $"passport-{Guid.NewGuid():N}.pdf");
+        var tempFile = Path.Combine(Path.GetTempPath(), $"certificate-{Guid.NewGuid():N}.pdf");
         try
         {
             await File.WriteAllBytesAsync(tempFile, BuildTestPdf());
-            await profile.UploadRequestedDocumentAsync("Passport", tempFile);
+            await profile.UploadRequestedDocumentAsync("Certificate", tempFile);
 
             // The grid reloads after a successful upload — the request should no longer show an
             // "Upload" action (its status has moved on from "Requested").
-            Assert.False(await profile.HasUploadButtonForDocumentRequestAsync("Passport"),
-                "Expected the Passport request's 'Upload' button to disappear once the document has been uploaded");
+            Assert.False(await profile.HasUploadButtonForDocumentRequestAsync("Certificate"),
+                "Expected the Certificate request's 'Upload' button to disappear once the document has been uploaded");
         }
         finally
         {

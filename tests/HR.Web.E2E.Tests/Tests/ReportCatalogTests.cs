@@ -14,9 +14,11 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Acknowledgement reports. Access-control coverage (non-HR persona not
 /// seeing the Employee Directory card, direct-URL 403 handling on the report page itself) lives
 /// in <see cref="EmployeeDirectoryReportTests"/>.
+///
+/// Runs serialized against HrDashboardTests (HrFavouritesSerialTestBase) — both toggle Laura
+/// Bennett's shared, server-persisted report favourites. See GroupSerializedTestBases.cs.
 /// </summary>
-[Collection("E2E")]
-public sealed class ReportCatalogTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : HrFavouritesSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -103,6 +105,14 @@ public sealed class ReportCatalogTests(AppFixture fixture) : E2ETestBase(fixture
         // "HR Headcount Summary" and "Employee Directory" are both in the "Hr" category, with
         // "Employee Directory" sorting first alphabetically by default (E < H) — favouriting
         // "HR Headcount Summary" should move it ahead of "Employee Directory".
+        //
+        // Self-heal rather than assert-and-fail: if an earlier run's assertion failure ever left
+        // this favourited despite the try/finally below, asserting False unconditionally would
+        // fail every subsequent run forever with no way to recover. Clear any pre-existing
+        // favourite first so this test is self-repairing against the shared, long-lived E2E dev
+        // database.
+        if (await catalog.IsFavouritedAsync("HR Headcount Summary"))
+            await catalog.ClickFavouriteAsync("HR Headcount Summary");
         Assert.False(await catalog.IsFavouritedAsync("HR Headcount Summary"));
 
         try
@@ -244,25 +254,50 @@ public sealed class ReportCatalogTests(AppFixture fixture) : E2ETestBase(fixture
 
         await catalog.GoToAsync(AcmeId);
 
+        // Self-heal rather than assert-and-fail here: if an earlier run's assertion failure ever
+        // slipped past the try/finally below (or a completely different bug left this favourited),
+        // asserting False unconditionally would fail every single subsequent run forever with no
+        // way to recover, since the very check that should trigger cleanup would itself be the
+        // thing failing. Clear any pre-existing favourite first so this test is self-repairing
+        // against the shared, long-lived E2E dev database.
+        if (await catalog.IsFavouritedAsync("Employee Starter Report"))
+            await catalog.ClickFavouriteAsync("Employee Starter Report");
         Assert.False(await catalog.IsFavouritedAsync("Employee Starter Report"));
 
-        await catalog.ClickFavouriteAsync("Employee Starter Report");
-        Assert.True(await catalog.IsFavouritedAsync("Employee Starter Report"));
+        // Guard the mutating middle section with try/finally so an assertion failure here still
+        // un-favourites the report before the test exits — without this, a failed assertion (e.g.
+        // the "survived navigation" check below) leaves "Employee Starter Report" permanently
+        // favourited on the shared, long-lived E2E dev database, which then pollutes every other
+        // test that reads Laura Bennett's favourites (HrDashboardTests.FavouriteReportsWidget_
+        // ShowsEmptyState_WhenNothingFavourited and ...ShowsFavouritedReport_AndNavigatesToItOnClick
+        // in particular — both assume "Employee Starter Report" starts unfavourited). Same pattern
+        // as FavouriteToggle_PersistsAcrossReload_AndSortsFirstInCategory above.
+        try
+        {
+            await catalog.ClickFavouriteAsync("Employee Starter Report");
+            Assert.True(await catalog.IsFavouritedAsync("Employee Starter Report"));
 
-        // Navigate away into the report page itself, then back to the catalog — proves the
-        // favourite round-tripped through the server rather than only surviving in the same
-        // component instance's in-memory state.
-        await catalog.ClickCardAsync("Employee Starter Report");
-        await _page.WaitForURLAsync("**/reporting/employee-starters", new() { Timeout = 15_000 });
-        Assert.False(await report.HasLoadErrorAsync());
+            // Navigate away into the report page itself, then back to the catalog — proves the
+            // favourite round-tripped through the server rather than only surviving in the same
+            // component instance's in-memory state.
+            await catalog.ClickCardAsync("Employee Starter Report");
+            await _page.WaitForURLAsync("**/reporting/employee-starters", new() { Timeout = 15_000 });
+            Assert.False(await report.HasLoadErrorAsync());
 
-        await catalog.GoToAsync(AcmeId);
+            await catalog.GoToAsync(AcmeId);
 
-        Assert.True(await catalog.IsFavouritedAsync("Employee Starter Report"),
-            "Expected the favourite to survive navigating away to the report page and back");
+            Assert.True(await catalog.IsFavouritedAsync("Employee Starter Report"),
+                "Expected the favourite to survive navigating away to the report page and back");
+        }
+        finally
+        {
+            // Clean up so this test is repeatable against the shared, long-lived E2E dev database.
+            // GoToAsync back to the catalog first in case the try block failed before returning here.
+            await catalog.GoToAsync(AcmeId);
+            if (await catalog.IsFavouritedAsync("Employee Starter Report"))
+                await catalog.ClickFavouriteAsync("Employee Starter Report");
+        }
 
-        // Clean up so this test is repeatable against the shared, long-lived E2E dev database.
-        await catalog.ClickFavouriteAsync("Employee Starter Report");
         Assert.False(await catalog.IsFavouritedAsync("Employee Starter Report"));
     }
 }

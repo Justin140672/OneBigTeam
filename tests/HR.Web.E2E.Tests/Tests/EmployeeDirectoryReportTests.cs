@@ -11,8 +11,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// "reporting:view-hr"-gated data/export endpoints. Catalog-page coverage (search, favourites,
 /// navigation into this page) lives in <see cref="ReportCatalogTests"/>.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeDirectoryReportTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeDirectoryReportTests(ParallelBlankPersonaFixture fixture)
+    : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

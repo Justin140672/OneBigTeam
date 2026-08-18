@@ -7,8 +7,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Direct coverage of the Close / unsaved-changes prompt (EditPageBase) on the Sickness
 /// Category edit page.
 /// </summary>
-[Collection("E2E")]
-public sealed class SicknessCategoryEditCloseBehaviorTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SicknessCategoryEditCloseBehaviorTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

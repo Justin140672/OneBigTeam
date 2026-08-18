@@ -21,7 +21,12 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
     public async Task GoToAsync()
     {
         await page.GotoAsync($"{baseUrl}/dashboard/manager");
-        await page.WaitForSelectorAsync(".dashboard-greeting", new() { Timeout = 20_000 });
+        // Bumped 20s -> 35s: several tests in this file call this right after
+        // CreateEmployeeReportingToDavidAsync's full-form UI employee creation, and under the
+        // higher concurrent load from the many tests that now create fresh employees the same
+        // way, the dashboard's own widget data load can genuinely take longer than 20s. Same
+        // load-timing theory as the employee-save navigation timeout fix.
+        await page.WaitForSelectorAsync(".dashboard-greeting", new() { Timeout = 35_000 });
     }
 
     /// <summary>Returns true if a widget with the given header title is present on the dashboard.</summary>
@@ -113,6 +118,15 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
     public async Task<IReadOnlyList<string>> GetTeamMemberContactTextAsync(string nameFragment)
     {
         var card = MyTeamWidget.Locator(".team-card").Filter(new() { HasText = nameFragment }).First;
+
+        // GetMyTeamMemberNamesAsync only waits for ".team-card"/".widget-empty" to exist, which
+        // proves the cards themselves have rendered but not that each card's own contact-text
+        // spans (a separate nested render) have populated yet — reading immediately after can
+        // observe 0, or occasionally a previous card's stale content mid-swap. Wait for at least
+        // one contact-text span on this specific card before reading.
+        await card.Locator(".team-card-contact-text").First.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
         var spans = await card.Locator(".team-card-contact-text").AllAsync();
 
         var values = new List<string>();

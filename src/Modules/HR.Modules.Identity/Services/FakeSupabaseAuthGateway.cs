@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Identity.Services;
@@ -11,14 +13,18 @@ namespace HR.Modules.Identity.Services;
 // ExchangeCodeForSessionAsync failing here matches that existing, documented behaviour rather than
 // starting to fake success.
 //
-// EnsureDevUserAsync/SignInWithPasswordAsync are different: E2E's persona-switching (the primary
-// "log in as X" mechanism across most of the suite) goes through the same real Supabase
-// password-grant path as local dev now, and — unlike invite/resend — plain sign-in doesn't send
-// email, so it isn't subject to the same rate-limit concern. These two delegate to a real
-// SupabaseAuthGateway instance instead of faking, which requires the same dev Supabase secrets as
-// local dev (SupabaseAuth:ProjectUrl/PublishableKey/SecretKey/JwksUrl) to be available wherever
-// E2E runs — already true via user-secrets for a local run; a CI E2E job would need them supplied
-// as environment variables instead.
+// EnsureDevUserAsync/SignInWithPasswordAsync used to delegate to a real SupabaseAuthGateway
+// instance instead of faking, on the assumption that plain sign-in (unlike invite/resend, which
+// sends email) wasn't subject to the same rate-limit concern. That assumption turned out to be
+// wrong: live retry evidence (5 attempts, growing backoff up to 25s between each) still failed
+// 3-in-a-row for multiple personas in the same run — Supabase's Auth API rate-limits sign-in too
+// under this suite's login volume, and no amount of local retry/backoff/concurrency tuning can work
+// around a quota that's exhausted on Supabase's side. These two are now faked as well, minting a
+// locally-signed token via E2eFakeSupabaseJwt instead of calling Supabase at all — HR.Api's JWT
+// bearer validation (Program.cs's ConfigureSupabaseJwtBearer) accepts these tokens ONLY when
+// E2E_TESTING=true is also set for the API process itself (same flag, already proven to propagate
+// there — it's what activates this very class), via an added signing-key candidate that's
+// completely absent from the real Supabase JWKS validation path used everywhere else.
 internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFactory, IOptions<SupabaseAuthOptions> options) : ISupabaseAuthGateway
 {
     private readonly SupabaseAuthGateway _real = new(httpClientFactory, options);
@@ -39,8 +45,35 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
         throw new InvalidOperationException("No live Supabase project is configured for E2E testing.");
 
     public Task<Guid> EnsureDevUserAsync(string email, string password, CancellationToken cancellationToken) =>
-        _real.EnsureDevUserAsync(email, password, cancellationToken);
+        Task.FromResult(DeriveFakeUserId(email));
 
-    public Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken) =>
-        _real.SignInWithPasswordAsync(email, password, cancellationToken);
+    public Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)
+    {
+        // Every dev-persona/E2E login uses the same fixed seeded password (see
+        // SupabaseAuthGateway.DevSupabasePassword and LoginPage.DevPersonaPassword) — checked here
+        // so a deliberately-wrong-password E2E test still gets a rejection instead of unconditional
+        // success, mirroring what real Supabase's password-grant endpoint would do.
+        if (password != SupabaseAuthGateway.DevSupabasePassword)
+        {
+            throw new InvalidOperationException(
+                $"Fake E2E Supabase sign-in rejected for '{email}': password did not match the seeded dev password.");
+        }
+
+        var userId = DeriveFakeUserId(email);
+        var expiresAt = DateTimeOffset.UtcNow.AddHours(1);
+        var accessToken = E2eFakeSupabaseJwt.CreateAccessToken(
+            options.Value.ProjectUrl, userId, email, expiresAt - DateTimeOffset.UtcNow);
+
+        return Task.FromResult(new SupabaseSession(accessToken, "e2e-fake-refresh-token", userId, expiresAt));
+    }
+
+    // Deterministic per-email GUID so repeated calls (EnsureDevUserAsync then SignInWithPasswordAsync,
+    // or multiple SignInWithPasswordAsync calls across a run) always resolve to the same fake
+    // Supabase user id for a given email — mirrors real Supabase's idempotent "already exists"
+    // behaviour (SupabaseAuthGateway.EnsureDevUserAsync) without needing any storage.
+    private static Guid DeriveFakeUserId(string email)
+    {
+        var hash = MD5.HashData(Encoding.UTF8.GetBytes(email.Trim().ToLowerInvariant()));
+        return new Guid(hash);
+    }
 }

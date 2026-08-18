@@ -1,0 +1,28 @@
+@using Syncfusion.Blazor.SplitButtons
+
+<SfDropDownButton Content="More" IconCss="fa-solid fa-ellipsis-vertical" CssClass="e-flat hr-toolbar-more-btn"
+                   Items="_items" aria-label="More actions">
+    <DropDownButtonEvents ItemSelected="HandleItemSelected" />
+</SfDropDownButton>
+
+@code {
+    // Groups the lower-frequency toolbar actions (Print, Export, Columns) behind a single "More"
+    // overflow button so the toolbar gives visual priority to the actions used most often
+    // (search, filters, Add, Update selected) rather than treating every action equally.
+    [Parameter] public EventCallback<string> OnItemSelected { get; set; }
+
+    private static readonly List<DropDownMenuItem> _items =
+    [
+        new() { Id = "hr-print",         Text = "Print",          IconCss = "fa-solid fa-print" },
+        new() { Id = "hr-excel",         Text = "Export to Excel", IconCss = "fa-solid fa-file-excel" },
+        new() { Id = "hr-csv",           Text = "Export to CSV",   IconCss = "fa-solid fa-file-csv" },
+        new() { Id = "hr-pdf",           Text = "Export to PDF",   IconCss = "fa-solid fa-file-pdf" },
+        new() { Id = "hr-columns",       Text = "Columns",         IconCss = "fa-solid fa-table-columns" },
+    ];
+
+    private async Task HandleItemSelected(MenuEventArgs args)
+    {
+        if (args.Item?.Id is { } id)
+            await OnItemSelected.InvokeAsync(id);
+    }
+}

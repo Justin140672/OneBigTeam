@@ -79,6 +79,12 @@ public sealed class AdminUsersPage(IPage page, string baseUrl)
         await DropDownSelector.SelectAsync(page, CreatePanel, role);
 
         await CreatePanel.GetByRole(AriaRole.Button, new() { Name = "Create administrator" }).ClickAsync();
+
+        // Wait for the server round-trip to complete before the caller queries the table — either
+        // the new row appears or a create-error message is shown. Without this wait, callers that
+        // immediately assert via HasAdministratorAsync race the create request.
+        await page.Locator($"table.billing-history-table tbody tr:has-text('{email}'), .admin-action-error")
+            .First.WaitForAsync(new() { Timeout = 15_000 });
     }
 
     public Task<string?> GetCreateErrorAsync() =>
@@ -86,20 +92,35 @@ public sealed class AdminUsersPage(IPage page, string baseUrl)
 
     // --- Row actions ---
 
-    public Task ClickDisableAsync(string emailFragment) =>
-        RowByEmail(emailFragment).GetByRole(AriaRole.Button, new() { Name = "Disable" }).ClickAsync();
+    public async Task ClickDisableAsync(string emailFragment)
+    {
+        await RowByEmail(emailFragment).GetByRole(AriaRole.Button, new() { Name = "Disable" }).ClickAsync();
+        await DisableDialog.WaitForAsync(new() { Timeout = 15_000 });
+    }
 
-    public Task ClickEnableAsync(string emailFragment) =>
-        RowByEmail(emailFragment).GetByRole(AriaRole.Button, new() { Name = "Enable" }).ClickAsync();
+    public async Task ClickEnableAsync(string emailFragment)
+    {
+        await RowByEmail(emailFragment).GetByRole(AriaRole.Button, new() { Name = "Enable" }).ClickAsync();
+        await EnableDialog.WaitForAsync(new() { Timeout = 15_000 });
+    }
 
-    public Task ClickAssignRoleAsync(string emailFragment) =>
-        RowByEmail(emailFragment).GetByRole(AriaRole.Button, new() { Name = "Assign role" }).ClickAsync();
+    public async Task ClickAssignRoleAsync(string emailFragment)
+    {
+        await RowByEmail(emailFragment).GetByRole(AriaRole.Button, new() { Name = "Assign role" }).ClickAsync();
+        await AssignRolePanel.WaitForAsync(new() { Timeout = 15_000 });
+    }
 
-    public Task ClickResetMfaAsync(string emailFragment) =>
-        RowByEmail(emailFragment).GetByRole(AriaRole.Button, new() { Name = "Reset MFA" }).ClickAsync();
+    public async Task ClickResetMfaAsync(string emailFragment)
+    {
+        await RowByEmail(emailFragment).GetByRole(AriaRole.Button, new() { Name = "Reset MFA" }).ClickAsync();
+        await ResetMfaDialog.WaitForAsync(new() { Timeout = 15_000 });
+    }
 
-    public Task ClickResetPasswordAsync(string emailFragment) =>
-        RowByEmail(emailFragment).GetByRole(AriaRole.Button, new() { Name = "Reset password" }).ClickAsync();
+    public async Task ClickResetPasswordAsync(string emailFragment)
+    {
+        await RowByEmail(emailFragment).GetByRole(AriaRole.Button, new() { Name = "Reset password" }).ClickAsync();
+        await ResetPasswordDialog.WaitForAsync(new() { Timeout = 15_000 });
+    }
 
     // --- Inline "Assign role" picker panel (step 1 of the two-step Assign role flow) ---
 
@@ -111,6 +132,12 @@ public sealed class AdminUsersPage(IPage page, string baseUrl)
     {
         await DropDownSelector.SelectAsync(page, AssignRolePanel, role);
         await AssignRolePanel.GetByRole(AriaRole.Button, new() { Name = "Continue" }).ClickAsync();
+        // The inline panel's Continue button synchronously flips _assignRoleDialogVisible off and
+        // opens the AdminActionConfirmDialog (a Syncfusion SfDialog), but the dialog still needs a
+        // render + open animation before it's actually visible — the caller's very next check was a
+        // single-shot IsVisibleAsync() snapshot (unlike ClickDisableAsync/ClickEnableAsync etc.,
+        // which all WaitForAsync their dialog), so it could race that animation. Wait here too.
+        await AssignRoleDialog.WaitForAsync(new() { Timeout = 15_000 });
     }
 
     // --- Shared AdminActionConfirmDialog, addressed by its per-action title ---

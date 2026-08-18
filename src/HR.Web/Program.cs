@@ -4,6 +4,13 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
 using Syncfusion.Blazor;
 
+// See HR.Api/Program.cs's identical call for the full rationale — raises the .NET ThreadPool's
+// minimum thread counts above their low, core-count-based defaults so a sudden burst of concurrent
+// work (many parallel E2E Playwright sessions, each driving its own Blazor Server circuit and firing
+// async HTTP calls to hrapi) doesn't queue up faster than the pool's default ramp-up rate. Only
+// raises the floor the pool starts warm at; never a ceiling.
+ThreadPool.SetMinThreads(Environment.ProcessorCount * 12, Environment.ProcessorCount * 12);
+
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 

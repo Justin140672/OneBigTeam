@@ -106,8 +106,20 @@ public sealed class ContactDetailsTab(IPage page)
     /// a failed client-side Validate() instead surfaces as the GlobalError banner
     /// (EditSectionBase sets it to "Please correct the highlighted fields above.").
     /// </summary>
-    public async Task<bool> HasGlobalErrorAsync() =>
-        await page.Locator(".alert-danger").IsVisibleAsync();
+    public async Task<bool> HasGlobalErrorAsync()
+    {
+        // Checking IsVisibleAsync() immediately after ClickSaveAsync races the save round-trip
+        // that renders this banner — give it a short window to appear.
+        try
+        {
+            await page.Locator(".alert-danger").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>Returns the current value of the Work Email field (readonly).</summary>
     public async Task<string?> GetWorkEmailAsync()

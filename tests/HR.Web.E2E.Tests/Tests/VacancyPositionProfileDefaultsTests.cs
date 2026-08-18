@@ -18,8 +18,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// tests here switch between Laura Bennett (HR Administrator, position profiles) and Marcus Diallo
 /// (Recruiter, vacancies) via LoginPage.SwitchAccountAsync.
 /// </summary>
-[Collection("E2E")]
-public sealed class VacancyPositionProfileDefaultsTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class VacancyPositionProfileDefaultsTests(CrossUserFixture fixture) : CrossUserVacancyTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

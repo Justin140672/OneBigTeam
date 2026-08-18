@@ -21,8 +21,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// file does not re-assert upload-dialog field validation or the Publish/Archive flows
 /// themselves, only what the acknowledgement-progress screen adds on top.
 /// </summary>
-[Collection("E2E")]
-public sealed class SharedDocumentAcknowledgementProgressTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class SharedDocumentAcknowledgementProgressTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

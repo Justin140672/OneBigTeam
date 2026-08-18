@@ -92,18 +92,43 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         return names;
     }
 
-    public async Task MoveUpAsync(string nameFragment)
-    {
-        await Row(nameFragment).Locator("button[title='Move up']").ClickAsync();
-        await page.WaitForSpinnerToClearAsync();
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
-    }
+    public async Task MoveUpAsync(string nameFragment) => await MoveAsync(nameFragment, "Move up", delta: -1);
 
-    public async Task MoveDownAsync(string nameFragment)
+    public async Task MoveDownAsync(string nameFragment) => await MoveAsync(nameFragment, "Move down", delta: +1);
+
+    /// <summary>
+    /// Clicks the named row's Move up/down button and waits for its position to actually change
+    /// by <paramref name="delta"/> rows before returning. Reorder is a real server round-trip
+    /// (ReorderRecruitmentStages), and both the spinner-clear wait and the "rows rendered" wait
+    /// this used to rely on are no-ops here: rows already existed before the click (this only ever
+    /// reorders an existing row, never adds one), so both resolve instantly regardless of whether
+    /// the actual reorder has landed — the exact same "container exists" race already fixed
+    /// elsewhere in this suite, just not previously caught here because the symptom (index math
+    /// off by one, e.g. ReorderStage_MoveUpAndDown_PersistsAcrossReload's persistent "Expected 5,
+    /// Actual 6") looked like shared-state pollution rather than a same-page timing race. Poll the
+    /// row's actual position instead of trusting either heuristic.
+    /// </summary>
+    private async Task MoveAsync(string nameFragment, string buttonTitle, int delta)
     {
-        await Row(nameFragment).Locator("button[title='Move down']").ClickAsync();
-        await page.WaitForSpinnerToClearAsync();
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        var namesBefore = await GetNamesInOrderAsync();
+        var indexBefore = namesBefore.ToList().IndexOf(nameFragment);
+
+        await Row(nameFragment).Locator($"button[title='{buttonTitle}']").ClickAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (true)
+        {
+            var names = (await GetNamesInOrderAsync()).ToList();
+            var index = names.IndexOf(nameFragment);
+            if (index == indexBefore + delta) return;
+
+            if (DateTime.UtcNow > deadline)
+                throw new TimeoutException(
+                    $"Timed out waiting for '{nameFragment}' to move from index {indexBefore} to {indexBefore + delta} " +
+                    $"after clicking '{buttonTitle}' — still at index {index}.");
+
+            await page.WaitForTimeoutAsync(200);
+        }
     }
 
     public async Task DeactivateAsync(string nameFragment)

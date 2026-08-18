@@ -602,10 +602,15 @@ a.card:focus-visible,
         justify-content: center;
     }
 
+    /* Reading/visual order below the breakpoint: headline -> supporting copy -> CTAs ->
+       screenshot. This already matches source/DOM order (.hero-content before
+       .hero-shot-figure), so no CSS `order` override is needed here — a previous
+       `order: -1` on .hero-shot-figure pushed the screenshot above the headline on
+       mobile, which is the layout this rule intentionally avoids. Keep the screenshot
+       and figcaption together as a single <figure>. */
     .hero-shot-figure {
-        order: -1;
         width: min(640px, 100%);
-        margin: 0 auto;
+        margin: 32px auto 0;
     }
 }
 
@@ -1471,6 +1476,7 @@ a.card:focus-visible,
     font-size: var(--text-meta);
     font-weight: 600;
     cursor: pointer;
+    white-space: nowrap;
 }
 
 .password-toggle:focus-visible {
@@ -2009,6 +2015,29 @@ a.card:focus-visible,
         font-size: clamp(2.2rem, 12vw, 3.1rem);
     }
 
+    /* Homepage hero headline: the generic h1 rule above (used by page heroes with a
+       single short line of copy) is still too large here — at 320-430px width it can
+       dominate the initial viewport and push the primary CTA below the fold. Scale it
+       down further and tighten the line-height specifically for the hero. */
+    .hero h1 {
+        font-size: clamp(1.7rem, 8.2vw, 2.35rem);
+        line-height: 1.15;
+    }
+
+    .hero-content .hero-text {
+        margin-top: 14px;
+        font-size: 1rem;
+    }
+
+    .hero-actions {
+        margin-top: 22px;
+        gap: 10px;
+    }
+
+    .hero-shot-figure {
+        margin-top: 28px;
+    }
+
     .hero-actions,
     .header-actions {
         width: 100%;
@@ -2084,4 +2113,45 @@ a.card:focus-visible,
         .pricing-example-card span {
             color: var(--color-ink-soft);
         }
+}
+
+/* ---------------------------------------------------------------------
+   Signup form — narrow mobile widths (ticket: stack name fields, ease up
+   on the password toggle, tidy panel padding). Scoped below ~480px so the
+   existing two-column desktop/tablet layout (including at 640px, which
+   still has room for First name / Last name side by side) is untouched.
+--------------------------------------------------------------------- */
+
+@media (max-width: 480px) {
+    .signup-main {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .signup-form.contact-form {
+        padding: 20px 16px;
+        gap: 16px;
+    }
+
+    /* First name / Last name stack vertically below ~480px instead of staying
+       cramped side-by-side; every other fieldset here is already form-field-full
+       (single column) so this only affects the name row. */
+    .signup-fieldset {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    /* The visible "Show password"/"Hide password" text label is kept (rather than
+       switched to an icon-only control) so its purpose stays unambiguous, but on
+       very narrow screens it needs more reserved space so it doesn't crowd the
+       last few characters a user is typing, while still leaving a usable text
+       entry width. */
+    .password-field input {
+        padding-right: 104px;
+    }
+
+    .password-toggle {
+        padding: 6px 8px;
+        font-size: 0.78rem;
+    }
 }

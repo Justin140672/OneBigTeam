@@ -20,7 +20,14 @@ public sealed class PersonalDetailsTab(IPage page)
     public async Task<string?> GetDetailAsync(string label)
     {
         var dt = page.Locator(".pd-dl dt").Filter(new() { HasText = label }).First;
-        if (!await dt.IsVisibleAsync()) return null;
+        try
+        {
+            await dt.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
         return (await dt.Locator("~ dd").First.TextContentAsync())?.Trim();
     }
 

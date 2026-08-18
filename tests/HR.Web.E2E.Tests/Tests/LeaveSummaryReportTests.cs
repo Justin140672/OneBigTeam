@@ -9,8 +9,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (aggregated, non-paged grid), the inline PolicyYear/Department/GroupBy filters, and export.
 /// Catalog-page coverage (card visibility/navigation) lives in <see cref="ReportCatalogTests"/>.
 /// </summary>
-[Collection("E2E")]
-public sealed class LeaveSummaryReportTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class LeaveSummaryReportTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

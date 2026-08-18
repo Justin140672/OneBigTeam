@@ -14,8 +14,7 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   Actions column.
 /// - External Recruiter edit: "Contact Name" renders on its own full-width row.
 /// </summary>
-[Collection("E2E")]
-public sealed class RecruitmentUiUpdatesTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class RecruitmentUiUpdatesTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

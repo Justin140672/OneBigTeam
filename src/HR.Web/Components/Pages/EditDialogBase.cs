@@ -114,6 +114,11 @@ public abstract class EditDialogBase<TModel> : ComponentBase where TModel : clas
 
     private async Task DiscardAndCancelAsync()
     {
+        // Close immediately rather than waiting for the parent to round-trip IsOpen back down
+        // through OnParametersSetAsync — that extra async hop (parent event handler -> re-render
+        // -> parameter push) can lag a tick behind under load, leaving the dialog visibly open
+        // even though the "discard" decision has already been made.
+        Visible = false;
         ResetForm();
         await OnCancelled.InvokeAsync();
     }

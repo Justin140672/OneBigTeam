@@ -13,8 +13,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Uses Marcus Diallo (Recruiter role) — recruitment:manage is Recruiter-only (see
 /// IdentityModule.AddRolePolicies), matching the convention in VacancyEditCloseBehaviorTests.
 /// </summary>
-[Collection("E2E")]
-public sealed class VacancyPublishTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class VacancyPublishTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

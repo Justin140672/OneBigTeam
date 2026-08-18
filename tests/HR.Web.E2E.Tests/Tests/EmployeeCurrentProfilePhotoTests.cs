@@ -20,8 +20,7 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   - Carlos Rivera (30000000-0000-0000-0000-000000000010) — self-uploads a pending photo, then
 ///     HR (Laura) approves it.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeCurrentProfilePhotoTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeCurrentProfilePhotoTests(CrossUserFixture fixture) : CrossUserTenantAndMiscTestBase(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid EmmaId  = Guid.Parse("30000000-0000-0000-0000-000000000009");

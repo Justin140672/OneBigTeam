@@ -23,7 +23,17 @@ public sealed class OverviewTab(IPage page)
     public async Task<string?> GetDetailAsync(string label)
     {
         var dt = page.Locator(".overview-dl dt").Filter(new() { HasText = label }).First;
-        if (!await dt.IsVisibleAsync()) return null;
+        // WaitForLoadAsync only proves the overview grid container/skeleton state has settled,
+        // not that this specific dt/dd pair has rendered yet — a bare instant IsVisibleAsync()
+        // right after can still race it (same class of race fixed elsewhere in this suite).
+        try
+        {
+            await dt.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
         return (await dt.Locator("~ dd").First.TextContentAsync())?.Trim();
     }
 
@@ -76,7 +86,14 @@ public sealed class OverviewTab(IPage page)
     public async Task<string?> GetStatValueAsync(string label)
     {
         var card = page.Locator(".stat-card").Filter(new() { HasText = label }).First;
-        if (!await card.IsVisibleAsync()) return null;
+        try
+        {
+            await card.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
         return (await card.Locator(".stat-value").TextContentAsync())?.Trim();
     }
 
@@ -85,8 +102,27 @@ public sealed class OverviewTab(IPage page)
     /// exactly (e.g. "Open Tasks") — each card now navigates to its relevant My Profile tab
     /// (MyProfileOverviewTab.razor's OnNavigateToTasks/OnNavigateToLeave/OnNavigateToSickness).
     /// </summary>
-    public Task ClickStatCardAsync(string label) =>
-        page.Locator(".stat-card").Filter(new() { HasText = label }).First.ClickAsync();
+    public async Task ClickStatCardAsync(string label)
+    {
+        await page.Locator(".stat-card").Filter(new() { HasText = label }).First.ClickAsync();
+
+        // Clicking a stat card switches the active tab, but the tab-switch is driven by a Blazor
+        // re-render, not a full navigation — the previously-active "Overview" tab element can
+        // still report aria-selected="true" for a moment after the click returns. Give the
+        // selection change a moment to land before the caller reads the now-active tab, otherwise
+        // MyProfilePage.GetActiveTabNameAsync races and returns "Overview" for every stat card.
+        try
+        {
+            await page.WaitForFunctionAsync(
+                "() => { const el = document.querySelector('[role=\"tab\"][aria-selected=\"true\"]'); return el && el.textContent.trim() !== 'Overview'; }",
+                null, new PageWaitForFunctionOptions { Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            // Fall through — the caller's own assertion on the resulting tab name will surface
+            // the mismatch with a clearer message than swallowing it here would.
+        }
+    }
 
     /// <summary>
     /// Returns true if the "Onboarding Progress" card is rendered — only present when the

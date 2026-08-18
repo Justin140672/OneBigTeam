@@ -16,8 +16,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Every scenario that mutates data creates its own brand-new employee(s) so it can't leak side
 /// effects into other tests that rely on seeded employees' compensation state remaining untouched.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeListBulkUpdateTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

@@ -9,8 +9,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - It disappears from the default (active-only) list view.
 /// - Toggling "Show Inactive" reveals it again.
 /// </summary>
-[Collection("E2E")]
-public sealed class AssetCategoryManagementTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class AssetCategoryManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

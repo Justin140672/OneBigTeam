@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
@@ -16,8 +17,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Admin user: Laura Bennett (laura.bennett@acme.example) who holds the
 /// employee:manage permission.
 /// </summary>
-[Collection("E2E")]
-public sealed class EmployeeAssetsTabTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class EmployeeAssetsTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId   = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId    = Guid.Parse("30000000-0000-0000-0000-000000000004");
@@ -199,27 +199,71 @@ public sealed class EmployeeAssetsTabTests(AppFixture fixture) : E2ETestBase(fix
             "Expected the Assign Asset dialog to close after clicking Cancel");
     }
 
+    /// <summary>
+    /// Creates a fresh, uniquely-named Acme employee (guaranteed to start with zero assigned
+    /// assets) and returns their employee ID.
+    ///
+    /// AssetsTab_AssigningAvailableAsset_AddsRowToGrid used to assign the shared seeded ASSET-0003
+    /// (Logitech MX Keys) to Carlos Rivera directly — an irreversible mutation (CreateAssetAssignmentHandler
+    /// marks the asset Assigned; there is no unassign action in this UI), which permanently broke
+    /// AssetsTab_ShowsEmptyGrid_ForEmployeeWithoutAssets and AssetsTab_ReturnAssetButton_IsDisabled_WhenNoAssetsAssigned
+    /// in this same file, plus ProfileAssetsTabTests.AssetsTab_IsVisible_And_Shows_Empty_State_For_Employee_Without_Assets,
+    /// all of which assert Carlos has zero assets. A freshly created employee has no assets by
+    /// construction, so it's a safe target for this destructive assignment — it doesn't need any
+    /// of the login-as-the-employee/acknowledgement machinery the asset-task tests need, since this
+    /// test only checks the grid from the HR-admin side.
+    /// </summary>
+    private async Task<Guid> CreateFreshAssetlessEmployeeAsync()
+    {
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"Asset{unique}";
+        var workEmail = $"e2e.asset{unique}@acme.example";
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SaveNewEmployeeAsync();
+        await empList.ClickEmployeeAsync(lastName);
+
+        var match = Regex.Match(_page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
+        return Guid.Parse(match.Groups[1].Value);
+    }
+
     [Fact]
     public async Task AssetsTab_AssigningAvailableAsset_AddsRowToGrid()
     {
-        // Carlos has no assets. ASSET-0003 (Logitech MX Keys) is seeded as Available.
+        // ASSET-0003 (Logitech MX Keys) is seeded as Available.
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await empAdmin.GoToAsync(AcmeId, CarlosId);
+        var freshEmployeeId = await CreateFreshAssetlessEmployeeAsync();
+
+        await empAdmin.GoToAsync(AcmeId, freshEmployeeId);
         await empAdmin.OpenAssetsTabAsync();
 
         Assert.False(await empAdmin.HasAssetsGridRowsAsync(),
-            "Carlos should have no assets before assignment");
+            "Expected the freshly created employee to have no assets before assignment");
 
         await empAdmin.OpenAssignAssetDialogAsync();
         await empAdmin.SelectAssetAndConfirmAsync("ASSET-0003");
 
         Assert.True(await empAdmin.HasAssetsGridRowsAsync(),
-            "Carlos should have one asset row after assignment");
+            "Expected the freshly created employee to have one asset row after assignment");
 
         var assetNumbers = await empAdmin.GetAssetsGridAssetNumbersAsync();
         Assert.Contains("ASSET-0003", assetNumbers);

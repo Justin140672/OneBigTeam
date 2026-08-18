@@ -10,8 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - A plain Employee cannot access another employee's admin profile.
 /// - An unauthenticated request to a protected page is redirected to login.
 /// </summary>
-[Collection("E2E")]
-public sealed class UnauthorizedAccessTests(AppFixture fixture) : E2ETestBase(fixture)
+public sealed class UnauthorizedAccessTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");
@@ -34,9 +33,13 @@ public sealed class UnauthorizedAccessTests(AppFixture fixture) : E2ETestBase(fi
         // report's full HR record" scenario, not an arbitrary stranger's profile.
         await _page.GotoAsync(
             $"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees/{TomId}");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
         // ── Step 3: Must be redirected away from the admin edit URL ───────────
+        // See E2ETestBase.WaitForUrlToStopContainingAsync's doc comment: the redirect is a
+        // client-side Blazor navigation, not a full page load, so WaitForLoadStateAsync(NetworkIdle)
+        // doesn't reliably observe it — read _page.Url immediately after can race the redirect.
+        await WaitForUrlToStopContainingAsync($"/employees/{TomId}");
+
         var finalUrl = _page.Url;
         Assert.DoesNotContain($"/employees/{TomId}", finalUrl);
     }
@@ -99,7 +102,10 @@ public sealed class UnauthorizedAccessTests(AppFixture fixture) : E2ETestBase(fi
         // This is the admin route (/employees/{id}) — not the self-service profile route.
         await _page.GotoAsync(
             $"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees/{JamesId}");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // See E2ETestBase.WaitForUrlToStopContainingAsync's doc comment: the redirect is a
+        // client-side Blazor NavigateTo, not a full navigation, so NetworkIdle is not a reliable
+        // completion signal.
+        await WaitForUrlToStopContainingAsync($"/employees/{JamesId}");
 
         // ── Step 3: Must be redirected away from the admin edit URL ───────────
         var finalUrl = _page.Url;

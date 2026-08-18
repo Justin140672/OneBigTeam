@@ -33,12 +33,14 @@ public sealed class EmployeeLeavingTab(IPage page)
         page.GetByRole(AriaRole.Tab, new() { Name = "Leaving" }).IsVisibleAsync();
 
     /// <summary>
-    /// Returns true if the Employee Overview header's "Start Leaving Process" button is
-    /// visible — only shown while no leaving process is active (see EmployeeEdit.razor's
-    /// `!_showLeavingTab` guard).
+    /// Returns true if the "More actions" overflow menu's "Start offboarding" item is present —
+    /// only shown while no leaving process is active (see EmployeeEdit.razor's `!_showLeavingTab`
+    /// guard / BuildMoreActionsItems). Replaces the old direct header "Start Leaving Process"
+    /// button now that the action lives inside the "More actions" dropdown — see
+    /// EmployeeEditPage.HasStartOffboardingMenuItemAsync, which this delegates to.
     /// </summary>
     public Task<bool> HasStartLeavingProcessButtonAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Start Leaving Process" }).IsVisibleAsync();
+        new EmployeeEditPage(page, string.Empty).HasStartOffboardingMenuItemAsync();
 
     /// <summary>Returns true if the "No leaving process found for this employee" empty state is visible.</summary>
     public Task<bool> IsEmptyStateVisibleAsync() =>
