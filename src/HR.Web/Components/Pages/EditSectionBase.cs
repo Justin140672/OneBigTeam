@@ -64,6 +64,15 @@ public abstract class EditSectionBase<TModel> : ComponentBase where TModel : cla
     private void CaptureBaseline() =>
         _baselineSnapshot = System.Text.Json.JsonSerializer.Serialize(Model);
 
+    // Public so an orchestrating parent page can discard this section's changes without saving —
+    // e.g. EmployeeEdit's Close/"Discard Changes" flow, which folds this section's HasUnsavedChanges
+    // into its own but has no other way to clear it back to false once the user has confirmed
+    // discarding (the section's own Model isn't reset; the page reload triggered by the discard
+    // makes that unnecessary, this exists purely so HasUnsavedChanges reads false for anything
+    // — e.g. NavigationLock — that checks it in the moment between the discard being confirmed and
+    // that reload actually happening).
+    public void ResetBaseline() => CaptureBaseline();
+
     /// <summary>Called by the parent page's single Save button. Returns null on success, or an error message.</summary>
     public async Task<string?> SaveAsync()
     {

@@ -215,12 +215,17 @@ app.MapGet("/verify-email", () => Results.Content("""
 // file's reasoning around Blazor Server's response-already-started constraints. Takes the access
 // token HR.Web's browser-side script already extracted, calls HR.Api's now-authenticated
 // /api/verify-email with it as a Bearer token (HR.Api's existing JWT Bearer validation verifies
-// the token itself — this endpoint does not need to, and never did trust it blindly), sets the
-// HttpOnly session cookie, and redirects into the app.
+// the token itself — this endpoint does not need to, and never did trust it blindly) purely to
+// activate the company, then sends the admin to /login to sign in with their own credentials.
+//
+// Deliberately does NOT establish a session here (no SetSessionCookie, no "st" carry-over) even
+// though the access token this endpoint holds could sign them straight in — confirmed via live
+// testing that doing so is unsafe: if the browser already has an existing session cookie from a
+// different signed-in user (e.g. a dev persona) that a Blazor Server circuit is still holding onto,
+// this hop can land the visitor in THAT other account instead of the one they just verified.
+// Requiring an explicit login here sidesteps the whole stale-session/circuit-reuse class of bug.
 app.MapGet("/verify-email-complete", async (
-    HttpContext context,
     string? access_token,
-    int? expires_in,
     IHttpClientFactory httpClientFactory) =>
 {
     if (string.IsNullOrWhiteSpace(access_token))
@@ -246,16 +251,7 @@ app.MapGet("/verify-email-complete", async (
         return Results.Redirect("/verify-email-error");
     }
 
-    // HttpOnly so the token is never exposed to client-side script. Also carried one hop further
-    // via the URL below (not just the cookie) — see /dev/persona-cookie's remarks and Routes.razor
-    // for why: Blazor Server's persistent circuit can survive this navigation with its own
-    // SupabaseSessionAccessor instance still holding whatever it resolved BEFORE this cookie
-    // existed, and IHttpContextAccessor.HttpContext is never reliably available again on that
-    // circuit to re-read it.
-    SupabaseSessionAccessor.SetSessionCookie(context, access_token, expires_in ?? 3600);
-
-    var expiresInSeconds = expires_in ?? 3600;
-    return Results.Redirect($"/getting-started?st={Uri.EscapeDataString(access_token)}&se={expiresInSeconds}");
+    return Results.Redirect("/login?verified=true");
 }).AllowAnonymous();
 
 // Handles Supabase's password-recovery redirect — same implicit/fragment flow as /verify-email
@@ -413,6 +409,39 @@ app.MapGet("/support-session/redeem", async (
         </body></html>
         """, "text/html");
 }).AllowAnonymous();
+
+// Authenticated proxy for downloading the employee import template (used by the Getting Started
+// "Download the Employee import template" task — see DownloadEmployeeImportTemplateTask). A plain
+// HTML <a href> can't attach a Supabase Bearer token to a call to hrapi directly, but it DOES
+// automatically send this app's own session cookie on a same-origin request — this bridges that
+// cookie auth to the real Bearer-authenticated hrapi call (via the "hrapi" HttpClient, which
+// already attaches the token via SupabaseAuthDelegatingHandler/SupabaseSessionAccessor) and
+// streams the file straight back with the same Content-Disposition the api endpoint itself sets,
+// so the browser downloads it exactly as if the link pointed at a static file. Requires
+// authentication via the default ("NoOp") scheme — same cookie-presence check every other
+// [Authorize]'d Razor page in this app already relies on; the real permission check still happens
+// server-side against hrapi's own "employee:manage" policy.
+app.MapGet("/companies/{companyId:guid}/data-import/employees/template/download", async (
+    Guid companyId,
+    IHttpClientFactory httpClientFactory) =>
+{
+    var http = httpClientFactory.CreateClient("hrapi");
+    using var response = await http.GetAsync($"api/companies/{companyId}/data-import/employees/template");
+
+    if (!response.IsSuccessStatusCode)
+    {
+        return Results.StatusCode((int)response.StatusCode);
+    }
+
+    var bytes = await response.Content.ReadAsByteArrayAsync();
+    var contentType = response.Content.Headers.ContentType?.ToString()
+        ?? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+        ?? response.Content.Headers.ContentDisposition?.FileName
+        ?? "employee-import-template.xlsx";
+
+    return Results.File(bytes, contentType, fileName);
+}).RequireAuthorization();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

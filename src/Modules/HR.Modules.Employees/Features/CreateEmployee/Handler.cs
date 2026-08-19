@@ -70,7 +70,12 @@ internal sealed class CreateEmployeeHandler
 
         var employeeNumberMode = await _employeeNumberSettingsReader.GetModeAsync(request.CompanyId, cancellationToken);
 
+        // Normalized the same way Employee.Create/UpdateEmploymentDetails normalize it, so these
+        // existence checks compare like-for-like with what the unique index enforces at the DB
+        // level.
         string employeeNumber;
+        string normalizedEmployeeNumber;
+
         if (string.IsNullOrWhiteSpace(request.EmployeeNumber))
         {
             if (employeeNumberMode == EmployeeNumberMode.Manual)
@@ -79,31 +84,56 @@ internal sealed class CreateEmployeeHandler
                     Error.Validation("Employee number is required."));
             }
 
-            // Automatic mode: caller didn't supply one, generate it via the atomic counter.
-            // If a later validation step in this handler fails, the claimed number is simply
-            // skipped — the same behaviour as a database SERIAL/IDENTITY column on a rolled-back
-            // transaction, and not something this wave needs to compensate for.
-            employeeNumber = await _employeeNumberGenerator.GenerateNextAsync(request.CompanyId, cancellationToken);
+            // Automatic mode: caller didn't supply one, generate it via the atomic counter and
+            // retry on conflict. The counter itself is race-free (a single UPDATE ... RETURNING
+            // relying on Postgres's row lock — see EmployeeNumberGenerator's own remarks), so two
+            // concurrent callers can never claim the same number from each other. But the stored
+            // "next" value can still drift out of sync with actual data by means outside this
+            // handler's control entirely — e.g. an admin directly editing "Next Number" on HR
+            // Settings to a value at or behind one already claimed. Retry with a fresh claim
+            // instead of failing the whole request outright; bounded, since a conflict persisting
+            // past a handful of attempts indicates something more seriously wrong than ordinary
+            // drift.
+            const int maxAttempts = 5;
+            var attempt = 0;
+            while (true)
+            {
+                attempt++;
+                employeeNumber = await _employeeNumberGenerator.GenerateNextAsync(request.CompanyId, cancellationToken);
+                normalizedEmployeeNumber = employeeNumber.ToUpperInvariant();
+
+                var candidateExists = await _dbContext.Employees
+                    .AnyAsync(
+                        e => e.CompanyId == request.CompanyId &&
+                             e.EmployeeNumber == normalizedEmployeeNumber,
+                        cancellationToken);
+
+                if (!candidateExists)
+                    break;
+
+                if (attempt >= maxAttempts)
+                {
+                    return Result.Failure<CreateEmployeeResponse>(
+                        Error.Conflict("Could not generate a unique employee number after several attempts."));
+                }
+            }
         }
         else
         {
             employeeNumber = request.EmployeeNumber.Trim();
-        }
+            normalizedEmployeeNumber = employeeNumber.ToUpperInvariant();
 
-        // Normalized the same way Employee.Create/UpdateEmploymentDetails normalize it, so this
-        // pre-check compares like-for-like with what the unique index enforces at the DB level.
-        var normalizedEmployeeNumber = employeeNumber.ToUpperInvariant();
+            var employeeNumberExists = await _dbContext.Employees
+                .AnyAsync(
+                    e => e.CompanyId == request.CompanyId &&
+                         e.EmployeeNumber == normalizedEmployeeNumber,
+                    cancellationToken);
 
-        var employeeNumberExists = await _dbContext.Employees
-            .AnyAsync(
-                e => e.CompanyId == request.CompanyId &&
-                     e.EmployeeNumber == normalizedEmployeeNumber,
-                cancellationToken);
-
-        if (employeeNumberExists)
-        {
-            return Result.Failure<CreateEmployeeResponse>(
-                Error.Conflict($"An employee with employee number '{employeeNumber}' already exists in this company."));
+            if (employeeNumberExists)
+            {
+                return Result.Failure<CreateEmployeeResponse>(
+                    Error.Conflict($"An employee with employee number '{employeeNumber}' already exists in this company."));
+            }
         }
 
         var departmentExists = await _dbContext.Departments

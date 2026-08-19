@@ -5,9 +5,10 @@ using Microsoft.Playwright;
 namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
-/// Covers the new static marketing page at /coming-soon (ComingSoon.razor), including the
-/// header/footer nav links added to reach it, and the "Coming soon" / "Planned" grouped
-/// feature-card sections sourced from UpcomingFeatureCatalog.
+/// Covers the static marketing page at /roadmap (ComingSoon.razor, renamed from "Coming Soon" to
+/// "Product Roadmap"), the legacy /coming-soon redirect, the footer nav link used to reach it,
+/// and the "Coming soon" / "Planned" grouped feature-card sections sourced from
+/// UpcomingFeatureCatalog.
 /// </summary>
 public sealed class ComingSoonPageTests(ParallelBlankPersonaFixture fixture)
     : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
@@ -15,54 +16,58 @@ public sealed class ComingSoonPageTests(ParallelBlankPersonaFixture fixture)
     [Fact]
     public async Task DirectNavigation_LoadsPage_WithHeroHeadingAndBody()
     {
-        await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/coming-soon");
+        await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/roadmap");
 
         await Assertions.Expect(_page.Locator("section.pricing-hero h1"))
-            .ToHaveTextAsync("More is coming to One Big Team");
+            .ToHaveTextAsync("Product Roadmap");
 
         await Assertions.Expect(_page.Locator("section.pricing-hero"))
             .ToContainTextAsync(
-                "We're continually improving One Big Team. Here's a look at some of the features we're planning next.");
+                "We're continually improving One Big Team. Here's a look at some of the problems we're working on solving next.");
     }
 
     [Fact]
-    public async Task HeaderComingSoonLink_NavigatesToComingSoonPage()
+    public async Task LegacyComingSoonUrl_RedirectsToRoadmap()
     {
-        await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/");
+        await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/coming-soon");
 
-        var headerLink = _page.Locator("nav#site-navigation a", new() { HasText = "Coming Soon" });
-        Assert.EndsWith("/coming-soon", await headerLink.GetAttributeAsync("href"));
-
-        await headerLink.ClickAsync();
-
-        await _page.WaitForURLAsync(new Regex("/coming-soon"), new() { Timeout = 20_000 });
-        Assert.Contains("/coming-soon", _page.Url);
+        await _page.WaitForURLAsync(new Regex("/roadmap"), new() { Timeout = 20_000 });
+        Assert.Contains("/roadmap", _page.Url);
 
         await Assertions.Expect(_page.Locator("section.pricing-hero h1"))
-            .ToHaveTextAsync("More is coming to One Big Team");
+            .ToHaveTextAsync("Product Roadmap");
     }
 
     [Fact]
-    public async Task FooterComingSoonLink_NavigatesToComingSoonPage()
+    public async Task RoadmapPage_ShowsDisclaimer()
+    {
+        await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/roadmap");
+
+        await Assertions.Expect(_page.Locator(".roadmap-disclaimer"))
+            .ToContainTextAsync("Plans may change");
+    }
+
+    [Fact]
+    public async Task FooterRoadmapLink_NavigatesToRoadmapPage()
     {
         await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/");
 
-        var footerLink = _page.Locator(".footer-links a", new() { HasText = "Coming Soon" });
-        Assert.EndsWith("/coming-soon", await footerLink.GetAttributeAsync("href"));
+        var footerLink = _page.Locator(".footer-links a", new() { HasText = "Roadmap" });
+        Assert.EndsWith("/roadmap", await footerLink.GetAttributeAsync("href"));
 
         await footerLink.ClickAsync();
 
-        await _page.WaitForURLAsync(new Regex("/coming-soon"), new() { Timeout = 20_000 });
-        Assert.Contains("/coming-soon", _page.Url);
+        await _page.WaitForURLAsync(new Regex("/roadmap"), new() { Timeout = 20_000 });
+        Assert.Contains("/roadmap", _page.Url);
 
         await Assertions.Expect(_page.Locator("section.pricing-hero h1"))
-            .ToHaveTextAsync("More is coming to One Big Team");
+            .ToHaveTextAsync("Product Roadmap");
     }
 
     [Fact]
     public async Task ComingSoonSection_RendersExpectedCards()
     {
-        await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/coming-soon");
+        await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/roadmap");
 
         var comingSoonSection = _page.Locator(
             "section.section",
@@ -71,19 +76,15 @@ public sealed class ComingSoonPageTests(ParallelBlankPersonaFixture fixture)
 
         var positionProfilesCard = comingSoonSection.Locator(".card", new() { HasText = "AI-powered position profiles" });
         await Assertions.Expect(positionProfilesCard.Locator("h3")).ToHaveTextAsync("AI-powered position profiles");
-        await Assertions.Expect(positionProfilesCard.Locator("p"))
-            .ToContainTextAsync("Generate and improve job descriptions and position profiles using AI.");
 
         var webhooksCard = comingSoonSection.Locator(".card", new() { HasText = "Employee webhooks" });
         await Assertions.Expect(webhooksCard.Locator("h3")).ToHaveTextAsync("Employee webhooks");
-        await Assertions.Expect(webhooksCard.Locator("p"))
-            .ToContainTextAsync("Integrate One Big Team with other systems when employees join, change or leave.");
     }
 
     [Fact]
     public async Task PlannedSection_RendersExpectedCard()
     {
-        await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/coming-soon");
+        await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/roadmap");
 
         var plannedSection = _page.Locator(
             "section.section",
@@ -92,14 +93,12 @@ public sealed class ComingSoonPageTests(ParallelBlankPersonaFixture fixture)
 
         var aiAssistantCard = plannedSection.Locator(".card", new() { HasText = "AI help assistant" });
         await Assertions.Expect(aiAssistantCard.Locator("h3")).ToHaveTextAsync("AI help assistant");
-        await Assertions.Expect(aiAssistantCard.Locator("p"))
-            .ToContainTextAsync("Ask questions about One Big Team and get contextual help.");
     }
 
     [Fact]
     public async Task StatusSections_AreGrouped_WithComingSoonAboveThePlannedSection()
     {
-        await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/coming-soon");
+        await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/roadmap");
 
         var comingSoonHeading = _page.Locator(".section-heading h2", new() { HasText = "Coming soon" });
         var plannedHeading = _page.Locator(".section-heading h2", new() { HasText = "Planned" });

@@ -170,8 +170,12 @@ public abstract class EditPageBase : ComponentBase, IDisposable
 
         if (target is not null)
         {
+            // forceLoad: true for the same reason OnSavedAsync's default already uses it — a
+            // client-side-only Blazor route change never fires a browser "load" event, which
+            // E2E callers (Playwright's WaitForURLAsync defaults to waitUntil: "Load") wait on
+            // after Discard/Cancel just as they do after a successful Save.
             _navigationConfirmed = true;
-            Navigation.NavigateTo(target);
+            Navigation.NavigateTo(target, forceLoad: true);
         }
     }
 
@@ -190,8 +194,23 @@ public abstract class EditPageBase : ComponentBase, IDisposable
     protected void DiscardChangesAndClose()
     {
         ShowUnsavedChangesDialog = false;
+
+        // CaptureBaseline() so HasUnsavedChanges reads false before NavigateToList()'s forceLoad
+        // navigate fires. <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" /> reads
+        // that flag's last-rendered value at the moment the browser navigation is issued — left
+        // true (the previous assumption being "it doesn't matter, this component is about to be
+        // destroyed by an in-app SPA nav anyway"), it fires an unnecessary beforeunload guard on a
+        // navigation the user already explicitly confirmed by clicking "Discard Changes".
+        CaptureBaseline();
+        ResetChildSectionsUnsavedState();
         NavigateToList();
     }
+
+    // Hook for pages whose HasUnsavedChanges also folds in a child EditSectionBase (e.g.
+    // EmployeeEdit's Employment tab) — CaptureBaseline() above only resets this page's OWN model,
+    // not a child section's independently-tracked one. Override to call ResetBaseline() on each
+    // such child.
+    protected virtual void ResetChildSectionsUnsavedState() { }
 
     protected void CancelCloseDialog()
     {

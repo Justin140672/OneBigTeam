@@ -18,30 +18,48 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task<Guid> CreateUserAsync(string email, string redirectTo, CancellationToken cancellationToken)
+    public async Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken)
     {
         var http = CreateClient(options.Value.SecretKey);
 
-        // UNVERIFIED: Supabase's /auth/v1/invite endpoint creates a user and sends an invite email.
-        // The exact placement of the post-verification redirect target ("redirect_to") is not
-        // confirmed against this project's live behaviour — Supabase's documented convention for
-        // several Auth endpoints nests it under "options": { "redirect_to": ... }, which is what's
-        // used here, but it is equally plausible Supabase expects a top-level "redirect_to" or a
-        // "data" object instead. Verify against the real project before relying on this in
-        // production (see the plan's "Known unverified assumptions" section).
+        // Deliberately NOT /auth/v1/invite: confirmed via live diagnosis that invite-created users
+        // don't get a real email/password identity wired up — a follow-up admin PUT to set the
+        // password looked like it succeeded (200 response) but real Supabase password-grant sign-in
+        // still failed with "Invalid login credentials" afterward. Using the same admin CREATE
+        // endpoint as EnsureDevUserAsync below (with the real password baked in from the start and
+        // email_confirm: false so the account still requires verification) avoids that entirely —
+        // this is the one Admin API shape already proven to work end-to-end for password auth here.
         var requestBody = new
         {
             email,
-            options = new { redirect_to = redirectTo },
+            password,
+            email_confirm = false,
         };
 
-        using var response = await http.PostAsJsonAsync("/auth/v1/invite", requestBody, JsonOptions, cancellationToken);
+        using var response = await http.PostAsJsonAsync("/auth/v1/admin/users", requestBody, JsonOptions, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            // Same loose matching as EnsureDevUserAsync below: Supabase's duplicate-email error is
+            // typically a 422 (or 400) with a message/error_code mentioning "already been
+            // registered" / "email_exists" / "user_already_exists" — this can happen here even
+            // though SignUpHandler already checked its own tables first, e.g. a Supabase user left
+            // over from a prior signup attempt whose local UserProfile never got created.
+            var isAlreadyExists =
+                body.Contains("already", StringComparison.OrdinalIgnoreCase)
+                && body.Contains("regist", StringComparison.OrdinalIgnoreCase)
+                || body.Contains("email_exists", StringComparison.OrdinalIgnoreCase)
+                || body.Contains("user_already_exists", StringComparison.OrdinalIgnoreCase);
+
+            if (isAlreadyExists)
+            {
+                throw new EmailAlreadyRegisteredException(email);
+            }
+
             throw new InvalidOperationException(
-                $"Supabase invite request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+                $"Supabase admin create-user request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
         }
 
         var payload = await response.Content.ReadFromJsonAsync<SupabaseInviteResponse>(JsonOptions, cancellationToken);
@@ -49,8 +67,13 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase invite response did not contain a parseable user id. Response body: {body}");
+                $"Supabase admin create-user response did not contain a parseable user id. Response body: {body}");
         }
+
+        // The admin create call above never sends an email itself — /auth/v1/resend is what
+        // actually delivers the confirmation link (already used identically by
+        // ResendVerificationEmailAsync for the "user asked us to resend it" case).
+        await ResendVerificationEmailAsync(email, redirectTo, cancellationToken);
 
         return userId;
     }
@@ -59,14 +82,9 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
     {
         var http = CreateClient(options.Value.SecretKey);
 
-        // UNVERIFIED — HIGH RISK: Supabase's documented /auth/v1/resend endpoint is paired with the
-        // client-facing signUp flow ("type": "signup"), not the admin-initiated /auth/v1/invite flow
-        // used by CreateUserAsync above. Whether /auth/v1/resend also works for invite-originated
-        // pending users (as opposed to, e.g., needing a second call to /auth/v1/invite for the same
-        // email) is explicitly unverified per the plan. This implementation uses the most plausible
-        // shape ("type": "signup") as a starting point; it may need to be swapped for a second
-        // /auth/v1/invite call once real Supabase behaviour is confirmed. Kept as its own gateway
-        // method specifically so that swap is a small, isolated change.
+        // "type": "signup" is correct now that CreateUserAsync above creates the pending user via
+        // the admin CREATE endpoint (same shape as a normal client signUp, just admin-initiated)
+        // rather than /auth/v1/invite — see CreateUserAsync's remarks for why that switch happened.
         var requestBody = new
         {
             type = "signup",
@@ -213,6 +231,50 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         // diagnosis: UserProfile rows seeded from that lookup didn't match the real "sub" claim).
         var session = await SignInWithPasswordAsync(email, password, cancellationToken);
         return session.UserId;
+    }
+
+    public async Task<Guid> CreateConfirmedUserAsync(string email, string password, CancellationToken cancellationToken)
+    {
+        var http = CreateClient(options.Value.SecretKey);
+
+        var requestBody = new
+        {
+            email,
+            password,
+            email_confirm = true,
+        };
+
+        using var response = await http.PostAsJsonAsync("/auth/v1/admin/users", requestBody, JsonOptions, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            // Same loose matching as CreateUserAsync/EnsureDevUserAsync above.
+            var isAlreadyExists =
+                body.Contains("already", StringComparison.OrdinalIgnoreCase)
+                && body.Contains("regist", StringComparison.OrdinalIgnoreCase)
+                || body.Contains("email_exists", StringComparison.OrdinalIgnoreCase)
+                || body.Contains("user_already_exists", StringComparison.OrdinalIgnoreCase);
+
+            if (isAlreadyExists)
+            {
+                throw new EmailAlreadyRegisteredException(email);
+            }
+
+            throw new InvalidOperationException(
+                $"Supabase admin create-user request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<SupabaseInviteResponse>(JsonOptions, cancellationToken);
+        if (payload is null || !Guid.TryParse(payload.Id, out var userId))
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase admin create-user response did not contain a parseable user id. Response body: {body}");
+        }
+
+        return userId;
     }
 
     public async Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)

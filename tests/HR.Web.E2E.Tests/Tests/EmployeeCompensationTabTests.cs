@@ -258,7 +258,11 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await empEdit.ClickDeleteCompensationRowAsync("1 Dec 2030");
         await empEdit.ConfirmDeleteCompensationAsync();
 
-        Assert.False(await empEdit.CompensationHistoryRow("1 Dec 2030").First.IsVisibleAsync(),
-            "Expected the deleted future-dated record to no longer appear in the history grid");
+        // ConfirmDeleteCompensationAsync's own wait only confirms the "Yes" confirmation button
+        // itself disappeared — that's a separate render pass from the grid actually re-fetching
+        // and dropping the deleted row, so a single immediate IsVisibleAsync() snapshot here can
+        // still catch it mid-transition. Use an auto-retrying assertion instead.
+        await Assertions.Expect(empEdit.CompensationHistoryRow("1 Dec 2030").First)
+            .Not.ToBeVisibleAsync(new() { Timeout = 10_000 });
     }
 }

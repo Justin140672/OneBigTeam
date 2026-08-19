@@ -11,11 +11,13 @@ internal sealed class ReviewCompanyDocumentsTask(DocumentsDbContext dbContext) :
     public string Name => "Review your company documents";
     public string Description => "Publish at least one company policy or handbook document.";
     public bool IsMandatory => true;
+    public int Order => 7;
+
     // HR.Web's shared company documents route is company-scoped
     // ("/companies/{CompanyId:guid}/shared-documents") — the "{companyId}" placeholder is
     // substituted by HR.Web with the current company id.
-    public string LinkUrl => "/companies/{companyId}/shared-documents";
-    public int Order => 6;
+    public Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken) =>
+        Task.FromResult("/companies/{companyId}/shared-documents");
 
     public Task<bool> IsCompletedAsync(Guid companyId, CancellationToken cancellationToken)
     {

@@ -1,342 +1,98 @@
-# 23. Reporting & Exports Module
+# 23. Reporting and Exports
 
-## Overview
+## Current status
 
-The Reporting & Exports capability provides operational reports, compliance reports, ad-hoc grid exports, and generated files across the HR platform.
+The Reporting module is implemented. It provides a formal report catalogue, permission-scoped report views, filtering and grouping, saved views, favourites and supported server export endpoints.
 
-The system supports two export paths:
+Reporting is separate from local Syncfusion grid export. A feature screen may export its visible grid without becoming a formal report.
 
-1. Lightweight client-side exports from Syncfusion grids.
-2. Server-side generated reports for formal, sensitive, or long-running reporting.
+## Implemented report catalogue
 
-Server-side reports are generated asynchronously using Hangfire, stored in Supabase Storage, and surfaced to the user through in-app notifications.
+The current catalogue includes:
 
----
+- Employee directory
+- Employee starters
+- Employee leavers
+- Leave summary
+- Leave calendar
+- Sickness
+- Probation
+- Onboarding progress
+- Offboarding progress
+- Recruitment pipeline
+- Vacancy performance
+- Document compliance
+- Company document acknowledgement
+- Asset assignments
+- Workload actions
 
-## Business Objectives
+## Data ownership
 
-The reporting capability shall:
+The Reporting module owns report definitions, saved views, favourites and export orchestration. It does not own the underlying HR records.
 
-- Allow users to export grid data where permitted.
-- Provide formal HR reports.
-- Support asynchronous report generation.
-- Store generated reports securely.
-- Notify users when reports are ready.
-- Enforce company and permission boundaries.
-- Audit sensitive report generation and downloads.
-- Support CSV and Excel as primary formats.
-- Support PDF only where business-appropriate.
+Source modules expose purpose-specific read contracts. Reporting must not query another module's DbContext or tables directly.
 
----
+## Report behaviour
 
-## Reporting Types
+- Reports execute against current tenant-scoped data.
+- Filters and grouping are validated by the API.
+- Saved views belong to the authenticated user and company.
+- A user may mark a saved view as their default for a report.
+- A user may favourite reports available to their permissions.
+- Export endpoints apply the same authorization and filters as the corresponding report view.
+- Report results and exports must remain bounded and should use pagination or a justified export limit.
 
-### 1. Grid Export
+## Authorization
 
-Used for simple ad-hoc exports from visible grid data.
+Every report requires server-side authorization.
 
-Examples:
+- HR reports require HR reporting access.
+- Recruitment reports require Recruitment reporting access.
+- Manager reports are limited to the manager's complete reporting hierarchy where the report supports manager access.
+- Company Administrator alone does not grant access to employee or HR reports.
+- Sensitive salary or compensation reporting follows the compensation access rules in `00-current-product-decisions.md`.
+- Every request remains subject to authenticated-tenant verification.
 
-- Employee list
-- Leave requests
-- Task list
-- Recruitment candidate list
-- Document list
+The report catalogue must omit reports the caller cannot use, but catalogue filtering does not replace endpoint authorization.
 
-Implemented using Syncfusion grid export functionality.
+## Exports
 
-Grid exports should reflect:
+Supported exports are generated on demand and returned through authorised endpoints. CSV is the baseline server export format; other formats may be supported by the shared report exporter where implemented.
 
-- Current filters
-- Current sorting
-- Current grouping
-- Current visible columns
+Export requirements:
 
-Grid exports must not bypass permissions.
+- Use a safe filename.
+- Escape spreadsheet-formula prefixes in user-controlled values.
+- Apply tenant and resource authorization before querying and again before returning a file where the operation is deferred.
+- Do not include fields absent from the corresponding authorised report.
+- Audit sensitive exports where required by the report classification.
 
----
+## Asynchronous and stored reports
 
-### 2. Formal Reports
+Asynchronous report generation, stored generated-report files, report history, scheduled reports and report subscriptions are not general MVP requirements and are not part of the current baseline.
 
-Used for reports that are:
+If a demonstrated large-report requirement cannot meet the normal response target, it may introduce a bounded Hangfire job and private Supabase Storage object. That work requires an explicit feature decision covering retention, idempotency, authorization at download time, failure visibility and cleanup.
 
-- Sensitive
-- Large
-- Compliance-related
-- Repeatable
-- Long-running
-- Multi-table
-- Stored for later download
+## Payroll boundary
 
-Examples:
+Reporting may export employee or compensation information for authorised operational use. It does not calculate payroll, tax, deductions or statutory payroll submissions.
 
-- Monthly absence report
-- Headcount report
-- Probation due report
-- Missing documents report
-- Expiring documents report
-- Recruitment pipeline report
-- Audit activity export
-- Payroll-ready employee export
+## Performance
 
-Formal reports are generated server-side.
+- Small reports should complete within 10 seconds under the supported tenant-size assumptions.
+- Queries must avoid unbounded materialisation and N+1 access patterns.
+- Filters used by common reports should be supported by relevant source-module indexes.
+- Large-report behaviour must be measured before asynchronous infrastructure is introduced.
 
----
+## Acceptance criteria
 
-## Report Generation Flow
-
-1. User requests report.
-2. System validates permissions.
-3. Report request record is created.
-4. Hangfire job is queued.
-5. Report is generated server-side.
-6. File is written to Supabase Storage.
-7. Report metadata is updated.
-8. User receives system notification.
-9. User downloads report through authorised endpoint.
-10. Download is audited.
-
----
-
-## Report Request Entity
-
-| Field | Required | Notes |
-|---|---|---|
-| Id | Yes | Unique report request identifier |
-| CompanyId | Yes | Tenant boundary |
-| RequestedByEmployeeId | Yes | Employee requesting report |
-| ReportType | Yes | System report type |
-| ParametersJson | Optional | Report filters/options |
-| Status | Yes | Pending, Processing, Completed, Failed |
-| OutputFormat | Yes | CSV, XLSX, PDF |
-| StoragePath | No | Set after generation |
-| CreatedAt | Yes | Request timestamp |
-| StartedAt | No | Processing timestamp |
-| CompletedAt | No | Completion timestamp |
-| FailedAt | No | Failure timestamp |
-| FailureReason | No | Redacted failure detail |
-| ExpiresAt | Optional | Optional expiry/retention date |
-
----
-
-## Report Statuses
-
-### Pending
-
-Report has been requested but not started.
-
-### Processing
-
-Background job is generating the report.
-
-### Completed
-
-Report file is available for download.
-
-### Failed
-
-Report generation failed.
-
-Failures should be visible to the requester and administrators.
-
-### Expired
-
-Report is no longer available.
-
----
-
-## Supported Formats
-
-### CSV
-
-Use for:
-
-- Raw exports
-- Payroll-ready exports
-- Integration-friendly data
-
-CSV should be UTF-8 encoded.
-
-### Excel XLSX
-
-Use for:
-
-- Formal HR reports
-- Multi-sheet reports
-- Styled operational reports
-
-Recommended for most HR reporting.
-
-### PDF
-
-Use only for:
-
-- Formal letters
-- Policy packs
-- Compliance documents
-- Printable outputs
-
-Avoid PDF for large analytical reports.
-
----
-
-## Storage
-
-Generated reports are stored in Supabase Storage.
-
-Recommended bucket:
-
-```text
-generated-reports
-```
-
-Recommended path format:
-
-```text
-{companyId}/reports/{reportType}/{reportId}.{extension}
-```
-
-Reports should be private.
-
-Downloads must use signed URLs generated after permission checks.
-
----
-
-## Report Notification Behaviour
-
-When report generation completes, the system creates an in-app notification:
-
-```text
-Your report is ready for download.
-```
-
-The notification should include:
-
-- Report name
-- Generated date
-- Download action
-- Expiry date if applicable
-
-Optional email may be sent for long-running or compliance-critical reports.
-
----
-
-## Permissions
-
-Report access must be permission-controlled.
-
-Examples:
-
-### Employee
-
-Can export own visible data only.
-
-### Manager
-
-Can generate reports for direct and indirect reports where permitted.
-
-### HR Admin
-
-Can generate company-wide HR reports.
-
-### Company Admin
-
-Can generate administrative/company reports.
-
-### Finance
-
-Can generate payroll-related reports if assigned the correct role.
-
----
-
-## Sensitive Reports
-
-Sensitive reports include:
-
-- Salary reports
-- Compensation history
-- Sickness reports
-- Audit exports
-- Document compliance exports
-- Termination reports
-
-Sensitive reports require explicit permissions.
-
-Sensitive report generation must be audited.
-
----
-
-## Audit Requirements
-
-Audit events must be created for:
-
-- Report requested
-- Report generated
-- Report failed
-- Report downloaded
-- Report expired
-- Sensitive report generated
-
-Audit metadata should include:
-
-- Report type
-- Requesting employee
-- Filters used where safe
-- Output format
-- Whether the report was sensitive
-
-Sensitive filter values should be redacted.
-
----
-
-## Validation Rules
-
-- Report type must be valid.
-- Output format must be supported.
-- User must have permission for requested scope.
-- Date ranges must be valid.
-- Report parameters must be validated before job creation.
-- Large reports must use background generation.
-- Report downloads must validate access at download time.
-
----
-
-## UX Requirements
-
-### Report Request Screen
-
-Users should be able to:
-
-- Select report type
-- Select format
-- Enter report parameters
-- Submit report request
-
-### Report History
-
-Users should see:
-
-- Recently generated reports
-- Status
-- Created date
-- Expiry
-- Download action
-
-### Admin Report View
-
-HR/Admin users may see wider report history depending on permissions.
-
----
-
-## Acceptance Criteria
-
-1. Users can export permitted grid data.
-2. Formal reports are generated server-side.
-3. Long-running reports run in Hangfire.
-4. Generated reports are stored in Supabase Storage.
-5. Users receive notification when report is ready.
-6. Report downloads are permission-checked.
-7. Sensitive reports are audited.
-8. Report failures are visible.
-9. CSV and XLSX are supported.
-10. PDF is supported only for appropriate report types.
+1. The formal report catalogue is available to authorised users.
+2. Reports are filtered by authenticated tenant and resource scope.
+3. The implemented catalogue covers the report types listed above.
+4. Saved views, defaults and favourites are scoped to the current user and company.
+5. Export endpoints enforce the same access and filters as report views.
+6. Sensitive reports and exports follow their owning data permissions.
+7. Company Administrator alone does not grant HR reporting access.
+8. Reporting uses module-owned read contracts and does not query another module's schema directly.
+9. Grid export remains available independently on screens that support it.
+10. Asynchronous stored reports are added only for a separately approved requirement.

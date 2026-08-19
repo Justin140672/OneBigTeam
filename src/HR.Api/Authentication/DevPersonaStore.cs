@@ -26,6 +26,7 @@ public sealed class DevPersonaStore
         new("30000000-0000-0000-0000-000000000010", Acme,     "Carlos Rivera", "Account Executive",   "carlos.rivera@acme.example"),
         new("30000000-0000-0000-0000-000000000011", BetaCorp, "Alice Morgan",  "Engineering Manager", "alice.morgan@betacorp.example"),
         new("30000000-0000-0000-0000-000000000012", BetaCorp, "Bob Taylor",    "Software Developer",  "bob.taylor@betacorp.example"),
+        new("30000000-0000-0000-0000-000000000015", BetaCorp, "Grace Kim",     "HR Administrator",    "grace.kim@betacorp.example"),
     ];
 
     // Personas created via the self-service SignUp flow (HR.Modules.Identity's SignUp feature) —

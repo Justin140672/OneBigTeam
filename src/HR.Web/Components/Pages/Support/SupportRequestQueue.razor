@@ -20,6 +20,11 @@
                         DataSource="@_statusFilterOptions"
                         Value="@_statusFilter"
                         ValueChanged="OnStatusFilterChangedAsync">
+            @* Same reasoning as the per-row status dropdown below: bound Value/DataSource stay
+               raw, only displayed text is humanized. AllStatusesOption ("All") is a single word,
+               unaffected either way. *@
+            <ItemTemplate Context="status">@EnumDisplay.Humanize(status)</ItemTemplate>
+            <ValueTemplate Context="status">@EnumDisplay.Humanize(status)</ValueTemplate>
         </SfDropDownList>
     </div>
 
@@ -75,6 +80,11 @@
                                         DataSource="@SupportRequestOptions.Statuses"
                                         Value="@row.Status"
                                         ValueChanged="@(async (string value) => await ChangeStatusAsync(row, value))">
+                            @* The bound Value/DataSource stay the raw enum strings ChangeStatusAsync
+                               sends back to the API — only the displayed text is humanized, via
+                               ItemTemplate (dropdown list) and ValueTemplate (closed selection box). *@
+                            <ItemTemplate Context="status">@EnumDisplay.Humanize(status)</ItemTemplate>
+                            <ValueTemplate Context="status">@EnumDisplay.Humanize(status)</ValueTemplate>
                         </SfDropDownList>
                     </Template>
                 </GridColumn>

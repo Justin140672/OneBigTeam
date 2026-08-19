@@ -38,7 +38,10 @@
     private ErrorBoundary? _errorBoundary;
 
     // Reads the "st" (session token) query-string param that /dev/persona-cookie and
-    // /verify-email-complete append to their redirect targets (see Program.cs). NavigationManager.Uri
+    // /login-complete append to their redirect targets (see Program.cs) — /verify-email-complete
+    // deliberately does NOT do this (see its remarks) since carrying a session over that hop risks
+    // landing the visitor in a stale circuit's existing session instead of the one they just
+    // verified. NavigationManager.Uri
     // — unlike IHttpContextAccessor.HttpContext — is reliably available inside a Blazor Server
     // interactive circuit even when that circuit persists across a full browser navigation (confirmed
     // via live diagnosis: the circuit's own SupabaseSessionAccessor instance otherwise never gets a

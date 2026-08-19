@@ -13,14 +13,56 @@ namespace HR.Web.E2E.Tests.Tests;
 /// confirmation, and Cancel/unsaved-changes-protection semantics around it. Also covers the
 /// "Users &amp; Access" card rename/relocation and the Details tab's field label associations.
 ///
-/// Every test creates its own fresh employee via the standard New Employee form (same pattern as
-/// EmployeeLeavingProcessTests.CreateEmployeeAsync) so view/edit assertions never race concurrent
-/// mutation of a shared seeded employee.
+/// None of these tests permanently corrupt what another test in this file needs (the one that
+/// does Save, does so via a freshly-generated field value that later tests read back dynamically
+/// rather than asserting a hardcoded original), and xUnit runs test METHODS within one class
+/// sequentially (only different classes run in parallel with each other in this suite — see
+/// GroupSerializedTestBases.cs's own remarks on that), so it's safe for every test below to share
+/// ONE employee instead of each paying the full New Employee form (4 combobox selections, 2 page
+/// navigations) just to get "some employee in view mode" — that per-test cost was making this
+/// file take noticeably longer than similarly-sized files that reuse seeded/shared data. The
+/// employee is created once, lazily, on whichever test method runs first; every test after that
+/// just navigates straight to its "/view" route.
 /// </summary>
 public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private const string LauraEmail = "laura.bennett@acme.example";
+
+    // xUnit creates a fresh instance of this class per [Fact] (confirmed elsewhere in this suite —
+    // see GroupSerializedTestBases.cs), so the shared employee has to live in a static, not an
+    // instance field, to actually be reused across test methods. Same
+    // create-once-lazily/double-checked-lock shape as PersonaLoginCache.
+    private static readonly SemaphoreSlim _sharedEmployeeLock = new(1, 1);
+    private static (Guid EmployeeId, string LastName)? _sharedEmployee;
+
+    private async Task<(Guid EmployeeId, string LastName)> GetSharedEmployeeAsync(
+        EmployeeListPage empList, EmployeeEditPage empEdit)
+    {
+        if (_sharedEmployee is { } cached)
+        {
+            await empEdit.GoToViewAsync(AcmeId, cached.EmployeeId);
+            return cached;
+        }
+
+        await _sharedEmployeeLock.WaitAsync();
+        try
+        {
+            if (_sharedEmployee is { } cachedAfterLock)
+            {
+                await empEdit.GoToViewAsync(AcmeId, cachedAfterLock.EmployeeId);
+                return cachedAfterLock;
+            }
+
+            var created = await CreateEmployeeAsync(empList, empEdit, "Shared");
+            _sharedEmployee = created;
+            return created;
+        }
+        finally
+        {
+            _sharedEmployeeLock.Release();
+        }
+    }
 
     private async Task<(Guid EmployeeId, string LastName)> CreateEmployeeAsync(
         EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
@@ -62,10 +104,10 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Default");
+        await GetSharedEmployeeAsync(empList, empEdit);
 
-        // ClickEmployeeAsync navigated us here via EmployeeList.razor's row link, which now
-        // points at the "/view" route (see EmployeeList.razor's employee link builder).
+        // GetSharedEmployeeAsync lands here via GoToViewAsync, which mirrors where
+        // EmployeeList.razor's row link would land (see its employee link builder).
         Assert.True(empEdit.IsInViewModeUrl, $"Expected to land on the '/view' route, got: {_page.Url}");
         Assert.True(await empEdit.IsEditDetailsButtonVisibleAsync(),
             "Expected the 'Edit details' button to be visible in view mode for an HR administrator");
@@ -85,16 +127,16 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "ReadOnly");
+        await GetSharedEmployeeAsync(empList, empEdit);
 
         Assert.True(empEdit.IsInViewModeUrl);
 
         // Genuinely disabled per the fix's own rationale (EmployeeEmploymentTab.razor's IsViewMode
         // comment: "pointer-events:none only prevented mouse interaction, not keyboard/programmatic
         // edits") — assert on the actual `readonly` HTML attribute, not visual/CSS state.
-        Assert.True(await empEdit.IsTextFieldReadOnlyAsync("employee-first-name"),
+        Assert.True(await empEdit.IsTextFieldReadOnlyAsync("First Name"),
             "Expected the First Name field to carry the HTML readonly attribute in view mode");
-        Assert.True(await empEdit.IsTextFieldReadOnlyAsync("employee-work-email"),
+        Assert.True(await empEdit.IsTextFieldReadOnlyAsync("Work Email"),
             "Expected the Work Email field to carry the HTML readonly attribute in view mode");
     }
 
@@ -108,7 +150,7 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "BackNav");
+        await GetSharedEmployeeAsync(empList, empEdit);
 
         await empEdit.ClickBackToEmployeesButtonAsync();
 
@@ -127,13 +169,13 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "EnterEdit");
+        await GetSharedEmployeeAsync(empList, empEdit);
         Assert.True(empEdit.IsInViewModeUrl);
 
         await empEdit.ClickEditDetailsButtonAsync();
 
         Assert.False(empEdit.IsInViewModeUrl, $"Expected to leave the '/view' route after clicking Edit details, got: {_page.Url}");
-        Assert.False(await empEdit.IsTextFieldReadOnlyAsync("employee-first-name"),
+        Assert.False(await empEdit.IsTextFieldReadOnlyAsync("First Name"),
             "Expected the First Name field to no longer be readonly in edit mode");
         Assert.True(await empEdit.IsStickyActionBarVisibleAsync(),
             "Expected the sticky Save/Cancel action bar to render in edit mode");
@@ -153,11 +195,11 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Save");
+        await GetSharedEmployeeAsync(empList, empEdit);
         await empEdit.ClickEditDetailsButtonAsync();
 
         var newPreferredName = $"Preferred{Guid.NewGuid().ToString("N")[..6]}";
-        await empEdit.FillTextFieldByIdAsync("employee-preferred-name", newPreferredName);
+        await empEdit.FillTextFieldByIdAsync("Preferred Name", newPreferredName);
 
         // Click Save directly (sticky bar) rather than ClickSaveChangesAsync's spinner-wait, since
         // we need to catch the ~700ms success banner before OnSavedAsync's forceLoad navigates
@@ -174,18 +216,21 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await saveClick;
 
         // OnSavedAsync's forceLoad navigation lands back on the view route with fresh data.
-        await _page.WaitForURLAsync(url => url.Contains("/view", StringComparison.OrdinalIgnoreCase), new() { Timeout = 20_000 });
+        await _page.WaitForURLAsync(url => url.Contains("/view", StringComparison.OrdinalIgnoreCase), new() { Timeout = 40_000 });
         await _page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
 
         Assert.True(empEdit.IsInViewModeUrl);
-        Assert.Equal(newPreferredName, await empEdit.GetTextFieldValueAsync("employee-preferred-name"));
+        Assert.Equal(newPreferredName, await empEdit.GetTextFieldValueAsync("Preferred Name"));
     }
 
     // ── Cancel discards edits ────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Cancel_DiscardsEdit_AndReturnsToViewMode_ShowingOriginalValue()
+    public async Task Cancel_WithUnsavedChanges_ShowsConfirmDialog_AndDiscardReturnsOriginalValue()
     {
+        // Cancel on any edit screen now always shows the unsaved-changes confirmation dialog when
+        // there are edits pending, rather than silently discarding — see EditPageBase.RequestClose,
+        // now used directly by the Employee Edit page's sticky-bar Cancel button too.
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
@@ -193,17 +238,23 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Cancel");
+        var (employeeId, _) = await GetSharedEmployeeAsync(empList, empEdit);
 
-        var originalValue = await empEdit.GetTextFieldValueAsync("employee-preferred-name");
+        var originalValue = await empEdit.GetTextFieldValueAsync("Preferred Name");
 
         await empEdit.ClickEditDetailsButtonAsync();
-        await empEdit.FillTextFieldByIdAsync("employee-preferred-name", "ShouldBeDiscarded");
+        await empEdit.FillTextFieldByIdAsync("Preferred Name", "ShouldBeDiscarded");
 
-        await empEdit.ClickCancelEditButtonAsync();
+        await empEdit.ClickCloseAsync();
+        Assert.True(await empEdit.IsUnsavedChangesDialogVisibleAsync(),
+            "Expected the unsaved-changes confirmation dialog after clicking Cancel with a pending edit");
 
-        Assert.True(empEdit.IsInViewModeUrl, $"Expected Cancel to return to the view route, got: {_page.Url}");
-        var reloadedValue = await empEdit.GetTextFieldValueAsync("employee-preferred-name");
+        await empEdit.ConfirmDiscardChangesAsync();
+        Assert.EndsWith("/employees", _page.Url);
+
+        // Reload the employee and confirm the discarded value never persisted.
+        await empEdit.GoToViewAsync(AcmeId, employeeId);
+        var reloadedValue = await empEdit.GetTextFieldValueAsync("Preferred Name");
         Assert.Equal(originalValue, reloadedValue);
         Assert.NotEqual("ShouldBeDiscarded", reloadedValue);
     }
@@ -220,10 +271,10 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Breadcrumb");
+        await GetSharedEmployeeAsync(empList, empEdit);
         await empEdit.ClickEditDetailsButtonAsync();
 
-        await empEdit.FillTextFieldByIdAsync("employee-preferred-name", "UnsavedBreadcrumbEdit");
+        await empEdit.FillTextFieldByIdAsync("Preferred Name", "UnsavedBreadcrumbEdit");
 
         // SfBreadcrumb's "Employees" item — an in-app navigation attempt intercepted by
         // EditPageBase's HandleLocationChangingAsync while the model is dirty.
@@ -246,10 +297,10 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "BreadcrumbCancel");
+        await GetSharedEmployeeAsync(empList, empEdit);
         await empEdit.ClickEditDetailsButtonAsync();
 
-        await empEdit.FillTextFieldByIdAsync("employee-preferred-name", "StillPendingEdit");
+        await empEdit.FillTextFieldByIdAsync("Preferred Name", "StillPendingEdit");
 
         await _page.GetByRole(AriaRole.Link, new() { Name = "Employees", Exact = true }).ClickAsync();
         Assert.True(await empEdit.IsUnsavedChangesDialogVisibleAsync());
@@ -258,7 +309,7 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
 
         // Still on the edit route with the in-progress edit intact.
         Assert.False(empEdit.IsInViewModeUrl);
-        Assert.Equal("StillPendingEdit", await empEdit.GetTextFieldValueAsync("employee-preferred-name"));
+        Assert.Equal("StillPendingEdit", await empEdit.GetTextFieldValueAsync("Preferred Name"));
     }
 
     // ── Users & Access card ──────────────────────────────────────────────────────
@@ -273,7 +324,7 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "UsersAccess");
+        await GetSharedEmployeeAsync(empList, empEdit);
         await empEdit.ClickEditDetailsButtonAsync();
 
         Assert.True(await empEdit.IsUsersAndAccessCardVisibleAsync(),
@@ -299,27 +350,22 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "A11y");
+        await GetSharedEmployeeAsync(empList, empEdit);
         await empEdit.ClickEditDetailsButtonAsync();
 
         Assert.True(await empEdit.HasRequiredFieldsNoteAsync(),
             "Expected the 'Fields marked * are required.' explanatory note on the Details tab");
 
-        // A sample of fields whose <label for="..."> was newly associated with the underlying
-        // input's id (see EmployeeEdit.razor's employee-first-name/employee-work-email/etc ids).
-        // GetByLabel resolves via the accessible name computed from that association, proving it's
-        // real (not just visual proximity).
-        foreach (var (labelText, expectFieldId) in new[]
-                 {
-                     ("First Name", "employee-first-name"),
-                     ("Work Email", "employee-work-email"),
-                     ("City", "employee-city"),
-                 })
+        // A sample of fields whose accessible name is set via aria-label (see EmployeeEdit.razor's
+        // HrTextBox HtmlAttributes["aria-label"] fields) — Syncfusion always overwrites any custom
+        // `id` passed to HrTextBox with its own auto-generated one, so `<label for="id">`-style
+        // association never reliably resolves for these; aria-label does. GetByLabel resolving at
+        // all here (rather than throwing/timing out) is itself the proof the accessible name is
+        // real, not just visual proximity.
+        foreach (var labelText in new[] { "First Name", "Work Email", "City" })
         {
             var field = _page.GetByLabel(labelText).First;
             await Assertions.Expect(field).ToBeVisibleAsync(new() { Timeout = 10_000 });
-            var id = await field.GetAttributeAsync("id");
-            Assert.Equal(expectFieldId, id);
         }
     }
 
@@ -335,7 +381,7 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Kbd");
+        await GetSharedEmployeeAsync(empList, empEdit);
         Assert.True(empEdit.IsInViewModeUrl);
 
         var editButton = _page.Locator("[data-testid='edit-details-button']");
@@ -359,7 +405,7 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "KbdMenu");
+        await GetSharedEmployeeAsync(empList, empEdit);
 
         var moreActions = _page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
         await moreActions.FocusAsync();
@@ -384,7 +430,7 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "KbdTabs");
+        await GetSharedEmployeeAsync(empList, empEdit);
 
         var detailsTab = _page.GetByRole(AriaRole.Tab, new() { Name = "Details" });
         await detailsTab.FocusAsync();

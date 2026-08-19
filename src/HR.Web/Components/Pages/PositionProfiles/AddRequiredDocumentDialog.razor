@@ -36,7 +36,7 @@
                     <div class="col-12">
                         <label class="form-label">Due Days After Start</label>
                         <SfNumericTextBox TValue="int?" @bind-Value="Model.DueDaysAfterStart" Min="0" Placeholder="e.g. 30"
-                                          FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" />
+                                          FloatLabelType="FloatLabelType.Always" ShowSpinButton="false" />
                     </div>
                     <div class="col-12">
                         <SfCheckBox TChecked="bool" Label="Requires Expiry Date" @bind-Checked="Model.RequiresExpiryDate" />

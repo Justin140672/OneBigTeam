@@ -177,7 +177,9 @@ Examples:
 
 ## Report Completion Notifications
 
-When reports complete:
+The current report baseline returns authorised exports directly and does not require report-completion notifications.
+
+If asynchronous stored reports are introduced for a separately approved large-report requirement, completion notifications follow this flow:
 
 1. Report generated
 2. File stored
@@ -226,6 +228,6 @@ Reports:
 3. Scheduled reminders supported.
 4. Templates supported.
 5. Delivery history maintained.
-6. Report completion notifications supported.
+6. Report completion notifications are supported when an asynchronous stored-report feature is enabled.
 7. Audit history maintained.
 8. Company isolation enforced.

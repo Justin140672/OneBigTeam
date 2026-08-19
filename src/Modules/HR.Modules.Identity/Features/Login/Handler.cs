@@ -16,6 +16,7 @@ internal sealed class LoginHandler(
     ISupabaseAuthGateway supabaseAuthGateway,
     IdentityDbContext dbContext,
     IServiceProvider serviceProvider,
+    IAuthorizationService authorizationService,
     ILogger<LoginHandler> logger)
 {
     public async Task<Result<LoginResponse>> HandleAsync(LoginRequest request, CancellationToken cancellationToken)
@@ -64,6 +65,20 @@ internal sealed class LoginHandler(
         if (!isAllowed)
         {
             return Result.Failure<LoginResponse>(Error.Validation("Your account has been disabled."));
+        }
+
+        // A UserProfile row with zero effective roles isn't a usable company-app account — e.g. a
+        // Supabase Auth user that's actually a platform administrator (Admin Portal-only, no
+        // company/role assignment here — see PlatformAdministrator) rather than a real HR.Web user.
+        // Without this, such an account would "successfully" log in to a blank/broken session (no
+        // roles to land on any page with) instead of a clear rejection.
+        var roles = await authorizationService.GetEffectiveRolesAsync(profile.Id, cancellationToken);
+        if (roles.Count == 0)
+        {
+            logger.LogWarning(
+                "Login succeeded at Supabase and resolved a UserProfile for {Email}, but the account has no roles — rejecting as invalid",
+                request.Email);
+            return Result.Failure<LoginResponse>(Error.Validation("Invalid email or password."));
         }
 
         var expiresInSeconds = (int)Math.Max(1, (session.ExpiresAt - DateTimeOffset.UtcNow).TotalSeconds);

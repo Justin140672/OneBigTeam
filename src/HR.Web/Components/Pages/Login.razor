@@ -19,6 +19,13 @@
     <EditForm Model="_form" OnValidSubmit="SubmitAsync" FormName="login">
         <DataAnnotationsValidator />
 
+        @if (Verified && _error is null)
+        {
+            <div class="login-success" data-testid="verified-message">
+                <i class="fa-solid fa-circle-check"></i> Your account is verified. Sign in to get started.
+            </div>
+        }
+
         @if (_error is not null)
         {
             <div class="login-error">
@@ -30,7 +37,8 @@
             <label class="login-label">Email</label>
             <SfTextBox @bind-Value="_form.Email"
                        Placeholder="you@example.com"
-                       Type="InputType.Email" />
+                       Type="InputType.Email"
+                       Input="@(() => _error = null)" />
             <ValidationMessage For="() => _form.Email" class="login-validation" />
         </div>
 
@@ -39,9 +47,19 @@
                 <label class="login-label">Password</label>
                 <a href="/forgot-password" class="login-forgot-link" data-testid="forgot-password-link">Forgot password?</a>
             </div>
-            <SfTextBox @bind-Value="_form.Password"
-                       Placeholder="••••••••"
-                       Type="InputType.Password" />
+            <div class="login-password-field">
+                <SfTextBox @bind-Value="_form.Password"
+                           Placeholder="••••••••"
+                           Type="@(_showPassword ? InputType.Text : InputType.Password)"
+                           Input="@(() => _error = null)" />
+                <button type="button"
+                        class="login-password-toggle"
+                        aria-pressed="@_showPassword.ToString().ToLowerInvariant()"
+                        aria-label="@(_showPassword ? "Hide password" : "Show password")"
+                        @onclick="() => _showPassword = !_showPassword">
+                    @(_showPassword ? "Hide" : "Show")
+                </button>
+            </div>
             <ValidationMessage For="() => _form.Password" class="login-validation" />
         </div>
 
@@ -59,9 +77,13 @@
 </div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "verified")]
+    public bool Verified { get; set; }
+
     private readonly LoginForm _form = new();
     private string? _error;
     private bool _busy;
+    private bool _showPassword;
 
     private async Task SubmitAsync()
     {

@@ -27,7 +27,7 @@ public class CompanySettingsEmployeeNumberTests
         settings.UpdateHrPolicy(
             WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
                              WorkingDays.Thursday | WorkingDays.Friday,
-            7.5m, 1, 25, 6, true, false, false, null, null,
+            7.5m, 1, 25, 6, true, false, false, 7, 1,
             "Custom statement.", 3, NoticePeriodUnit.Months, 1, true,
             EmployeeNumberMode.Automatic, "EMP-", 125, 5, now);
 
@@ -47,7 +47,7 @@ public class CompanySettingsEmployeeNumberTests
         settings.UpdateHrPolicy(
             WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
                              WorkingDays.Thursday | WorkingDays.Friday,
-            7.5m, 1, 25, 6, true, false, false, null, null,
+            7.5m, 1, 25, 6, true, false, false, 7, 1,
             "Custom statement.", 3, NoticePeriodUnit.Months, 1, true,
             EmployeeNumberMode.Manual, "   ", 1, 1, now);
 
@@ -64,7 +64,7 @@ public class CompanySettingsEmployeeNumberTests
         settings.UpdateHrPolicy(
             WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
                              WorkingDays.Thursday | WorkingDays.Friday,
-            7.5m, 1, 25, 6, true, false, false, null, null,
+            7.5m, 1, 25, 6, true, false, false, 7, 1,
             "Custom statement.", 3, NoticePeriodUnit.Months, 1, true,
             EmployeeNumberMode.Manual, "  EMP-  ", 1, 1, now);
 
@@ -81,7 +81,7 @@ public class CompanySettingsEmployeeNumberTests
         settings.UpdateHrPolicy(
             WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
                              WorkingDays.Thursday | WorkingDays.Friday,
-            7.5m, 1, 25, 6, true, false, false, null, null,
+            7.5m, 1, 25, 6, true, false, false, 7, 1,
             "Custom statement.", 3, NoticePeriodUnit.Months, 1, true,
             EmployeeNumberMode.Automatic, null, 1, 1, now);
 
@@ -98,7 +98,7 @@ public class CompanySettingsEmployeeNumberTests
         settings.UpdateHrPolicy(
             WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
                              WorkingDays.Thursday | WorkingDays.Friday,
-            7.5m, 1, 25, 6, true, false, false, null, null,
+            7.5m, 1, 25, 6, true, false, false, 7, 1,
             string.Empty, 3, NoticePeriodUnit.Months, 1, true,
             EmployeeNumberMode.Automatic, null, 1, 1, now);
 
@@ -115,7 +115,7 @@ public class CompanySettingsEmployeeNumberTests
         settings.UpdateHrPolicy(
             WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
                              WorkingDays.Thursday | WorkingDays.Friday,
-            7.5m, 1, 25, 6, true, false, false, null, null,
+            7.5m, 1, 25, 6, true, false, false, 7, 1,
             "   ", 3, NoticePeriodUnit.Months, 1, true,
             EmployeeNumberMode.Automatic, null, 1, 1, now);
 
@@ -132,7 +132,7 @@ public class CompanySettingsEmployeeNumberTests
         settings.UpdateHrPolicy(
             WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
                              WorkingDays.Thursday | WorkingDays.Friday,
-            7.5m, 1, 25, 6, true, false, false, null, null,
+            7.5m, 1, 25, 6, true, false, false, 7, 1,
             "Custom statement.", 3, NoticePeriodUnit.Months, 1, true,
             EmployeeNumberMode.Automatic, null, 1, 1, now);
 

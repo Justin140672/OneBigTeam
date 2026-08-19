@@ -392,7 +392,8 @@ public static class EmployeesModule
         services.AddScoped<IWorkloadActionProvider, UpcomingEmployeeStartDatesWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, UpcomingEmployeeLeavingDatesWorkloadActionProvider>();
 
-        // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
+        // Getting Started checklist task definitions (HR.Modules.CompanyOnboarding epic, Phase A).
+        services.AddScoped<IOnboardingTaskDefinition, DownloadEmployeeImportTemplateTask>();
         services.AddScoped<IOnboardingTaskDefinition, ImportEmployeesTask>();
     }
 
@@ -642,6 +643,7 @@ public static class EmployeesModule
             var betaPosDevId    = Guid.Parse("20000000-0000-0000-0000-000000000012");
             var betaEmpMgrId    = Guid.Parse("30000000-0000-0000-0000-000000000011");
             var betaEmpDevId    = Guid.Parse("30000000-0000-0000-0000-000000000012");
+            var betaEmpHrId     = Guid.Parse("30000000-0000-0000-0000-000000000015");
 
             var betaEtPermId = Guid.Parse("40000000-0000-0000-0000-000000000011");
             db.EmploymentTypes.Add(EmploymentType.Create(betaEtPermId, betaCorpId, "Permanent", null, now));
@@ -682,7 +684,12 @@ public static class EmployeesModule
 
             db.Employees.AddRange(
                 MakeBeta(betaEmpMgrId, "Alice", "Morgan", "alice.morgan@betacorp.example", new DateOnly(2022, 3, 1), betaPosEngMgrId, null,         new DateOnly(1987, 5, 20),  "British", "Female", "alice.morgan@gmail.com", "07700 900021", "33 Headingley Lane", null,     "Leeds", "West Yorkshire", "LS6 1BL", "BETA-001", betaEtPermId),
-                MakeBeta(betaEmpDevId, "Bob",   "Taylor", "bob.taylor@betacorp.example",   new DateOnly(2023, 9, 4), betaPosDevId,    betaEmpMgrId, new DateOnly(1993, 10, 11), "British", "Male",   "bob.taylor@hotmail.com", "07700 900022", "7 Kirkstall Road",   "Flat 2", "Leeds", "West Yorkshire", "LS3 1LH", "BETA-002", betaEtPermId));
+                MakeBeta(betaEmpDevId, "Bob",   "Taylor", "bob.taylor@betacorp.example",   new DateOnly(2023, 9, 4), betaPosDevId,    betaEmpMgrId, new DateOnly(1993, 10, 11), "British", "Male",   "bob.taylor@hotmail.com", "07700 900022", "7 Kirkstall Road",   "Flat 2", "Leeds", "West Yorkshire", "LS3 1LH", "BETA-002", betaEtPermId),
+                // HR Administrator for Beta Corp — gives HrSettingsPageTests (which mutates the
+                // shared CompanySettings row's Employee Numbering mode mid-test) a tenant fully
+                // isolated from every other role-fixed test's Acme-based employee creation, rather
+                // than racing them on Acme's own shared settings row.
+                MakeBeta(betaEmpHrId,  "Grace", "Kim",    "grace.kim@betacorp.example",     new DateOnly(2021, 6, 1), betaPosEngMgrId, null,         new DateOnly(1985, 2, 14),  "British", "Female", "grace.kim@gmail.com",   "07700 900023", "12 Kirkgate",        null,     "Leeds", "West Yorkshire", "LS1 6BY", "BETA-003", betaEtPermId));
 
             await db.SaveChangesAsync();
 

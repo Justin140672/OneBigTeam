@@ -29,7 +29,7 @@
                 <h1 class="mb-1">@_detail.Title</h1>
                 <div class="text-muted">@_detail.ReferenceNumber</div>
             </div>
-            <span class="badge fs-6 @StatusBadgeClass(_detail.Status)">@_detail.Status</span>
+            <span class="badge fs-6 @StatusBadgeClass(_detail.Status)">@EnumDisplay.Humanize(_detail.Status)</span>
         </div>
 
         <div class="row g-4">

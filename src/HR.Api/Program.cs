@@ -85,13 +85,18 @@ builder.Services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher
 builder.Services.AddRateLimiter(options =>
 {
 	options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+	// Window/PermitLimit are configurable (not just hardcoded) so integration tests can widen them —
+	// ContactEndpointTests exercises many validation cases per class run against one in-memory
+	// TestServer, all sharing a single per-IP partition; production defaults are unchanged.
+	var contactFormRateLimitWindowMinutes = builder.Configuration.GetValue("Marketing:ContactForm:RateLimit:WindowMinutes", 5);
+	var contactFormRateLimitPermitLimit = builder.Configuration.GetValue("Marketing:ContactForm:RateLimit:PermitLimit", 5);
 	options.AddPolicy("contact-form", context =>
 		RateLimitPartition.GetFixedWindowLimiter(
 			partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
 			factory: _ => new FixedWindowRateLimiterOptions
 			{
-				Window = TimeSpan.FromMinutes(5),
-				PermitLimit = 5,
+				Window = TimeSpan.FromMinutes(contactFormRateLimitWindowMinutes),
+				PermitLimit = contactFormRateLimitPermitLimit,
 				QueueLimit = 0,
 			}));
 });
@@ -792,12 +797,14 @@ app.MapPost("/api/contact", async (
 		return Results.Problem("The contact form is not available right now. Please try again later.", statusCode: StatusCodes.Status503ServiceUnavailable);
 	}
 
-	var subject = $"New contact form enquiry from {WebUtility.HtmlEncode(request.Company.Trim())}";
+	var companyDisplay = string.IsNullOrWhiteSpace(request.Company) ? "(not provided)" : request.Company.Trim();
+	var employeeCountDisplay = request.EmployeeCount?.ToString() ?? "(not provided)";
+	var subject = $"New contact form enquiry from {WebUtility.HtmlEncode(companyDisplay)}";
 	var htmlBody = $"""
 		<p><strong>Name:</strong> {WebUtility.HtmlEncode(request.Name.Trim())}</p>
 		<p><strong>Email:</strong> {WebUtility.HtmlEncode(request.Email.Trim())}</p>
-		<p><strong>Company:</strong> {WebUtility.HtmlEncode(request.Company.Trim())}</p>
-		<p><strong>Approximate employee count:</strong> {request.EmployeeCount}</p>
+		<p><strong>Company:</strong> {WebUtility.HtmlEncode(companyDisplay)}</p>
+		<p><strong>Approximate employee count:</strong> {WebUtility.HtmlEncode(employeeCountDisplay)}</p>
 		<p><strong>Message:</strong></p>
 		<p>{WebUtility.HtmlEncode(request.Message.Trim()).Replace("\n", "<br>")}</p>
 		""";
@@ -843,12 +850,10 @@ static Dictionary<string, string[]> ValidateContactRequest(ContactRequest reques
 		}
 	}
 
-	if (string.IsNullOrWhiteSpace(request.Company))
-		errors["company"] = ["Enter your company name."];
-	else if (request.Company.Trim().Length > 200)
+	if (!string.IsNullOrWhiteSpace(request.Company) && request.Company.Trim().Length > 200)
 		errors["company"] = ["Company name must be 200 characters or fewer."];
 
-	if (request.EmployeeCount is null or < 1)
+	if (request.EmployeeCount is < 1)
 		errors["employeeCount"] = ["Enter an employee count of 1 or more."];
 
 	if (string.IsNullOrWhiteSpace(request.Message))

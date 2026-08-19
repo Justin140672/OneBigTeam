@@ -108,7 +108,12 @@
     private async Task LoadAsync()
     {
         var tasksTask = TaskService.GetUnassignedTasksAsync(Session.CompanyId);
-        var leaveTask = LeaveService.GetRecentLeaveRequestsAsync(Session.CompanyId);
+        // Default take=10 (LeaveService.GetRecentLeaveRequestsAsync) is too easy to exceed for a
+        // company with meaningful leave-request volume — a request can age out of the "recent"
+        // window (and so never reach this widget at all, resolved or pending) well before anyone
+        // actually needs to act on or review it. Widened here specifically for the Attention Queue
+        // (not the default itself, which other callers may reasonably want to keep tighter).
+        var leaveTask = LeaveService.GetRecentLeaveRequestsAsync(Session.CompanyId, take: 50);
         var probationTask = ProbationService.GetUpcomingReviewsAsync(Session.CompanyId);
         var rtwTask = SicknessService.GetOverdueReturnToWorkReviewsAsync(Session.CompanyId);
         var expiringDocsTask = DocumentService.GetExpiringDocumentsAsync(Session.CompanyId);

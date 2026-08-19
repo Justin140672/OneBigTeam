@@ -67,6 +67,15 @@ internal sealed class ApproveProfilePhotoHandler(
             db.EmployeeProfilePhotos.Add(livePhoto);
         }
 
+        // Create/Replace both set ScanStatus back to Pending (correct for a genuinely new upload)
+        // — but this reuses the pending submission's already-scanned blob rather than uploading a
+        // new one (see the comment above), and nothing ever enqueues a scan job against this
+        // EmployeeProfilePhoto row afterward (unlike the direct-HR-upload path, which does).
+        // Left as Pending, ScanStatusAccessGuard.CheckDownloadable rejects it forever — the photo
+        // would never become downloadable no matter how long a caller waits. The pending photo can
+        // only have reached this point via the same upload pipeline that already scanned it clean.
+        livePhoto.MarkScanClean(now);
+
         var pendingPhotoId = pendingPhoto.Id;
         db.PendingProfilePhotos.Remove(pendingPhoto);
 

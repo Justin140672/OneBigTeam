@@ -1,54 +1,84 @@
+@page "/roadmap"
 @page "/coming-soon"
 @using HR.Marketing.Services
+@inject NavigationManager Navigation
 
-<PageTitle>Coming Soon | One Big Team</PageTitle>
+<PageTitle>Product Roadmap | One Big Team</PageTitle>
 <HeadContent>
     <meta name="description" content="See what's coming next to One Big Team, including AI-powered position profiles, employee webhooks and an AI help assistant.">
 </HeadContent>
 
-<SiteHeader CurrentPage="coming-soon" />
+@if (IsLegacyRoute)
+{
+    // Old /coming-soon bookmarks still resolve here rather than 404ing, then redirect to the
+    // renamed /roadmap route so all new links and analytics settle on a single canonical URL.
+}
+else
+{
+    <SiteHeader CurrentPage="roadmap" />
 
-<main>
-    <section class="pricing-hero section-band">
-        <div class="section-inner hero-copy">
-            <h1>More is coming to One Big Team</h1>
-            <p class="hero-text">
-                We're continually improving One Big Team. Here's a look at some of the features we're planning next.
-            </p>
-        </div>
-    </section>
-
-    @foreach (var group in StatusGroups)
-    {
-        var items = UpcomingFeatureCatalog.All.Where(f => f.Status == group.Status).ToList();
-        if (items.Count == 0)
-        {
-            continue;
-        }
-
-        <section class="section @(group.Muted ? "section-muted" : "")">
-            <div class="section-inner">
-                <div class="section-heading">
-                    <h2>@group.Heading</h2>
-                </div>
-                <div class="card-grid">
-                    @foreach (var feature in items)
-                    {
-                        <div class="card">
-                            <span class="card-icon" aria-hidden="true"><Icon Name="@feature.IconName" /></span>
-                            <h3>@feature.Title</h3>
-                            <p>@feature.Description</p>
-                        </div>
-                    }
-                </div>
+    <main>
+        <section class="pricing-hero section-band">
+            <div class="section-inner hero-copy">
+                <h1>Product Roadmap</h1>
+                <p class="hero-text">
+                    We're continually improving One Big Team. Here's a look at some of the problems
+                    we're working on solving next.
+                </p>
             </div>
         </section>
-    }
-</main>
 
-<SiteFooter />
+        @foreach (var group in StatusGroups)
+        {
+            var items = UpcomingFeatureCatalog.All.Where(f => f.Status == group.Status).ToList();
+            if (items.Count == 0)
+            {
+                continue;
+            }
+
+            <section class="section @(group.Muted ? "section-muted" : "")">
+                <div class="section-inner">
+                    <div class="section-heading">
+                        <h2>@group.Heading</h2>
+                    </div>
+                    <div class="card-grid">
+                        @foreach (var feature in items)
+                        {
+                            <div class="card">
+                                <span class="card-icon" aria-hidden="true"><Icon Name="@feature.IconName" /></span>
+                                <h3>@feature.Title</h3>
+                                <p>@feature.Description</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </section>
+        }
+
+        <section class="section roadmap-disclaimer-section">
+            <div class="section-inner">
+                <p class="roadmap-disclaimer">
+                    This roadmap reflects our current thinking and priorities. Plans may change, and
+                    nothing here is a commitment to a specific feature or delivery date.
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <SiteFooter />
+}
 
 @code {
+    private bool IsLegacyRoute => Navigation.Uri.Contains("/coming-soon", StringComparison.OrdinalIgnoreCase);
+
+    protected override void OnInitialized()
+    {
+        if (IsLegacyRoute)
+        {
+            Navigation.NavigateTo("/roadmap", forceLoad: false);
+        }
+    }
+
     private static readonly (UpcomingFeatureStatus Status, string Heading, bool Muted)[] StatusGroups =
     {
         (UpcomingFeatureStatus.ComingSoon, "Coming soon", false),

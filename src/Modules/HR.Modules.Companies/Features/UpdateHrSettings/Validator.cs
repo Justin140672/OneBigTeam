@@ -28,6 +28,12 @@ internal sealed class UpdateHrSettingsValidator : AbstractValidator<UpdateHrSett
 		RuleFor(request => request.ProbationMonths)
 			.InclusiveBetween(0, 24);
 
+		RuleFor(request => request.FitNoteRequiredAfterDays)
+			.GreaterThan(0);
+
+		RuleFor(request => request.ReturnToWorkRequiredAfterDays)
+			.GreaterThan(0);
+
 		RuleFor(request => request.DefaultAcknowledgementStatement)
 			.MaximumLength(2000);
 

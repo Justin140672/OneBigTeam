@@ -29,7 +29,7 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
 {
     private readonly SupabaseAuthGateway _real = new(httpClientFactory, options);
 
-    public Task<Guid> CreateUserAsync(string email, string redirectTo, CancellationToken cancellationToken) =>
+    public Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken) =>
         Task.FromResult(Guid.NewGuid());
 
     public Task ResendVerificationEmailAsync(string email, string redirectTo, CancellationToken cancellationToken) =>
@@ -45,6 +45,9 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
         throw new InvalidOperationException("No live Supabase project is configured for E2E testing.");
 
     public Task<Guid> EnsureDevUserAsync(string email, string password, CancellationToken cancellationToken) =>
+        Task.FromResult(DeriveFakeUserId(email));
+
+    public Task<Guid> CreateConfirmedUserAsync(string email, string password, CancellationToken cancellationToken) =>
         Task.FromResult(DeriveFakeUserId(email));
 
     public Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)

@@ -48,17 +48,18 @@ Changes should create new effective-dated records rather than overwriting histor
 
 Compensation data is sensitive.
 
-Do not expose compensation data to:
+Compensation visibility is:
 
-- Employees unless explicitly allowed
-- Managers unless permitted by role/scope
-- Recruiters by default
+- Always available to HR Administrators within their company
+- Available to an employee for their own salary when `DisplaySalaryOnEmployeeProfile` is enabled
+- Available to managers for employees beneath them in the complete reporting hierarchy when `DisplaySalaryOnEmployeeProfile` is enabled
+- Not granted by Recruiter or Company Administrator alone
 
 ---
 
 ## Manager Visibility
 
-Managers may view compensation for reporting chain only if granted the relevant permission.
+Managers may view compensation for their complete subordinate hierarchy only when `DisplaySalaryOnEmployeeProfile` is enabled.
 
 This should remain separate from payroll-sensitive data.
 
@@ -88,7 +89,7 @@ Can view reporting chain compensation only if permitted.
 
 ### Employee
 
-No default access to compensation history.
+Can view their own salary when `DisplaySalaryOnEmployeeProfile` is enabled. Editing and administrative history operations remain restricted.
 
 ---
 

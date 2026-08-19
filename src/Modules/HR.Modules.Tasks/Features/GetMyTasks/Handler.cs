@@ -11,9 +11,18 @@ internal sealed class GetMyTasksHandler(TasksDbContext dbContext, IEmployeeNameR
         GetMyTasksRequest request,
         CancellationToken cancellationToken)
     {
+        // AssignedUserId alone misses tasks created before the assignee had a linked user account
+        // (several task-creation call sites — RequestAdditionalEmployeeDocument,
+        // EmployeeCreatedHandler, ProcessDocumentExpiryNotifications, UploadMyProfilePhoto, asset
+        // assignment — pass assignedUserId: null unconditionally, relying on AssignedEmployeeId
+        // alone). Employee ID and User ID are the same value by construction throughout this app
+        // (see SignUpHandler/AcceptInvite/EnsureDevSupabaseUserAsync's own remarks on this
+        // invariant), so matching AssignedEmployeeId against the caller's UserId here correctly
+        // picks those tasks up too, without needing to fix every writer individually.
         var query = dbContext.TaskItems
             .AsNoTracking()
-            .Where(t => t.CompanyId == request.CompanyId && t.AssignedUserId == request.UserId);
+            .Where(t => t.CompanyId == request.CompanyId
+                && (t.AssignedUserId == request.UserId || t.AssignedEmployeeId == request.UserId));
 
         if (!string.IsNullOrWhiteSpace(request.Status) &&
             Enum.TryParse<TaskItemStatus>(request.Status, ignoreCase: true, out var status))

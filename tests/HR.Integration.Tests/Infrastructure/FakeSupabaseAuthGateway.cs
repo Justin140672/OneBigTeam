@@ -22,8 +22,9 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
 
     public List<(string Email, string Password)> EnsuredDevUsers { get; } = [];
     public List<(string Email, string Password)> SignedInUsers { get; } = [];
+    public List<(string Email, string Password)> ConfirmedUsersCreated { get; } = [];
 
-    public Task<Guid> CreateUserAsync(string email, string redirectTo, CancellationToken cancellationToken)
+    public Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken)
     {
         if (ShouldThrowOnCreate)
         {
@@ -71,6 +72,17 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
     }
 
+    public Task<Guid> CreateConfirmedUserAsync(string email, string password, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowOnCreate)
+        {
+            throw new InvalidOperationException("Simulated Supabase failure.");
+        }
+
+        ConfirmedUsersCreated.Add((email, password));
+        return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
+    }
+
     public Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)
     {
         if (ShouldThrowOnSignIn)
@@ -94,5 +106,6 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         ShouldThrowOnSignIn = false;
         EnsuredDevUsers.Clear();
         SignedInUsers.Clear();
+        ConfirmedUsersCreated.Clear();
     }
 }

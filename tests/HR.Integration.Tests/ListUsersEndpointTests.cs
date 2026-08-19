@@ -89,6 +89,32 @@ public class ListUsersEndpointTests
     }
 
     [Fact]
+    public async Task Get_ListUsers_Returns_Row_For_UserProfile_With_No_Invite_And_No_ApplicationUser()
+    {
+        // Self-service signup creates a UserProfile directly (Supabase-backed), with neither a
+        // UserInvite row nor an ApplicationUser row — this previously fell through both lookups
+        // and was silently skipped entirely.
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "SelfSignup", "Admin");
+        await IdentityUserAdminTestHelpers.SeedUserProfileAsync(_factory, companyId, employeeId, "selfsignup@test.com");
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/users");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        Assert.NotNull(payload);
+        Assert.Single(payload!.Items);
+        var item = payload.Items[0];
+        Assert.Equal(employeeId, item.EmployeeId);
+        Assert.Equal(employeeId, item.UserId);
+        Assert.Equal("selfsignup@test.com", item.Email);
+        Assert.Equal("Active", item.AccountStatus);
+        Assert.Equal("Claimed", item.InvitationStatus);
+    }
+
+    [Fact]
     public async Task Get_ListUsers_Does_Not_Include_Employees_Never_Invited()
     {
         var companyId = Guid.NewGuid();

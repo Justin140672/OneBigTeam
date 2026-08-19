@@ -51,12 +51,31 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     {
         // Renamed from the generic "Add" to "Add employee" so the primary toolbar action reads
         // unambiguously (see SearchPageBase.AddButtonText / EmployeeList.AddButtonText override).
-        await page.GetByRole(AriaRole.Button, new() { Name = "Add employee" }).ClickAsync();
-        // Bumped 15s -> 40s for the same reason as EmployeeEditPage.SaveNewEmployeeAsync's
-        // **/employees navigation wait: under the higher concurrent load from the many tests that
-        // now create fresh employees via this same full-form UI flow, this genuinely (not a logic
-        // bug) takes longer than 15s often enough to time out on a shared Aspire-hosted app.
-        await page.WaitForURLAsync("**/employees/new", new() { Timeout = 40_000 });
+        //
+        // The button's own Disabled state (SearchPageBase's IsAddDisabled) is bound to
+        // Session.IsReadOnly, NOT to whether the click actually does anything — EmployeeList's
+        // GetAddUrl() separately gates on "_canCreateEmployee", set by its own independent async
+        // permission check (UserService.HasPermissionAsync) in OnInitializedAsync. GoToAsync above
+        // only waits for the grid's own rows to render, an unrelated async path — if the
+        // permission check hasn't resolved by the time this click fires, SearchPageBase's "hr-add"
+        // handler silently no-ops (GetAddUrl() returns null, nothing navigates, no error). Confirmed
+        // via a fully isolated single-test run still failing deterministically — not a load/timing
+        // flake, a genuine race between two independent OnInitializedAsync tasks that this page
+        // object's wait condition doesn't cover. Retry the click rather than trusting one attempt.
+        var button = page.GetByRole(AriaRole.Button, new() { Name = "Add employee" });
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            await button.ClickAsync();
+            try
+            {
+                await page.WaitForURLAsync("**/employees/new", new() { Timeout = attempt < 5 ? 2_000 : 10_000 });
+                return;
+            }
+            catch (TimeoutException) when (attempt < 5)
+            {
+                // Permission check likely still pending when we clicked — try again.
+            }
+        }
     }
 
     /// <summary>
@@ -112,7 +131,24 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
         var row = page.Locator(".e-grid .e-row").Filter(new() { HasTextRegex = NameMatcher(nameFragment) }).First;
-        await row.Locator(".e-checkbox-wrapper").First.ClickAsync();
+        var checkbox = row.Locator(".e-checkbox-wrapper").First;
+        var input = checkbox.Locator("input[type='checkbox']").First;
+        var wasChecked = await input.IsCheckedAsync();
+
+        await checkbox.ClickAsync();
+
+        // The click itself only updates Syncfusion's client-side checkbox state immediately —
+        // SelectedCount/_hasSelection and the "Update selected (N)" button text are updated by
+        // SearchPageBase.OnRowSelected/OnRowDeselected on the SERVER, over a Blazor Server
+        // round-trip that isn't guaranteed to have completed by the time ClickAsync returns. A
+        // caller checking a second row immediately after (e.g.
+        // MultiRowSelection_ShowsCorrectCountOnUpdateSelectedButton) can otherwise read a stale
+        // count from before this row's round-trip lands. Wait for the checkbox to actually flip
+        // (this method also backs UncheckEmployeeRowAsync, so the target state can be either way)
+        // as a proxy for that round-trip having landed.
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (await input.IsCheckedAsync() == wasChecked && DateTime.UtcNow < deadline)
+            await page.WaitForTimeoutAsync(100);
     }
 
     /// <summary>

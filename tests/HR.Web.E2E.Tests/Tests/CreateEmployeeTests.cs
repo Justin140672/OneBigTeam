@@ -201,9 +201,12 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
             $"Expected the new employee '{lastName}' to appear in the employee list after creation");
 
         // Navigate into the new employee's edit page and read its id back out of the URL
-        // (…/employees/{id}) rather than adding a separate id-lookup helper.
+        // (…/employees/{id}/view — EmployeeList.razor's row link/OnRecordClick lands on the view
+        // route) rather than adding a separate id-lookup helper. A trailing-segment split would
+        // grab "view" instead of the id, so match the guid directly instead.
         await empList.ClickEmployeeAsync(lastName);
-        var employeeId = Guid.Parse(_page.Url.TrimEnd('/').Split('/').Last());
+        var employeeId = Guid.Parse(System.Text.RegularExpressions.Regex.Match(
+            _page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})").Groups[1].Value);
 
         // ── Step 2: Open the Employment tab and change Position Profile ────────
         await empEdit.OpenEmploymentTabAsync();

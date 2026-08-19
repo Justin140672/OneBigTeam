@@ -12,7 +12,7 @@ Document metadata is stored in PostgreSQL.
 - Store employee documents
 - Store recruitment documents
 - Store company documents
-- Store generated reports
+- Store generated reports only where a separately approved asynchronous-report feature requires retained files
 - Support document versioning
 - Support expiry tracking
 - Support document search

@@ -68,8 +68,14 @@ public sealed class EmployeeEditCloseBehaviorTests(HrAdminPersonaFixture fixture
         await empEdit.OpenEmploymentTabAsync();
 
         // Edit a field that lives on the Employment tab's own model, not the Details tab's —
-        // this is what exercises EmployeeEdit's HasUnsavedChanges override.
-        await empEdit.FillEmployeeNumberAsync($"E2E-{Guid.NewGuid().ToString("N")[..6]}");
+        // this is what exercises EmployeeEdit's HasUnsavedChanges override. "HR Notes" (rather
+        // than Employee Number) deliberately, since Employee Number is only rendered while the
+        // shared Acme company's Employee Numbering Mode is "Manual" — a global setting other
+        // tests running concurrently toggle, making a field conditional on it a race. HR Notes
+        // has no such dependency.
+        await _page.GetByPlaceholder("Optional internal notes visible to HR only")
+            .FillAsync($"E2E close-behavior note {Guid.NewGuid():N}");
+        await _page.Keyboard.PressAsync("Tab");
 
         await empEdit.ClickCloseAsync();
 
@@ -89,9 +95,24 @@ public sealed class EmployeeEditCloseBehaviorTests(HrAdminPersonaFixture fixture
         await empEdit.GoToAsync(AcmeId, MarcusId);
         await empEdit.OpenEmploymentTabAsync();
 
-        var originalNumber = await _page.GetByPlaceholder("e.g. EMP-001").InputValueAsync();
-        var discardedNumber = $"E2E-DISCARD-{Guid.NewGuid().ToString("N")[..6]}";
-        await empEdit.FillEmployeeNumberAsync(discardedNumber);
+        // HR Notes rather than Employee Number — see
+        // Close_ExistingEmployee_EmploymentTabEditOnly_StillShowsConfirmDialog's remarks: Employee
+        // Number is only rendered while the shared Acme company's Employee Numbering Mode happens
+        // to be "Manual", a global setting other tests toggle concurrently.
+        var notesField = _page.GetByPlaceholder("Optional internal notes visible to HR only");
+        var originalNotes = await notesField.InputValueAsync();
+        var discardedNotes = $"E2E-DISCARD-{Guid.NewGuid().ToString("N")[..6]}";
+
+        // FillAsync sets the DOM value directly via CDP, bypassing the keyup/input listeners
+        // Syncfusion's own JS uses to sync a typed value back to the Blazor-bound model — same
+        // issue documented on CompanyEditPage.SetFirstAddressLine1Async for this exact class of
+        // Syncfusion input. Real keystrokes are required for the value to actually round-trip.
+        await notesField.ClickAsync();
+        await _page.Keyboard.PressAsync("Control+A");
+        await _page.Keyboard.PressAsync("Delete");
+        await notesField.PressSequentiallyAsync(discardedNotes, new() { Delay = 30 });
+        await _page.Keyboard.PressAsync("Tab");
+        await _page.WaitForTimeoutAsync(300);
 
         await empEdit.ClickCloseAsync();
         Assert.True(await empEdit.IsUnsavedChangesDialogVisibleAsync());
@@ -102,9 +123,9 @@ public sealed class EmployeeEditCloseBehaviorTests(HrAdminPersonaFixture fixture
         // Reload the employee and confirm the discarded value never persisted.
         await empEdit.GoToAsync(AcmeId, MarcusId);
         await empEdit.OpenEmploymentTabAsync();
-        var reloadedNumber = await _page.GetByPlaceholder("e.g. EMP-001").InputValueAsync();
-        Assert.Equal(originalNumber, reloadedNumber);
-        Assert.NotEqual(discardedNumber, reloadedNumber);
+        var reloadedNotes = await _page.GetByPlaceholder("Optional internal notes visible to HR only").InputValueAsync();
+        Assert.Equal(originalNotes, reloadedNotes);
+        Assert.NotEqual(discardedNotes, reloadedNotes);
     }
 
     [Fact]

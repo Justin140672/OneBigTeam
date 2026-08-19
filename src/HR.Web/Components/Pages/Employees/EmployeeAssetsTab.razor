@@ -142,8 +142,8 @@ else
             </Content>
         </DialogTemplates>
         <DialogButtons>
-            <DialogButton Content="Request Return" IsPrimary="true" OnClick="ConfirmReturnAsync" />
-            <DialogButton Content="Cancel" OnClick="CloseReturnDialog" />
+            <DialogButton Content="Request Return" IsPrimary="true" OnClick="ConfirmReturnAsync" Disabled="@_returnSaving" />
+            <DialogButton Content="Cancel" OnClick="CloseReturnDialog" Disabled="@_returnSaving" />
         </DialogButtons>
     </SfDialog>
 }
@@ -168,6 +168,7 @@ else
     private bool _showReturnDialog;
     private Guid? _selectedReturnAssignmentId;
     private string? _returnDialogError;
+    private bool _returnSaving;
 
     private IEnumerable<EmployeeAssetItem> _returnableAssets => _assets.Where(a => a.IsAcknowledged);
 
@@ -233,6 +234,13 @@ else
 
     private async Task ConfirmReturnAsync()
     {
+        // Without this guard, RequestAssetReturnHandler has no idempotency check against the
+        // assignment (only that it's still active, which stays true until the return is actually
+        // processed later) — a double-click here creates two separate "Return asset" tasks for the
+        // same assignment.
+        if (_returnSaving)
+            return;
+
         if (_selectedReturnAssignmentId is null)
         {
             _returnDialogError = "Please select an asset.";
@@ -240,18 +248,26 @@ else
         }
 
         _returnDialogError = null;
+        _returnSaving = true;
 
-        var requestedBy = Session.EmployeeId ?? Session.UserId;
-        var ok = await AssetService.RequestReturnAsync(CompanyId, _selectedReturnAssignmentId.Value, requestedBy);
-
-        if (!ok)
+        try
         {
-            _returnDialogError = "Failed to request return. The return may already have been requested.";
-            return;
-        }
+            var requestedBy = Session.EmployeeId ?? Session.UserId;
+            var ok = await AssetService.RequestReturnAsync(CompanyId, _selectedReturnAssignmentId.Value, requestedBy);
 
-        _showReturnDialog = false;
-        _success = "Return requested successfully.";
-        await LoadAsync();
+            if (!ok)
+            {
+                _returnDialogError = "Failed to request return. The return may already have been requested.";
+                return;
+            }
+
+            _showReturnDialog = false;
+            _success = "Return requested successfully.";
+            await LoadAsync();
+        }
+        finally
+        {
+            _returnSaving = false;
+        }
     }
 }

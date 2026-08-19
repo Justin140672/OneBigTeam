@@ -27,40 +27,14 @@
     </div>
   </section>
 
-  <section class="section section-muted">
-    <div class="section-inner info-panel">
-      <div>
-        <h2>Start a conversation about replacing scattered HR admin.</h2>
-        <p>
-          Tell us how your team currently manages employee records, leave,
-          sickness, documents and recruitment. We can help you understand whether
-          One Big Team is the right fit for the way your business is growing.
-        </p>
-      </div>
-      <div class="info-points">
-        <div>
-          <strong>Built around SME needs</strong>
-          <p>Designed for growing businesses that need structure without heavyweight HR systems.</p>
-        </div>
-        <div>
-          <strong>Focused on everyday admin</strong>
-          <p>Bring repeat people processes out of spreadsheets, inboxes and disconnected tools.</p>
-        </div>
-        <div>
-          <strong>No billing on this page</strong>
-          <p>This form captures interest only. Customer onboarding and billing happen inside the SaaS app.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <section class="section">
     <div class="section-inner contact-grid">
       <div>
         <h2>Tell us what you would like to solve.</h2>
         <p class="estimator-intro">
-          Use the form to ask a question or share a little context
-          about your team. Required fields are marked so you can send the essentials quickly.
+          Use the form to ask a question or share a little context about your team.
+          Name, work email and message are required &mdash; everything else is optional.
+          We typically respond within one business day.
         </p>
       </div>
 
@@ -93,13 +67,12 @@
           </div>
 
           <div class="form-field">
-            <label for="company-name">Company name</label>
-            <input id="company-name" name="company" type="text" autocomplete="organization" value="@Company" required>
-            <p class="field-error" data-error-for="company-name">Enter your company name.</p>
+            <label for="company-name">Company name <span class="field-optional">(optional)</span></label>
+            <input id="company-name" name="company" type="text" autocomplete="organization" value="@Company">
           </div>
 
           <div class="form-field">
-            <label for="employee-count-contact">Approximate employee count</label>
+            <label for="employee-count-contact">Approximate employee count <span class="field-optional">(optional)</span></label>
             <input
               id="employee-count-contact"
               name="employee-count"
@@ -108,7 +81,6 @@
               step="1"
               inputmode="numeric"
               value="@EmployeeCount"
-              required
             >
             <p class="field-error" data-error-for="employee-count-contact">Enter an employee count of 1 or more.</p>
           </div>
@@ -121,24 +93,19 @@
 
           <div class="form-field-honeypot" aria-hidden="true">
             <label for="contact-website">Website</label>
-            <input id="contact-website" name="website" type="text" tabindex="-1" autocomplete="off">
+            <input id="contact-website" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
           </div>
+
+          <p class="form-privacy-note">
+            We only use these details to respond to your enquiry. See our
+            <a href="/privacy-policy">privacy policy</a> for how we handle your information.
+          </p>
 
           <div class="form-submit-row">
             <button class="button button-primary button-large" type="submit" data-contact-submit>Send message</button>
           </div>
         </form>
       }
-    </div>
-  </section>
-
-  <section class="section final-cta">
-    <div class="section-inner cta-panel">
-      <h2>Bring your HR, leave, sickness, documents and recruitment into one place.</h2>
-      <div class="hero-actions">
-        <a class="button button-primary button-large" href="/signup">Start free trial</a>
-        <a class="button button-secondary button-large" href="#contact-form">Contact us</a>
-      </div>
     </div>
   </section>
 </main>

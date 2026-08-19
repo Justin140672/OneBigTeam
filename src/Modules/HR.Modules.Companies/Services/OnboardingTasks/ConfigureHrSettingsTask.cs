@@ -10,10 +10,12 @@ internal sealed class ConfigureHrSettingsTask(CompaniesDbContext dbContext) : IO
     public string Name => "Configure your HR settings";
     public string Description => "Review and set your working days, holiday allowance, and other HR policies.";
     public bool IsMandatory => true;
+    public int Order => 2;
+
     // HR.Web's HR settings route is company-scoped ("/companies/{Id:guid}/hr-settings") — the
     // "{companyId}" placeholder is substituted by HR.Web with the current company id.
-    public string LinkUrl => "/companies/{companyId}/hr-settings";
-    public int Order => 2;
+    public Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken) =>
+        Task.FromResult("/companies/{companyId}/hr-settings");
 
     public async Task<bool> IsCompletedAsync(Guid companyId, CancellationToken cancellationToken)
     {

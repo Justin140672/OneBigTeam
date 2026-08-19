@@ -8,11 +8,45 @@
             <HrTextBox @bind-Value="Model.Name" Placeholder="Company name" />
             <ValidationMessage For="@(() => Model.Name)" />
         </div>
-        <div class="mb-3">
-            <label class="form-label fw-semibold">Status</label>
-            <p class="mb-0">
-                <ActiveStatusBadge IsActive="Company.IsActive" />
-            </p>
+
+        @if (Model.Addresses.Count == 0)
+        {
+            <p class="text-muted">No addresses found.</p>
+        }
+
+        <div class="row g-3">
+            @foreach (var (addr, i) in Model.Addresses.Select((a, i) => (a, i)))
+            {
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <h6 class="text-uppercase text-muted small mb-3">@EnumDisplay.Humanize(addr.Type)</h6>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <SfTextBox @bind-Value="addr.Line1" Placeholder="Line 1" />
+                                <ValidationMessage For="@(() => addr.Line1)" />
+                            </div>
+                            <div class="col-12">
+                                <SfTextBox @bind-Value="addr.Line2" Placeholder="Line 2" />
+                            </div>
+                            <div class="col-md-6">
+                                <SfTextBox @bind-Value="addr.City" Placeholder="City" />
+                                <ValidationMessage For="@(() => addr.City)" />
+                            </div>
+                            <div class="col-md-6">
+                                <SfTextBox @bind-Value="addr.Region" Placeholder="County" />
+                            </div>
+                            <div class="col-md-6">
+                                <SfTextBox @bind-Value="addr.PostalCode" Placeholder="Postal Code" />
+                                <ValidationMessage For="@(() => addr.PostalCode)" />
+                            </div>
+                            @* Country Code deliberately not shown — UK-only customers for now (same
+                               reasoning as the removed Settings tab's TimeZone/Locale), so it's
+                               always "GB", set in code (CompanyEdit.razor's LoadAsync /
+                               CompanyProvisioner's default address) rather than user-editable. *@
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
     </div>
 </div>

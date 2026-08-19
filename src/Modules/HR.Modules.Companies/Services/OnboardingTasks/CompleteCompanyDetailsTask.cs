@@ -10,10 +10,12 @@ internal sealed class CompleteCompanyDetailsTask(CompaniesDbContext dbContext) :
     public string Name => "Complete your company details";
     public string Description => "Add your company name and registered address.";
     public bool IsMandatory => true;
+    public int Order => 1;
+
     // HR.Web's company edit route is company-scoped ("/companies/{CompanyId:guid}/edit") — the
     // "{companyId}" placeholder is substituted by HR.Web with the current company id.
-    public string LinkUrl => "/companies/{companyId}/edit";
-    public int Order => 1;
+    public Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken) =>
+        Task.FromResult("/companies/{companyId}/edit");
 
     public async Task<bool> IsCompletedAsync(Guid companyId, CancellationToken cancellationToken)
     {

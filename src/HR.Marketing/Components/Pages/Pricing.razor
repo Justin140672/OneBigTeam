@@ -26,11 +26,11 @@
         <div class="section-inner pricing-card-grid">
             <div class="pricing-card">
                 <p class="summary-label">Pricing Tiers</p>
-                <div class="pricing-headline">From &pound;2</div>
-                <div class="pricing-headline">per employee</div>
+                <div class="pricing-headline">&pound;20/month minimum</div>
 
                 <p class="tier-list-intro">
                     Pricing is banded: each employee is charged at the rate for their band, not your whole headcount.
+                    Every plan has a &pound;20.00/month minimum charge, regardless of headcount.
                 </p>
                 <ul class="tier-list">
                     <li>
@@ -58,6 +58,11 @@
                     <strong>Worked example (75 employees):</strong>
                     50 &times; &pound;2.00 = &pound;100.00, plus 25 &times; &pound;1.75 = &pound;43.75.
                     Total: &pound;143.75/month (before VAT and any minimum charge adjustment).
+                </p>
+
+                <p class="tier-list-intro">
+                    Every feature included: employee management, leave, recruitment, onboarding/offboarding,
+                    documents, employee assets, reporting and unlimited users &mdash; with no feature limits at any tier.
                 </p>
             </div>
 
@@ -132,88 +137,6 @@
         </div>
     </section>
 
-    <section class="section section-muted">
-        <div class="section-inner">
-            <div class="section-heading">
-                <h2>See how the price scales with your team.</h2>
-            </div>
-
-            <div class="pricing-examples-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th scope="col">Active employees</th>
-                            <th scope="col">Monthly cost</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var example in Examples)
-                        {
-                            <tr>
-                                <td>@example.Employees</td>
-                                <td>@FormatCurrency(example.Monthly)@(example.Employees == 10 ? " (minimum charge)" : "")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-
-                <div class="pricing-examples-cards">
-                    @foreach (var example in Examples)
-                    {
-                        <div class="pricing-example-card">
-                            <span>@example.Employees employees</span>
-                            <strong>@FormatCurrency(example.Monthly)@(example.Employees == 10 ? " (minimum charge)" : "")</strong>
-                        </div>
-                    }
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section class="section">
-        <div class="section-inner">
-            <div class="section-heading">
-                <h2>Everything included.</h2>
-            </div>
-
-            <div class="card-grid included-feature-grid">
-                @foreach (var feature in IncludedFeatures)
-                {
-                    <article class="card">
-                        <h3>@feature</h3>
-                    </article>
-                }
-            </div>
-        </div>
-    </section>
-
-    <section class="section section-muted">
-        <div class="section-inner">
-            <div class="section-heading">
-                <h2>Pricing that grows with your business.</h2>
-            </div>
-
-            <div class="benefit-grid">
-                <div>
-                    <strong>Fair pricing</strong>
-                    <p>You only pay for active employees.</p>
-                </div>
-                <div>
-                    <strong>Rewarding growth</strong>
-                    <p>The cost per employee decreases as your company grows.</p>
-                </div>
-                <div>
-                    <strong>No feature limits</strong>
-                    <p>Every customer receives every feature.</p>
-                </div>
-                <div>
-                    <strong>Simple billing</strong>
-                    <p>No contracts. No setup fees. No surprise charges.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <section class="section faq-section">
         <div class="section-inner faq-grid">
             <div>
@@ -222,42 +145,12 @@
 
             <div class="faq-list">
                 <details>
-                    <summary>How do the pricing tiers work?</summary>
-                    <p>
-                        Pricing is banded, not flat-rate. Your first 50 employees cost &pound;2.00 each, your
-                        next 100 employees (51-150) cost &pound;1.75 each, and each employee beyond 150 costs
-                        &pound;1.50 each. Only the employees within a band are charged at that band's rate -
-                        for example, a 75-employee organisation pays &pound;100.00 for the first 50 plus
-                        &pound;43.75 for the next 25, totalling &pound;143.75/month before VAT.
-                    </p>
-                </details>
-                <details>
                     <summary>Who counts as an active employee?</summary>
-                    <p>Employees whose employment has started and who have not left the company.</p>
+                    <p>Employees whose employment has started and who have not left the company. Billing is based on active employees, not user accounts, and future starters and former employees are never billed.</p>
                 </details>
                 <details>
-                    <summary>Are future starters billed?</summary>
-                    <p>No. Employees are billed from their employment start date.</p>
-                </details>
-                <details>
-                    <summary>Are former employees billed?</summary>
-                    <p>No. Employees leaving your organisation stop being counted once they are no longer active.</p>
-                </details>
-                <details>
-                    <summary>Are all features included?</summary>
-                    <p>Yes. Every customer has access to every feature regardless of company size.</p>
-                </details>
-                <details>
-                    <summary>Is there a minimum contract?</summary>
-                    <p>No. You can cancel at any time.</p>
-                </details>
-                <details>
-                    <summary>Is there a free trial?</summary>
-                    <p>Yes. Start your free trial without speaking to sales.</p>
-                </details>
-                <details>
-                    <summary>Do I pay for inactive users?</summary>
-                    <p>No. Billing is based on active employees, not user accounts.</p>
+                    <summary>Is there a minimum contract or free trial?</summary>
+                    <p>No minimum contract &mdash; you can cancel at any time. A free trial is available without speaking to sales.</p>
                 </details>
             </div>
         </div>
@@ -296,31 +189,6 @@
     private PricingResult Result => PricingCalculator.Calculate(DisplayEmployees);
 
     private PricingCtaResult Cta => PricingCtaResolver.Resolve(DisplayEmployees, PricingOptionsAccessor.Value.LargeOrganisationThreshold);
-
-    private static readonly (int Employees, decimal Monthly)[] Examples =
-    [
-        (10, PricingCalculator.Calculate(10).Monthly),
-        (25, PricingCalculator.Calculate(25).Monthly),
-        (50, PricingCalculator.Calculate(50).Monthly),
-        (75, PricingCalculator.Calculate(75).Monthly),
-        (100, PricingCalculator.Calculate(100).Monthly),
-        (150, PricingCalculator.Calculate(150).Monthly),
-        (250, PricingCalculator.Calculate(250).Monthly),
-    ];
-
-    private static readonly string[] IncludedFeatures =
-    [
-        "Employee Management",
-        "Leave Management",
-        "Recruitment",
-        "Onboarding/Offboarding",
-        "Documents",
-        "Employee Assets",
-        "Reporting",
-        "HR Workflows",
-        "Unlimited Users",
-        "Free Upgrades"
-    ];
 
     private static string FormatCurrency(decimal amount) => $"£{amount:0.00}";
 }

@@ -2,6 +2,8 @@
 
 <!-- impeccable:product-schema 1 -->
 
+Current dated decisions that supersede conflicting older specifications are recorded in `specifications/product-specifications/00-current-product-decisions.md`.
+
 ## Platform
 
 web
@@ -11,9 +13,9 @@ web
 Primary actors, per role:
 
 - **Employee** — self-service: leave requests, documents, tasks, own profile.
-- **Manager** — approves leave, views team information, completes workflow actions for direct reports.
+- **Manager** — approves leave, views team information and completes authorised workflow actions for employees beneath them in the complete reporting hierarchy.
 - **HR Administrator** — manages employees, recruitment, documents, policies, and compliance.
-- **Company Administrator** — manages company settings, branding, users, and permissions.
+- **Company Administrator** — manages company profile, settings and branding. This role does not grant HR or employee-management access.
 - **Recruiter** — manages vacancies, candidates, and interview workflow.
 - **Finance User** — may view compensation/payroll-related exports if authorised.
 
@@ -33,7 +35,7 @@ Simple enough for SMEs, structured enough for growing businesses, secure enough 
 
 - Multi-tenant: every company's data is isolated (`company_id` boundary enforced at every permission check); users can never see another company's data.
 - Auth via Supabase Auth.
-- Role-Based Access Control layered with scope evaluation (self / direct reports / company) and manager-hierarchy evaluation; permissions are primarily inherited from Position Profiles, with rare employee-specific overrides. Roles are fixed in v1: Employee, Manager, HR Administrator, Recruiter, Finance, Company Administrator.
+- Role-Based Access Control layered with scope evaluation (self / full reporting hierarchy / company) and manager-hierarchy evaluation; permissions are primarily inherited from Position Profiles, with rare employee-specific overrides. Roles are fixed in v1: Employee, Manager, HR Administrator, Recruiter, Finance, Company Administrator. The initial company creator deliberately receives both Company Administrator and HR Administrator; Company Administrator alone remains limited to company administration.
 - Workflow-driven: approvals, onboarding, reminders, and compliance actions run through a task/notification system, not ad hoc process.
 - Audit-first: business-critical actions are recorded in an immutable, searchable audit trail; sensitive data (salary, National Insurance numbers, bank details, credentials) must never appear in logs or audit records.
 - Companies can apply their own branding (logo, primary/secondary/accent colours) on top of the base One Big Team platform, surfaced in-app, in emails, and on generated reports/documents — branding is company-specific and does not allow custom CSS/JS or full UI replacement.
@@ -41,11 +43,11 @@ Simple enough for SMEs, structured enough for growing businesses, secure enough 
 
 ## Capabilities and Constraints
 
-In scope for MVP: company setup, employee records, departments and position profiles, position-based permissions, Supabase Auth integration, leave management, sickness management, recruitment pipeline, task/workflow system, document management, notifications, reporting/exports, audit/activity history, search, role-aware dashboards, admin experience. A Support module (in-app help requests/dashboard) is also in active development.
+In scope for MVP: company setup, employee records, departments and position profiles, position-based permissions, Supabase Auth integration, leave management, sickness management, recruitment pipeline, task/workflow system, document management, notifications, reporting/exports, audit/activity history, search, role-aware dashboards, admin experience and in-app support. These capabilities are implemented; remaining work is defect remediation, security hardening and operational readiness rather than another core feature module.
 
 Explicitly out of scope for MVP: payroll processing, benefits administration, advanced performance reviews, a public recruitment portal, a mobile app, external integrations (incl. Slack/Teams), multi-language support, white-label domains, advanced analytics, AI assistant features.
 
-Performance targets: page/dashboard load < 2s, search results < 500ms, standard CRUD actions < 1s, small reports < 10s (large reports generated asynchronously). Target availability 99.5%.
+Performance targets: page/dashboard load < 2s, search results < 500ms, standard CRUD actions < 1s and small reports < 10s. A separately approved large report may use asynchronous generation when measurement shows the synchronous model is unsafe. Target availability is 99.5%.
 
 ## Brand Commitments
 

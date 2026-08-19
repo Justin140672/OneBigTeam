@@ -64,7 +64,7 @@
                         @{
                             var row = (context as VacancyListItemModel)!;
                         }
-                        <StatusBadge Variant="@StatusVariant(row.Status)">@row.Status</StatusBadge>
+                        <StatusBadge Variant="@StatusVariant(row.Status)">@EnumDisplay.Humanize(row.Status)</StatusBadge>
                     </Template>
                 </GridColumn>
                 <GridColumn Field="@nameof(VacancyListItemModel.OpenedAt)" HeaderText="Opened" Width="130" Format="d" />

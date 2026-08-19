@@ -467,6 +467,7 @@ public static class IdentityModule
             (Id: new Guid("30000000-0000-0000-0000-000000000013"), First: "Priya",  Last: "Shah",    Email: "priya.shah@acme.example",          Roles: new[] { SystemRoles.Employee, SystemRoles.CompanyAdministrator }),
             (Id: new Guid("30000000-0000-0000-0000-000000000011"), First: "Alice",  Last: "Morgan",  Email: "alice.morgan@betacorp.example",    Roles: new[] { SystemRoles.Employee, SystemRoles.Manager }),
             (Id: new Guid("30000000-0000-0000-0000-000000000012"), First: "Bob",    Last: "Taylor",  Email: "bob.taylor@betacorp.example",      Roles: new[] { SystemRoles.Employee }),
+            (Id: new Guid("30000000-0000-0000-0000-000000000015"), First: "Grace",  Last: "Kim",     Email: "grace.kim@betacorp.example",       Roles: new[] { SystemRoles.Employee, SystemRoles.HrAdministrator }),
         };
 
         foreach (var persona in personas)
@@ -613,6 +614,19 @@ public static class IdentityModule
             // every later login attempt fails to resolve a UserProfile despite Supabase itself
             // authenticating successfully.
             profile.UpdateSupabaseAuthUserId(supabaseUserId, DateTimeOffset.UtcNow);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        // Baseline Employee role, same fallback AcceptInvite grants when an invite carries no
+        // explicit role selection. Without this, a UserProfile created by this endpoint has zero
+        // roles — LoginHandler now rejects zero-role accounts outright ("Invalid email or
+        // password.", added to stop a broken blank-session login), so callers of this dev endpoint
+        // (E2E tests logging in as a just-created employee) would otherwise never be able to log in
+        // at all. Idempotent: only adds the role if it isn't already present.
+        var hasAnyRole = await db.UserRoles.AnyAsync(ur => ur.UserId == id, cancellationToken);
+        if (!hasAnyRole)
+        {
+            db.UserRoles.Add(UserRole.Create(id, SystemRoles.Employee, DateTimeOffset.UtcNow));
             await db.SaveChangesAsync(cancellationToken);
         }
     }

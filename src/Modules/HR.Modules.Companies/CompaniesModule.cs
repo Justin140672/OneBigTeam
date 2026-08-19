@@ -6,7 +6,6 @@ using HR.Modules.Companies.Features.CancelCustomerDeletion;
 using HR.Modules.Companies.Features.CancelSubscription;
 using HR.Modules.Companies.Features.CreateBillingPortalSession;
 using HR.Modules.Companies.Features.CreateCheckoutSession;
-using HR.Modules.Companies.Features.CreateCompany;
 using HR.Modules.Companies.Features.CreatePublicHoliday;
 using HR.Modules.Companies.Features.ExecuteCustomerDeletion;
 using HR.Modules.Companies.Features.ExtendCustomerTrial;
@@ -204,7 +203,6 @@ public static class CompaniesModule
 
     private static void AddFeatureServices(IServiceCollection services)
     {
-        services.AddScoped<CreateCompanyHandler>();
         services.AddScoped<GetCompanyHandler>();
         services.AddScoped<GetCompanySettingsHandler>();
         services.AddScoped<GetHrSettingsHandler>();
@@ -233,7 +231,6 @@ public static class CompaniesModule
         services.AddScoped<ListPublicHolidaysHandler>();
         services.AddScoped<UpdatePublicHolidayHandler>();
         services.AddScoped<IValidator<UpdatePublicHolidayRequest>, UpdatePublicHolidayValidator>();
-        services.AddScoped<IValidator<CreateCompanyRequest>, CreateCompanyValidator>();
         services.AddScoped<IValidator<UpdateCompanyRequest>, UpdateCompanyValidator>();
         services.AddScoped<IValidator<UpdateCompanySettingsRequest>, UpdateCompanySettingsValidator>();
         services.AddScoped<IValidator<UpdateHrSettingsRequest>, UpdateHrSettingsValidator>();

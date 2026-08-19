@@ -166,7 +166,7 @@ Enable/disable reminder notifications.
 
 ### Report Completion Notifications
 
-Enable/disable report-ready notifications.
+Reserved for a separately approved asynchronous stored-report feature. It is not required by the current on-demand reporting baseline.
 
 ---
 

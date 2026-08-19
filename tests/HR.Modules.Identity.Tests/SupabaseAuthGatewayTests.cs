@@ -31,14 +31,28 @@ public class SupabaseAuthGatewayTests
         var options = Options();
         var gateway = BuildGateway(handler, options);
 
-        var result = await gateway.CreateUserAsync("ada@example.com", "https://app.example.com/verify-email", CancellationToken.None);
+        var result = await gateway.CreateUserAsync("ada@example.com", "s3cret!!", "https://app.example.com/verify-email", CancellationToken.None);
 
         Assert.Equal(userId, result);
-        Assert.NotNull(handler.LastRequest);
-        Assert.Equal("https://example.supabase.co/auth/v1/invite", handler.LastRequest!.RequestUri!.ToString());
-        Assert.True(handler.LastRequest.Headers.Contains("apikey"));
-        Assert.Equal(options.SecretKey, handler.LastRequest.Headers.GetValues("apikey").Single());
-        Assert.Equal(options.SecretKey, handler.LastRequest.Headers.Authorization?.Parameter);
+        Assert.Equal(2, handler.Requests.Count);
+
+        // Step 1: admin-create the user with the real password baked in from the start (not
+        // /auth/v1/invite — see CreateUserAsync's remarks on why that combination doesn't produce
+        // a working password against real Supabase).
+        var (createRequest, createBody) = handler.Requests[0];
+        Assert.Equal(HttpMethod.Post, createRequest.Method);
+        Assert.Equal("https://example.supabase.co/auth/v1/admin/users", createRequest.RequestUri!.ToString());
+        Assert.Contains("s3cret!!", createBody);
+        Assert.True(createRequest.Headers.Contains("apikey"));
+        Assert.Equal(options.SecretKey, createRequest.Headers.GetValues("apikey").Single());
+        Assert.Equal(options.SecretKey, createRequest.Headers.Authorization?.Parameter);
+
+        // Step 2: the confirmation email is sent via a separate /auth/v1/resend call, since the
+        // admin-create endpoint above never sends one itself.
+        var (resendRequest, resendBody) = handler.Requests[1];
+        Assert.Equal(HttpMethod.Post, resendRequest.Method);
+        Assert.Equal("https://example.supabase.co/auth/v1/resend", resendRequest.RequestUri!.ToString());
+        Assert.Contains("ada@example.com", resendBody);
     }
 
     [Fact]
@@ -47,14 +61,28 @@ public class SupabaseAuthGatewayTests
         var handler = new FakeHttpMessageHandler
         {
             StatusCodeToReturn = HttpStatusCode.BadRequest,
-            ResponseBodyToReturn = "{\"error\": \"email already registered\"}",
+            ResponseBodyToReturn = "{\"error\": \"invalid email address\"}",
         };
         var gateway = BuildGateway(handler);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => gateway.CreateUserAsync("ada@example.com", "https://app.example.com/verify-email", CancellationToken.None));
+            () => gateway.CreateUserAsync("ada@example.com", "s3cret!!", "https://app.example.com/verify-email", CancellationToken.None));
 
-        Assert.Contains("email already registered", ex.Message);
+        Assert.Contains("invalid email address", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateUserAsync_Throws_EmailAlreadyRegisteredException_When_Supabase_Reports_Duplicate()
+    {
+        var handler = new FakeHttpMessageHandler
+        {
+            StatusCodeToReturn = HttpStatusCode.UnprocessableEntity,
+            ResponseBodyToReturn = "{\"error_code\": \"email_exists\"}",
+        };
+        var gateway = BuildGateway(handler);
+
+        await Assert.ThrowsAsync<EmailAlreadyRegisteredException>(
+            () => gateway.CreateUserAsync("ada@example.com", "s3cret!!", "https://app.example.com/verify-email", CancellationToken.None));
     }
 
     [Fact]

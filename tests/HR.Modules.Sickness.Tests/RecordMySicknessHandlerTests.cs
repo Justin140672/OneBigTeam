@@ -76,7 +76,10 @@ public class RecordMySicknessHandlerTests
         Assert.Equal(SicknessStatus.Active, result.Value.Status);
         Assert.Equal(StartDate, result.Value.StartDate);
         Assert.Equal(SicknessDayPart.FullDay, result.Value.StartDayPart);
-        Assert.Equal(SicknessEvidenceStatus.NotRequired, result.Value.EvidenceStatus);
+        // Fit note requirement is mandatory now (default 7 days — see
+        // CompanySettings.FitNoteRequiredAfterDays), and with no end date yet we can't tell if
+        // the threshold will be met, so this defaults to Pending rather than NotRequired.
+        Assert.Equal(SicknessEvidenceStatus.Pending, result.Value.EvidenceStatus);
         Assert.Equal("Feeling unwell", result.Value.Notes);
 
         var saved = await db.SicknessRecords.SingleAsync();

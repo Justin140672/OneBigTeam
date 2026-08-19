@@ -2,21 +2,22 @@
 
 ## Overview
 
-The platform uses an event-driven internal architecture to enable communication between modules while preserving strict module boundaries.
+The platform uses events and explicit cross-module contracts while preserving strict module boundaries.
 
-Modules never call each other directly.
+Modules never reference another module's implementation project or query another module's tables directly.
 
 Communication occurs through:
 
 - Domain Events
 - Integration Events
+- Module-owned contracts and purpose-specific read models for synchronous queries or coordinated operations
 
 This architecture supports:
 
 - Loose coupling
 - Eventual consistency
 - Future service extraction
-- Outbox processing
+- Optional module-scoped outbox processing where reliable deferred delivery is required
 - Reliable notification delivery
 
 ---
@@ -195,7 +196,9 @@ Avoid exposing entities.
 
 ## Outbox Pattern
 
-The platform uses the Outbox Pattern.
+An outbox is not a universal V1 requirement. Integration events may be dispatched in-process where that is sufficient for the workflow and failure model.
+
+A module may adopt a local outbox when it has a concrete requirement for durable deferred delivery. The Companies module currently uses a scoped outbox for selected events; this does not require every module to add one.
 
 Purpose:
 
@@ -205,7 +208,7 @@ Purpose:
 
 ---
 
-## Outbox Flow
+## Optional Outbox Flow
 
 1. Business transaction completes.
 2. Integration event stored in Outbox.
@@ -216,7 +219,7 @@ Purpose:
 
 ---
 
-## Outbox Table
+## Optional Outbox Table
 
 Suggested fields:
 
@@ -351,12 +354,14 @@ Audit:
 
 Avoid:
 
-Direct module service calls
+Direct calls to another module's implementation service
 
 ```text
 Leave -> EmployeeService
 Recruitment -> DocumentService
 ```
+
+An interface or read model deliberately exposed as a cross-module contract is permitted. The consuming module depends on the contract, not the providing module's implementation assembly.
 
 Avoid:
 
@@ -376,10 +381,10 @@ Synchronous cross-module workflows
 
 AI-generated code must:
 
-- Publish integration events
-- Use outbox
+- Use integration events or explicit cross-module contracts where appropriate
 - Respect module boundaries
-- Use idempotent consumers
+- Make consumers idempotent when delivery can repeat
+- Use an outbox only where the owning module has explicitly adopted one for a concrete reliability requirement
 
 AI must not:
 
@@ -391,11 +396,11 @@ AI must not:
 
 ## Acceptance Criteria
 
-1. Modules communicate through events.
+1. Modules communicate through events or explicit module-owned contracts.
 2. Domain events remain module-local.
 3. Integration events support cross-module communication.
-4. Outbox guarantees delivery.
+4. Modules that adopt an outbox persist and dispatch it reliably; other modules are not required to implement one.
 5. Consumers are idempotent.
 6. Notifications are event-driven.
-7. Reporting updates are event-driven.
+7. Reporting obtains data through module-owned read contracts; projections may use events where a report explicitly needs one.
 8. Direct module dependencies are avoided.

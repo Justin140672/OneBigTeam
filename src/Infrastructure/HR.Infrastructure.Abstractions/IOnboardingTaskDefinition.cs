@@ -18,9 +18,17 @@ public interface IOnboardingTaskDefinition
 
     bool IsMandatory { get; }
 
-    string LinkUrl { get; }
-
     int Order { get; }
+
+    /// <summary>
+    /// The URL this task's "Go to task" link should navigate to, for the given company. A plain
+    /// "{companyId}" placeholder (substituted by HR.Web with the current company id) is enough
+    /// for most tasks — those can just wrap a constant string in Task.FromResult. Async so tasks
+    /// that need to link to a specific per-company record (e.g. "review your default leave
+    /// policy" linking straight to that policy's edit page, not a search screen) can look up the
+    /// real id first.
+    /// </summary>
+    Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken);
 
     Task<bool> IsCompletedAsync(Guid companyId, CancellationToken cancellationToken);
 }

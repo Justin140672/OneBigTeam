@@ -353,11 +353,36 @@ passwordToggle?.addEventListener("click", () => {
 passwordInput?.addEventListener("blur", () => {
   if (!passwordLive) return;
 
-  if (passwordInput.value.length === 0) {
-    passwordLive.textContent = "";
-  } else if (passwordInput.value.length < 8) {
+  if (passwordInput.value.length > 0 && passwordInput.value.length < 8) {
     passwordLive.textContent = "Password requirement not yet met: at least 8 characters.";
   } else {
-    passwordLive.textContent = "Password meets the minimum length requirement.";
+    passwordLive.textContent = "";
   }
+});
+
+// Terms of Service / Privacy Policy links on the signup form open their document in a <dialog>
+// instead of navigating away — losing an in-progress signup to a link click would be a bad
+// trade for reading legal text that's also reachable at its own URL (kept as the link's href for
+// no-JS visitors and open-in-new-tab). Native <dialog> gives us Escape-to-close, focus trapping,
+// and a ::backdrop for free.
+document.querySelectorAll("[data-legal-modal-trigger]").forEach((trigger) => {
+  const dialog = document.getElementById(trigger.getAttribute("data-legal-modal-trigger"));
+  if (!dialog) return;
+
+  trigger.addEventListener("click", (event) => {
+    event.preventDefault();
+    dialog.showModal();
+  });
+});
+
+document.querySelectorAll("[data-legal-modal]").forEach((dialog) => {
+  dialog.querySelector("[data-legal-modal-close]")?.addEventListener("click", () => dialog.close());
+
+  // Clicking the ::backdrop counts as a click on the <dialog> element itself (its content sits
+  // in a child wrapper), so only close when the click target is the dialog, not something inside it.
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) {
+      dialog.close();
+    }
+  });
 });

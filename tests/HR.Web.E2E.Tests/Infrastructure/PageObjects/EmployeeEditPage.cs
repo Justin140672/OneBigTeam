@@ -26,6 +26,18 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>
+    /// Navigates directly to the employee's read-only "/view" route — the same place
+    /// ClickEmployeeAsync's row link lands on, without going through the employee list. Useful
+    /// for tests that just need to (re)land in view mode on a specific employee, rather than
+    /// recreating one via the full New Employee form each time.
+    /// </summary>
+    public async Task GoToViewAsync(Guid companyId, Guid employeeId)
+    {
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}/view");
+        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+    }
+
+    /// <summary>
     /// Navigates directly to the employee edit page with a query string appended (e.g.
     /// "tab=onboarding") — used to verify deep-link tab activation (see EmployeeEdit.razor's
     /// LoadAsync, which maps the "tab" query parameter to an initial SfTab selected index).
@@ -113,8 +125,28 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     /// <summary>Clicks "Edit details" and waits for the resulting forceLoad reload to land on the editable route.</summary>
     public async Task ClickEditDetailsButtonAsync()
     {
-        await page.Locator("[data-testid='edit-details-button']").ClickAsync();
-        await page.WaitForURLAsync(url => !url.Contains("/view", StringComparison.OrdinalIgnoreCase), new() { Timeout = 20_000 });
+        var button = page.Locator("[data-testid='edit-details-button']");
+
+        // The button only renders for IsViewMode && Session.CanManageEmployees (EmployeeEdit.razor)
+        // — a bare ClickAsync() here relies entirely on Playwright's own 30s default actionability
+        // timeout and gives no indication, on failure, of WHY it never appeared (still on the edit
+        // route because a prior navigation didn't land where expected, vs. a real rendering delay
+        // under load, vs. a permissions gap). Surface that distinction instead of a bare timeout.
+        try
+        {
+            await button.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+        }
+        catch (TimeoutException)
+        {
+            throw new Exception(
+                "Timed out waiting for the 'Edit details' button to appear. " +
+                $"Current URL: {page.Url} (IsViewMode expected — url should contain '/view'). " +
+                "The button only renders when IsViewMode is true and the caller can manage employees — " +
+                "check whether navigation actually landed on the view route.");
+        }
+
+        await button.ClickAsync();
+        await page.WaitForURLAsync(url => !url.Contains("/view", StringComparison.OrdinalIgnoreCase), new() { Timeout = 40_000 });
         await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
     }
 
@@ -124,25 +156,12 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task ClickBackToEmployeesButtonAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Back to employees" }).ClickAsync();
-        await page.WaitForURLAsync("**/employees", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/employees", new() { Timeout = 40_000 });
     }
 
     /// <summary>The sticky Save/Cancel action bar (".employee-edit-sticky-bar") — only rendered in edit mode.</summary>
     public Task<bool> IsStickyActionBarVisibleAsync() =>
         page.Locator(".employee-edit-sticky-bar").IsVisibleAsync();
-
-    /// <summary>
-    /// Clicks the sticky bar's "Cancel" button (existing-employee edit mode) — discards edits and
-    /// forceLoad-reloads back to the view route. Same visible label as <see cref="ClickCloseAsync"/>'s
-    /// "Cancel" (RequestClose), but this one is CancelEdit — there is only ever one such button
-    /// rendered at a time per mode, so the locator is unambiguous.
-    /// </summary>
-    public async Task ClickCancelEditButtonAsync()
-    {
-        await page.Locator(".employee-edit-sticky-bar").GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
-        await page.WaitForURLAsync(url => url.Contains("/view", StringComparison.OrdinalIgnoreCase), new() { Timeout = 20_000 });
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
-    }
 
     /// <summary>
     /// Returns the accessible success confirmation banner's text (role="status" aria-live="polite",
@@ -208,22 +227,62 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     // ── Details tab field access (view-mode read-only checks / accessible labels) ─
 
-    /// <summary>True if the given Details-tab text input (by its `id`, e.g. "employee-first-name") carries the HTML `readonly` attribute.</summary>
-    public async Task<bool> IsTextFieldReadOnlyAsync(string fieldId) =>
-        await page.Locator($"#{fieldId}").GetAttributeAsync("readonly") is not null;
+    /// <summary>
+    /// True if the given Details-tab text input (by its accessible label/aria-label, e.g. "First
+    /// Name") carries the HTML `readonly` attribute. Located by label rather than `id` — Syncfusion
+    /// always overwrites any custom `id` passed to HrTextBox with its own auto-generated one (see
+    /// HrTextBox's own remarks / EmployeeEdit.razor's HtmlAttributes["aria-label"] fields), so an
+    /// id-based CSS selector never reliably resolves.
+    /// </summary>
+    public async Task<bool> IsTextFieldReadOnlyAsync(string fieldLabel) =>
+        await page.GetByLabel(fieldLabel).First.GetAttributeAsync("readonly") is not null;
 
-    public Task<string> GetTextFieldValueAsync(string fieldId) =>
-        page.Locator($"#{fieldId}").InputValueAsync();
+    public Task<string> GetTextFieldValueAsync(string fieldLabel) =>
+        page.GetByLabel(fieldLabel).First.InputValueAsync();
 
-    public Task FillTextFieldByIdAsync(string fieldId, string value) =>
-        page.Locator($"#{fieldId}").FillAsync(value);
+    public Task FillTextFieldByIdAsync(string fieldLabel, string value) =>
+        page.GetByLabel(fieldLabel).First.FillAsync(value);
 
     /// <summary>True if the "Fields marked * are required." explanatory note is visible on the Details tab.</summary>
-    public Task<bool> HasRequiredFieldsNoteAsync() =>
-        page.Locator("p").Filter(new() { HasText = "Fields marked" }).Filter(new() { HasText = "are required" }).First.IsVisibleAsync();
+    public async Task<bool> HasRequiredFieldsNoteAsync()
+    {
+        // ClickEditDetailsButtonAsync's own wait only confirms SOME combobox rendered somewhere on
+        // the page, not specifically the Details tab's own content — this note can still be a
+        // render pass behind that at the moment a caller checks immediately afterward. Poll
+        // briefly rather than a single snapshot.
+        var note = page.Locator("p").Filter(new() { HasText = "Fields marked" }).Filter(new() { HasText = "are required" }).First;
+        try
+        {
+            await note.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
-    public Task<bool> IsUsersAndAccessCardVisibleAsync() =>
-        page.Locator(".card-header:has-text('Users & Access')").IsVisibleAsync();
+    /// <summary>
+    /// A bare IsVisibleAsync() snapshot here can fire before the card has actually rendered —
+    /// same "container mounts before Blazor content renders" race documented across other page
+    /// objects in this suite. Previously masked by the incidental delay of each caller's own full
+    /// New Employee form creation flow; surfaced once callers started reaching this page via a
+    /// much faster shared-employee navigation instead. Use an auto-retrying wait rather than a
+    /// one-shot check.
+    /// </summary>
+    public async Task<bool> IsUsersAndAccessCardVisibleAsync()
+    {
+        try
+        {
+            await Assertions.Expect(page.Locator(".card-header:has-text('Users & Access')").First)
+                .ToBeVisibleAsync(new() { Timeout = 10_000 });
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
+    }
 
     public Task<bool> HasInviteExpiryNoteAsync() =>
         page.Locator("p").Filter(new() { HasText = "Invite links expire after 7 days" }).First.IsVisibleAsync();
@@ -236,6 +295,42 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         // Wait for the Employment-tab-specific heading — the generic .card-header selector
         // would resolve immediately against the Details tab's already-rendered card headers.
         await page.WaitForSelectorAsync(".card-header:has-text('Employment Details')", new() { Timeout = 15_000 });
+
+        // The heading above is on the FIRST card of this tab; every combobox further down still
+        // needs Syncfusion's JS interop to attach before it's genuinely click-ready, and the very
+        // first popup opened on a freshly-loaded page pays a further, much larger one-time
+        // cold-start cost on top of that. DropDownSelector itself detects and sizes for both
+        // automatically (see its own remarks) — but that just means the FIRST dropdown any caller
+        // happens to touch on this tab pays the cold cost, whichever one it is (confirmed: this
+        // tab's Position Profile field hitting it in CreateEmployeeTests, after previously being
+        // reliable, once this warm-up was removed during an earlier consolidation pass). Paying
+        // that cost once, right here, up front, means every real selection a caller makes
+        // afterward — Manager, Position Profile, Department, whatever order the test uses — lands
+        // on the fast "warm" path instead of each independently risking being the unlucky first
+        // one. Manager is the natural choice: last in DOM order, so warming it up implies every
+        // earlier combobox on this tab already had time to attach too.
+        // A plain click + Escape, not DropDownSelector.SelectAsync — that method deliberately
+        // no-ops when the combobox's current value already matches the target text (correct for
+        // real selections, wrong here: a brand-new employee's Manager already reads "No Manager",
+        // which is exactly the common case this warm-up most needs to cover, so skipping on
+        // already-matching text would skip the warm-up for it entirely).
+        var managerCombobox = page.Locator(".col-md-4, .col-12")
+            .Filter(new() { HasText = "Manager" })
+            .First
+            .Locator("span[role='combobox']")
+            .First;
+        try
+        {
+            await managerCombobox.ClickAsync(new() { Timeout = 60_000 });
+            await page.Keyboard.PressAsync("Escape");
+            await page.WaitForTimeoutAsync(250);
+        }
+        catch (TimeoutException)
+        {
+            // Best-effort warm-up only — if this doesn't even open, the caller's own real
+            // DropDownSelector.SelectAsync call will surface the actual failure with its own
+            // (equally cold-start-aware) retry logic.
+        }
     }
 
     /// <summary>
@@ -276,15 +371,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         var managerGroup = page.Locator(".col-md-4, .col-12")
             .Filter(new() { HasText = "Manager" })
             .First;
-        // This combobox only mounts once the Employment tab's own async data load completes, so
-        // its "aria-owns" attribute can take longer to attach than DropDownSelector's narrow
-        // default budget (5s) — observed as "waiting for '.e-popup.e-ddl' to be visible" against
-        // the unscoped fallback selector (which can resolve to a *different*, already-open-but-
-        // hidden dropdown's popup on a page with more than one). Widen the attach budget for this
-        // specific call site (60 attempts = 15s) rather than raising DropDownSelector's default for
-        // every combobox in the suite — see that method's own remarks for why a blanket raise was
-        // already tried and reverted.
-        await DropDownSelector.SelectAsync(page, managerGroup, managerNameFragment, ariaOwnsAttempts: 60);
+        await DropDownSelector.SelectAsync(page, managerGroup, managerNameFragment);
     }
 
     /// <summary>
@@ -332,12 +419,30 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task SaveNewEmployeeAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        // Navigates to the employee list on success. Bumped 20s -> 40s: under the higher
+
+        // A failed save (client validation or a server-side Conflict/error) leaves this on the same
+        // form with no navigation — waiting on the URL alone then surfaces as a generic 40s timeout
+        // with no indication of the real cause, unlike ClickSaveChangesAsync above (which already
+        // checks this). Give the spinner a moment to clear and check for an error banner before
+        // committing to the long navigation wait, so a genuine validation/server failure fails fast
+        // and loud instead of masquerading as a load-related timeout.
+        try
+        {
+            await page.WaitForSelectorAsync(".alert-danger", new() { Timeout = 2_000 });
+            var message = (await page.Locator(".alert-danger").First.TextContentAsync())?.Trim();
+            throw new Exception($"Save failed: {message}");
+        }
+        catch (TimeoutException)
+        {
+            // No error banner appeared — proceed to the normal success-path wait below.
+        }
+
+        // Navigates to the employee list on success. Bumped 20s -> 40s -> 60s: under the higher
         // concurrent load from the many tests that now create fresh employees via this same
         // full-form UI flow, this genuinely (not a logic bug — flow is identical to the
-        // long-established working pattern) takes longer than 20s often enough to time out.
-        // Same fix already applied to the equivalent signup-navigation timeout.
-        await page.WaitForURLAsync("**/employees", new() { Timeout = 40_000 });
+        // long-established working pattern) takes longer than the previous budget often enough
+        // to time out. Same pattern as EmployeeListPage.ClickNewEmployeeAsync's navigation wait.
+        await page.WaitForURLAsync("**/employees", new() { Timeout = 60_000 });
         // With prerender:false the circuit connects after navigation, wait for the grid. ".e-grid"
         // alone isn't enough — Syncfusion populates ".e-row"/".e-rowcell" on a separate JS tick
         // after the grid element mounts, so callers that immediately click the new row (e.g.
@@ -527,6 +632,31 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         {
             await checkbox.CheckAsync();
             await NoticePeriodOverrideRow.WaitForAsync(new() { Timeout = 10_000 });
+
+            // Comparing against PositionProfileEditPage's equivalent flow (same three component
+            // types, same order — checkbox, Unit dropdown, Length numeric — and reliably fast)
+            // shows the difference isn't this row's markup: PositionProfileEdit's page has two
+            // OTHER SfNumericTextBox fields (Probation Months Override, Salary Range) rendered
+            // unconditionally near the top of that form, so by the time its test reaches Notice
+            // Period Length, Syncfusion's numeric-textbox JS module has already paid its one-time
+            // per-page init cost on an earlier instance. The Employment tab has no such earlier
+            // SfNumericTextBox anywhere — this Length field is the first one ever mounted on the
+            // page, and (like the first-ever dropdown popup handled in OpenEmploymentTabAsync)
+            // that first-of-its-kind cold start is real and can run well past a casual budget.
+            // Pay it here, immediately once the field exists, rather than leaving it to
+            // TypeIntoNumericInputAsync's later, harder-deadline wait — this gives it the most
+            // possible elapsed time (the caller's subsequent Unit dropdown selection included)
+            // before anything actually needs it enabled.
+            try
+            {
+                await Assertions.Expect(NoticePeriodOverrideRow.Locator("input.e-numerictextbox").First)
+                    .ToBeEnabledAsync(new() { Timeout = 90_000 });
+            }
+            catch (PlaywrightException)
+            {
+                // Best-effort warm-up only — TypeIntoNumericInputAsync has its own wait and will
+                // surface the real failure if it's still not enabled by the time it's needed.
+            }
         }
         if (!overrideEnabled && isChecked)
         {
@@ -603,14 +733,14 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task ConfirmDiscardChangesAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
-        await page.WaitForURLAsync("**/employees", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/employees", new() { Timeout = 40_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
     public async Task ConfirmSaveFromUnsavedChangesDialogAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-        await page.WaitForURLAsync("**/employees", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/employees", new() { Timeout = 40_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
@@ -747,6 +877,17 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     // focus, select-all, delete, then type each character for real.
     private async Task TypeIntoNumericInputAsync(ILocator input, string value)
     {
+        // Syncfusion renders SfNumericTextBox server-side with the native "disabled" attribute
+        // set, and only removes it once its own JS interop has initialized the component client
+        // side — the same freshly-mounted-widget race documented at length on DropDownSelector
+        // (aria-owns not present until interop finishes) and OpenEmploymentTabAsync, just showing
+        // up here as a literal disabled attribute instead of a missing aria attribute. A bare
+        // ClickAsync() falls back to Playwright's default 30s actionability wait, which recent
+        // evidence under a busy run shows isn't always enough for interop to catch up (see
+        // DropDownSelector's own widened click-retry budget) — wait for "enabled" explicitly with
+        // the same wider budget rather than relying on the implicit default.
+        await input.WaitForAsync(new() { State = WaitForSelectorState.Attached });
+        await Assertions.Expect(input).ToBeEnabledAsync(new() { Timeout = 90_000 });
         await input.ClickAsync();
         await page.Keyboard.PressAsync("Control+A");
         await page.Keyboard.PressAsync("Delete");

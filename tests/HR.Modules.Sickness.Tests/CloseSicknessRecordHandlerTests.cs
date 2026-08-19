@@ -53,8 +53,14 @@ public class CloseSicknessRecordHandlerTests
         bool excludePublicHolidays = false,
         IReadOnlyCollection<DateOnly>? publicHolidays = null,
         FakeAuditEventPublisher? auditPublisher = null,
-        int? fitNoteRequiredAfterDays = null,
-        int? returnToWorkRequiredAfterDays = null,
+        // Deliberately a high default rather than the real production default (1) — most tests in
+        // this file call BuildHandler without caring about fit-note/return-to-work behavior at
+        // all, and a low default would spuriously trigger both for their (typically small)
+        // totalDays, same as the old "null = never triggers" default did before these settings
+        // became mandatory (see CompanySettings.FitNoteRequiredAfterDays). Tests that actually
+        // exercise this behavior always pass an explicit low value.
+        int fitNoteRequiredAfterDays = 9999,
+        int returnToWorkRequiredAfterDays = 9999,
         FakeIntegrationEventPublisher? eventPublisher = null) =>
         new(db,
             new FakeClock(FixedUtcNow),
@@ -486,28 +492,7 @@ public class CloseSicknessRecordHandlerTests
         Assert.Empty(eventPublisher.PublishedEvents);
     }
 
-    [Fact]
-    public async Task HandleAsync_Does_Not_Create_ReturnToWorkReview_When_Setting_Is_Null()
-    {
-        await using var db = BuildContext();
-        var companyId = Guid.NewGuid();
-        var employeeId = Guid.NewGuid();
-        var categoryId = await SeedCategory(db, companyId);
-        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
-        var eventPublisher = new FakeIntegrationEventPublisher();
-
-        var result = await BuildHandler(db, returnToWorkRequiredAfterDays: null, eventPublisher: eventPublisher)
-            .HandleAsync(new CloseSicknessRecordRequest
-            {
-                CompanyId = companyId,
-                EmployeeId = employeeId,
-                Id = record.Id,
-                EndDate = new DateOnly(2026, 7, 3),
-                EndDayPart = SicknessDayPart.FullDay
-            }, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.False(await db.ReturnToWorkReviews.AnyAsync(r => r.SicknessRecordId == record.Id));
-        Assert.Empty(eventPublisher.PublishedEvents);
-    }
+    // ReturnToWorkRequiredAfterDays is mandatory now (no opt-out — see
+    // CompanySettings.ReturnToWorkRequiredAfterDays), so the "setting is null, no review created"
+    // case this used to cover can no longer occur and has been removed.
 }

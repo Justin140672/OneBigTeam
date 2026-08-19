@@ -60,7 +60,7 @@
                                 "Retired"     => "bg-secondary",
                                 _             => "bg-secondary"
                             };
-                            <span class="badge @css">@row.Status</span>
+                            <span class="badge @css">@EnumDisplay.Humanize(row.Status)</span>
                         }
                     </Template>
                 </GridColumn>

@@ -441,9 +441,8 @@
                             </div>
                         </div>
                         <div class="col-md-4">
+                            <label class="form-label">Hours Per Day</label>
                             <SfNumericTextBox TValue="decimal" @bind-Value="Model.HoursPerDay"
-                                              Placeholder="Hours Per Day"
-                                              FloatLabelType="FloatLabelType.Auto"
                                               ShowSpinButton="false"
                                               Min="0.5m" Max="24m" Step="0.5m" />
                             <ValidationMessage For="@(() => Model.HoursPerDay)" />

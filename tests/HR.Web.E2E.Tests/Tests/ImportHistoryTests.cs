@@ -148,7 +148,9 @@ public sealed class ImportHistoryTests(HrSettingsSerialFixture fixture) : HrSett
             await wizard.ConfirmImportAsync();
 
             var wizardStatus = await wizard.GetResultStatusAsync();
-            Assert.Equal("CompletedWithErrors", wizardStatus);
+            // Displayed via EnumDisplay.Humanize now (EmployeeImportWizard.razor) — was a raw,
+            // unspaced "CompletedWithErrors" before.
+            Assert.Equal("Completed With Errors", wizardStatus);
 
             await history.GoToAsync(AcmeId);
 

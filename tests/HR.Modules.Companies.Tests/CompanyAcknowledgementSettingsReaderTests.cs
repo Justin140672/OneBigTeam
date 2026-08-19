@@ -19,7 +19,7 @@ public class CompanyAcknowledgementSettingsReaderTests
         settings.UpdateHrPolicy(
             WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
                              WorkingDays.Thursday | WorkingDays.Friday,
-            7.5m, 1, 25, 6, true, false, false, null, null,
+            7.5m, 1, 25, 6, true, false, false, 7, 1,
             "Custom company acknowledgement statement.", 3,
             NoticePeriodUnit.Months, 1, true, EmployeeNumberMode.Manual, null, 1, 1, now);
         company.SetSettings(settings, now);

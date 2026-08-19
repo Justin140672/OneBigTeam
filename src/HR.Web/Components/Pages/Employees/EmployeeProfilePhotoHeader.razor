@@ -145,11 +145,17 @@
         var error = await ProfilePhotoService.ApproveProfilePhotoAsync(CompanyId, EmployeeId);
         if (error is not null)
             _error = error;
-        else
-            await LoadCurrentPhotoAsync();
 
+        // Clear the "Pending Review" card promptly regardless of the photo poll below — it can
+        // take up to 20s (see PollForCurrentPhotoAsync's own remarks on the virus scan race), and
+        // the approval itself has already succeeded at this point; there's no reason to leave the
+        // card showing "Pending Review" for an action that already went through.
         _reviewing = false;
         await LoadPendingAsync();
+        StateHasChanged();
+
+        if (error is null)
+            await PollForCurrentPhotoAsync();
     }
 
     private async Task ConfirmRejectAsync()

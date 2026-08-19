@@ -10,11 +10,48 @@ namespace HR.Web.E2E.Tests.Tests;
 /// consequences-explanation paragraph on the StartLeavingProcessDialog's confirmation step. Does
 /// not re-cover the full wizard end to end — see EmployeeLeavingProcessTests.cs for that; this
 /// file focuses on the new confirmation-step text and the cancel-leaves-employee-unchanged path.
+///
+/// None of the three tests below ever actually confirms/completes the Start Leaving Process
+/// wizard (the second only drives it as far as the "5. Confirm" step to check its text, the third
+/// explicitly cancels), so no test here permanently mutates the employee — safe to share ONE
+/// employee across all three instead of each paying the full New Employee form. Same
+/// create-once-lazily pattern as EmployeeProfileViewEditModeTests.cs; see that file's own remarks
+/// on why sharing is safe (xUnit runs methods within one class sequentially).
 /// </summary>
 public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private const string LauraEmail = "laura.bennett@acme.example";
+
+    private static readonly SemaphoreSlim _sharedEmployeeLock = new(1, 1);
+    private static Guid? _sharedEmployeeId;
+
+    private async Task<Guid> GetSharedEmployeeAsync(EmployeeListPage empList, EmployeeEditPage empEdit)
+    {
+        if (_sharedEmployeeId is { } cached)
+        {
+            await empEdit.GoToViewAsync(AcmeId, cached);
+            return cached;
+        }
+
+        await _sharedEmployeeLock.WaitAsync();
+        try
+        {
+            if (_sharedEmployeeId is { } cachedAfterLock)
+            {
+                await empEdit.GoToViewAsync(AcmeId, cachedAfterLock);
+                return cachedAfterLock;
+            }
+
+            var created = await CreateEmployeeAsync(empList, empEdit, "Shared");
+            _sharedEmployeeId = created;
+            return created;
+        }
+        finally
+        {
+            _sharedEmployeeLock.Release();
+        }
+    }
 
     private async Task<Guid> CreateEmployeeAsync(EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
     {
@@ -54,7 +91,7 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Reach");
+        await GetSharedEmployeeAsync(empList, empEdit);
 
         Assert.False(
             await _page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Start Leaving Process" }).IsVisibleAsync(),
@@ -74,7 +111,7 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Consequences");
+        await GetSharedEmployeeAsync(empList, empEdit);
 
         await dialog.OpenAsync();
         await dialog.FillResignationReceivedDateAsync("01/09/2026");
@@ -108,9 +145,13 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "CancelDialog");
+        await GetSharedEmployeeAsync(empList, empEdit);
 
-        Assert.Equal("Active", await empEdit.GetEmployeeStatusBadgeTextAsync());
+        // A freshly-created employee starts as "Draft" (Employee.Create's unconditional default —
+        // there's no status field on the New Employee form itself), not "Active". The point of
+        // this test is that cancelling leaves the status unchanged, not that it's specifically
+        // "Active", so capture whatever the real baseline is rather than assuming one.
+        var originalStatus = await empEdit.GetEmployeeStatusBadgeTextAsync();
 
         await dialog.OpenAsync();
         await dialog.FillResignationReceivedDateAsync("01/09/2026");
@@ -120,7 +161,7 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
         Assert.False(await dialog.IsVisibleAsync(),
             "Expected the Start offboarding dialog to close after Cancel");
 
-        Assert.Equal("Active", await empEdit.GetEmployeeStatusBadgeTextAsync());
+        Assert.Equal(originalStatus, await empEdit.GetEmployeeStatusBadgeTextAsync());
         Assert.True(await empEdit.HasStartOffboardingMenuItemAsync(),
             "'Start offboarding' should still be offered after a cancelled attempt");
     }

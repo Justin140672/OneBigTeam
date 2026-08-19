@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Admin Experience provides company administrators and HR administrators with tools to configure, govern, and manage the HR platform.
+The Admin Experience provides separate company-administration, HR-administration and platform-administration capabilities. These roles must not be conflated.
 
 The administrative experience should be powerful, secure, and easy to navigate.
 
@@ -34,8 +34,10 @@ Responsible for:
 - Company configuration
 - Branding
 - Settings
-- User management
-- Reporting
+
+Company Administrator alone does not grant employee management, user-role management, HR reporting, recruitment, leave, document, sickness or salary access.
+
+The initial company creator also receives HR Administrator as an explicit separate role so that the first account can use the whole application.
 
 ---
 
@@ -48,25 +50,21 @@ Responsible for:
 - Leave administration
 - Documents
 - Compliance
+- Employee user administration and role assignment where permitted
 
 ---
 
-# Administration Dashboard
+# Landing Behaviour
 
-The Admin Dashboard should display:
+A Company Administrator without HR, Recruitment or Manager roles lands in company administration rather than an operational dashboard.
 
-- Active employees
-- Pending approvals
-- Open recruitment activity
-- Overdue tasks
-- Compliance alerts
-- Recent audit activity
+HR, Recruitment and Manager roles use their role-specific dashboards. Platform administrators use the separate `HR.Admin.Web` application.
 
 ---
 
 # User Administration
 
-Administrators can:
+Authorised HR or user administrators can:
 
 - Invite users
 - Disable users
@@ -91,7 +89,7 @@ Display:
 
 # Permission Administration
 
-Administrators can:
+Authorised role administrators can:
 
 - Assign roles
 - Remove roles
@@ -147,12 +145,13 @@ Manage:
 
 # Report Administration
 
-Administrators can:
+Authorised reporting users can:
 
 - Generate reports
-- View report history
 - Download reports
-- Review failed reports
+- Manage their own saved report views and favourites
+
+Generated-file history and failed asynchronous report administration are added only if an asynchronous stored-report feature is separately approved.
 
 ---
 
@@ -253,3 +252,5 @@ Reports:
 6. Compliance information is visible.
 7. Reporting is available.
 8. Access is permission controlled.
+9. Company Administrator alone is restricted to company profile, settings and branding.
+10. Platform administration is isolated from tenant company administration.

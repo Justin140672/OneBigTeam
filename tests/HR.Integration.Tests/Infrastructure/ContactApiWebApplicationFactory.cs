@@ -53,6 +53,11 @@ public sealed class ContactApiWebApplicationFactory : WebApplicationFactory<Prog
             configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Marketing:ContactForm:RecipientEmail"] = RecipientEmail,
+                // This test class makes many requests against one in-memory TestServer, all sharing
+                // a single per-IP partition on Program.cs's real "contact-form" rate limiter (5 / 5
+                // min in production) — widen it here so validation/happy-path tests don't trip it.
+                // No test in this class exercises the limiter itself, so this loses no coverage.
+                ["Marketing:ContactForm:RateLimit:PermitLimit"] = "1000",
             });
         });
 

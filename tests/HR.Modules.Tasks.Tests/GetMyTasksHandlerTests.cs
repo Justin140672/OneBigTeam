@@ -56,6 +56,35 @@ public class GetMyTasksHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_Task_Assigned_By_EmployeeId_When_AssignedUserId_Is_Null()
+    {
+        // Several task-creation call sites (asset assignment, RequestAdditionalEmployeeDocument,
+        // EmployeeCreatedHandler, ProcessDocumentExpiryNotifications, UploadMyProfilePhoto) pass
+        // assignedUserId: null unconditionally, relying only on AssignedEmployeeId — e.g. an asset
+        // acknowledgement task created for a brand-new employee before they have a linked user
+        // account at all. Employee ID and User ID are the same value by construction throughout
+        // this app, so the handler must also match AssignedEmployeeId against the caller's UserId.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Acknowledge receipt of asset", null, TaskPriority.Medium, TaskSource.Asset, TaskActionType.Acknowledge,
+            null, assignedEmployeeId: userId, assignedUserId: null, Now);
+
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var result = await new GetMyTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
+            new GetMyTasksRequest { CompanyId = companyId, UserId = userId },
+            CancellationToken.None);
+
+        Assert.Single(result.Items);
+        Assert.Equal("Acknowledge receipt of asset", result.Items[0].Title);
+    }
+
+    [Fact]
     public async Task HandleAsync_Excludes_Tasks_From_Other_Companies()
     {
         await using var context = BuildContext();

@@ -36,6 +36,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/HR.Architecture.Tests/HR.Architecture.Tests.csproj" />
     <Project Path="tests/HR.Marketing.Tests/HR.Marketing.Tests.csproj" />
+    <Project Path="tests/HR.SharedKernel.Tests/HR.SharedKernel.Tests.csproj" />
     <Project Path="tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj" />
      <Project Path="tests/HR.Modules.Companies.Tests/HR.Modules.Companies.Tests.csproj" />
     <Project Path="tests/HR.Modules.CompanyOnboarding.Tests/HR.Modules.CompanyOnboarding.Tests.csproj" />
@@ -52,6 +53,7 @@
     <Project Path="tests/HR.Modules.Recruitment.Tests/HR.Modules.Recruitment.Tests.csproj" />
     <Project Path="tests/HR.Modules.Assets.Tests/HR.Modules.Assets.Tests.csproj" />
     <Project Path="tests/HR.Modules.Reporting.Tests/HR.Modules.Reporting.Tests.csproj" />
+    <Project Path="tests/HR.Modules.Sickness.Tests/HR.Modules.Sickness.Tests.csproj" />
     <Project Path="tests/HR.Modules.Support.Tests/HR.Modules.Support.Tests.csproj" />
     <Project Path="tests/HR.Modules.Tasks.Tests/HR.Modules.Tasks.Tests.csproj" />
     <Project Path="tests/HR.Web.Tests/HR.Web.Tests.csproj" />

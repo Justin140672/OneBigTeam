@@ -6,10 +6,11 @@ namespace HR.Modules.Identity.Services;
 internal interface ISupabaseAuthGateway
 {
     /// <summary>
-    /// Creates a pending (unverified) Supabase Auth user and sends a verification email whose link
-    /// redirects to <paramref name="redirectTo"/>. Returns the Supabase Auth user id.
+    /// Creates a pending (unverified) Supabase Auth user with the given <paramref name="password"/>
+    /// already set, and sends a verification email whose link redirects to
+    /// <paramref name="redirectTo"/>. Returns the Supabase Auth user id.
     /// </summary>
-    Task<Guid> CreateUserAsync(string email, string redirectTo, CancellationToken cancellationToken);
+    Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken);
 
     /// <summary>
     /// Resends the verification email for a still-pending user.
@@ -49,6 +50,16 @@ internal interface ISupabaseAuthGateway
     /// whether this call created the user or found it already existing.
     /// </summary>
     Task<Guid> EnsureDevUserAsync(string email, string password, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Creates an already-confirmed (email_confirm: true) Supabase Auth user with the given
+    /// <paramref name="password"/>, via the Admin API — the production (real-email, real-password)
+    /// counterpart to EnsureDevUserAsync above. No email is sent: the caller (AcceptInvite) already
+    /// has independent proof of email ownership — the invite link itself was emailed to that
+    /// address — so there's nothing left to verify. Throws EmailAlreadyRegisteredException if
+    /// Supabase reports the email as already registered (mirrors CreateUserAsync).
+    /// </summary>
+    Task<Guid> CreateConfirmedUserAsync(string email, string password, CancellationToken cancellationToken);
 
     /// <summary>
     /// Performs a real Supabase password-grant login (POST /auth/v1/token?grant_type=password) for

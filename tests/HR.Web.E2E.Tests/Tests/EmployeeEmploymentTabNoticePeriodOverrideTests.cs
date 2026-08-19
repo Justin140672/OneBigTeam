@@ -31,7 +31,8 @@ public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(HrAdminPerson
     /// <summary>
     /// Creates a fresh Acme employee assigned to the "Software Engineer" position profile
     /// (Engineering / London Office, no notice period override) and returns its id and last
-    /// name, leaving the caller positioned on the employee list after creation.
+    /// name, leaving the caller positioned on that employee's editable (not "/view") profile
+    /// page.
     /// </summary>
     private async Task<(Guid EmployeeId, string LastName)> CreateEmployeeAsync(
         EmployeeListPage empList, EmployeeEditPage empEdit)
@@ -60,8 +61,23 @@ public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(HrAdminPerson
 
         await empEdit.SaveNewEmployeeAsync();
 
+        // Matches the guid directly rather than splitting on the trailing "/view" segment
+        // (EmployeeList.razor's row link/OnRecordClick lands on the view route).
         await empList.ClickEmployeeAsync(lastName);
-        var employeeId = Guid.Parse(_page.Url.TrimEnd('/').Split('/').Last());
+        var employeeId = Guid.Parse(System.Text.RegularExpressions.Regex.Match(
+            _page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})").Groups[1].Value);
+
+        // ClickEmployeeAsync lands on the read-only "/view" route (EmployeeList.razor's row
+        // link/OnRecordClick), where EditPageBase.IsViewMode is true and every field on the
+        // Employment tab is rendered with Enabled="@(!IsViewMode)" — including the notice period
+        // override's checkbox, Unit dropdown, and Length numeric field. Syncfusion's checkbox and
+        // dropdown don't set a native "disabled" attribute for that state (only a CSS/aria one),
+        // so Playwright can still force those through — but SfNumericTextBox genuinely does render
+        // a real disabled input, which then never becomes enabled no matter how long a caller
+        // waits, since it's correctly reflecting view mode rather than racing anything. Navigate
+        // to the edit route (GoToAsync, no "/view" suffix — unlike ClickEmployeeAsync) so every
+        // caller of this helper actually lands in edit mode.
+        await empEdit.GoToAsync(companyId: AcmeId, employeeId: employeeId);
 
         return (employeeId, lastName);
     }

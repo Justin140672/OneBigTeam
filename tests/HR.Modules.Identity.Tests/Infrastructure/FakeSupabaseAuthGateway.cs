@@ -5,25 +5,34 @@ namespace HR.Modules.Identity.Tests.Infrastructure;
 internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
 {
     public List<(string Email, string RedirectTo)> CreatedUsers { get; } = [];
+    public List<(string Email, string Password, string RedirectTo)> CreatedUsersWithPassword { get; } = [];
     public List<(string Email, string RedirectTo)> ResentEmails { get; } = [];
     public List<(string Email, string RedirectTo)> PasswordResetRequests { get; } = [];
 
     public Guid? UserIdToReturn { get; set; }
     public bool ShouldThrowOnCreate { get; set; }
+    public bool ShouldThrowEmailAlreadyRegistered { get; set; }
     public bool ShouldThrowOnExchange { get; set; }
     public bool ShouldThrowOnSignIn { get; set; }
 
     public List<(string Email, string Password)> EnsuredDevUsers { get; } = [];
     public List<(string Email, string Password)> SignedInUsers { get; } = [];
+    public List<(string Email, string Password)> ConfirmedUsersCreated { get; } = [];
 
-    public Task<Guid> CreateUserAsync(string email, string redirectTo, CancellationToken cancellationToken)
+    public Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken)
     {
+        if (ShouldThrowEmailAlreadyRegistered)
+        {
+            throw new EmailAlreadyRegisteredException(email);
+        }
+
         if (ShouldThrowOnCreate)
         {
             throw new InvalidOperationException("Simulated Supabase failure.");
         }
 
         CreatedUsers.Add((email, redirectTo));
+        CreatedUsersWithPassword.Add((email, password, redirectTo));
         return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
     }
 
@@ -55,6 +64,22 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
     public Task<Guid> EnsureDevUserAsync(string email, string password, CancellationToken cancellationToken)
     {
         EnsuredDevUsers.Add((email, password));
+        return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
+    }
+
+    public Task<Guid> CreateConfirmedUserAsync(string email, string password, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowEmailAlreadyRegistered)
+        {
+            throw new EmailAlreadyRegisteredException(email);
+        }
+
+        if (ShouldThrowOnCreate)
+        {
+            throw new InvalidOperationException("Simulated Supabase failure.");
+        }
+
+        ConfirmedUsersCreated.Add((email, password));
         return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
     }
 

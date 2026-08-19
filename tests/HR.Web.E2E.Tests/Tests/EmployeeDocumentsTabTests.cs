@@ -125,10 +125,23 @@ public sealed class EmployeeDocumentsTabTests(HrAdminPersonaFixture fixture) : R
 
         // ".request-document-dialog" matches multiple elements (the SfDialog container, the
         // role="dialog" element itself, and its close-icon button all carry this CssClass), so an
-        // unscoped IsVisibleAsync() throws a Playwright strict-mode violation rather than
-        // resolving. .First mirrors EmployeeAdminPage's own scoping convention for this selector.
-        Assert.False(await _page.Locator(".request-document-dialog").First.IsVisibleAsync(),
-            "Expected the Request Document dialog to actually close after Cancel + Discard Changes");
+        // unscoped locator throws a Playwright strict-mode violation rather than resolving. .First
+        // mirrors EmployeeAdminPage's own scoping convention for this selector.
+        //
+        // A bare IsVisibleAsync() snapshot here races the SfDialog close animation: the helper's
+        // own JS wait (offsetParent-based) can resolve as soon as the close transition starts,
+        // before it's visually finished — an immediate follow-up check can still catch it
+        // mid-animation. Wait for Playwright's own Hidden state instead, which accounts for the
+        // full transition rather than a single point-in-time read.
+        try
+        {
+            await _page.Locator(".request-document-dialog").First
+                .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            Assert.Fail("Expected the Request Document dialog to actually close after Cancel + Discard Changes");
+        }
 
         // No request should have been created for the cancelled attempt.
         Assert.False(await empAdmin.HasDocumentRequestAsync("Right To Work"),

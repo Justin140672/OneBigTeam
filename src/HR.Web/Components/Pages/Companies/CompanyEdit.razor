@@ -22,15 +22,8 @@
     {
         <div class="d-flex align-items-center gap-3 mb-1">
             <h1 class="mb-0">@_company.Name</h1>
-            <ActiveStatusBadge IsActive="_company.IsActive" />
-            @if (Session.IsHrAdministrator)
-            {
-                <SfButton CssClass="e-small ms-auto" OnClick="@(() => Navigation.NavigateTo($"/companies/{Id}/user-administration"))">
-                    <i class="fa-solid fa-user-shield me-1"></i>User Administration
-                </SfButton>
-            }
         </div>
-        <p class="text-muted mb-4">Manage this company's profile, addresses, and settings.</p>
+        <p class="text-muted mb-4">Manage this company's profile and addresses.</p>
 
         @if (!string.IsNullOrEmpty(GlobalError))
         {
@@ -45,40 +38,20 @@
                         <div class="mt-4 @(IsViewMode ? "view-mode" : "")">
                             <EditForm EditContext="EditContext">
                                 <DataAnnotationsValidator />
+                                <NestedDataAnnotationsValidator />
                                 <CompanyProfileTab Company="_company" Model="Model" />
                             </EditForm>
                         </div>
                     </ContentTemplate>
                 </TabItem>
-                <TabItem>
-                    <ChildContent><TabHeader Text="Addresses" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4 @(IsViewMode ? "view-mode" : "")">
-                            <EditForm EditContext="EditContext">
-                                <NestedDataAnnotationsValidator />
-                                <CompanyAddressesTab Model="Model" />
-                            </EditForm>
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
-                <TabItem>
-                    <ChildContent><TabHeader Text="Settings" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4 @(IsViewMode ? "view-mode" : "")">
-                            <CompanySettingsTab @ref="_settingsTab" CompanyId="Id" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
-                <TabItem>
-                    <ChildContent><TabHeader Text="Branding" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4 @(IsViewMode ? "view-mode" : "")">
-                            <CompanyBrandingTab CompanyId="Id" Company="_company" CanEdit="!IsViewMode" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
             </TabItems>
         </SfTab>
+
+        @* Branding: hidden per product decision, not removed — CompanyBrandingTab itself is
+           untouched, just not shown as its own tab for now. *@
+        <div style="display:none" aria-hidden="true">
+            <CompanyBrandingTab CompanyId="Id" Company="_company" CanEdit="!IsViewMode" />
+        </div>
 
         <div class="mt-4 d-flex gap-2 align-items-center">
             @if (!string.IsNullOrEmpty(SuccessMsg))
@@ -109,12 +82,11 @@
     [Parameter] public Guid Id { get; set; }
 
     private GetCompanyResponse? _company;
-    private CompanySettingsTab? _settingsTab;
 
     protected override async Task LoadAsync()
     {
-        // Editing (not just viewing) company settings/profile/branding is admin-only,
-        // matching the "company:manage" policy that guards the underlying save endpoints.
+        // Editing (not just viewing) company profile/addresses is admin-only, matching the
+        // "company:manage" policy that guards the underlying save endpoints.
         await Session.InitialiseAsync();
         if (!IsViewMode && !Session.CanManageCompany)
         {
@@ -134,7 +106,11 @@
                 City = a.City,
                 Region = a.Region,
                 PostalCode = a.PostalCode,
-                CountryCode = a.CountryCode,
+                // Country Code is no longer user-editable (UK-only customers for now — see
+                // CompanyProfileTab.razor's remarks) — always "GB" regardless of whatever the
+                // stored value actually is, so existing addresses from before this change (or a
+                // freshly provisioned company's default address) still save correctly.
+                CountryCode = "GB",
                 PostcodeRegexPattern = Session.PostcodeRegex
             }).ToList();
         }
@@ -151,13 +127,6 @@
         if (companyResult is null)
             return companyError ?? "Failed to save company profile.";
 
-        if (_settingsTab is not null)
-        {
-            var settingsError = await _settingsTab.SaveAsync();
-            if (settingsError is not null)
-                return settingsError;
-        }
-
         return null;
     }
 
@@ -170,7 +139,4 @@
 
     // Close navigates to the dashboard — there's no dedicated "company list" page.
     protected override string? ListUrl => "/";
-
-    protected override bool HasUnsavedChanges =>
-        base.HasUnsavedChanges || (_settingsTab?.HasUnsavedChanges ?? false);
 }

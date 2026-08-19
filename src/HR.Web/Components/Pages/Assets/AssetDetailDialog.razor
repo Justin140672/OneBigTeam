@@ -19,7 +19,7 @@
             {
                 <div data-testid="asset-detail-content">
                 <div class="mb-3">
-                    <span class="@StatusBadgeClass" data-testid="asset-status">@_asset.Status</span>
+                    <span class="@StatusBadgeClass" data-testid="asset-status">@EnumDisplay.Humanize(_asset.Status)</span>
                 </div>
 
                 <div class="card mb-3">

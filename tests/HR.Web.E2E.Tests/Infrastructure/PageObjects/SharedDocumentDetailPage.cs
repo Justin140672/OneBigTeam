@@ -589,19 +589,29 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task ClickResetAcknowledgementStatementToDefaultAsync()
     {
+        var beforeValue = await AcknowledgementStatementTextArea.InputValueAsync();
+
         var deadline = DateTime.UtcNow.AddSeconds(20);
         while (true)
         {
             try
             {
                 await ResetAcknowledgementStatementButton.ClickAsync(new() { Timeout = 5_000 });
-                return;
+                break;
             }
             catch (Exception) when (DateTime.UtcNow < deadline)
             {
                 await page.WaitForTimeoutAsync(250);
             }
         }
+
+        // ResetToDefault() is a server-side C# method — the click only queues its Blazor Server
+        // round-trip; the textarea's value doesn't reflect the reset until that round-trip lands
+        // and re-renders. A caller reading the value immediately after this returns can otherwise
+        // still see the pre-reset value.
+        var valueDeadline = DateTime.UtcNow.AddSeconds(10);
+        while (await AcknowledgementStatementTextArea.InputValueAsync() == beforeValue && DateTime.UtcNow < valueDeadline)
+            await page.WaitForTimeoutAsync(100);
     }
 
     /// <summary>

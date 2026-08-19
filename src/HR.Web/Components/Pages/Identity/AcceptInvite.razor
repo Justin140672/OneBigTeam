@@ -1,47 +1,76 @@
 @page "/invite/{Token}"
+@layout HR.Web.Components.Layout.LoginLayout
 @rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 @using System.ComponentModel.DataAnnotations
 @inject InviteService InviteService
 @inject NavigationManager Navigation
 
-<PageTitle>Accept Invitation</PageTitle>
+<PageTitle>Accept Invitation — One Big Team</PageTitle>
 
-<div class="container py-5 invite-container">
-    <h1 class="mb-1">Welcome to One Big Team</h1>
-    <p class="text-muted mb-4">Set a password to activate your account.</p>
+<div class="login-card">
+    <div class="login-brand">
+        <img src="/images/logo.png" alt="One Big Team" class="login-logo-img" />
+    </div>
 
     @if (_success)
     {
-        <div class="alert alert-success">
-            <strong>Account activated!</strong> You can now sign in.
-        </div>
+        <h1 class="login-heading">Account activated</h1>
+        <p class="login-subheading">Your password has been set. You can now sign in.</p>
+
+        <a href="/login" class="login-back-link" data-testid="back-to-login">Back to sign in</a>
     }
     else
     {
-        @if (_error is not null)
-        {
-            <div class="alert alert-danger">@_error</div>
-        }
+        <h1 class="login-heading">Welcome to One Big Team</h1>
+        <p class="login-subheading">Set a password to activate your account.</p>
 
         <EditForm EditContext="_editContext" OnValidSubmit="Submit">
             <DataAnnotationsValidator />
-            <div class="mb-3">
-                <label class="form-label">Password <span class="text-danger">*</span></label>
-                <input type="password" class="form-control" @bind="_model.Password" placeholder="Choose a password" />
-                <ValidationMessage For="@(() => _model.Password)" />
-            </div>
-            <div class="mb-4">
-                <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
-                <input type="password" class="form-control" @bind="_model.Confirm" placeholder="Repeat password" />
-                <ValidationMessage For="@(() => _model.Confirm)" />
+
+            @if (_error is not null)
+            {
+                <div class="login-error">
+                    <i class="fa-solid fa-circle-exclamation"></i> @_error
+                </div>
+            }
+
+            <div class="login-field">
+                <label class="login-label">Password</label>
+                <div class="login-password-field">
+                    <SfTextBox @bind-Value="_model.Password"
+                               Placeholder="Choose a password"
+                               Type="@(_showPassword ? InputType.Text : InputType.Password)"
+                               Input="@(() => _error = null)" />
+                    <button type="button"
+                            class="login-password-toggle"
+                            aria-pressed="@_showPassword.ToString().ToLowerInvariant()"
+                            aria-label="@(_showPassword ? "Hide password" : "Show password")"
+                            @onclick="() => _showPassword = !_showPassword">
+                        @(_showPassword ? "Hide" : "Show")
+                    </button>
+                </div>
+                <ValidationMessage For="@(() => _model.Password)" class="login-validation" />
             </div>
 
-            <SfButton CssClass="w-100" IsPrimary="true" Type="ButtonType.Submit" Disabled="@_saving">
+            <div class="login-field">
+                <label class="login-label">Confirm password</label>
+                <SfTextBox @bind-Value="_model.Confirm"
+                           Placeholder="Repeat password"
+                           Type="@(_showPassword ? InputType.Text : InputType.Password)"
+                           Input="@(() => _error = null)" />
+                <ValidationMessage For="@(() => _model.Confirm)" class="login-validation" />
+            </div>
+
+            <SfButton IsPrimary="true"
+                      Type="ButtonType.Submit"
+                      Disabled="@_saving"
+                      CssClass="login-btn">
                 @if (_saving)
                 {
-                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
                 }
-                Activate Account
+                Activate account
             </SfButton>
         </EditForm>
     }
@@ -55,6 +84,7 @@
 
     private bool _saving;
     private bool _success;
+    private bool _showPassword;
     private string? _error;
 
     protected override void OnInitialized() => _editContext = new EditContext(_model);

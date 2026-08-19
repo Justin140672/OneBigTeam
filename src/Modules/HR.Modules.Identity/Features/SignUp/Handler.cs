@@ -72,7 +72,7 @@ internal sealed class SignUpHandler(
                 throw new InvalidOperationException(employeeResult.Error.Message);
             }
 
-            var user = await CreateIdentityRecordAsync(companyId, request, cancellationToken);
+            var user = await CreateIdentityRecordAsync(companyId, employeeResult.Value, request, cancellationToken);
 
             await auditEventPublisher.PublishAsync(
                 new RegistrationCreatedAuditEvent(companyId, user.Id, clock.UtcNowOffset(), Succeeded: true, FailureReason: null),
@@ -80,6 +80,16 @@ internal sealed class SignUpHandler(
 
             var response = new SignUpResponse(user.Id, companyId, user.Email, user.FirstName, user.LastName);
             return Result.Success(response);
+        }
+        catch (EmailAlreadyRegisteredException ex)
+        {
+            // Supabase reported the email as already registered even though SignUpHandler's own
+            // table check above didn't catch it (e.g. a Supabase user left over from a prior signup
+            // attempt whose local UserProfile row never got created) — tell the customer the real
+            // reason instead of falling into the generic "registration failed" message below.
+            logger.LogWarning(ex, "Self-service registration failed for company {CompanyId}: email already registered with Supabase", companyId);
+            await CompensateFailedRegistrationAsync(companyId, ex.Message, cancellationToken);
+            return Result.Failure<SignUpResponse>(Error.Conflict("An account with this email already exists."));
         }
         catch (Exception ex)
         {
@@ -131,7 +141,8 @@ internal sealed class SignUpHandler(
     // which sends the verification email) plus a corresponding local UserProfile, rather than a
     // local-auth ApplicationUser. The admin is NOT signed in here — the company remains
     // PendingVerification until Phase D's VerifyEmail flow runs.
-    private async Task<UserProfile> CreateIdentityRecordAsync(Guid companyId, SignUpRequest request, CancellationToken cancellationToken)
+    private async Task<UserProfile> CreateIdentityRecordAsync(
+        Guid companyId, Guid employeeId, SignUpRequest request, CancellationToken cancellationToken)
     {
         var now = clock.UtcNowOffset();
         var email = request.AdminEmail.Trim();
@@ -142,10 +153,16 @@ internal sealed class SignUpHandler(
             "http://localhost:5157";
         var redirectTo = $"{webBaseUrl}/verify-email/";
 
-        var supabaseUserId = await supabaseAuthGateway.CreateUserAsync(email, redirectTo, cancellationToken);
+        var supabaseUserId = await supabaseAuthGateway.CreateUserAsync(email, request.Password, redirectTo, cancellationToken);
 
+        // Use the employee ID as the user ID — single identity across modules, same convention
+        // AcceptInvite already follows (see its own remarks). Confirmed via live diagnosis this
+        // was previously generating an UNRELATED random id here instead, silently breaking that
+        // invariant for every self-service signup: ListUsersHandler (User Administration),
+        // EmployeeUserAccountStatusReader, and anything else joining on "employee id == user id"
+        // could never find this admin's account at all.
         var profile = UserProfile.Create(
-            Guid.NewGuid(),
+            employeeId,
             supabaseUserId,
             companyId,
             email,
@@ -162,8 +179,15 @@ internal sealed class SignUpHandler(
         // specific role — it's the floor role required by "role:employee", which gates core
         // session endpoints (GetMe, GetCompany, etc.) that AppSession depends on for every page.
         // Without it, a self-service admin would 403 on first load once verified.
+        // The self-service admin is the company's first (and, at this point, only) user — without
+        // HrAdministrator too they'd be locked out of Employees/HR Settings/User Administration
+        // (and the Getting Started checklist would show tasks pointing at those pages that
+        // immediately redirect them away, since it has no per-task role awareness — see
+        // GettingStarted.razor/OnboardingTaskCard.razor). CompanyAdministrator alone was never
+        // enough to actually use the app end to end.
         dbContext.UserRoles.Add(UserRole.Create(profile.Id, SystemRoles.Employee, now));
         dbContext.UserRoles.Add(UserRole.Create(profile.Id, SystemRoles.CompanyAdministrator, now));
+        dbContext.UserRoles.Add(UserRole.Create(profile.Id, SystemRoles.HrAdministrator, now));
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

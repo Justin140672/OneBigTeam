@@ -18,8 +18,8 @@ internal sealed class CompanySettings
     public bool ExcludePublicHolidaysFromLeave { get; private set; }
     public bool ExcludePublicHolidaysFromSickness { get; private set; }
     public bool DisplaySalaryOnEmployeeProfile { get; private set; }
-    public int? FitNoteRequiredAfterDays { get; private set; }
-    public int? ReturnToWorkRequiredAfterDays { get; private set; }
+    public int FitNoteRequiredAfterDays { get; private set; }
+    public int ReturnToWorkRequiredAfterDays { get; private set; }
     public string PostcodeRegex { get; private set; } = UkContactRegexDefaults.Postcode;
     public string TelephoneRegex { get; private set; } = UkContactRegexDefaults.Telephone;
     public string MobileRegex { get; private set; } = UkContactRegexDefaults.Mobile;
@@ -63,8 +63,10 @@ internal sealed class CompanySettings
             ExcludePublicHolidaysFromLeave = true,
             ExcludePublicHolidaysFromSickness = false,
             DisplaySalaryOnEmployeeProfile = false,
-            FitNoteRequiredAfterDays = null,
-            ReturnToWorkRequiredAfterDays = null,
+            // Mandatory, no opt-out — every company requires fit-note evidence after a week of
+            // sickness and a return-to-work review after 1 day by default.
+            FitNoteRequiredAfterDays = 7,
+            ReturnToWorkRequiredAfterDays = 1,
             PostcodeRegex = UkContactRegexDefaults.Postcode,
             TelephoneRegex = UkContactRegexDefaults.Telephone,
             MobileRegex = UkContactRegexDefaults.Mobile,
@@ -113,8 +115,8 @@ internal sealed class CompanySettings
         bool excludePublicHolidaysFromLeave,
         bool excludePublicHolidaysFromSickness,
         bool displaySalaryOnEmployeeProfile,
-        int? fitNoteRequiredAfterDays,
-        int? returnToWorkRequiredAfterDays,
+        int fitNoteRequiredAfterDays,
+        int returnToWorkRequiredAfterDays,
         string defaultAcknowledgementStatement,
         int acknowledgementReminderIntervalDays,
         NoticePeriodUnit noticePeriodUnit,

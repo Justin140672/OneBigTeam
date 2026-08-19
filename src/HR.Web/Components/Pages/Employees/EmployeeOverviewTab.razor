@@ -21,7 +21,7 @@
 
             <dt class="col-sm-4 text-muted fw-normal">Status</dt>
             <dd class="col-sm-8">
-                <span class="badge @StatusBadgeClass(Employee.Status)">@Employee.Status</span>
+                <span class="badge @StatusBadgeClass(Employee.Status)">@EnumDisplay.Humanize(Employee.Status)</span>
             </dd>
 
             <dt class="col-sm-4 text-muted fw-normal">Created</dt>

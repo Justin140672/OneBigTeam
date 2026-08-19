@@ -84,7 +84,7 @@
                         </div>
                     </div>
 
-                    <div class="d-flex gap-2 mt-3">
+                    <div class="d-flex gap-2 mt-3 justify-content-end">
                         @if (!IsViewMode)
                         {
                             <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
@@ -141,7 +141,7 @@
                                 {
                                     <li>
                                         <a href="/companies/@CompanyId/vacancies/@v.VacancyId/view">@(v.AdvertTitle ?? "(untitled vacancy)")</a>
-                                        <span class="text-muted ms-1">— @v.Status@(v.DateInstructed is { } opened ? $", opened {opened:d}" : "")</span>
+                                        <span class="text-muted ms-1">— @EnumDisplay.Humanize(v.Status)@(v.DateInstructed is { } opened ? $", opened {opened:d}" : "")</span>
                                     </li>
                                 }
                             </ul>
@@ -159,7 +159,7 @@
                                 {
                                     <li>
                                         <a href="/companies/@CompanyId/vacancies/@v.VacancyId/view">@(v.AdvertTitle ?? "(untitled vacancy)")</a>
-                                        <span class="text-muted ms-1">— @v.Status@(v.DateInstructed is { } opened ? $", opened {opened:d}" : "")</span>
+                                        <span class="text-muted ms-1">— @EnumDisplay.Humanize(v.Status)@(v.DateInstructed is { } opened ? $", opened {opened:d}" : "")</span>
                                     </li>
                                 }
                             </ul>

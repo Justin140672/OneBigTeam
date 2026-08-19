@@ -10,10 +10,15 @@ internal sealed class ImportEmployeesTask(EmployeesDbContext dbContext) : IOnboa
     public string Name => "Add your team";
     public string Description => "Import or add your employees to get started.";
     public bool IsMandatory => true;
-    // HR.Web's employee list route is company-scoped ("/companies/{CompanyId:guid}/employees") —
-    // the "{companyId}" placeholder is substituted by HR.Web with the current company id.
-    public string LinkUrl => "/companies/{companyId}/employees";
-    public int Order => 4;
+    public int Order => 5;
+
+    // HR.Web's employee import wizard route is company-scoped
+    // ("/companies/{CompanyId:guid}/data-import/employees") — the "{companyId}" placeholder is
+    // substituted by HR.Web with the current company id. Points at the import wizard rather than
+    // the plain employee list, since "Add your team" is specifically about getting employees in,
+    // not just browsing the (still-empty) list.
+    public Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken) =>
+        Task.FromResult("/companies/{companyId}/data-import/employees");
 
     public async Task<bool> IsCompletedAsync(Guid companyId, CancellationToken cancellationToken)
     {

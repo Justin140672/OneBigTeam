@@ -96,7 +96,11 @@ public sealed class SupportAndFeedbackTests(HrAdminPersonaFixture fixture) : Rol
         Assert.True(await queue.HasRequestAsync(title),
             $"Expected the submitted request '{title}' to appear in the staff queue");
 
-        await queue.ChangeStatusAsync(title, "UnderReview");
+        // The dropdown now displays humanized text ("Under Review") via ItemTemplate/ValueTemplate
+        // — see SupportRequestQueue.razor — even though the bound Value/DataSource are still the
+        // raw enum strings; DropDownSelector.SelectAsync matches on the same text a user actually
+        // sees in the popup, so pass the humanized label here.
+        await queue.ChangeStatusAsync(title, "Under Review");
 
         Assert.False(await queue.HasActionErrorAsync(),
             "Expected no error after updating the request's status");

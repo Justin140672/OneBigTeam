@@ -44,10 +44,11 @@
     margin-bottom: 6px;
 }
 
-.login-validation {
+.login-validation,
+::deep .login-validation {
     display: block;
     font-size: 0.8rem;
-    color: #dc2626;
+    color: #dc2626 !important;
     margin-top: 4px;
 }
 

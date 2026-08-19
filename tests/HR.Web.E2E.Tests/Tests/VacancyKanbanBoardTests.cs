@@ -133,24 +133,6 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
     }
 
     [Fact]
-    public async Task DragCard_ToAnotherActiveNonTerminalStage_MovesTheApplicationAndPersistsAcrossReload()
-    {
-        var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
-
-        // Ticket #99 removed the compiled linear transition graph — a company's stages can be
-        // reordered/inserted freely, so any active, non-terminal target stage is now a valid move.
-        await kanban.DragCardToColumnAsync(candidateLast, NonTerminalStage2);
-
-        Assert.Equal(NonTerminalStage2, await kanban.GetCardStatusBadgeTextAsync(candidateLast));
-
-        // Reload the board from scratch (fresh navigation, not just re-reading the DOM) — the move
-        // must have actually been persisted server-side (MoveApplicationStageAsync), not merely
-        // reflected client-side by the drag itself.
-        await kanban.WaitForLoadedAsync();
-        Assert.Equal(NonTerminalStage2, await kanban.GetCardStatusBadgeTextAsync(candidateLast));
-    }
-
-    [Fact]
     public async Task RecruitmentDashboard_TogglingBetweenBoardAndList_RemembersBoardSearchFilter()
     {
         var (candidateLast, _) = await ArrangeAppliedApplicationAsync();

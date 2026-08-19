@@ -1072,6 +1072,58 @@ public class CreateEmployeeHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Retries_When_Generated_EmployeeNumber_Already_Exists()
+    {
+        // The atomic counter itself is race-free (see EmployeeNumberGenerator's own remarks), but
+        // its stored "next" value can still drift out of sync with actual data by means outside
+        // CreateEmployeeHandler's control — e.g. an admin directly editing "Next Number" on HR
+        // Settings to a value at or behind one already claimed. The handler must retry with a
+        // fresh claim rather than failing the request outright.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+
+        var existing = Employee.Create(
+            Guid.NewGuid(), companyId, "Existing", "Employee", "existing@example.com", StartDate,
+            hasSystemAccess: false, new DateOnly(1990, 1, 1), "British", "Female", "AUTO-00001",
+            employmentTypeId, departmentId, locationId, positionProfileId, now);
+        context.Employees.Add(existing);
+        await context.SaveChangesAsync();
+
+        // First claim ("AUTO-00001") collides with the employee just seeded; the second
+        // ("AUTO-00002") does not.
+        var generator = new FakeEmployeeNumberGenerator(n => $"AUTO-{n:D5}");
+        var handler = new CreateEmployeeHandler(
+            context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(),
+            new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Automatic),
+            generator);
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = string.Empty,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await context.Employees.SingleAsync(e => e.Id == result.Value!.Id);
+        Assert.Equal("AUTO-00002", saved.EmployeeNumber);
+    }
+
+    [Fact]
     public async Task HandleAsync_Uses_Supplied_EmployeeNumber_When_Automatic_Mode_And_Value_Provided()
     {
         await using var context = BuildContext();

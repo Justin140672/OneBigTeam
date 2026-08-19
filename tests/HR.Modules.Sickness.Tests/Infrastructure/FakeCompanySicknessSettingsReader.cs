@@ -5,8 +5,8 @@ namespace HR.Modules.Sickness.Tests.Infrastructure;
 
 internal sealed class FakeCompanySicknessSettingsReader(
     bool excludePublicHolidays = false,
-    int? fitNoteRequiredAfterDays = null,
-    int? returnToWorkRequiredAfterDays = null) : ICompanySicknessSettingsReader
+    int fitNoteRequiredAfterDays = 7,
+    int returnToWorkRequiredAfterDays = 1) : ICompanySicknessSettingsReader
 {
     public Task<CompanySicknessSettings> GetSicknessSettingsAsync(Guid companyId, CancellationToken cancellationToken)
         => Task.FromResult(new CompanySicknessSettings(excludePublicHolidays, fitNoteRequiredAfterDays, returnToWorkRequiredAfterDays));

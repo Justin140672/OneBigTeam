@@ -152,7 +152,7 @@
                     <Template>
                         @{
                             var row = (context as EmployeeListItemModel)!;
-                            <a class="employee-cell" href="/companies/@CompanyId/employees/@row.Id" aria-label="@($"Open profile for {row.FullName}")">
+                            <a class="employee-cell" href="/companies/@CompanyId/employees/@row.Id/view" aria-label="@($"Open profile for {row.FullName}")">
                                 <ProfilePhotoAvatar PhotoUrl="@row.ProfilePhotoUrl" Initials="@GetInitials(row)" SizePx="32" />
                                 <span class="employee-cell-text">
                                     <span class="employee-cell-name">@row.FullName</span>
@@ -174,7 +174,7 @@
                     <Template>
                         @{
                             var row = (context as EmployeeListItemModel)!;
-                            <span class="badge @StatusBadgeClass(row.Status)">@row.Status</span>
+                            <span class="badge @StatusBadgeClass(row.Status)">@EnumDisplay.Humanize(row.Status)</span>
                         }
                     </Template>
                 </GridColumn>
@@ -509,7 +509,7 @@
     private void OnRecordClick(Syncfusion.Blazor.Grids.RecordClickEventArgs<EmployeeListItemModel> args)
     {
         if (args.Column?.Type == Syncfusion.Blazor.Grids.ColumnType.CheckBox) return;
-        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{args.RowData.Id}");
+        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{args.RowData.Id}/view");
     }
 
     private static string GetInitials(EmployeeListItemModel row)

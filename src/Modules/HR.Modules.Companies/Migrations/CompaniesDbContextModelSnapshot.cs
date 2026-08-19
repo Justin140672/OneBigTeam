@@ -18,7 +18,7 @@ namespace HR.Modules.Companies.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("companies")
-                .HasAnnotation("ProductVersion", "10.0.10")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -225,8 +225,10 @@ namespace HR.Modules.Companies.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("exclude_public_holidays_from_sickness");
 
-                    b.Property<int?>("FitNoteRequiredAfterDays")
+                    b.Property<int>("FitNoteRequiredAfterDays")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
+                        .HasDefaultValue(7)
                         .HasColumnName("fit_note_required_after_days");
 
                     b.Property<decimal>("HoursPerDay")
@@ -284,8 +286,10 @@ namespace HR.Modules.Companies.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("probation_months");
 
-                    b.Property<int?>("ReturnToWorkRequiredAfterDays")
+                    b.Property<int>("ReturnToWorkRequiredAfterDays")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
+                        .HasDefaultValue(1)
                         .HasColumnName("return_to_work_required_after_days");
 
                     b.Property<string>("TelephoneRegex")
@@ -660,15 +664,15 @@ namespace HR.Modules.Companies.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("issued_by_admin_user_id");
 
-                    b.Property<DateTimeOffset?>("RedeemedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("redeemed_at");
-
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset?>("RedeemedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("redeemed_at");
 
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("timestamp with time zone")

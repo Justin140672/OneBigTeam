@@ -73,14 +73,18 @@ public class SignUpEndpointTests
         Assert.Equal(payload.CompanyId, profile.CompanyId);
         Assert.Equal(email, profile.Email);
 
-        // Also granted SystemRoles.Employee alongside CompanyAdministrator — it's the floor role
-        // required by "role:employee", which gates core session endpoints (GetMe, GetCompany,
-        // etc.) that every seeded persona also carries (see SignUpHandler remarks). Roles are
-        // keyed to UserProfile.Id (payload.UserId), not the raw Supabase auth user id.
+        // Also granted SystemRoles.HrAdministrator alongside CompanyAdministrator — the
+        // self-service admin is the company's only user at this point, so CompanyAdministrator
+        // alone would lock them out of Employees/HR Settings/User Administration. Plus
+        // SystemRoles.Employee, the floor role required by "role:employee", which gates core
+        // session endpoints (GetMe, GetCompany, etc.) that every seeded persona also carries (see
+        // SignUpHandler remarks). Roles are keyed to UserProfile.Id (payload.UserId), not the raw
+        // Supabase auth user id.
         var roleIds = await db.UserRoles.Where(r => r.UserId == payload.UserId).Select(r => r.RoleId).ToListAsync();
         Assert.Contains(SystemRoles.CompanyAdministrator, roleIds);
+        Assert.Contains(SystemRoles.HrAdministrator, roleIds);
         Assert.Contains(SystemRoles.Employee, roleIds);
-        Assert.Equal(2, roleIds.Count);
+        Assert.Equal(3, roleIds.Count);
 
         // Self-service signup starts a company in PendingVerification — it is not yet Active
         // until an email-verification step (out of scope for Phase A) flips it.

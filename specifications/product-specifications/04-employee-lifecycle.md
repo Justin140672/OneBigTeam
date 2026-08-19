@@ -112,13 +112,16 @@ Cannot:
 
 ### Manager
 Can:
-- view reporting chain
+- view detailed employee records for direct and indirect reports beneath them
 
-Cannot:
-- access payroll-sensitive fields
+Salary visibility for that hierarchy is controlled by `DisplaySalaryOnEmployeeProfile`. Bank, tax and payroll-sensitive fields remain separately protected.
 
 ### HR Admin
-Full CRUD.
+May view and manage employee records company-wide and always has salary access. Destructive or specialised operations may still require their own permission.
+
+### Company Administrator
+
+Company Administrator alone has no detailed employee-record or salary access.
 
 ---
 

@@ -20,7 +20,7 @@ public class FitNoteRequestJobTests
 
     private static FitNoteRequestJob BuildJob(
         SicknessDbContext db,
-        int? fitNoteRequiredAfterDays = 7,
+        int fitNoteRequiredAfterDays = 7,
         FakeIntegrationEventPublisher? integrationPublisher = null,
         FakeAuditEventPublisher? auditPublisher = null) =>
         new(db,
@@ -160,23 +160,9 @@ public class FitNoteRequestJobTests
         Assert.Empty(requests);
     }
 
-    [Fact]
-    public async Task ExecuteAsync_SkipsCompany_WhenFitNoteRequiredAfterDaysIsNull()
-    {
-        await using var db = BuildContext();
-        var companyId = Guid.NewGuid();
-        var categoryId = await SeedCategory(db, companyId);
-
-        var record = CreateOpenRecord(companyId, categoryId, totalDays: 8m);
-        db.SicknessRecords.Add(record);
-        await db.SaveChangesAsync();
-
-        var job = BuildJob(db, fitNoteRequiredAfterDays: null);
-        await job.ExecuteAsync();
-
-        var requests = await db.SicknessEvidenceRequests.ToListAsync();
-        Assert.Empty(requests);
-    }
+    // FitNoteRequiredAfterDays is mandatory now (no opt-out — see
+    // CompanySettings.FitNoteRequiredAfterDays), so the "setting is null, company skipped" case
+    // this used to cover can no longer occur and has been removed.
 
     [Fact]
     public async Task ExecuteAsync_SetsCorrectDueDate_TodayPlusSevenDays()

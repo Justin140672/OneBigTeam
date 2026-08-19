@@ -10,10 +10,25 @@ internal sealed class ReviewDefaultLeavePolicyTask(LeaveDbContext dbContext) : I
     public string Name => "Review your default leave policy";
     public string Description => "Check the carry-over rules and settings for your default leave policy.";
     public bool IsMandatory => true;
-    // HR.Web's leave policies route is company-scoped ("/companies/{CompanyId:guid}/leave-policies")
-    // — the "{companyId}" placeholder is substituted by HR.Web with the current company id.
-    public string LinkUrl => "/companies/{companyId}/leave-policies";
     public int Order => 3;
+
+    // Links straight to the default policy's own edit page
+    // ("/companies/{CompanyId:guid}/leave-policies/{Id:guid}") rather than the leave policies
+    // search/list screen — "review your default leave policy" means look at that one specific
+    // policy, not go find it yourself. Falls back to the plain list route (still company-scoped,
+    // "{companyId}" substituted by HR.Web) in the unexpected case no default policy exists yet.
+    public async Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        var defaultPolicyId = await dbContext.LeavePolicies
+            .AsNoTracking()
+            .Where(p => p.CompanyId == companyId && p.IsDefault)
+            .Select(p => (Guid?)p.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return defaultPolicyId is null
+            ? "/companies/{companyId}/leave-policies"
+            : $"/companies/{{companyId}}/leave-policies/{defaultPolicyId}";
+    }
 
     public Task<bool> IsCompletedAsync(Guid companyId, CancellationToken cancellationToken)
     {

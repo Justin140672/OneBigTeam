@@ -403,18 +403,18 @@
                                         <div class="card-body @(IsViewMode ? "view-mode" : "")">
                                             <div class="row g-3">
                                                 <div class="col-md-6">
-                                                    <label class="form-label" for="employee-first-name">First Name <span class="text-danger">*</span></label>
-                                                    <HrTextBox ID="employee-first-name" @bind-Value="Model.FirstName" Placeholder="First name" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">First Name <span class="text-danger">*</span></label>
+                                                    <HrTextBox @bind-Value="Model.FirstName" Placeholder="First name" ReadOnly="@IsViewMode" HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "First Name" })" />
                                                     <ValidationMessage For="@(() => Model.FirstName)" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label" for="employee-last-name">Last Name <span class="text-danger">*</span></label>
-                                                    <HrTextBox ID="employee-last-name" @bind-Value="Model.LastName" Placeholder="Last name" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Last Name" })" @bind-Value="Model.LastName" Placeholder="Last name" ReadOnly="@IsViewMode" />
                                                     <ValidationMessage For="@(() => Model.LastName)" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label" for="employee-preferred-name">Preferred Name</label>
-                                                    <HrTextBox ID="employee-preferred-name" @bind-Value="Model.PreferredName" Placeholder="Defaults to first name" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">Preferred Name</label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Preferred Name" })" @bind-Value="Model.PreferredName" Placeholder="Defaults to first name" ReadOnly="@IsViewMode" />
                                                 </div>
                                                 <div class="col-md-6">
                                                     <label class="form-label" for="employee-dob">Date of Birth <span class="text-danger">*</span></label>
@@ -454,13 +454,13 @@
                                                     }
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label" for="employee-work-email">Work Email <span class="text-danger">*</span></label>
-                                                    <HrTextBox ID="employee-work-email" @bind-Value="Model.WorkEmail" Placeholder="work@company.com" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">Work Email <span class="text-danger">*</span></label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Work Email" })" @bind-Value="Model.WorkEmail" Placeholder="work@company.com" ReadOnly="@IsViewMode" />
                                                     <ValidationMessage For="@(() => Model.WorkEmail)" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label" for="employee-personal-email">Personal Email</label>
-                                                    <HrTextBox ID="employee-personal-email" @bind-Value="Model.PersonalEmail" Placeholder="personal@example.com" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">Personal Email</label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Personal Email" })" @bind-Value="Model.PersonalEmail" Placeholder="personal@example.com" ReadOnly="@IsViewMode" />
                                                     <ValidationMessage For="@(() => Model.PersonalEmail)" />
                                                 </div>
                                                 <div class="col-md-4">
@@ -478,39 +478,39 @@
                                         <div class="card-body @(IsViewMode ? "view-mode" : "")">
                                             <div class="row g-3">
                                                 <div class="col-md-6">
-                                                    <label class="form-label" for="employee-phone">Mobile / Work Phone</label>
-                                                    <HrTextBox ID="employee-phone" @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">Mobile / Work Phone</label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Mobile / Work Phone" })" @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" ReadOnly="@IsViewMode" />
                                                     <ValidationMessage For="@(() => Model.PhoneNumber)" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label" for="employee-home-phone">Home Phone</label>
-                                                    <HrTextBox ID="employee-home-phone" @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">Home Phone</label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Home Phone" })" @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" ReadOnly="@IsViewMode" />
                                                     <ValidationMessage For="@(() => Model.HomePhone)" />
                                                 </div>
                                                 <div class="col-12">
-                                                    <label class="form-label" for="employee-address-1">Address Line 1</label>
-                                                    <HrTextBox ID="employee-address-1" @bind-Value="Model.AddressLine1" Placeholder="Street address" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">Address Line 1</label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Address Line 1" })" @bind-Value="Model.AddressLine1" Placeholder="Street address" ReadOnly="@IsViewMode" />
                                                 </div>
                                                 <div class="col-12">
-                                                    <label class="form-label" for="employee-address-2">Address Line 2</label>
-                                                    <HrTextBox ID="employee-address-2" @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">Address Line 2</label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Address Line 2" })" @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." ReadOnly="@IsViewMode" />
                                                 </div>
                                                 <div class="col-md-4">
-                                                    <label class="form-label" for="employee-city">City</label>
-                                                    <HrTextBox ID="employee-city" @bind-Value="Model.City" Placeholder="e.g. London" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">City</label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "City" })" @bind-Value="Model.City" Placeholder="e.g. London" ReadOnly="@IsViewMode" />
                                                 </div>
                                                 <div class="col-md-4">
-                                                    <label class="form-label" for="employee-county">County / State</label>
-                                                    <HrTextBox ID="employee-county" @bind-Value="Model.County" Placeholder="e.g. Greater London" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">County / State</label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "County / State" })" @bind-Value="Model.County" Placeholder="e.g. Greater London" ReadOnly="@IsViewMode" />
                                                 </div>
                                                 <div class="col-md-3">
-                                                    <label class="form-label" for="employee-postcode">Post Code</label>
-                                                    <HrTextBox ID="employee-postcode" @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">Post Code</label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Post Code" })" @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" ReadOnly="@IsViewMode" />
                                                     <ValidationMessage For="@(() => Model.PostCode)" />
                                                 </div>
                                                 <div class="col-md-3">
-                                                    <label class="form-label" for="employee-country">Country</label>
-                                                    <HrTextBox ID="employee-country" @bind-Value="Model.Country" Placeholder="e.g. United Kingdom" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label">Country</label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Country" })" @bind-Value="Model.Country" Placeholder="e.g. United Kingdom" ReadOnly="@IsViewMode" />
                                                 </div>
                                             </div>
                                         </div>
@@ -781,7 +781,7 @@
                         }
                         Save
                     </SfButton>
-                    <SfButton OnClick="CancelEdit" Disabled="@Saving">Cancel</SfButton>
+                    <SfButton OnClick="RequestClose" Disabled="@Saving">Cancel</SfButton>
                 </div>
             </div>
         }
@@ -884,12 +884,6 @@
     // starts from freshly-fetched data rather than whatever was last rendered in view mode.
     private void EnterEditMode() =>
         Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Id}", forceLoad: true);
-
-    // Cancel (AC5) — discards any in-progress edits (both this page's Model and the Employment
-    // tab's own independent model) by doing a full reload back into view mode, rather than
-    // attempting to hand-revert every bound field.
-    private void CancelEdit() =>
-        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Id}/view", forceLoad: true);
 
     private static readonly string[] _genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
 
@@ -1312,7 +1306,8 @@
                     return employmentError;
             }
 
-            _redirectUrl = $"/companies/{CompanyId}/employees";
+            // Existing employee — return to viewing the employee just updated, not the list.
+            _redirectUrl = $"/companies/{CompanyId}/employees/{Id}/view";
             return null;
         }
     }
@@ -1331,6 +1326,9 @@
 
     protected override bool HasUnsavedChanges =>
         base.HasUnsavedChanges || (_employmentTab?.HasUnsavedChanges ?? false);
+
+    protected override void ResetChildSectionsUnsavedState() =>
+        _employmentTab?.ResetBaseline();
 
     private async Task SendInvite()
     {

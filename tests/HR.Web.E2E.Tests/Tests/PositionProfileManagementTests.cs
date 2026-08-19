@@ -217,7 +217,13 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
         await login.LoginAsync(tomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/position-profiles");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        // See E2ETestBase.WaitForUrlToStopContainingAsync's doc comment: the redirect is a
+        // client-side Blazor NavigateTo fired from OnBeforeLoadAsync, not a full page navigation,
+        // so NetworkIdle can resolve before the redirect actually happens — not an auth
+        // regression, the same race already fixed this way across every other
+        // PlainEmployee_IsRedirectedAway-shaped test in the suite.
+        await WaitForUrlToStopContainingAsync("/position-profiles");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/position-profiles"),

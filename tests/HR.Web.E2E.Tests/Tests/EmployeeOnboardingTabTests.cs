@@ -31,7 +31,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
     /// captured from the URL after navigating back into their profile from the employee list.
     /// Caller must already be logged in as an HR administrator.
     /// </summary>
-    private async Task<Guid> CreateEmployeeWithFreshOnboardingPlanAsync(
+    private async Task<(Guid EmployeeId, string LastName)> CreateEmployeeWithFreshOnboardingPlanAsync(
         EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
     {
         var unique    = Guid.NewGuid().ToString("N")[..8];
@@ -62,7 +62,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await empList.ClickEmployeeAsync(lastName);
 
         var match = Regex.Match(_page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
-        return Guid.Parse(match.Groups[1].Value);
+        return (Guid.Parse(match.Groups[1].Value), lastName);
     }
 
     [Fact]
@@ -168,7 +168,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var employeeId = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, "Hide");
+        var (employeeId, lastName) = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, "Hide");
 
         Assert.True(
             await _page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).IsVisibleAsync(),
@@ -187,7 +187,17 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         {
             await inbox.GoToAsync(AcmeId);
             var titles = await inbox.GetTaskTitlesAsync();
-            var claimedTitle = titles.First(t => t.Contains(fragment, StringComparison.OrdinalIgnoreCase));
+            // Every onboarding task title is suffixed "— {FirstName LastName}" (see
+            // EmployeeCreatedHandler), and this Inbox is shared across the whole E2E run/DB — it
+            // can accumulate other employees' still-unclaimed "Set up workstation…" etc. tasks
+            // from other tests. Matching on the generic fragment alone can grab a DIFFERENT
+            // employee's task (whichever sorts first), silently completing it while this
+            // employee's own task is never touched — and the plan then never reaches Completed,
+            // since CompleteOnboardingTaskFromTaskAction requires every one of THIS plan's tasks
+            // done. Disambiguate with this employee's own last name.
+            var claimedTitle = titles.First(t =>
+                t.Contains(fragment, StringComparison.OrdinalIgnoreCase) &&
+                t.Contains(lastName, StringComparison.OrdinalIgnoreCase));
             await inbox.ClaimAsync(claimedTitle);
 
             // MyOnboardingTasksWidget (the old dashboard widget this used to click through) is
@@ -236,7 +246,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var employeeId = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, "Deep");
+        var (employeeId, _) = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, "Deep");
 
         // EmployeeEdit.razor's LoadAsync maps "?tab=onboarding" to tab index 11 (the last tab).
         await empEdit.GoToAsync(AcmeId, employeeId, "tab=onboarding");

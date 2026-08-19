@@ -179,12 +179,15 @@ public class UserInviteEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<AcceptPayload>();
         Assert.Equal(employeeId, payload!.UserId);
 
-        // Verify user and role were created in DB
+        // Verify a real Supabase-backed UserProfile (not a local-auth ApplicationUser — see
+        // Endpoint.cs's remarks) and role were created in DB.
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        Assert.True(await db.Users.AnyAsync(u => u.Id == employeeId));
+        Assert.True(await db.UserProfiles.AnyAsync(p => p.Id == employeeId));
         Assert.True(await db.UserRoles.AnyAsync(
             ur => ur.UserId == employeeId && ur.RoleId == SystemRoles.Employee));
+
+        Assert.Contains(_factory.SupabaseAuthGateway.ConfirmedUsersCreated, u => u.Password == "SecurePass1!");
     }
 
     [Fact]

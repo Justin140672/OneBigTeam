@@ -95,7 +95,7 @@ User may access their own records only.
 
 ## Direct Reports
 
-User may access direct reports.
+The scope name is retained for compatibility, but manager hierarchy access includes every employee beneath the manager in the complete reporting hierarchy, including indirect reports. It does not include peers, the manager's own manager or employees in unrelated branches.
 
 ## Department
 
@@ -171,7 +171,25 @@ Managers receive access through:
 
 manager_employee_id
 
-Permissions apply only to employees within the hierarchy.
+Permissions apply only to employees beneath the manager in the complete hierarchy. Hierarchy membership must be evaluated on the server for the requested employee or resource.
+
+---
+
+# Employee Resource Access Matrix
+
+| Caller | Detailed employee record | Salary/compensation |
+|---|---|---|
+| Employee | Own record only | Own salary only when `DisplaySalaryOnEmployeeProfile` is enabled |
+| Manager | Employees beneath them in the complete hierarchy | Same hierarchy, only when `DisplaySalaryOnEmployeeProfile` is enabled |
+| HR Administrator | Company-wide | Company-wide regardless of the display setting |
+| Recruiter only | No general detailed employee access | No access |
+| Company Administrator only | No general detailed employee access | No access |
+
+Company Administrator is a company-settings role, not an HR role. The initial company creator also receives HR Administrator as a separately assigned, explicit exception.
+
+Directory-style lists may expose a deliberately reduced set of work fields to a wider audience, but must not reuse a detailed employee response containing personal or sensitive fields.
+
+UI visibility never substitutes for API authorization.
 
 ---
 
@@ -260,3 +278,6 @@ Reports:
 6. Permission changes audited.
 7. Cross-company access prevented.
 8. Reporting available.
+9. Managers can access the complete subordinate hierarchy but not unrelated employees.
+10. Company Administrator alone grants no HR, employee-record or salary access.
+11. Salary access follows the company setting for self and managers, while HR access is unconditional.

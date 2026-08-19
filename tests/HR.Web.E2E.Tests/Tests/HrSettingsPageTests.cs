@@ -11,19 +11,30 @@ namespace HR.Web.E2E.Tests.Tests;
 /// DisplaySalaryOnEmployeeProfile, Sickness, Document Acknowledgement, Leaving Process, and
 /// Employee Numbering).
 ///
-/// Access is gated on Session.IsHrAdministrator, so all positive-path tests here use Laura
-/// Bennett (laura.bennett@acme.example, HrAdministrator) — the same persona used throughout the
-/// suite for HR-administrator-only pages. Priya Shah (priya.shah@acme.example,
-/// CompanyAdministrator-only) is used to confirm the permission gap fix: she can no longer reach
-/// this page or see its nav link, whereas she previously could edit these same fields via the
-/// Company Settings tab.
+/// Access is gated on Session.IsHrAdministrator. The read-only/permission-boundary tests below
+/// use Laura Bennett (laura.bennett@acme.example, HrAdministrator) and Priya Shah
+/// (priya.shah@acme.example, CompanyAdministrator-only, to confirm the permission gap fix: she
+/// can no longer reach this page or see its nav link) — the same personas used throughout the
+/// suite for HR-administrator-only pages.
+///
+/// The tests that actually mutate Employee Numbering mode (which flips the shared
+/// company_settings row to Automatic mid-test, hiding the Employee Number field on the New
+/// Employee form for anyone else on that tenant — see FillEmployeeNumberAsync's own remarks) use
+/// Grace Kim on Beta Corp (grace.kim@betacorp.example, HrAdministrator) instead of Laura on
+/// Acme, even though this class already serializes against itself (HrSettingsSerial): that only
+/// prevents these tests from racing each other, not from racing the ~139 other, ordinary
+/// role-fixed classes that create Acme employees via the same New Employee form and expect
+/// Manual mode. Using a dedicated tenant removes the race at its source instead of requiring
+/// every employee-creation test to join a shared serialization group.
 /// </summary>
 public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid BetaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
     private const string HrAdminEmail = "laura.bennett@acme.example";
     private const string CompanyAdminEmail = "priya.shah@acme.example";
+    private const string BetaHrAdminEmail = "grace.kim@betacorp.example";
 
     [Fact]
     public async Task LoadPage_RendersAllExpectedSections()
@@ -66,9 +77,9 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(HrAdminEmail);
+        await login.LoginAsync(BetaHrAdminEmail);
 
-        await hrSettings.GoToAsync(AcmeId);
+        await hrSettings.GoToAsync(BetaCorpId);
 
         // Capture initial state so we can restore it afterwards and avoid leaking state into
         // other tests/fixtures that rely on the seeded defaults for this company.
@@ -108,7 +119,7 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
 
             // Reload the page for real (re-navigate) to exercise the settings-hydration path
             // server-side, not just in-memory Blazor state.
-            await hrSettings.GoToAsync(AcmeId);
+            await hrSettings.GoToAsync(BetaCorpId);
 
             Assert.Equal(desiredSaturday, await hrSettings.IsWorkingDayCheckedAsync("Saturday"));
             Assert.Equal(7.5m, await hrSettings.GetHoursPerDayAsync());
@@ -147,9 +158,9 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(HrAdminEmail);
+        await login.LoginAsync(BetaHrAdminEmail);
 
-        await hrSettings.GoToAsync(AcmeId);
+        await hrSettings.GoToAsync(BetaCorpId);
 
         var initialMode = await hrSettings.GetEmployeeNumberModeAsync();
 
@@ -175,9 +186,9 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(HrAdminEmail);
+        await login.LoginAsync(BetaHrAdminEmail);
 
-        await hrSettings.GoToAsync(AcmeId);
+        await hrSettings.GoToAsync(BetaCorpId);
 
         var initialMode = await hrSettings.GetEmployeeNumberModeAsync();
 

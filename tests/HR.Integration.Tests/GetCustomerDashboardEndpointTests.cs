@@ -112,21 +112,34 @@ public class GetCustomerDashboardEndpointTests
         // GetCustomerDashboardHandler's "recent" lists are Take(10) most-recent-first across the
         // *entire* shared integration-test database (Collection("Integration") reuses one
         // Postgres container for the whole run), with no scoping to companies this test itself
-        // created. Timestamps in the past (even by a few minutes) can be pushed out of that top-10
-        // window by other test classes that ran moments earlier and created their own companies
-        // essentially "now" — seeding in the future instead guarantees these three always sort
-        // above anything else in the shared DB, regardless of run order or volume.
-        var activeCompany = await SeedCompanyAsync("Active Co", CompanyStatus.Active, now.AddMinutes(3));
-        await SeedActiveSubscriptionAsync(activeCompany.Id, now.AddMinutes(3));
+        // created. A few minutes into the future used to be enough to guarantee these three sort
+        // above anything else — but under a full ~2000-test run (~5+ minutes wall-clock), heavy
+        // Testcontainers/DB contention can delay this test's own seeding-to-assertion window enough
+        // for real "now"-timestamped rows from other, concurrently-running test classes to catch up
+        // to and exceed a few-minutes offset. A full year ahead is immune to any realistic delay,
+        // while AddMinutes(3/4/5) preserves the three companies' relative ordering.
+        var activeCompany = await SeedCompanyAsync("Active Co", CompanyStatus.Active, now.AddYears(1).AddMinutes(3));
+        await SeedActiveSubscriptionAsync(activeCompany.Id, now.AddYears(1).AddMinutes(3));
 
-        var trialCompany = await SeedCompanyAsync("Trial Co", CompanyStatus.PendingVerification, now.AddMinutes(4));
-        await SeedTrialSubscriptionAsync(trialCompany.Id, now.AddMinutes(4), now.AddMinutes(4));
+        var trialCompany = await SeedCompanyAsync("Trial Co", CompanyStatus.PendingVerification, now.AddYears(1).AddMinutes(4));
+        await SeedTrialSubscriptionAsync(trialCompany.Id, now.AddYears(1).AddMinutes(4), now.AddYears(1).AddMinutes(4));
 
         var noSubscriptionCompany = await SeedCompanyAsync(
-            "No Subscription Co", CompanyStatus.PendingVerification, now.AddMinutes(5));
+            "No Subscription Co", CompanyStatus.PendingVerification, now.AddYears(1).AddMinutes(5));
 
         var userId = Guid.NewGuid();
         using var client = ClientFor(userId, AllowListedEmail);
+
+        // PendingPermanentDeletions is likewise a global count across the whole shared database,
+        // not scoped to companies this test created — this test schedules none itself, but other
+        // test classes elsewhere in the suite legitimately do (and may not have cleaned up by the
+        // time this runs), so asserting it's exactly 0 breaks under real parallel/shared-DB
+        // execution the same way the unscoped "recent" lists above do. Assert it doesn't increase
+        // as a result of anything this test did, rather than asserting a global absolute.
+        var baselineResponse = await client.GetAsync("/api/companies/admin/customer-dashboard");
+        baselineResponse.EnsureSuccessStatusCode();
+        var baselinePayload = await baselineResponse.Content.ReadFromJsonAsync<CustomerDashboardPayload>();
+        var baselinePendingDeletions = baselinePayload!.PendingPermanentDeletions;
 
         var response = await client.GetAsync("/api/companies/admin/customer-dashboard");
         response.EnsureSuccessStatusCode();
@@ -136,7 +149,7 @@ public class GetCustomerDashboardEndpointTests
         Assert.True(payload!.TotalCustomers >= 3);
         Assert.True(payload.ActiveCustomers >= 1);
         Assert.True(payload.TrialCustomers >= 1);
-        Assert.Equal(0, payload.PendingPermanentDeletions);
+        Assert.Equal(baselinePendingDeletions, payload.PendingPermanentDeletions);
 
         Assert.Contains(
             payload.RecentRegistrations,

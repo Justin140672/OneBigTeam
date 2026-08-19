@@ -31,11 +31,12 @@ public class ExportLeaveSummaryReportValidatorTests
     }
 
     [Theory]
-    [InlineData(LeaveSummaryGroupBy.Employee)]
-    [InlineData(LeaveSummaryGroupBy.Department)]
-    [InlineData(LeaveSummaryGroupBy.LeaveType)]
-    public void Should_Not_Have_Error_For_Any_Defined_GroupBy(LeaveSummaryGroupBy groupBy)
+    [InlineData((int)LeaveSummaryGroupBy.Employee)]
+    [InlineData((int)LeaveSummaryGroupBy.Department)]
+    [InlineData((int)LeaveSummaryGroupBy.LeaveType)]
+    public void Should_Not_Have_Error_For_Any_Defined_GroupBy(int groupByValue)
     {
+        var groupBy = (LeaveSummaryGroupBy)groupByValue;
         var request = ValidRequest() with { GroupBy = groupBy };
 
         var result = _validator.Validate(request);

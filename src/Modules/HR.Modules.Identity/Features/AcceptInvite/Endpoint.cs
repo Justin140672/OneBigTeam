@@ -1,14 +1,25 @@
 using FastEndpoints;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
+using HR.Modules.Identity.Services;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.AcceptInvite;
 
+// Creates a real Supabase-backed UserProfile (not a local-auth ApplicationUser — that Phase A
+// stand-in has been superseded here the same way SignUp's was, see SignUpHandler's remarks) so an
+// invited employee can actually use every Supabase-based flow: real password-grant Login,
+// RequestPasswordReset/forgot-password (which only ever looks at UserProfiles — an
+// ApplicationUser-only account was silently invisible to it), etc. Uses
+// ISupabaseAuthGateway.CreateConfirmedUserAsync rather than CreateUserAsync: the invite link
+// itself, emailed to invite.Email when the invite was sent, already proves ownership of that
+// address, so there's no separate "verify your email" step needed here the way self-service
+// SignUp needs one.
 internal sealed class Endpoint(
     IdentityDbContext db,
+    ISupabaseAuthGateway supabaseAuthGateway,
     IClock clock) : Endpoint<AcceptInviteRequest, AcceptInviteResponse>
 {
     public override void Configure()
@@ -42,18 +53,27 @@ internal sealed class Endpoint(
             return;
         }
 
-        // Use the employee ID as the user ID — single identity across modules.
-        var userExists = await db.Users.AnyAsync(u => u.Id == invite.EmployeeId, ct);
-        if (!userExists)
+        // Use the employee ID as the user ID — single identity across modules (UserRole.UserId
+        // below relies on this matching, same as SignUpHandler's admin profile).
+        var profileExists = await db.UserProfiles.AnyAsync(p => p.Id == invite.EmployeeId, ct);
+        if (!profileExists)
         {
-            var user = ApplicationUser.Create(
-                invite.EmployeeId,
-                invite.Email,
-                passwordHash: HashPassword(req.Password),
-                firstName: string.Empty,
-                lastName: string.Empty,
-                now);
-            db.Users.Add(user);
+            Guid supabaseUserId;
+            try
+            {
+                supabaseUserId = await supabaseAuthGateway.CreateConfirmedUserAsync(invite.Email, req.Password, ct);
+            }
+            catch (EmailAlreadyRegisteredException)
+            {
+                await Send.ResultAsync(TypedResults.Conflict(
+                    new { error = "An account with this email already exists." }));
+                return;
+            }
+
+            var profile = UserProfile.Create(
+                invite.EmployeeId, supabaseUserId, invite.CompanyId, invite.Email,
+                firstName: string.Empty, lastName: string.Empty, now);
+            db.UserProfiles.Add(profile);
         }
 
         // Assign the roles selected when the invite was sent (Features/InviteEmployeeUser),
@@ -75,14 +95,6 @@ internal sealed class Endpoint(
         await db.SaveChangesAsync(ct);
 
         await Send.ResultAsync(TypedResults.Ok(new AcceptInviteResponse(invite.EmployeeId)));
-    }
-
-    private static string HashPassword(string password)
-    {
-        // BCrypt-style hashing via built-in PBKDF2
-        return Convert.ToBase64String(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(password)));
     }
 }
 

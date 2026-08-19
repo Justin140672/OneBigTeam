@@ -15,17 +15,32 @@ public sealed class CompanyDetailsEditModel
 public sealed class CompanyAddressEditModel
 {
     public string Type { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Line 1 is required.")]
+    [MaxLength(200)]
     public string? Line1 { get; set; }
+
+    [MaxLength(200)]
     public string? Line2 { get; set; }
+
+    [Required(ErrorMessage = "City is required.")]
+    [MaxLength(100)]
     public string? City { get; set; }
+
+    [MaxLength(100)]
     public string? Region { get; set; }
+
     private string? _postalCode;
     [DynamicRegex(nameof(PostcodeRegexPattern), ErrorMessage = "Enter a valid postcode.")]
+    [MaxLength(20)]
     public string? PostalCode
     {
         get => _postalCode;
         set => _postalCode = value?.ToUpperInvariant();
     }
+
+    [Required(ErrorMessage = "Country code is required.")]
+    [RegularExpression("^[A-Za-z]{2}$", ErrorMessage = "Enter a valid 2-letter country code.")]
     public string? CountryCode { get; set; }
 
     public string? PostcodeRegexPattern { get; set; }
@@ -54,8 +69,10 @@ public sealed class HrSettingsEditModel
     public bool ExcludePublicHolidaysFromLeave { get; set; } = true;
     public bool ExcludePublicHolidaysFromSickness { get; set; }
     public bool DisplaySalaryOnEmployeeProfile { get; set; }
-    public int? FitNoteRequiredAfterDays { get; set; }
-    public int? ReturnToWorkRequiredAfterDays { get; set; }
+    [Range(1, int.MaxValue, ErrorMessage = "Fit note required after must be at least 1 day.")]
+    public int FitNoteRequiredAfterDays { get; set; } = 7;
+    [Range(1, int.MaxValue, ErrorMessage = "Return-to-work review required after must be at least 1 day.")]
+    public int ReturnToWorkRequiredAfterDays { get; set; } = 1;
     [MaxLength(2000)]
     public string? DefaultAcknowledgementStatement { get; set; }
     [Range(1, int.MaxValue, ErrorMessage = "Reminder interval must be at least 1 day.")]

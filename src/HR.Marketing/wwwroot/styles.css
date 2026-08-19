@@ -126,8 +126,8 @@ a {
     border-radius: 4px;
 }
 
-/* Keep the sticky header from obscuring in-page anchor targets (e.g. the "/#about" nav
-   link) when navigated to via keyboard/click. Sized to roughly match .site-header's
+/* Keep the sticky header from obscuring in-page anchor targets (e.g. "#contact-form")
+   when navigated to via keyboard/click. Sized to roughly match .site-header's
    height at each breakpoint; more specific selectors elsewhere (e.g. .feature-detail-section,
    .contact-form) already set their own value and take precedence via source order. */
 section[id] {
@@ -516,6 +516,16 @@ a.card:focus-visible,
 .card-grid > .card:last-child:nth-child(3n + 1) {
     grid-column: 2;
 }
+
+.features-more-link {
+    margin: 28px 0 0;
+    font-weight: 600;
+}
+
+    .features-more-link a {
+        color: var(--color-accent);
+        text-decoration: underline;
+    }
 
 /* ---------------------------------------------------------------------
    Home hero
@@ -1204,6 +1214,12 @@ a.card:focus-visible,
     font-size: var(--text-meta);
 }
 
+    .small-note a {
+        color: var(--color-accent);
+        font-weight: 600;
+        text-decoration: underline;
+    }
+
 /* ---------------------------------------------------------------------
    Feature detail
 --------------------------------------------------------------------- */
@@ -1436,6 +1452,31 @@ a.card:focus-visible,
     font-size: var(--text-meta);
 }
 
+.field-optional {
+    font-weight: 400;
+    color: var(--color-ink-muted, var(--color-ink));
+    font-size: var(--text-meta);
+}
+
+.form-privacy-note {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--color-ink-muted, var(--color-ink));
+    font-size: var(--text-meta);
+}
+
+.roadmap-disclaimer-section {
+    padding-top: 0;
+    padding-bottom: clamp(32px, 5vw, 56px);
+}
+
+.roadmap-disclaimer {
+    margin: 0;
+    color: var(--color-ink-muted, var(--color-ink));
+    font-size: var(--text-meta);
+    font-style: italic;
+}
+
 .field-live {
     margin: 0;
     font-size: var(--text-meta);
@@ -1569,6 +1610,56 @@ a.card:focus-visible,
     font-size: var(--text-meta);
 }
 
+.legal-layout {
+    display: flex;
+    gap: 48px;
+    align-items: flex-start;
+}
+
+.legal-toc {
+    flex: 0 0 220px;
+    position: sticky;
+    top: 24px;
+}
+
+    .legal-toc ol {
+        margin: 8px 0 0;
+        padding-left: 18px;
+        color: var(--color-ink-soft);
+        font-size: var(--text-meta);
+    }
+
+    .legal-toc a {
+        color: var(--color-accent);
+    }
+
+.legal-related {
+    max-width: 720px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--color-border);
+}
+
+    .legal-related ul {
+        margin: 8px 0 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+@media (max-width: 900px) {
+    .legal-layout {
+        flex-direction: column;
+        gap: 24px;
+    }
+
+    .legal-toc {
+        position: static;
+    }
+}
+
 .legal-content {
     max-width: 720px;
 }
@@ -1628,6 +1719,61 @@ a.card:focus-visible,
     .legal-content tr:last-child td {
         border-bottom: none;
     }
+
+.legal-modal {
+    width: min(720px, calc(100vw - 40px));
+    max-height: min(80vh, 900px);
+    padding: 32px clamp(20px, 4vw, 40px);
+    border: none;
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-lg);
+    color: var(--color-ink);
+}
+
+    .legal-modal::backdrop {
+        background: rgba(15, 15, 20, 0.5);
+    }
+
+    .legal-modal .legal-content {
+        max-width: none;
+    }
+
+.legal-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+    .legal-modal-header h2 {
+        margin: 0;
+        font-size: 1.3rem;
+    }
+
+.legal-modal-close {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: var(--radius-full);
+    background: var(--color-bg-muted);
+    color: var(--color-ink-soft);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+    .legal-modal-close:hover {
+        background: var(--color-border);
+        color: var(--color-ink);
+    }
+
+.legal-modal-body {
+    margin-top: 20px;
+    overflow-y: auto;
+    max-height: calc(80vh - 120px);
+}
 
 /* ---------------------------------------------------------------------
    Simple pages (Error / NotFound)
@@ -1815,6 +1961,20 @@ a.card:focus-visible,
         color: var(--color-ink);
     }
 
+.signup-confirmation-note {
+    margin: 0;
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-muted);
+    font-size: var(--text-meta);
+    color: var(--color-ink-soft);
+}
+
+    .signup-confirmation-note strong {
+        color: var(--color-ink);
+    }
+
 .signup-submit-block .button-large {
     width: 100%;
 }
@@ -1911,6 +2071,12 @@ a.card:focus-visible,
     border-radius: var(--radius-md);
     color: var(--color-ink-soft);
 }
+
+    .trust-terms-note a {
+        color: var(--color-accent);
+        font-weight: 600;
+        text-decoration: underline;
+    }
 
 /* ---------------------------------------------------------------------
    Responsive

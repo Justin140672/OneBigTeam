@@ -11,6 +11,19 @@ var isE2ETesting = string.Equals(
 // occasionally lands in one of those excluded ranges, causing "Unable to allocate a network
 // port for service 'postgres'" and leaving the whole app without a working DB connection.
 var postgres = builder.AddPostgres("postgres").WithHostPort(5432);
+
+// Persist local dev data across AppHost restarts — without this, every restart recreates an
+// empty Postgres container while externally-hosted Supabase Auth users survive untouched,
+// leaving real Supabase accounts with no matching local UserProfile/Company rows (confirmed via
+// live diagnosis: a signed-up admin could log in once, then get "invalid email or password" and
+// a null UserProfile lookup after a restart, purely because the local copy was wiped out from
+// under a still-alive Supabase identity). Skipped for E2E_TESTING, which relies on each run
+// starting from a clean, migrated-but-empty database.
+if (!isE2ETesting)
+{
+	postgres = postgres.WithDataVolume();
+}
+
 var hrDatabase = postgres.AddDatabase("hr");
 
 // ClamAV daemon for virus-scanning uploaded documents/photos (Documents module,

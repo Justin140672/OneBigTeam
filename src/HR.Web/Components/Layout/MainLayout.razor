@@ -50,6 +50,10 @@ else
                             CssClass="app-nav-menu"
                             ShowItemOnClick="true">
                         <MenuItems>
+                            @if (Session.ShowGettingStarted && (Session.IsHrAdministrator || Session.CanManageCompany))
+                            {
+                                <MenuItem Text="Getting Started" IconCss="fa-solid fa-list-check" Url="/getting-started" />
+                            }
                             @if (Session.IsHrAdministrator)
                             {
                                 <MenuItem Text="Dashboard" IconCss="fa-solid fa-house" Url="/dashboard/hr" />

@@ -41,9 +41,8 @@
                             </div>
                         </div>
                         <div class="col-md-3">
+                            <label class="form-label">Hours Per Day</label>
                             <SfNumericTextBox TValue="decimal" @bind-Value="Model.HoursPerDay"
-                                              Placeholder="Hours Per Day"
-                                              FloatLabelType="FloatLabelType.Auto"
                                               ShowSpinButton="false"
                                               Min="0.5m" Max="24m" Step="0.5m" />
                             <ValidationMessage For="@(() => Model.HoursPerDay)" />
@@ -58,17 +57,15 @@
                             <div class="form-text">The month each employee's annual leave allowance resets.</div>
                         </div>
                         <div class="col-md-3">
+                            <label class="form-label">Default Holiday Allowance (days)</label>
                             <SfNumericTextBox TValue="decimal" @bind-Value="Model.DefaultHolidayAllowance"
-                                              Placeholder="Default Holiday Allowance (days)"
-                                              FloatLabelType="FloatLabelType.Auto"
                                               ShowSpinButton="false"
                                               Min="0" Max="365" />
                             <ValidationMessage For="@(() => Model.DefaultHolidayAllowance)" />
                         </div>
                         <div class="col-md-3">
+                            <label class="form-label">Probation Months</label>
                             <SfNumericTextBox TValue="int" @bind-Value="Model.ProbationMonths"
-                                              Placeholder="Probation Months"
-                                              FloatLabelType="FloatLabelType.Auto"
                                               ShowSpinButton="false"
                                               Min="0" Max="24" />
                             <ValidationMessage For="@(() => Model.ProbationMonths)" />
@@ -92,18 +89,18 @@
                                         CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromSickness = v)" />
                         </div>
                         <div class="col-md-4">
-                            <SfNumericTextBox TValue="int?" @bind-Value="Model.FitNoteRequiredAfterDays"
-                                              Placeholder="Fit Note Required After (Days)"
-                                              FloatLabelType="FloatLabelType.Auto"
+                            <label class="form-label">Fit Note Required After (Days)</label>
+                            <SfNumericTextBox TValue="int" @bind-Value="Model.FitNoteRequiredAfterDays"
                                               ShowSpinButton="false"
-                                              Min="0" />
+                                              Min="1" />
+                            <ValidationMessage For="@(() => Model.FitNoteRequiredAfterDays)" />
                         </div>
                         <div class="col-md-4">
-                            <SfNumericTextBox TValue="int?" @bind-Value="Model.ReturnToWorkRequiredAfterDays"
-                                              Placeholder="Return-to-Work Review Required After (Days)"
-                                              FloatLabelType="FloatLabelType.Auto"
+                            <label class="form-label">Return-to-Work Review Required After (Days)</label>
+                            <SfNumericTextBox TValue="int" @bind-Value="Model.ReturnToWorkRequiredAfterDays"
                                               ShowSpinButton="false"
-                                              Min="0" />
+                                              Min="1" />
+                            <ValidationMessage For="@(() => Model.ReturnToWorkRequiredAfterDays)" />
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-semibold">Document Acknowledgement</label>
@@ -123,9 +120,8 @@
                             <ValidationMessage For="@(() => Model.DefaultAcknowledgementStatement)" />
                         </div>
                         <div class="col-md-4">
+                            <label class="form-label">Acknowledgement Reminder Interval (days)</label>
                             <SfNumericTextBox TValue="int" @bind-Value="Model.AcknowledgementReminderIntervalDays"
-                                              Placeholder="Acknowledgement Reminder Interval (days)"
-                                              FloatLabelType="FloatLabelType.Auto"
                                               ShowSpinButton="false"
                                               Min="1" />
                             <ValidationMessage For="@(() => Model.AcknowledgementReminderIntervalDays)" />
@@ -153,9 +149,8 @@
                                 </SfDropDownList>
                             </div>
                             <div class="col-md-4">
+                                <label class="form-label">Length</label>
                                 <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
-                                                  Placeholder="Length"
-                                                  FloatLabelType="FloatLabelType.Auto"
                                                   ShowSpinButton="false"
                                                   Min="1" />
                                 <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
@@ -180,24 +175,22 @@
                         @if (Model.EmployeeNumberMode == EmployeeNumberMode.Automatic)
                         {
                             <div class="col-md-4">
-                                <HrTextBox @bind-Value="Model.EmployeeNumberPrefix" Placeholder="e.g. EMP-" />
+                                <HrTextBox @bind-Value="Model.EmployeeNumberPrefix" Placeholder="Prefix (e.g. EMP-)" />
                                 <div class="form-text">
                                     Changing the prefix only affects employee numbers assigned in the future —
                                     existing employees' numbers are never changed retroactively.
                                 </div>
                             </div>
                             <div class="col-md-4">
+                                <label class="form-label">Next Number</label>
                                 <SfNumericTextBox TValue="int" @bind-Value="Model.NextEmployeeNumber"
-                                                  Placeholder="Next Number"
-                                                  FloatLabelType="FloatLabelType.Auto"
                                                   ShowSpinButton="false"
                                                   Min="1" />
                                 <ValidationMessage For="@(() => Model.NextEmployeeNumber)" />
                             </div>
                             <div class="col-md-4">
+                                <label class="form-label">Minimum Numeric Length</label>
                                 <SfNumericTextBox TValue="int" @bind-Value="Model.EmployeeNumberMinimumLength"
-                                                  Placeholder="Minimum Numeric Length"
-                                                  FloatLabelType="FloatLabelType.Auto"
                                                   ShowSpinButton="false"
                                                   Min="1" Max="10" />
                                 <ValidationMessage For="@(() => Model.EmployeeNumberMinimumLength)" />
@@ -238,10 +231,12 @@
             {
                 <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@SuccessMsg</div>
             }
-            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
-                @(Saving ? "Saving…" : "Save")
-            </SfButton>
-            <SfButton OnClick="RequestClose" Disabled="@Saving">Cancel</SfButton>
+            <div class="ms-auto d-flex gap-2">
+                <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                    @(Saving ? "Saving…" : "Save")
+                </SfButton>
+                <SfButton OnClick="RequestClose" Disabled="@Saving">Cancel</SfButton>
+            </div>
         </div>
     }
 

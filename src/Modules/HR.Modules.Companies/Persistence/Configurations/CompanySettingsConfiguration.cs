@@ -77,11 +77,13 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
 
         builder.Property(settings => settings.FitNoteRequiredAfterDays)
             .HasColumnName("fit_note_required_after_days")
-            .IsRequired(false);
+            .IsRequired()
+            .HasDefaultValue(7);
 
         builder.Property(settings => settings.ReturnToWorkRequiredAfterDays)
             .HasColumnName("return_to_work_required_after_days")
-            .IsRequired(false);
+            .IsRequired()
+            .HasDefaultValue(1);
 
         builder.Property(settings => settings.PostcodeRegex)
             .HasColumnName("postcode_regex")

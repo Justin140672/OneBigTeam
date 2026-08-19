@@ -28,6 +28,13 @@ public abstract class EditDialogBase<TModel> : ComponentBase where TModel : clas
 
     private string? _baselineSnapshot;
 
+    // DialogEvents.Closed fires for EVERY close — including one this class itself just drove via
+    // DiscardAndCancelAsync's `Visible = false` — not only the close-icon/Escape-key path it exists
+    // to protect. Without this guard, a confirmed Discard re-enters CancelAsync a second time via
+    // HandleDialogClosed while the dialog is still finishing its close animation, a race that can
+    // leave the dialog in an unstable visible/hidden state depending on timing.
+    private bool _suppressNextClosedEvent;
+
     protected virtual bool HasUnsavedChanges =>
         _baselineSnapshot is not null && _baselineSnapshot != System.Text.Json.JsonSerializer.Serialize(Model);
 
@@ -41,6 +48,21 @@ public abstract class EditDialogBase<TModel> : ComponentBase where TModel : clas
     {
         var wasOpen = Visible;
         Visible = IsOpen;
+
+        if (!IsOpen && wasOpen)
+        {
+            // This dialog is always rendered (parent toggles IsOpen, never conditionally
+            // recreates it — see e.g. SharedDocumentDetail.razor), so _suppressNextClosedEvent
+            // persists across opens on the SAME instance. A successful Submit doesn't close the
+            // dialog directly — it closes asynchronously here, once the parent's OnSaved handler
+            // flips IsOpen back to false on its own round-trip. Without this, the client's
+            // "Closed" JS event echoing that closure back (fired once the close animation
+            // completes) arrives with no way to tell it apart from a genuine user-initiated
+            // X-icon/Escape close, and can land AFTER a subsequent re-open already happened —
+            // silently closing the dialog again out from under it. Same suppression
+            // DiscardAndCancelAsync already applies for its own direct Visible assignment.
+            _suppressNextClosedEvent = true;
+        }
 
         if (IsOpen && !wasOpen)
         {
@@ -118,6 +140,7 @@ public abstract class EditDialogBase<TModel> : ComponentBase where TModel : clas
         // through OnParametersSetAsync — that extra async hop (parent event handler -> re-render
         // -> parameter push) can lag a tick behind under load, leaving the dialog visibly open
         // even though the "discard" decision has already been made.
+        _suppressNextClosedEvent = true;
         Visible = false;
         ResetForm();
         await OnCancelled.InvokeAsync();
@@ -137,5 +160,14 @@ public abstract class EditDialogBase<TModel> : ComponentBase where TModel : clas
 
     protected void CancelUnsavedChangesDialog() => ShowUnsavedChangesDialog = false;
 
-    protected Task HandleDialogClosed() => CancelAsync();
+    protected Task HandleDialogClosed()
+    {
+        if (_suppressNextClosedEvent)
+        {
+            _suppressNextClosedEvent = false;
+            return Task.CompletedTask;
+        }
+
+        return CancelAsync();
+    }
 }

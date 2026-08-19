@@ -144,20 +144,19 @@ AI must not:
 
 # Event Rules
 
-Cross-module behaviour requires:
-
-Integration Events
+Cross-module behaviour uses integration events or explicit contracts owned by the providing module.
 
 AI must:
 
-- Publish events
-- Use outbox processing
-- Build idempotent consumers
+- Publish events when the workflow is event-driven
+- Use module-owned contracts for synchronous reads or explicitly coordinated operations
+- Build idempotent consumers where delivery may repeat
+- Add outbox processing only when the owning module explicitly requires durable deferred delivery
 
 AI must not:
 
-- Use direct service calls
-- Use synchronous module communication
+- Reference another module's implementation project
+- Query another module's database schema directly
 
 ---
 

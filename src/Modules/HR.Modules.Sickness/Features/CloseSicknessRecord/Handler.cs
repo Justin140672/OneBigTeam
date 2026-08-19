@@ -61,9 +61,9 @@ internal sealed class CloseSicknessRecordHandler(
 
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
 
+        // Mandatory, always set (no opt-out) — see CompanySettings.ReturnToWorkRequiredAfterDays.
         ReturnToWorkReview? returnToWorkReview = null;
-        if (sicknessSettings.ReturnToWorkRequiredAfterDays is not null &&
-            totalDays >= sicknessSettings.ReturnToWorkRequiredAfterDays.Value)
+        if (totalDays >= sicknessSettings.ReturnToWorkRequiredAfterDays)
         {
             var dueDate = request.ReturnToWorkDate ?? request.EndDate;
 

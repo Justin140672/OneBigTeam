@@ -1,10 +1,14 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Markdig;
 
 namespace HR.Marketing.Services;
 
+/// <summary>An H2 heading extracted from a rendered document, used to build a simple table of contents.</summary>
+public sealed record MarkdownHeading(string Id, string Text);
+
 /// <summary>Parsed result of a Documents/*.md file: its front-matter metadata plus rendered HTML body.</summary>
-public sealed record MarkdownDocument(string Title, string LastUpdated, string Html);
+public sealed record MarkdownDocument(string Title, string LastUpdated, string Html, IReadOnlyList<MarkdownHeading> Headings);
 
 /// <summary>
 /// Loads the legal/product markdown files embedded from Documents/*.md (see HR.Marketing.csproj)
@@ -15,6 +19,7 @@ public static class MarkdownDocumentLoader
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
+        .UseAutoLinks() // ensures bare email addresses (e.g. security@onebigteam.co.uk) render as clickable mailto: links
         .Build();
 
     /// <summary>Loads Documents/{slug}.md, e.g. slug "privacy-policy" for Documents/privacy-policy.md.</summary>
@@ -72,6 +77,17 @@ public static class MarkdownDocumentLoader
         }
 
         var html = Markdown.ToHtml(body, Pipeline);
-        return new MarkdownDocument(title, lastUpdated, html);
+        var headings = ExtractH2Headings(html);
+        return new MarkdownDocument(title, lastUpdated, html, headings);
     }
+
+    // Markdig's advanced-extensions bundle auto-generates a slug "id" attribute on every heading
+    // (the auto-identifiers extension), so H2s can be turned into a simple anchor-link table of
+    // contents for longer documents without any extra authoring in the .md files themselves.
+    private static readonly Regex H2Pattern = new("""<h2 id="([^"]+)">(.*?)</h2>""", RegexOptions.Compiled | RegexOptions.Singleline);
+
+    private static IReadOnlyList<MarkdownHeading> ExtractH2Headings(string html) =>
+        H2Pattern.Matches(html)
+            .Select(m => new MarkdownHeading(m.Groups[1].Value, Regex.Replace(m.Groups[2].Value, "<.*?>", string.Empty)))
+            .ToList();
 }

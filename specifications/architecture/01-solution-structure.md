@@ -47,6 +47,8 @@ Recommended top-level layout:
 
   HR.Web
   HR.Api
+  HR.Admin.Web
+  HR.Marketing
 
   /Modules
     HR.Modules.Companies
@@ -56,19 +58,32 @@ Recommended top-level layout:
     HR.Modules.Recruitment
     HR.Modules.Tasks
     HR.Modules.Documents
+    HR.Modules.Assets
+    HR.Modules.CompanyOnboarding
+    HR.Modules.DataImport
+    HR.Modules.Notifications
+    HR.Modules.Offboarding
+    HR.Modules.Onboarding
+    HR.Modules.Probation
+    HR.Modules.Reporting
+    HR.Modules.Sickness
+    HR.Modules.Support
 
   /Infrastructure
     HR.Infrastructure
+    HR.Infrastructure.Abstractions
 
   /Shared
     HR.SharedKernel
 
 /tests
   HR.Architecture.Tests
-  HR.Domain.Tests
   HR.Integration.Tests
-  HR.UI.Tests
-  HR.Playwright.Tests
+  HR.Modules.*.Tests
+  HR.SharedKernel.Tests
+  HR.Web.Tests
+  HR.Web.E2E.Tests
+  HR.Marketing.Tests
 ```
 
 ---
@@ -176,9 +191,9 @@ Responsible for:
 - Supabase integration
 - Postmark email
 - Hangfire
-- Outbox processing
+- Background processing and any module-scoped outbox dispatchers
 - Auditing
-- Reporting/export generation
+- Shared export infrastructure where required by the Reporting module
 - Storage access
 - Logging
 - Observability
@@ -215,7 +230,7 @@ Forbidden contents:
 
 ## Module List
 
-The initial module set is:
+The current module set is:
 
 ```text
 Companies
@@ -225,9 +240,19 @@ Leave
 Recruitment
 Tasks
 Documents
+Assets
+CompanyOnboarding
+DataImport
+Notifications
+Offboarding
+Onboarding
+Probation
+Reporting
+Sickness
+Support
 ```
 
-Cross-cutting concerns such as notifications, reporting and audit are implemented in Infrastructure.
+Notifications and Reporting are business capabilities with explicit module ownership rather than miscellaneous Infrastructure concerns. Audit persistence remains a cross-cutting Infrastructure capability. Infrastructure also provides technical implementations such as storage, email, job scheduling and database integration, but does not own module business rules.
 
 ---
 

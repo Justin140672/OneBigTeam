@@ -37,11 +37,27 @@ public class CompanyService(IHttpClientFactory httpClientFactory)
         if (response.IsSuccessStatusCode)
             return (await response.Content.ReadFromJsonAsync<UpdateCompanyResponse>(), null);
 
-        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-        return (null, body?.Error ?? "Failed to save company profile.");
+        return (null, await ExtractErrorMessageAsync(response));
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    // FastEndpoints' own automatic request-validation failures (FluentValidation rules that
+    // fail before the handler even runs — e.g. UpdateCompanyValidator) return a different shape
+    // than this app's handler-level business errors ({ "error": "..." }): a dictionary of field
+    // name -> messages, e.g. { "errors": { "addresses[0].line1": ["'Line1' must not be empty."] } }.
+    // Falling back to a generic "Failed to..." message when THIS shape comes back hides real,
+    // actionable per-field validation failures from the user — read whichever shape the response
+    // actually has instead.
+    private static async Task<string> ExtractErrorMessageAsync(HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (body?.Errors is { Count: > 0 })
+            return string.Join(" ", body.Errors.SelectMany(kvp => kvp.Value));
+
+        return body?.Error ?? "Failed to save company profile.";
+    }
+
+    private sealed record ErrorEnvelope(string? Error, Dictionary<string, string[]>? Errors);
 
     public async Task<UpdateCompanySettingsResponse?> UpdateCompanySettingsAsync(Guid id, UpdateCompanySettingsRequest request)
     {

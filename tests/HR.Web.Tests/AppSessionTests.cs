@@ -36,7 +36,7 @@ public class AppSessionTests
             companyId, "Europe/London", "en-GB",
             "^postcode$", "^telephone$", "^mobile$", DateTime.UtcNow);
         var hrSettings = new GetHrSettingsResponse(
-            companyId, 31, 7.5m, 1, 25m, 6, true, false, true, null, null,
+            companyId, 31, 7.5m, 1, 25m, 6, true, false, true, 7, 1,
             "I confirm that I have read and understood this document.", 3,
             NoticePeriodUnit.Months, 1, true,
             EmployeeNumberMode.Automatic, "EMP-", 1, 4, DateTime.UtcNow);

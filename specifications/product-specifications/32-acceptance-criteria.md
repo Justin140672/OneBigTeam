@@ -32,6 +32,8 @@ The platform shall:
 4. Support manager hierarchy permissions.
 5. Prevent cross-company access.
 6. Audit permission changes.
+7. Allow managers to access only employees beneath them in the complete reporting hierarchy.
+8. Keep Company Administrator separate from HR Administrator, except where both roles are explicitly assigned to the initial company creator.
 
 ---
 
@@ -115,7 +117,7 @@ The platform shall:
 1. Support in-app notifications.
 2. Support email notifications.
 3. Support scheduled reminders.
-4. Support report completion notifications.
+4. Support report completion notifications if asynchronous stored reports are introduced.
 
 ---
 
@@ -125,9 +127,10 @@ The platform shall:
 
 1. Support grid exports.
 2. Support formal reports.
-3. Support asynchronous report generation.
-4. Store generated reports securely.
-5. Audit sensitive reports.
+3. Support permission-scoped report filters, grouping, saved views and favourites.
+4. Support authorised on-demand exports.
+5. Audit sensitive reports and exports where required.
+6. Add asynchronous stored reports only for a separately approved large-report requirement.
 
 ---
 
@@ -158,11 +161,11 @@ The platform shall:
 
 The platform shall:
 
-1. Provide role-aware dashboards.
-2. Display tasks.
-3. Display notifications.
-4. Display compliance alerts.
-5. Provide quick actions.
+1. Provide role-aware dashboards for HR Administrator, Recruiter and Manager roles.
+2. Land ordinary Employees on their own profile.
+3. Land Company Administrators without an operational role in company administration.
+4. Display authorised tasks, notifications, compliance alerts and quick actions.
+5. Enforce the same tenant and resource permissions in the API as in the dashboard UI.
 
 ---
 

@@ -19,9 +19,19 @@ public sealed class NestedDataAnnotationsValidator : ComponentBase, IDisposable
     {
         _messageStore = new ValidationMessageStore(CurrentEditContext);
         CurrentEditContext.OnValidationRequested += OnValidationRequested;
+
+        // Blazor's built-in DataAnnotationsValidator also revalidates on every field change (not
+        // just on submit) so a corrected field's message disappears immediately rather than
+        // sticking around until the next full submit — this component only had the submit-time
+        // half of that, which is why fixed address fields kept showing stale errors.
+        CurrentEditContext.OnFieldChanged += OnFieldChanged;
     }
 
-    private void OnValidationRequested(object? sender, ValidationRequestedEventArgs e)
+    private void OnValidationRequested(object? sender, ValidationRequestedEventArgs e) => Revalidate();
+
+    private void OnFieldChanged(object? sender, FieldChangedEventArgs e) => Revalidate();
+
+    private void Revalidate()
     {
         _messageStore.Clear();
         ValidateObject(CurrentEditContext.Model, new HashSet<object>(ReferenceEqualityComparer.Instance));
@@ -64,5 +74,9 @@ public sealed class NestedDataAnnotationsValidator : ComponentBase, IDisposable
         }
     }
 
-    public void Dispose() => CurrentEditContext.OnValidationRequested -= OnValidationRequested;
+    public void Dispose()
+    {
+        CurrentEditContext.OnValidationRequested -= OnValidationRequested;
+        CurrentEditContext.OnFieldChanged -= OnFieldChanged;
+    }
 }

@@ -37,6 +37,17 @@ internal sealed class ListUsersHandler(
             .ToListAsync(cancellationToken);
         var usersById = users.ToDictionary(u => u.Id);
 
+        // Real Supabase-backed accounts (self-service SignUp, AcceptInvite) live in UserProfiles,
+        // never in Users (ApplicationUser) — without this, an admin who signed themselves up, or
+        // any employee who accepted a real invite, never appeared in this list at all (no
+        // ApplicationUser row to find, and — for SignUp specifically — no UserInvite row either,
+        // so the "invite is null && user is null" skip below dropped them silently).
+        var profiles = await db.UserProfiles
+            .AsNoTracking()
+            .Where(p => employeeIds.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+        var profilesById = profiles.ToDictionary(p => p.Id);
+
         var userRoles = await db.UserRoles
             .AsNoTracking()
             .Where(ur => employeeIds.Contains(ur.UserId))
@@ -53,9 +64,10 @@ internal sealed class ListUsersHandler(
         {
             latestInviteByEmployee.TryGetValue(employeeId, out var invite);
             usersById.TryGetValue(employeeId, out var user);
+            profilesById.TryGetValue(employeeId, out var profile);
 
             // No invite and no account for this employee — nothing to show them for yet.
-            if (invite is null && user is null)
+            if (invite is null && user is null && profile is null)
                 continue;
 
             var roleIds = userRoles.Where(ur => ur.UserId == employeeId).Select(ur => ur.RoleId).ToList();
@@ -63,7 +75,9 @@ internal sealed class ListUsersHandler(
 
             var name = names.TryGetValue(employeeId, out var employeeName)
                 ? employeeName
-                : user is not null ? $"{user.FirstName} {user.LastName}".Trim() : invite?.Email ?? string.Empty;
+                : user is not null ? $"{user.FirstName} {user.LastName}".Trim()
+                : profile is not null ? $"{profile.FirstName} {profile.LastName}".Trim()
+                : invite?.Email ?? string.Empty;
 
             // Same convention as GetUserDetailsHandler: a user with no tracked invite record (e.g. a
             // dev-seeded persona created directly as an ApplicationUser) is treated as Claimed rather
@@ -80,15 +94,18 @@ internal sealed class ListUsersHandler(
             else
                 invitationStatus = "Pending";
 
-            var accountStatus = user is null
-                ? "NoAccount"
-                : user.IsActive ? "Active" : "Disabled";
+            // UserProfile (Supabase-backed) has no local IsActive/disable concept — its mere
+            // existence means the account is active, same convention as
+            // EmployeeUserAccountStatusReader's earlier fix for this account type.
+            var accountStatus = user is not null
+                ? user.IsActive ? "Active" : "Disabled"
+                : profile is not null ? "Active" : "NoAccount";
 
-            var email = user?.Email ?? invite?.Email ?? string.Empty;
+            var email = user?.Email ?? profile?.Email ?? invite?.Email ?? string.Empty;
 
             rows.Add(new UserAdministrationListItem(
                 employeeId,
-                user?.Id,
+                user?.Id ?? profile?.Id,
                 string.IsNullOrWhiteSpace(name) ? email : name,
                 email,
                 roleIds,
@@ -97,7 +114,7 @@ internal sealed class ListUsersHandler(
                 invitationStatus,
                 invite?.Id,
                 user?.LastLoginAt,
-                invite?.CreatedAt ?? user!.CreatedAt));
+                invite?.CreatedAt ?? user?.CreatedAt ?? profile?.CreatedAt ?? DateTimeOffset.UtcNow));
         }
 
         if (!string.IsNullOrWhiteSpace(request.Search))

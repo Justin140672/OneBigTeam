@@ -6,18 +6,17 @@ namespace HR.Web.E2E.Tests.Tests;
 /// <summary>
 /// Direct coverage of the Close / unsaved-changes prompt on the Company edit page.
 /// CompanyEdit is a non-trivial host for this shared EditPageBase behavior: it has no
-/// dedicated "list" page (Close navigates to the dashboard instead), its own Save button
-/// intentionally stays on the page showing an inline success banner (unlike most edit pages),
-/// and its <c>HasUnsavedChanges</c> override folds in the Settings tab's independently-saved
-/// model — so an edit made purely on the Settings tab must still trigger the Close prompt, and
-/// choosing "Save" from that prompt must navigate away even though the page's own Save button
-/// doesn't.
+/// dedicated "list" page (Close navigates to the dashboard instead), and its own Save button
+/// intentionally stays on the page showing an inline success banner (unlike most edit pages).
+///
+/// This used to also cover an edit made purely on the (now-removed) Settings tab, which had its
+/// own independently-saved model outside EditPageBase's tracked <c>Model</c> and needed a
+/// <c>HasUnsavedChanges</c> override to fold in — that override no longer exists now that
+/// Settings is gone. Company name and addresses both live on the same Profile tab/EditContext
+/// now, so the base <c>HasUnsavedChanges</c> (a snapshot diff of <c>Model</c> — see
+/// EditPageBase&lt;TModel&gt;) already covers both without any page-specific override.
 /// </summary>
-// Moved from "CrossUser" to "HrSettingsSerial": this file mutates the same single shared
-// CompanySettings.TimeZone row (Regional section) that the HrSettingsSerial collection exists to
-// serialize — see HrSettingsSerialCollection. Putting it here avoids forcing an entire CrossUser
-// subgroup to block on an unrelated (Settings-row) concern.
-public sealed class CompanyEditCloseBehaviorTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
+public sealed class CompanyEditCloseBehaviorTests(PriyaShahPersonaFixture fixture) : RoleE2ETestBase<PriyaShahPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -63,57 +62,12 @@ public sealed class CompanyEditCloseBehaviorTests(HrSettingsSerialFixture fixtur
             "Expected the unsaved-changes dialog when closing with an edited Profile name");
     }
 
-    [Fact]
-    public async Task Close_SettingsTabEditOnly_StillShowsConfirmDialog()
-    {
-        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
-        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
-
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
-
-        // Edit a field that lives entirely on the Settings tab's own model (Regional section) —
-        // this is what exercises CompanyEdit's HasUnsavedChanges override. Most of the Settings
-        // tab's fields have since moved to the standalone HR Settings page (see HrSettingsPage),
-        // leaving only TimeZone/Locale (Regional) and the Backfill Employee Timeline trigger here.
-        var initialTimeZone = await companyEdit.GetTimeZoneAsync();
-        await companyEdit.SetTimeZoneAsync($"{initialTimeZone}-edited");
-
-        await companyEdit.ClickCloseAsync();
-
-        Assert.True(await companyEdit.IsUnsavedChangesDialogVisibleAsync(),
-            "Expected the unsaved-changes dialog to appear for an edit made only on the Settings tab");
-    }
-
-    [Fact]
-    public async Task Close_DiscardSettingsChange_NavigatesAwayWithoutSaving()
-    {
-        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
-        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
-
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
-
-        var initialTimeZone = await companyEdit.GetTimeZoneAsync();
-        await companyEdit.SetTimeZoneAsync($"{initialTimeZone}-edited");
-
-        await companyEdit.ClickCloseAsync();
-        Assert.True(await companyEdit.IsUnsavedChangesDialogVisibleAsync());
-
-        await companyEdit.ConfirmDiscardChangesAsync(_fixture.WebBaseUrl, AcmeId);
-        Assert.Equal($"{_fixture.WebBaseUrl}/companies/{AcmeId}/edit", _page.Url);
-
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
-        Assert.Equal(initialTimeZone, await companyEdit.GetTimeZoneAsync());
-    }
-
+    /// <summary>
+    /// Choosing "Save" from the unsaved-changes prompt always navigates away on success — unlike
+    /// the page's own Save button, which stays put and shows an inline success banner. Exercised
+    /// via the Profile tab's Company Name field now that Settings (which used to carry this
+    /// coverage via its own independently-saved model) is gone.
+    /// </summary>
     [Fact]
     public async Task Close_SaveFromUnsavedChangesDialog_PersistsAndNavigatesAway()
     {
@@ -124,23 +78,31 @@ public sealed class CompanyEditCloseBehaviorTests(HrSettingsSerialFixture fixtur
         await login.LoginAsync(CompanyAdminEmail);
 
         await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
+        await companyEdit.OpenProfileTabAsync();
 
-        var initialTimeZone = await companyEdit.GetTimeZoneAsync();
-        var desiredTimeZone = $"{initialTimeZone}-edited";
-        await companyEdit.SetTimeZoneAsync(desiredTimeZone);
+        var originalName = await companyEdit.GetCompanyNameInputValueAsync();
+        var desiredName = $"{originalName} (edited)";
+        await companyEdit.FillCompanyNameInputAsync(desiredName);
 
         await companyEdit.ClickCloseAsync();
         Assert.True(await companyEdit.IsUnsavedChangesDialogVisibleAsync());
 
-        // Choosing Save from the prompt should persist the change AND navigate away — unlike
-        // the page's own Save button, which stays put and shows an inline success banner.
         await companyEdit.ConfirmSaveFromUnsavedChangesDialogAsync(_fixture.WebBaseUrl, AcmeId);
         Assert.Equal($"{_fixture.WebBaseUrl}/companies/{AcmeId}/edit", _page.Url);
 
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
-        Assert.Equal(desiredTimeZone, await companyEdit.GetTimeZoneAsync());
+        try
+        {
+            await companyEdit.GoToAsync(AcmeId);
+            await companyEdit.OpenProfileTabAsync();
+            Assert.Equal(desiredName, await companyEdit.GetCompanyNameInputValueAsync());
+        }
+        finally
+        {
+            // Restore the original name so this test doesn't leak state into other tests that
+            // rely on the seeded "Acme Corp" name.
+            await companyEdit.FillCompanyNameInputAsync(originalName);
+            await companyEdit.SaveAsync();
+        }
     }
 
     [Fact]

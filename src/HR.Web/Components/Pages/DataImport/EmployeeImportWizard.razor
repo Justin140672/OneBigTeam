@@ -46,7 +46,7 @@
                     <dt class="col-sm-3">File</dt>
                     <dd class="col-sm-9">@_session.FileName</dd>
                     <dt class="col-sm-3">Status</dt>
-                    <dd class="col-sm-9">@_session.Status</dd>
+                    <dd class="col-sm-9">@EnumDisplay.Humanize(_session.Status)</dd>
                     <dt class="col-sm-3">Total Rows</dt>
                     <dd class="col-sm-9">@_session.TotalRows</dd>
                 </dl>
@@ -168,7 +168,7 @@
             <div class="card-body">
                 <dl class="row mb-0">
                     <dt class="col-sm-3">Status</dt>
-                    <dd class="col-sm-9">@_validation.Status</dd>
+                    <dd class="col-sm-9">@EnumDisplay.Humanize(_validation.Status)</dd>
                     <dt class="col-sm-3">Successful Rows</dt>
                     <dd class="col-sm-9">@_validation.SuccessfulRows</dd>
                     <dt class="col-sm-3">Failed Rows</dt>
@@ -290,7 +290,7 @@
             <div class="card-body">
                 <dl class="row mb-3">
                     <dt class="col-sm-3">Status</dt>
-                    <dd class="col-sm-9">@_confirmResult.Status</dd>
+                    <dd class="col-sm-9">@EnumDisplay.Humanize(_confirmResult.Status)</dd>
                     <dt class="col-sm-3">Created</dt>
                     <dd class="col-sm-9">@_confirmResult.CreatedCount</dd>
                     <dt class="col-sm-3">Failed</dt>

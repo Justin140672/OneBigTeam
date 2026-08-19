@@ -5,20 +5,9 @@ namespace HR.Modules.Sickness.Tests;
 public class FitNoteEvaluatorTests
 {
     // EvaluateOnCreate
-
-    [Fact]
-    public void EvaluateOnCreate_Returns_NotRequired_When_Setting_Is_Null()
-    {
-        var result = FitNoteEvaluator.EvaluateOnCreate(fitNoteRequiredAfterDays: null, totalDays: 10m);
-        Assert.Equal(SicknessEvidenceStatus.NotRequired, result);
-    }
-
-    [Fact]
-    public void EvaluateOnCreate_Returns_NotRequired_When_Setting_Is_Null_And_TotalDays_Is_Null()
-    {
-        var result = FitNoteEvaluator.EvaluateOnCreate(fitNoteRequiredAfterDays: null, totalDays: null);
-        Assert.Equal(SicknessEvidenceStatus.NotRequired, result);
-    }
+    // Note: FitNoteRequiredAfterDays is mandatory now (no opt-out — see
+    // CompanySettings.FitNoteRequiredAfterDays), so the "setting is null" cases these used to
+    // cover can no longer occur and have been removed.
 
     [Fact]
     public void EvaluateOnCreate_Returns_Pending_When_TotalDays_Is_Null_And_Setting_Is_Set()
@@ -79,17 +68,4 @@ public class FitNoteEvaluatorTests
         Assert.Equal(SicknessEvidenceStatus.NotRequired, result);
     }
 
-    [Fact]
-    public void EvaluateOnClose_Returns_NotRequired_When_Setting_Is_Null_And_Status_Was_NotRequired()
-    {
-        var result = FitNoteEvaluator.EvaluateOnClose(SicknessEvidenceStatus.NotRequired, fitNoteRequiredAfterDays: null, totalDays: 10m);
-        Assert.Equal(SicknessEvidenceStatus.NotRequired, result);
-    }
-
-    [Fact]
-    public void EvaluateOnClose_Returns_NotRequired_When_Setting_Is_Null_And_Status_Was_Pending()
-    {
-        var result = FitNoteEvaluator.EvaluateOnClose(SicknessEvidenceStatus.Pending, fitNoteRequiredAfterDays: null, totalDays: 10m);
-        Assert.Equal(SicknessEvidenceStatus.NotRequired, result);
-    }
 }

@@ -147,7 +147,7 @@
                                             <div class="fw-semibold">@item.Title</div>
                                             <div class="text-muted small">@item.ReferenceNumber &middot; @SupportRequestOptions.TypeLabel(item.Type)</div>
                                         </div>
-                                        <span class="badge @StatusBadgeClass(item.Status)">@item.Status</span>
+                                        <span class="badge @StatusBadgeClass(item.Status)">@EnumDisplay.Humanize(item.Status)</span>
                                     </div>
                                     @if (!string.IsNullOrWhiteSpace(item.LatestResponseSnippet))
                                     {

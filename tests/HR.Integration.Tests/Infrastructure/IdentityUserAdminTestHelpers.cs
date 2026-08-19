@@ -73,6 +73,26 @@ internal static class IdentityUserAdminTestHelpers
         return user.Id;
     }
 
+    public static async Task<Guid> SeedUserProfileAsync(
+        ApiWebApplicationFactory factory,
+        Guid companyId,
+        Guid employeeId,
+        string email,
+        string firstName = "Test",
+        string lastName = "User")
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+
+        var now = DateTimeOffset.UtcNow;
+        var profile = UserProfile.Create(employeeId, Guid.NewGuid(), companyId, email, firstName, lastName, now);
+
+        db.UserProfiles.Add(profile);
+        await db.SaveChangesAsync();
+
+        return profile.Id;
+    }
+
     public static async Task<Guid> SeedInviteAsync(
         ApiWebApplicationFactory factory,
         Guid companyId,

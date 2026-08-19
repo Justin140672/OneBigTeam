@@ -36,7 +36,7 @@ public class RecordSicknessHandlerTests
         bool excludePublicHolidays = false,
         IReadOnlyCollection<DateOnly>? publicHolidays = null,
         FakeAuditEventPublisher? auditPublisher = null,
-        int? fitNoteRequiredAfterDays = null,
+        int fitNoteRequiredAfterDays = 7,
         FakeManagerReader? managerReader = null,
         FakeEmployeeNameReader? employeeNameReader = null,
         FakeNotificationWriter? notificationWriter = null) =>
@@ -77,7 +77,10 @@ public class RecordSicknessHandlerTests
         Assert.Equal(SicknessStatus.Active, result.Value.Status);
         Assert.Equal(StartDate, result.Value.StartDate);
         Assert.Equal(SicknessDayPart.FullDay, result.Value.StartDayPart);
-        Assert.Equal(SicknessEvidenceStatus.NotRequired, result.Value.EvidenceStatus);
+        // Fit note requirement is mandatory now (default 7 days — see
+        // CompanySettings.FitNoteRequiredAfterDays), and with no end date yet we can't tell if
+        // the threshold will be met, so this defaults to Pending rather than NotRequired.
+        Assert.Equal(SicknessEvidenceStatus.Pending, result.Value.EvidenceStatus);
         Assert.Equal("Feeling unwell", result.Value.Notes);
 
         var saved = await db.SicknessRecords.SingleAsync();
@@ -488,25 +491,9 @@ public class RecordSicknessHandlerTests
         Assert.Empty(auditPublisher.PublishedEvents);
     }
 
-    [Fact]
-    public async Task HandleAsync_Sets_EvidenceStatus_NotRequired_When_FitNote_Setting_Is_Null()
-    {
-        await using var db = BuildContext();
-        var companyId = Guid.NewGuid();
-        var categoryId = await SeedCategory(db, companyId);
-
-        var result = await BuildHandler(db, fitNoteRequiredAfterDays: null).HandleAsync(new RecordSicknessRequest
-        {
-            CompanyId = companyId,
-            EmployeeId = Guid.NewGuid(),
-            CategoryId = categoryId,
-            StartDate = StartDate,
-            StartDayPart = SicknessDayPart.FullDay
-        }, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(SicknessEvidenceStatus.NotRequired, result.Value!.EvidenceStatus);
-    }
+    // FitNoteRequiredAfterDays is mandatory now (no opt-out — see
+    // CompanySettings.FitNoteRequiredAfterDays), so the "setting is null, NotRequired" case this
+    // used to cover can no longer occur and has been removed.
 
     [Fact]
     public async Task HandleAsync_Sets_EvidenceStatus_Pending_When_Open_Record_And_FitNote_Setting_Is_Set()

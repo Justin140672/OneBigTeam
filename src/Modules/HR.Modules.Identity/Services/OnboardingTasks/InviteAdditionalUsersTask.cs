@@ -19,11 +19,13 @@ internal sealed class InviteAdditionalUsersTask(
     public string Name => "Invite your team";
     public string Description => "Invite additional users so others can access the system.";
     public bool IsMandatory => true;
+    public int Order => 6;
+
     // HR.Web's user administration route is company-scoped
     // ("/companies/{CompanyId:guid}/user-administration") — the "{companyId}" placeholder is
     // substituted by HR.Web with the current company id.
-    public string LinkUrl => "/companies/{companyId}/user-administration";
-    public int Order => 5;
+    public Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken) =>
+        Task.FromResult("/companies/{companyId}/user-administration");
 
     public async Task<bool> IsCompletedAsync(Guid companyId, CancellationToken cancellationToken)
     {

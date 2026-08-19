@@ -50,8 +50,11 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
         await empEdit.SaveNewEmployeeAsync();
 
+        // Matches the guid directly rather than splitting on the trailing "/view" segment
+        // (EmployeeList.razor's row link/OnRecordClick lands on the view route).
         await empList.ClickEmployeeAsync(lastName);
-        var employeeId = Guid.Parse(_page.Url.TrimEnd('/').Split('/').Last());
+        var employeeId = Guid.Parse(System.Text.RegularExpressions.Regex.Match(
+            _page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})").Groups[1].Value);
 
         await empEdit.OpenCompensationTabAsync();
         await empEdit.ClickAddCompensationAsync();

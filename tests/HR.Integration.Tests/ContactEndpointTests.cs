@@ -126,14 +126,17 @@ public sealed class ContactEndpointTests : IAsyncLifetime
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task Post_Contact_Returns_BadRequest_When_Company_Is_Blank(string? company)
+    public async Task Post_Contact_Returns_Ok_When_Company_Is_Blank(string? company)
     {
+        // Company name is marked "(optional)" on the marketing form (Contact.razor) and
+        // Program.cs's ValidateContactRequest only rejects it for exceeding the max length, never
+        // for being blank — this mirrors that intentional design.
         using var client = _factory.CreateClient();
 
         var response = await client.PostAsJsonAsync("/api/contact", ValidContactRequest(company: company!));
 
-        await AssertValidationErrorAsync(response, "company");
-        Assert.Empty(_factory.EmailSender.Sent);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Single(_factory.EmailSender.Sent);
     }
 
     [Fact]
@@ -149,7 +152,6 @@ public sealed class ContactEndpointTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData(null)]
     [InlineData(0)]
     [InlineData(-1)]
     public async Task Post_Contact_Returns_BadRequest_When_EmployeeCount_Is_Invalid(int? employeeCount)
@@ -160,6 +162,20 @@ public sealed class ContactEndpointTests : IAsyncLifetime
 
         await AssertValidationErrorAsync(response, "employeeCount");
         Assert.Empty(_factory.EmailSender.Sent);
+    }
+
+    [Fact]
+    public async Task Post_Contact_Returns_Ok_When_EmployeeCount_Is_Null()
+    {
+        // Approximate employee count is marked "(optional)" on the marketing form (Contact.razor) —
+        // Program.cs's ValidateContactRequest only rejects it when provided and < 1, never for
+        // being absent.
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/contact", ValidContactRequest(employeeCount: null));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Single(_factory.EmailSender.Sent);
     }
 
     [Theory]
@@ -199,9 +215,11 @@ public sealed class ContactEndpointTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("name", errors.Keys);
         Assert.Contains("email", errors.Keys);
-        Assert.Contains("company", errors.Keys);
-        Assert.Contains("employeeCount", errors.Keys);
         Assert.Contains("message", errors.Keys);
+        // Company and employeeCount are optional (Contact.razor marks both "(optional)") — missing
+        // entirely is valid, so they're deliberately absent from the expected error set here.
+        Assert.DoesNotContain("company", errors.Keys);
+        Assert.DoesNotContain("employeeCount", errors.Keys);
     }
 
     private static async Task AssertValidationErrorAsync(HttpResponseMessage response, string expectedField)

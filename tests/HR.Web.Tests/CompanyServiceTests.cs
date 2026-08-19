@@ -105,6 +105,35 @@ public class CompanyServiceTests
     }
 
     [Fact]
+    public async Task UpdateCompanyAsync_Returns_FieldErrors_When_Api_Returns_FastEndpoints_ValidationShape()
+    {
+        // FastEndpoints' own automatic FluentValidation failures (e.g. UpdateCompanyValidator
+        // rejecting an empty address Line1/City/CountryCode) return a different shape than this
+        // app's handler-level business errors ({ "error": "..." }) — a dictionary of field name
+        // to messages. Before this test's fix, UpdateCompanyAsync couldn't parse this shape at
+        // all and silently fell back to the generic "Failed to save company profile." message,
+        // hiding exactly which fields were invalid.
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.UnprocessableEntity, new
+        {
+            statusCode = 422,
+            message = "One or more errors occurred!",
+            errors = new Dictionary<string, string[]>
+            {
+                ["addresses[0].line1"] = ["'Line1' must not be empty."],
+                ["addresses[0].city"] = ["'City' must not be empty."],
+            },
+        }));
+        var service = new CompanyService(factory);
+
+        var (result, error) = await service.UpdateCompanyAsync(Guid.NewGuid(), new UpdateCompanyRequest(Guid.NewGuid(), "Acme Corporation", []));
+
+        Assert.Null(result);
+        Assert.NotNull(error);
+        Assert.Contains("'Line1' must not be empty.", error);
+        Assert.Contains("'City' must not be empty.", error);
+    }
+
+    [Fact]
     public async Task UpdateCompanyAsync_Returns_GenericMessage_When_Error_Body_Has_No_Error_Field()
     {
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.InternalServerError, new { }));

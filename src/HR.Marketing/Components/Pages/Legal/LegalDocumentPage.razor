@@ -7,7 +7,7 @@
 <main>
   <section class="section-band legal-hero">
     <div class="section-inner">
-      <p class="small-note"><a href="/">&larr; One Big Team</a></p>
+      <p class="small-note"><a href="/">&larr; Back to home</a></p>
       <h1>@Document.Title</h1>
       @if (!string.IsNullOrWhiteSpace(Document.LastUpdated))
       {
@@ -17,9 +17,37 @@
   </section>
 
   <section class="section">
-    <div class="section-inner legal-content">
-      @((MarkupString)Document.Html)
+    <div class="section-inner legal-layout">
+      @if (Document.Headings.Count > 1)
+      {
+        <nav class="legal-toc" aria-label="On this page">
+          <p class="summary-label">On this page</p>
+          <ol>
+            @foreach (var heading in Document.Headings)
+            {
+              <li><a href="#@heading.Id">@heading.Text</a></li>
+            }
+          </ol>
+        </nav>
+      }
+
+      <div class="legal-content">
+        @((MarkupString)Document.Html)
+      </div>
     </div>
+
+    @if (RelatedPages.Length > 0)
+    {
+      <div class="legal-related">
+        <p class="summary-label">Related pages</p>
+        <ul>
+          @foreach (var (href, label) in RelatedPages)
+          {
+            <li><a href="@href">@label</a></li>
+          }
+        </ul>
+      </div>
+    }
   </section>
 </main>
 
@@ -30,6 +58,50 @@
     [Parameter, EditorRequired] public string DocumentSlug { get; set; } = string.Empty;
 
     private MarkdownDocument Document { get; set; } = null!;
+
+    // Cross-links between related legal/trust pages, keyed by document slug. Kept as a small
+    // static map here rather than parsing it out of markdown, since the relationships are a
+    // handful of fixed pairs rather than derived content.
+    private static readonly Dictionary<string, (string Href, string Label)[]> RelatedPagesBySlug = new()
+    {
+        ["privacy-policy"] =
+        [
+            ("/security", "Security"),
+            ("/subprocessors", "Subprocessors"),
+            ("/data-processing-agreement", "Data Processing Agreement"),
+        ],
+        ["security"] =
+        [
+            ("/privacy-policy", "Privacy Policy"),
+            ("/subprocessors", "Subprocessors"),
+        ],
+        ["subprocessors"] =
+        [
+            ("/privacy-policy", "Privacy Policy"),
+            ("/security", "Security"),
+        ],
+        ["data-processing-agreement"] =
+        [
+            ("/privacy-policy", "Privacy Policy"),
+            ("/subprocessors", "Subprocessors"),
+        ],
+        ["terms-of-service"] =
+        [
+            ("/acceptable-use-policy", "Acceptable Use Policy"),
+            ("/privacy-policy", "Privacy Policy"),
+        ],
+        ["acceptable-use-policy"] =
+        [
+            ("/terms-of-service", "Terms of Service"),
+        ],
+        ["cookie-policy"] =
+        [
+            ("/privacy-policy", "Privacy Policy"),
+        ],
+    };
+
+    private (string Href, string Label)[] RelatedPages =>
+        RelatedPagesBySlug.TryGetValue(DocumentSlug, out var related) ? related : [];
 
     protected override void OnInitialized()
     {

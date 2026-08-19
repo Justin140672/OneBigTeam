@@ -1,0 +1,20 @@
+@using HR.Marketing.Services
+
+<dialog id="@Id" class="legal-modal" data-legal-modal aria-labelledby="@($"{Id}-title")">
+  <div class="legal-modal-header">
+    <h2 id="@($"{Id}-title")">@Document.Title</h2>
+    <button type="button" class="legal-modal-close" data-legal-modal-close aria-label="Close">&times;</button>
+  </div>
+  @if (!string.IsNullOrWhiteSpace(Document.LastUpdated))
+  {
+    <p class="legal-updated">Last updated @Document.LastUpdated</p>
+  }
+  <div class="legal-modal-body legal-content">
+    @((MarkupString)Document.Html)
+  </div>
+</dialog>
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public MarkdownDocument Document { get; set; } = null!;
+}

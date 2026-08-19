@@ -701,6 +701,10 @@ html[data-theme="dark"] .card-header {
     text-decoration: none;
 }
 
+.widget-view-all i {
+    margin-left: 4px;
+}
+
 .widget-view-all:hover {
     text-decoration: underline;
 }

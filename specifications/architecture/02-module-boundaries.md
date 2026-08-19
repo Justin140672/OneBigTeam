@@ -258,11 +258,34 @@ documents
 
 ---
 
+# Additional Current Modules
+
+The repository also contains the following independently owned capabilities:
+
+| Module | Primary ownership |
+|---|---|
+| Assets | Asset catalogue, assignments, acknowledgements and returns |
+| CompanyOnboarding | Initial tenant setup checklist and exploration guidance |
+| DataImport | Coordinated import of organisation structure and existing employees |
+| Notifications | In-app notifications and notification delivery state |
+| Onboarding | Employee onboarding plans and task progress |
+| Offboarding | Employee leaving plans and task progress |
+| Probation | Probation periods, reviews and outcomes |
+| Reporting | Formal report catalogue, report queries, saved views, favourites and exports |
+| Sickness | Sickness records, evidence and return-to-work reviews |
+| Support | Customer support requests, responses and attachments |
+
+These modules follow the same schema ownership, migration ownership and dependency rules as the original module set.
+
+---
+
 # Cross-Module Communication
 
 ## Allowed
 
-Integration Events
+- Integration events
+- Explicit cross-module interfaces and DTOs owned by the providing capability
+- Purpose-specific read models
 
 Example:
 
@@ -276,7 +299,7 @@ Create Onboarding Tasks
 
 ## Not Allowed
 
-Direct service calls:
+References or calls to another module's implementation service:
 
 ```text
 Leave -> EmployeesService
@@ -329,15 +352,25 @@ The source of truth remains the Employees module.
 | Recruitment | Recruitment |
 | Tasks | Tasks |
 | Documents | Documents |
+| Assets | Assets |
+| Initial Company Setup | CompanyOnboarding |
+| Data Import | DataImport |
+| Notifications | Notifications |
+| Employee Onboarding | Onboarding |
+| Employee Offboarding | Offboarding |
+| Probation | Probation |
+| Formal Reporting | Reporting |
+| Sickness | Sickness |
+| Customer Support | Support |
 
 ---
 
 # Acceptance Criteria
 
 1. Every business capability has a single owner.
-2. Modules do not directly reference each other.
-3. Cross-module communication uses events.
+2. A module does not reference another module's implementation project.
+3. Cross-module communication uses integration events or explicit contracts owned by the providing capability.
 4. Each module owns its schema.
 5. Each module owns its migrations.
-6. Read models are local copies only.
+6. Read models are local projections or purpose-specific contract results; they never expose another module's entities or DbContext.
 7. Architecture tests enforce boundaries.

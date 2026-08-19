@@ -577,7 +577,9 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        // Navigates to /employees list on success
-        await page.WaitForURLAsync("**/employees", new() { Timeout = 15_000 });
+        // EmployeeEdit.razor's SaveCoreAsync (existing-employee branch) redirects back to the
+        // employee's own /view page on success, not the plain /employees list — see its own
+        // "Existing employee — return to viewing the employee just updated, not the list" remark.
+        await page.WaitForURLAsync("**/employees/*/view", new() { Timeout = 15_000 });
     }
 }

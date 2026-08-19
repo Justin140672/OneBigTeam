@@ -5,11 +5,8 @@ internal static class FitNoteEvaluator
     /// <summary>
     /// Determines the evidence status for a new sickness record at creation time.
     /// </summary>
-    internal static SicknessEvidenceStatus EvaluateOnCreate(int? fitNoteRequiredAfterDays, decimal? totalDays)
+    internal static SicknessEvidenceStatus EvaluateOnCreate(int fitNoteRequiredAfterDays, decimal? totalDays)
     {
-        if (fitNoteRequiredAfterDays is null)
-            return SicknessEvidenceStatus.NotRequired;
-
         // No end date yet — we cannot determine duration, so default to Pending
         if (totalDays is null)
             return SicknessEvidenceStatus.Pending;
@@ -25,7 +22,7 @@ internal static class FitNoteEvaluator
     /// </summary>
     internal static SicknessEvidenceStatus EvaluateOnClose(
         SicknessEvidenceStatus currentStatus,
-        int? fitNoteRequiredAfterDays,
+        int fitNoteRequiredAfterDays,
         decimal totalDays)
     {
         if (currentStatus == SicknessEvidenceStatus.Received ||

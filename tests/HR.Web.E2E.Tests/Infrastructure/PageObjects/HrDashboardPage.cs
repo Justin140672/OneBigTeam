@@ -206,8 +206,24 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
     {
         var checkbox = AttentionQueueWidget.Locator(".attention-queue-toggle input[type='checkbox']");
         var isChecked = await checkbox.IsCheckedAsync();
-        if (isChecked != show)
-            await checkbox.SetCheckedAsync(show);
+        if (isChecked == show)
+            return;
+
+        // OnShowResolvedChanged (AttentionQueueWidget.razor) is plain synchronous C#
+        // (RefreshVisibleItems, no further data fetch), but this is still Blazor Server — running
+        // that handler and pushing the updated DOM back down still requires a real SignalR round
+        // trip. SetCheckedAsync completing only proves the click landed, not that the round trip
+        // has finished, so a caller reading row count immediately after can race a queue that
+        // hasn't actually re-rendered yet. This method's own doc comment claimed to already wait
+        // for that; it didn't. Poll the row count until it actually changes.
+        var titleLocator = AttentionQueueWidget.Locator(".attention-queue-item .task-widget-title");
+        var countBefore = await titleLocator.CountAsync();
+
+        await checkbox.SetCheckedAsync(show);
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (await titleLocator.CountAsync() == countBefore && DateTime.UtcNow < deadline)
+            await AttentionQueueWidget.Page.WaitForTimeoutAsync(100);
     }
 
     // ── Document review rows within the attention queue ──────────────────────

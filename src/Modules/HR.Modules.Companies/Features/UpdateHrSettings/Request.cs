@@ -14,8 +14,8 @@ internal sealed record UpdateHrSettingsRequest
 	public bool ExcludePublicHolidaysFromLeave { get; init; } = true;
 	public bool ExcludePublicHolidaysFromSickness { get; init; } = false;
 	public bool DisplaySalaryOnEmployeeProfile { get; init; } = false;
-	public int? FitNoteRequiredAfterDays { get; init; }
-	public int? ReturnToWorkRequiredAfterDays { get; init; }
+	public int FitNoteRequiredAfterDays { get; init; } = 7;
+	public int ReturnToWorkRequiredAfterDays { get; init; } = 1;
 	public string DefaultAcknowledgementStatement { get; init; } = string.Empty;
 	public int AcknowledgementReminderIntervalDays { get; init; } = 3;
 	public NoticePeriodUnit NoticePeriodUnit { get; init; } = NoticePeriodUnit.Months;

@@ -64,7 +64,7 @@ public class RequestAssetReturnHandlerTests
         var taskCreator = new FakeTaskCreator();
         var notificationWriter = new FakeNotificationWriter();
         var requestedBy = Guid.NewGuid();
-        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, notificationWriter, new FakeAuditPublisher());
+        var handler = new RequestAssetReturnHandler(db, taskCreator, new FakeOpenTaskBySourceEntityReader(), clock, notificationWriter, new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
@@ -98,12 +98,39 @@ public class RequestAssetReturnHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Does_Not_Create_A_Second_Return_Task_When_One_Is_Already_Open()
+    {
+        // AssetTaskCompletionAction already creates a "Return asset" task automatically as soon
+        // as the employee acknowledges the asset — an admin explicitly requesting the return
+        // afterwards (this handler) must not create a second, duplicate task for the same
+        // assignment.
+        await using var db = BuildContext();
+        var (assignmentId, employeeId, companyId) = await SeedActiveAssignmentAsync(db);
+        var clock = new FakeClock(FixedUtcNow);
+        var taskCreator = new FakeTaskCreator();
+        var existingTaskId = Guid.NewGuid();
+        var openTaskReader = new FakeOpenTaskBySourceEntityReader(
+            new Dictionary<Guid, Guid> { [assignmentId] = existingTaskId });
+        var handler = new RequestAssetReturnHandler(db, taskCreator, openTaskReader, clock, new FakeNotificationWriter(), new FakeAuditPublisher());
+
+        var result = await handler.HandleAsync(new RequestAssetReturnRequest
+        {
+            CompanyId = companyId,
+            Id = assignmentId,
+            RequestedBy = Guid.NewGuid()
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(taskCreator.Created);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Assignment_Does_Not_Exist()
     {
         await using var db = BuildContext();
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
-        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, new FakeNotificationWriter(), new FakeAuditPublisher());
+        var handler = new RequestAssetReturnHandler(db, taskCreator, new FakeOpenTaskBySourceEntityReader(), clock, new FakeNotificationWriter(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
@@ -129,7 +156,7 @@ public class RequestAssetReturnHandlerTests
         await db.SaveChangesAsync();
 
         var taskCreator = new FakeTaskCreator();
-        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, new FakeNotificationWriter(), new FakeAuditPublisher());
+        var handler = new RequestAssetReturnHandler(db, taskCreator, new FakeOpenTaskBySourceEntityReader(), clock, new FakeNotificationWriter(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
@@ -150,7 +177,7 @@ public class RequestAssetReturnHandlerTests
         var (assignmentId, _, _) = await SeedActiveAssignmentAsync(db);
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
-        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, new FakeNotificationWriter(), new FakeAuditPublisher());
+        var handler = new RequestAssetReturnHandler(db, taskCreator, new FakeOpenTaskBySourceEntityReader(), clock, new FakeNotificationWriter(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
@@ -172,7 +199,7 @@ public class RequestAssetReturnHandlerTests
         var clock = new FakeClock(FixedUtcNow);
         var auditPublisher = new FakeAuditPublisher();
         var requestedBy = Guid.NewGuid();
-        var handler = new RequestAssetReturnHandler(db, new FakeTaskCreator(), clock, new FakeNotificationWriter(), auditPublisher);
+        var handler = new RequestAssetReturnHandler(db, new FakeTaskCreator(), new FakeOpenTaskBySourceEntityReader(), clock, new FakeNotificationWriter(), auditPublisher);
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
@@ -195,7 +222,7 @@ public class RequestAssetReturnHandlerTests
         await using var db = BuildContext();
         var clock = new FakeClock(FixedUtcNow);
         var auditPublisher = new FakeAuditPublisher();
-        var handler = new RequestAssetReturnHandler(db, new FakeTaskCreator(), clock, new FakeNotificationWriter(), auditPublisher);
+        var handler = new RequestAssetReturnHandler(db, new FakeTaskCreator(), new FakeOpenTaskBySourceEntityReader(), clock, new FakeNotificationWriter(), auditPublisher);
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {

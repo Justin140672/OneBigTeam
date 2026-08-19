@@ -149,7 +149,7 @@ public sealed class CompanyAdministratorAccessTests(HrAdminPersonaFixture fixtur
         await avatarLink.ClickAsync();
 
         // MyProfilePage.WaitForLoadAsync only waits for ".e-tab" to exist, which the Company Edit
-        // page (Profile/Settings tabs) we're navigating away FROM also has — so it can resolve
+        // page (its Profile tab) we're navigating away FROM also has — so it can resolve
         // against tabs still left over from the pre-navigation page without proving the click
         // actually navigated anywhere yet, and Url could still read the stale /companies/{id}/edit
         // address a beat after the click. Wait for the URL to actually land on the profile route

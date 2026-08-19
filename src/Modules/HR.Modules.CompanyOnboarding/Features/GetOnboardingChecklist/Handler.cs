@@ -41,6 +41,7 @@ internal sealed class GetOnboardingChecklistHandler(
         foreach (var task in registry.Tasks)
         {
             var isCompleted = await task.IsCompletedAsync(companyId, cancellationToken);
+            var linkUrl = await task.GetLinkUrlAsync(companyId, cancellationToken);
 
             if (!completionsByKey.TryGetValue(task.Key, out var completion))
             {
@@ -56,7 +57,7 @@ internal sealed class GetOnboardingChecklistHandler(
                 task.Name,
                 task.Description,
                 task.IsMandatory,
-                task.LinkUrl,
+                linkUrl,
                 task.Order,
                 isCompleted,
                 completion.CompletedAt));

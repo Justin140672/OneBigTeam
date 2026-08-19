@@ -183,7 +183,7 @@ Validate:
 - Event publication
 - Event consumption
 - Idempotency
-- Outbox processing
+- Outbox processing where the owning module implements an outbox
 
 Examples:
 

@@ -57,9 +57,11 @@ The system shall:
 | Employee | Uses self-service features such as leave requests, documents and tasks |
 | Manager | Approves leave, views team information and completes workflow actions |
 | HR Administrator | Manages employees, recruitment, documents, policies and compliance |
-| Company Administrator | Manages company settings, branding, users and permissions |
+| Company Administrator | Manages company profile, settings and branding; does not receive HR access from this role |
 | Recruiter | Manages vacancies, candidates and interview workflow |
 | Finance User | May view compensation or payroll-related exports if authorised |
+
+The initial company creator is deliberately assigned both Company Administrator and HR Administrator. This is an explicit first-account exception, not an implication between the roles.
 
 ---
 

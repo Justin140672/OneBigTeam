@@ -31,7 +31,7 @@ Small reports:
 
 Large reports:
 
-- Generated asynchronously
+- Must be measured and bounded. Asynchronous generation may be introduced for a separately approved report that cannot meet the synchronous target safely.
 
 ---
 

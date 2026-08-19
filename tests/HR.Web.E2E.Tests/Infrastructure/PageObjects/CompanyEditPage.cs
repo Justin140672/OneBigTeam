@@ -3,8 +3,11 @@ using Microsoft.Playwright;
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 /// <summary>
-/// Page object for the company edit page (/companies/{id}/edit).
-/// Covers the Profile and Settings tabs.
+/// Page object for the company edit page (/companies/{id}/edit). A single Profile tab now covers
+/// company name, status, and addresses — the former Addresses tab was merged into it and the
+/// Settings tab (Regional TimeZone/Locale + Backfill Employee Timeline trigger) was removed
+/// outright (UK-only customers for now; revisited via the Admin app if that changes). Branding
+/// still exists as a component but is no longer rendered as its own tab.
 /// </summary>
 public sealed class CompanyEditPage(IPage page, string baseUrl)
 {
@@ -22,101 +25,11 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".card", new() { Timeout = 15_000 });
     }
 
-    public async Task OpenSettingsTabAsync()
-    {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Settings" }).ClickAsync();
-        await page.WaitForSelectorAsync(".card", new() { Timeout = 15_000 });
-        // Wait for Blazor's interactive render to finish populating the tab. The tab was slimmed
-        // down to just the Regional (TimeZone/Locale) fields and the Backfill Employee Timeline
-        // button — it no longer has any Syncfusion dropdown, so wait on the Time Zone input
-        // instead of the old span[role='combobox'] check (Leave Year Start Month has moved to
-        // the standalone HR Settings page — see HrSettingsPage).
-        await page.WaitForSelectorAsync("input[placeholder='Time Zone']", new() { Timeout = 20_000 });
-    }
-
-    public async Task OpenAddressesTabAsync()
-    {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Addresses" }).ClickAsync();
-        await page.WaitForSelectorAsync(".card", new() { Timeout = 15_000 });
-    }
-
     // ── Profile tab ────────────────────────────────────────────────────────────
 
     /// <summary>Returns the company name shown in the h1 heading.</summary>
     public async Task<string> GetCompanyNameAsync() =>
         (await page.Locator("h1").TextContentAsync())?.Trim() ?? "";
-
-    public async Task<bool> IsActiveAsync() =>
-        await page.Locator("h1 ~ .badge.bg-success, .badge.bg-success").First.IsVisibleAsync();
-
-    // ── Settings tab ───────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// The "Time Zone" HrTextBox in the Regional section — a plain HTML placeholder attribute
-    /// (HrTextBox uses FloatLabelType.Never by default), same rendering as the "Locale" field.
-    /// </summary>
-    private ILocator TimeZoneInput => page.GetByPlaceholder("Time Zone");
-
-    // FillAsync sets a Syncfusion SfTextBox's DOM value through CDP directly, which bypasses the
-    // component's own JS keyup/input listeners that sync the typed value back to the Blazor-bound
-    // model — so a value that visually "fills" never actually round-trips to the server (see
-    // EmployeeEditPage.TypeIntoNumericInputAsync for the same issue on SfNumericTextBox). Click-to-
-    // focus, select-all, delete, then type each character for real, then Tab to blur/commit.
-    private async Task TypeIntoTextBoxAsync(ILocator input, string value)
-    {
-        await input.ClickAsync();
-        await page.Keyboard.PressAsync("Control+A");
-        await page.Keyboard.PressAsync("Delete");
-        // Give the clear a moment to actually land before typing — same mitigation applied to
-        // EmployeeEditPage.TypeIntoNumericInputAsync for the same observed corruption (old value
-        // still present, new text appended rather than replacing it).
-        await page.WaitForTimeoutAsync(150);
-        if (value.Length > 0)
-            await input.PressSequentiallyAsync(value, new() { Delay = 30 });
-        await page.Keyboard.PressAsync("Tab");
-        // Tab blurs the Syncfusion SfTextBox, which raises its change event and round-trips the
-        // new value to the server over the Blazor Server circuit — that round-trip is async and
-        // not complete the instant PressAsync("Tab") returns. A caller that immediately clicks
-        // Close (as Close_SaveFromUnsavedChangesDialog_PersistsAndNavigatesAway does) can open the
-        // "unsaved changes" dialog and choose Save before Model.TimeZone/Model.Locale have
-        // actually been updated server-side, silently saving the pre-edit value (observed:
-        // "UTC-edited" typed and blurred, but "UTC" persisted).
-        //
-        // NOTE: an earlier fix here waited on Assertions.Expect(input).ToHaveValueAsync(value) as
-        // a proxy for the round-trip, but that assertion is trivially satisfied the instant
-        // PressSequentiallyAsync finishes typing — real keystrokes already update the input's DOM
-        // value synchronously, well before Tab is even pressed. It does not observe the blur ->
-        // change event -> SignalR round-trip -> Model update at all, so the race it was meant to
-        // close was never actually closed. There's no DOM-observable signal that the server-side
-        // bound property has been updated, so give the round-trip a fixed settling window instead.
-        await page.WaitForTimeoutAsync(300);
-    }
-
-    public Task SetTimeZoneAsync(string value) => TypeIntoTextBoxAsync(TimeZoneInput, value);
-
-    public Task<string> GetTimeZoneAsync() => TimeZoneInput.InputValueAsync();
-
-    /// <summary>The "Locale" HrTextBox in the Regional section.</summary>
-    private ILocator LocaleInput => page.GetByPlaceholder("Locale");
-
-    public Task SetLocaleAsync(string value) => TypeIntoTextBoxAsync(LocaleInput, value);
-
-    public Task<string> GetLocaleAsync() => LocaleInput.InputValueAsync();
-
-    /// <summary>
-    /// The "Backfill Employee Timeline…" button in the "Employee Timeline" subsection. Only rendered
-    /// (@if in CompanySettingsTab.razor) while Session.CanManageEmployees is true (mirrors the
-    /// server-side "employee:manage" policy) — note this is a *different* gate than the
-    /// Session.CanManageCompany gate on the Settings tab itself.
-    /// </summary>
-    private ILocator BackfillEmployeeTimelineButton =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Backfill Employee Timeline…" });
-
-    public Task<bool> IsBackfillEmployeeTimelineButtonVisibleAsync() =>
-        BackfillEmployeeTimelineButton.IsVisibleAsync();
-
-    public Task OpenBackfillEmployeeTimelineDialogAsync() =>
-        BackfillEmployeeTimelineButton.ClickAsync();
 
     // ── Save ───────────────────────────────────────────────────────────────────
 
@@ -148,6 +61,34 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
 
     public async Task<string> GetCompanyNameInputValueAsync() =>
         await page.GetByPlaceholder("Company name").InputValueAsync();
+
+    // ── Addresses (merged into the Profile tab) ───────────────────────────────
+
+    /// <summary>The first address block's "Line 1" field — Acme has more than one address type
+    /// (Registered Office, Trading Address) seeded, so this always targets the first.</summary>
+    private ILocator FirstAddressLine1Input => page.GetByPlaceholder("Line 1").First;
+
+    // FillAsync sets a Syncfusion SfTextBox's DOM value through CDP directly, which bypasses the
+    // component's own JS keyup/input listeners that sync the typed value back to the Blazor-bound
+    // model — a value that visually "fills" never actually round-trips to the server. Click-to-
+    // focus, select-all, delete, then type each character for real, then Tab to blur/commit —
+    // same technique as the old Settings tab's TypeIntoTextBoxAsync (removed along with that tab).
+    public async Task SetFirstAddressLine1Async(string value)
+    {
+        await FirstAddressLine1Input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        await page.WaitForTimeoutAsync(150);
+        if (value.Length > 0)
+            await FirstAddressLine1Input.PressSequentiallyAsync(value, new() { Delay = 30 });
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForTimeoutAsync(300);
+    }
+
+    public Task<bool> IsAddressLine1ValidationMessageVisibleAsync() =>
+        page.Locator(".validation-message", new() { HasText = "Line 1 is required." }).First.IsVisibleAsync();
+
+    public Task<string> GetFirstAddressLine1Async() => FirstAddressLine1Input.InputValueAsync();
 
     // ── Close / unsaved-changes prompt (EditPageBase) ──────────────────────────
 

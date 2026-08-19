@@ -12,6 +12,11 @@ internal sealed class FakeHttpMessageHandler : HttpMessageHandler
     public HttpRequestMessage? LastRequest { get; private set; }
     public string? LastRequestBody { get; private set; }
 
+    /// <summary>Every request/body pair seen, in order — for gateway methods that issue more than
+    /// one HTTP call (e.g. CreateUserAsync's admin-create followed by a resend), so a test can
+    /// assert on a specific step rather than just whichever happened to run last.</summary>
+    public List<(HttpRequestMessage Request, string? Body)> Requests { get; } = [];
+
     public HttpStatusCode StatusCodeToReturn { get; set; } = HttpStatusCode.OK;
     public string ResponseBodyToReturn { get; set; } = "{}";
 
@@ -22,6 +27,7 @@ internal sealed class FakeHttpMessageHandler : HttpMessageHandler
         LastRequestBody = request.Content is null
             ? null
             : await request.Content.ReadAsStringAsync(cancellationToken);
+        Requests.Add((request, LastRequestBody));
 
         return new HttpResponseMessage(StatusCodeToReturn)
         {

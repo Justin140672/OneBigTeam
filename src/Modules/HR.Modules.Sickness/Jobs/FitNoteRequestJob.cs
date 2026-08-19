@@ -32,10 +32,8 @@ internal sealed class FitNoteRequestJob(
         {
             var settings = await sicknessSettingsReader.GetSicknessSettingsAsync(companyId, CancellationToken.None);
 
-            if (settings.FitNoteRequiredAfterDays is null)
-                continue;
-
-            var threshold = settings.FitNoteRequiredAfterDays.Value;
+            // Mandatory, always set (no opt-out) — see CompanySettings.FitNoteRequiredAfterDays.
+            var threshold = settings.FitNoteRequiredAfterDays;
 
             var eligibleRecords = await db.SicknessRecords
                 .Where(r =>

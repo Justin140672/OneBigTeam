@@ -39,7 +39,7 @@
         <EditForm EditContext="EditContext">
             <DataAnnotationsValidator />
             @RenderDetailsCard()
-            <div class="d-flex gap-2 mt-3">
+            <div class="d-flex gap-2 mt-3 justify-content-end">
                 <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
                     @if (Saving)
                     {
@@ -57,7 +57,7 @@
             <h1 class="mb-0 fs-4">@(_vacancy?.EffectiveTitle ?? PageTitle)</h1>
             @if (_vacancy is not null)
             {
-                <StatusBadge Variant="@StatusVariant(_vacancy.Status)">@_vacancy.Status</StatusBadge>
+                <StatusBadge Variant="@StatusVariant(_vacancy.Status)">@EnumDisplay.Humanize(_vacancy.Status)</StatusBadge>
             }
             @if (CanPublish)
             {
@@ -104,7 +104,7 @@
                             <DataAnnotationsValidator />
                             <div class="mt-4">
                                 @RenderDetailsCard()
-                                <div class="d-flex gap-2 mt-3">
+                                <div class="d-flex gap-2 mt-3 justify-content-end">
                                     @if (!IsViewMode)
                                     {
                                         <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">

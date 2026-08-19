@@ -439,7 +439,16 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<string?> GetHeaderTextAsync()
     {
-        var h1 = page.Locator("h1").First;
+        // A bare "h1" locator is ambiguous on this page: VacancyList.razor (the page this test
+        // just navigated FROM, via client-side routing) has its own "<h1 class='mb-1'>Vacancies
+        // </h1>" — on a client-side route transition, that markup can still be present in the DOM
+        // a tick after the URL/tab-strip wait callers already do (ClickVacancyAsync's own wait)
+        // is satisfied, so ".First" here can resolve to the OLD list page's heading instead of
+        // this page's own "h1.mb-0.fs-4" title (see VacancyDetail.razor's non-IsNew branch).
+        // Scope to that specific class, and wait rather than snapshot, since it renders from
+        // _vacancy?.EffectiveTitle after this page's own async load completes.
+        var h1 = page.Locator("h1.fs-4");
+        await h1.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
         return (await h1.TextContentAsync())?.Trim();
     }
 

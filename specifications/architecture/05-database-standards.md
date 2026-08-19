@@ -374,17 +374,17 @@ Inside vertical slice handlers.
 Use transactions when:
 
 - Multiple aggregates updated
-- Outbox records written
+- A module-scoped outbox record is written alongside its owning business change
 
 Transactions should remain short-lived.
 
 ---
 
-## Outbox Persistence
+## Optional Outbox Persistence
 
-Outbox records stored in PostgreSQL.
+An outbox is not required for every module. Where a module explicitly adopts one, its outbox records are stored in PostgreSQL and written in the same transaction as the owning business change.
 
-Outbox write occurs within the same transaction as business changes.
+Modules without an outbox must still use transactions, uniqueness constraints and idempotency appropriate to their commands, jobs and event consumers.
 
 ---
 

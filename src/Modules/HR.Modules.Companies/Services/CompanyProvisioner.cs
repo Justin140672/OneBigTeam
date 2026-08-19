@@ -27,6 +27,16 @@ internal sealed class CompanyProvisioner(
         var settings = CompanySettings.CreateDefault(company.Id, now);
         company.SetSettings(settings, now);
 
+        // A blank RegisteredOffice address so the admin lands on an editable form (Company
+        // Edit's Profile tab) instead of "No addresses found" with no row to fill in at all.
+        // CountryCode defaults to "GB" — UK-only customers for now, and it's no longer
+        // user-editable in the UI (see CompanyProfileTab.razor's remarks).
+        var address = CompanyAddress.Create(
+            Guid.NewGuid(), company.Id, CompanyAddressType.RegisteredOffice,
+            line1: string.Empty, line2: null, city: string.Empty, region: null,
+            postalCode: null, countryCode: "GB", now);
+        company.SetAddress(address, now);
+
         var subscription = CustomerSubscription.StartTrial(company.Id, now, trialLengthDays);
 
         dbContext.Companies.Add(company);

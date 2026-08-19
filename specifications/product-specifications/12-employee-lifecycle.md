@@ -165,7 +165,9 @@ Can manage employee records.
 
 ### Company Admin
 
-Can manage broader employee/user configuration.
+Company Administrator alone cannot view or manage detailed employee records. The role is limited to company administration.
+
+The initial company creator can manage employees because that account is also explicitly assigned HR Administrator.
 
 ---
 

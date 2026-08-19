@@ -33,9 +33,12 @@ internal sealed class FakeOnboardingTaskDefinition : IOnboardingTaskDefinition
 
     public bool IsMandatory { get; }
 
-    public string LinkUrl { get; }
+    private string LinkUrl { get; }
 
     public int Order { get; }
+
+    public Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken) =>
+        Task.FromResult(LinkUrl);
 
     public Task<bool> IsCompletedAsync(Guid companyId, CancellationToken cancellationToken)
     {

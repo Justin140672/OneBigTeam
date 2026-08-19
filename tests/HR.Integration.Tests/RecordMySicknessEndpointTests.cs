@@ -93,7 +93,9 @@ public class RecordMySicknessEndpointTests
         Assert.Equal(employeeId, payload.EmployeeId);
         Assert.Equal(categoryId, payload.CategoryId);
         Assert.Equal("Active", payload.Status);
-        Assert.Equal("NotRequired", payload.EvidenceStatus);
+        // FitNoteRequiredAfterDays is now a mandatory setting (default 7) — an open record (no end
+        // date yet) can't be ruled out as needing evidence, so it's Pending, not NotRequired.
+        Assert.Equal("Pending", payload.EvidenceStatus);
         Assert.Equal("Self-reported illness", payload.Notes);
     }
 

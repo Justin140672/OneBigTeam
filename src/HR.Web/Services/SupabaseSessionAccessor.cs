@@ -39,10 +39,9 @@ public sealed class SupabaseSessionAccessor(IHttpContextAccessor httpContextAcce
     }
 
     /// <summary>
-    /// Sets the token from the "st" query-string parameter Routes.razor reads on arrival at "/" or
-    /// "/getting-started" (see /dev/persona-cookie and /verify-email-complete in Program.cs) — the
-    /// one value proven reliable across this circuit's whole lifetime, unlike a cookie re-read via
-    /// HttpContext.
+    /// Sets the token from the "st" query-string parameter Routes.razor reads on arrival at "/"
+    /// (see /dev/persona-cookie and /login-complete in Program.cs) — the one value proven reliable
+    /// across this circuit's whole lifetime, unlike a cookie re-read via HttpContext.
     /// </summary>
     public void Initialize(string accessToken)
     {
@@ -53,9 +52,10 @@ public sealed class SupabaseSessionAccessor(IHttpContextAccessor httpContextAcce
     /// <summary>
     /// Sets the HttpOnly Supabase access-token session cookie on the current response. Shared by
     /// every place that establishes a real Supabase session from a minimal API endpoint (the
-    /// /verify-email-complete email-verification flow, and /dev/persona-cookie used by the dev
-    /// persona switcher) — Blazor Server's interactive circuit cannot set cookies mid-response, so
-    /// both flows must go through a plain HTTP request/response endpoint like this one.
+    /// /login-complete real sign-in flow, and /dev/persona-cookie used by the dev persona switcher)
+    /// — Blazor Server's interactive circuit cannot set cookies mid-response, so both flows must go
+    /// through a plain HTTP request/response endpoint like this one. Deliberately NOT used by
+    /// /verify-email-complete — see that endpoint's remarks in Program.cs.
     /// </summary>
     public static void SetSessionCookie(HttpContext context, string accessToken, int expiresInSeconds)
     {

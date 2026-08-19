@@ -97,6 +97,11 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Equal(request.AdminEmail, createdUser.Email);
         Assert.EndsWith("/verify-email/", createdUser.RedirectTo);
 
+        // The password the admin chose on the signup form must reach Supabase — otherwise it's
+        // silently discarded and password-grant Login can never work for this account.
+        var createdUserWithPassword = Assert.Single(deps.SupabaseAuthGateway.CreatedUsersWithPassword);
+        Assert.Equal(request.Password, createdUserWithPassword.Password);
+
         // No compensation triggered.
         Assert.Empty(deps.Provisioner.DeactivatedCompanyIds);
 
@@ -109,7 +114,7 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
     }
 
     [Fact]
-    public async Task HandleAsync_Creates_UserProfile_With_CompanyAdministrator_And_Employee_Roles()
+    public async Task HandleAsync_Creates_UserProfile_With_CompanyAdministrator_HrAdministrator_And_Employee_Roles()
     {
         var deps = BuildDependencies();
         var supabaseUserId = Guid.NewGuid();
@@ -130,8 +135,12 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Equal(request.AdminFirstName, profile.FirstName);
         Assert.Equal(request.AdminLastName, profile.LastName);
 
-        // Every seeded persona carries SystemRoles.Employee alongside their specific role — it's
-        // the floor role required by "role:employee", which gates core session endpoints
+        // The self-service admin gets both CompanyAdministrator and HrAdministrator — they're the
+        // company's only user at this point, so CompanyAdministrator alone would lock them out of
+        // Employees/HR Settings/User Administration (and leave the Getting Started checklist
+        // pointing at pages that redirect them straight back out — see SignUpHandler's remarks).
+        // Every seeded persona also carries SystemRoles.Employee alongside their specific role(s) —
+        // it's the floor role required by "role:employee", which gates core session endpoints
         // (GetMe, GetCompany, etc.) that AppSession depends on for every page.
         //
         // UserRole.UserId must key off the local UserProfile.Id, NOT the raw Supabase auth user
@@ -140,8 +149,9 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         // the raw Supabase user id explicitly guards against wiring the wrong id here.
         var roles = await db.UserRoles.Where(r => r.UserId == profile.Id).Select(r => r.RoleId).ToListAsync();
         Assert.Contains(SystemRoles.CompanyAdministrator, roles);
+        Assert.Contains(SystemRoles.HrAdministrator, roles);
         Assert.Contains(SystemRoles.Employee, roles);
-        Assert.Equal(2, roles.Count);
+        Assert.Equal(3, roles.Count);
 
         var rolesKeyedToSupabaseId = await db.UserRoles.CountAsync(r => r.UserId == supabaseUserId);
         Assert.Equal(0, rolesKeyedToSupabaseId);
@@ -230,6 +240,27 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         await using var db2 = fixture.BuildContext();
         var userCount = await db2.Users.CountAsync(u => u.Email == existingEmail);
         Assert.Equal(1, userCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Deactivates_Company_And_Returns_Conflict_When_Supabase_Reports_Email_Already_Registered()
+    {
+        var deps = BuildDependencies();
+        deps.SupabaseAuthGateway.ShouldThrowEmailAlreadyRegistered = true;
+        var handler = BuildHandler(deps);
+        var request = ValidRequest();
+
+        var result = await handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("An account with this email already exists.", result.Error.Message);
+        var deactivatedCompanyId = Assert.Single(deps.Provisioner.DeactivatedCompanyIds);
+        Assert.NotEqual(Guid.Empty, deactivatedCompanyId);
+
+        var auditEvent = Assert.Single(deps.AuditEventPublisher.PublishedEvents);
+        var registrationEvent = Assert.IsType<RegistrationCreatedAuditEvent>(auditEvent);
+        Assert.False(registrationEvent.Succeeded);
+        Assert.Null(registrationEvent.AdminUserId);
     }
 
     [Fact]

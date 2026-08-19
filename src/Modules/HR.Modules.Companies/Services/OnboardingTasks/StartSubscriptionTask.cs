@@ -8,8 +8,10 @@ internal sealed class StartSubscriptionTask(ISubscriptionStatusReader subscripti
     public string Name => "Start your subscription";
     public string Description => "Add billing details to keep full access once your trial ends.";
     public bool IsMandatory => false;
-    public string LinkUrl => "/subscription";
-    public int Order => 7;
+    public int Order => 8;
+
+    public Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken) =>
+        Task.FromResult("/subscription");
 
     public async Task<bool> IsCompletedAsync(Guid companyId, CancellationToken cancellationToken)
     {

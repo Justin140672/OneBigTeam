@@ -159,7 +159,7 @@ Responsibilities:
 
 - Business data
 - Audit data
-- Outbox data
+- Module-scoped outbox data where implemented
 
 Backups managed through Supabase.
 
@@ -199,7 +199,6 @@ Used for:
 
 - Employee documents
 - Recruitment documents
-- Reports
 - Branding assets
 
 Storage remains private.
@@ -221,7 +220,6 @@ Used for:
 - Invitations
 - Notifications
 - Reminders
-- Report completion
 
 Business modules never send emails directly.
 
@@ -239,8 +237,8 @@ Responsibilities:
 
 - Notifications
 - Reminder processing
-- Report generation
-- Outbox processing
+- Long-running report generation if introduced for a demonstrated requirement
+- Module-scoped outbox processing where implemented
 
 Hangfire uses PostgreSQL storage.
 

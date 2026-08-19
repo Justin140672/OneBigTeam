@@ -55,12 +55,12 @@
                     <div class="col-6">
                         <label class="form-label">Hours Per Week</label>
                         <SfNumericTextBox TValue="decimal?" @bind-Value="Model.HoursPerWeek" Min="0" Max="168" ShowSpinButton="false"
-                                          FloatLabelType="FloatLabelType.Auto" Placeholder="e.g. 37.5" />
+                                          FloatLabelType="FloatLabelType.Always" Placeholder="e.g. 37.5" />
                     </div>
                     <div class="col-6">
                         <label class="form-label">FTE</label>
                         <SfNumericTextBox TValue="decimal?" @bind-Value="Model.FTE" Min="0" Max="1" Step="0.05m" ShowSpinButton="false"
-                                          FloatLabelType="FloatLabelType.Auto" Placeholder="e.g. 1.0" />
+                                          FloatLabelType="FloatLabelType.Always" Placeholder="e.g. 1.0" />
                     </div>
                     <div class="col-12">
                         <label class="form-label">Notes</label>
