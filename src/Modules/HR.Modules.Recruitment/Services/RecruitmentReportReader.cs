@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -6,15 +7,15 @@ using Microsoft.EntityFrameworkCore;
 namespace HR.Modules.Recruitment.Services;
 
 /// <summary>
-/// Backs both IRecruitmentPipelineReader (OBT-709) and IVacancyPerformanceReader (OBT-710). Kept as
-/// a single reader so the applicant/interview/offer/hire counting logic — which both reports need —
-/// is written once. "Offers" are counted as distinct applications with an
-/// ApplicationStageHistoryEntry into the company's "Offer" named RecruitmentStage (there is no
-/// separate Offer entity/field in the domain). Date range filtering (when supplied) is applied
-/// against Application.AppliedAt.
+/// Backs IRecruitmentPipelineReader (OBT-709), IVacancyPerformanceReader (OBT-710) and
+/// IRecruitmentPipelineSummaryReader. Kept as a single reader so the applicant/interview/offer/hire
+/// counting logic — which all three reports need — is written once. "Offers" are counted as distinct
+/// applications with an ApplicationStageHistoryEntry into the company's "Offer" named
+/// RecruitmentStage (there is no separate Offer entity/field in the domain). Date range filtering
+/// (when supplied) is applied against Application.AppliedAt.
 /// </summary>
-internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext)
-    : IRecruitmentPipelineReader, IVacancyPerformanceReader
+internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext, IPositionProfileReader positionProfileReader)
+    : IRecruitmentPipelineReader, IVacancyPerformanceReader, IRecruitmentPipelineSummaryReader
 {
     // Row cap (OBT-720 perf pass) — see HR.Modules.Sickness.Services.SicknessReportReader.MaxRows
     // for rationale. Applied to the raw applications query that both reports' metrics are built
@@ -122,6 +123,79 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext)
                     m?.HireDate);
             })
             .ToList();
+    }
+
+    public async Task<RecruitmentPipelineSummaryResult> GetSummaryAsync(
+        Guid companyId,
+        bool includeClosed,
+        CancellationToken cancellationToken)
+    {
+        var vacancyQuery = dbContext.Vacancies
+            .AsNoTracking()
+            .Where(v => v.CompanyId == companyId);
+
+        if (!includeClosed)
+            vacancyQuery = vacancyQuery.Where(v => v.Status != VacancyStatus.Closed && v.Status != VacancyStatus.Cancelled);
+
+        var vacancies = await vacancyQuery
+            .Select(v => new { v.Id, v.PositionProfileId, v.AdvertTitle, v.Status, v.OpenedAt })
+            .ToListAsync(cancellationToken);
+
+        var stages = await dbContext.RecruitmentStages
+            .AsNoTracking()
+            .Where(s => s.CompanyId == companyId && s.IsActive)
+            .OrderBy(s => s.DisplayOrder)
+            .Select(s => new RecruitmentStageColumn(s.Id, s.Name))
+            .ToListAsync(cancellationToken);
+
+        if (vacancies.Count == 0)
+            return new RecruitmentPipelineSummaryResult([], stages);
+
+        var vacancyIds = vacancies.Select(v => v.Id).ToList();
+
+        var applications = await dbContext.Applications
+            .AsNoTracking()
+            .Where(a => a.CompanyId == companyId && vacancyIds.Contains(a.VacancyId))
+            .Select(a => new { a.VacancyId, a.CurrentStageId })
+            .ToListAsync(cancellationToken);
+
+        var candidateCounts = applications
+            .GroupBy(a => a.VacancyId)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var stageCountsByVacancy = applications
+            .GroupBy(a => a.VacancyId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyDictionary<Guid, int>)g
+                    .GroupBy(a => a.CurrentStageId)
+                    .ToDictionary(sg => sg.Key, sg => sg.Count()));
+
+        // Cross-module read: Position Profile title/department are owned by HR.Modules.Employees,
+        // resolved via the narrow IPositionProfileReader contract rather than a direct module
+        // reference — same pattern as GetVacancy/ListVacancies in this module.
+        var positionProfileIds = vacancies.Select(v => v.PositionProfileId).Distinct().ToList();
+        var positionProfilesById = (await positionProfileReader.GetSummariesAsync(companyId, positionProfileIds, cancellationToken))
+            .ToDictionary(p => p.Id);
+
+        var rows = vacancies
+            .Select(v =>
+            {
+                var positionProfile = positionProfilesById.GetValueOrDefault(v.PositionProfileId);
+
+                return new RecruitmentPipelineSummaryRow(
+                    v.Id,
+                    v.AdvertTitle ?? positionProfile?.Title ?? "(untitled vacancy)",
+                    positionProfile?.Title,
+                    positionProfile?.DepartmentName,
+                    v.Status.ToString(),
+                    v.OpenedAt,
+                    candidateCounts.GetValueOrDefault(v.Id, 0),
+                    stageCountsByVacancy.GetValueOrDefault(v.Id, new Dictionary<Guid, int>()));
+            })
+            .ToList();
+
+        return new RecruitmentPipelineSummaryResult(rows, stages);
     }
 
     private sealed record VacancyMetrics(

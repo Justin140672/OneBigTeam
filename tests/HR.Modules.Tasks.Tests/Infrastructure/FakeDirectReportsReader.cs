@@ -13,4 +13,10 @@ internal sealed class FakeDirectReportsReader(params Guid[] reportIds) : IDirect
         Guid managerId,
         CancellationToken cancellationToken) =>
         Task.FromResult(_reportIds);
+
+    public Task<IReadOnlyList<Guid>> GetAllDescendantIdsAsync(
+        Guid companyId,
+        Guid managerId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(_reportIds);
 }

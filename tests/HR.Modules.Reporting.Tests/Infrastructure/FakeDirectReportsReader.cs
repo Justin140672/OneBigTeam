@@ -30,4 +30,15 @@ internal sealed class FakeDirectReportsReader : IDirectReportsReader
 
         return Task.FromResult(_directReportIds);
     }
+
+    public Task<IReadOnlyList<Guid>> GetAllDescendantIdsAsync(
+        Guid companyId,
+        Guid managerId,
+        CancellationToken cancellationToken)
+    {
+        LastCompanyId = companyId;
+        LastManagerId = managerId;
+
+        return Task.FromResult(_directReportIds);
+    }
 }

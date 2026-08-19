@@ -80,7 +80,11 @@ internal sealed class DownloadImportTemplateHandler
             {
                 var validationRange = sheet.Range(2, col + 1, 1000, col + 1);
                 var validation = validationRange.CreateDataValidation();
-                validation.List(string.Join(',', allowedValues), true);
+                // The explicit-list form of Excel's formula1 must be a quoted string literal
+                // ("A,B,C") — without the quotes it's parsed as an (invalid) range reference,
+                // which is what was triggering Excel's "Removed Feature: Data validation" repair
+                // prompt on open.
+                validation.List($"\"{string.Join(',', allowedValues)}\"", true);
                 validation.InputMessage = $"Choose one of: {string.Join(", ", allowedValues)}";
                 validation.ErrorMessage = $"Value must be one of: {string.Join(", ", allowedValues)}";
                 validation.ErrorStyle = XLErrorStyle.Stop;

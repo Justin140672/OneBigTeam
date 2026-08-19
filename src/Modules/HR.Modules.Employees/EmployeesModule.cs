@@ -374,6 +374,7 @@ public static class EmployeesModule
         services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
         services.AddScoped<IDirectReportsReader, DirectReportsReader>();
         services.AddScoped<IEmployeeDirectoryReader, EmployeeDirectoryReader>();
+        services.AddScoped<IHrHeadcountSummaryReader, HrHeadcountSummaryReader>();
         services.AddScoped<IEmployeeDepartmentReader, EmployeeDepartmentReader>();
         services.AddScoped<IEmployeeStarterReader, EmployeeStarterReader>();
         services.AddScoped<IEmployeeLeaverReader, EmployeeLeaverReader>();

@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
@@ -13,8 +14,16 @@ internal sealed class CompleteTaskHandler(
     INotificationWriter notificationWriter,
     IClock clock,
     IAuditEventPublisher auditPublisher,
-    TaskCompletionDispatcher dispatcher)
+    TaskCompletionDispatcher dispatcher,
+    IAuthorizationService authorizationService,
+    IDirectReportsReader directReportsReader)
 {
+    // Mirrors HR.Modules.Identity.Domain.SystemRoles.HrAdministrator. Tasks cannot reference
+    // Identity's internal SystemRoles directly, so the role id is duplicated here as the
+    // sanctioned escape hatch — same pattern as GetRecentLeaveRequests/Endpoint.cs's
+    // HrAdministratorRoleId and GetTeamSicknessToday's SicknessManagePermissionId.
+    private static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");
+
     public async Task<Result<CompleteTaskResponse>> HandleAsync(
         CompleteTaskRequest request,
         CancellationToken cancellationToken)
@@ -27,6 +36,38 @@ internal sealed class CompleteTaskHandler(
         if (task is null)
             return Result.Failure<CompleteTaskResponse>(
                 Error.NotFound($"Task with id '{request.Id}' was not found."));
+
+        // SEC-003: only the assignee, the assignee's manager (anywhere in the reporting
+        // hierarchy), or an HR Administrator may complete a task. Endpoint-level
+        // Policies("role:employee") only proves tenant membership, not resource ownership —
+        // the task's specific assignee is only known after this DB lookup, so the check must
+        // live here rather than at the endpoint. This runs before the cancelled-status check
+        // and before task.Complete()'s already-completed short-circuit, so an unauthorized
+        // caller can never use either as a bypass.
+        var isAssignee = task.AssignedUserId == request.CompletedBy || task.AssignedEmployeeId == request.CompletedBy;
+
+        var isHrAdministrator = (await authorizationService.GetEffectiveRolesAsync(request.CompletedBy, cancellationToken))
+            .Contains(HrAdministratorRoleId);
+
+        // Employee ID and User ID are the same value by construction throughout this app (see
+        // GetMyTasksHandler.cs), so AssignedUserId is a valid fallback when AssignedEmployeeId
+        // is null — a task assigned only via AssignedUserId must still be reachable by that
+        // person's manager.
+        var effectiveAssigneeId = task.AssignedEmployeeId ?? task.AssignedUserId;
+
+        var isManagerInHierarchy = false;
+        if (effectiveAssigneeId.HasValue)
+        {
+            var descendantIds = await directReportsReader.GetAllDescendantIdsAsync(
+                task.CompanyId, request.CompletedBy, cancellationToken);
+            isManagerInHierarchy = descendantIds.Contains(effectiveAssigneeId.Value);
+        }
+
+        // Unassigned tasks (AssignedEmployeeId and AssignedUserId both null) have no
+        // assignee/manager path — only the HR override can complete them.
+        if (!isAssignee && !isHrAdministrator && !isManagerInHierarchy)
+            return Result.Failure<CompleteTaskResponse>(
+                Error.Forbidden("You are not authorized to complete this task."));
 
         if (task.Status == TaskItemStatus.Cancelled)
             return Result.Failure<CompleteTaskResponse>(

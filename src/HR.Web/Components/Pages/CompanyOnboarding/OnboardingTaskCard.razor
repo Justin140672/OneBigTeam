@@ -17,7 +17,7 @@
         else
         {
             <a href="@ResolvedLinkUrl" class="btn btn-primary btn-sm align-self-start mt-auto">
-                Go to task
+                @ActionLabel
             </a>
         }
     </div>
@@ -29,5 +29,13 @@
 
     // Task.LinkUrl contains a "{companyId}" placeholder since HR.Web's routes are company-scoped
     // (e.g. "/companies/{CompanyId:guid}/employees") — substitute the current company id here.
-    private string ResolvedLinkUrl => Task.LinkUrl.Replace("{companyId}", CompanyId.ToString());
+    // "returnUrl" tells the target edit page (EditPageBase.TargetListUrl) to send the user back
+    // here on Save/Close instead of its own list page, so completing a task from the checklist
+    // returns to the checklist rather than stranding the user on an unrelated list screen.
+    private string ResolvedLinkUrl =>
+        Task.LinkUrl.Replace("{companyId}", CompanyId.ToString()) + "?returnUrl=%2Fgetting-started";
+
+    // The import template task streams a file download rather than navigating to a page (see
+    // DownloadEmployeeImportTemplateTask.GetLinkUrlAsync), so "Go to task" reads wrong there.
+    private string ActionLabel => Task.Key == "download-employee-import-template" ? "Download" : "Go to task";
 }

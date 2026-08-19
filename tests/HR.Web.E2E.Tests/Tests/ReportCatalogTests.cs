@@ -66,9 +66,11 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : HrFavour
         Assert.True(await catalog.IsCardClickableAsync("Employee Directory"),
             "Expected the Employee Directory card to be clickable (no 'Coming soon' badge)");
 
-        // Other phase-1 catalog entries are rendered but not yet clickable.
-        Assert.False(await catalog.IsCardClickableAsync("HR Headcount Summary"),
-            "Expected the HR Headcount Summary card to show a 'Coming soon' badge");
+        // HR Headcount Summary was a phase-1 "Coming soon" placeholder card but is now a fully
+        // built, clickable report (see ReportRoutes.Map in ReportingModels.cs) — its clickability
+        // and navigation are covered by NewReportCard_IsClickable_AndNavigatesToCorrectRoute below.
+        Assert.True(await catalog.IsCardClickableAsync("HR Headcount Summary"),
+            "Expected the HR Headcount Summary card to be clickable (no 'Coming soon' badge) now that its report page exists");
     }
 
     [Fact]
@@ -190,6 +192,7 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : HrFavour
     [InlineData("Offboarding Progress Report", "offboarding-progress")]
     [InlineData("Document Compliance Report", "document-compliance")]
     [InlineData("Company Document Acknowledgement Report", "document-acknowledgement")]
+    [InlineData("HR Headcount Summary", "hr-headcount-summary")]
     public async Task NewReportCard_IsClickable_AndNavigatesToCorrectRoute(string cardTitleFragment, string routeSlug)
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -213,6 +216,7 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : HrFavour
     [Theory]
     [InlineData("Recruitment Pipeline Report", "recruitment-pipeline")]
     [InlineData("Vacancy Performance Report", "vacancy-performance")]
+    [InlineData("Recruitment Pipeline Summary", "recruitment-pipeline-summary")]
     public async Task NewRecruitmentReportCard_IsClickable_AndNavigatesToCorrectRoute(string cardTitleFragment, string routeSlug)
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

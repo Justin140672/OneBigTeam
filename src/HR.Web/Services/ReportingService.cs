@@ -810,6 +810,121 @@ public class ReportingService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    // ── Recruitment Pipeline Summary report ──────────────────────────────────
+
+    public async Task<(GetRecruitmentPipelineSummaryReportResponse? Response, string? Error)> GetRecruitmentPipelineSummaryReportAsync(
+        Guid companyId, RecruitmentPipelineSummaryReportFilter filter, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = BuildQuery(filter);
+            var response = await Http.GetFromJsonAsync<GetRecruitmentPipelineSummaryReportResponse>(
+                $"api/companies/{companyId}/reporting/recruitment-pipeline-summary?{query}", HrApiJsonOptions.Default, cancellationToken);
+            return (response, null);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Forbidden)
+        {
+            return (null, "You do not have permission to view this report.");
+        }
+        catch (HttpRequestException)
+        {
+            return (null, "Failed to load the recruitment pipeline summary report.");
+        }
+    }
+
+    public async Task<(byte[]? Bytes, string? ContentType, string? FileName, string? Error)> ExportRecruitmentPipelineSummaryReportAsync(
+        Guid companyId, RecruitmentPipelineSummaryReportFilter filter, ReportExportFormat format, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = BuildQuery(filter);
+            query += $"&format={format}";
+
+            var response = await Http.GetAsync(
+                $"api/companies/{companyId}/reporting/recruitment-pipeline-summary/export?{query}", cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+                return (null, null, null, "Failed to export the recruitment pipeline summary report.");
+
+            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            var contentType = response.Content.Headers.ContentType?.MediaType;
+            var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"');
+
+            return (bytes, contentType, fileName, null);
+        }
+        catch
+        {
+            return (null, null, null, "Failed to export the recruitment pipeline summary report.");
+        }
+    }
+
+    private static string BuildQuery(RecruitmentPipelineSummaryReportFilter filter)
+    {
+        var query = HttpUtility.ParseQueryString(string.Empty);
+        query["includeClosed"] = filter.IncludeClosed.ToString();
+        return query.ToString() ?? string.Empty;
+    }
+
+    // ── HR Headcount Summary report ──────────────────────────────────────────
+
+    public async Task<(GetHrHeadcountSummaryReportResponse? Response, string? Error)> GetHrHeadcountSummaryReportAsync(
+        Guid companyId, HrHeadcountSummaryReportFilter filter, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = BuildQuery(filter);
+            var response = await Http.GetFromJsonAsync<GetHrHeadcountSummaryReportResponse>(
+                $"api/companies/{companyId}/reporting/hr-headcount-summary?{query}", HrApiJsonOptions.Default, cancellationToken);
+            return (response, null);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Forbidden)
+        {
+            return (null, "You do not have permission to view this report.");
+        }
+        catch (HttpRequestException)
+        {
+            return (null, "Failed to load the HR headcount summary report.");
+        }
+    }
+
+    public async Task<(byte[]? Bytes, string? ContentType, string? FileName, string? Error)> ExportHrHeadcountSummaryReportAsync(
+        Guid companyId, HrHeadcountSummaryReportFilter filter, ReportExportFormat format, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = BuildQuery(filter);
+            query += $"&format={format}";
+
+            var response = await Http.GetAsync(
+                $"api/companies/{companyId}/reporting/hr-headcount-summary/export?{query}", cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+                return (null, null, null, "Failed to export the HR headcount summary report.");
+
+            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            var contentType = response.Content.Headers.ContentType?.MediaType;
+            var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"');
+
+            return (bytes, contentType, fileName, null);
+        }
+        catch
+        {
+            return (null, null, null, "Failed to export the HR headcount summary report.");
+        }
+    }
+
+    private static string BuildQuery(HrHeadcountSummaryReportFilter filter)
+    {
+        var query = HttpUtility.ParseQueryString(string.Empty);
+        if (filter.DepartmentId is not null) query["departmentId"] = filter.DepartmentId.ToString();
+        if (filter.LocationId is not null) query["locationId"] = filter.LocationId.ToString();
+        if (filter.EmploymentTypeId is not null) query["employmentTypeId"] = filter.EmploymentTypeId.ToString();
+        if (!string.IsNullOrWhiteSpace(filter.EmployeeStatus)) query["employeeStatus"] = filter.EmployeeStatus;
+        return query.ToString() ?? string.Empty;
+    }
+
     // ── Favourites ────────────────────────────────────────────────────────────
 
     public async Task<GetReportFavouritesResponse?> GetReportFavouritesAsync(

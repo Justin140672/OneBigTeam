@@ -36,6 +36,8 @@ public static class ReportRoutes
         ["document-acknowledgement"] = "document-acknowledgement",
         ["asset-assignment"] = "asset-assignment",
         ["workload-actions"] = "workload-actions",
+        ["recruitment-pipeline-summary"] = "recruitment-pipeline-summary",
+        ["hr-headcount-summary"] = "hr-headcount-summary",
     };
 
     public static bool IsClickable(string reportId) => Map.ContainsKey(reportId);
@@ -416,6 +418,54 @@ public record WorkloadActionSummaryModel(
     int Overdue,
     int DueToday,
     int DueThisWeek);
+
+// ── Recruitment Pipeline Summary report ─────────────────────────────────────
+
+public record RecruitmentPipelineSummaryReportFilter(bool IncludeClosed = false);
+
+public record GetRecruitmentPipelineSummaryReportResponse(
+    List<RecruitmentPipelineSummaryRowModel> Vacancies,
+    List<RecruitmentStageColumnModel> Stages);
+
+public record RecruitmentStageColumnModel(Guid StageId, string StageName);
+
+public record RecruitmentPipelineSummaryRowModel(
+    Guid VacancyId,
+    string VacancyTitle,
+    string? PositionProfileTitle,
+    string? DepartmentName,
+    string Status,
+    DateOnly? OpenedAt,
+    int CandidateCount,
+    Dictionary<Guid, int> CandidatesByStage);
+
+// ── HR Headcount Summary report ──────────────────────────────────────────────
+
+public record HrHeadcountSummaryReportFilter(
+    Guid? DepartmentId = null,
+    Guid? LocationId = null,
+    Guid? EmploymentTypeId = null,
+    string? EmployeeStatus = null);
+
+public record GetHrHeadcountSummaryReportResponse(
+    List<HrHeadcountSummaryReportItemModel> Items,
+    int TotalHeadcount,
+    int ActiveEmployees,
+    int FutureStarters,
+    int Leavers,
+    decimal TotalFte);
+
+public record HrHeadcountSummaryReportItemModel(
+    Guid EmployeeId,
+    string EmployeeName,
+    string? Department,
+    string? Location,
+    string? Position,
+    string? EmploymentType,
+    string Status,
+    DateOnly StartDate,
+    DateOnly? LeavingDate,
+    decimal? Fte);
 
 // ── Favourites ────────────────────────────────────────────────────────────────
 

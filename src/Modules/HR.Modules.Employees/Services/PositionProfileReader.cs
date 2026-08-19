@@ -63,8 +63,10 @@ internal sealed class PositionProfileReader(EmployeesDbContext dbContext)
                 where p.Id == positionProfileId && p.CompanyId == companyId
                 join l in dbContext.Locations.AsNoTracking() on p.LocationId equals l.Id into locations
                 from location in locations.DefaultIfEmpty()
+                join d in dbContext.Departments.AsNoTracking() on p.DepartmentId equals d.Id into departments
+                from department in departments.DefaultIfEmpty()
                 select new PositionProfileSummary(
-                    p.Id, p.Title, p.DepartmentId, p.Description, p.IsActive, p.LocationId, location.Name))
+                    p.Id, p.Title, p.DepartmentId, p.Description, p.IsActive, p.LocationId, location.Name, department.Name))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -79,8 +81,10 @@ internal sealed class PositionProfileReader(EmployeesDbContext dbContext)
                 where p.CompanyId == companyId && positionProfileIds.Contains(p.Id)
                 join l in dbContext.Locations.AsNoTracking() on p.LocationId equals l.Id into locations
                 from location in locations.DefaultIfEmpty()
+                join d in dbContext.Departments.AsNoTracking() on p.DepartmentId equals d.Id into departments
+                from department in departments.DefaultIfEmpty()
                 select new PositionProfileSummary(
-                    p.Id, p.Title, p.DepartmentId, p.Description, p.IsActive, p.LocationId, location.Name))
+                    p.Id, p.Title, p.DepartmentId, p.Description, p.IsActive, p.LocationId, location.Name, department.Name))
             .ToListAsync(cancellationToken);
     }
 

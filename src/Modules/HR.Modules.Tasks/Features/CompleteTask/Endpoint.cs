@@ -36,6 +36,12 @@ internal sealed class Endpoint(CompleteTaskHandler handler, ICurrentUser current
                 return;
             }
 
+            if (result.Error.Code == "forbidden")
+            {
+                await Send.ResultAsync(TypedResults.Forbid());
+                return;
+            }
+
             await Send.ResultAsync(TypedResults.Conflict(businessError));
             return;
         }

@@ -18,11 +18,21 @@ public class CompleteTaskHandlerTests
     private static readonly TaskCompletionDispatcher NoOpDispatcher =
         new(Enumerable.Empty<ITaskCompletionAction>());
 
+    private static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");
+    private static readonly Guid CompanyAdministratorRoleId = new("00000000-0000-0000-0000-000000000006");
+
     private static CompleteTaskHandler BuildHandler(
         TasksDbContext context,
         FakeAuditPublisher? audit = null,
-        FakeNotificationWriter? notif = null) =>
-        new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher(), NoOpDispatcher);
+        FakeNotificationWriter? notif = null,
+        FakeRoleAuthorizationService? authorizationService = null,
+        FakeDirectReportsReader? directReportsReader = null) =>
+        new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher(), NoOpDispatcher,
+            // Defaults to an HR-Administrator caller so tests unrelated to SEC-003 authorization
+            // (pre-existing behavior around completion/notification/audit) don't need to wire up
+            // assignee/manager relationships just to get past the authorization check.
+            authorizationService ?? new FakeRoleAuthorizationService(HrAdministratorRoleId),
+            directReportsReader ?? new FakeDirectReportsReader());
 
     private static TaskItem MakeTask(Guid companyId, TaskItemStatus status = TaskItemStatus.Open)
     {
@@ -317,6 +327,364 @@ public class CompleteTaskHandlerTests
             CancellationToken.None);
 
         Assert.Empty(notif.Written);
+    }
+
+    // ---- SEC-003: authorization matrix ----
+
+    [Fact]
+    public async Task HandleAsync_Returns_Forbidden_For_Unrelated_Peer_Employee()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+        var unrelatedPeer = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Task", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = unrelatedPeer },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("forbidden", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Assignee_By_AssignedEmployeeId()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Task", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = assignedEmployee },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Assignee_By_AssignedUserId()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedUser = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Task", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            null, null, assignedUser, DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = assignedUser },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Assignees_Direct_Manager()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+        var manager = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Task", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader(assignedEmployee));
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = manager },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Forbidden_For_Manager_Who_Does_Not_Manage_Assignee()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+        var otherManager = Guid.NewGuid();
+        var someoneElsesReport = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Task", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader(someoneElsesReport));
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = otherManager },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("forbidden", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_HrAdministrator_Even_When_Not_Assignee_Or_Manager()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+        var hrAdmin = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Task", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(HrAdministratorRoleId),
+            directReportsReader: new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = hrAdmin },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Forbidden_For_Unassigned_Task_Completed_By_NonHrAdmin()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var caller = Guid.NewGuid();
+
+        var task = MakeTask(companyId); // AssignedEmployeeId and AssignedUserId both null
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = caller },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("forbidden", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_HrAdministrator_To_Complete_Unassigned_Task()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var hrAdmin = Guid.NewGuid();
+
+        var task = MakeTask(companyId); // AssignedEmployeeId and AssignedUserId both null
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(HrAdministratorRoleId),
+            directReportsReader: new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = hrAdmin },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Forbidden_Even_When_Task_Already_Completed()
+    {
+        // Authorization must be checked before the already-completed short-circuit; an
+        // unauthorized caller must not be able to "complete" an already-completed task to
+        // silently succeed.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+        var unrelatedPeer = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Task", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow);
+        task.Complete(assignedEmployee, DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = unrelatedPeer },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("forbidden", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_Not_Forbidden_When_Cancelled_Task_Completed_By_Authorized_Assignee()
+    {
+        // Authorization is checked first, but for an authorized caller the pre-existing
+        // cancelled-task Conflict behavior must be unchanged.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Task", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow);
+        task.Cancel(DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = assignedEmployee },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Skip_Level_Manager_In_Three_Level_Hierarchy()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid(); // A
+        var skipLevelManager = Guid.NewGuid(); // C, A's manager's manager
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Task", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        // C's full descendant tree (via GetAllDescendantIdsAsync) includes A even though C is not
+        // A's direct manager.
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader(assignedEmployee));
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = skipLevelManager },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Forbidden_For_CompanyAdministrator_Who_Is_Not_Assignee_Or_Manager()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+        var companyAdmin = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Task", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(CompanyAdministratorRoleId),
+            directReportsReader: new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = companyAdmin },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("forbidden", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Manager_Of_AssignedUserId_Only_Task()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedUser = Guid.NewGuid();
+        var manager = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Task", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            null, null, assignedUser, DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader(assignedUser));
+
+        var result = await handler.HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = manager },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
     }
 
     private static TasksDbContext BuildContext()

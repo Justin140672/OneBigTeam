@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.AspNetCore.WebUtilities;
 using HR.Web.Services;
 
 namespace HR.Web.Components.Pages;
@@ -28,6 +29,25 @@ public abstract class EditPageBase : ComponentBase, IDisposable
     // The list page to return to on Close, and to navigate to after a successful save (unless
     // OnSavedAsync is overridden). Leave null for pages that should stay put after saving.
     protected virtual string? ListUrl => null;
+
+    // Where Close/Save-and-close should actually go: a "?returnUrl=" query param set by callers
+    // that sent the user here from somewhere other than ListUrl (e.g. the Getting Started
+    // checklist), falling back to ListUrl when absent. Only trusts an app-relative path (starts
+    // with "/", not "//") so a crafted external returnUrl can't redirect the user off-site.
+    private string? ReturnUrl
+    {
+        get
+        {
+            var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+            if (!QueryHelpers.ParseQuery(uri.Query).TryGetValue("returnUrl", out var value))
+                return null;
+
+            var returnUrl = value.ToString();
+            return returnUrl.StartsWith('/') && !returnUrl.StartsWith("//") ? returnUrl : null;
+        }
+    }
+
+    private string? TargetListUrl => ReturnUrl ?? ListUrl;
 
     // Overridden by EditPageBase<TModel> (diffs the model against a load-time snapshot) and by
     // orchestrator pages that also want to factor in a child section's unsaved state.
@@ -143,8 +163,8 @@ public abstract class EditPageBase : ComponentBase, IDisposable
     // success banner (multi-section pages like CompanyEdit that don't set ListUrl).
     protected virtual Task OnSavedAsync()
     {
-        if (ListUrl is not null)
-            Navigation.NavigateTo(ListUrl, forceLoad: true);
+        if (TargetListUrl is not null)
+            Navigation.NavigateTo(TargetListUrl, forceLoad: true);
         else
             SuccessMsg = "Saved successfully.";
 
@@ -165,7 +185,7 @@ public abstract class EditPageBase : ComponentBase, IDisposable
     // button instead (no intercepted navigation, so _pendingNavigationUri is null).
     protected void NavigateToList()
     {
-        var target = _pendingNavigationUri ?? ListUrl;
+        var target = _pendingNavigationUri ?? TargetListUrl;
         _pendingNavigationUri = null;
 
         if (target is not null)

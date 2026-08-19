@@ -1,3 +1,5 @@
+using System.IO.Packaging;
+using System.Xml.Linq;
 using ClosedXML.Excel;
 using HR.Modules.DataImport.Features.DownloadImportTemplate;
 using HR.Modules.DataImport.Services;
@@ -103,6 +105,37 @@ public class DownloadImportTemplateHandlerTests
         Assert.Contains("Annual", listValue);
         Assert.Contains("Hourly", listValue);
         Assert.Contains("Daily", listValue);
+    }
+
+    // Regression test for a workbook-corruption bug: ClosedXML's validation.List() writes an
+    // *unquoted* comma-separated string straight into formula1 unless the caller wraps it in
+    // literal quotes itself. Excel requires an explicit-list formula1 to be a quoted string
+    // literal ("A,B,C") — unquoted, it's parsed as an invalid range reference, and Excel drops
+    // the data validation with a "Removed Feature: Data validation" repair prompt on open.
+    // ClosedXML's own object model silently round-trips the bad value (it strips/re-adds quotes
+    // when reading validation.Value back), so the higher-level test above wouldn't catch this —
+    // only inspecting the raw sheet XML does.
+    [Fact]
+    public void Handle_SalaryType_DataValidation_Formula_Is_A_Quoted_List_Literal()
+    {
+        var handler = new DownloadImportTemplateHandler();
+
+        var bytes = handler.Handle();
+        using var package = Package.Open(new MemoryStream(bytes), FileMode.Open, FileAccess.Read);
+        var sheetPart = package.GetParts()
+            .Single(p => p.Uri.OriginalString.EndsWith("/worksheets/sheet1.xml", StringComparison.OrdinalIgnoreCase));
+
+        using var stream = sheetPart.GetStream();
+        var doc = XDocument.Load(stream);
+        XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+        var formula1 = doc.Descendants(ns + "dataValidation")
+            .Single()
+            .Element(ns + "formula1")!
+            .Value;
+
+        Assert.StartsWith("\"", formula1);
+        Assert.EndsWith("\"", formula1);
     }
 
     [Fact]

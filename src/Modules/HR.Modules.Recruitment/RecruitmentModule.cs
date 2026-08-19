@@ -238,6 +238,7 @@ public static class RecruitmentModule
         services.AddScoped<RecruitmentReportReader>();
         services.AddScoped<IRecruitmentPipelineReader>(sp => sp.GetRequiredService<RecruitmentReportReader>());
         services.AddScoped<IVacancyPerformanceReader>(sp => sp.GetRequiredService<RecruitmentReportReader>());
+        services.AddScoped<IRecruitmentPipelineSummaryReader>(sp => sp.GetRequiredService<RecruitmentReportReader>());
     }
 
     public static WebApplication UseRecruitmentRecurringJobs(this WebApplication app)

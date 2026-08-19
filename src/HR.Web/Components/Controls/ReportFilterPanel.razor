@@ -10,22 +10,23 @@
 
 <div class="card mb-3">
     <div class="card-body">
-        <div class="report-filter-toolbar d-flex justify-content-end mb-2">
-            <SfButton CssClass="e-primary e-small" IconCss="e-icons e-save" OnClick="@(() => _showSaveAs = true)">Save</SfButton>
-        </div>
         <div class="row g-3 align-items-end mb-2">
             <div class="col-md-4">
                 <label class="form-label">Saved Views</label>
-                <SfDropDownList TValue="Guid?"
-                                TItem="SavedViewOption"
-                                DataSource="@_savedViewOptions"
-                                Value="@_selectedViewId"
-                                ValueChanged="OnSavedViewSelectedAsync"
-                                Placeholder="Select a saved view"
-                                AllowFiltering="true"
-                                ShowClearButton="true">
-                    <DropDownListFieldSettings Value="Id" Text="DisplayText" />
-                </SfDropDownList>
+                <div class="d-flex gap-2">
+                    <SfDropDownList TValue="Guid?"
+                                    TItem="SavedViewOption"
+                                    DataSource="@_savedViewOptions"
+                                    Value="@_selectedViewId"
+                                    ValueChanged="OnSavedViewSelectedAsync"
+                                    Placeholder="Select a saved view"
+                                    AllowFiltering="true"
+                                    ShowClearButton="true"
+                                    CssClass="flex-grow-1">
+                        <DropDownListFieldSettings Value="Id" Text="DisplayText" />
+                    </SfDropDownList>
+                    <SfButton CssClass="e-primary e-small flex-shrink-0" IconCss="e-icons e-save" OnClick="@(() => _showSaveAs = true)">Save</SfButton>
+                </div>
             </div>
             @if (_selectedView is not null)
             {

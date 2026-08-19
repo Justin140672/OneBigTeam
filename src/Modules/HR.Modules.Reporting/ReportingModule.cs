@@ -5,6 +5,7 @@ using HR.Modules.Reporting.Features.ExportAssetAssignmentReport;
 using HR.Modules.Reporting.Features.ExportEmployeeDirectoryReport;
 using HR.Modules.Reporting.Features.ExportEmployeeLeaverReport;
 using HR.Modules.Reporting.Features.ExportEmployeeStarterReport;
+using HR.Modules.Reporting.Features.ExportHrHeadcountSummaryReport;
 using HR.Modules.Reporting.Features.ExportLeaveCalendarReport;
 using HR.Modules.Reporting.Features.ExportLeaveSummaryReport;
 using HR.Modules.Reporting.Features.ExportOnboardingProgressReport;
@@ -13,12 +14,14 @@ using HR.Modules.Reporting.Features.ExportDocumentComplianceReport;
 using HR.Modules.Reporting.Features.ExportCompanyDocumentAcknowledgementReport;
 using HR.Modules.Reporting.Features.ExportProbationReport;
 using HR.Modules.Reporting.Features.ExportRecruitmentPipelineReport;
+using HR.Modules.Reporting.Features.ExportRecruitmentPipelineSummaryReport;
 using HR.Modules.Reporting.Features.ExportSicknessReport;
 using HR.Modules.Reporting.Features.ExportVacancyPerformanceReport;
 using HR.Modules.Reporting.Features.GetAssetAssignmentReport;
 using HR.Modules.Reporting.Features.GetEmployeeDirectoryReport;
 using HR.Modules.Reporting.Features.GetEmployeeLeaverReport;
 using HR.Modules.Reporting.Features.GetEmployeeStarterReport;
+using HR.Modules.Reporting.Features.GetHrHeadcountSummaryReport;
 using HR.Modules.Reporting.Features.GetLeaveCalendarReport;
 using HR.Modules.Reporting.Features.GetLeaveSummaryReport;
 using HR.Modules.Reporting.Features.GetOnboardingProgressReport;
@@ -27,6 +30,7 @@ using HR.Modules.Reporting.Features.GetDocumentComplianceReport;
 using HR.Modules.Reporting.Features.GetCompanyDocumentAcknowledgementReport;
 using HR.Modules.Reporting.Features.GetProbationReport;
 using HR.Modules.Reporting.Features.GetRecruitmentPipelineReport;
+using HR.Modules.Reporting.Features.GetRecruitmentPipelineSummaryReport;
 using HR.Modules.Reporting.Features.GetReportCatalog;
 using HR.Modules.Reporting.Features.GetReportFavourites;
 using HR.Modules.Reporting.Features.GetReportViews;
@@ -69,6 +73,12 @@ public static class ReportingModule
 
         services.AddScoped<ExportEmployeeDirectoryReportHandler>();
         services.AddScoped<IValidator<ExportEmployeeDirectoryReportRequest>, ExportEmployeeDirectoryReportValidator>();
+
+        services.AddScoped<GetHrHeadcountSummaryReportHandler>();
+        services.AddScoped<IValidator<GetHrHeadcountSummaryReportRequest>, GetHrHeadcountSummaryReportValidator>();
+
+        services.AddScoped<ExportHrHeadcountSummaryReportHandler>();
+        services.AddScoped<IValidator<ExportHrHeadcountSummaryReportRequest>, ExportHrHeadcountSummaryReportValidator>();
 
         services.AddScoped<GetEmployeeStarterReportHandler>();
         services.AddScoped<IValidator<GetEmployeeStarterReportRequest>, GetEmployeeStarterReportValidator>();
@@ -129,6 +139,12 @@ public static class ReportingModule
 
         services.AddScoped<ExportRecruitmentPipelineReportHandler>();
         services.AddScoped<IValidator<ExportRecruitmentPipelineReportRequest>, ExportRecruitmentPipelineReportValidator>();
+
+        services.AddScoped<GetRecruitmentPipelineSummaryReportHandler>();
+        services.AddScoped<IValidator<GetRecruitmentPipelineSummaryReportRequest>, GetRecruitmentPipelineSummaryReportValidator>();
+
+        services.AddScoped<ExportRecruitmentPipelineSummaryReportHandler>();
+        services.AddScoped<IValidator<ExportRecruitmentPipelineSummaryReportRequest>, ExportRecruitmentPipelineSummaryReportValidator>();
 
         services.AddScoped<GetVacancyPerformanceReportHandler>();
         services.AddScoped<IValidator<GetVacancyPerformanceReportRequest>, GetVacancyPerformanceReportValidator>();

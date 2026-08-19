@@ -23,7 +23,12 @@ public sealed record PositionProfileSummary(
     // location-fallback resolution ("Location override ?? Position Profile location default", see
     // GetVacancyHandler/ListVacanciesHandler) never need a direct reference to the Employees module's
     // Location entity.
-    string? LocationName);
+    string? LocationName,
+    // Resolved display name for DepartmentId, or null when the profile has no department set (or the
+    // department can no longer be found). Same rationale/resolution approach as LocationName — added
+    // for the Recruitment Pipeline Summary Report (see IRecruitmentPipelineSummaryReader), which needs
+    // a vacancy's department name without a direct reference to the Employees module's Department entity.
+    string? DepartmentName = null);
 
 /// <summary>
 /// A position profile's employment defaults, as owned by HR.Modules.Employees. Surfaced as read-only
