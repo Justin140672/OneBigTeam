@@ -13,10 +13,12 @@
   </Folder>
   <Folder Name="/src/Modules/">
     <Project Path="src/Modules/HR.Modules.Companies/HR.Modules.Companies.csproj" />
+    <Project Path="src/Modules/HR.Modules.Companies.Contracts/HR.Modules.Companies.Contracts.csproj" />
     <Project Path="src/Modules/HR.Modules.CompanyOnboarding/HR.Modules.CompanyOnboarding.csproj" />
     <Project Path="src/Modules/HR.Modules.DataImport/HR.Modules.DataImport.csproj" />
     <Project Path="src/Modules/HR.Modules.Documents/HR.Modules.Documents.csproj" />
     <Project Path="src/Modules/HR.Modules.Employees/HR.Modules.Employees.csproj" />
+    <Project Path="src/Modules/HR.Modules.Employees.Contracts/HR.Modules.Employees.Contracts.csproj" />
     <Project Path="src/Modules/HR.Modules.Identity/HR.Modules.Identity.csproj" />
     <Project Path="src/Modules/HR.Modules.Leave/HR.Modules.Leave.csproj" />
     <Project Path="src/Modules/HR.Modules.Notifications/HR.Modules.Notifications.csproj" />
@@ -29,6 +31,7 @@
     <Project Path="src/Modules/HR.Modules.Sickness/HR.Modules.Sickness.csproj" />
     <Project Path="src/Modules/HR.Modules.Support/HR.Modules.Support.csproj" />
     <Project Path="src/Modules/HR.Modules.Tasks/HR.Modules.Tasks.csproj" />
+    <Project Path="src/Modules/HR.Modules.Tasks.Contracts/HR.Modules.Tasks.Contracts.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/HR.SharedKernel/HR.SharedKernel.csproj" />

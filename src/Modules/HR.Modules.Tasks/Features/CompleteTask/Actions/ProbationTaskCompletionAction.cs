@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 

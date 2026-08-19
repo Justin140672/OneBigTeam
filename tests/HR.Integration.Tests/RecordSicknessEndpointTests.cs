@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;

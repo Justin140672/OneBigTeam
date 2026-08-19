@@ -1,5 +1,6 @@
 using System.Text.Json;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Documents.Features.GetSharedCompanyDocumentAuditHistory;

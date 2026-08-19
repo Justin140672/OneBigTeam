@@ -1,7 +1,9 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

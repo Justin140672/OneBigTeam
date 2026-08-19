@@ -27,7 +27,12 @@ public class RequireTenantMiddlewareTests
         // Authenticated (X-Test-User present) but no X-Test-Tenant header
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "user-without-tenant");
 
-        var response = await client.PostAsJsonAsync("/api/companies", new { });
+        // POST /api/companies (CreateCompany) was removed in 78a43344. These tests are
+        // deliberately provider-agnostic about which endpoint they hit — they only care that it
+        // requires auth + tenant and has no {companyId} route segment, to keep the test bodies
+        // simple. /api/company-onboarding/checklist/dismiss (onboarding:manage policy, no route
+        // params) fits that shape.
+        var response = await client.PostAsJsonAsync("/api/company-onboarding/checklist/dismiss", new { });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -38,7 +43,12 @@ public class RequireTenantMiddlewareTests
         using var client = _factory.CreateClient();
         // No auth headers at all — should get 401 from auth, not 403 from tenant guard
 
-        var response = await client.PostAsJsonAsync("/api/companies", new { });
+        // POST /api/companies (CreateCompany) was removed in 78a43344. These tests are
+        // deliberately provider-agnostic about which endpoint they hit — they only care that it
+        // requires auth + tenant and has no {companyId} route segment, to keep the test bodies
+        // simple. /api/company-onboarding/checklist/dismiss (onboarding:manage policy, no route
+        // params) fits that shape.
+        var response = await client.PostAsJsonAsync("/api/company-onboarding/checklist/dismiss", new { });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -47,7 +57,9 @@ public class RequireTenantMiddlewareTests
     public async Task Authenticated_Request_With_Tenant_Passes_Guard()
     {
         var userId = new Guid("aa000005-0000-0000-0000-000000000001");
-        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee);
+        // onboarding:manage (guarding the dismiss-checklist endpoint below) requires
+        // HrAdministrator or CompanyAdministrator, not plain Employee.
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
 
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
@@ -55,7 +67,12 @@ public class RequireTenantMiddlewareTests
 
         // We only care that the tenant guard passes (not 403). The actual endpoint
         // response (200, 404, etc.) is tested in the endpoint-specific tests.
-        var response = await client.PostAsJsonAsync("/api/companies", new { });
+        // POST /api/companies (CreateCompany) was removed in 78a43344. These tests are
+        // deliberately provider-agnostic about which endpoint they hit — they only care that it
+        // requires auth + tenant and has no {companyId} route segment, to keep the test bodies
+        // simple. /api/company-onboarding/checklist/dismiss (onboarding:manage policy, no route
+        // params) fits that shape.
+        var response = await client.PostAsJsonAsync("/api/company-onboarding/checklist/dismiss", new { });
 
         Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
     }

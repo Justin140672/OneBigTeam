@@ -26,6 +26,7 @@ using HR.Modules.Leave.Features.DeactivateLeaveType;
 using HR.Modules.Leave.Persistence;
 using HR.Modules.Leave.Services;
 using HR.Modules.Leave.Services.OnboardingTasks;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;

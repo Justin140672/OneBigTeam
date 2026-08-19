@@ -576,14 +576,9 @@ public class LeaveLifecycleIntegrationTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, UserId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, UserId);
 
-        var companyResp = await client.PostAsJsonAsync("/api/companies", new
-        {
-            name = $"Lifecycle Test {Guid.NewGuid():N}",
-            addresses = new[] { new { type = "RegisteredOffice", line1 = "1 Test St", city = "London", countryCode = "GB" } }
-        });
-        companyResp.EnsureSuccessStatusCode();
-        var company = await companyResp.Content.ReadFromJsonAsync<CompanyPayload>();
-        var companyId = company!.Id;
+        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
+        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
+        var companyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Lifecycle Test {Guid.NewGuid():N}");
 
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());

@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Features.CompleteTask.Actions;
 using HR.Modules.Tasks.Tests.Infrastructure;
 using HR.SharedKernel;

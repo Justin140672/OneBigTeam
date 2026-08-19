@@ -48,7 +48,11 @@ public class StructuredLoggingIntegrationTests(ApiWebApplicationFactory factory)
         // Middleware runs before authentication, so even 401 responses carry a correlation ID.
         using var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/companies", new { name = "Test" });
+        // POST /api/companies (CreateCompany) was removed in 78a43344. This test only cares that
+        // some authenticated POST route exercises the logging/correlation-id middleware, so it's
+        // deliberately provider-agnostic about which endpoint it hits —
+        // /api/company-onboarding/checklist/dismiss (no {companyId} route segment) fits.
+        var response = await client.PostAsJsonAsync("/api/company-onboarding/checklist/dismiss", new { name = "Test" });
 
         Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.True(response.Headers.Contains(CorrelationIdMiddleware.HeaderName));
@@ -106,7 +110,11 @@ public class StructuredLoggingIntegrationTests(ApiWebApplicationFactory factory)
         // 405 (no matching route for this method) but never 500 (middleware fault).
         using var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/companies", new { name = "Test" });
+        // POST /api/companies (CreateCompany) was removed in 78a43344. This test only cares that
+        // some authenticated POST route exercises the logging/correlation-id middleware, so it's
+        // deliberately provider-agnostic about which endpoint it hits —
+        // /api/company-onboarding/checklist/dismiss (no {companyId} route segment) fits.
+        var response = await client.PostAsJsonAsync("/api/company-onboarding/checklist/dismiss", new { name = "Test" });
 
         Assert.NotEqual(System.Net.HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.True(response.Headers.Contains(CorrelationIdMiddleware.HeaderName));

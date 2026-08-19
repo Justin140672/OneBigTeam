@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.GetOutstandingTaskCount;

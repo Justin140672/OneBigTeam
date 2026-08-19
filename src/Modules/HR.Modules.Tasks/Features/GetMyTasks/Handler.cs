@@ -1,5 +1,6 @@
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 

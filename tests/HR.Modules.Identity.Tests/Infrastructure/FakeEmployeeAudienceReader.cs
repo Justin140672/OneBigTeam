@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Identity.Tests.Infrastructure;

@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.DataImport.Tests.Infrastructure;

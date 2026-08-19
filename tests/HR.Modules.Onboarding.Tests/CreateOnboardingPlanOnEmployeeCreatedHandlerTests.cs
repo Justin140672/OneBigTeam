@@ -1,8 +1,10 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Onboarding.Domain;
 using HR.Modules.Onboarding.Features.CreateOnboardingPlanOnEmployeeCreated;
 using HR.Modules.Onboarding.Persistence;
 using HR.Modules.Onboarding.Tests.Infrastructure;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

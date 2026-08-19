@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Recruitment.Domain;
 
 namespace HR.Modules.Recruitment.Features.ListVacancies;

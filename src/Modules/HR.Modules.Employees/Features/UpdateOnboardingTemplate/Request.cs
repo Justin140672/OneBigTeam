@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Employees.Features.UpdateOnboardingTemplate;

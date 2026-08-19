@@ -8,6 +8,9 @@ namespace HR.Infrastructure.Abstractions;
 /// while an employee is an HR record — the two are not 1:1 (an employee may have no portal
 /// account yet, and a platform-admin persona could in principle have no employee record at all).
 /// Implemented in HR.Modules.Identity, consumed by HR.Modules.Companies' Customer Support View.
+/// Despite the "Company" prefix (reflecting the consumer), this contract is owned by
+/// HR.Modules.Identity (the implementer), so it is not part of HR.Modules.Companies.Contracts —
+/// moving it there would misrepresent ownership. Left here pending an Identity.Contracts project.
 /// </summary>
 public interface ICompanyUserCountReader
 {

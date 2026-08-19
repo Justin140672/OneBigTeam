@@ -4,6 +4,7 @@ using HR.Modules.Sickness.Features.RecordSickness;
 using HR.Modules.Sickness.Persistence;
 using HR.Modules.Sickness.Tests.Infrastructure;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

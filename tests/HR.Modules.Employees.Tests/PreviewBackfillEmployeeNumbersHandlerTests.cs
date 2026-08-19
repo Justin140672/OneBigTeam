@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.PreviewBackfillEmployeeNumbers;
 using HR.Modules.Employees.Persistence;

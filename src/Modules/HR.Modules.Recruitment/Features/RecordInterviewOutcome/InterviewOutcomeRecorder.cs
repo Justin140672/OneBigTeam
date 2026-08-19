@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;

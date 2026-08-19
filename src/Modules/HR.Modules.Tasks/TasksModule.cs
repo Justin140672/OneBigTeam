@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.CandidateHired;
 using HR.Modules.Tasks.Features.CompleteTask;

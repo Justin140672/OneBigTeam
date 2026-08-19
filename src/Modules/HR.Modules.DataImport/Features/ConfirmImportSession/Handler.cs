@@ -3,6 +3,7 @@ using System.Text.Json;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.DataImport.Domain;
 using HR.Modules.DataImport.Persistence;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

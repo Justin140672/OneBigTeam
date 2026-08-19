@@ -3,6 +3,7 @@ using HR.Modules.DataImport.Domain;
 using HR.Modules.DataImport.Features.ConfirmImportSession;
 using HR.Modules.DataImport.Persistence;
 using HR.Modules.DataImport.Tests.Infrastructure;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

@@ -1,4 +1,6 @@
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 using HR.Modules.Employees.Domain;
 
 namespace HR.Modules.Employees.Features.CreatePositionProfile;

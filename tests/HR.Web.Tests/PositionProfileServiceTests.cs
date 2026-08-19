@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Web.Models;
 using HR.Web.Services;

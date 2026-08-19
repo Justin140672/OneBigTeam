@@ -3,6 +3,7 @@ using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.UpdateEmploymentDetails;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Tests.Infrastructure;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -434,15 +435,15 @@ public class UpdateEmploymentDetailsHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(3, publisher.Published.Count);
 
-        var positionEvt = Assert.Single(publisher.Published.OfType<HR.SharedKernel.EmployeePositionChangedIntegrationEvent>());
+        var positionEvt = Assert.Single(publisher.Published.OfType<HR.Modules.Employees.Contracts.EmployeePositionChangedIntegrationEvent>());
         Assert.Equal(previousPositionId, positionEvt.PreviousPositionProfileId);
         Assert.Equal(newPositionId, positionEvt.NewPositionProfileId);
 
-        var locationEvt = Assert.Single(publisher.Published.OfType<HR.SharedKernel.EmployeeLocationChangedIntegrationEvent>());
+        var locationEvt = Assert.Single(publisher.Published.OfType<HR.Modules.Employees.Contracts.EmployeeLocationChangedIntegrationEvent>());
         Assert.Equal(previousLocationId, locationEvt.PreviousLocationId);
         Assert.Equal(newLocationId, locationEvt.NewLocationId);
 
-        var managerEvt = Assert.Single(publisher.Published.OfType<HR.SharedKernel.EmployeeManagerChangedIntegrationEvent>());
+        var managerEvt = Assert.Single(publisher.Published.OfType<HR.Modules.Employees.Contracts.EmployeeManagerChangedIntegrationEvent>());
         Assert.Null(managerEvt.PreviousManagerId);
         Assert.Equal(manager.Id, managerEvt.NewManagerId);
     }

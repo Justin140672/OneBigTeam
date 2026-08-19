@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.ListEmployees;
@@ -424,20 +425,20 @@ public class ListEmployeesHandlerTests
         Assert.Equal(pageIds, statusReader.LastEmployeeIds.ToHashSet());
     }
 
-    private sealed class SpyEmployeeUserAccountStatusReader : HR.Infrastructure.Abstractions.IEmployeeUserAccountStatusReader
+    private sealed class SpyEmployeeUserAccountStatusReader : HR.Modules.Employees.Contracts.IEmployeeUserAccountStatusReader
     {
         public Guid? LastCompanyId { get; private set; }
         public IReadOnlyList<Guid>? LastEmployeeIds { get; private set; }
 
-        public Task<IReadOnlyDictionary<Guid, HR.Infrastructure.Abstractions.EmployeeUserAccountSummary>> GetStatusesAsync(
+        public Task<IReadOnlyDictionary<Guid, HR.Modules.Employees.Contracts.EmployeeUserAccountSummary>> GetStatusesAsync(
             Guid companyId,
             IEnumerable<Guid> employeeIds,
             CancellationToken cancellationToken)
         {
             LastCompanyId = companyId;
             LastEmployeeIds = employeeIds.ToList();
-            return Task.FromResult<IReadOnlyDictionary<Guid, HR.Infrastructure.Abstractions.EmployeeUserAccountSummary>>(
-                new Dictionary<Guid, HR.Infrastructure.Abstractions.EmployeeUserAccountSummary>());
+            return Task.FromResult<IReadOnlyDictionary<Guid, HR.Modules.Employees.Contracts.EmployeeUserAccountSummary>>(
+                new Dictionary<Guid, HR.Modules.Employees.Contracts.EmployeeUserAccountSummary>());
         }
     }
 

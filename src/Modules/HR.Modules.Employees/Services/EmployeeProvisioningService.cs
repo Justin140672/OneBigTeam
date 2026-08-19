@@ -1,5 +1,6 @@
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Services;

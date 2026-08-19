@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
 using HR.SharedKernel;

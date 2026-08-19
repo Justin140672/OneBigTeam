@@ -1,3 +1,5 @@
+using HR.Modules.Employees.Contracts;
+
 namespace HR.Infrastructure.Abstractions;
 
 public sealed record CompanyLeaveSettings(

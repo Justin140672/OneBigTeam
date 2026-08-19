@@ -1,4 +1,6 @@
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 
 namespace HR.Modules.Companies.Features.GetHrSettings;
 

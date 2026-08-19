@@ -101,6 +101,7 @@ using HR.Modules.Employees.Jobs;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.Modules.Employees.Services.OnboardingTasks;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Builder;

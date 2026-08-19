@@ -109,14 +109,9 @@ public class PublicHolidayLeaveExclusionTests
         bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, CompanyAdminUserId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdminUserId, SystemRoles.CompanyAdministrator, CompanyAdminUserId);
 
-        var createResp = await bootstrapClient.PostAsJsonAsync("/api/companies", new
-        {
-            name = $"PH Test {Guid.NewGuid():N}",
-            addresses = new[] { new { type = "RegisteredOffice", line1 = "1 Test St", city = "London", countryCode = "GB" } }
-        });
-        createResp.EnsureSuccessStatusCode();
-        var company = await createResp.Content.ReadFromJsonAsync<CompanyPayload>();
-        var companyId = company!.Id;
+        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
+        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
+        var companyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"PH Test {Guid.NewGuid():N}");
 
         // excludePublicHolidaysFromLeave lives on HR settings, not company settings — PUT
         // .../settings (UpdateCompanySettingsHandler) only persists TimeZone/Locale and

@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;

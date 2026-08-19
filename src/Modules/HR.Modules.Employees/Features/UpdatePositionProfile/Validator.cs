@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Employees.Features.UpdatePositionProfile;

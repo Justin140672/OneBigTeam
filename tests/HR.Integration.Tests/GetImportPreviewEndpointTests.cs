@@ -133,20 +133,14 @@ public class GetImportPreviewEndpointTests
         return client;
     }
 
-    private static async Task<Guid> CreateCompanyAsync(HttpClient client)
+    // POST /api/companies (CreateCompany) was removed in 78a43344; this now provisions the
+    // company directly via CompaniesDbContext, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
+    private async Task<Guid> CreateCompanyAsync(HttpClient client)
     {
-        var response = await client.PostAsJsonAsync("/api/companies", new
-        {
-            name = $"Import Preview Test Co {Guid.NewGuid():N}",
-            addresses = new[]
-            {
-                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
-            }
-        });
-        response.EnsureSuccessStatusCode();
-        var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
-        return payload!.Id;
+        _ = client;
+        return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Import Preview Test Co {Guid.NewGuid():N}");
     }
+
 
     // UpdateCompanySettings only persists TimeZone/Locale and silently ignores employeeNumberMode.
     // The actual employee-number/HR settings live behind PUT /api/companies/{id}/hr-settings

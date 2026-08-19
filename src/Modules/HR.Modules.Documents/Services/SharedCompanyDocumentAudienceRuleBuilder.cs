@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Documents.Services;

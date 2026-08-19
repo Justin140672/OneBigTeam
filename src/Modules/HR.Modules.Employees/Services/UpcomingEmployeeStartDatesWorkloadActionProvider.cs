@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Persistence;
 using Microsoft.AspNetCore.Authorization;

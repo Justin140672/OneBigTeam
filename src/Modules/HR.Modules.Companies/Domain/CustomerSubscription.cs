@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Domain;

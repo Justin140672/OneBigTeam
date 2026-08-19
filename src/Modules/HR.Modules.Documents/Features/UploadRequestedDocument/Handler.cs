@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using Hangfire;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Jobs;

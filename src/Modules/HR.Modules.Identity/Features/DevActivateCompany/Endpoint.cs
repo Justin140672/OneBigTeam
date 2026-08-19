@@ -1,5 +1,6 @@
 using FastEndpoints;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Onboarding.Services;
 using HR.Modules.Onboarding.Tests.Infrastructure;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Onboarding.Tests;

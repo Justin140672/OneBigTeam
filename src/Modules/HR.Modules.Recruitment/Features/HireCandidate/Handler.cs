@@ -2,6 +2,7 @@ using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

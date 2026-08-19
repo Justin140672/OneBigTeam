@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\HR.AppHost\HR.AppHost.csproj" />
+    <ProjectReference Include="..\..\src\Modules\HR.Modules.Tasks.Contracts\HR.Modules.Tasks.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

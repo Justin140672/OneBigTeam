@@ -1,4 +1,5 @@
 using HR.Modules.Recruitment.Domain;
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Recruitment.Services;

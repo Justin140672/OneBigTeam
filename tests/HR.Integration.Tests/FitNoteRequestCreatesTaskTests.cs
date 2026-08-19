@@ -155,23 +155,16 @@ public class FitNoteRequestCreatesTaskTests
     {
         var companyAdminClient = await ClientFor(CompanyAdminUser, CompanyAdminUser);
 
-        var resp = await companyAdminClient.PostAsJsonAsync("/api/companies", new
-        {
-            name = $"FitNote Test {Guid.NewGuid():N}",
-            addresses = new[]
-            {
-                new { type = "RegisteredOffice", line1 = "1 Test Street", city = "London", countryCode = "GB" }
-            }
-        });
-        resp.EnsureSuccessStatusCode();
-        var company = await resp.Content.ReadFromJsonAsync<IdPayload>();
+        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
+        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
+        var companyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"FitNote Test {Guid.NewGuid():N}");
 
         companyAdminClient.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
-        companyAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, company!.Id.ToString());
+        companyAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
-        var hrClient = await ClientFor(HrAdminUser, company.Id);
+        var hrClient = await ClientFor(HrAdminUser, companyId);
 
-        return (companyAdminClient, hrClient, company.Id);
+        return (companyAdminClient, hrClient, companyId);
     }
 
     // fitNoteRequiredAfterDays lives on HR settings, not company settings — PUT .../settings

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 using HR.Web.Models;
 using HR.Web.Services;
 using Microsoft.Extensions.DependencyInjection;

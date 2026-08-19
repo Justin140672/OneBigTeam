@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using System.Security.Claims;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Tasks.Domain;

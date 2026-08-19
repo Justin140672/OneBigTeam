@@ -1,4 +1,5 @@
 using HR.Modules.Employees.Services;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Features.CreateCompensationRecord;

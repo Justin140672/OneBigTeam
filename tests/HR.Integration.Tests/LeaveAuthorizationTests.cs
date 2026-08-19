@@ -58,14 +58,9 @@ public class LeaveAuthorizationTests
         bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, HrAdminUserId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, HrAdminUserId, SystemRoles.HrAdministrator, HrAdminUserId);
 
-        var createResp = await bootstrapClient.PostAsJsonAsync("/api/companies", new
-        {
-            name = $"Leave Auth Test {Guid.NewGuid():N}",
-            addresses = new[] { new { type = "RegisteredOffice", line1 = "1 Test St", city = "London", countryCode = "GB" } }
-        });
-        createResp.EnsureSuccessStatusCode();
-        var company = await createResp.Content.ReadFromJsonAsync<CompanyPayload>();
-        var companyId = company!.Id;
+        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
+        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
+        var companyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Leave Auth Test {Guid.NewGuid():N}");
 
         var hrAdminClient = await ClientForCompany(companyId, HrAdminUserId);
         var companyAdminClient = await ClientForCompany(companyId, CompanyAdministratorUserId);

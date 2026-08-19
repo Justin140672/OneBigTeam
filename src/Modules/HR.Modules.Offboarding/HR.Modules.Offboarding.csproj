@@ -2,7 +2,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Shared\HR.SharedKernel\HR.SharedKernel.csproj" />
+    <ProjectReference Include="..\HR.Modules.Employees.Contracts\HR.Modules.Employees.Contracts.csproj" />
     <ProjectReference Include="..\..\Infrastructure\HR.Infrastructure.Abstractions\HR.Infrastructure.Abstractions.csproj" />
+    <ProjectReference Include="..\HR.Modules.Companies.Contracts\HR.Modules.Companies.Contracts.csproj" />
+    <ProjectReference Include="..\HR.Modules.Tasks.Contracts\HR.Modules.Tasks.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

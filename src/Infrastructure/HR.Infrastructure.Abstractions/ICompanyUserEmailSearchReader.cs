@@ -6,6 +6,9 @@ namespace HR.Infrastructure.Abstractions;
 /// (which owns the UserProfile aggregate). Implemented in HR.Modules.Identity and consumed by
 /// HR.Modules.Companies' platform-admin customer list (ListCustomers), whose "search by email"
 /// criterion needs to match against user emails that live outside the companies schema entirely.
+/// Despite the "Company" prefix (reflecting the consumer), this contract is owned by
+/// HR.Modules.Identity (the implementer), so it is not part of HR.Modules.Companies.Contracts —
+/// moving it there would misrepresent ownership. Left here pending an Identity.Contracts project.
 /// </summary>
 public interface ICompanyUserEmailSearchReader
 {

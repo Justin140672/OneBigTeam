@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Onboarding.Features.CompleteOnboardingTaskFromTask;
 using HR.Modules.Onboarding.Features.CreateOnboardingPlanOnEmployeeCreated;
 using HR.Modules.Onboarding.Features.GetOnboardingOverview;
@@ -7,6 +8,7 @@ using HR.Modules.Onboarding.Features.GetTeamOnboarding;
 using HR.Modules.Onboarding.Jobs;
 using HR.Modules.Onboarding.Persistence;
 using HR.Modules.Onboarding.Services;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Hangfire;

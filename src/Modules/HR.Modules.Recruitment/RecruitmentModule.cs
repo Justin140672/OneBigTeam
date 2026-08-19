@@ -53,6 +53,7 @@ using HR.Modules.Recruitment.Features.WithdrawApplication;
 using HR.Modules.Recruitment.Jobs;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -108,7 +109,7 @@ public static class RecruitmentModule
         services.AddScoped<PublishVacancyHandler>();
         services.AddScoped<IValidator<PublishVacancyRequest>, PublishVacancyValidator>();
 
-        services.AddScoped<HR.SharedKernel.IIntegrationEventHandler<HR.SharedKernel.EmployeePromotedIntegrationEvent>, EmployeePromotedHandler>();
+        services.AddScoped<HR.SharedKernel.IIntegrationEventHandler<HR.Modules.Employees.Contracts.EmployeePromotedIntegrationEvent>, EmployeePromotedHandler>();
 
         services.AddScoped<CreateCandidateHandler>();
         services.AddScoped<IValidator<CreateCandidateRequest>, CreateCandidateValidator>();

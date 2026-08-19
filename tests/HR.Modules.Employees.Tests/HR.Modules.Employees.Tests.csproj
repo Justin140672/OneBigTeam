@@ -24,10 +24,12 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="HR.Modules.Companies.Contracts" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Employees\HR.Modules.Employees.csproj" />
+    <ProjectReference Include="..\..\src\Modules\HR.Modules.Companies.Contracts\HR.Modules.Companies.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

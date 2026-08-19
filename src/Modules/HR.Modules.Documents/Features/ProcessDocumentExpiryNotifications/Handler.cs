@@ -1,5 +1,7 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Documents.Persistence;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;

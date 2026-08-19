@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.UpdateEmployeeProfile;
 using HR.Modules.Employees.Persistence;
@@ -377,7 +378,7 @@ public class UpdateEmployeeProfileHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        var evt = Assert.IsType<HR.SharedKernel.EmployeeLocationChangedIntegrationEvent>(Assert.Single(publisher.Published));
+        var evt = Assert.IsType<HR.Modules.Employees.Contracts.EmployeeLocationChangedIntegrationEvent>(Assert.Single(publisher.Published));
         Assert.Equal(previousLocationId, evt.PreviousLocationId);
         Assert.Equal(newLocationId, evt.NewLocationId);
     }
@@ -413,7 +414,7 @@ public class UpdateEmployeeProfileHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        var evt = Assert.IsType<HR.SharedKernel.EmployeePositionChangedIntegrationEvent>(Assert.Single(publisher.Published));
+        var evt = Assert.IsType<HR.Modules.Employees.Contracts.EmployeePositionChangedIntegrationEvent>(Assert.Single(publisher.Published));
         Assert.Equal(previousPositionId, evt.PreviousPositionProfileId);
         Assert.Equal(newPositionId, evt.NewPositionProfileId);
     }
@@ -446,7 +447,7 @@ public class UpdateEmployeeProfileHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        var evt = Assert.IsType<HR.SharedKernel.EmployeeDetailsCorrectedIntegrationEvent>(Assert.Single(publisher.Published));
+        var evt = Assert.IsType<HR.Modules.Employees.Contracts.EmployeeDetailsCorrectedIntegrationEvent>(Assert.Single(publisher.Published));
         Assert.Equal(companyId, evt.CompanyId);
         Assert.Equal(employee.Id, evt.EmployeeId);
 

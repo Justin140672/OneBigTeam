@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;

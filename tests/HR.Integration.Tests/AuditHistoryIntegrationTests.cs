@@ -315,21 +315,14 @@ public class AuditHistoryIntegrationTests
         companyAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, CompanyAdminUser.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdminUser, SystemRoles.CompanyAdministrator, CompanyAdminUser);
 
-        var createResp = await companyAdminClient.PostAsJsonAsync("/api/companies", new
-        {
-            name = $"Audit Test {Guid.NewGuid():N}",
-            addresses = new[]
-            {
-                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
-            }
-        });
-        createResp.EnsureSuccessStatusCode();
-        var company = await createResp.Content.ReadFromJsonAsync<IdPayload>();
+        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
+        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
+        var companyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Audit Test {Guid.NewGuid():N}");
 
         companyAdminClient.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
-        companyAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, company!.Id.ToString());
+        companyAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
-        var settingsResp = await companyAdminClient.PutAsJsonAsync($"/api/companies/{company.Id}/settings", new
+        var settingsResp = await companyAdminClient.PutAsJsonAsync($"/api/companies/{companyId}/settings", new
         {
             timeZone = "Europe/London",
             locale = "en-GB",
@@ -345,13 +338,13 @@ public class AuditHistoryIntegrationTests
         var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
 
         var auditRecord = await auditDb.AuditEvents
-            .Where(e => e.CompanyId == company.Id && e.EventType == "company-settings.updated")
+            .Where(e => e.CompanyId == companyId && e.EventType == "company-settings.updated")
             .OrderByDescending(e => e.OccurredAt)
             .FirstOrDefaultAsync();
 
         Assert.NotNull(auditRecord);
         Assert.Equal("CompanySettings", auditRecord!.EntityType);
-        Assert.Equal(company.Id, auditRecord.EntityId);
+        Assert.Equal(companyId, auditRecord.EntityId);
         Assert.Contains("Europe/London", auditRecord.AfterJson);
     }
 

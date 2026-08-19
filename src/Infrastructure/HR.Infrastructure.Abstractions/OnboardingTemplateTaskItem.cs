@@ -1,3 +1,5 @@
+using HR.Modules.Tasks.Contracts;
+
 namespace HR.Infrastructure.Abstractions;
 
 public sealed record OnboardingTemplateTaskItem(

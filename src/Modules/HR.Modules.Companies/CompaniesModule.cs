@@ -49,6 +49,7 @@ using HR.Modules.Companies.Services;
 using HR.Modules.Companies.Services.OnboardingTasks;
 using HR.Modules.Companies.Storage;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 using HR.SharedKernel;
 
 using Microsoft.AspNetCore.Builder;

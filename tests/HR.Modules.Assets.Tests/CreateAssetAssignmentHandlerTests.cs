@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Assets.Domain;
 using HR.Modules.Assets.Features.CreateAsset;
 using HR.Modules.Assets.Features.CreateAssetAssignment;

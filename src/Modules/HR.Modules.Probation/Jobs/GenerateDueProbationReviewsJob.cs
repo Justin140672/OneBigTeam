@@ -1,7 +1,10 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

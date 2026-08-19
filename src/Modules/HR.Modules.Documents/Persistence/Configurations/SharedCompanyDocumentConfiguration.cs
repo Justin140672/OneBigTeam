@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Documents.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

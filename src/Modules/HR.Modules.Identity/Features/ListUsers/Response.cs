@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 namespace HR.Modules.Identity.Features.ListUsers;
 
 // Invitation status taxonomy (documented once here — GetUserDetails reuses the same derivation):

@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using Hangfire;
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Features.CloseSicknessRecord;

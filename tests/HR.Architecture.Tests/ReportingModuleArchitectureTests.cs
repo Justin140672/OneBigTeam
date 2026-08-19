@@ -91,12 +91,15 @@ public class ReportingModuleArchitectureTests
     [Fact]
     public void Reporting_Module_Does_Not_Reference_Other_Modules()
     {
+        // Contracts assemblies (e.g. HR.Modules.Employees.Contracts) are the sanctioned exception to
+        // the "no module-to-module references" rule — see ModuleDependencyBoundariesTests.
         var forbiddenReferences = ModuleAssembly
             .GetReferencedAssemblies()
             .Where(reference =>
                 reference.Name is not null &&
                 reference.Name.StartsWith("HR.Modules.", StringComparison.Ordinal) &&
-                !string.Equals(reference.Name, ModuleAssembly.GetName().Name, StringComparison.Ordinal))
+                !string.Equals(reference.Name, ModuleAssembly.GetName().Name, StringComparison.Ordinal) &&
+                !reference.Name.EndsWith(".Contracts", StringComparison.Ordinal))
             .Select(reference => reference.Name!)
             .ToArray();
 

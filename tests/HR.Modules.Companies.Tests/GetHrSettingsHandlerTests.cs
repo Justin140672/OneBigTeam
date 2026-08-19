@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.GetHrSettings;

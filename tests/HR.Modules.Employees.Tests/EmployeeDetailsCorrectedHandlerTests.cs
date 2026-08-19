@@ -1,6 +1,7 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnEmployeeDetailsCorrected;
 using HR.Modules.Employees.Tests.Infrastructure;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Tests;

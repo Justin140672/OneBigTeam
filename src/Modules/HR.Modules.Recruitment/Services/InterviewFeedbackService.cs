@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Persistence;

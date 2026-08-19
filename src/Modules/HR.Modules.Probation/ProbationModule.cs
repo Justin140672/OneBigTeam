@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using FluentValidation;
 using Hangfire;
 using HR.Modules.Probation.Domain;
@@ -17,6 +18,7 @@ using HR.Modules.Probation.Features.UpdateProbationRecord;
 using HR.Modules.Probation.Jobs;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Services;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Builder;

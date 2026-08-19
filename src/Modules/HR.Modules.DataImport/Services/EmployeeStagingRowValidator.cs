@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 
 namespace HR.Modules.DataImport.Services;
 

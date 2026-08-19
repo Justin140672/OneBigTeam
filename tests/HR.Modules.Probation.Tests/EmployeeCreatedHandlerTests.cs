@@ -2,6 +2,7 @@ using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Features.CreateProbationOnEmployeeCreated;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Tests.Infrastructure;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

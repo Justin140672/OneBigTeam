@@ -22,6 +22,7 @@ using HR.Modules.Assets.Jobs;
 using HR.Modules.Assets.Persistence;
 using HR.Modules.Assets.Services;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;

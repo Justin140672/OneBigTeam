@@ -52,22 +52,12 @@ public class CompanyAuthorizationTests
         return client;
     }
 
+    // POST /api/companies (CreateCompany) was removed in 78a43344; this now provisions the
+    // company directly via CompaniesDbContext, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
     private async Task<Guid> CreateCompanyAsync(Guid tenantId)
     {
-        using var client = await ClientFor(tenantId, CompanyAdminUser);
-
-        var response = await client.PostAsJsonAsync("/api/companies", new
-        {
-            name = $"Auth Test {Guid.NewGuid():N}",
-            addresses = new[]
-            {
-                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
-            }
-        });
-        response.EnsureSuccessStatusCode();
-
-        var payload = await response.Content.ReadFromJsonAsync<CreatedCompanyPayload>();
-        return payload!.Id;
+        _ = tenantId;
+        return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Auth Test {Guid.NewGuid():N}");
     }
 
     // --- UpdateCompany ---

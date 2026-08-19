@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 
 namespace HR.Modules.Companies.Services.OnboardingTasks;
 

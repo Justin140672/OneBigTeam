@@ -37,37 +37,24 @@ public class GetCompanyEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AuthenticatedUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
-        var createResponse = await client.PostAsJsonAsync("/api/companies", new
-        {
-            name = $"Get Test {Guid.NewGuid():N}",
-            addresses = new[]
-            {
-                new
-                {
-                    type = "RegisteredOffice",
-                    line1 = "10 High Street",
-                    city = "London",
-                    countryCode = "GB"
-                }
-            }
-        });
-        createResponse.EnsureSuccessStatusCode();
+        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
+        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
+        // (That deleted endpoint used to also default a TradingAddress alongside the posted
+        // RegisteredOffice; the DB seeder creates no addresses at all, so this now asserts an
+        // empty address collection rather than the historical two-address shape.)
+        var companyName = $"Get Test {Guid.NewGuid():N}";
+        var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, companyName);
 
-        var createdCompany = await createResponse.Content.ReadFromJsonAsync<CreateCompanyPayload>();
-        Assert.NotNull(createdCompany);
-
-        var response = await client.GetAsync($"/api/companies/{createdCompany!.Id}");
+        var response = await client.GetAsync($"/api/companies/{createdCompanyId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var payload = await response.Content.ReadFromJsonAsync<GetCompanyPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(createdCompany.Id, payload!.Id);
-        Assert.Equal(createdCompany.Name, payload.Name);
-        Assert.Equal(createdCompany.IsActive, payload.IsActive);
-        Assert.Equal(2, payload.Addresses.Count);
-        Assert.Contains(payload.Addresses, address => address.Type == "RegisteredOffice");
-        Assert.Contains(payload.Addresses, address => address.Type == "TradingAddress");
+        Assert.Equal(createdCompanyId, payload!.Id);
+        Assert.Equal(companyName, payload.Name);
+        Assert.True(payload.IsActive);
+        Assert.Empty(payload.Addresses);
     }
 
     [Fact]
@@ -81,13 +68,6 @@ public class GetCompanyEndpointTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    private sealed record CreateCompanyPayload(
-        Guid Id,
-        string Name,
-        bool IsActive,
-        DateTimeOffset CreatedAt,
-        IReadOnlyCollection<CompanyAddressPayload> Addresses);
 
     private sealed record GetCompanyPayload(
         Guid Id,

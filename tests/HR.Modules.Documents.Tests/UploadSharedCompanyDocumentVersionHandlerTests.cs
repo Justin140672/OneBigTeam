@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using System.Text.Json;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;

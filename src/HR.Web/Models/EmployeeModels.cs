@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Web.Models;

@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Assets.Domain;
 using HR.Modules.Assets.Features.CreateAssetCategory;

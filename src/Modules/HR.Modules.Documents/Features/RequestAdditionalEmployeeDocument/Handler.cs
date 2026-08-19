@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.Infrastructure.Abstractions;

@@ -1,6 +1,8 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Offboarding.Domain;
 using HR.Modules.Offboarding.Persistence;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

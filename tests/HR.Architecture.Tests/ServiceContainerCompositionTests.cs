@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure;
 using HR.Modules.Assets;
 using HR.Modules.Companies;

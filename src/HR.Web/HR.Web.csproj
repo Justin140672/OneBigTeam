@@ -13,6 +13,7 @@
     <ProjectReference Include="..\HR.ServiceDefaults\HR.ServiceDefaults.csproj" />
     <ProjectReference Include="..\Shared\HR.SharedKernel\HR.SharedKernel.csproj" />
     <ProjectReference Include="..\Infrastructure\HR.Infrastructure.Abstractions\HR.Infrastructure.Abstractions.csproj" />
+    <ProjectReference Include="..\Modules\HR.Modules.Companies.Contracts\HR.Modules.Companies.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

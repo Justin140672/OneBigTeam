@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Offboarding.Domain;
 using HR.Modules.Offboarding.Features.StartOffboarding;

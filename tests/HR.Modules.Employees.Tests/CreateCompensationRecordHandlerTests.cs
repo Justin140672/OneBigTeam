@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.CreateCompensationRecord;
 using HR.Modules.Employees.Persistence;
@@ -437,7 +438,7 @@ public class CreateCompensationRecordHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        var evt = Assert.IsType<HR.SharedKernel.CompensationChangedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
+        var evt = Assert.IsType<HR.Modules.Employees.Contracts.CompensationChangedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
         Assert.Equal(companyId, evt.CompanyId);
         Assert.Equal(employee.Id, evt.EmployeeId);
         Assert.Equal(result.Value!.Id, evt.CompensationId);

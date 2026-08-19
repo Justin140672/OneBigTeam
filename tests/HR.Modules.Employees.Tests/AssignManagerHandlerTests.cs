@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.AssignManager;
 using HR.Modules.Employees.Persistence;
@@ -266,7 +267,7 @@ public class AssignManagerHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        var evt = Assert.IsType<HR.SharedKernel.EmployeeManagerChangedIntegrationEvent>(Assert.Single(publisher.Published));
+        var evt = Assert.IsType<HR.Modules.Employees.Contracts.EmployeeManagerChangedIntegrationEvent>(Assert.Single(publisher.Published));
         Assert.Equal(companyId, evt.CompanyId);
         Assert.Equal(employee.Id, evt.EmployeeId);
         Assert.Null(evt.PreviousManagerId);

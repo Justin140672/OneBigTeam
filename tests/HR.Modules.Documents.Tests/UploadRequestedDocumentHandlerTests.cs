@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.UploadRequestedDocument;
 using HR.Modules.Documents.Persistence;

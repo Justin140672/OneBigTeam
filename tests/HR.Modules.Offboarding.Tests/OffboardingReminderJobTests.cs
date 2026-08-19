@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 using HR.Modules.Offboarding.Domain;
 using HR.Modules.Offboarding.Jobs;
 using HR.Modules.Offboarding.Persistence;

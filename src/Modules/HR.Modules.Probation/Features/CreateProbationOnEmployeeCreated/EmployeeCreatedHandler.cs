@@ -1,5 +1,6 @@
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Probation.Features.CreateProbationOnEmployeeCreated;

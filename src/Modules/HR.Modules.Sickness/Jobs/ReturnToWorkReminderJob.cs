@@ -1,5 +1,6 @@
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Persistence;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;

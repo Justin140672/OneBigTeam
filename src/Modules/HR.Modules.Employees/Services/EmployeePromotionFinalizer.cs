@@ -1,5 +1,6 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Services;

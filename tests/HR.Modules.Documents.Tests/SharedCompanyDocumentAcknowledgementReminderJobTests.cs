@@ -1,3 +1,5 @@
+using HR.Modules.Tasks.Contracts;
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Jobs;

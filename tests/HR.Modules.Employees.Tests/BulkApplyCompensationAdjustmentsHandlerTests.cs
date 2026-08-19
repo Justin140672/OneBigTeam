@@ -3,6 +3,7 @@ using HR.Modules.Employees.Features.BulkApplyCompensationAdjustments;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.Modules.Employees.Tests.Infrastructure;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;

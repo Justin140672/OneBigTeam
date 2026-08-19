@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Shared\HR.SharedKernel\HR.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\Modules\HR.Modules.Tasks.Contracts\HR.Modules.Tasks.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\HR.Modules.Employees.Contracts\HR.Modules.Employees.Contracts.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

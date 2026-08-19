@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 namespace HR.Modules.Documents.Domain;
 
 /// <summary>

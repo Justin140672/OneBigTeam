@@ -1,5 +1,7 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Assets.Features.CreateAssetProvisioningTasksOnEmployeeCreated;
 using HR.Modules.Assets.Tests.Infrastructure;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 

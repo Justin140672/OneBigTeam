@@ -4,6 +4,7 @@ using HR.Modules.Recruitment.Features.HireCandidate;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

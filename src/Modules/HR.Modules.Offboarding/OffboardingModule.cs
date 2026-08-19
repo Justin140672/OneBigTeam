@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using FluentValidation;
 using Hangfire;
 using HR.Modules.Offboarding.Features.CompleteOffboardingTaskFromTask;

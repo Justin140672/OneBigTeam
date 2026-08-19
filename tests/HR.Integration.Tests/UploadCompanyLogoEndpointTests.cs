@@ -47,31 +47,22 @@ public class UploadCompanyLogoEndpointTests
     {
         using var client = await AuthenticatedClient(UserId);
 
-        var createResponse = await client.PostAsJsonAsync("/api/companies", new
-        {
-            name = $"Logo Test {Guid.NewGuid():N}",
-            addresses = new[]
-            {
-                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
-            }
-        });
-        createResponse.EnsureSuccessStatusCode();
-
-        var createdCompany = await createResponse.Content.ReadFromJsonAsync<CreateCompanyPayload>();
-        Assert.NotNull(createdCompany);
+        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
+        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
+        var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Logo Test {Guid.NewGuid():N}");
 
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, createdCompany!.Id.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, createdCompanyId.ToString());
 
         var response = await client.PostAsJsonAsync(
-            $"/api/companies/{createdCompany.Id}/branding/logos/PrimaryLogo",
+            $"/api/companies/{createdCompanyId}/branding/logos/PrimaryLogo",
             new { fileName = "logo.png", contentType = "image/png", fileSizeBytes = 1024 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var payload = await response.Content.ReadFromJsonAsync<UploadCompanyLogoPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(createdCompany.Id, payload!.CompanyId);
+        Assert.Equal(createdCompanyId, payload!.CompanyId);
         Assert.Equal("PrimaryLogo", payload.AssetType);
         Assert.Contains("logo.png", payload.LogoUrl);
     }
@@ -87,8 +78,6 @@ public class UploadCompanyLogoEndpointTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    private sealed record CreateCompanyPayload(Guid Id);
 
     private sealed record UploadCompanyLogoPayload(
         Guid CompanyId,

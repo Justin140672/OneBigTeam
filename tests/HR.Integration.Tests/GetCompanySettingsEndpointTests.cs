@@ -44,23 +44,14 @@ public class GetCompanySettingsEndpointTests
     {
         using var client = await AuthenticatedClient(UserId);
 
-        var createResponse = await client.PostAsJsonAsync("/api/companies", new
-        {
-            name = $"Settings Test {Guid.NewGuid():N}",
-            addresses = new[]
-            {
-                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
-            }
-        });
-        createResponse.EnsureSuccessStatusCode();
-
-        var createdCompany = await createResponse.Content.ReadFromJsonAsync<CreateCompanyPayload>();
-        Assert.NotNull(createdCompany);
+        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
+        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
+        var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Settings Test {Guid.NewGuid():N}");
 
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, createdCompany!.Id.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, createdCompanyId.ToString());
 
-        var response = await client.GetAsync($"/api/companies/{createdCompany.Id}/settings");
+        var response = await client.GetAsync($"/api/companies/{createdCompanyId}/settings");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -74,7 +65,7 @@ public class GetCompanySettingsEndpointTests
 
         var payload = await response.Content.ReadFromJsonAsync<GetCompanySettingsPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(createdCompany.Id, payload!.CompanyId);
+        Assert.Equal(createdCompanyId, payload!.CompanyId);
         Assert.Equal("UTC", payload.TimeZone);
         Assert.Equal("en-GB", payload.Locale);
         Assert.False(string.IsNullOrEmpty(payload.PostcodeRegex));
@@ -91,8 +82,6 @@ public class GetCompanySettingsEndpointTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    private sealed record CreateCompanyPayload(Guid Id);
 
     private sealed record GetCompanySettingsPayload(
         Guid CompanyId,

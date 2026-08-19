@@ -27,6 +27,7 @@ using HR.Modules.Identity.Features.VerifyEmail;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
 using HR.Modules.Identity.Services.OnboardingTasks;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;

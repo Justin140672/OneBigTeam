@@ -2,6 +2,7 @@ using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.UpdateHrSettings;
 using HR.Modules.Companies.Persistence;
 using HR.Modules.Companies.Tests.Infrastructure;
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 

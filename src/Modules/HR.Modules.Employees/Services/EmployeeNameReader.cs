@@ -1,4 +1,5 @@
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 

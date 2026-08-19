@@ -48,23 +48,14 @@ public class UpdateCompanyEndpointTests
     {
         using var client = await AuthenticatedClient();
 
-        var createResponse = await client.PostAsJsonAsync("/api/companies", new
-        {
-            name = $"Update Test {Guid.NewGuid():N}",
-            addresses = new[]
-            {
-                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
-            }
-        });
-        createResponse.EnsureSuccessStatusCode();
-
-        var createdCompany = await createResponse.Content.ReadFromJsonAsync<CreateCompanyPayload>();
-        Assert.NotNull(createdCompany);
+        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
+        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
+        var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Update Test {Guid.NewGuid():N}");
 
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, createdCompany!.Id.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, createdCompanyId.ToString());
 
-        var response = await client.PutAsJsonAsync($"/api/companies/{createdCompany.Id}", new
+        var response = await client.PutAsJsonAsync($"/api/companies/{createdCompanyId}", new
         {
             name = "Updated Company",
             addresses = new[]
@@ -100,8 +91,6 @@ public class UpdateCompanyEndpointTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-
-    private sealed record CreateCompanyPayload(Guid Id, string Name);
 
     private sealed record UpdateCompanyPayload(
         Guid Id,

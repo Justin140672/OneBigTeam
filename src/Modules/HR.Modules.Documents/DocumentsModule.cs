@@ -2,6 +2,7 @@ using FluentValidation;
 using Hangfire;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Jobs;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Features.CreateDocumentRequestsOnEmployeeCreated;

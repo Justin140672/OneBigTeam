@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using System.Net;
 using System.Net.Http.Json;
 using HR.Infrastructure.Abstractions;

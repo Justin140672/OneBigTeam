@@ -1,5 +1,6 @@
 using HR.Modules.Companies.Features.UpdateHrSettings;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Tests;

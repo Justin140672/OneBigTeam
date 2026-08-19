@@ -1,7 +1,9 @@
 using HR.Modules.Onboarding.Domain;
 using HR.Modules.Onboarding.Persistence;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Onboarding.Jobs;

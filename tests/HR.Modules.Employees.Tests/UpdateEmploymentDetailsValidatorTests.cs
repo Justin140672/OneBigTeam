@@ -1,6 +1,7 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.UpdateEmploymentDetails;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Tests;

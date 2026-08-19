@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Features.ReturnToWorkReviewRequired;
 using HR.Modules.Tasks.Tests.Infrastructure;
 using HR.Infrastructure.Abstractions;

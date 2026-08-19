@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.CreateVacancy;
 using HR.Modules.Recruitment.Persistence;
@@ -332,7 +333,7 @@ public class CreateVacancyHandlerTests
         Assert.Equal(6, await db.RecruitmentStages.CountAsync(s => s.CompanyId == companyId));
     }
 
-    private static CreateVacancyHandler handler(RecruitmentDbContext db, HR.Infrastructure.Abstractions.IPositionProfileReader? positionProfileReader = null) =>
+    private static CreateVacancyHandler handler(RecruitmentDbContext db, HR.Modules.Employees.Contracts.IPositionProfileReader? positionProfileReader = null) =>
         new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), new HR.Modules.Recruitment.Services.RecruitmentStageSeeder(db));
 
     private static RecruitmentDbContext BuildContext() =>

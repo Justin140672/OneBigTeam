@@ -1,9 +1,11 @@
+using HR.Modules.Tasks.Contracts;
 using Hangfire;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Jobs;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

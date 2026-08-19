@@ -2,6 +2,7 @@ using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.AssignVacancyPositionProfile;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Tests.Infrastructure;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -189,7 +190,7 @@ public class AssignVacancyPositionProfileHandlerTests
 
     private static AssignVacancyPositionProfileHandler handler(
         RecruitmentDbContext db,
-        HR.Infrastructure.Abstractions.IPositionProfileReader? positionProfileReader = null,
+        HR.Modules.Employees.Contracts.IPositionProfileReader? positionProfileReader = null,
         FakeAuditPublisher? auditPublisher = null) =>
         new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), auditPublisher ?? new FakeAuditPublisher());
 

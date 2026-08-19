@@ -3,6 +3,7 @@ using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.CloseVacancy;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Tests.Infrastructure;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

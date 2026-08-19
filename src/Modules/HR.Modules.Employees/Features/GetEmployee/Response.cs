@@ -1,6 +1,8 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Services;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
+using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Features.GetEmployee;
