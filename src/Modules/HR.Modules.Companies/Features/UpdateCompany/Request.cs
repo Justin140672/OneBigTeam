@@ -4,7 +4,7 @@ namespace HR.Modules.Companies.Features.UpdateCompany;
 
 internal sealed record UpdateCompanyRequest
 {
-    public Guid Id { get; init; }
+    public Guid CompanyId { get; init; }
     public string Name { get; init; } = string.Empty;
     public List<UpdateCompanyAddressRequest> Addresses { get; init; } = [];
 }

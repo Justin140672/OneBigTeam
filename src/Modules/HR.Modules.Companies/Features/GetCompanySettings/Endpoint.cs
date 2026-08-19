@@ -8,7 +8,7 @@ internal sealed class Endpoint(
 {
     public override void Configure()
     {
-        Get("/api/companies/{id:guid}/settings");
+        Get("/api/companies/{companyId:guid}/settings");
         Policies("role:employee");
     }
 

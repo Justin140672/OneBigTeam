@@ -56,8 +56,7 @@ public class CompanyAuthorizationTests
     // company directly via CompaniesDbContext, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
     private async Task<Guid> CreateCompanyAsync(Guid tenantId)
     {
-        _ = tenantId;
-        return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Auth Test {Guid.NewGuid():N}");
+        return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Auth Test {Guid.NewGuid():N}", companyId: tenantId);
     }
 
     // --- UpdateCompany ---

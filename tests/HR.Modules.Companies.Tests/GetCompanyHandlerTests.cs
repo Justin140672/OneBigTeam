@@ -32,7 +32,7 @@ public class GetCompanyHandlerTests
         var handler = new GetCompanyHandler(context);
 
         var result = await handler.HandleAsync(
-            new GetCompanyRequest { Id = company.Id },
+            new GetCompanyRequest { CompanyId = company.Id },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -56,7 +56,7 @@ public class GetCompanyHandlerTests
         var unknownCompanyId = Guid.NewGuid();
 
         var result = await handler.HandleAsync(
-            new GetCompanyRequest { Id = unknownCompanyId },
+            new GetCompanyRequest { CompanyId = unknownCompanyId },
             CancellationToken.None);
 
         Assert.True(result.IsFailure);

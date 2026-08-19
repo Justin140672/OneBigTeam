@@ -8,7 +8,7 @@ internal sealed class UpdateHrSettingsValidator : AbstractValidator<UpdateHrSett
 {
 	public UpdateHrSettingsValidator()
 	{
-		RuleFor(request => request.Id)
+		RuleFor(request => request.CompanyId)
 			.NotEmpty();
 
 		RuleFor(request => request.WorkingDays)

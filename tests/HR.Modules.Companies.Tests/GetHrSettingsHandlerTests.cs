@@ -27,7 +27,7 @@ public class GetHrSettingsHandlerTests
 
         var handler = new GetHrSettingsHandler(context);
 
-        var result = await handler.HandleAsync(new GetHrSettingsRequest { Id = company.Id }, CancellationToken.None);
+        var result = await handler.HandleAsync(new GetHrSettingsRequest { CompanyId = company.Id }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(company.Id, result.Value!.CompanyId);
@@ -59,7 +59,7 @@ public class GetHrSettingsHandlerTests
 
         var handler = new GetHrSettingsHandler(context);
 
-        var result = await handler.HandleAsync(new GetHrSettingsRequest { Id = company.Id }, CancellationToken.None);
+        var result = await handler.HandleAsync(new GetHrSettingsRequest { CompanyId = company.Id }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(company.Id, result.Value!.CompanyId);
@@ -92,7 +92,7 @@ public class GetHrSettingsHandlerTests
 
         var handler = new GetHrSettingsHandler(context);
 
-        var result = await handler.HandleAsync(new GetHrSettingsRequest { Id = company.Id }, CancellationToken.None);
+        var result = await handler.HandleAsync(new GetHrSettingsRequest { CompanyId = company.Id }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(EmployeeNumberMode.Automatic, result.Value!.EmployeeNumberMode);
@@ -112,7 +112,7 @@ public class GetHrSettingsHandlerTests
 
         var handler = new GetHrSettingsHandler(context);
 
-        var result = await handler.HandleAsync(new GetHrSettingsRequest { Id = company.Id }, CancellationToken.None);
+        var result = await handler.HandleAsync(new GetHrSettingsRequest { CompanyId = company.Id }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(EmployeeNumberMode.Automatic, result.Value!.EmployeeNumberMode);
@@ -127,7 +127,7 @@ public class GetHrSettingsHandlerTests
         await using var context = BuildContext();
         var handler = new GetHrSettingsHandler(context);
 
-        var result = await handler.HandleAsync(new GetHrSettingsRequest { Id = Guid.NewGuid() }, CancellationToken.None);
+        var result = await handler.HandleAsync(new GetHrSettingsRequest { CompanyId = Guid.NewGuid() }, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);

@@ -21,7 +21,7 @@ public class UploadCompanyLogoHandlerTests
         var result = await handler.HandleAsync(
             new UploadCompanyLogoRequest
             {
-                Id = Guid.NewGuid(),
+                CompanyId = Guid.NewGuid(),
                 AssetType = BrandingAssetType.PrimaryLogo,
                 FileName = "logo.png",
                 ContentType = "image/png",
@@ -50,7 +50,7 @@ public class UploadCompanyLogoHandlerTests
         var result = await handler.HandleAsync(
             new UploadCompanyLogoRequest
             {
-                Id = company.Id,
+                CompanyId = company.Id,
                 AssetType = BrandingAssetType.PrimaryLogo,
                 FileName = "logo.png",
                 ContentType = "image/png",
@@ -92,7 +92,7 @@ public class UploadCompanyLogoHandlerTests
         var result = await handler.HandleAsync(
             new UploadCompanyLogoRequest
             {
-                Id = company.Id,
+                CompanyId = company.Id,
                 AssetType = BrandingAssetType.SmallLogo,
                 FileName = "small.svg",
                 ContentType = "image/svg+xml",
@@ -127,7 +127,7 @@ public class UploadCompanyLogoHandlerTests
         var emailResult = await handler.HandleAsync(
             new UploadCompanyLogoRequest
             {
-                Id = company.Id,
+                CompanyId = company.Id,
                 AssetType = BrandingAssetType.EmailLogo,
                 FileName = "email.png",
                 ContentType = "image/png",

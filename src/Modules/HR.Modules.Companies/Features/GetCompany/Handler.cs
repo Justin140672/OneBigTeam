@@ -21,11 +21,11 @@ internal sealed class GetCompanyHandler
             .Include(currentCompany => currentCompany.Addresses)
             .Include(currentCompany => currentCompany.Branding)
             .AsNoTracking()
-            .SingleOrDefaultAsync(company => company.Id == request.Id, cancellationToken);
+            .SingleOrDefaultAsync(company => company.Id == request.CompanyId, cancellationToken);
 
         if (company is null)
         {
-            return Result.Failure<GetCompanyResponse>(Error.NotFound($"Company with id '{request.Id}' was not found."));
+            return Result.Failure<GetCompanyResponse>(Error.NotFound($"Company with id '{request.CompanyId}' was not found."));
         }
 
         var branding = company.Branding;

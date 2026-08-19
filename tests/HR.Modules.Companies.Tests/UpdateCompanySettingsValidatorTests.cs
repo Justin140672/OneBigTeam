@@ -6,7 +6,7 @@ public class UpdateCompanySettingsValidatorTests
 {
 	private static UpdateCompanySettingsRequest ValidRequest() => new()
 	{
-		Id = Guid.NewGuid(),
+		CompanyId = Guid.NewGuid(),
 		TimeZone = "Europe/London",
 		Locale = "en-GB",
 	};
@@ -22,9 +22,9 @@ public class UpdateCompanySettingsValidatorTests
 	public void Validate_Fails_When_Id_Is_Empty()
 	{
 		var validator = new UpdateCompanySettingsValidator();
-		var result = validator.Validate(ValidRequest() with { Id = Guid.Empty });
+		var result = validator.Validate(ValidRequest() with { CompanyId = Guid.Empty });
 		Assert.False(result.IsValid);
-		Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateCompanySettingsRequest.Id));
+		Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateCompanySettingsRequest.CompanyId));
 	}
 
 	[Fact]

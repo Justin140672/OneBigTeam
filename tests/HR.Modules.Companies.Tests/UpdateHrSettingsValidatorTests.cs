@@ -9,7 +9,7 @@ public class UpdateHrSettingsValidatorTests
 {
 	private static UpdateHrSettingsRequest ValidRequest() => new()
 	{
-		Id = Guid.NewGuid(),
+		CompanyId = Guid.NewGuid(),
 		WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
 		              WorkingDays.Thursday | WorkingDays.Friday,
 		HoursPerDay = 7.5m,

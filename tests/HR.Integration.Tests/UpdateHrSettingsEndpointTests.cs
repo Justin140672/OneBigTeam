@@ -24,21 +24,23 @@ public class UpdateHrSettingsEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private async Task<HttpClient> ClientFor(Guid userId, Guid tenantId)
+    private async Task<HttpClient> ClientFor(Guid userId, Guid tenantId, bool ensureActiveSubscription = true)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, tenantId.ToString());
-        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, tenantId);
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, tenantId, ensureActiveSubscription);
         return client;
     }
 
     // POST /api/companies (CreateCompany) was removed in 78a43344; this now provisions the
     // company directly via CompaniesDbContext, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
+    // The route companyId must match the caller's resolved tenant (UserProfile.CompanyId), which
+    // TenantRouteAuthorizationMiddleware now enforces — so the company is seeded under the same
+    // tenantId the caller is synced to via ClientFor, not an unrelated random id.
     private async Task<Guid> CreateCompanyAsync(Guid tenantId)
     {
-        _ = tenantId;
-        return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Hr Settings Test {Guid.NewGuid():N}");
+        return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Hr Settings Test {Guid.NewGuid():N}", companyId: tenantId);
     }
 
     private static object HrSettingsBody() => new
@@ -140,13 +142,21 @@ public class UpdateHrSettingsEndpointTests
     }
 
     [Fact]
-    public async Task Put_Hr_Settings_Returns_NotFound_For_Unknown_Id()
+    public async Task Put_Hr_Settings_Returns_Forbidden_For_Unknown_Id()
     {
-        using var client = await ClientFor(HrAdminUserId, Guid.NewGuid());
+        // Under the SEC-001 tenant-isolation fix, a route companyId must match the caller's
+        // resolved tenant, and CustomerSubscription has a hard FK to Company — so a subscription
+        // can never exist without a real Company row for the same id. There is therefore no
+        // reachable "own tenant, but company row is unexpectedly missing" 404 case for this
+        // mutation endpoint any more: syncing the caller to a fresh tenant id with no seeded
+        // Company/subscription now surfaces as ReadOnlyModeMiddleware's missing-subscription 403
+        // before the handler's own lookup would ever run.
+        var tenantId = Guid.NewGuid();
+        using var client = await ClientFor(HrAdminUserId, tenantId, ensureActiveSubscription: false);
 
-        var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/hr-settings", HrSettingsBody());
+        var response = await client.PutAsJsonAsync($"/api/companies/{tenantId}/hr-settings", HrSettingsBody());
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

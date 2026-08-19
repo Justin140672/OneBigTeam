@@ -24,12 +24,12 @@ internal sealed class UpdateCompanyHandler
         var company = await _dbContext.Companies
             .Include(c => c.Addresses)
             .Include(c => c.Settings)
-            .SingleOrDefaultAsync(c => c.Id == request.Id, cancellationToken);
+            .SingleOrDefaultAsync(c => c.Id == request.CompanyId, cancellationToken);
 
         if (company is null)
         {
             return Result.Failure<UpdateCompanyResponse>(
-                Error.NotFound($"Company with id '{request.Id}' was not found."));
+                Error.NotFound($"Company with id '{request.CompanyId}' was not found."));
         }
 
         var postcodeRegex = company.Settings?.PostcodeRegex ?? UkContactRegexDefaults.Postcode;

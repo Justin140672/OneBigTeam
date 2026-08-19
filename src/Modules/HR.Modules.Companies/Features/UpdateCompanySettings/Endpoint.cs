@@ -8,7 +8,7 @@ internal sealed class Endpoint(
 {
 	public override void Configure()
 	{
-		Put("/api/companies/{id:guid}/settings");
+		Put("/api/companies/{companyId:guid}/settings");
         Policies("company:manage");
 	}
 

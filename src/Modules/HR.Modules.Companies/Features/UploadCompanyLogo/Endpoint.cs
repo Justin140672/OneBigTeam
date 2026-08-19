@@ -8,7 +8,7 @@ internal sealed class Endpoint(
 {
     public override void Configure()
     {
-        Post("/api/companies/{id:guid}/branding/logos/{assetType}");
+        Post("/api/companies/{companyId:guid}/branding/logos/{assetType}");
         Policies("company:manage");
     }
 

@@ -15,7 +15,7 @@ public class UpdateCompanyValidatorTests
 
     private static UpdateCompanyRequest ValidRequest() => new()
     {
-        Id = Guid.NewGuid(),
+        CompanyId = Guid.NewGuid(),
         Name = "Acme Corp",
         Addresses = [ValidAddress()]
     };
@@ -24,9 +24,9 @@ public class UpdateCompanyValidatorTests
     public void Validate_Fails_When_Id_Is_Empty()
     {
         var v = new UpdateCompanyValidator();
-        var result = v.Validate(ValidRequest() with { Id = Guid.Empty });
+        var result = v.Validate(ValidRequest() with { CompanyId = Guid.Empty });
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateCompanyRequest.Id));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateCompanyRequest.CompanyId));
     }
 
     [Fact]

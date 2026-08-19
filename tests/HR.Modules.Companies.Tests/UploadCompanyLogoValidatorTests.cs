@@ -12,7 +12,7 @@ public class UploadCompanyLogoValidatorTests
 
         var result = validator.Validate(new UploadCompanyLogoRequest
         {
-            Id = Guid.NewGuid(),
+            CompanyId = Guid.NewGuid(),
             AssetType = BrandingAssetType.PrimaryLogo,
             FileName = "logo.png",
             ContentType = "image/png",
@@ -29,7 +29,7 @@ public class UploadCompanyLogoValidatorTests
 
         var result = validator.Validate(new UploadCompanyLogoRequest
         {
-            Id = Guid.NewGuid(),
+            CompanyId = Guid.NewGuid(),
             AssetType = BrandingAssetType.SmallLogo,
             FileName = "small.svg",
             ContentType = "image/svg+xml",
@@ -46,7 +46,7 @@ public class UploadCompanyLogoValidatorTests
 
         var result = validator.Validate(new UploadCompanyLogoRequest
         {
-            Id = Guid.NewGuid(),
+            CompanyId = Guid.NewGuid(),
             AssetType = BrandingAssetType.PrimaryLogo,
             FileName = string.Empty,
             ContentType = "image/png",
@@ -64,7 +64,7 @@ public class UploadCompanyLogoValidatorTests
 
         var result = validator.Validate(new UploadCompanyLogoRequest
         {
-            Id = Guid.NewGuid(),
+            CompanyId = Guid.NewGuid(),
             AssetType = BrandingAssetType.PrimaryLogo,
             FileName = "logo.gif",
             ContentType = "image/gif",
@@ -82,7 +82,7 @@ public class UploadCompanyLogoValidatorTests
 
         var result = validator.Validate(new UploadCompanyLogoRequest
         {
-            Id = Guid.NewGuid(),
+            CompanyId = Guid.NewGuid(),
             AssetType = BrandingAssetType.PrimaryLogo,
             FileName = "logo.png",
             ContentType = "image/png",
@@ -100,7 +100,7 @@ public class UploadCompanyLogoValidatorTests
 
         var result = validator.Validate(new UploadCompanyLogoRequest
         {
-            Id = Guid.NewGuid(),
+            CompanyId = Guid.NewGuid(),
             AssetType = BrandingAssetType.PrimaryLogo,
             FileName = "logo.png",
             ContentType = "image/png",
@@ -117,7 +117,7 @@ public class UploadCompanyLogoValidatorTests
 
         var result = validator.Validate(new UploadCompanyLogoRequest
         {
-            Id = Guid.NewGuid(),
+            CompanyId = Guid.NewGuid(),
             AssetType = BrandingAssetType.PrimaryLogo,
             FileName = "logo.png",
             ContentType = "image/png",
@@ -135,7 +135,7 @@ public class UploadCompanyLogoValidatorTests
 
         var result = validator.Validate(new UploadCompanyLogoRequest
         {
-            Id = Guid.NewGuid(),
+            CompanyId = Guid.NewGuid(),
             AssetType = (BrandingAssetType)99,
             FileName = "logo.png",
             ContentType = "image/png",

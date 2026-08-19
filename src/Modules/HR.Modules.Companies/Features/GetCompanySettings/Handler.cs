@@ -12,20 +12,20 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
     {
         var settings = await dbContext.CompanySettings
             .AsNoTracking()
-            .SingleOrDefaultAsync(s => s.CompanyId == request.Id, cancellationToken);
+            .SingleOrDefaultAsync(s => s.CompanyId == request.CompanyId, cancellationToken);
 
         if (settings is null)
         {
             // Company exists but has no customised settings — return defaults
             var exists = await dbContext.Companies
                 .AsNoTracking()
-                .AnyAsync(c => c.Id == request.Id, cancellationToken);
+                .AnyAsync(c => c.Id == request.CompanyId, cancellationToken);
 
             if (!exists)
                 return Result.Failure<GetCompanySettingsResponse>(
-                    Error.NotFound($"Company with id '{request.Id}' was not found."));
+                    Error.NotFound($"Company with id '{request.CompanyId}' was not found."));
 
-            var defaults = Domain.CompanySettings.CreateDefault(request.Id, DateTimeOffset.UtcNow);
+            var defaults = Domain.CompanySettings.CreateDefault(request.CompanyId, DateTimeOffset.UtcNow);
             return Result.Success(new GetCompanySettingsResponse(
                 defaults.CompanyId, defaults.TimeZone, defaults.Locale,
                 defaults.PostcodeRegex, defaults.TelephoneRegex, defaults.MobileRegex,

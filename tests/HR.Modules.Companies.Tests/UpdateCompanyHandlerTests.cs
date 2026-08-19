@@ -27,7 +27,7 @@ public class UpdateCompanyHandlerTests
 
         var result = await handler.HandleAsync(new UpdateCompanyRequest
         {
-            Id = company.Id,
+            CompanyId = company.Id,
             Name = "Acme Corporation",
             Addresses =
             [
@@ -63,7 +63,7 @@ public class UpdateCompanyHandlerTests
 
         var result = await handler.HandleAsync(new UpdateCompanyRequest
         {
-            Id = Guid.NewGuid(),
+            CompanyId = Guid.NewGuid(),
             Name = "Unknown",
             Addresses =
             [
@@ -97,7 +97,7 @@ public class UpdateCompanyHandlerTests
 
         var result = await handler.HandleAsync(new UpdateCompanyRequest
         {
-            Id = company.Id,
+            CompanyId = company.Id,
             Name = "Acme Corporation",
             Addresses =
             [
@@ -134,7 +134,7 @@ public class UpdateCompanyHandlerTests
 
         var result = await handler.HandleAsync(new UpdateCompanyRequest
         {
-            Id = company.Id,
+            CompanyId = company.Id,
             Name = "Acme Corporation",
             Addresses =
             [

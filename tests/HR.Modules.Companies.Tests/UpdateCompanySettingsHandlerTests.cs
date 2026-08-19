@@ -30,7 +30,7 @@ public class UpdateCompanySettingsHandlerTests
 		var result = await handler.HandleAsync(
 			new UpdateCompanySettingsRequest
 			{
-				Id = company.Id,
+				CompanyId = company.Id,
 				TimeZone = "Europe/London",
 				Locale = "en-GB",
 			},
@@ -72,7 +72,7 @@ public class UpdateCompanySettingsHandlerTests
 		var result = await handler.HandleAsync(
 			new UpdateCompanySettingsRequest
 			{
-				Id = Guid.NewGuid(),
+				CompanyId = Guid.NewGuid(),
 				TimeZone = "UTC",
 				Locale = "en-GB",
 			},
@@ -101,7 +101,7 @@ public class UpdateCompanySettingsHandlerTests
 		await handler.HandleAsync(
 			new UpdateCompanySettingsRequest
 			{
-				Id = company.Id,
+				CompanyId = company.Id,
 				TimeZone = "Europe/London",
 				Locale = "en-GB",
 			},

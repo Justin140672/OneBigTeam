@@ -7,7 +7,7 @@ internal sealed class UpdateCompanyValidator : AbstractValidator<UpdateCompanyRe
 {
     public UpdateCompanyValidator()
     {
-        RuleFor(request => request.Id)
+        RuleFor(request => request.CompanyId)
             .NotEmpty();
 
         RuleFor(request => request.Name)

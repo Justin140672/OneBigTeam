@@ -30,12 +30,12 @@ internal sealed class UpdateCompanySettingsHandler
 	{
 		var company = await _dbContext.Companies
 			.Include(currentCompany => currentCompany.Settings)
-			.SingleOrDefaultAsync(currentCompany => currentCompany.Id == request.Id, cancellationToken);
+			.SingleOrDefaultAsync(currentCompany => currentCompany.Id == request.CompanyId, cancellationToken);
 
 		if (company is null)
 		{
 			return Result.Failure<UpdateCompanySettingsResponse>(
-				Error.NotFound($"Company with id '{request.Id}' was not found."));
+				Error.NotFound($"Company with id '{request.CompanyId}' was not found."));
 		}
 
 		var now = _clock.UtcNowOffset();

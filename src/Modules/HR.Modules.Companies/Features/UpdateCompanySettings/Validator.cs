@@ -6,7 +6,7 @@ internal sealed class UpdateCompanySettingsValidator : AbstractValidator<UpdateC
 {
 	public UpdateCompanySettingsValidator()
 	{
-		RuleFor(request => request.Id)
+		RuleFor(request => request.CompanyId)
 			.NotEmpty();
 
 		RuleFor(request => request.TimeZone)

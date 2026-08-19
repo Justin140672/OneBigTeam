@@ -21,12 +21,12 @@ public class GetHrSettingsEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private async Task<HttpClient> AuthenticatedClient(Guid tenantId)
+    private async Task<HttpClient> AuthenticatedClient(Guid tenantId, bool ensureActiveSubscription = true)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, tenantId.ToString());
-        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, tenantId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, tenantId, ensureActiveSubscription);
         return client;
     }
 
@@ -43,14 +43,15 @@ public class GetHrSettingsEndpointTests
     [Fact]
     public async Task Get_Hr_Settings_Returns_OK_For_Employee_Role_Reading_Own_Company()
     {
-        using var client = await AuthenticatedClient(UserId);
+        // The route companyId must match the caller's resolved tenant (UserProfile.CompanyId),
+        // which TenantRouteAuthorizationMiddleware now enforces — seed the company under the
+        // same fresh tenant id the caller is synced to, rather than an unrelated random id.
+        var tenantId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(tenantId);
 
         // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
         // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
-        var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Hr Settings Test {Guid.NewGuid():N}");
-
-        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, createdCompanyId.ToString());
+        var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Hr Settings Test {Guid.NewGuid():N}", companyId: tenantId);
 
         var response = await client.GetAsync($"/api/companies/{createdCompanyId}/hr-settings");
 
@@ -66,9 +67,13 @@ public class GetHrSettingsEndpointTests
     [Fact]
     public async Task Get_Hr_Settings_Returns_NotFound_For_Unknown_Id()
     {
-        using var client = await AuthenticatedClient(UserId);
+        // Route companyId must match the caller's resolved tenant to pass tenant-route
+        // authorization; sync the caller to a fresh tenant id for which no Company row was ever
+        // seeded, so the request is authorized but the endpoint's own lookup 404s.
+        var tenantId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(tenantId, ensureActiveSubscription: false);
 
-        var response = await client.GetAsync($"/api/companies/{Guid.NewGuid()}/hr-settings");
+        var response = await client.GetAsync($"/api/companies/{tenantId}/hr-settings");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }

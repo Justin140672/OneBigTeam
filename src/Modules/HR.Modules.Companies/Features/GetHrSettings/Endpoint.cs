@@ -8,7 +8,7 @@ internal sealed class Endpoint(
 {
     public override void Configure()
     {
-        Get("/api/companies/{id:guid}/hr-settings");
+        Get("/api/companies/{companyId:guid}/hr-settings");
         // Read access mirrors GetCompanySettings' "role:employee" policy — many parts of the app
         // (leave calculations, sickness thresholds, employee numbering previews, document
         // acknowledgement defaults) need to read HR-policy values regardless of role. The actual

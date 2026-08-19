@@ -12,7 +12,7 @@ public class UpdateHrSettingsHandlerTests
 {
 	private static UpdateHrSettingsRequest ValidRequest(Guid companyId) => new()
 	{
-		Id = companyId,
+		CompanyId = companyId,
 		WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
 		              WorkingDays.Thursday | WorkingDays.Friday,
 		HoursPerDay = 7.5m,

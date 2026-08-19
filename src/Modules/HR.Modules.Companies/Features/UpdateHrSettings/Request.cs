@@ -7,7 +7,7 @@ namespace HR.Modules.Companies.Features.UpdateHrSettings;
 
 internal sealed record UpdateHrSettingsRequest
 {
-	public Guid Id { get; init; }
+	public Guid CompanyId { get; init; }
 	public WorkingDays WorkingDays { get; init; }
 	public decimal HoursPerDay { get; init; }
 	public int LeaveYearStartMonth { get; init; }

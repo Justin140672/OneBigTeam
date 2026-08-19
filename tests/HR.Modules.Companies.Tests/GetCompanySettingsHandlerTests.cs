@@ -27,7 +27,7 @@ public class GetCompanySettingsHandlerTests
 
         var handler = new GetCompanySettingsHandler(context);
 
-        var result = await handler.HandleAsync(new GetCompanySettingsRequest { Id = company.Id }, CancellationToken.None);
+        var result = await handler.HandleAsync(new GetCompanySettingsRequest { CompanyId = company.Id }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Europe/London", result.Value!.TimeZone);
@@ -49,7 +49,7 @@ public class GetCompanySettingsHandlerTests
 
         var handler = new GetCompanySettingsHandler(context);
 
-        var result = await handler.HandleAsync(new GetCompanySettingsRequest { Id = company.Id }, CancellationToken.None);
+        var result = await handler.HandleAsync(new GetCompanySettingsRequest { CompanyId = company.Id }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(company.Id, result.Value!.CompanyId);
@@ -64,7 +64,7 @@ public class GetCompanySettingsHandlerTests
         await using var context = BuildContext();
         var handler = new GetCompanySettingsHandler(context);
 
-        var result = await handler.HandleAsync(new GetCompanySettingsRequest { Id = Guid.NewGuid() }, CancellationToken.None);
+        var result = await handler.HandleAsync(new GetCompanySettingsRequest { CompanyId = Guid.NewGuid() }, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);

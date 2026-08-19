@@ -28,18 +28,18 @@ internal sealed class UploadCompanyLogoHandler
     {
         var company = await _dbContext.Companies
             .Include(c => c.Branding)
-            .SingleOrDefaultAsync(c => c.Id == request.Id, cancellationToken);
+            .SingleOrDefaultAsync(c => c.Id == request.CompanyId, cancellationToken);
 
         if (company is null)
         {
             return Result.Failure<UploadCompanyLogoResponse>(
-                Error.NotFound($"Company with id '{request.Id}' was not found."));
+                Error.NotFound($"Company with id '{request.CompanyId}' was not found."));
         }
 
         var now = _clock.UtcNowOffset();
 
         var logoUrl = await _brandingStorage.StoreLogoAsync(
-            request.Id,
+            request.CompanyId,
             request.AssetType,
             request.FileName,
             request.ContentType,
