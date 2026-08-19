@@ -77,6 +77,7 @@ public static class IdentityModule
         services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();
         services.AddScoped<HR.SharedKernel.IAuthorizationService, IdentityAuthorizationService>();
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, RoleAuthorizationHandler>();
+        services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PlatformAdminAuthorizationHandler>();
         services.AddSingleton<IClock, SystemClock>();
 
         services.AddScoped<IEmployeeUserAccountStatusReader, EmployeeUserAccountStatusReader>();
@@ -195,15 +196,18 @@ public static class IdentityModule
         // Platform-admin policy — used exclusively by the new cross-tenant Admin Portal (Customer
         // Dashboard epic). Deliberately NOT built on RolePolicy/RoleRequirement: those require a
         // company-scoped RoleAssignment, but a platform administrator manages the whole platform
-        // and may have no employee/company relationship at all. This policy only asserts "the
-        // caller is an authenticated Supabase user" — the actual allow-list check (is this specific
-        // user permitted to see cross-tenant data) happens in the handler via configuration
-        // (PlatformAdmin:AllowedEmails), which is deliberately conservative until a real
-        // platform-admin identity model exists. No dedicated "platform staff" role/table exists yet
-        // in SystemRoles/Identity (see support:manage's remarks above making the same observation) —
-        // revisit this with a first-class model once the Admin Portal grows beyond a single
-        // read-only dashboard.
-        builder.AddPolicy("platform:admin", policy => policy.RequireAuthenticatedUser());
+        // and may have no employee/company relationship at all. SEC-002 fix: this is now backed by
+        // PlatformAdminAuthorizationHandler, which requires an enabled row in
+        // identity.platform_administrators for the caller (matched by SupabaseAuthUserId, falling
+        // back to email). Previously this only asserted "authenticated Supabase user", which let
+        // any authenticated user of any tenant pass — a privilege-escalation hole surfaced by two
+        // Companies-module handlers (GetPlatformSettings/UpdatePlatformSettings) that had no
+        // additional handler-level check, unlike the ~23 other handlers that separately check the
+        // PlatformAdmin:AllowedEmails config allow-list (left in place for now as defense-in-depth
+        // — see PlatformAdminAuthorizationHandler remarks).
+        builder.AddPolicy("platform:admin", policy => policy
+            .RequireAuthenticatedUser()
+            .AddRequirements(new PlatformAdminRequirement()));
 
         // Individual role policies
         builder.AddPolicy("role:employee",             RolePolicy(SystemRoles.Employee));
@@ -507,7 +511,9 @@ public static class IdentityModule
     /// elsewhere already read — this seeding does not touch or remove those checks). Idempotent
     /// and safe to call on every startup: for each configured email not already present
     /// (case-insensitive), creates an enabled PlatformOwner row with CreatedByUserId = null
-    /// (system-seeded). Not wired into any startup call-site yet — a separate step will do that.
+    /// (system-seeded). Called from HR.Api's Program.cs startup sequence, in every environment,
+    /// so the "platform:admin" policy (see PlatformAdminAuthorizationHandler) has real
+    /// PlatformAdministrator rows to check against without a manual migration step.
     /// </summary>
     public static async Task SeedPlatformAdministratorsFromConfigAsync(
         this IServiceProvider services, IConfiguration configuration)

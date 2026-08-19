@@ -20,14 +20,20 @@ internal static class PlatformAdministratorTestHelpers
         ApiWebApplicationFactory factory,
         PlatformAdministratorRole role,
         bool isEnabled = true,
-        string? email = null)
+        string? email = null,
+        Guid? supabaseAuthUserId = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
 
         var normalizedEmail = (email ?? $"platform-admin-{Guid.NewGuid():N}@test.example").ToLowerInvariant();
         var now = DateTimeOffset.UtcNow;
-        var administrator = PlatformAdministrator.Create(normalizedEmail, role, now);
+        var administrator = PlatformAdministrator.Create(
+            normalizedEmail,
+            role,
+            now,
+            createdByUserId: null,
+            supabaseAuthUserId: supabaseAuthUserId);
         if (!isEnabled)
             administrator.Disable(now, actorUserId: null);
 

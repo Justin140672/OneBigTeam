@@ -8,12 +8,12 @@ using Microsoft.Extensions.DependencyInjection;
 namespace HR.Integration.Tests;
 
 /// <summary>
-/// Unlike the other "platform:admin" Companies endpoints (e.g. ExtendCustomerTrial, ListCustomers),
-/// GetPlatformSettings/UpdatePlatformSettings do not additionally gate on a
-/// PlatformAdmin:AllowedEmails allow-list or an identity.platform_administrators row inside the
-/// handler — the "platform:admin" FastEndpoints policy (RequireAuthenticatedUser, see
-/// IdentityModule.AddRolePolicies) is the only authorization check for these two endpoints. So any
-/// authenticated caller succeeds; only an anonymous request is rejected (401).
+/// The "platform:admin" FastEndpoints policy now enforces a real DB-backed check (SEC-002 fix —
+/// see PlatformAdminAuthorizationHandler) on top of RequireAuthenticatedUser: the caller must match
+/// an enabled identity.platform_administrators row. See PlatformSettingsAuthorizationTests for the
+/// full authorization matrix (anonymous / no-role / employee / company admin / hr admin / disabled
+/// admin / enabled admin). This file only seeds a platform administrator for its own
+/// success-path/business-behaviour assertions.
 /// </summary>
 [Collection("Integration")]
 public class GetPlatformSettingsEndpointTests
@@ -25,10 +25,17 @@ public class GetPlatformSettingsEndpointTests
         _factory = factory;
     }
 
-    private HttpClient AuthenticatedClient()
+    private async Task<HttpClient> AuthenticatedClientAsync()
     {
+        var userId = Guid.NewGuid();
+        await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
+            _factory,
+            HR.Modules.Identity.Domain.PlatformAdministratorRole.SupportStaff,
+            isEnabled: true,
+            supabaseAuthUserId: userId);
+
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, Guid.NewGuid().ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         return client;
     }
 
@@ -61,7 +68,7 @@ public class GetPlatformSettingsEndpointTests
     {
         await ResetSingletonRowAsync();
 
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClientAsync();
 
         var response = await client.GetAsync("/api/companies/admin/platform-settings");
 

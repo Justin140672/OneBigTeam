@@ -5,9 +5,9 @@ using HR.Integration.Tests.Infrastructure;
 namespace HR.Integration.Tests;
 
 /// <summary>
-/// See GetPlatformSettingsEndpointTests remarks: the "platform:admin" policy on this endpoint only
-/// requires an authenticated caller (RequireAuthenticatedUser), no additional handler-level
-/// allow-list/PlatformAdministrator gate.
+/// See GetPlatformSettingsEndpointTests remarks: the "platform:admin" policy now requires a real
+/// enabled identity.platform_administrators row (SEC-002 fix — PlatformAdminAuthorizationHandler).
+/// See PlatformSettingsAuthorizationTests for the full authorization matrix.
 /// </summary>
 [Collection("Integration")]
 public class UpdatePlatformSettingsEndpointTests
@@ -19,10 +19,17 @@ public class UpdatePlatformSettingsEndpointTests
         _factory = factory;
     }
 
-    private HttpClient AuthenticatedClient()
+    private async Task<HttpClient> AuthenticatedClientAsync()
     {
+        var userId = Guid.NewGuid();
+        await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
+            _factory,
+            HR.Modules.Identity.Domain.PlatformAdministratorRole.SupportStaff,
+            isEnabled: true,
+            supabaseAuthUserId: userId);
+
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, Guid.NewGuid().ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         return client;
     }
 
@@ -49,7 +56,7 @@ public class UpdatePlatformSettingsEndpointTests
     [Fact]
     public async Task Put_PlatformSettings_Persists_Values_And_Reflects_On_Subsequent_Get()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClientAsync();
 
         var putResponse = await client.PutAsJsonAsync("/api/companies/admin/platform-settings", ValidBody());
 
@@ -77,7 +84,7 @@ public class UpdatePlatformSettingsEndpointTests
     [Fact]
     public async Task Put_PlatformSettings_Returns_BadRequest_When_TrialLengthDays_Is_Zero()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClientAsync();
 
         var body = new
         {
