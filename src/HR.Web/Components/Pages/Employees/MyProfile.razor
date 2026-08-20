@@ -21,7 +21,7 @@
                         <MyProfileOverviewTab CompanyId="CompanyId"
                                              EmployeeId="EmployeeId"
                                              OnNavigateToDocuments="() => _activeTabIndex = 6"
-                                             OnNavigateToTasks="() => _activeTabIndex = 8"
+                                             OnNavigateToTasks="() => _activeTabIndex = 7"
                                              OnNavigateToLeave="() => _activeTabIndex = 4"
                                              OnNavigateToSickness="() => _activeTabIndex = 5" />
                     </div>
@@ -61,12 +61,6 @@
                 <ChildContent><TabHeader Text="Documents" /></ChildContent>
                 <ContentTemplate>
                     <div class="mt-4"><MyProfileDocumentsTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
-                </ContentTemplate>
-            </TabItem>
-            <TabItem>
-                <ChildContent><TabHeader Text="Company Documents" /></ChildContent>
-                <ContentTemplate>
-                    <div class="mt-4"><MyProfileCompanyDocumentsTab CompanyId="CompanyId" /></div>
                 </ContentTemplate>
             </TabItem>
             <TabItem>
@@ -117,13 +111,15 @@
         {
             _activeTabIndex = tab.ToString() switch
             {
-                "leave"            => 4,
-                "documents"        => 6,
-                "companyDocuments" => 7,
-                "tasks"            => 8,
-                "assets"           => 9,
-                "timeline"         => 10,
-                _                  => 0
+                "leave"     => 4,
+                // "companyDocuments" merged into "documents" — see MyProfileDocumentsTab's
+                // combined-list remarks — kept as an alias so any existing bookmarked/shared link
+                // using the old query value still lands on the (now single) Documents tab.
+                "documents" or "companyDocuments" => 6,
+                "tasks"     => 7,
+                "assets"    => 8,
+                "timeline"  => 9,
+                _           => 0
             };
         }
     }

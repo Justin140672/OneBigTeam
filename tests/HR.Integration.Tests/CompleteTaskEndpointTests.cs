@@ -49,7 +49,12 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
         var userId = Guid.NewGuid();
         using var client = await AuthenticatedClient(userId);
 
-        var cancelledTaskId = await SeedCancelledTaskAsync();
+        // SEC-003 (see CompleteTaskHandler): only the assignee, their manager, or an HR
+        // Administrator may act on a task at all — an unassigned task can only be reached by
+        // an HR override. This test is specifically about the cancelled-status Conflict path,
+        // so the task must be assigned to the calling user to get past the authorization
+        // check and actually exercise that path.
+        var cancelledTaskId = await SeedCancelledTaskAsync(userId);
 
         var response = await client.PostAsync(
             $"/api/companies/{SeededCompanyId}/tasks/{cancelledTaskId}/complete",
@@ -66,7 +71,8 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
         var userId = Guid.NewGuid();
         using var client = await AuthenticatedClient(userId);
 
-        var taskId = await CreateTaskAsync("Task to complete");
+        // Assigned to the calling user — see SEC-003 note above.
+        var taskId = await CreateTaskAsync("Task to complete", userId);
 
         var response = await client.PostAsync(
             $"/api/companies/{SeededCompanyId}/tasks/{taskId}/complete",
@@ -85,7 +91,8 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
         var userId = Guid.NewGuid();
         using var client = await AuthenticatedClient(userId);
 
-        var taskId = await CreateTaskAsync("Task to complete twice");
+        // Assigned to the calling user — see SEC-003 note above.
+        var taskId = await CreateTaskAsync("Task to complete twice", userId);
 
         await client.PostAsync($"/api/companies/{SeededCompanyId}/tasks/{taskId}/complete", EmptyJson());
         var response = await client.PostAsync($"/api/companies/{SeededCompanyId}/tasks/{taskId}/complete", EmptyJson());
@@ -108,11 +115,13 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
         return client;
     }
 
-    private Task<Guid> CreateTaskAsync(string title) =>
-        TaskSeeder.SeedAsync(factory, SeededCompanyId, title);
+    private Task<Guid> CreateTaskAsync(string title, Guid? assignedEmployeeId = null) =>
+        TaskSeeder.SeedAsync(factory, SeededCompanyId, title, assignedEmployeeId: assignedEmployeeId);
 
-    private Task<Guid> SeedCancelledTaskAsync() =>
-        TaskSeeder.SeedAsync(factory, SeededCompanyId, "Cancelled task", status: TaskItemStatus.Cancelled);
+    private Task<Guid> SeedCancelledTaskAsync(Guid? assignedEmployeeId = null) =>
+        TaskSeeder.SeedAsync(
+            factory, SeededCompanyId, "Cancelled task",
+            status: TaskItemStatus.Cancelled, assignedEmployeeId: assignedEmployeeId);
 
     private static StringContent EmptyJson() =>
         new("{}", Encoding.UTF8, "application/json");

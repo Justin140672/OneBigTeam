@@ -13,6 +13,10 @@ internal sealed class FakeEmployeeImportLookupReader : IEmployeeImportLookupRead
     private readonly HashSet<string> _existingEmployeeNumbers = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _existingWorkEmails = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Guid> _referenceToEmployeeId = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Guid> _initialCompanyAdminByWorkEmail = new(StringComparer.OrdinalIgnoreCase);
+
+    public void SeedInitialCompanyAdmin(string workEmail, Guid employeeId) =>
+        _initialCompanyAdminByWorkEmail[workEmail.Trim()] = employeeId;
 
     public void SeedExistingEmployeeNumber(string employeeNumber) =>
         _existingEmployeeNumbers.Add(employeeNumber.Trim());
@@ -31,4 +35,7 @@ internal sealed class FakeEmployeeImportLookupReader : IEmployeeImportLookupRead
 
     public Task<Guid?> FindEmployeeIdByReferenceAsync(Guid companyId, string reference, CancellationToken cancellationToken) =>
         Task.FromResult(_referenceToEmployeeId.TryGetValue(reference.Trim(), out var id) ? (Guid?)id : null);
+
+    public Task<Guid?> TryFindInitialCompanyAdminEmployeeIdByWorkEmailAsync(Guid companyId, string workEmail, CancellationToken cancellationToken) =>
+        Task.FromResult(_initialCompanyAdminByWorkEmail.TryGetValue(workEmail.Trim(), out var id) ? (Guid?)id : null);
 }

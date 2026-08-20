@@ -54,6 +54,12 @@
                             var m = member;
                             <div @key="m.EmployeeId" class="team-card">
                                 <span class="team-card-status team-card-status--@StatusCss(m.Status)">@StatusLabel(m.Status)</span>
+                                @if (AlertCounts is not null && AlertCounts.TryGetValue(m.EmployeeId, out var alertCount) && alertCount > 0)
+                                {
+                                    <span class="team-card-alert-badge" title="@($"{alertCount} item(s) need attention")" aria-label="@($"{alertCount} item(s) need attention")">
+                                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> @alertCount
+                                    </span>
+                                }
                                 <ProfilePhotoAvatar PhotoUrl="@m.ProfilePhotoUrl" Initials="@Initials(m.FullName)" SizePx="48" />
                                 <span class="team-card-name" title="@m.FullName">@m.FullName</span>
                                 <span class="team-card-title" title="@(m.JobTitle ?? "—")">@(m.JobTitle ?? "—")</span>
@@ -81,6 +87,11 @@
 }
 
 @code {
+    // Optional cross-widget wiring from ManagerDashboard: aggregated open-attention-item counts
+    // per employee, computed once by ManagerAttentionQueueWidget and passed down here rather than
+    // re-fetched — avoids a second round of the same service calls just to badge a card.
+    [Parameter] public IReadOnlyDictionary<Guid, int>? AlertCounts { get; set; }
+
     private bool _loading = true;
     private bool _scopeSwitching;
     private bool _includeIndirect;

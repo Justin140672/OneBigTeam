@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -9,12 +8,15 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// directly to "/dashboard/manager". The page guards on Session.IsManager and redirects any
 /// other role to Session.MyProfileUrl before the widgets below ever render.
 ///
-/// Note: not every widget on this dashboard is gated the same way as the route itself. Most gate
-/// on Session.IsManager (matching the route guard), but TeamOnboardingWidget additionally
-/// requires Session.CanManageEmployees (the HrAdministrator-only "employee:manage" permission) —
-/// so a Manager-only persona (e.g. James Okafor) will not see Team Onboarding even though they
-/// can reach this dashboard, while a Manager who is also an HrAdministrator (e.g. David Park)
-/// will. See HR.Web.Components.Pages.Onboarding.TeamOnboardingWidget.razor.
+/// Redesigned dashboard layout (see PRODUCT ticket "Reorganise the Team Manager Dashboard around
+/// priority actions"): the former standalone Team Tasks, Leave Requests, Upcoming Probation
+/// Reviews, Overdue Return-to-Work Reviews and Missing Fit Notes widgets were folded into a
+/// single combined "Requires your attention" queue (ManagerAttentionQueueWidget.razor). A new
+/// compact "Team Status" metric strip (TeamStatusSummary.razor) was added, and the
+/// TeamOnboardingWidget / TeamSicknessTodayWidget cards were removed from this page entirely
+/// (they remain used elsewhere — TeamOnboardingWidget is unused now, MissingFitNotesWidget is
+/// still used standalone on the HR dashboard). My Team (MyTeamWidget) and Reports
+/// (TeamReportsWidget) are unchanged structurally.
 /// </summary>
 public sealed class ManagerDashboardPage(IPage page, string baseUrl)
 {
@@ -39,58 +41,101 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
     public async Task WaitForWidgetLoadedAsync(string widgetTitle)
     {
         var widget = page.Locator(".widget-card").Filter(new() { HasText = widgetTitle }).First;
-        await widget.Locator(".task-widget-item, .widget-empty").First.WaitForAsync(new() { Timeout = 15_000 });
+        await widget.Locator(".task-widget-item, .widget-empty, .attention-queue-all-clear").First.WaitForAsync(new() { Timeout = 15_000 });
     }
 
-    // ── Team Tasks Widget ──────────────────────────────────────────────────────
+    // ── "Requires your attention" combined queue (ManagerAttentionQueueWidget.razor) ─────────
+    //
+    // Replaces the old per-category widgets (Team Tasks, Leave Requests, Upcoming Probation
+    // Reviews, Overdue Return-to-Work Reviews, Missing Fit Notes). Each row is a single button
+    // element (class "task-widget-item attention-queue-item", plus "attention-queue-item--overdue"
+    // when overdue) whose text content includes both the row's subject (".task-widget-title") and
+    // its category/status (".task-widget-meta", e.g. "Leave request · Pending"), so filtering by
+    // either the subject or the category text both work via Playwright's HasText. This mirrors
+    // HrDashboardPage's equivalent accessors for AttentionQueueWidget.razor.
 
-    private ILocator TeamTasksWidget =>
-        page.Locator(".widget-card").Filter(new() { HasText = "Team Tasks" }).First;
+    private ILocator AttentionQueueWidget =>
+        page.Locator(".widget-card.attention-queue-card").First;
 
-    public async Task<IReadOnlyList<string>> GetTeamTaskTitlesAsync()
-    {
-        await TeamTasksWidget.Locator(".task-widget-item, .widget-empty").First.WaitForAsync(new() { Timeout = 15_000 });
-
-        var titles = await TeamTasksWidget.Locator(".task-widget-title").AllAsync();
-        var names  = new List<string>();
-        foreach (var t in titles)
-            names.Add((await t.TextContentAsync())?.Trim() ?? "");
-        return names;
-    }
-
-    // ── Leave Requests Widget ─────────────────────────────────────────────────
-
-    private ILocator LeaveRequestsWidget =>
-        page.Locator(".widget-card").Filter(new() { HasText = "Leave Requests" }).First;
-
-    public async Task<IReadOnlyList<string>> GetLeaveRequestEmployeeNamesAsync()
-    {
-        await LeaveRequestsWidget.Locator(".task-widget-item, .widget-empty").First
+    /// <summary>Waits for the attention queue to finish loading (spinner replaced by rows/empty state).</summary>
+    public async Task WaitForAttentionQueueLoadedAsync() =>
+        await AttentionQueueWidget.Locator(".attention-queue-item, .attention-queue-all-clear").First
             .WaitForAsync(new() { Timeout = 15_000 });
-
-        var titles = await LeaveRequestsWidget.Locator(".task-widget-title").AllAsync();
-        var names  = new List<string>();
-        foreach (var t in titles)
-            names.Add((await t.TextContentAsync())?.Trim() ?? "");
-        return names;
-    }
 
     /// <summary>
-    /// Clicks the Leave Requests widget row whose employee name contains
-    /// <paramref name="nameFragment"/> (LeaveRequestsWidget.razor's NavigateToRequest). If the
-    /// request still has an open leave-approval task, this opens TaskViewDialog in place (use
-    /// TaskViewPage to interact with it); otherwise it navigates away to that employee's profile
-    /// Leave tab. Callers should assert on whichever outcome they expect.
+    /// Returns the subject (".task-widget-title") of every row currently in the attention queue.
+    /// Pass <paramref name="categoryFilter"/> (e.g. "Team task", "Leave request", "Probation
+    /// review", "Return-to-work review", "Fit note evidence") to scope to one category — the
+    /// filter matches against the whole row's text, which includes both title and category/meta.
     /// </summary>
-    public async Task ClickLeaveRequestItemAsync(string nameFragment)
+    public async Task<IReadOnlyList<string>> GetAttentionQueueSubjectsAsync(string? categoryFilter = null)
     {
-        await LeaveRequestsWidget.Locator(".task-widget-item, .widget-empty").First
-            .WaitForAsync(new() { Timeout = 15_000 });
+        await WaitForAttentionQueueLoadedAsync();
 
-        await LeaveRequestsWidget.Locator(".task-widget-item")
-            .Filter(new() { HasText = nameFragment })
+        var rows = categoryFilter is null
+            ? AttentionQueueWidget.Locator(".attention-queue-item")
+            : AttentionQueueWidget.Locator(".attention-queue-item").Filter(new() { HasText = categoryFilter });
+
+        var titles = await rows.Locator(".task-widget-title").AllAsync();
+        var names  = new List<string>();
+        foreach (var t in titles)
+            names.Add((await t.TextContentAsync())?.Trim() ?? "");
+        return names;
+    }
+
+    /// <summary>Returns true if the attention-queue row matching <paramref name="subjectFragment"/> is styled overdue.</summary>
+    public async Task<bool> IsAttentionQueueItemOverdueAsync(string subjectFragment)
+    {
+        await WaitForAttentionQueueLoadedAsync();
+        var row = AttentionQueueWidget.Locator(".attention-queue-item").Filter(new() { HasText = subjectFragment }).First;
+        var classes = await row.GetAttributeAsync("class") ?? "";
+        return classes.Contains("attention-queue-item--overdue");
+    }
+
+    /// <summary>Returns true if the attention queue is showing its "All clear" empty state.</summary>
+    public async Task<bool> AttentionQueueIsAllClearAsync() =>
+        await AttentionQueueWidget.Locator(".attention-queue-all-clear").IsVisibleAsync();
+
+    /// <summary>
+    /// Clicks the first attention-queue row whose text (subject or category/meta) contains
+    /// <paramref name="textFragment"/>. If the row's underlying item has an open task, this opens
+    /// TaskViewDialog in place (use TaskViewPage to interact with it); otherwise it navigates away
+    /// (e.g. to an employee's profile). Callers should assert on whichever outcome they expect.
+    /// </summary>
+    public async Task ClickAttentionQueueItemAsync(string textFragment)
+    {
+        await WaitForAttentionQueueLoadedAsync();
+        await AttentionQueueWidget.Locator(".attention-queue-item")
+            .Filter(new() { HasText = textFragment })
             .First
             .ClickAsync();
+    }
+
+    // ── Team Status Summary (TeamStatusSummary.razor) ─────────────────────────────────────────
+    //
+    // Compact metric strip added by the redesign. Tiles are not clickable/filterable (see the
+    // component's own remarks), so this only exposes read access to the displayed counts.
+
+    private ILocator TeamStatusWidget =>
+        page.Locator(".widget-card.team-status-summary").First;
+
+    public async Task WaitForTeamStatusLoadedAsync() =>
+        await TeamStatusWidget.Locator(".team-status-tile, .widget-empty").First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
+    /// <summary>
+    /// Returns the numeric value shown on the Team Status tile whose label (".team-status-label")
+    /// exactly matches <paramref name="tileLabel"/> (e.g. "At work", "Away today", "On leave",
+    /// "Sick", "In probation", "Missing fit notes").
+    /// </summary>
+    public async Task<int> GetTeamStatusValueAsync(string tileLabel)
+    {
+        await WaitForTeamStatusLoadedAsync();
+        var tile = TeamStatusWidget.Locator(".team-status-tile")
+            .Filter(new() { Has = page.Locator(".team-status-label", new() { HasText = tileLabel }) })
+            .First;
+        var text = await tile.Locator(".team-status-value").TextContentAsync();
+        return int.TryParse(text?.Trim(), out var value) ? value : 0;
     }
 
     // ── My Team Widget ────────────────────────────────────────────────────────
@@ -156,73 +201,5 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
         var card = MyTeamWidget.Locator(".team-card").Filter(new() { HasText = nameFragment }).First;
         await card.GetByRole(AriaRole.Button, new() { Name = "Notify Sickness" }).ClickAsync();
         await page.WaitForSelectorAsync("[role='dialog'].record-sickness-dialog", new() { Timeout = 10_000 });
-    }
-
-    // ── Upcoming Probation Reviews Widget ─────────────────────────────────────
-
-    private ILocator UpcomingProbationWidget =>
-        page.Locator(".widget-card").Filter(new() { HasText = "Upcoming Probation Reviews" }).First;
-
-    public async Task<IReadOnlyList<string>> GetUpcomingProbationEmployeeNamesAsync()
-    {
-        await UpcomingProbationWidget.Locator(".task-widget-item, .widget-empty").First
-            .WaitForAsync(new() { Timeout = 15_000 });
-
-        var titles = await UpcomingProbationWidget.Locator(".task-widget-title").AllAsync();
-        var names  = new List<string>();
-        foreach (var t in titles)
-            names.Add((await t.TextContentAsync())?.Trim() ?? "");
-        return names;
-    }
-
-    // ── Team Onboarding Widget ─────────────────────────────────────────────────
-
-    private ILocator TeamOnboardingWidget =>
-        page.Locator(".widget-card").Filter(new() { HasText = "Team Onboarding" }).First;
-
-    /// <summary>
-    /// Returns the employee names shown in the Team Onboarding widget items. Only call this for
-    /// a persona with Session.CanManageEmployees (see class remarks) — for a Manager-only
-    /// persona the widget never renders at all, so this would time out.
-    /// </summary>
-    public async Task<IReadOnlyList<string>> GetTeamOnboardingEmployeeNamesAsync()
-    {
-        await TeamOnboardingWidget.Locator(".task-widget-item, .widget-empty").First
-            .WaitForAsync(new() { Timeout = 15_000 });
-
-        var titles = await TeamOnboardingWidget.Locator(".task-widget-title").AllAsync();
-        var names  = new List<string>();
-        foreach (var t in titles)
-            names.Add((await t.TextContentAsync())?.Trim() ?? "");
-        return names;
-    }
-
-    /// <summary>
-    /// Clicks the first Team Onboarding item whose title contains <paramref name="nameFragment"/>
-    /// and waits for navigation to the employee's profile with the Onboarding tab active.
-    /// </summary>
-    public async Task ClickTeamOnboardingItemAsync(string nameFragment)
-    {
-        await TeamOnboardingWidget.Locator(".task-widget-item, .widget-empty").First
-            .WaitForAsync(new() { Timeout = 15_000 });
-
-        await TeamOnboardingWidget.Locator(".task-widget-item")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .ClickAsync();
-
-        await page.WaitForURLAsync(new Regex(@"/employees/[0-9a-f-]{36}\?tab=onboarding"), new() { Timeout = 15_000 });
-    }
-
-    // ── Team Sickness Today Widget ────────────────────────────────────────────
-
-    private ILocator TeamSicknessTodayWidget =>
-        page.Locator(".widget-card").Filter(new() { HasText = "Team Sickness Today" }).First;
-
-    public async Task<bool> IsTeamSicknessTodayEmptyAsync()
-    {
-        await TeamSicknessTodayWidget.Locator(".task-widget-item, .widget-empty").First
-            .WaitForAsync(new() { Timeout = 15_000 });
-        return await TeamSicknessTodayWidget.Locator(".widget-empty").IsVisibleAsync();
     }
 }

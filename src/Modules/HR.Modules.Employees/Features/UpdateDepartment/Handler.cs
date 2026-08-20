@@ -53,15 +53,15 @@ internal sealed class UpdateDepartmentHandler
             }
         }
 
-        // Validate name uniqueness (excluding self)
+        // Validate name uniqueness (excluding self), case-insensitively.
         var newName = request.Name.Trim();
-        if (!string.Equals(department.Name, newName, StringComparison.Ordinal))
+        if (!string.Equals(department.Name, newName, StringComparison.OrdinalIgnoreCase))
         {
             var nameExists = await _dbContext.Departments
                 .AnyAsync(
                     d => d.CompanyId == request.CompanyId &&
                          d.Id != request.Id &&
-                         d.Name == newName &&
+                         d.Name.ToLower() == newName.ToLower() &&
                          d.IsActive,
                     cancellationToken);
 

@@ -87,7 +87,9 @@ public class ExecuteCustomerDeletionEndpointTests
         var response = await client.PostAsJsonAsync(
             Url(Guid.NewGuid()), new { reason = "Countdown elapsed, executing deletion" });
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
+        // is Forbidden (403), not Unauthorized (401).
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

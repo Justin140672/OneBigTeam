@@ -15,6 +15,10 @@ internal sealed class ImportStagingEmployee
     public Guid? LocationId { get; private set; }
     public Guid? EmploymentTypeId { get; private set; }
     public Guid? PositionProfileId { get; private set; }
+    // Set only when this row's Work Email matches the company's initial (seed) admin employee —
+    // see Employee.IsInitialCompanyAdmin. ConfirmImportSessionHandler updates that existing
+    // employee instead of creating a new one when this is non-null.
+    public Guid? ExistingEmployeeIdToUpdate { get; private set; }
     public string RawData { get; private set; } = string.Empty;
     public bool IsValid { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -33,7 +37,8 @@ internal sealed class ImportStagingEmployee
         Guid? positionProfileId,
         string rawData,
         bool isValid,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? existingEmployeeIdToUpdate = null)
     {
         return new ImportStagingEmployee
         {
@@ -48,6 +53,7 @@ internal sealed class ImportStagingEmployee
             LocationId = locationId,
             EmploymentTypeId = employmentTypeId,
             PositionProfileId = positionProfileId,
+            ExistingEmployeeIdToUpdate = existingEmployeeIdToUpdate,
             RawData = rawData,
             IsValid = isValid,
             CreatedAt = now,

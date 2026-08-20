@@ -52,4 +52,67 @@ public class CandidateTests
 
         Assert.Throws<InvalidOperationException>(() => candidate.LinkToEmployee(Guid.NewGuid(), Now));
     }
+
+    [Fact]
+    public void Deactivate_Sets_IsActive_False_And_Deactivation_Fields()
+    {
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var deactivatedBy = Guid.NewGuid();
+        var later = Now.AddDays(1);
+
+        candidate.Deactivate(deactivatedBy, "  No longer available  ", later);
+
+        Assert.False(candidate.IsActive);
+        Assert.Equal(later, candidate.DeactivatedAt);
+        Assert.Equal(deactivatedBy, candidate.DeactivatedByUserId);
+        Assert.Equal("No longer available", candidate.DeactivationReason);
+        Assert.Equal(later, candidate.UpdatedAt);
+    }
+
+    [Fact]
+    public void Deactivate_When_Already_Inactive_Throws()
+    {
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        candidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
+
+        Assert.Throws<InvalidOperationException>(() => candidate.Deactivate(Guid.NewGuid(), "Another reason", Now.AddDays(1)));
+    }
+
+    [Fact]
+    public void Reactivate_Sets_IsActive_True_And_Reactivation_Fields()
+    {
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        candidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
+        var reactivatedBy = Guid.NewGuid();
+        var later = Now.AddDays(2);
+
+        candidate.Reactivate(reactivatedBy, later);
+
+        Assert.True(candidate.IsActive);
+        Assert.Equal(later, candidate.ReactivatedAt);
+        Assert.Equal(reactivatedBy, candidate.ReactivatedByUserId);
+        Assert.Equal(later, candidate.UpdatedAt);
+    }
+
+    [Fact]
+    public void Reactivate_When_Already_Active_Throws()
+    {
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+
+        Assert.Throws<InvalidOperationException>(() => candidate.Reactivate(Guid.NewGuid(), Now));
+    }
+
+    [Fact]
+    public void Reactivate_Does_Not_Clear_Prior_Deactivation_History_Fields()
+    {
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var deactivatedBy = Guid.NewGuid();
+        candidate.Deactivate(deactivatedBy, "No longer available", Now);
+
+        candidate.Reactivate(Guid.NewGuid(), Now.AddDays(1));
+
+        Assert.Equal(Now, candidate.DeactivatedAt);
+        Assert.Equal(deactivatedBy, candidate.DeactivatedByUserId);
+        Assert.Equal("No longer available", candidate.DeactivationReason);
+    }
 }

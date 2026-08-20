@@ -15,6 +15,12 @@ internal sealed class Employee
     public Guid LocationId { get; private set; }
     public Guid PositionProfileId { get; private set; }
     public Guid? ManagerId { get; private set; }
+    // True only for the single employee record auto-created for the admin who signed the company
+    // up (see SignUpHandler.CreateAdminEmployeeAsync / MarkAsInitialCompanyAdmin below). Used
+    // exclusively by DataImport's employee import: a row whose Work Email matches this specific
+    // employee is treated as an update to the seed record rather than a duplicate-email error —
+    // see EmployeeStagingRowValidator/ConfirmImportSessionHandler. Never set for any other employee.
+    public bool IsInitialCompanyAdmin { get; private set; }
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
     public string WorkEmail { get; private set; } = string.Empty;
@@ -231,6 +237,12 @@ internal sealed class Employee
     // One-off administrative assignment of an employee number to a legacy/edge-case employee
     // record that has none (EmployeeNumber == ""), distinct from UpdateEmploymentDetails' general
     // "correction" of an existing number and from Create's initial assignment.
+    public void MarkAsInitialCompanyAdmin(DateTimeOffset now)
+    {
+        IsInitialCompanyAdmin = true;
+        UpdatedAt = now;
+    }
+
     public void AssignBackfilledEmployeeNumber(string employeeNumber, DateTimeOffset now)
     {
         EmployeeNumber = NormalizeEmployeeNumber(employeeNumber);

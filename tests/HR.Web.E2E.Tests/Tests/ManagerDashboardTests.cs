@@ -11,13 +11,16 @@ namespace HR.Web.E2E.Tests.Tests;
 /// "/dashboard/manager". The page guards on Session.IsManager and redirects any other role to
 /// Session.MyProfileUrl.
 ///
-/// Not every widget on this dashboard shares that same gate: TeamTasksWidget, LeaveRequestsWidget,
-/// MyTeamWidget, UpcomingProbationReviewsWidget, TeamSicknessTodayWidget,
-/// OverdueReturnToWorkReviewsWidget and MissingFitNotesWidget all gate on Session.IsManager (or
-/// something Session.IsManager implies), matching the route guard — but TeamOnboardingWidget
-/// additionally requires Session.CanManageEmployees (the HrAdministrator-only "employee:manage"
-/// permission). So James Okafor (Manager only) can reach this dashboard but never sees Team
-/// Onboarding, while David Park (HrAdministrator + Manager) sees every widget on the page.
+/// Redesigned layout (see PRODUCT ticket "Reorganise the Team Manager Dashboard around priority
+/// actions"): the former standalone Team Tasks, Leave Requests, Upcoming Probation Reviews,
+/// Overdue Return-to-Work Reviews and Missing Fit Notes widgets are now folded into a single
+/// combined "Requires your attention" queue (ManagerAttentionQueueWidget.razor). A new compact
+/// "Team Status" metric strip (TeamStatusSummary.razor) was added. TeamOnboardingWidget and
+/// TeamSicknessTodayWidget were removed from this page entirely (and are unused elsewhere) — see
+/// the removed TeamOnboardingWidget_* and TeamSicknessTodayWidget_* tests that previously lived
+/// in this file, deleted as part of that redesign since there is no longer any UI surface on this
+/// page for them to exercise. My Team (MyTeamWidget) and Reports (TeamReportsWidget) are
+/// unchanged structurally and still gate on Session.IsManager.
 ///
 /// Uses seeded personas:
 ///   - James Okafor (james.okafor@acme.example) — Manager only, manages Tom Williams directly.
@@ -104,7 +107,7 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
     }
 
     [Fact]
-    public async Task ManagerOnly_SeesManagerScopedWidgets_ButNotTeamOnboarding()
+    public async Task ManagerOnly_SeesAttentionQueueAndTeamStatusWidgets()
     {
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
@@ -113,37 +116,20 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
         await login.LoginAsync(JamesEmail);
         await dashboard.GoToAsync();
 
-        Assert.True(await dashboard.HasWidgetAsync("Team Tasks"));
-        Assert.True(await dashboard.HasWidgetAsync("Leave Requests"));
+        Assert.True(await dashboard.HasWidgetAsync("Requires your attention"));
+        Assert.True(await dashboard.HasWidgetAsync("Team Status"));
         Assert.True(await dashboard.HasWidgetAsync("My Team"));
-        Assert.True(await dashboard.HasWidgetAsync("Upcoming Probation Reviews"));
-        Assert.True(await dashboard.HasWidgetAsync("Team Sickness Today"));
-        Assert.True(await dashboard.HasWidgetAsync("Overdue Return-to-Work Reviews"));
-        Assert.True(await dashboard.HasWidgetAsync("Missing Fit Notes"));
-
-        // James has the Manager role but not HrAdministrator, so he lacks CanManageEmployees —
-        // Team Onboarding additionally requires that permission (see class remarks).
-        Assert.False(await dashboard.HasWidgetAsync("Team Onboarding"),
-            "Expected Team Onboarding to be hidden for a Manager-only persona without CanManageEmployees");
     }
 
     [Fact]
-    public async Task ManagerWithHrAdministratorRole_AlsoSeesTeamOnboardingWidget()
+    public async Task AttentionQueueWidget_LoadsWithoutError_AndIncludesAllCategories()
     {
-        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
-        var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(DavidEmail);
-        await dashboard.GoToAsync();
-
-        Assert.True(await dashboard.HasWidgetAsync("Team Onboarding"),
-            "Expected Team Onboarding to be visible for a Manager who is also an HrAdministrator");
-    }
-
-    [Fact]
-    public async Task TeamTasksWidget_LoadsWithoutError()
-    {
+        // Replaces the former separate TeamTasksWidget_LoadsWithoutError,
+        // UpcomingProbationReviewsWidget_IsVisible_ForManager and
+        // OverdueReturnToWorkAndMissingFitNotesWidgets_LoadWithoutError tests — all of those
+        // categories are now rows inside the single combined attention queue
+        // (ManagerAttentionQueueWidget.razor), so a single load-without-error assertion against
+        // that widget now covers what those four separate widget cards used to cover.
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
 
@@ -151,8 +137,33 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
         await login.LoginAsync(JamesEmail);
         await dashboard.GoToAsync();
 
-        await dashboard.WaitForWidgetLoadedAsync("Team Tasks");
-        await dashboard.GetTeamTaskTitlesAsync();
+        Assert.True(await dashboard.HasWidgetAsync("Requires your attention"));
+        await dashboard.WaitForAttentionQueueLoadedAsync();
+        await dashboard.GetAttentionQueueSubjectsAsync();
+    }
+
+    [Fact]
+    public async Task TeamStatusSummary_LoadsWithoutError_ForManager()
+    {
+        // Replaces the former TeamSicknessTodayWidget_Loads_SelfScopedToDirectReports test — the
+        // standalone Team Sickness Today widget was removed from this page; the equivalent "how
+        // many of my team are sick right now" signal now lives as the "Sick" tile on the new Team
+        // Status summary strip.
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(JamesEmail);
+        await dashboard.GoToAsync();
+
+        Assert.True(await dashboard.HasWidgetAsync("Team Status"));
+        await dashboard.WaitForTeamStatusLoadedAsync();
+
+        // No seeded active sickness record for James's team as of writing — asserting the tile
+        // resolves to a definite non-negative count is sufficient here; the underlying
+        // sickness-detection logic is covered by the Sickness module's own tests.
+        var sick = await dashboard.GetTeamStatusValueAsync("Sick");
+        Assert.True(sick >= 0);
     }
 
     [Fact]
@@ -227,99 +238,6 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
         // its header reads "Record Sickness" even though the card's own button says "Notify
         // Sickness" — see MyTeamWidget.razor / RecordSicknessDialog.razor.
         Assert.Contains("Record Sickness", await _page.ContentAsync());
-    }
-
-    [Fact]
-    public async Task UpcomingProbationReviewsWidget_IsVisible_ForManager()
-    {
-        // Full regression coverage (including the click-through navigation) for this widget
-        // lives in HrDashboardTests, since it is shared between the HR and Manager dashboards
-        // and its content does not differ by role — this just confirms it also renders here.
-        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
-        var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(JamesEmail);
-        await dashboard.GoToAsync();
-
-        Assert.True(await dashboard.HasWidgetAsync("Upcoming Probation Reviews"));
-        await dashboard.WaitForWidgetLoadedAsync("Upcoming Probation Reviews");
-    }
-
-    [Fact]
-    public async Task TeamSicknessTodayWidget_Loads_SelfScopedToDirectReports()
-    {
-        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
-        var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(JamesEmail);
-        await dashboard.GoToAsync();
-
-        Assert.True(await dashboard.HasWidgetAsync("Team Sickness Today"));
-        // No seeded active sickness record for James's team as of writing — asserting the
-        // widget resolves to a definite state (items or empty) is sufficient here; the widget's
-        // actual sickness-detection logic is covered by the Sickness module's own tests.
-        await dashboard.IsTeamSicknessTodayEmptyAsync();
-    }
-
-    [Fact]
-    public async Task OverdueReturnToWorkAndMissingFitNotesWidgets_LoadWithoutError()
-    {
-        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
-        var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(JamesEmail);
-        await dashboard.GoToAsync();
-
-        await dashboard.WaitForWidgetLoadedAsync("Overdue Return-to-Work Reviews");
-        await dashboard.WaitForWidgetLoadedAsync("Missing Fit Notes");
-    }
-
-    [Fact]
-    public async Task TeamOnboardingWidget_ShowsEmployeeCurrentlyOnboarding()
-    {
-        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
-        var empList   = new EmployeeListPage(_page, _fixture.WebBaseUrl);
-        var empEdit   = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
-        var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(DavidEmail);
-
-        var (_, lastName) = await CreateEmployeeReportingToDavidAsync(empList, empEdit, "Show");
-
-        await dashboard.GoToAsync();
-
-        var names = await dashboard.GetTeamOnboardingEmployeeNamesAsync();
-
-        Assert.True(
-            names.Any(n => n.Contains(lastName, StringComparison.OrdinalIgnoreCase)),
-            $"Expected the newly-created employee '{lastName}' (reporting to David, onboarding not " +
-            $"yet started) to appear in the Team Onboarding widget. Names found: [{string.Join(", ", names)}]");
-    }
-
-    [Fact]
-    public async Task ClickingTeamOnboardingItem_NavigatesToEmployeeProfile_WithOnboardingTabActive()
-    {
-        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
-        var empList   = new EmployeeListPage(_page, _fixture.WebBaseUrl);
-        var empEdit   = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
-        var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
-        var employee  = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(DavidEmail);
-
-        var (employeeId, lastName) = await CreateEmployeeReportingToDavidAsync(empList, empEdit, "Nav");
-
-        await dashboard.GoToAsync();
-        await dashboard.GetTeamOnboardingEmployeeNamesAsync();
-        await dashboard.ClickTeamOnboardingItemAsync(lastName);
-
-        Assert.Contains($"/employees/{employeeId}?tab=onboarding", _page.Url);
-        Assert.Equal("Onboarding", await employee.GetActiveTabNameAsync());
     }
 
     /// <summary>

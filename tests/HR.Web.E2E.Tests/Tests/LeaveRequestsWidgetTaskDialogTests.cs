@@ -61,11 +61,14 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(CrossUserFixture fixture)
         await login.SwitchAccountAsync(JamesEmail);
         await dashboard.GoToAsync();
 
-        // ── Step 3: Click Tom's row in the Leave Requests widget. ───────────────────────
-        var namesBeforeClick = await dashboard.GetLeaveRequestEmployeeNamesAsync();
+        // ── Step 3: Click Tom's row in the combined "Requires your attention" queue —
+        // LeaveRequestsWidget's standalone card was folded into ManagerAttentionQueueWidget by
+        // the Manager Dashboard redesign, so leave-request rows now live there, filterable by
+        // the "Leave request" category text rendered in each row's ".task-widget-meta". ───────
+        var namesBeforeClick = await dashboard.GetAttentionQueueSubjectsAsync("Leave request");
         Assert.Contains(namesBeforeClick, n => n.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
 
-        await dashboard.ClickLeaveRequestItemAsync("Tom Williams");
+        await dashboard.ClickAttentionQueueItemAsync("Tom Williams");
 
         // ── Step 4: The Task view dialog opens in place — no navigation away from the
         // dashboard, unlike the "already actioned" fallback. ────────────────────────────

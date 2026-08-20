@@ -68,7 +68,7 @@ else
                                 <MenuItem Text="Vacancies" IconCss="fa-solid fa-briefcase" Url="@_menuItems["Vacancies"]" />
                                 <MenuItem Text="Candidates" IconCss="fa-solid fa-user-tie" Url="@_menuItems["Candidates"]" />
                                 <MenuItem Text="Recruiters" IconCss="fa-solid fa-people-arrows" Url="@_menuItems["ExternalRecruiters"]" />
-                                <MenuItem Text="Recruitment Settings" IconCss="fa-solid fa-gear" Url="@_menuItems["RecruitmentStages"]" />
+                                <MenuItem Text="Recruitment Stages" IconCss="fa-solid fa-gear" Url="@_menuItems["RecruitmentStages"]" />
                             }
                             @if (Session.CanManageEmployees)
                             {
@@ -85,7 +85,6 @@ else
                                         <MenuItem Text="Shared Documents" Url="@_menuItems["SharedDocuments"]" />
                                         <MenuItem Text="Onboarding Templates" Url="@_menuItems["OnboardingTemplates"]" />
                                         <MenuItem Text="Data Import" Url="@_menuItems["DataImport"]" />
-                                        <MenuItem Text="Import History" Url="@_menuItems["ImportHistory"]" />                                        
                                     </MenuItems>
                                 </MenuItem>
                                 <MenuItem Text="Assets" IconCss="fa-solid fa-box">
@@ -121,12 +120,7 @@ else
                             }
                             @if (Session.IsHrAdministrator || Session.CanManageCompany)
                             {
-                                <MenuItem Text="Support" IconCss="fa-solid fa-headset">
-                                    <MenuItems>
-                                        <MenuItem Text="Support Requests" Url="@_menuItems["SupportQueue"]" />
-                                        <MenuItem Text="Feedback Dashboard" Url="@_menuItems["SupportDashboard"]" />
-                                    </MenuItems>
-                                </MenuItem>
+                                <MenuItem Text="Support Requests" IconCss="fa-solid fa-headset" Url="@_menuItems["SupportQueue"]" />
                             }
                         </MenuItems>
                     </SfMenu>
@@ -170,9 +164,6 @@ else
                                 <div class="help-dropdown">
                                     <a class="help-item" href="/getting-started" @onclick="CloseHelp">
                                         <i class="fa-solid fa-list-check me-2"></i>Getting Started
-                                    </a>
-                                    <a class="help-item" href="/explore" @onclick="CloseHelp">
-                                        <i class="fa-solid fa-compass me-2"></i>Explore One Big Team
                                     </a>
                                     <a class="help-item" href="/companies/@Session.CompanyId/support" @onclick="CloseHelp">
                                         <i class="fa-solid fa-life-ring me-2"></i>Help &amp; Feedback
@@ -360,7 +351,6 @@ else
         ["DocumentTypes"] = "/",
         ["SharedDocuments"] = "/",
         ["DataImport"] = "/",
-        ["ImportHistory"] = "/",
         ["SicknessCategories"] = "/",
         ["OrganisationChart"] = "/",
         ["Vacancies"] = "/",
@@ -372,7 +362,6 @@ else
         ["HrSettings"] = "/",
         ["UserAdministration"] = "/",
         ["SupportQueue"] = "/",
-        ["SupportDashboard"] = "/",
     };
 
     protected override async Task OnInitializedAsync()
@@ -397,7 +386,6 @@ else
         _menuItems["DocumentTypes"] = $"/companies/{companyId}/document-types";
         _menuItems["SharedDocuments"] = $"/companies/{companyId}/shared-documents";
         _menuItems["DataImport"] = $"/companies/{companyId}/data-import/employees";
-        _menuItems["ImportHistory"] = $"/companies/{companyId}/data-import/history";
         _menuItems["SicknessCategories"] = $"/companies/{companyId}/sickness-categories";
         _menuItems["OrganisationChart"] = $"/companies/{companyId}/organisation-chart";
         _menuItems["Vacancies"] = $"/companies/{companyId}/vacancies";
@@ -409,7 +397,6 @@ else
         _menuItems["HrSettings"] = $"/companies/{companyId}/hr-settings";
         _menuItems["UserAdministration"] = $"/companies/{companyId}/user-administration";
         _menuItems["SupportQueue"] = $"/companies/{companyId}/support/admin/queue";
-        _menuItems["SupportDashboard"] = $"/companies/{companyId}/support/admin/dashboard";
 
         await LoadUnreadCountAsync();
 

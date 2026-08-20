@@ -1,6 +1,6 @@
 using HR.Modules.CompanyOnboarding.Features.DismissOnboardingChecklist;
-using HR.Modules.CompanyOnboarding.Features.GetExploreCards;
 using HR.Modules.CompanyOnboarding.Features.GetOnboardingChecklist;
+using HR.Modules.CompanyOnboarding.Features.MarkOnboardingTaskComplete;
 using HR.Modules.CompanyOnboarding.Persistence;
 using HR.Modules.CompanyOnboarding.Services;
 using Microsoft.AspNetCore.Builder;
@@ -40,7 +40,7 @@ public static class CompanyOnboardingModule
     /// created the first time the checklist is viewed (see GetOnboardingChecklistHandler) with
     /// IsHidden=false — fine for a real brand-new company, but wrong for these shared, long-lived
     /// fixtures that dozens of other E2E tests assume land straight on a dashboard. The "/getting-
-    /// started" page itself still has its own dedicated coverage (GettingStartedAndExploreTests),
+    /// started" page itself still has its own dedicated coverage (GettingStartedTests),
     /// so this doesn't reduce what's tested — it just stops it leaking into unrelated tests.
     /// </summary>
     public static async Task SeedCompanyOnboardingAsync(this IServiceProvider services)
@@ -82,6 +82,6 @@ public static class CompanyOnboardingModule
 
         services.AddScoped<GetOnboardingChecklistHandler>();
         services.AddScoped<DismissOnboardingChecklistHandler>();
-        services.AddScoped<GetExploreCardsHandler>();
+        services.AddScoped<MarkOnboardingTaskCompleteHandler>();
     }
 }

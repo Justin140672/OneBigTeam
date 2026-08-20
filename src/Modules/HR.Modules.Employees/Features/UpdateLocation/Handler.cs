@@ -47,13 +47,13 @@ internal sealed class UpdateLocationHandler
         }
 
         var newName = request.Name.Trim();
-        if (!string.Equals(location.Name, newName, StringComparison.Ordinal))
+        if (!string.Equals(location.Name, newName, StringComparison.OrdinalIgnoreCase))
         {
             var nameExists = await _dbContext.Locations
                 .AnyAsync(
                     l => l.CompanyId == request.CompanyId &&
                          l.Id != request.Id &&
-                         l.Name == newName &&
+                         l.Name.ToLower() == newName.ToLower() &&
                          l.IsActive,
                     cancellationToken);
 

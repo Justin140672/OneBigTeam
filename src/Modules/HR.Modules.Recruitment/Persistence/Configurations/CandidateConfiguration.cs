@@ -46,6 +46,27 @@ internal sealed class CandidateConfiguration : IEntityTypeConfiguration<Candidat
         builder.Property(c => c.EmployeeId)
             .HasColumnName("employee_id");
 
+        builder.Property(c => c.IsActive)
+            .HasColumnName("is_active")
+            .IsRequired()
+            .HasDefaultValue(true);
+
+        builder.Property(c => c.DeactivatedAt)
+            .HasColumnName("deactivated_at");
+
+        builder.Property(c => c.DeactivatedByUserId)
+            .HasColumnName("deactivated_by_user_id");
+
+        builder.Property(c => c.DeactivationReason)
+            .HasColumnName("deactivation_reason")
+            .HasMaxLength(1000);
+
+        builder.Property(c => c.ReactivatedAt)
+            .HasColumnName("reactivated_at");
+
+        builder.Property(c => c.ReactivatedByUserId)
+            .HasColumnName("reactivated_by_user_id");
+
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
@@ -56,5 +77,6 @@ internal sealed class CandidateConfiguration : IEntityTypeConfiguration<Candidat
 
         builder.HasIndex(c => c.CompanyId);
         builder.HasIndex(c => new { c.CompanyId, c.Email });
+        builder.HasIndex(c => new { c.CompanyId, c.IsActive });
     }
 }

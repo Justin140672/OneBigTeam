@@ -9,6 +9,7 @@
 @inject EmploymentTypeService EmploymentTypeService
 @inject ExternalRecruiterService ExternalRecruiterService
 @inject RecruitmentStageService RecruitmentStageService
+@inject CompanyService CompanyService
 @inject IJSRuntime JS
 
 <div data-testid="vacancy-applications-tab">
@@ -279,10 +280,20 @@
                         </div>
                     }
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Employee Number <span class="text-danger">*</span></label>
-                    <SfTextBox @bind-Value="_employeeNumber" Placeholder="e.g. EMP-001" />
-                </div>
+                @if (_hireEmployeeNumberMode == EmployeeNumberMode.Automatic)
+                {
+                    <div class="col-md-6">
+                        <label class="form-label">Employee Number</label>
+                        <p class="text-muted small mb-0">An employee number will be assigned automatically when this candidate is hired.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="col-md-6">
+                        <label class="form-label">Employee Number <span class="text-danger">*</span></label>
+                        <SfTextBox @bind-Value="_employeeNumber" Placeholder="e.g. EMP-001" />
+                    </div>
+                }
                 <div class="col-md-6">
                     <label class="form-label">Employment Type <span class="text-danger">*</span></label>
                     <SfDropDownList TValue="Guid?"
@@ -422,6 +433,7 @@
     private string _gender = string.Empty;
     private string? _genderOther;
     private string _employeeNumber = string.Empty;
+    private EmployeeNumberMode _hireEmployeeNumberMode = EmployeeNumberMode.Manual;
     private Guid? _employmentTypeId;
     private Guid? _managerId;
     // Derived read-only display fields — populated from the Vacancy's linked Position Profile
@@ -513,6 +525,22 @@
     // where their interview stands.
     private static bool HasPendingInterview(ApplicationListItemModel row) =>
         row.InterviewOutcome == "Pending";
+
+    // "Offer" stage = the same stage OfferCandidateHandler moves an application TO (the last
+    // active non-terminal stage by DisplayOrder) — stages are fully data-driven per company, so
+    // there's no fixed enum/name to compare against; this mirrors the backend's own resolution
+    // logic exactly rather than hardcoding a stage name like "Offer". Once an application is here,
+    // an offer has already been made — Schedule Interview/Offer/Reject no longer make sense (Hire
+    // and Withdraw remain the only valid next actions).
+    private bool IsOnOfferStage(ApplicationListItemModel row)
+    {
+        var offerStage = _stages
+            .Where(s => s.IsActive && !s.IsTerminal)
+            .OrderByDescending(s => s.DisplayOrder)
+            .FirstOrDefault();
+
+        return offerStage is not null && row.CurrentStageId == offerStage.Id;
+    }
 
     private async Task OpenAddDialog()
     {
@@ -733,6 +761,12 @@
             _nationalities = result?.Items.ToList() ?? [];
         }
 
+        // Same rule as Employee Edit (see EmployeeEdit.razor): when the company's Employee Number
+        // Mode is Automatic, the field isn't shown at all — a number is generated when the
+        // employee is created (here: hired), so there's nothing for the recruiter to enter.
+        var hrSettings = await CompanyService.GetHrSettingsAsync(CompanyId);
+        _hireEmployeeNumberMode = hrSettings?.EmployeeNumberMode ?? EmployeeNumberMode.Manual;
+
         var vacancyTask = VacancyService.GetVacancyAsync(CompanyId, VacancyId);
         var employmentTypeTask = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
         var managerTask = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
@@ -767,14 +801,19 @@
         {
             var active = _selectedRow is not null && IsActive(_selectedRow);
             var pendingInterview = _selectedRow is not null && HasPendingInterview(_selectedRow);
+            var onOfferStage = _selectedRow is not null && IsOnOfferStage(_selectedRow);
             var enabled = active && !pendingInterview;
+
+            // An offer's already been made once on the Offer stage — Schedule Interview/Offer/
+            // Reject stop making sense there (Hire and Withdraw remain valid).
+            var enabledPreOffer = enabled && !onOfferStage;
 
             return new List<object>
             {
-                new ItemModel { Id = "app-schedule", Text = "Schedule Interview", PrefixIcon = "fa-solid fa-calendar-plus", Disabled = !enabled, TooltipText = "Schedule an interview for the selected application" },
-                new ItemModel { Id = "app-offer",     Text = "Offer",              PrefixIcon = "fa-solid fa-file-signature", Disabled = !enabled, TooltipText = "Make an offer to the selected candidate" },
+                new ItemModel { Id = "app-schedule", Text = "Schedule Interview", PrefixIcon = "fa-solid fa-calendar-plus", Disabled = !enabledPreOffer, TooltipText = "Schedule an interview for the selected application" },
+                new ItemModel { Id = "app-offer",     Text = "Offer",              PrefixIcon = "fa-solid fa-file-signature", Disabled = !enabledPreOffer, TooltipText = "Make an offer to the selected candidate" },
                 new ItemModel { Id = "app-hire",      Text = "Hire",               PrefixIcon = "fa-solid fa-user-check", Disabled = !enabled, TooltipText = "Hire the selected candidate" },
-                new ItemModel { Id = "app-reject",    Text = "Reject",             PrefixIcon = "fa-solid fa-user-xmark", Disabled = !enabled, TooltipText = "Reject the selected candidate" },
+                new ItemModel { Id = "app-reject",    Text = "Reject",             PrefixIcon = "fa-solid fa-user-xmark", Disabled = !enabledPreOffer, TooltipText = "Reject the selected candidate" },
                 new ItemModel { Id = "app-withdraw",  Text = "Withdraw",           PrefixIcon = "fa-solid fa-arrow-rotate-left", Disabled = _selectedRow is null, TooltipText = "Withdraw the selected application" },
             };
         }
@@ -801,9 +840,12 @@
 
         var active = _selectedRow is not null && IsActive(_selectedRow);
         var pendingInterview = _selectedRow is not null && HasPendingInterview(_selectedRow);
+        var onOfferStage = _selectedRow is not null && IsOnOfferStage(_selectedRow);
         var enabled = active && !pendingInterview;
+        var enabledPreOffer = enabled && !onOfferStage;
 
-        await _grid.EnableToolbarItemsAsync(["app-schedule", "app-offer", "app-hire", "app-reject"], enabled);
+        await _grid.EnableToolbarItemsAsync(["app-schedule", "app-offer", "app-reject"], enabledPreOffer);
+        await _grid.EnableToolbarItemsAsync(["app-hire"], enabled);
         await _grid.EnableToolbarItemsAsync(["app-withdraw"], _selectedRow is not null);
     }
 
@@ -851,9 +893,11 @@
 
     private async Task ConfirmHireAsync()
     {
+        var employeeNumberRequired = _hireEmployeeNumberMode != EmployeeNumberMode.Automatic;
+
         if (_activeApplication is null || _startDate is null || _dateOfBirth is null ||
             string.IsNullOrWhiteSpace(_nationality) || string.IsNullOrWhiteSpace(_gender) ||
-            string.IsNullOrWhiteSpace(_employeeNumber) || _employmentTypeId is null)
+            (employeeNumberRequired && string.IsNullOrWhiteSpace(_employeeNumber)) || _employmentTypeId is null)
         {
             _dialogError = "Please complete all required fields.";
             return;
@@ -863,7 +907,7 @@
             CompanyId, VacancyId, _activeApplication.Id,
             _startDate.Value, _dateOfBirth.Value, _nationality, _gender,
             string.IsNullOrWhiteSpace(_genderOther) ? null : _genderOther.Trim(),
-            _employeeNumber.Trim(), _employmentTypeId.Value,
+            employeeNumberRequired ? _employeeNumber.Trim() : string.Empty, _employmentTypeId.Value,
             _managerId == Guid.Empty ? null : _managerId);
 
         var (result, error) = await ApplicationService.HireCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);

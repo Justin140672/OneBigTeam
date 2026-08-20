@@ -248,11 +248,22 @@
         if (!Guid.TryParse(moved.StageKey, out var targetStageId) || targetStageId == previous.StageId)
             return;
 
+        // Always cancel the widget's own optimistic client-side DOM move — not just on failure.
+        // The reload below is always the sole source of truth for the board's contents (see the
+        // class remarks above), but SfKanban's own internal drag handling was still separately
+        // committing its own DOM mutation for the dropped card on a *successful* move, alongside
+        // Blazor's own re-render off the freshly reloaded DataSource. Because SfKanban manages
+        // some of its drag/column DOM outside normal Blazor diffing, those two updates could each
+        // leave behind a card element — visible as a duplicated candidate card until the next full
+        // page refresh, even though the server-side data was only ever written once. Cancelling
+        // unconditionally means the widget never performs its own DOM move at all; the only visual
+        // update ever comes from the authoritative reload.
+        args.Cancel = true;
+
         var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, moved.ApplicationId, targetStageId);
 
         if (result is null)
         {
-            args.Cancel = true;
             _error = error ?? "Failed to move applicant to the new stage.";
             await LoadAsync(showSpinner: false);
             return;

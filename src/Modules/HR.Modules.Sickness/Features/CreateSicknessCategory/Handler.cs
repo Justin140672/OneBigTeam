@@ -12,7 +12,7 @@ internal sealed class CreateSicknessCategoryHandler(SicknessDbContext db, IClock
         CancellationToken cancellationToken)
     {
         var exists = await db.SicknessCategories
-            .AnyAsync(c => c.CompanyId == request.CompanyId && c.Name == request.Name, cancellationToken);
+            .AnyAsync(c => c.CompanyId == request.CompanyId && c.Name.ToLower() == request.Name.Trim().ToLower(), cancellationToken);
 
         if (exists)
             return Result.Failure<CreateSicknessCategoryResponse>(Error.Conflict("A sickness category with this name already exists."));

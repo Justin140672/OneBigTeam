@@ -34,12 +34,14 @@ public sealed record EmployeeImportCreateResult(
 
 public sealed record EmployeeImportWorkingPattern(WorkingDays? WorkingDays, decimal? HoursPerDay);
 
+// Hours Per Week and FTE are deliberately NOT part of this record: they are always calculated from
+// the employee's working pattern (working days x hours per day, see
+// WorkingPatternCompensationCalculator) rather than imported directly — see backlog items on
+// removing the Hours Per Week / FTE import columns.
 public sealed record EmployeeImportCompensation(
     decimal SalaryAmount,
     string SalaryType,
-    string Currency,
-    decimal? HoursPerWeek,
-    decimal? Fte);
+    string Currency);
 
 /// <summary>
 /// Cross-module write surface used exclusively by the DataImport confirm step to create
@@ -50,6 +52,16 @@ public interface IEmployeeImportWriter
 {
     Task<EmployeeImportCreateResult> CreateEmployeeAsync(
         EmployeeImportCreateRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Updates an existing employee (identified by <paramref name="existingEmployeeId"/>) with the
+    /// import row's data, instead of creating a new employee. Used exclusively for the single
+    /// case where an import row's Work Email matches the company's initial (seed) admin employee —
+    /// see Employee.IsInitialCompanyAdmin / EmployeeStagingRowValidator. The seed-admin flag itself
+    /// is left untouched (still true) — this only refreshes the employee's data from the import row.
+    /// </summary>
+    Task<EmployeeImportCreateResult> UpdateEmployeeAsync(
+        Guid existingEmployeeId, EmployeeImportCreateRequest request, CancellationToken cancellationToken);
 
     Task SetWorkingPatternAsync(
         Guid companyId, Guid employeeId, EmployeeImportWorkingPattern pattern, CancellationToken cancellationToken);

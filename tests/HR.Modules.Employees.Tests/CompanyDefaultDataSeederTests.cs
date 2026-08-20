@@ -15,14 +15,19 @@ public class CompanyDefaultDataSeederTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var leavePolicyProvisioner = new FakeLeavePolicyProvisioner();
-        var seeder = new CompanyDefaultDataSeeder(context, new FakeClock(FixedUtcNow), leavePolicyProvisioner);
+        var seeder = new CompanyDefaultDataSeeder(
+            context, new FakeClock(FixedUtcNow), leavePolicyProvisioner,
+            new FakeLeaveTypeDefaultsProvisioner(), new FakeSicknessCategoryDefaultsProvisioner(),
+            new FakeDocumentTypeDefaultsProvisioner());
 
         await seeder.SeedDefaultsAsync(companyId, CancellationToken.None);
 
         Assert.Equal(1, await context.Departments.CountAsync(d => d.CompanyId == companyId));
         Assert.Equal(1, await context.LocationTypes.CountAsync(lt => lt.CompanyId == companyId));
         Assert.Equal(1, await context.Locations.CountAsync(l => l.CompanyId == companyId));
-        Assert.Equal(1, await context.EmploymentTypes.CountAsync(et => et.CompanyId == companyId));
+        // Full default set (Permanent, Fixed Term, Contractor, Casual, Apprentice) — matches the
+        // dev/E2E seed data's canonical Employment Types, not a single placeholder type.
+        Assert.Equal(5, await context.EmploymentTypes.CountAsync(et => et.CompanyId == companyId));
         Assert.Equal(1, await context.PositionProfiles.CountAsync(pp => pp.CompanyId == companyId));
     }
 
@@ -32,7 +37,10 @@ public class CompanyDefaultDataSeederTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var leavePolicyProvisioner = new FakeLeavePolicyProvisioner();
-        var seeder = new CompanyDefaultDataSeeder(context, new FakeClock(FixedUtcNow), leavePolicyProvisioner);
+        var seeder = new CompanyDefaultDataSeeder(
+            context, new FakeClock(FixedUtcNow), leavePolicyProvisioner,
+            new FakeLeaveTypeDefaultsProvisioner(), new FakeSicknessCategoryDefaultsProvisioner(),
+            new FakeDocumentTypeDefaultsProvisioner());
 
         var result = await seeder.SeedDefaultsAsync(companyId, CancellationToken.None);
 
@@ -53,9 +61,17 @@ public class CompanyDefaultDataSeederTests
         Assert.Equal(locationType.Id, location.LocationTypeId);
         Assert.Equal("Office", locationType.Name);
 
-        var employmentType = await context.EmploymentTypes.SingleAsync(et => et.CompanyId == companyId);
-        Assert.Equal(result.EmploymentTypeId, employmentType.Id);
-        Assert.Equal("Full-time", employmentType.Name);
+        // The returned EmploymentTypeId is the "Permanent" one — the default assigned to the
+        // admin employee created immediately after this returns (same role "Full-time" used to
+        // play before the full default set was added).
+        var employmentType = await context.EmploymentTypes.SingleAsync(et => et.Id == result.EmploymentTypeId);
+        Assert.Equal("Permanent", employmentType.Name);
+
+        var employmentTypeNames = await context.EmploymentTypes
+            .Where(et => et.CompanyId == companyId).Select(et => et.Name).ToListAsync();
+        Assert.Equal(
+            new[] { "Permanent", "Fixed Term", "Contractor", "Casual", "Apprentice" }.OrderBy(n => n),
+            employmentTypeNames.OrderBy(n => n));
 
         var positionProfile = await context.PositionProfiles.SingleAsync(pp => pp.CompanyId == companyId);
         Assert.Equal(result.PositionProfileId, positionProfile.Id);
@@ -71,7 +87,10 @@ public class CompanyDefaultDataSeederTests
         {
             PolicyIdToReturn = Guid.NewGuid(),
         };
-        var seeder = new CompanyDefaultDataSeeder(context, new FakeClock(FixedUtcNow), leavePolicyProvisioner);
+        var seeder = new CompanyDefaultDataSeeder(
+            context, new FakeClock(FixedUtcNow), leavePolicyProvisioner,
+            new FakeLeaveTypeDefaultsProvisioner(), new FakeSicknessCategoryDefaultsProvisioner(),
+            new FakeDocumentTypeDefaultsProvisioner());
 
         var result = await seeder.SeedDefaultsAsync(companyId, CancellationToken.None);
 
@@ -87,12 +106,39 @@ public class CompanyDefaultDataSeederTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var leavePolicyProvisioner = new FakeLeavePolicyProvisioner();
-        var seeder = new CompanyDefaultDataSeeder(context, new FakeClock(FixedUtcNow), leavePolicyProvisioner);
+        var seeder = new CompanyDefaultDataSeeder(
+            context, new FakeClock(FixedUtcNow), leavePolicyProvisioner,
+            new FakeLeaveTypeDefaultsProvisioner(), new FakeSicknessCategoryDefaultsProvisioner(),
+            new FakeDocumentTypeDefaultsProvisioner());
 
         await seeder.SeedDefaultsAsync(companyId, CancellationToken.None);
 
         Assert.Equal(1, leavePolicyProvisioner.CallCount);
         Assert.Equal(companyId, Assert.Single(leavePolicyProvisioner.RequestedCompanyIds));
+    }
+
+    [Fact]
+    public async Task SeedDefaultsAsync_Calls_LeaveType_SicknessCategory_And_DocumentType_DefaultsProvisioners()
+    {
+        // Closes a real gap: a brand-new company previously got no default Leave Types, Sickness
+        // Categories, or Document Types at all — only these three provisioners fixed that.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var leaveTypeProvisioner = new FakeLeaveTypeDefaultsProvisioner();
+        var sicknessCategoryProvisioner = new FakeSicknessCategoryDefaultsProvisioner();
+        var documentTypeProvisioner = new FakeDocumentTypeDefaultsProvisioner();
+        var seeder = new CompanyDefaultDataSeeder(
+            context, new FakeClock(FixedUtcNow), new FakeLeavePolicyProvisioner(),
+            leaveTypeProvisioner, sicknessCategoryProvisioner, documentTypeProvisioner);
+
+        await seeder.SeedDefaultsAsync(companyId, CancellationToken.None);
+
+        Assert.Equal(1, leaveTypeProvisioner.CallCount);
+        Assert.Equal(companyId, Assert.Single(leaveTypeProvisioner.RequestedCompanyIds));
+        Assert.Equal(1, sicknessCategoryProvisioner.CallCount);
+        Assert.Equal(companyId, Assert.Single(sicknessCategoryProvisioner.RequestedCompanyIds));
+        Assert.Equal(1, documentTypeProvisioner.CallCount);
+        Assert.Equal(companyId, Assert.Single(documentTypeProvisioner.RequestedCompanyIds));
     }
 
     private static EmployeesDbContext BuildContext()

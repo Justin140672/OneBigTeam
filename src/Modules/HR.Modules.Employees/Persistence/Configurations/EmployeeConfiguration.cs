@@ -77,6 +77,11 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(e => e.IsInitialCompanyAdmin)
+            .HasColumnName("is_initial_company_admin")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(e => e.WorkingDaysOverride)
             .HasColumnName("working_days_override");
 

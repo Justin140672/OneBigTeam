@@ -26,7 +26,7 @@ public class EmployeeProvisioningServiceTests
         var createEmployeeHandler = new CreateEmployeeHandler(
             context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
             new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
-        var service = new EmployeeProvisioningService(createEmployeeHandler);
+        var service = new EmployeeProvisioningService(createEmployeeHandler, context, new FakeClock(FixedUtcNow));
 
         var result = await service.CreateFromCandidateAsync(
             new EmployeeProvisioningRequest(
@@ -55,7 +55,7 @@ public class EmployeeProvisioningServiceTests
         var createEmployeeHandler = new CreateEmployeeHandler(
             context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
             new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
-        var service = new EmployeeProvisioningService(createEmployeeHandler);
+        var service = new EmployeeProvisioningService(createEmployeeHandler, context, new FakeClock(FixedUtcNow));
 
         await service.CreateFromCandidateAsync(
             new EmployeeProvisioningRequest(

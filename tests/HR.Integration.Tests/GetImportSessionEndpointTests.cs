@@ -67,6 +67,100 @@ public class GetImportSessionEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    // These two tests preserve coverage that used to live in the E2E suite's (now-removed, see
+    // item 47 — Import History screen deleted) ImportHistoryTests: that a completed import
+    // session's Status/TotalRows/SuccessfulRows/FailedRows are correctly reflected via
+    // GetImportSession once the full upload -> validate -> confirm flow has actually run, not
+    // just right after upload (Pending, all counts zero — the only state the tests above cover).
+    // The Import History UI screen is gone, but ListImportSessions/GetImportSession themselves
+    // remain in place and still need to report accurate post-confirm state for any other caller.
+    [Fact]
+    public async Task Returns_Imported_Status_And_Correct_Row_Counts_After_A_Fully_Successful_Confirm()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.CompanyAdministrator, companyId);
+
+        await EnsureDefaultLeavePolicyAsync(client, companyId);
+        await SetEmployeeNumberModeAsync(client, companyId, "Manual");
+
+        var sessionId = await UploadAsync(client, companyId, FullyValidCsv());
+        (await client.PostAsync(
+            $"/api/companies/{companyId}/data-import/sessions/{sessionId}/validate", EmptyJson()))
+            .EnsureSuccessStatusCode();
+        (await client.PostAsync(
+            $"/api/companies/{companyId}/data-import/sessions/{sessionId}/confirm", EmptyJson()))
+            .EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync(SessionUrl(companyId, sessionId));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<SessionDetailPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("Imported", payload!.Status);
+        Assert.Equal(2, payload.TotalRows);
+        Assert.Equal(2, payload.SuccessfulRows);
+        Assert.Equal(0, payload.FailedRows);
+
+        // Also preserved from the removed E2E test: the session must appear correctly in the list
+        // view too, not only its own detail endpoint.
+        var listResponse = await client.GetAsync($"/api/companies/{companyId}/data-import/sessions");
+        listResponse.EnsureSuccessStatusCode();
+        var sessions = await listResponse.Content.ReadFromJsonAsync<List<SessionSummaryPayload>>();
+        Assert.NotNull(sessions);
+        var summary = Assert.Single(sessions!, s => s.Id == sessionId);
+        Assert.Equal("Imported", summary.Status);
+        Assert.Equal(2, summary.TotalRows);
+        Assert.Equal(2, summary.SuccessfulRows);
+        Assert.Equal(0, summary.FailedRows);
+    }
+
+    [Fact]
+    public async Task Returns_CompletedWithErrors_Status_And_Correct_Row_Counts_After_A_Partially_Failed_Confirm()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.CompanyAdministrator, companyId);
+
+        await EnsureDefaultLeavePolicyAsync(client, companyId);
+        await SetEmployeeNumberModeAsync(client, companyId, "Manual");
+
+        // Second row is missing the required Last Name — one valid row, one row that fails
+        // EmployeeStagingRowValidator's RequiredFields check.
+        const string csv =
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
+            "Valid,Employee,valid.employee@example.com,2026-01-01,EMP-VALID,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n" +
+            "Invalid,,invalid.employee@example.com,2026-01-02,EMP-INVALID,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n";
+
+        var sessionId = await UploadAsync(client, companyId, csv);
+        (await client.PostAsync(
+            $"/api/companies/{companyId}/data-import/sessions/{sessionId}/validate", EmptyJson()))
+            .EnsureSuccessStatusCode();
+        (await client.PostAsync(
+            $"/api/companies/{companyId}/data-import/sessions/{sessionId}/confirm", EmptyJson()))
+            .EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync(SessionUrl(companyId, sessionId));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<SessionDetailPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("CompletedWithErrors", payload!.Status);
+        Assert.Equal(2, payload.TotalRows);
+        Assert.Equal(1, payload.SuccessfulRows);
+        Assert.Equal(1, payload.FailedRows);
+    }
+
     [Fact]
     public async Task Returns_NotFound_When_Session_Belongs_To_A_Different_Company()
     {
@@ -92,6 +186,49 @@ public class GetImportSessionEndpointTests
         return client;
     }
 
+    // POST /api/companies (CreateCompany) was removed in 78a43344; this now provisions the
+    // company directly via CompaniesDbContext — same as ConfirmImportSessionEndpointTests'
+    // identical helper.
+    private async Task<Guid> CreateCompanyAsync(HttpClient client)
+    {
+        _ = client;
+        return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Import GetSession Test Co {Guid.NewGuid():N}");
+    }
+
+    /// <summary>
+    /// DefaultLeavePolicyId is mandatory on PositionProfile, so ImportLookupResolver's
+    /// auto-create-position-profile path can only succeed once the company already has a default
+    /// leave policy (the first policy created for a company is automatically its default).
+    /// </summary>
+    private static async Task EnsureDefaultLeavePolicyAsync(HttpClient client, Guid companyId)
+    {
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"Default Policy {Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
+        response.EnsureSuccessStatusCode();
+    }
+
+    private static async Task SetEmployeeNumberModeAsync(
+        HttpClient client, Guid companyId, string mode, string? prefix = null, int nextEmployeeNumber = 1, int minimumLength = 1)
+    {
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
+        {
+            id = companyId,
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 25,
+            probationMonths = 6,
+            employeeNumberMode = mode,
+            employeeNumberPrefix = prefix,
+            nextEmployeeNumber,
+            employeeNumberMinimumLength = minimumLength
+        });
+        response.EnsureSuccessStatusCode();
+    }
+
+    private static StringContent EmptyJson() => new("{}", Encoding.UTF8, "application/json");
+
     private static string SessionUrl(Guid companyId, Guid sessionId) =>
         $"/api/companies/{companyId}/data-import/sessions/{sessionId}";
 
@@ -99,6 +236,15 @@ public class GetImportSessionEndpointTests
         "First Name,Last Name,Work Email,Start Date,Employee Number\n" +
         "John,Doe,john.doe@example.com,2026-01-01,EMP001\n" +
         "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002\n";
+
+    // Unlike ValidCsv() above (upload/detail-only tests, never validated/confirmed), this includes
+    // every field EmployeeStagingRowValidator.RequiredFields/RequiredLookupFields needs so rows
+    // actually pass staging validation and can be confirmed — same shape as
+    // ConfirmImportSessionEndpointTests' own ValidCsv().
+    private static string FullyValidCsv() =>
+        "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
+        "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n" +
+        "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer,50000\n";
 
     private static async Task<Guid> UploadAsync(HttpClient client, Guid companyId, string csvContent)
     {
@@ -158,4 +304,8 @@ public class GetImportSessionEndpointTests
         Guid Id, string EntityType, string FileName, string Status, int TotalRows, int ProcessedRows,
         int SuccessfulRows, int FailedRows, DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt,
         string? ErrorSummary, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+
+    private sealed record SessionSummaryPayload(
+        Guid Id, string FileName, string Status, int TotalRows, int SuccessfulRows, int FailedRows,
+        DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt);
 }

@@ -58,6 +58,14 @@
 
         _checklist = await CompanyOnboardingService.GetChecklistAsync();
         _isLoading = false;
+
+        // The checklist fetch above already persisted IsHidden=true server-side if this load
+        // pushed completion to 100% (see GetOnboardingChecklistHandler) — refresh AppSession's
+        // own cached flag immediately so the nav menu / landing redirect reflect it for the rest
+        // of this session too, not only on the user's next login. See MarkGettingStartedHidden's
+        // remarks for why this can't just wait for a fresh circuit.
+        if (_checklist is { IsHidden: true })
+            Session.MarkGettingStartedHidden();
     }
 
     private async Task SkipForNowAsync()
@@ -65,6 +73,8 @@
         _dismissing = true;
         await CompanyOnboardingService.DismissChecklistAsync();
         _dismissing = false;
+
+        Session.MarkGettingStartedHidden();
 
         Navigation.NavigateTo(Session.IsHrAdministrator
             ? "/dashboard/hr"

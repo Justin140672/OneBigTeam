@@ -7,12 +7,13 @@ namespace HR.Modules.Reporting.Tests;
 public class GetLeaveSummaryReportHandlerTests
 {
     [Fact]
-    public async Task HandleAsync_Without_LeaveTypeId_Sums_Entitlement_Across_LeaveTypes_When_Grouped_By_Employee()
+    public async Task HandleAsync_Without_LeaveTypeId_Reflects_Annual_Leave_Only_When_Grouped_By_Employee()
     {
-        // Reproduces the pre-fix behaviour: with no LeaveTypeId filter supplied, grouping by
-        // Employee (the default) sums EntitlementDays across every balance-tracked leave type —
-        // this is the existing/unchanged shape callers relying on GroupBy=Employee still get, even
-        // though it isn't meaningful on its own (hence the new optional filter).
+        // Regression test for the real bug: grouping by Employee with no LeaveTypeId filter used
+        // to sum EntitlementDays across EVERY balance-tracked leave type for that employee
+        // (25 Annual + 10 Sick + 5 Compassionate + 52 Parental = 92) — a meaningless combined
+        // figure, not a genuine entitlement anyone has. Fixed to restrict to Annual Leave (the
+        // one entitlement-bearing "headline" leave type) when no explicit filter narrows it.
         var employeeId = Guid.NewGuid();
         var annualTypeId = Guid.NewGuid();
         var sickTypeId = Guid.NewGuid();
@@ -36,8 +37,31 @@ public class GetLeaveSummaryReportHandlerTests
         Assert.True(result.IsSuccess);
         var row = Assert.Single(result.Value!.Items);
         Assert.Equal(employeeId.ToString(), row.GroupKey);
-        // 25 + 10 + 5 + 52 = 92 — the exact inflated figure from the bug report (Tom Williams).
-        Assert.Equal(92m, row.EntitlementDays);
+        Assert.Equal(25m, row.EntitlementDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Without_LeaveTypeId_Reflects_Annual_Leave_Only_When_Grouped_By_Department()
+    {
+        var employeeId = Guid.NewGuid();
+        var annualTypeId = Guid.NewGuid();
+        var sickTypeId = Guid.NewGuid();
+        var reader = new FakeLeaveSummaryReader(
+        [
+            new LeaveSummaryReportRow(employeeId, annualTypeId, "Annual Leave", 23m, 0m, 0m, 23m, 0),
+            new LeaveSummaryReportRow(employeeId, sickTypeId, "Sick Leave", 10m, 0m, 0m, 10m, 0),
+        ]);
+        var handler = new GetLeaveSummaryReportHandler(reader, new FakeEmployeeDepartmentReader(), new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new GetLeaveSummaryReportRequest(Guid.NewGuid(), GroupBy: LeaveSummaryGroupBy.Department),
+            callerIsHr: true,
+            callerEmployeeId: Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var row = Assert.Single(result.Value!.Items);
+        Assert.Equal(23m, row.EntitlementDays);
     }
 
     [Fact]

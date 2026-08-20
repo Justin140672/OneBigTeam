@@ -18,7 +18,7 @@ namespace HR.Modules.Recruitment.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("recruitment")
-                .HasAnnotation("ProductVersion", "10.0.9")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -161,6 +161,19 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTimeOffset?>("DeactivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deactivated_at");
+
+                    b.Property<Guid?>("DeactivatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deactivated_by_user_id");
+
+                    b.Property<string>("DeactivationReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("deactivation_reason");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -177,6 +190,12 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("first_name");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -187,6 +206,14 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("phone");
+
+                    b.Property<DateTimeOffset?>("ReactivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reactivated_at");
+
+                    b.Property<Guid?>("ReactivatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reactivated_by_user_id");
 
                     b.Property<string>("ResumeUrl")
                         .HasMaxLength(500)
@@ -202,6 +229,8 @@ namespace HR.Modules.Recruitment.Migrations
                     b.HasIndex("CompanyId");
 
                     b.HasIndex("CompanyId", "Email");
+
+                    b.HasIndex("CompanyId", "IsActive");
 
                     b.ToTable("candidates", "recruitment");
                 });

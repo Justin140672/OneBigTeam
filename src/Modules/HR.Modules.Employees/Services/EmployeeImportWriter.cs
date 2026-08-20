@@ -21,7 +21,8 @@ internal sealed class EmployeeImportWriter(
     IClock clock,
     IProbationDateResolver probationDateResolver,
     IAuditEventPublisher auditEventPublisher,
-    IEmployeeNumberGenerator employeeNumberGenerator) : IEmployeeImportWriter
+    IEmployeeNumberGenerator employeeNumberGenerator,
+    WorkingPatternCompensationCalculator workingPatternCalculator) : IEmployeeImportWriter
 {
     public async Task<EmployeeImportCreateResult> CreateEmployeeAsync(
         EmployeeImportCreateRequest request, CancellationToken cancellationToken)
@@ -77,9 +78,65 @@ internal sealed class EmployeeImportWriter(
             request.CompanyId, positionProfile?.ProbationMonthsOverride, employee.StartDate, cancellationToken);
         employee.SetProbationEndDate(probationEndDate, now);
 
-        employee.Activate(now);
+        // Employee.Create leaves Status = Draft. Previously this unconditionally activated every
+        // imported employee regardless of start date — wrong for a future starter, and (by
+        // accident) right for one who has already started. Only activate here when the start date
+        // has already arrived; a future start date correctly stays Draft until that date arrives.
+        // Note: there is currently no scheduled job that transitions Draft -> Active once a future
+        // start date arrives for ANY employee (manually created or imported) — this only fixes
+        // import so it never leaves an already-started employee incorrectly stuck in Draft.
+        if (request.StartDate <= DateOnly.FromDateTime(now.Date))
+            employee.Activate(now);
 
         dbContext.Employees.Add(employee);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditEventPublisher.PublishAsync(
+            new EmployeeCreatedAuditEvent(
+                request.CompanyId, employee.Id, request.ActorUserId, now, "Import", request.ImportSessionId),
+            cancellationToken);
+
+        return new EmployeeImportCreateResult(
+            employee.Id,
+            employee.EmployeeNumber,
+            employee.StartDate,
+            employee.ManagerId,
+            employee.PositionProfileId,
+            probationEndDate,
+            positionProfile?.DefaultLeavePolicyId);
+    }
+
+    public async Task<EmployeeImportCreateResult> UpdateEmployeeAsync(
+        Guid existingEmployeeId, EmployeeImportCreateRequest request, CancellationToken cancellationToken)
+    {
+        var now = clock.UtcNowOffset();
+
+        var employee = await dbContext.Employees
+            .SingleAsync(e => e.Id == existingEmployeeId && e.CompanyId == request.CompanyId, cancellationToken);
+
+        employee.UpdateProfile(
+            request.FirstName, request.LastName, request.WorkEmail, request.PersonalEmail, request.StartDate, now);
+
+        employee.UpdatePersonalDetails(
+            string.IsNullOrWhiteSpace(request.PreferredName) ? request.FirstName : request.PreferredName,
+            request.DateOfBirth,
+            request.Nationality,
+            request.Gender,
+            genderOther: null,
+            now);
+
+        employee.Assign(request.DepartmentId, request.PositionProfileId, request.LocationId, employee.ManagerId, now);
+
+        var positionProfile = await dbContext.PositionProfiles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                p => p.Id == request.PositionProfileId && p.CompanyId == request.CompanyId,
+                cancellationToken);
+
+        var probationEndDate = await probationDateResolver.ResolveEndDateAsync(
+            request.CompanyId, positionProfile?.ProbationMonthsOverride, employee.StartDate, cancellationToken);
+        employee.SetProbationEndDate(probationEndDate, now);
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await auditEventPublisher.PublishAsync(
@@ -119,6 +176,13 @@ internal sealed class EmployeeImportWriter(
 
         var now = clock.UtcNowOffset();
 
+        var employee = await dbContext.Employees
+            .AsNoTracking()
+            .SingleOrDefaultAsync(e => e.Id == employeeId && e.CompanyId == companyId, cancellationToken);
+
+        var (hoursPerWeek, fte) = await workingPatternCalculator.CalculateAsync(
+            companyId, employee?.WorkingDaysOverride, employee?.HoursPerDayOverride, cancellationToken);
+
         var record = Compensation.Create(
             Guid.NewGuid(),
             companyId,
@@ -127,8 +191,8 @@ internal sealed class EmployeeImportWriter(
             salaryType,
             compensation.SalaryAmount,
             compensation.Currency.Trim().ToUpperInvariant(),
-            compensation.HoursPerWeek,
-            compensation.Fte,
+            hoursPerWeek,
+            fte,
             notes: "Imported",
             CompensationChangeReason.NewHire,
             employeeId,

@@ -43,6 +43,12 @@ internal sealed class UploadImportFileHandler(
                 Error.Validation($"The file could not be read: {ex.Message}"));
         }
 
+        if (totalRows == 0)
+        {
+            return Result.Failure<UploadImportFileResponse>(
+                Error.Validation("The uploaded file has no data rows to import. Add at least one employee row below the header and try again."));
+        }
+
         fileStream.Seek(0, SeekOrigin.Begin);
 
         var storageKey = await storage.UploadAsync(

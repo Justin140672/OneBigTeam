@@ -36,7 +36,7 @@
                     <div class="col-12">
                         <label class="form-label">Quantity</label>
                         <SfNumericTextBox TValue="int" @bind-Value="Model.Quantity" Min="1" Placeholder="1"
-                                          FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" />
+                                          ShowSpinButton="false" />
                         <ValidationMessage For="@(() => Model.Quantity)" />
                     </div>
                 </div>

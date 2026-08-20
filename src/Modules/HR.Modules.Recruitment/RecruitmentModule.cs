@@ -9,6 +9,7 @@ using HR.Modules.Recruitment.Features.CreateApplication;
 using HR.Modules.Recruitment.Features.CreateCandidate;
 using HR.Modules.Recruitment.Features.CreateExternalRecruiter;
 using HR.Modules.Recruitment.Features.CreateVacancy;
+using HR.Modules.Recruitment.Features.DeactivateCandidate;
 using HR.Modules.Recruitment.Features.DeleteCandidateDocument;
 using HR.Modules.Recruitment.Features.DownloadCandidateDocument;
 using HR.Modules.Recruitment.Features.GetApplication;
@@ -35,6 +36,7 @@ using HR.Modules.Recruitment.Features.ListVacancies;
 using HR.Modules.Recruitment.Features.MoveApplicationStage;
 using HR.Modules.Recruitment.Features.OfferCandidate;
 using HR.Modules.Recruitment.Features.PublishVacancy;
+using HR.Modules.Recruitment.Features.ReactivateCandidate;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Features.RejectCandidate;
 using HR.Modules.Recruitment.Features.ListRecruitmentStages;
@@ -121,6 +123,12 @@ public static class RecruitmentModule
 
         services.AddScoped<UpdateCandidateHandler>();
         services.AddScoped<IValidator<UpdateCandidateRequest>, UpdateCandidateValidator>();
+
+        services.AddScoped<DeactivateCandidateHandler>();
+        services.AddScoped<IValidator<DeactivateCandidateRequest>, DeactivateCandidateValidator>();
+
+        services.AddScoped<ReactivateCandidateHandler>();
+        services.AddScoped<IValidator<ReactivateCandidateRequest>, ReactivateCandidateValidator>();
 
         services.AddScoped<CreateApplicationHandler>();
         services.AddScoped<IValidator<CreateApplicationRequest>, CreateApplicationValidator>();

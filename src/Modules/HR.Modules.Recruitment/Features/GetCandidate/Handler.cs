@@ -29,6 +29,10 @@ internal sealed class GetCandidateHandler(RecruitmentDbContext db)
             candidate.Phone,
             candidate.ResumeUrl,
             candidate.EmployeeId,
+            candidate.IsActive,
+            candidate.DeactivatedAt,
+            candidate.DeactivatedByUserId,
+            candidate.DeactivationReason,
             candidate.CreatedAt,
             candidate.UpdatedAt));
     }

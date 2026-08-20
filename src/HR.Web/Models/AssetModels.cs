@@ -11,6 +11,7 @@ public record AssetListItemModel(
     Guid CompanyId,
     string AssetNumber,
     Guid CategoryId,
+    string CategoryName,
     string Name,
     string? Manufacturer,
     string? Model,

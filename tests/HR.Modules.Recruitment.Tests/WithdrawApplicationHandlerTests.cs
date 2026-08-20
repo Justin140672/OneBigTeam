@@ -210,6 +210,32 @@ public class WithdrawApplicationHandlerTests
         Assert.Equal(InterviewOutcome.Passed, reloadedInterview.Outcome);
     }
 
+    [Fact]
+    public async Task HandleAsync_Does_Not_Change_Candidate_IsActive()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.CvReview.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new WithdrawApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedCandidate = await db.Candidates.SingleAsync();
+        Assert.True(savedCandidate.IsActive);
+        Assert.Null(savedCandidate.DeactivatedAt);
+    }
+
     private static WithdrawApplicationHandler handler(
         RecruitmentDbContext db,
         FakeAuditPublisher? auditPublisher = null) =>

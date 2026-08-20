@@ -90,7 +90,11 @@ public class AdminCancelSubscriptionEndpointTests
         var response = await client.PostAsJsonAsync(
             Url(Guid.NewGuid()), new { reason = "Customer requested cancellation via support call" });
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        // "platform:admin" policy: an authenticated caller proven authenticated but not on the
+        // allow list is Forbidden (403), not Unauthorized (401) — see
+        // PlatformAdminAuthorizationHandler.cs / f2658d7d ("Fix Platform settings policy only
+        // proves authentication"), the same fix already applied to GetPlatformSettingsEndpointTests.
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

@@ -94,7 +94,8 @@ internal sealed class ValidateImportSessionHandler(
                 validation.PositionProfileId,
                 rawDataJson,
                 isValid,
-                now);
+                now,
+                validation.ExistingEmployeeIdToUpdate);
 
             db.ImportStagingEmployees.Add(staging);
 

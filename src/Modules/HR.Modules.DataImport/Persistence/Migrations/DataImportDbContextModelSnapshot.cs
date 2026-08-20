@@ -18,7 +18,7 @@ namespace HR.Modules.DataImport.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("data_import")
-                .HasAnnotation("ProductVersion", "10.0.9")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -186,6 +186,10 @@ namespace HR.Modules.DataImport.Persistence.Migrations
                     b.Property<Guid?>("EmploymentTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("employment_type_id");
+
+                    b.Property<Guid?>("ExistingEmployeeIdToUpdate")
+                        .HasColumnType("uuid")
+                        .HasColumnName("existing_employee_id_to_update");
 
                     b.Property<Guid>("ImportSessionId")
                         .HasColumnType("uuid")

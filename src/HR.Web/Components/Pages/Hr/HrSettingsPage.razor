@@ -175,6 +175,7 @@
                         @if (Model.EmployeeNumberMode == EmployeeNumberMode.Automatic)
                         {
                             <div class="col-md-4">
+                                <label class="form-label">Prefix</label>
                                 <HrTextBox @bind-Value="Model.EmployeeNumberPrefix" Placeholder="Prefix (e.g. EMP-)" />
                                 <div class="form-text">
                                     Changing the prefix only affects employee numbers assigned in the future —
@@ -368,14 +369,17 @@
         return result is not null ? null : "Failed to save HR settings.";
     }
 
-    protected override Task OnSavedAsync()
-    {
-        SuccessMsg = "HR settings saved successfully.";
-        return Task.CompletedTask;
-    }
-
-    // Close navigates back to the company edit page (no dedicated HR settings list page).
-    protected override string? ListUrl => $"/companies/{Id}/edit";
+    // Save navigates to the HR Dashboard — this page is only ever reachable by an HR
+    // Administrator (see the IsHrAdministrator guard above), so the target is unambiguous. Left as
+    // EditPageBase's default OnSavedAsync (navigate to TargetListUrl via NavigateToList()) rather
+    // than a raw Navigation.NavigateTo call here: ConfirmSaveAndCloseAsync (the "unsaved changes"
+    // dialog's Save option) always issues its own follow-up NavigateToList() call after SaveAsync
+    // succeeds, targeting ListUrl — bypassing that mechanism with a direct call risked two
+    // stacked forceLoad navigations to two different URLs on that path (see the
+    // _navigatedThisSave fix elsewhere in EditPageBase for the general form of this bug). Routing
+    // both Save and Close to the dashboard keeps this page's navigation behaviour uniform and safe
+    // regardless of which path triggered it.
+    protected override string? ListUrl => "/dashboard/hr";
 
     private void ToggleDay(string day, bool isChecked)
     {

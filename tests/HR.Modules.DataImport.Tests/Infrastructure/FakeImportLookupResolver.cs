@@ -67,6 +67,18 @@ internal sealed class FakeImportLookupResolver : IImportLookupResolver
         return new ImportLookupResult(newId, WasCreated: true);
     }
 
+    public Task<Guid?> TryFindDepartmentAsync(Guid companyId, string name, CancellationToken cancellationToken) =>
+        Task.FromResult(_departments.TryGetValue(Key(companyId, name), out var id) ? (Guid?)id : null);
+
+    public Task<Guid?> TryFindEmploymentTypeAsync(Guid companyId, string name, CancellationToken cancellationToken) =>
+        Task.FromResult(_employmentTypes.TryGetValue(Key(companyId, name), out var id) ? (Guid?)id : null);
+
+    public Task<Guid?> TryFindLocationAsync(Guid companyId, string name, CancellationToken cancellationToken) =>
+        Task.FromResult(_locations.TryGetValue(Key(companyId, name), out var id) ? (Guid?)id : null);
+
+    public Task<Guid?> TryFindPositionProfileAsync(Guid companyId, string title, CancellationToken cancellationToken) =>
+        Task.FromResult(_positionProfiles.TryGetValue(Key(companyId, title), out var id) ? (Guid?)id : null);
+
     private static (Guid CompanyId, string NormalizedName) Key(Guid companyId, string name) =>
         (companyId, name.Trim().ToLowerInvariant());
 }

@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Support.Domain;
 using HR.Modules.Support.Features.UpdateSupportRequestStatus;
 using HR.Modules.Support.Persistence;
@@ -47,7 +48,7 @@ public class UpdateSupportRequestStatusHandlerTests
         db.SupportRequests.Add(request);
         await db.SaveChangesAsync();
 
-        var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow), new FakeHrAdministratorDirectory(), new FakeNotificationWriter());
         var result = await handler.HandleAsync(
             new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = to },
             CancellationToken.None);
@@ -69,7 +70,7 @@ public class UpdateSupportRequestStatusHandlerTests
         db.SupportRequests.Add(request);
         await db.SaveChangesAsync();
 
-        var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow), new FakeHrAdministratorDirectory(), new FakeNotificationWriter());
         var result = await handler.HandleAsync(
             new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = SupportRequestStatus.Submitted },
             CancellationToken.None);
@@ -82,10 +83,59 @@ public class UpdateSupportRequestStatusHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Notifies_Every_HrAdministrator_When_Status_Actually_Changes()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var request = CreateRequest(companyId, SupportRequestStatus.Submitted);
+        db.SupportRequests.Add(request);
+        await db.SaveChangesAsync();
+
+        var hrAdminDirectory = new FakeHrAdministratorDirectory();
+        var hrAdmin1 = Guid.NewGuid();
+        var hrAdmin2 = Guid.NewGuid();
+        hrAdminDirectory.Seed(companyId, hrAdmin1, hrAdmin2);
+        var notificationWriter = new FakeNotificationWriter();
+
+        var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow), hrAdminDirectory, notificationWriter);
+
+        var result = await handler.HandleAsync(
+            new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = SupportRequestStatus.UnderReview },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, notificationWriter.WrittenNotifications.Count);
+        Assert.Contains(notificationWriter.WrittenNotifications, n => n.EmployeeId == hrAdmin1 && n.Type == NotificationType.SupportRequestStatusChanged);
+        Assert.Contains(notificationWriter.WrittenNotifications, n => n.EmployeeId == hrAdmin2 && n.Type == NotificationType.SupportRequestStatusChanged);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Notify_On_A_No_Op_Status_Transition()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var request = CreateRequest(companyId, SupportRequestStatus.Submitted);
+        db.SupportRequests.Add(request);
+        await db.SaveChangesAsync();
+
+        var hrAdminDirectory = new FakeHrAdministratorDirectory();
+        hrAdminDirectory.Seed(companyId, Guid.NewGuid());
+        var notificationWriter = new FakeNotificationWriter();
+
+        var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow), hrAdminDirectory, notificationWriter);
+
+        await handler.HandleAsync(
+            new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = SupportRequestStatus.Submitted },
+            CancellationToken.None);
+
+        Assert.Empty(notificationWriter.WrittenNotifications);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Request_Does_Not_Exist()
     {
         await using var db = BuildContext();
-        var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow), new FakeHrAdministratorDirectory(), new FakeNotificationWriter());
 
         var result = await handler.HandleAsync(
             new UpdateSupportRequestStatusRequest { CompanyId = Guid.NewGuid(), Id = Guid.NewGuid(), Status = SupportRequestStatus.Resolved },
@@ -103,7 +153,7 @@ public class UpdateSupportRequestStatusHandlerTests
         db.SupportRequests.Add(request);
         await db.SaveChangesAsync();
 
-        var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow), new FakeHrAdministratorDirectory(), new FakeNotificationWriter());
         var result = await handler.HandleAsync(
             new UpdateSupportRequestStatusRequest { CompanyId = Guid.NewGuid(), Id = request.Id, Status = SupportRequestStatus.Resolved },
             CancellationToken.None);

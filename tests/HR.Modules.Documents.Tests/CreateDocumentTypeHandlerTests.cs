@@ -69,8 +69,11 @@ public class CreateDocumentTypeHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Conflict_Check_Is_Case_Sensitive()
+    public async Task HandleAsync_Conflict_Check_Is_Case_Insensitive()
     {
+        // Case-insensitive uniqueness is deliberate (see backlog item on preventing
+        // case-insensitive duplicate names across all "Name must be unique per company" entities)
+        // — "Contract" and "contract" are the same document type name.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
 
@@ -82,7 +85,8 @@ public class CreateDocumentTypeHandlerTests
             new CreateDocumentTypeRequest { CompanyId = companyId, Name = "contract" },
             CancellationToken.None);
 
-        Assert.True(result.IsSuccess);
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
     }
 
     [Fact]

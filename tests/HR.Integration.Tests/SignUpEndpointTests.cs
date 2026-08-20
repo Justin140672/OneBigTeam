@@ -105,9 +105,16 @@ public class SignUpEndpointTests
         Assert.NotNull(location);
         Assert.Equal("Head Office", location!.Name);
 
-        var employmentType = await employeesDb.EmploymentTypes.SingleOrDefaultAsync(et => et.CompanyId == payload.CompanyId);
-        Assert.NotNull(employmentType);
-        Assert.Equal("Full-time", employmentType!.Name);
+        // Full default Employment Types set (matches the dev/E2E seed data's canonical set — see
+        // CompanyDefaultDataSeeder), not a single placeholder "Full-time" type. "Permanent" is the
+        // one actually assigned to the admin's own Employee record below.
+        var employmentTypeNames = await employeesDb.EmploymentTypes
+            .Where(et => et.CompanyId == payload.CompanyId).Select(et => et.Name).ToListAsync();
+        Assert.Equal(
+            new[] { "Permanent", "Fixed Term", "Contractor", "Casual", "Apprentice" }.OrderBy(n => n),
+            employmentTypeNames.OrderBy(n => n));
+        var employmentType = await employeesDb.EmploymentTypes
+            .SingleAsync(et => et.CompanyId == payload.CompanyId && et.Name == "Permanent");
 
         var positionProfile = await employeesDb.PositionProfiles.SingleOrDefaultAsync(pp => pp.CompanyId == payload.CompanyId);
         Assert.NotNull(positionProfile);
@@ -118,6 +125,31 @@ public class SignUpEndpointTests
         var employee = await employeesDb.Employees.SingleOrDefaultAsync(e => e.CompanyId == payload.CompanyId);
         Assert.NotNull(employee);
         Assert.Equal(positionProfile.Id, employee!.PositionProfileId);
+        Assert.Equal(employmentType.Id, employee.EmploymentTypeId);
+
+        // Also seeded at signup (item 43 — new companies previously got none of these at all):
+        // default Leave Types (minus Sick Leave, deliberately removed from the default set),
+        // Sickness Categories, and Document Types.
+        var leaveDb = scope.ServiceProvider.GetRequiredService<HR.Modules.Leave.Persistence.LeaveDbContext>();
+        var leaveTypeNames = await leaveDb.LeaveTypes
+            .Where(lt => lt.CompanyId == payload.CompanyId).Select(lt => lt.Name).ToListAsync();
+        Assert.Equal(
+            new[] { "Annual Leave", "Unpaid Leave", "Compassionate Leave", "Parental Leave", "Time Off In Lieu" }.OrderBy(n => n),
+            leaveTypeNames.OrderBy(n => n));
+
+        var sicknessDb = scope.ServiceProvider.GetRequiredService<HR.Modules.Sickness.Persistence.SicknessDbContext>();
+        var sicknessCategoryNames = await sicknessDb.SicknessCategories
+            .Where(c => c.CompanyId == payload.CompanyId).Select(c => c.Name).ToListAsync();
+        Assert.Equal(
+            new[] { "Cold/Flu", "Back Pain", "Migraine" }.OrderBy(n => n),
+            sicknessCategoryNames.OrderBy(n => n));
+
+        var documentsDb = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
+        var documentTypeNames = await documentsDb.DocumentTypes
+            .Where(dt => dt.CompanyId == payload.CompanyId).Select(dt => dt.Name).ToListAsync();
+        Assert.Equal(
+            new[] { "Contract", "Passport", "Driving Licence", "Right To Work", "Certificate", "Other" }.OrderBy(n => n),
+            documentTypeNames.OrderBy(n => n));
     }
 
     [Fact]

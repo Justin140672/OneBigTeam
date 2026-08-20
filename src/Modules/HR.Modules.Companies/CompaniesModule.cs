@@ -223,6 +223,7 @@ public static class CompaniesModule
         services.AddScoped<ICompanyContactValidationReader, CompanyContactValidationReader>();
         services.AddScoped<ICompanyTimeZoneReader, CompanyTimeZoneReader>();
         services.AddScoped<ICompanyEmployeeNumberSettingsReader, CompanyEmployeeNumberSettingsReader>();
+        services.AddScoped<ICompanyWorkingPatternSettingsReader, CompanyWorkingPatternSettingsReader>();
         services.AddScoped<IEmployeeNumberGenerator, EmployeeNumberGenerator>();
         services.AddScoped<IPublicHolidayReader, PublicHolidayReader>();
         services.AddScoped<ISubscriptionStatusReader, SubscriptionStatusReader>();

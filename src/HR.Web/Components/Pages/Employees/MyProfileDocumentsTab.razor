@@ -1,6 +1,289 @@
-<EmployeeDocumentsTab CompanyId="CompanyId" EmployeeId="EmployeeId" EmployeeSelfUpload="true" />
+@inject DocumentService DocumentService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+@* Combines the employee's personal documents (uploads/requests) and published company-wide
+   documents into a single list — previously two separate tabs ("Documents" and "Company
+   Documents"). A shared row model (MyProfileDocumentRow) normalises both sources into one set of
+   columns; the Actions column still branches per-source since a personal document is
+   downloaded/deleted while a company document is opened/acknowledged — those are genuinely
+   different actions, not something that should be papered over into a single fake "same" action. *@
+
+<UploadDocumentDialog CompanyId="CompanyId"
+                      EmployeeId="EmployeeId"
+                      IsOpen="_uploadOpen"
+                      EmployeeSelfUpload="true"
+                      OnSaved="OnDocumentUploadedAsync"
+                      OnCancelled="@(() => _uploadOpen = false)" />
+
+<UploadRequestedDocumentDialog @ref="_uploadRequestedDialog"
+                               CompanyId="CompanyId"
+                               EmployeeId="EmployeeId"
+                               IsOpen="_uploadRequestedOpen"
+                               OnUploaded="OnRequestedDocumentUploadedAsync"
+                               OnCancelled="@(() => _uploadRequestedOpen = false)" />
+
+@if (!_requestsLoading && _requests.Count > 0)
+{
+    <div class="card mb-4" data-testid="my-profile-document-requests-section">
+        <div class="card-header d-flex align-items-center">
+            <h5 class="mb-0">Document Requests</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Document Type</th>
+                        <th width="130">Due Date</th>
+                        <th width="130">Status</th>
+                        <th width="160">Requested By</th>
+                        <th width="130">Requested Date</th>
+                        <th width="100"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in _requests)
+                    {
+                        var (css, label) = GetRequestBadge(r);
+                        <tr>
+                            <td class="align-middle">@r.DocumentTypeName</td>
+                            <td class="align-middle text-muted small">@(r.DueDate?.ToString("d MMM yyyy") ?? "—")</td>
+                            <td class="align-middle"><span class="badge @css">@label</span></td>
+                            <td class="align-middle text-muted small">@(r.RequestedByName ?? "—")</td>
+                            <td class="align-middle text-muted small">@r.CreatedAt.LocalDateTime.ToString("d MMM yyyy")</td>
+                            <td class="align-middle text-end">
+                                @if (r.Status == "Requested")
+                                {
+                                    <SfButton CssClass="e-primary e-small" OnClick="() => OpenUploadRequested(r)">
+                                        <i class="fa-solid fa-upload me-1"></i> Upload
+                                    </SfButton>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@if (_loading)
+{
+    <HrLoadingIndicator Label="Loading documents…" />
+}
+else
+{
+    <div class="card" data-testid="my-profile-documents-grid-section">
+        <div class="card-header d-flex align-items-center">
+            <h5 class="mb-0">Documents</h5>
+            <div class="ms-auto">
+                <SfButton CssClass="e-primary e-small" OnClick="@(() => _uploadOpen = true)">
+                    <i class="fa-solid fa-upload me-1"></i> Upload
+                </SfButton>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <HrGrid TValue="MyProfileDocumentRow"
+                    DataSource="@_rows"
+                    AllowPaging="true"
+                    AllowSorting="true"
+                    AllowFiltering="true">
+                <GridColumns>
+                    <GridColumn HeaderText="Title" Width="220">
+                        <Template>
+                            @{ var r = (context as MyProfileDocumentRow)!; }
+                            @if (r.Source == DocumentSource.Company)
+                            {
+                                <a href="javascript:void(0)" @onclick="@(() => OpenCompanyDocument(r.CompanyDocumentId!.Value))">@r.Title</a>
+                            }
+                            else
+                            {
+                                @r.Title
+                            }
+                        </Template>
+                    </GridColumn>
+                    <GridColumn Field="@nameof(MyProfileDocumentRow.Source)" HeaderText="Source" Width="110">
+                        <Template>
+                            @{ var r = (context as MyProfileDocumentRow)!; }
+                            <span class="badge @(r.Source == DocumentSource.Company ? "text-bg-info" : "text-bg-secondary")">
+                                @(r.Source == DocumentSource.Company ? "Company" : "Personal")
+                            </span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn Field="@nameof(MyProfileDocumentRow.TypeOrCategory)" HeaderText="Type / Category" Width="160" />
+                    <GridColumn Field="@nameof(MyProfileDocumentRow.Date)" HeaderText="Date" Width="130">
+                        <Template>
+                            @{ var r = (context as MyProfileDocumentRow)!; }
+                            <span class="text-muted small">@(r.Date?.ToString("dd MMM yyyy") ?? "—")</span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn HeaderText="Status" Width="200" AllowSorting="false" AllowFiltering="false">
+                        <Template>
+                            @{ var r = (context as MyProfileDocumentRow)!; }
+                            <span class="badge @r.StatusCss">@r.StatusLabel</span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn HeaderText="" Width="180" AllowSorting="false" AllowFiltering="false" TextAlign="TextAlign.Right">
+                        <Template>
+                            @{ var r = (context as MyProfileDocumentRow)!; }
+                            @if (r.Source == DocumentSource.Personal)
+                            {
+                                <SfButton CssClass="e-outline e-small" OnClick="@(() => DownloadAsync(r.PersonalDocumentId!.Value))">
+                                    Download
+                                </SfButton>
+                            }
+                            else
+                            {
+                                <SfButton CssClass="e-outline e-small" OnClick="@(() => OpenCompanyDocument(r.CompanyDocumentId!.Value))">
+                                    View
+                                </SfButton>
+                            }
+                        </Template>
+                    </GridColumn>
+                </GridColumns>
+            </HrGrid>
+        </div>
+    </div>
+}
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private enum DocumentSource { Personal, Company }
+
+    private sealed record MyProfileDocumentRow(
+        DocumentSource Source,
+        string Title,
+        string TypeOrCategory,
+        DateOnly? Date,
+        string StatusLabel,
+        string StatusCss,
+        Guid? PersonalDocumentId,
+        Guid? CompanyDocumentId);
+
+    private bool _loading = true;
+    private bool _requestsLoading = true;
+    private bool _uploadOpen;
+    private bool _uploadRequestedOpen;
+    private UploadRequestedDocumentDialog? _uploadRequestedDialog;
+    private List<MyProfileDocumentRow> _rows = [];
+    private List<DocumentRequestListItem> _requests = [];
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _requestsLoading = true;
+
+        var personalTask = DocumentService.ListEmployeeDocumentsAsync(CompanyId, EmployeeId);
+        var companyTask  = DocumentService.ListPublishedSharedCompanyDocumentsAsync(CompanyId);
+        var requestTask  = DocumentService.ListDocumentRequestsAsync(CompanyId, EmployeeId);
+        await Task.WhenAll(personalTask, companyTask, requestTask);
+
+        _requests = (await requestTask)?.Items.ToList() ?? [];
+        _requestsLoading = false;
+
+        var personalDocs = (await personalTask)?.Items ?? [];
+        var companyDocs  = (await companyTask)?.Items ?? [];
+
+        var rows = new List<MyProfileDocumentRow>();
+
+        rows.AddRange(personalDocs.Select(d =>
+        {
+            var (css, label) = GetPersonalStatusBadge(d);
+            return new MyProfileDocumentRow(
+                DocumentSource.Personal, d.Title, d.DocumentTypeName, d.IssueDate,
+                label, css, d.EmployeeDocumentId, null);
+        }));
+
+        rows.AddRange(companyDocs.Select(d =>
+        {
+            var (css, label) = GetCompanyStatusBadge(d);
+            return new MyProfileDocumentRow(
+                DocumentSource.Company, d.Title, d.CategoryName, d.EffectiveDate,
+                label, css, null, d.Id);
+        }));
+
+        _rows = rows;
+        _loading = false;
+    }
+
+    private async Task OnDocumentUploadedAsync()
+    {
+        _uploadOpen = false;
+        await LoadAsync();
+    }
+
+    private void OpenUploadRequested(DocumentRequestListItem request)
+    {
+        // See EmployeeDocumentsTab's identical comment: _uploadRequestedOpen also has to flip
+        // true here — the dialog force-closes itself on any parent re-render while IsOpen is
+        // still false, which would otherwise immediately undo the Open() call below.
+        _uploadRequestedOpen = true;
+        _uploadRequestedDialog?.Open(request);
+    }
+
+    private async Task OnRequestedDocumentUploadedAsync()
+    {
+        _uploadRequestedOpen = false;
+        await LoadAsync();
+    }
+
+    private static (string Css, string Label) GetRequestBadge(DocumentRequestListItem r)
+    {
+        if (r.Status == "Requested" && r.DueDate.HasValue && r.DueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow))
+            return ("text-bg-danger", "Overdue");
+
+        return r.Status switch
+        {
+            "Requested" => ("text-bg-warning", "Requested"),
+            "Uploaded"  => ("text-bg-success", "Uploaded"),
+            "Cancelled" => ("text-bg-secondary", "Cancelled"),
+            "Expired"   => ("text-bg-danger", "Expired"),
+            _           => ("text-bg-secondary", r.Status),
+        };
+    }
+
+    private async Task DownloadAsync(Guid employeeDocumentId)
+    {
+        var url = await DocumentService.GetDownloadUrlAsync(CompanyId, EmployeeId, employeeDocumentId);
+        if (url is not null)
+            await JS.InvokeVoidAsync("window.open", url, "_blank");
+    }
+
+    private void OpenCompanyDocument(Guid documentId) =>
+        Navigation.NavigateTo($"/companies/{CompanyId}/shared-documents/published/{documentId}");
+
+    private static (string Css, string Label) GetPersonalStatusBadge(EmployeeDocumentListItem doc)
+    {
+        if (doc.ExpiryDate.HasValue)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            if (doc.ExpiryDate < today)
+                return ("text-bg-danger", "Expired");
+            if (doc.ExpiryDate <= today.AddDays(30))
+                return ("text-bg-warning", "Expiring Soon");
+        }
+        return doc.Status switch
+        {
+            "Archived" => ("text-bg-secondary", "Archived"),
+            "Expired"  => ("text-bg-danger", "Expired"),
+            _          => ("text-bg-success", "Active"),
+        };
+    }
+
+    private static (string Css, string Label) GetCompanyStatusBadge(PublishedSharedCompanyDocumentItem d)
+    {
+        if (!d.RequiresAcknowledgement)
+            return ("text-bg-secondary", "No acknowledgement required");
+
+        return d.AcknowledgementStatus switch
+        {
+            "Completed" => ("text-bg-success", $"Acknowledged {d.MyAcknowledgedAt!.Value:d MMM yyyy}"),
+            "Overdue"   => ("text-bg-danger", "Acknowledgement Overdue"),
+            _           => ("text-bg-warning text-dark", "Acknowledgement Required"),
+        };
+    }
 }

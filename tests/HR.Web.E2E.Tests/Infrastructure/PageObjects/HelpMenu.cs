@@ -5,8 +5,8 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// <summary>
 /// Interacts with the Help menu in MainLayout.razor's top bar — a "?" button
 /// (".help-btn", inside ".help-menu") only rendered for HR Administrator / Company
-/// Administrator personas, that toggles open a dropdown (".help-dropdown") with two links
-/// (".help-item"): "Getting Started" (/getting-started) and "Explore One Big Team" (/explore).
+/// Administrator personas, that toggles open a dropdown (".help-dropdown") with links
+/// (".help-item"): "Getting Started" (/getting-started) and "Help & Feedback" (/support).
 /// </summary>
 public sealed class HelpMenu(IPage page)
 {
@@ -41,7 +41,4 @@ public sealed class HelpMenu(IPage page)
 
     public Task ClickGettingStartedAsync() =>
         HelpDropdown.GetByRole(AriaRole.Link, new() { Name = "Getting Started" }).ClickAsync();
-
-    public Task ClickExploreAsync() =>
-        HelpDropdown.GetByRole(AriaRole.Link, new() { Name = "Explore One Big Team" }).ClickAsync();
 }

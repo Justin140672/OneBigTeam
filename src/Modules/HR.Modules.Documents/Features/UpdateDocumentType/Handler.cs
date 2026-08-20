@@ -24,13 +24,13 @@ internal sealed class UpdateDocumentTypeHandler(DocumentsDbContext db, IClock cl
         }
 
         var newName = request.Name.Trim();
-        if (!string.Equals(documentType.Name, newName, StringComparison.Ordinal))
+        if (!string.Equals(documentType.Name, newName, StringComparison.OrdinalIgnoreCase))
         {
             var nameExists = await db.DocumentTypes
                 .AnyAsync(
                     dt => dt.CompanyId == request.CompanyId &&
                           dt.Id != request.DocumentTypeId &&
-                          dt.Name == newName &&
+                          dt.Name.ToLower() == newName.ToLower() &&
                           dt.IsActive,
                     cancellationToken);
 

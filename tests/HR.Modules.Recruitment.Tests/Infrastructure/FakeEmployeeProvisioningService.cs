@@ -22,4 +22,7 @@ internal sealed class FakeEmployeeProvisioningService : IEmployeeProvisioningSer
         Requests.Add(request);
         return Task.FromResult(_result);
     }
+
+    public Task MarkAsInitialCompanyAdminAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
 }

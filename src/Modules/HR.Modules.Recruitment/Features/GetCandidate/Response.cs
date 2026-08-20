@@ -9,5 +9,9 @@ internal sealed record GetCandidateResponse(
     string? Phone,
     string? ResumeUrl,
     Guid? EmployeeId,
+    bool IsActive,
+    DateTimeOffset? DeactivatedAt,
+    Guid? DeactivatedByUserId,
+    string? DeactivationReason,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

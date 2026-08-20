@@ -123,6 +123,51 @@ public class UpdateAssetCategoryHandlerTests
         Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), result.Value!.UpdatedAt);
     }
 
+    [Fact]
+    public async Task HandleAsync_Rejects_Rename_To_Another_Category_Name_Case_Insensitively()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        await SeedCategory(db, companyId, "Electronics", null);
+        await SeedCategory(db, companyId, "Furniture", null);
+
+        var furnitureId = (await db.AssetCategories.SingleAsync(c => c.Name == "Furniture")).Id;
+        var handler = new UpdateAssetCategoryHandler(db, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateAssetCategoryRequest
+        {
+            CompanyId = companyId,
+            Id = furnitureId,
+            Name = "electronics",
+            Description = null
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Keeping_Its_Own_Name_With_Different_Casing()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        await SeedCategory(db, companyId, "Electronics", "Old description");
+
+        var categoryId = (await db.AssetCategories.SingleAsync()).Id;
+        var handler = new UpdateAssetCategoryHandler(db, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateAssetCategoryRequest
+        {
+            CompanyId = companyId,
+            Id = categoryId,
+            Name = "ELECTRONICS",
+            Description = "New description"
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("ELECTRONICS", result.Value!.Name);
+    }
+
     private static async Task SeedCategory(AssetsDbContext db, Guid companyId, string name, string? description)
     {
         var createHandler = new CreateAssetCategoryHandler(db, new FakeClock(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)));

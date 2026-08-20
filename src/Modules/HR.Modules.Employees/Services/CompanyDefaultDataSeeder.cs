@@ -21,7 +21,10 @@ namespace HR.Modules.Employees.Services;
 internal sealed class CompanyDefaultDataSeeder(
     EmployeesDbContext dbContext,
     IClock clock,
-    ILeavePolicyProvisioner leavePolicyProvisioner) : ICompanyDefaultDataSeeder
+    ILeavePolicyProvisioner leavePolicyProvisioner,
+    ILeaveTypeDefaultsProvisioner leaveTypeDefaultsProvisioner,
+    ISicknessCategoryDefaultsProvisioner sicknessCategoryDefaultsProvisioner,
+    IDocumentTypeDefaultsProvisioner documentTypeDefaultsProvisioner) : ICompanyDefaultDataSeeder
 {
     public async Task<CompanyDefaultDataResult> SeedDefaultsAsync(Guid companyId, CancellationToken cancellationToken)
     {
@@ -36,8 +39,19 @@ internal sealed class CompanyDefaultDataSeeder(
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
         dbContext.Locations.Add(location);
 
-        var employmentType = EmploymentType.Create(Guid.NewGuid(), companyId, "Full-time", null, now);
-        dbContext.EmploymentTypes.Add(employmentType);
+        // Full default set (matches the dev/E2E seed data's canonical Employment Types exactly —
+        // see EmployeesModule's own seed block) rather than a single placeholder "Full-time" type.
+        // "Permanent" is designated the default assigned to the admin employee created immediately
+        // after this returns, same role "Full-time" previously played.
+        var employmentTypePermanent  = EmploymentType.Create(Guid.NewGuid(), companyId, "Permanent", null, now);
+        var employmentTypeFixedTerm  = EmploymentType.Create(Guid.NewGuid(), companyId, "Fixed Term", null, now);
+        var employmentTypeContractor = EmploymentType.Create(Guid.NewGuid(), companyId, "Contractor", null, now);
+        var employmentTypeCasual     = EmploymentType.Create(Guid.NewGuid(), companyId, "Casual", null, now);
+        var employmentTypeApprentice = EmploymentType.Create(Guid.NewGuid(), companyId, "Apprentice", null, now);
+        dbContext.EmploymentTypes.AddRange(
+            employmentTypePermanent, employmentTypeFixedTerm, employmentTypeContractor,
+            employmentTypeCasual, employmentTypeApprentice);
+        var employmentType = employmentTypePermanent;
 
         // Persist these first so the leave-policy provisioner's own SaveChangesAsync (a different
         // DbContext/connection — no cross-module transaction) can't race ahead of them, and so the
@@ -45,6 +59,16 @@ internal sealed class CompanyDefaultDataSeeder(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         var defaultLeavePolicyId = await leavePolicyProvisioner.EnsureDefaultLeavePolicyAsync(companyId, cancellationToken);
+
+        // Same "genuine pre-existing gap" rationale as ILeavePolicyProvisioner's own doc comment —
+        // a brand-new company previously got no default Leave Types, Sickness Categories, or
+        // Document Types at all. These three don't block PositionProfile creation the way the
+        // leave policy does, so they're fire-and-forget-safe here (order relative to the
+        // PositionProfile insert below doesn't matter), but are still awaited so a failure here
+        // surfaces clearly rather than as a silent gap discovered later.
+        await leaveTypeDefaultsProvisioner.EnsureDefaultLeaveTypesAsync(companyId, cancellationToken);
+        await sicknessCategoryDefaultsProvisioner.EnsureDefaultSicknessCategoriesAsync(companyId, cancellationToken);
+        await documentTypeDefaultsProvisioner.EnsureDefaultDocumentTypesAsync(companyId, cancellationToken);
 
         var positionProfile = PositionProfile.Create(
             Guid.NewGuid(),

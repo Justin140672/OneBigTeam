@@ -66,9 +66,10 @@ internal static class StandardEmployeeColumnMapping
         ["SalaryAmount"] = "Salary Amount",
         ["SalaryType"] = "Salary Type",
         ["Currency"] = "Currency",
-        ["HoursPerWeek"] = "Hours Per Week",
-        ["FTE"] = "FTE",
-        ["LeaveTypeCode"] = "Leave Type Code",
+        // Hours Per Week and FTE are deliberately not import columns: they are always calculated
+        // from Working Days + Hours Per Day (see WorkingPatternCompensationCalculator). Leave Type
+        // Code was removed since the only leave type ever imported is Annual Leave (hardcoded in
+        // ConfirmImportSessionHandler) — Leave Balance Days alone is enough to set its balance.
         ["LeaveBalanceDays"] = "Leave Balance Days",
         ["WorkingDays"] = "Working Days",
         ["HoursPerDay"] = "Hours Per Day",

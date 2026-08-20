@@ -47,6 +47,34 @@ public class EmployeeImportFileParserTests
     }
 
     [Fact]
+    public void Parse_Xlsx_Formats_Native_Date_Cells_As_Yyyy_MM_Dd_Regardless_Of_Excel_Display_Format()
+    {
+        // Regression test: a genuine Excel date cell (as opposed to a plain text cell) previously
+        // came back from ClosedXML's GetString() with a trailing time component (e.g.
+        // "01/08/2026 00:00:00") that neither of EmployeeStagingRowValidator's expected date
+        // formats (yyyy-MM-dd / dd/MM/yyyy) could parse, incorrectly rejecting a legitimately
+        // entered date. The parser must normalize any date/time-typed cell to yyyy-MM-dd itself,
+        // rather than trusting the cell's raw display string.
+        var mapping = new ColumnMappingProfile(new Dictionary<string, string> { ["StartDate"] = "Start Date" });
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Sheet1");
+        worksheet.Cell(1, 1).Value = "Start Date";
+        worksheet.Cell(2, 1).Value = new DateTime(2026, 8, 1); // a real Excel date cell, not text
+        worksheet.Cell(2, 1).Style.DateFormat.Format = "dd/mm/yyyy hh:mm:ss";
+
+        var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var parser = new EmployeeImportFileParser();
+        var result = parser.Parse(stream, mapping);
+
+        var row = Assert.Single(result.Rows);
+        Assert.Equal("2026-08-01", row.Fields["StartDate"]);
+    }
+
+    [Fact]
     public void Parse_Xlsx_Maps_Headers_And_Rows_With_Correct_RowNumbers_And_Values()
     {
         var stream = ToXlsxStream(

@@ -8,7 +8,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// <summary>
 /// Verifies sidebar changes in MainLayout.razor:
 /// 1. A Recruiter-only persona now gets a full sidebar (not just their dashboard as "home") with
-///    "Vacancies", "Candidates", "Recruiters" and "Recruitment Settings" as top-level items, plus
+///    "Vacancies", "Candidates", "Recruiters" and "Recruitment Stages" as top-level items, plus
 ///    a plain "Dashboard" link (not "Recruitment Dashboard" — that label is reserved for a combo
 ///    persona, see below) pointing at "/dashboard/recruitment".
 /// 2. A Manager-only persona still gets no sidebar at all — their dashboard is "home", and
@@ -51,7 +51,7 @@ public sealed class SidebarNavigationTests(ParallelBlankPersonaFixture fixture)
         // with another qualifying role) — a Recruiter-only persona sees a sidebar with a
         // "Dashboard" link (not "Recruitment Dashboard" — that label is reserved for an
         // HR-Administrator-and-Recruiter combo persona's separate link) plus Vacancies,
-        // Candidates, Recruiters and Recruitment Settings.
+        // Candidates, Recruiters and Recruitment Stages.
         Assert.True(await sidebar.IsSidebarVisibleAsync(),
             "Expected a Recruiter-only persona to see a sidebar");
 
@@ -63,7 +63,8 @@ public sealed class SidebarNavigationTests(ParallelBlankPersonaFixture fixture)
         Assert.True(await sidebar.HasTopLevelMenuItemAsync("Vacancies"));
         Assert.True(await sidebar.HasTopLevelMenuItemAsync("Candidates"));
         Assert.True(await sidebar.HasTopLevelMenuItemAsync("Recruiters"));
-        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Recruitment Settings"));
+        // Renamed from "Recruitment Settings" — see MainLayout.razor's menu item text (item 29).
+        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Recruitment Stages"));
         Assert.True(await sidebar.HasTopLevelMenuItemAsync("Reporting"));
     }
 

@@ -201,6 +201,38 @@ public class ScheduleInterviewHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_Candidate_Is_Inactive()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        candidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new ScheduleInterviewRequest
+            {
+                CompanyId             = companyId,
+                VacancyId             = vacancy.Id,
+                ApplicationId         = application.Id,
+                InterviewerEmployeeId = Guid.NewGuid(),
+                ScheduledAt           = Now.AddDays(3),
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(await db.Interviews.ToListAsync());
+    }
+
+    [Fact]
     public async Task HandleAsync_Creates_Preparation_And_Feedback_Tasks_For_Interviewer()
     {
         await using var db = BuildContext();

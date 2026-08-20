@@ -23,12 +23,19 @@ internal sealed class CreateApplicationHandler(
             return Result.Failure<CreateApplicationResponse>(
                 Error.NotFound($"Vacancy '{request.VacancyId}' was not found."));
 
-        var candidateExists = await db.Candidates
-            .AnyAsync(c => c.Id == request.CandidateId && c.CompanyId == request.CompanyId, cancellationToken);
+        var candidate = await db.Candidates
+            .AsNoTracking()
+            .SingleOrDefaultAsync(c => c.Id == request.CandidateId && c.CompanyId == request.CompanyId, cancellationToken);
 
-        if (!candidateExists)
+        if (candidate is null)
             return Result.Failure<CreateApplicationResponse>(
                 Error.NotFound($"Candidate '{request.CandidateId}' was not found."));
+
+        // Server-side enforcement (not just UI hiding): an inactive candidate must not be able to
+        // pick up new recruitment activity, per the candidate deactivation ticket.
+        if (!candidate.IsActive)
+            return Result.Failure<CreateApplicationResponse>(
+                Error.Validation("This candidate is inactive and cannot be added to a new application."));
 
         var alreadyApplied = await db.Applications
             .AnyAsync(a => a.VacancyId == request.VacancyId && a.CandidateId == request.CandidateId, cancellationToken);

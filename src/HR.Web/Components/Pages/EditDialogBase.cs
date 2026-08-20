@@ -143,6 +143,12 @@ public abstract class EditDialogBase<TModel> : ComponentBase where TModel : clas
         _suppressNextClosedEvent = true;
         Visible = false;
         ResetForm();
+
+        // Only Submit should validate — Cancel/Discard must not leave stale per-field
+        // modified/invalid styling visible (see EditPageBase.DiscardChangesAndClose's matching
+        // fix for the routed-page equivalent of this dialog).
+        EditContext.MarkAsUnmodified();
+
         await OnCancelled.InvokeAsync();
     }
 

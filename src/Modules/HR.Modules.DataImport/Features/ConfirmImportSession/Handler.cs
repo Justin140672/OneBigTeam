@@ -21,6 +21,7 @@ internal sealed class ConfirmImportSessionHandler(
     IEmployeeImportWriter employeeWriter,
     ILeaveImportWriter leaveWriter,
     IEmployeeImportLookupReader lookupReader,
+    IImportLookupResolver lookupResolver,
     IIntegrationEventPublisher integrationEventPublisher,
     IClock clock)
 {
@@ -78,27 +79,63 @@ internal sealed class ConfirmImportSessionHandler(
             {
                 var fields = ParseRawData(row.RawData);
 
-                var createResult = await employeeWriter.CreateEmployeeAsync(
-                    new EmployeeImportCreateRequest(
-                        Guid.NewGuid(),
-                        request.CompanyId,
-                        GetRequired(fields, "FirstName"),
-                        GetRequired(fields, "LastName"),
-                        fields.GetValueOrDefault("PreferredName"),
-                        GetRequired(fields, "WorkEmail"),
-                        fields.GetValueOrDefault("PersonalEmail"),
-                        ParseDate(fields.GetValueOrDefault("StartDate"))!.Value,
-                        ParseDate(fields.GetValueOrDefault("DateOfBirth"))!.Value,
-                        GetRequired(fields, "Nationality"),
-                        GetRequired(fields, "Gender"),
-                        row.DepartmentId!.Value,
-                        row.LocationId!.Value,
-                        row.EmploymentTypeId!.Value,
-                        row.PositionProfileId!.Value,
-                        row.EmployeeNumber,
-                        session.Id,
-                        actorUserId),
-                    cancellationToken);
+                // Reference data (new departments/locations/employment types/position profiles) is
+                // deliberately NOT created during preview/validation — only here, at confirm time,
+                // once the user has reviewed the preview and clicked Confirm. The staging row's
+                // DepartmentId/LocationId/EmploymentTypeId/PositionProfileId may therefore be null
+                // even for an otherwise-valid row; resolve (get-or-create) them by name now.
+                var departmentId = row.DepartmentId ?? (await lookupResolver.GetOrCreateDepartmentAsync(
+                    request.CompanyId, GetRequired(fields, "DepartmentName"), cancellationToken)).Id;
+
+                var locationId = row.LocationId ?? (await lookupResolver.GetOrCreateLocationAsync(
+                    request.CompanyId, GetRequired(fields, "LocationName"), cancellationToken)).Id;
+
+                var employmentTypeId = row.EmploymentTypeId ?? (await lookupResolver.GetOrCreateEmploymentTypeAsync(
+                    request.CompanyId, GetRequired(fields, "EmploymentTypeName"), cancellationToken)).Id;
+
+                Guid positionProfileId;
+                if (row.PositionProfileId is not null)
+                {
+                    positionProfileId = row.PositionProfileId.Value;
+                }
+                else
+                {
+                    var positionProfileResult = await lookupResolver.GetOrCreatePositionProfileAsync(
+                        request.CompanyId, GetRequired(fields, "PositionProfileTitle"), departmentId, locationId, cancellationToken);
+
+                    if (positionProfileResult.Skipped || positionProfileResult.Id is null)
+                        throw new InvalidOperationException($"Position Profile '{GetRequired(fields, "PositionProfileTitle")}' could not be created.");
+
+                    positionProfileId = positionProfileResult.Id.Value;
+                }
+
+                var createRequest = new EmployeeImportCreateRequest(
+                    Guid.NewGuid(),
+                    request.CompanyId,
+                    GetRequired(fields, "FirstName"),
+                    GetRequired(fields, "LastName"),
+                    fields.GetValueOrDefault("PreferredName"),
+                    GetRequired(fields, "WorkEmail"),
+                    fields.GetValueOrDefault("PersonalEmail"),
+                    ParseDate(fields.GetValueOrDefault("StartDate"))!.Value,
+                    ParseDate(fields.GetValueOrDefault("DateOfBirth"))!.Value,
+                    GetRequired(fields, "Nationality"),
+                    GetRequired(fields, "Gender"),
+                    departmentId,
+                    locationId,
+                    employmentTypeId,
+                    positionProfileId,
+                    row.EmployeeNumber,
+                    session.Id,
+                    actorUserId);
+
+                // Rows whose Work Email matched the company's seed admin employee (see
+                // Employee.IsInitialCompanyAdmin) update that existing employee rather than
+                // creating a duplicate — this is the ONLY case where import ever updates an
+                // existing employee (see EmployeeStagingRowValidator's remarks).
+                var createResult = row.ExistingEmployeeIdToUpdate is not null
+                    ? await employeeWriter.UpdateEmployeeAsync(row.ExistingEmployeeIdToUpdate.Value, createRequest, cancellationToken)
+                    : await employeeWriter.CreateEmployeeAsync(createRequest, cancellationToken);
 
                 var workingDaysRaw = fields.GetValueOrDefault("WorkingDays");
                 var hoursPerDayRaw = fields.GetValueOrDefault("HoursPerDay");
@@ -123,9 +160,7 @@ internal sealed class ConfirmImportSessionHandler(
                         new EmployeeImportCompensation(
                             decimal.Parse(salaryAmountRaw, CultureInfo.InvariantCulture),
                             fields.GetValueOrDefault("SalaryType") ?? "Annual",
-                            fields.GetValueOrDefault("Currency") ?? "GBP",
-                            ParseDecimal(fields.GetValueOrDefault("HoursPerWeek")),
-                            ParseDecimal(fields.GetValueOrDefault("FTE"))),
+                            fields.GetValueOrDefault("Currency") ?? "GBP"),
                         cancellationToken);
                 }
 
@@ -144,14 +179,16 @@ internal sealed class ConfirmImportSessionHandler(
                 await integrationEventPublisher.PublishAsync(new EmployeeImportedIntegrationEvent(
                     request.CompanyId, createResult.EmployeeId, session.Id, row.RowNumber), cancellationToken);
 
-                var leaveTypeCode = fields.GetValueOrDefault("LeaveTypeCode");
+                // Leave Type Code was removed from the import template — Annual Leave is the only
+                // leave type an import ever sets an opening balance for, so it's hardcoded here
+                // rather than asking the user to specify a type.
                 var leaveBalanceDaysRaw = fields.GetValueOrDefault("LeaveBalanceDays");
-                if (!string.IsNullOrWhiteSpace(leaveTypeCode) && !string.IsNullOrWhiteSpace(leaveBalanceDaysRaw))
+                if (!string.IsNullOrWhiteSpace(leaveBalanceDaysRaw))
                 {
                     await leaveWriter.TryLayOpeningBalanceAsync(
                         request.CompanyId,
                         createResult.EmployeeId,
-                        leaveTypeCode,
+                        "Annual Leave",
                         decimal.Parse(leaveBalanceDaysRaw, CultureInfo.InvariantCulture),
                         actorUserId,
                         cancellationToken);

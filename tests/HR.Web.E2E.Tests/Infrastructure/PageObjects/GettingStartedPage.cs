@@ -47,17 +47,19 @@ public sealed class GettingStartedPage(IPage page, string baseUrl)
         TaskCard(taskNameFragment).GetByText("Completed", new() { Exact = true }).IsVisibleAsync();
 
     /// <summary>
-    /// Returns the href of the "Go to task" link for an incomplete task, or null if the task
-    /// is already completed (no link is rendered in that case).
+    /// Returns the href of the task's action link (usually "Go to task", but e.g. "Download" for
+    /// the import-template task — see OnboardingTaskCard.razor.ActionLabel), or null if the task
+    /// is already completed (no link is rendered in that case). Matched by role rather than name
+    /// since each card renders exactly one such link.
     /// </summary>
     public async Task<string?> GetTaskLinkUrlAsync(string taskNameFragment)
     {
-        var link = TaskCard(taskNameFragment).GetByRole(AriaRole.Link, new() { Name = "Go to task" });
+        var link = TaskCard(taskNameFragment).GetByRole(AriaRole.Link);
         return await link.IsVisibleAsync() ? await link.GetAttributeAsync("href") : null;
     }
 
     public Task ClickTaskLinkAsync(string taskNameFragment) =>
-        TaskCard(taskNameFragment).GetByRole(AriaRole.Link, new() { Name = "Go to task" }).ClickAsync();
+        TaskCard(taskNameFragment).GetByRole(AriaRole.Link).ClickAsync();
 
     /// <summary>
     /// Reads the "NN% complete" label next to the progress bar (GettingStarted.razor's

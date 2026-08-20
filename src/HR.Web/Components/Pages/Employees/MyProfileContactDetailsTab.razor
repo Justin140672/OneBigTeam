@@ -61,20 +61,6 @@ else
                     <ValidationMessage For="@(() => Model.PersonalEmail)" />
                 </div>
 
-                <!-- Phone -->
-                <div class="cd-section-label mt-3">Phone Numbers</div>
-
-                <div class="cd-field-row">
-                    <div class="cd-field-group">
-                        <label class="cd-label">Mobile / Work Phone</label>
-                        <input class="form-control" type="tel" @bind="Model.PhoneNumber" placeholder="e.g. 07700 900000" maxlength="30" />
-                    </div>
-                    <div class="cd-field-group">
-                        <label class="cd-label">Home Phone</label>
-                        <input class="form-control" type="tel" @bind="Model.HomePhone" placeholder="e.g. 01234 567890" maxlength="30" />
-                    </div>
-                </div>
-
                 <!-- Address -->
                 <div class="cd-section-label mt-3">Home Address</div>
 
@@ -111,6 +97,20 @@ else
                         <label class="cd-label">Country <span class="cd-required">*</span></label>
                         <input class="form-control" @bind="Model.Country" placeholder="e.g. United Kingdom" maxlength="100" />
                         <ValidationMessage For="@(() => Model.Country)" />
+                    </div>
+                </div>
+
+                <!-- Phone -->
+                <div class="cd-section-label mt-3">Phone Numbers</div>
+
+                <div class="cd-field-row">
+                    <div class="cd-field-group">
+                        <label class="cd-label">Mobile / Work Phone</label>
+                        <input class="form-control" type="tel" @bind="Model.PhoneNumber" placeholder="e.g. 07700 900000" maxlength="30" />
+                    </div>
+                    <div class="cd-field-group">
+                        <label class="cd-label">Home Phone</label>
+                        <input class="form-control" type="tel" @bind="Model.HomePhone" placeholder="e.g. 01234 567890" maxlength="30" />
                     </div>
                 </div>
 

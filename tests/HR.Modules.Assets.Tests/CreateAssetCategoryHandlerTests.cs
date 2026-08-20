@@ -72,6 +72,41 @@ public class CreateAssetCategoryHandlerTests
         Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), result.Value.UpdatedAt);
     }
 
+    [Fact]
+    public async Task HandleAsync_Rejects_Duplicate_Name_Case_Insensitively()
+    {
+        // Was previously missing entirely — asset category names had no uniqueness check at all.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        await new CreateAssetCategoryHandler(db, new FakeClock(FixedUtcNow)).HandleAsync(
+            new CreateAssetCategoryRequest { CompanyId = companyId, Name = "Electronics" },
+            CancellationToken.None);
+
+        var result = await new CreateAssetCategoryHandler(db, new FakeClock(FixedUtcNow)).HandleAsync(
+            new CreateAssetCategoryRequest { CompanyId = companyId, Name = "electronics" },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Same_Name_In_Different_Companies()
+    {
+        await using var db = BuildContext();
+
+        await new CreateAssetCategoryHandler(db, new FakeClock(FixedUtcNow)).HandleAsync(
+            new CreateAssetCategoryRequest { CompanyId = Guid.NewGuid(), Name = "Electronics" },
+            CancellationToken.None);
+
+        var result = await new CreateAssetCategoryHandler(db, new FakeClock(FixedUtcNow)).HandleAsync(
+            new CreateAssetCategoryRequest { CompanyId = Guid.NewGuid(), Name = "Electronics" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
     private static AssetsDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<AssetsDbContext>()

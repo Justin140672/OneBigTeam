@@ -74,6 +74,11 @@ internal sealed class SignUpHandler(
                 throw new InvalidOperationException(employeeResult.Error.Message);
             }
 
+            // Flags this employee as the company's seed admin record — see Employee.IsInitialCompanyAdmin.
+            // Used only by the DataImport module to allow a later import row to update (not duplicate-
+            // error against) this specific employee if its Work Email matches.
+            await employeeProvisioningService.MarkAsInitialCompanyAdminAsync(companyId, employeeResult.Value, cancellationToken);
+
             var user = await CreateIdentityRecordAsync(companyId, employeeResult.Value, request, cancellationToken);
 
             await auditEventPublisher.PublishAsync(

@@ -43,7 +43,9 @@ public class ResetPlatformAdministratorMfaEndpointTests
         var response = await client.PostAsync(
             $"/api/platform-administrators/{Guid.NewGuid()}/reset-mfa", EmptyJson());
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
+        // is Forbidden (403), not Unauthorized (401).
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

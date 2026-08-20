@@ -37,7 +37,9 @@ public class ListPlatformAdministratorsEndpointTests
 
         var response = await client.GetAsync("/api/platform-administrators");
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
+        // is Forbidden (403), not Unauthorized (401).
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -49,7 +51,9 @@ public class ListPlatformAdministratorsEndpointTests
 
         var response = await client.GetAsync("/api/platform-administrators");
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
+        // is Forbidden (403), not Unauthorized (401).
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

@@ -14,7 +14,7 @@ internal sealed class CreateDocumentTypeHandler(DocumentsDbContext db, IClock cl
         var nameExists = await db.DocumentTypes
             .AnyAsync(
                 dt => dt.CompanyId == request.CompanyId &&
-                      dt.Name == request.Name.Trim() &&
+                      dt.Name.ToLower() == request.Name.Trim().ToLower() &&
                       dt.IsActive,
                 cancellationToken);
 

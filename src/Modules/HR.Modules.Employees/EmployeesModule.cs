@@ -391,6 +391,7 @@ public static class EmployeesModule
         services.AddScoped<IEmployeeImportLookupReader, EmployeeImportLookupReader>();
         services.AddScoped<IImportLookupResolver, ImportLookupResolver>();
         services.AddScoped<IEmployeeImportWriter, EmployeeImportWriter>();
+        services.AddScoped<WorkingPatternCompensationCalculator>();
         services.AddScoped<IWorkloadActionProvider, UpcomingEmployeeStartDatesWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, UpcomingEmployeeLeavingDatesWorkloadActionProvider>();
 
@@ -632,6 +633,49 @@ public static class EmployeesModule
                     performedByUserId: null, "Employees", sourceRecordId: null,
                     EmployeeTimelineVisibility.AuthorisedInternal, now));
             }
+
+            // Sarah Chen (empCtoId) gets a handful of additional realistic timeline entries beyond
+            // the plain "Employee joined" every seeded employee already has — she's the longest-
+            // tenured, most-promoted employee in the seed data (joined 2020, promoted to CTO 2023
+            // with her own compensation history above), so her timeline is the natural one for
+            // demoing/screenshotting a fuller history rather than a single-entry timeline.
+            db.EmployeeTimelineEntries.AddRange(
+                EmployeeTimelineEntry.Create(
+                    Guid.NewGuid(), acmeId, empCtoId, new DateOnly(2020, 4, 6),
+                    EmployeeTimelineEventType.ProbationPassed, EmployeeTimelineCategory.OnboardingAndProbation,
+                    "Probation passed", "Successfully completed probationary period.",
+                    performedByUserId: null, "Probation", sourceRecordId: null,
+                    EmployeeTimelineVisibility.AuthorisedInternal, now),
+                EmployeeTimelineEntry.Create(
+                    Guid.NewGuid(), acmeId, empCtoId, new DateOnly(2020, 4, 20),
+                    EmployeeTimelineEventType.OnboardingCompleted, EmployeeTimelineCategory.OnboardingAndProbation,
+                    "Onboarding completed", "Completed all onboarding tasks.",
+                    performedByUserId: null, "Onboarding", sourceRecordId: null,
+                    EmployeeTimelineVisibility.AuthorisedInternal, now),
+                EmployeeTimelineEntry.Create(
+                    Guid.NewGuid(), acmeId, empCtoId, new DateOnly(2021, 11, 15),
+                    EmployeeTimelineEventType.LocationChanged, EmployeeTimelineCategory.Employment,
+                    "Location changed", "Relocated to the London Head Office.",
+                    performedByUserId: null, "Employees", sourceRecordId: null,
+                    EmployeeTimelineVisibility.AuthorisedInternal, now),
+                EmployeeTimelineEntry.Create(
+                    Guid.NewGuid(), acmeId, empCtoId, new DateOnly(2023, 1, 1),
+                    EmployeeTimelineEventType.EmployeePromoted, EmployeeTimelineCategory.Employment,
+                    "Promoted to CTO", "Promoted from Engineering Manager to Chief Technology Officer.",
+                    performedByUserId: null, "Employees", sourceRecordId: null,
+                    EmployeeTimelineVisibility.AuthorisedInternal, now),
+                EmployeeTimelineEntry.Create(
+                    Guid.NewGuid(), acmeId, empCtoId, new DateOnly(2023, 1, 1),
+                    EmployeeTimelineEventType.CompensationChanged, EmployeeTimelineCategory.Compensation,
+                    "Compensation updated", "Salary increased to £145,000 following promotion to CTO.",
+                    performedByUserId: null, "Employees", sourceRecordId: ctoCurrentSalary.Id,
+                    EmployeeTimelineVisibility.AuthorisedInternal, now),
+                EmployeeTimelineEntry.Create(
+                    Guid.NewGuid(), acmeId, empCtoId, new DateOnly(2024, 6, 10),
+                    EmployeeTimelineEventType.EmployeeDetailsCorrected, EmployeeTimelineCategory.Employment,
+                    "Contact details updated", "Personal email and phone number updated.",
+                    performedByUserId: null, "Employees", sourceRecordId: null,
+                    EmployeeTimelineVisibility.AuthorisedInternal, now));
 
             await db.SaveChangesAsync();
         }

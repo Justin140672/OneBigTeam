@@ -36,6 +36,18 @@ internal sealed class ScheduleInterviewHandler(
             return Result.Failure<ScheduleInterviewResponse>(
                 Error.Validation("Cannot schedule an interview for an application that has been withdrawn."));
 
+        // Server-side enforcement (not just UI hiding): an inactive candidate must not be able to
+        // pick up new recruitment activity, per the candidate deactivation ticket.
+        var candidateIsActive = await db.Candidates
+            .AsNoTracking()
+            .Where(c => c.Id == application.CandidateId && c.CompanyId == request.CompanyId)
+            .Select(c => c.IsActive)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (!candidateIsActive)
+            return Result.Failure<ScheduleInterviewResponse>(
+                Error.Validation("Cannot schedule an interview for an inactive candidate."));
+
         var currentStage = await db.RecruitmentStages
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.Id == application.CurrentStageId && s.CompanyId == request.CompanyId, cancellationToken);

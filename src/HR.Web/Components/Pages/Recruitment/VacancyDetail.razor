@@ -216,6 +216,23 @@
         var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
         _positionProfiles = profileResult?.Items.ToList() ?? [];
 
+        // A brand-new vacancy can only be opened against a position profile that has no
+        // currently-active employee holding it — e.g. once an employee holding a profile has
+        // resigned/left, that profile becomes available again. Only applied when creating a new
+        // vacancy: an existing vacancy's already-assigned profile must stay selectable/visible
+        // regardless (see the explicit re-merge below for the disabled-dropdown edit-mode case).
+        if (IsNew)
+        {
+            var activelyHeldProfileIds = _employees
+                .Where(e => e.Status == "Active" && e.PositionProfileId is not null)
+                .Select(e => e.PositionProfileId!.Value)
+                .ToHashSet();
+
+            _positionProfiles = _positionProfiles
+                .Where(p => !activelyHeldProfileIds.Contains(p.Id))
+                .ToList();
+        }
+
         // Only active recruitment agencies are selectable, per ticket #81 (same rule as the removed
         // VacancyRecruiterAssignment feature previously enforced). "Not assigned" is prepended below,
         // per this codebase's convention of an explicit sentinel list item over Syncfusion's

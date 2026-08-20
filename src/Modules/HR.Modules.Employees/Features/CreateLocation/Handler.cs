@@ -36,7 +36,7 @@ internal sealed class CreateLocationHandler
         var nameExists = await _dbContext.Locations
             .AnyAsync(
                 l => l.CompanyId == request.CompanyId &&
-                     l.Name == request.Name.Trim() &&
+                     l.Name.ToLower() == request.Name.Trim().ToLower() &&
                      l.IsActive,
                 cancellationToken);
 

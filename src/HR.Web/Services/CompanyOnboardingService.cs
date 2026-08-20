@@ -40,18 +40,4 @@ public class CompanyOnboardingService(IHttpClientFactory httpClientFactory)
             return null;
         }
     }
-
-    public async Task<GetCompanyOnboardingExploreCardsResponse?> GetExploreCardsAsync(
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            return await Http.GetFromJsonAsync<GetCompanyOnboardingExploreCardsResponse>(
-                "api/company-onboarding/explore-cards", HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
-    }
 }

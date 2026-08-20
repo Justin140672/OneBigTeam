@@ -68,13 +68,13 @@
                     @if (_selectedView is not null)
                     {
                         <div class="col-md-auto d-flex gap-2 pb-1">
-                            <SfButton CssClass="e-outline e-small" OnClick="StartRenameAsync">Rename</SfButton>
-                            <SfButton CssClass="e-outline e-small" Disabled="_selectedView.IsDefault" OnClick="SetDefaultAsync">Set Default</SfButton>
+                            <SfButton OnClick="StartRenameAsync">Rename</SfButton>
+                            <SfButton Disabled="_selectedView.IsDefault" OnClick="SetDefaultAsync">Set Default</SfButton>
                             <SfButton CssClass="e-outline e-small e-danger" OnClick="DeleteSelectedViewAsync">Delete</SfButton>
                         </div>
                     }
                     <div class="col-md-auto pb-1">
-                        <SfButton CssClass="e-flat e-small" OnClick="@(() => _showSaveAs = !_showSaveAs)">Save current filters as view</SfButton>
+                        <SfButton OnClick="@(() => _showSaveAs = !_showSaveAs)">Save current filters as view</SfButton>
                     </div>
                 </div>
                 @if (_showSaveAs)
@@ -84,8 +84,8 @@
                             <HrTextBox @bind-Value="_newViewName" Placeholder="View name" />
                         </div>
                         <div class="col-md-auto pb-1 d-flex gap-2">
-                            <SfButton CssClass="e-primary e-small" Disabled="@(string.IsNullOrWhiteSpace(_newViewName))" OnClick="SaveCurrentAsViewAsync">Save</SfButton>
-                            <SfButton CssClass="e-outline e-small" OnClick="@(() => _showSaveAs = false)">Cancel</SfButton>
+                            <SfButton IsPrimary="true" Disabled="@(string.IsNullOrWhiteSpace(_newViewName))" OnClick="SaveCurrentAsViewAsync">Save</SfButton>
+                            <SfButton OnClick="@(() => _showSaveAs = false)">Cancel</SfButton>
                         </div>
                     </div>
                 }
@@ -96,8 +96,8 @@
                             <HrTextBox @bind-Value="_renameViewName" Placeholder="View name" />
                         </div>
                         <div class="col-md-auto pb-1 d-flex gap-2">
-                            <SfButton CssClass="e-primary e-small" Disabled="@(string.IsNullOrWhiteSpace(_renameViewName))" OnClick="ConfirmRenameAsync">Save Name</SfButton>
-                            <SfButton CssClass="e-outline e-small" OnClick="@(() => _showRename = false)">Cancel</SfButton>
+                            <SfButton IsPrimary="true" Disabled="@(string.IsNullOrWhiteSpace(_renameViewName))" OnClick="ConfirmRenameAsync">Save Name</SfButton>
+                            <SfButton OnClick="@(() => _showRename = false)">Cancel</SfButton>
                         </div>
                     </div>
                 }
@@ -208,8 +208,8 @@
                     </div>
                 </div>
                 <div class="mt-3 d-flex gap-2">
-                    <SfButton CssClass="e-primary e-small" OnClick="LoadAsync">Apply Filters</SfButton>
-                    <SfButton CssClass="e-outline e-small" OnClick="ClearFiltersAsync">Clear</SfButton>
+                    <SfButton IsPrimary="true" OnClick="LoadAsync">Apply Filters</SfButton>
+                    <SfButton OnClick="ClearFiltersAsync">Clear</SfButton>
                 </div>
             </div>
         </div>
@@ -217,14 +217,6 @@
         @if (_totalItemCount == 0)
         {
             <div class="alert alert-info">No outstanding actions. Everything is up to date.</div>
-        }
-        else if (_groupBy is not null)
-        {
-            @foreach (var group in _groups)
-            {
-                <h5 class="mt-4">@group.Key <span class="text-muted small">(@group.Items.Count)</span></h5>
-                @RenderGrid(group.Items)
-            }
         }
         else
         {
@@ -242,7 +234,6 @@
     [Parameter] public Guid CompanyId { get; set; }
 
     private List<WorkloadActionRowModel> _items = [];
-    private List<WorkloadActionGroupModel> _groups = [];
     private WorkloadActionSummaryModel _summary = new(0, 0, 0, 0);
     private int _totalItemCount;
 
@@ -519,9 +510,10 @@
 
     private async Task OnGroupByChangedAsync(WorkloadActionsGroupBy? value)
     {
-        // Selecting a Group By value switches the render path to _groups before that collection
-        // has been repopulated for the new grouping, making the grid appear to "clear". Reload
-        // immediately so the grouped view is populated as soon as it's selected.
+        // GroupBy is also sent to the server as a request filter (affects urgency/summary
+        // computation ordering upstream), so a full reload keeps this consistent with every other
+        // filter change on this page, even though the actual grouped *rendering* itself is now
+        // entirely client-side (Syncfusion's native Group By via GroupColumns).
         _groupBy = value;
         await LoadAsync();
     }
@@ -597,21 +589,21 @@
         }
         else
         {
+            // response.Items is always the full flat row set regardless of GroupBy (see
+            // GetWorkloadActionsHandler — "rows" is unconditionally returned; "groups" is only an
+            // additional, now-unused-by-this-page pre-split projection of the same rows). A single
+            // grid with Syncfusion's native Group By (see RenderGrid/GroupColumns below) replaces
+            // what used to be a separate <HrGrid> rendered per server-computed group.
             _items = response.Items;
-            _groups = response.Groups;
             _summary = response.Summary;
-            _totalItemCount = _groupBy is not null
-                ? _groups.Sum(g => g.Items.Count)
-                : _items.Count;
+            _totalItemCount = _items.Count;
 
             // Populate filter dropdown options from the loaded data set when not yet populated,
             // so Action Type / Department / Status filters offer real values without a dedicated
             // lookup endpoint (none exists in the workload-actions backend contract).
-            var allRows = _groupBy is not null ? _groups.SelectMany(g => g.Items) : _items;
-            var rowList = allRows.ToList();
-            _actionTypeOptions = rowList.Select(r => r.ActionType).Distinct().OrderBy(x => x).ToList();
-            _departmentOptions = rowList.Select(r => r.Department).Where(d => !string.IsNullOrWhiteSpace(d)).Distinct().OrderBy(x => x).ToList()!;
-            _statusOptions = rowList.Select(r => r.Status).Distinct().OrderBy(x => x).ToList();
+            _actionTypeOptions = _items.Select(r => r.ActionType).Distinct().OrderBy(x => x).ToList();
+            _departmentOptions = _items.Select(r => r.Department).Where(d => !string.IsNullOrWhiteSpace(d)).Distinct().OrderBy(x => x).ToList()!;
+            _statusOptions = _items.Select(r => r.Status).Distinct().OrderBy(x => x).ToList();
         }
 
         _isLoading = false;
@@ -654,11 +646,27 @@
         await LoadAsync();
     }
 
+    // Maps the report's own WorkloadActionsGroupBy filter (Action Type / Assigned User /
+    // Department / Due Date) to the matching grid column field, so Syncfusion's native
+    // single-grid Group By feature reflects the same grouping the filter dropdown offers — one
+    // grid with Group By replaces what used to be a separate <HrGrid> rendered per server-computed
+    // group (see item 48's identical Asset List pattern).
+    private string[] GroupColumns => _groupBy switch
+    {
+        WorkloadActionsGroupBy.ActionType   => [nameof(WorkloadActionRowModel.ActionType)],
+        WorkloadActionsGroupBy.AssignedUser => [nameof(WorkloadActionRowModel.AssignedTo)],
+        WorkloadActionsGroupBy.Department   => [nameof(WorkloadActionRowModel.Department)],
+        WorkloadActionsGroupBy.DueDate      => [nameof(WorkloadActionRowModel.DueDate)],
+        _                                   => [],
+    };
+
     private RenderFragment RenderGrid(List<WorkloadActionRowModel> rows) => @<HrGrid TValue="WorkloadActionRowModel"
             Toolbar="@Toolbar"
             DataSource="@rows"
             AllowPaging="true"
-            AllowSorting="true">
+            AllowSorting="true"
+            AllowGrouping="true">
+        <GridGroupSettings Columns="@GroupColumns" />
         <GridColumns>
             <GridColumn HeaderText="Employee" Width="180">
                 <Template>
@@ -687,7 +695,7 @@
                     @{
                         var item = (WorkloadActionRowModel)context;
                     }
-                    <SfButton CssClass="e-outline e-small" OnClick="@(() => GoToAction(item))">Go</SfButton>
+                    <SfButton OnClick="@(() => GoToAction(item))">Go</SfButton>
                 </Template>
             </GridColumn>
         </GridColumns>

@@ -11,4 +11,13 @@ public interface IEmployeeImportLookupReader
     /// for manager-reference validation. Null if no match.
     /// </summary>
     Task<Guid?> FindEmployeeIdByReferenceAsync(Guid companyId, string reference, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns the id of the company's initial (seed) admin employee — the single employee record
+    /// auto-created at self-service signup, see Employee.IsInitialCompanyAdmin — if its Work Email
+    /// matches <paramref name="workEmail"/>. Null otherwise (including when the matching employee
+    /// exists but is not the seed admin). Used only by employee import: a matching row is treated
+    /// as an update to this seed record rather than a duplicate-email error.
+    /// </summary>
+    Task<Guid?> TryFindInitialCompanyAdminEmployeeIdByWorkEmailAsync(Guid companyId, string workEmail, CancellationToken cancellationToken);
 }

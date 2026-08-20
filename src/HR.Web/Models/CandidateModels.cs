@@ -17,7 +17,8 @@ public record CandidateListItemModel(
     string LastName,
     string Email,
     string? Phone,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    bool IsActive = true)
 {
     public string FullName => $"{FirstName} {LastName}";
 }
@@ -34,6 +35,38 @@ public record GetCandidateResponse(
     string? ResumeUrl,
     Guid? EmployeeId,
     DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    bool IsActive = true,
+    DateTimeOffset? DeactivatedAt = null,
+    Guid? DeactivatedByUserId = null,
+    string? DeactivationReason = null);
+
+// ── DEACTIVATE / REACTIVATE ─────────────────────────────────────────────────
+
+public record DeactivateCandidateRequest(
+    Guid CompanyId,
+    Guid CandidateId,
+    string Reason);
+
+public record DeactivateCandidateResponse(
+    Guid Id,
+    Guid CompanyId,
+    bool IsActive,
+    DateTimeOffset? DeactivatedAt,
+    Guid? DeactivatedByUserId,
+    string? DeactivationReason,
+    DateTimeOffset UpdatedAt);
+
+public record ReactivateCandidateRequest(
+    Guid CompanyId,
+    Guid CandidateId);
+
+public record ReactivateCandidateResponse(
+    Guid Id,
+    Guid CompanyId,
+    bool IsActive,
+    DateTimeOffset? ReactivatedAt,
+    Guid? ReactivatedByUserId,
     DateTimeOffset UpdatedAt);
 
 // ── CREATE ────────────────────────────────────────────────────────────────────

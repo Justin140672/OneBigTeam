@@ -163,6 +163,62 @@ internal sealed class ImportLookupResolver(
         return new PositionProfileImportLookupResult(profile.Id, WasCreated: true, Skipped: false);
     }
 
+    public async Task<Guid?> TryFindDepartmentAsync(Guid companyId, string name, CancellationToken cancellationToken)
+    {
+        var trimmed = name.Trim();
+        var cacheKey = (companyId, trimmed.ToLowerInvariant());
+
+        if (_departmentCache.TryGetValue(cacheKey, out var cachedId))
+            return cachedId;
+
+        return await dbContext.Departments
+            .AsNoTracking()
+            .Where(d => d.CompanyId == companyId && d.Name.ToLower() == trimmed.ToLower())
+            .Select(d => (Guid?)d.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<Guid?> TryFindEmploymentTypeAsync(Guid companyId, string name, CancellationToken cancellationToken)
+    {
+        var trimmed = name.Trim();
+        var cacheKey = (companyId, trimmed.ToLowerInvariant());
+
+        if (_employmentTypeCache.TryGetValue(cacheKey, out var cachedId))
+            return cachedId;
+
+        return await dbContext.EmploymentTypes
+            .AsNoTracking()
+            .Where(e => e.CompanyId == companyId && e.Name.ToLower() == trimmed.ToLower())
+            .Select(e => (Guid?)e.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<Guid?> TryFindLocationAsync(Guid companyId, string name, CancellationToken cancellationToken)
+    {
+        var trimmed = name.Trim();
+        var cacheKey = (companyId, trimmed.ToLowerInvariant());
+
+        if (_locationCache.TryGetValue(cacheKey, out var cachedId))
+            return cachedId;
+
+        return await dbContext.Locations
+            .AsNoTracking()
+            .Where(l => l.CompanyId == companyId && l.Name.ToLower() == trimmed.ToLower())
+            .Select(l => (Guid?)l.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<Guid?> TryFindPositionProfileAsync(Guid companyId, string title, CancellationToken cancellationToken)
+    {
+        var trimmed = title.Trim();
+
+        return await dbContext.PositionProfiles
+            .AsNoTracking()
+            .Where(p => p.CompanyId == companyId && p.Title.ToLower() == trimmed.ToLower())
+            .Select(p => (Guid?)p.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     private async Task<Guid> GetOrCreateDefaultLocationTypeIdAsync(Guid companyId, CancellationToken cancellationToken)
     {
         if (_defaultLocationTypeCache.TryGetValue(companyId, out var cachedId))

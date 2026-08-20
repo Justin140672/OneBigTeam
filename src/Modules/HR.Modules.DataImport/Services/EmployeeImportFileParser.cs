@@ -48,7 +48,7 @@ internal sealed class EmployeeImportFileParser
             var cells = new List<string>();
             for (var col = 1; col <= lastColumn; col++)
             {
-                var value = worksheet.Cell(row, col).GetString();
+                var value = GetCellStringValue(worksheet.Cell(row, col));
                 if (!string.IsNullOrWhiteSpace(value))
                     rowIsEmpty = false;
                 cells.Add(value);
@@ -87,6 +87,25 @@ internal sealed class EmployeeImportFileParser
         }
 
         return headers;
+    }
+
+    // Excel stores dates as numeric cells with a date display format. ClosedXML's Cell.GetString()
+    // renders such a cell using its Excel number format, which is frequently a full date+time
+    // format (e.g. "01/08/2026 00:00:00") even when the file only ever shows/expects a date — that
+    // trailing time component doesn't match either of DateFields' expected formats
+    // (yyyy-MM-dd / dd/MM/yyyy) and caused legitimately-entered dates to be rejected as invalid
+    // downstream in EmployeeStagingRowValidator. For any cell ClosedXML recognises as a date/time
+    // value, read the underlying DateTime directly and format it unambiguously as yyyy-MM-dd
+    // instead of trusting the cell's display-string rendering.
+    private static string GetCellStringValue(IXLCell cell)
+    {
+        if (cell.DataType == XLDataType.DateTime)
+        {
+            var dateTime = cell.GetDateTime();
+            return dateTime.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        return cell.GetString();
     }
 
     private static Dictionary<string, int> ResolveColumnIndexes(

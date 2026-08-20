@@ -243,6 +243,33 @@ public class OfferCandidateHandlerTests
         Assert.Equal("validation", result.Error.Code);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_Candidate_Is_Inactive()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        candidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+
+        var savedApplication = await db.Applications.SingleAsync();
+        Assert.Equal(stages.Interview.Id, savedApplication.CurrentStageId);
+    }
+
     private static OfferCandidateHandler handler(
         RecruitmentDbContext db,
         FakePositionProfileReader? positionProfileReader = null,

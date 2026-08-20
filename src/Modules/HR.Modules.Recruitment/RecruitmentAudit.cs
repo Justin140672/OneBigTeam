@@ -130,6 +130,45 @@ internal sealed record CandidateUpdatedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
+internal sealed record CandidateDeactivatedAuditEvent(
+    Guid CompanyId,
+    Guid CandidateId,
+    string CandidateName,
+    string Reason,
+    Guid DeactivatedByUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "candidate.deactivated";
+    string IAuditEvent.EntityType => "Candidate";
+    Guid IAuditEvent.EntityId => CandidateId;
+    Guid? IAuditEvent.ActorUserId => DeactivatedByUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Candidate '{CandidateName}' deactivated: {Reason}";
+    object? IAuditEvent.Before => new { IsActive = true };
+    object? IAuditEvent.After => new { IsActive = false, Reason };
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record CandidateReactivatedAuditEvent(
+    Guid CompanyId,
+    Guid CandidateId,
+    string CandidateName,
+    Guid ReactivatedByUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "candidate.reactivated";
+    string IAuditEvent.EntityType => "Candidate";
+    Guid IAuditEvent.EntityId => CandidateId;
+    Guid? IAuditEvent.ActorUserId => ReactivatedByUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Candidate '{CandidateName}' reactivated";
+    object? IAuditEvent.Before => new { IsActive = false };
+    object? IAuditEvent.After => new { IsActive = true };
+    object? IAuditEvent.Metadata => null;
+}
+
 internal sealed record InterviewOutcomeRecordedAuditEvent(
     Guid CompanyId,
     Guid InterviewId,

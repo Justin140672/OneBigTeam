@@ -49,12 +49,25 @@
                                     <HrTextBox @bind-Value="Model.Code" Placeholder="e.g. ANNUAL" />
                                     <ValidationMessage For="@(() => Model.Code)" />
                                 </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Default Days <span class="text-danger">*</span></label>
-                                    <SfNumericTextBox TValue="int" @bind-Value="Model.DefaultEntitlementDays"
-                                                      Min="0" Step="1" ShowSpinButton="false" />
-                                    <ValidationMessage For="@(() => Model.DefaultEntitlementDays)" />
-                                </div>
+                                @if (IsAnnualLeave)
+                                {
+                                    <div class="col-md-4">
+                                        <label class="form-label">Default Days <span class="text-danger">*</span></label>
+                                        <SfNumericTextBox TValue="int" @bind-Value="Model.DefaultEntitlementDays"
+                                                          Min="0" Step="1" ShowSpinButton="false" />
+                                        <ValidationMessage For="@(() => Model.DefaultEntitlementDays)" />
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="col-md-4">
+                                        <label class="form-label">Default Days</label>
+                                        <p class="text-muted small mb-0">
+                                            Only the Annual Leave type has a default entitlement — other leave types
+                                            don't set one here.
+                                        </p>
+                                    </div>
+                                }
                                 <div class="col-md-4">
                                     <label class="form-label">Accrual Method <span class="text-danger">*</span></label>
                                     <SfDropDownList TValue="string" TItem="Option"
@@ -144,6 +157,22 @@
     protected override Guid? GetId() => Id;
 
     protected override string? ListUrl => $"/companies/{CompanyId}/leave-types";
+
+    // Only the Annual Leave type record is allowed a default entitlement — matched by name since
+    // the domain model has no other "this is the annual leave type" concept to key off. Any other
+    // leave type's Default Days field is hidden in the form above and forced to 0 here before
+    // saving, so a value entered before a rename away from "Annual Leave" (or any other stale
+    // value) can never be silently persisted for a non-Annual-Leave type.
+    private bool IsAnnualLeave =>
+        string.Equals(Model.Name?.Trim(), "Annual Leave", StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task<string?> SaveCoreAsync()
+    {
+        if (!IsAnnualLeave)
+            Model.DefaultEntitlementDays = 0;
+
+        return await base.SaveCoreAsync();
+    }
 
     private sealed record Option(string Value, string Label);
 }

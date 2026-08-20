@@ -12,7 +12,7 @@ internal sealed class CreateEmploymentTypeHandler(EmployeesDbContext db, IClock 
         CancellationToken cancellationToken)
     {
         var exists = await db.EmploymentTypes.AnyAsync(
-            e => e.CompanyId == request.CompanyId && e.Name == request.Name,
+            e => e.CompanyId == request.CompanyId && e.Name.ToLower() == request.Name.Trim().ToLower(),
             cancellationToken);
 
         if (exists)

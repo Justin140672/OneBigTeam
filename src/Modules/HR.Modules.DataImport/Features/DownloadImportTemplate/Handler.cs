@@ -41,10 +41,9 @@ internal sealed class DownloadImportTemplateHandler
         ("Salary Amount", true, "Positive number"),
         ("Salary Type", false, "One of: Annual, Hourly, Daily"),
         ("Currency", false, "3-letter currency code (e.g. GBP, USD)"),
-        ("Hours Per Week", false, "Positive number"),
-        ("FTE", false, "Number between 0 and 1"),
-        ("Leave Type Code", false, "Free text"),
-        ("Leave Balance Days", false, "Non-negative number"),
+        // Hours Per Week and FTE are intentionally not import columns — both are always calculated
+        // from Working Days + Hours Per Day rather than imported directly.
+        ("Leave Balance Days", false, "Non-negative number; sets the employee's Annual Leave balance (the only leave type imported)"),
         ("Working Days", false, "Comma-separated day names, e.g. Monday,Tuesday,Wednesday,Thursday,Friday"),
         ("Hours Per Day", false, "Positive number"),
     ];

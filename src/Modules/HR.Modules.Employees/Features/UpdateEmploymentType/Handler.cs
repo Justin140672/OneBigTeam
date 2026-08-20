@@ -17,7 +17,7 @@ internal sealed class UpdateEmploymentTypeHandler(EmployeesDbContext db, IClock 
             return Result.Failure<UpdateEmploymentTypeResponse>(Error.NotFound("Employment type not found."));
 
         var nameConflict = await db.EmploymentTypes.AnyAsync(
-            e => e.CompanyId == request.CompanyId && e.Name == request.Name && e.Id != request.Id,
+            e => e.CompanyId == request.CompanyId && e.Name.ToLower() == request.Name.Trim().ToLower() && e.Id != request.Id,
             cancellationToken);
 
         if (nameConflict)

@@ -86,10 +86,6 @@
                     <SfButton CssClass="e-outline e-small" OnClick="FitToScreen" title="Fit chart to screen">
                         <i class="fa-solid fa-expand"></i>
                     </SfButton>
-                    <span class="org-chart-toolbar-divider"></span>                    
-                    <SfButton CssClass="e-outline e-small" OnClick="ExportChartAsync" title="Export as image">
-                        <i class="fa-solid fa-download"></i>
-                    </SfButton>
                 </div>
                 <SfDiagramComponent @ref="_diagram" Height="100%" Width="100%"
                                     NodeCreating="OnNodeCreating"
@@ -335,8 +331,14 @@
             NavigateToEmployee(item);
     }
 
-    private void NavigateToEmployee(OrganisationChartDiagramItem item) =>
-        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{item.Id}");
+    // Opens in VIEW mode (not edit) — arriving from the org chart is a "look someone up" action,
+    // not an intent to edit — with a returnUrl back to this chart so Close navigates back here
+    // instead of the Employee List (see EditPageBase.ReturnUrl / EmployeeEdit.razor's ListUrl).
+    private void NavigateToEmployee(OrganisationChartDiagramItem item)
+    {
+        var returnUrl = Uri.EscapeDataString($"/companies/{CompanyId}/organisation-chart");
+        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{item.Id}/view?returnUrl={returnUrl}");
+    }
 
     // Fires once the diagram has finished laying itself out from DataSourceSettings — the
     // earliest safe point at which _diagram.Nodes is actually populated. Centers the viewport on
@@ -379,15 +381,6 @@
             Region = DiagramRegion.Content,
             CanZoomIn = true,
         });
-    }
-        
-    // Downloads a PNG snapshot of the current chart. Diagram only supports image formats
-    // (JPEG/PNG/SVG) — there's no PDF/Excel option here the way grid exports offer, since this is
-    // a canvas, not tabular data.
-    private async Task ExportChartAsync()
-    {
-        if (_diagram is not null)
-            await _diagram.ExportAsync(DiagramExportFormat.PNG, new DiagramExportSettings());
     }
 
     // Fires for every zoom change regardless of source (toolbar buttons, mouse wheel, pinch) —

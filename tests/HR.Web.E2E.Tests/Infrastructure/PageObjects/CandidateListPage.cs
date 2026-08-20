@@ -45,4 +45,35 @@ public sealed class CandidateListPage(IPage page, string baseUrl)
         await link.ClickAsync();
         await page.WaitForURLAsync("**/candidates/**", new() { Timeout = 15_000 });
     }
+
+    // ── Active/Inactive filter + status badge (Status column, ActiveStatusBadge) ────────────────
+
+    /// <summary>
+    /// Toggles the "Show Inactive"/"Show Active" toolbar button, following the same
+    /// SupportsActiveFilter toolbar convention as ExternalRecruiterListPage.ShowInactiveAsync.
+    /// </summary>
+    public async Task ShowInactiveAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).ClickAsync();
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+    }
+
+    public async Task ShowActiveOnlyAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Show Active" }).ClickAsync();
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+    }
+
+    private ILocator Row(string nameFragment) =>
+        page.Locator(".e-row").Filter(new() { HasText = nameFragment }).First;
+
+    /// <summary>
+    /// True if the given candidate's row is present and its Status column shows the "Active"
+    /// badge (ActiveStatusBadge -> StatusBadge with the "bg-success" variant class).
+    /// </summary>
+    public async Task<bool> IsActiveAsync(string nameFragment)
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        return await Row(nameFragment).Locator(".status-badge.status-badge--success").IsVisibleAsync();
+    }
 }

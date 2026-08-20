@@ -70,6 +70,7 @@ public static class SicknessModule
         services.AddScoped<ITaskCompletionAction, SicknessEvidenceUploadCompletionAction>();
         services.AddScoped<ITaskCompletionAction, CompleteReturnToWorkReviewFromTaskAction>();
         services.AddScoped<IEmployeeSicknessStatusReader, EmployeeSicknessStatusReader>();
+        services.AddScoped<ISicknessCategoryDefaultsProvisioner, SicknessCategoryDefaultsProvisioner>();
         services.AddScoped<ISicknessReportReader, SicknessReportReader>();
     }
 

@@ -709,6 +709,14 @@ html[data-theme="dark"] .card-header {
     text-decoration: underline;
 }
 
+/* Footer variant — "Browse all" positioned below the widget's list content instead of in its
+   header (e.g. FavouriteReportsWidget on My Profile). */
+.widget-footer {
+    padding: 8px 16px 14px;
+    text-align: right;
+    border-top: 1px solid var(--hr-gray-200, #e5e7eb);
+}
+
 /* ── Team scope toggle (MyTeamWidget) ───────────────────── */
 
 .team-widget-scope {
@@ -1001,6 +1009,45 @@ html[data-theme="dark"] .card-header {
 .attention-queue-all-clear p.text-muted {
     color: var(--hr-gray-400) !important;
     font-size: 0.85rem;
+}
+
+/* ── Team status summary strip (Manager Dashboard) ────── */
+
+.team-status-summary {
+    margin-bottom: 1.25rem;
+}
+
+.team-status-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 1px;
+    background: var(--hr-gray-100);
+}
+
+.team-status-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 14px 8px;
+    background: #fff;
+    text-align: center;
+}
+
+.team-status-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--hr-gray-900);
+    line-height: 1;
+}
+
+.team-status-label {
+    font-size: 0.72rem;
+    color: var(--hr-gray-500);
+}
+
+.team-status-tile--warning .team-status-value {
+    color: var(--hr-color-warning, #d97706);
 }
 
 /* ── Horizontal bar chart (replaces donut/accumulation charts) ───────────
@@ -1319,6 +1366,22 @@ html[data-theme="dark"] .attention-queue-toggle {
     color: var(--hr-gray-400);
 }
 
+html[data-theme="dark"] .team-status-strip {
+    background: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .team-status-tile {
+    background: var(--hr-gray-800);
+}
+
+html[data-theme="dark"] .team-status-value {
+    color: var(--hr-gray-50);
+}
+
+html[data-theme="dark"] .team-status-label {
+    color: var(--hr-gray-400);
+}
+
 html[data-theme="dark"] .attention-queue-all-clear p.text-muted {
     color: var(--hr-gray-500) !important;
 }
@@ -1374,6 +1437,18 @@ html[data-theme="dark"] .hbar-row--button:hover {
 
 .dashboard-section + .dashboard-section {
     margin-top: 2rem;
+}
+
+/* Visually de-emphasised secondary section (Manager Dashboard's Reports, which the redesign
+   ticket asks not to dominate the page relative to Requires Attention). */
+.dashboard-section--secondary .dashboard-section-title {
+    color: var(--hr-gray-300);
+}
+
+.dashboard-activity-summary {
+    margin-top: 4px;
+    font-size: 0.85rem;
+    color: var(--hr-gray-500);
 }
 
 .dashboard-section-title {
@@ -1433,6 +1508,14 @@ html[data-theme="dark"] .dashboard-greeting {
 
 html[data-theme="dark"] .dashboard-heading {
     color: var(--hr-gray-50);
+}
+
+html[data-theme="dark"] .dashboard-activity-summary {
+    color: var(--hr-gray-400);
+}
+
+html[data-theme="dark"] .dashboard-section--secondary .dashboard-section-title {
+    color: var(--hr-gray-600);
 }
 
 /* ── Chart backgrounds (HiringPipelineChart, NewHiresTrendChart, HeadcountByDepartmentChart) ──

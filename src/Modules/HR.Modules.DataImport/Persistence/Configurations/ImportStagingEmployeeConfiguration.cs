@@ -52,6 +52,9 @@ internal sealed class ImportStagingEmployeeConfiguration : IEntityTypeConfigurat
         builder.Property(e => e.PositionProfileId)
             .HasColumnName("position_profile_id");
 
+        builder.Property(e => e.ExistingEmployeeIdToUpdate)
+            .HasColumnName("existing_employee_id_to_update");
+
         builder.Property(e => e.RawData)
             .HasColumnName("raw_data")
             .IsRequired();

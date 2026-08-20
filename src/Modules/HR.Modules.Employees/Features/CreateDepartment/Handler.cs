@@ -39,7 +39,7 @@ internal sealed class CreateDepartmentHandler
         var nameExists = await _dbContext.Departments
             .AnyAsync(
                 d => d.CompanyId == request.CompanyId &&
-                     d.Name == request.Name.Trim() &&
+                     d.Name.ToLower() == request.Name.Trim().ToLower() &&
                      d.IsActive,
                 cancellationToken);
 

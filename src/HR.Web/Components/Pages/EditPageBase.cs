@@ -160,11 +160,14 @@ public abstract class EditPageBase : ComponentBase, IDisposable
     protected abstract Task<string?> SaveCoreAsync();
 
     // Default: navigate to ListUrl if set, otherwise stay on the page and show an inline
-    // success banner (multi-section pages like CompanyEdit that don't set ListUrl).
+    // success banner (multi-section pages like CompanyEdit that don't set ListUrl). Routed
+    // through NavigateToList() (rather than a raw Navigation.NavigateTo call) so it sets the same
+    // _navigatedThisSave flag NavigateToList() always sets — see ConfirmSaveAndCloseAsync's
+    // remarks on why that flag exists.
     protected virtual Task OnSavedAsync()
     {
         if (TargetListUrl is not null)
-            Navigation.NavigateTo(TargetListUrl, forceLoad: true);
+            NavigateToList();
         else
             SuccessMsg = "Saved successfully.";
 
@@ -179,6 +182,15 @@ public abstract class EditPageBase : ComponentBase, IDisposable
         else
             NavigateToList();
     }
+
+    // Set by NavigateToList() every time it actually issues a navigation this "save" cycle —
+    // reset at the start of ConfirmSaveAndCloseAsync. Guards against a double forceLoad
+    // navigation: SaveAsync's default OnSavedAsync already navigates via NavigateToList() when
+    // TargetListUrl is set, so ConfirmSaveAndCloseAsync must not blindly call NavigateToList()
+    // again afterwards — two back-to-back forceLoad navigations to (usually) the same URL was
+    // producing an extra browser history entry, which is what made the in-app "back" button
+    // require two clicks to leave the page instead of one.
+    private bool _navigatedThisSave;
 
     // Navigates to wherever the in-progress navigation attempt was headed
     // (HandleLocationChangingAsync), or ListUrl when the dialog was raised by the Close
@@ -195,19 +207,23 @@ public abstract class EditPageBase : ComponentBase, IDisposable
             // E2E callers (Playwright's WaitForURLAsync defaults to waitUntil: "Load") wait on
             // after Discard/Cancel just as they do after a successful Save.
             _navigationConfirmed = true;
+            _navigatedThisSave = true;
             Navigation.NavigateTo(target, forceLoad: true);
         }
     }
 
     // Save, then always navigate on success — even for pages whose normal OnSavedAsync stays
     // put (e.g. an orchestrator page showing an inline success banner), since the user
-    // explicitly chose "Save" from the "unsaved changes" prompt.
+    // explicitly chose "Save" from the "unsaved changes" prompt. Skips the extra NavigateToList()
+    // call when OnSavedAsync's own default path already navigated (see _navigatedThisSave) to
+    // avoid issuing two forceLoad navigations back-to-back.
     protected async Task ConfirmSaveAndCloseAsync()
     {
         ShowUnsavedChangesDialog = false;
+        _navigatedThisSave = false;
         await SaveAsync();
 
-        if (GlobalError is null)
+        if (GlobalError is null && !_navigatedThisSave)
             NavigateToList();
     }
 
@@ -220,11 +236,38 @@ public abstract class EditPageBase : ComponentBase, IDisposable
         // that flag's last-rendered value at the moment the browser navigation is issued — left
         // true (the previous assumption being "it doesn't matter, this component is about to be
         // destroyed by an in-app SPA nav anyway"), it fires an unnecessary beforeunload guard on a
-        // navigation the user already explicitly confirmed by clicking "Discard Changes".
+        // navigation the user already explicitly confirmed by clicking "Discard Changes". This
+        // mirrors SaveAsync's own StateHasChanged()+delay before its forceLoad navigate (see that
+        // method's remarks) — the render clearing HasUnsavedChanges needs a chance to reach the
+        // client BEFORE the forceLoad fires, or the browser can still show its native "leave
+        // site?" prompt on top of (or instead of) our own confirm dialog, which is exactly the
+        // double-dialog bug this fixes.
         CaptureBaseline();
         ResetChildSectionsUnsavedState();
+
+        // Only Save should ever validate — Close/Discard must not. Nothing in this class calls
+        // EditContext.Validate() from here, but EditPageBase<TModel> owns an EditContext whose
+        // per-field CSS state (modified/invalid) is driven by field-level notifications that can
+        // accumulate independently of an explicit Validate() call (e.g. Syncfusion inputs raising
+        // OnFieldChanged as the user tabs through an empty "Add" form before ever clicking Save).
+        // Clearing that per-field "modified" state here guarantees Close never leaves stale
+        // validation styling visible on the page being navigated away from, regardless of how it
+        // got there.
+        ClearEditContextModifiedState();
+
+        StateHasChanged();
+        _ = DelayThenNavigateToListAsync();
+    }
+
+    private async Task DelayThenNavigateToListAsync()
+    {
+        await Task.Delay(50);
         NavigateToList();
     }
+
+    // Overridden by EditPageBase<TModel> to call EditContext.MarkAsUnmodified(). No-op for
+    // orchestrator pages with no owned EditContext.
+    protected virtual void ClearEditContextModifiedState() { }
 
     // Hook for pages whose HasUnsavedChanges also folds in a child EditSectionBase (e.g.
     // EmployeeEdit's Employment tab) — CaptureBaseline() above only resets this page's OWN model,
@@ -267,6 +310,8 @@ public abstract class EditPageBase<TModel> : EditPageBase where TModel : class, 
 
     protected override bool HasUnsavedChanges =>
         _baselineSnapshot is not null && _baselineSnapshot != System.Text.Json.JsonSerializer.Serialize(Model);
+
+    protected override void ClearEditContextModifiedState() => EditContext.MarkAsUnmodified();
 }
 
 /// <summary>

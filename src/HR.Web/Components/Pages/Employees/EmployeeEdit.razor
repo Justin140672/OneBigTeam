@@ -477,16 +477,6 @@
                                         </div>
                                         <div class="card-body @(IsViewMode ? "view-mode" : "")">
                                             <div class="row g-3">
-                                                <div class="col-md-6">
-                                                    <label class="form-label">Mobile / Work Phone</label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Mobile / Work Phone" })" @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" ReadOnly="@IsViewMode" />
-                                                    <ValidationMessage For="@(() => Model.PhoneNumber)" />
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label">Home Phone</label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Home Phone" })" @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" ReadOnly="@IsViewMode" />
-                                                    <ValidationMessage For="@(() => Model.HomePhone)" />
-                                                </div>
                                                 <div class="col-12">
                                                     <label class="form-label">Address Line 1</label>
                                                     <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Address Line 1" })" @bind-Value="Model.AddressLine1" Placeholder="Street address" ReadOnly="@IsViewMode" />
@@ -511,6 +501,16 @@
                                                 <div class="col-md-3">
                                                     <label class="form-label">Country</label>
                                                     <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Country" })" @bind-Value="Model.Country" Placeholder="e.g. United Kingdom" ReadOnly="@IsViewMode" />
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Mobile / Work Phone</label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Mobile / Work Phone" })" @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" ReadOnly="@IsViewMode" />
+                                                    <ValidationMessage For="@(() => Model.PhoneNumber)" />
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Home Phone</label>
+                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Home Phone" })" @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" ReadOnly="@IsViewMode" />
+                                                    <ValidationMessage For="@(() => Model.HomePhone)" />
                                                 </div>
                                             </div>
                                         </div>
@@ -765,7 +765,10 @@
         @if (IsViewMode)
         {
             <div class="d-flex gap-2 align-items-center mt-4 justify-content-end">
-                <SfButton OnClick="@(() => Navigation.NavigateTo(ListUrl!))">Back to employees</SfButton>
+                <!-- RequestClose (not a direct NavigateTo(ListUrl!)) so a "?returnUrl=" set by the
+                     caller (e.g. the Organisation Chart) is honoured — view mode never has unsaved
+                     changes, so this always navigates immediately without the confirm dialog. -->
+                <SfButton OnClick="RequestClose">Back to employees</SfButton>
             </div>
         }
         else

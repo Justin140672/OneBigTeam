@@ -130,6 +130,7 @@ public static class DocumentsModule
     {
         services.Configure<ImageUploadOptions>(configuration.GetSection("Documents:ProfilePhoto:Upload"));
         services.AddScoped<IImageUploadValidator, ImageUploadValidator>();
+        services.AddScoped<IDocumentTypeDefaultsProvisioner, DocumentTypeDefaultsProvisioner>();
     }
 
     private static void AddFeatureServices(IServiceCollection services)

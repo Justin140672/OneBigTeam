@@ -24,12 +24,14 @@ public class ConfirmImportSessionHandlerTests
         FakeEmployeeImportWriter? employeeWriter = null,
         FakeLeaveImportWriter? leaveWriter = null,
         FakeEmployeeImportLookupReader? lookupReader = null,
+        FakeImportLookupResolver? lookupResolver = null,
         FakeIntegrationEventPublisher? publisher = null) =>
         new(
             db,
             employeeWriter ?? new FakeEmployeeImportWriter(),
             leaveWriter ?? new FakeLeaveImportWriter(),
             lookupReader ?? new FakeEmployeeImportLookupReader(),
+            lookupResolver ?? new FakeImportLookupResolver(),
             publisher ?? new FakeIntegrationEventPublisher(),
             new FakeClock(FixedUtcNow));
 
@@ -94,7 +96,8 @@ public class ConfirmImportSessionHandlerTests
         Guid? departmentId = null,
         Guid? locationId = null,
         Guid? employmentTypeId = null,
-        Guid? positionProfileId = null)
+        Guid? positionProfileId = null,
+        Guid? existingEmployeeIdToUpdate = null)
     {
         var row = ImportStagingEmployee.Create(
             Guid.NewGuid(), companyId, sessionId, rowNumber, employeeNumber, workEmail,
@@ -104,7 +107,8 @@ public class ConfirmImportSessionHandlerTests
             employmentTypeId ?? Guid.NewGuid(),
             positionProfileId ?? Guid.NewGuid(),
             string.IsNullOrEmpty(rawData) ? BuildRawData(workEmail: workEmail) : rawData,
-            isValid: true, FixedNowOffset);
+            isValid: true, FixedNowOffset,
+            existingEmployeeIdToUpdate);
         db.ImportStagingEmployees.Add(row);
         db.SaveChanges();
         return row;
@@ -147,6 +151,34 @@ public class ConfirmImportSessionHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("conflict", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Updates_Existing_Employee_Instead_Of_Creating_When_Row_Targets_Seed_Admin()
+    {
+        // A staging row with ExistingEmployeeIdToUpdate set (Work Email matched the company's seed
+        // admin employee — see EmployeeStagingRowValidator) must be routed to
+        // IEmployeeImportWriter.UpdateEmployeeAsync, never CreateEmployeeAsync.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var session = SeedSession(db, companyId, ImportStatus.Validated);
+        var seedAdminEmployeeId = Guid.NewGuid();
+        AddValidRow(db, companyId, session.Id, 2, existingEmployeeIdToUpdate: seedAdminEmployeeId);
+
+        var employeeWriter = new FakeEmployeeImportWriter();
+        var handler = BuildHandler(db, employeeWriter: employeeWriter);
+
+        var result = await handler.HandleAsync(
+            new ConfirmImportSessionRequest { CompanyId = companyId, ImportSessionId = session.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.CreatedCount);
+        Assert.Empty(employeeWriter.CreateRequests);
+        var update = Assert.Single(employeeWriter.UpdateRequests);
+        Assert.Equal(seedAdminEmployeeId, update.ExistingEmployeeId);
+        Assert.Equal("alice@example.com", update.Request.WorkEmail);
     }
 
     [Fact]
@@ -248,7 +280,9 @@ public class ConfirmImportSessionHandlerTests
 
         Assert.True(result.IsSuccess);
         var call = Assert.Single(leaveWriter.Calls);
-        Assert.Equal("ANNUAL", call.LeaveTypeCode);
+        // Leave Type Code was removed from the import template — Annual Leave is now hardcoded as
+        // the only leave type an import ever sets an opening balance for.
+        Assert.Equal("Annual Leave", call.LeaveTypeCode);
         Assert.Equal(20m, call.OpeningBalanceDays);
     }
 

@@ -138,6 +138,40 @@ public class ListAssetsHandlerTests
         Assert.Equal(FixedOffset, item.UpdatedAt);
     }
 
+    [Fact]
+    public async Task HandleAsync_Includes_CategoryName_When_Category_Exists()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category = AssetCategory.Create(Guid.NewGuid(), companyId, "Electronics", null, FixedOffset);
+        db.AssetCategories.Add(category);
+        db.Assets.Add(Asset.Create(Guid.NewGuid(), companyId, "A001", category.Id, "Laptop", null, null, null, null, null, FixedOffset));
+        await db.SaveChangesAsync();
+
+        var handler = new ListAssetsHandler(db);
+        var result = await handler.HandleAsync(new ListAssetsRequest { CompanyId = companyId }, CancellationToken.None);
+
+        Assert.Equal("Electronics", Assert.Single(result).CategoryName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Uses_Fallback_CategoryName_When_Category_Cannot_Be_Resolved()
+    {
+        // An asset must never silently disappear from the list just because its category can't
+        // be resolved (e.g. a stale/orphaned CategoryId) — this asserts the left-join fallback,
+        // not just "some assets are returned".
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var orphanedCategoryId = Guid.NewGuid();
+        db.Assets.Add(Asset.Create(Guid.NewGuid(), companyId, "A001", orphanedCategoryId, "Laptop", null, null, null, null, null, FixedOffset));
+        await db.SaveChangesAsync();
+
+        var handler = new ListAssetsHandler(db);
+        var result = await handler.HandleAsync(new ListAssetsRequest { CompanyId = companyId }, CancellationToken.None);
+
+        Assert.Equal("Unknown", Assert.Single(result).CategoryName);
+    }
+
     private static AssetsDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<AssetsDbContext>()

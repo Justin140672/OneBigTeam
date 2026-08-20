@@ -45,4 +45,16 @@ internal sealed class EmployeeImportLookupReader(EmployeesDbContext dbContext) :
 
         return employee;
     }
+
+    public async Task<Guid?> TryFindInitialCompanyAdminEmployeeIdByWorkEmailAsync(
+        Guid companyId, string workEmail, CancellationToken cancellationToken)
+    {
+        var normalized = workEmail.Trim().ToLowerInvariant();
+
+        return await dbContext.Employees
+            .AsNoTracking()
+            .Where(e => e.CompanyId == companyId && e.WorkEmail == normalized && e.IsInitialCompanyAdmin)
+            .Select(e => (Guid?)e.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
 }

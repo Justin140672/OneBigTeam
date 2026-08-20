@@ -48,13 +48,15 @@ public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : S
     }
 
     [Fact]
-    public async Task SelfServiceDocumentsTab_HasNoGeneralUploadButton_OnlyPerRequestUploadButtons()
+    public async Task SelfServiceDocumentsTab_HasGeneralUploadButton_PlusOnePerRequestUploadButton()
     {
-        // The admin-only bulk "Upload" button (Documents card header) never renders for
-        // EmployeeSelfUpload — that part is unchanged. But each "Requested" row in the Document
-        // Requests grid now gets its own contextual "Upload" button (EmployeeDocumentsTab.razor),
-        // so the button isn't entirely absent anymore — Tom has exactly one open request
-        // (Passport), so exactly one "Upload" button should be visible.
+        // MyProfileDocumentsTab.razor (the merged Documents tab — see item 34) always renders its
+        // own bulk "Upload" button (self-service employees can now upload a document of their own
+        // from My Profile, not only in response to an HR request) — this replaced the older
+        // EmployeeDocumentsTab.razor-based tab, whose bulk Upload button was admin-only and never
+        // rendered for EmployeeSelfUpload. Each "Requested" row in the Document Requests table
+        // still gets its own contextual "Upload" button too — Tom has exactly one open request
+        // (Passport) — so 2 "Upload" buttons should be visible in total: 1 bulk + 1 per-request.
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
@@ -69,7 +71,7 @@ public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : S
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
         var uploadBtns = _page.GetByRole(AriaRole.Button, new() { Name = "Upload" });
-        Assert.Equal(1, await uploadBtns.CountAsync());
+        Assert.Equal(2, await uploadBtns.CountAsync());
     }
 
     [Fact]
@@ -111,9 +113,10 @@ public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : S
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
         // "Requested Documents" (the self-service-only duplicate section) was removed — the
-        // "Document Requests" section (shared with the admin employee profile view) is now the
-        // only place this shows, so assert against that instead.
-        var requestedSection = _page.Locator("[data-testid='admin-document-requests-section']");
+        // "Document Requests" section on MyProfileDocumentsTab.razor (data-testid=
+        // "my-profile-document-requests-section" — distinct from EmployeeDocumentsTab.razor's
+        // admin equivalent, "admin-document-requests-section") is now the only place this shows.
+        var requestedSection = _page.Locator("[data-testid='my-profile-document-requests-section']");
         Assert.True(await requestedSection.IsVisibleAsync(),
             "Expected the 'Document Requests' section to be visible for Tom, who has a Passport request");
 

@@ -16,7 +16,8 @@ internal sealed record RowValidationResult(
     Guid? DepartmentId,
     Guid? LocationId,
     Guid? EmploymentTypeId,
-    Guid? PositionProfileId)
+    Guid? PositionProfileId,
+    Guid? ExistingEmployeeIdToUpdate = null)
 {
     public bool IsValid => Errors.Count == 0;
 }
@@ -49,8 +50,8 @@ internal sealed class EmployeeStagingRowValidator(
     // compensation columns happen to be mapped for this import. It stays out of this array
     // (which only gates the fields that remain optional-if-mapped) but its numeric-format check
     // still lives in ValidateCompensationFields below, run unconditionally per row.
-    private static readonly string[] CompensationFields = ["SalaryType", "Currency", "HoursPerWeek", "FTE"];
-    private static readonly string[] LeaveFields = ["LeaveTypeCode", "LeaveBalanceDays"];
+    private static readonly string[] CompensationFields = ["SalaryType", "Currency"];
+    private static readonly string[] LeaveFields = ["LeaveBalanceDays"];
     private static readonly string[] WorkingPatternFields = ["WorkingDays", "HoursPerDay"];
 
     // Comma-separated day names, e.g. "Monday,Tuesday,Wednesday,Thursday,Friday" — mirrors the
@@ -78,6 +79,7 @@ internal sealed class EmployeeStagingRowValidator(
         var locationIdByRow = new Dictionary<int, Guid?>();
         var employmentTypeIdByRow = new Dictionary<int, Guid?>();
         var positionProfileIdByRow = new Dictionary<int, Guid?>();
+        var existingEmployeeIdToUpdateByRow = new Dictionary<int, Guid?>();
 
         var hasCompensationColumns = CompensationFields.Any(mappedFields.Contains);
         var hasLeaveColumns = LeaveFields.Any(mappedFields.Contains);
@@ -112,10 +114,14 @@ internal sealed class EmployeeStagingRowValidator(
             ValidateDateFields(row, rowErrors);
             ValidateSalaryAmountFormat(row, rowErrors);
 
+            Guid? existingEmployeeIdToUpdate;
             if (employeeNumberMode == EmployeeNumberMode.Manual)
-                await ValidateDuplicateAgainstExistingEmployeesAsync(companyId, row, rowErrors, cancellationToken);
+                existingEmployeeIdToUpdate = await ValidateDuplicateAgainstExistingEmployeesAsync(companyId, row, rowErrors, cancellationToken);
             else
-                await ValidateWorkEmailAgainstExistingEmployeesAsync(companyId, row, rowErrors, cancellationToken);
+                existingEmployeeIdToUpdate = await ValidateWorkEmailAgainstExistingEmployeesAsync(companyId, row, rowErrors, cancellationToken);
+
+            existingEmployeeIdToUpdateByRow[row.RowNumber] = existingEmployeeIdToUpdate;
+
             await ValidateManagerReferenceAsync(companyId, row, rows, rowErrors, cancellationToken);
 
             if (hasCompensationColumns)
@@ -144,7 +150,8 @@ internal sealed class EmployeeStagingRowValidator(
                 departmentIdByRow[r.RowNumber],
                 locationIdByRow[r.RowNumber],
                 employmentTypeIdByRow[r.RowNumber],
-                positionProfileIdByRow[r.RowNumber]))
+                positionProfileIdByRow[r.RowNumber],
+                existingEmployeeIdToUpdateByRow[r.RowNumber]))
             .ToList();
     }
 
@@ -160,49 +167,57 @@ internal sealed class EmployeeStagingRowValidator(
         Guid? employmentTypeId = null;
         Guid? positionProfileId = null;
 
+        // Note: this only checks existence (read-only) — nothing is created here. Reference data
+        // (new departments/locations/employment types/position profiles) is only ever created at
+        // ConfirmImportSession time, once the user has reviewed the preview and clicked Confirm.
+        // A row whose lookup doesn't yet exist keeps a null id here and surfaces as a "will be
+        // created" warning; ConfirmImportSessionHandler re-resolves (get-or-create) each of these
+        // fields by name immediately before creating the employee.
         var departmentName = GetField(row, "DepartmentName");
         if (!string.IsNullOrWhiteSpace(departmentName))
         {
-            var result = await lookupResolver.GetOrCreateDepartmentAsync(companyId, departmentName, cancellationToken);
-            departmentId = result.Id;
-            if (result.WasCreated)
-                rowWarnings.Add($"Department '{departmentName.Trim()}' did not exist and was created.");
+            departmentId = await lookupResolver.TryFindDepartmentAsync(companyId, departmentName, cancellationToken);
+            if (departmentId is null)
+                rowWarnings.Add($"Department '{departmentName.Trim()}' does not exist and will be created when this import is confirmed.");
         }
 
         var employmentTypeName = GetField(row, "EmploymentTypeName");
         if (!string.IsNullOrWhiteSpace(employmentTypeName))
         {
-            var result = await lookupResolver.GetOrCreateEmploymentTypeAsync(companyId, employmentTypeName, cancellationToken);
-            employmentTypeId = result.Id;
-            if (result.WasCreated)
-                rowWarnings.Add($"Employment Type '{employmentTypeName.Trim()}' did not exist and was created.");
+            employmentTypeId = await lookupResolver.TryFindEmploymentTypeAsync(companyId, employmentTypeName, cancellationToken);
+            if (employmentTypeId is null)
+                rowWarnings.Add($"Employment Type '{employmentTypeName.Trim()}' does not exist and will be created when this import is confirmed.");
         }
 
         var locationName = GetField(row, "LocationName");
         if (!string.IsNullOrWhiteSpace(locationName))
         {
-            var result = await lookupResolver.GetOrCreateLocationAsync(companyId, locationName, cancellationToken);
-            locationId = result.Id;
-            if (result.WasCreated)
-                rowWarnings.Add($"Location '{locationName.Trim()}' did not exist and was created.");
+            locationId = await lookupResolver.TryFindLocationAsync(companyId, locationName, cancellationToken);
+            if (locationId is null)
+                rowWarnings.Add($"Location '{locationName.Trim()}' does not exist and will be created when this import is confirmed.");
         }
 
         var positionProfileTitle = GetField(row, "PositionProfileTitle");
         if (!string.IsNullOrWhiteSpace(positionProfileTitle))
         {
-            var result = await lookupResolver.GetOrCreatePositionProfileAsync(
-                companyId, positionProfileTitle, departmentId, locationId, cancellationToken);
+            positionProfileId = await lookupResolver.TryFindPositionProfileAsync(companyId, positionProfileTitle, cancellationToken);
 
-            if (result.Skipped)
+            if (positionProfileId is null)
             {
-                rowErrors.Add(
-                    $"Position Profile '{positionProfileTitle.Trim()}' could not be created because both Department and Location must be present and resolvable on this row.");
-            }
-            else
-            {
-                positionProfileId = result.Id;
-                if (result.WasCreated)
-                    rowWarnings.Add($"Position Profile '{positionProfileTitle.Trim()}' did not exist and was created.");
+                // A brand-new position profile can only ever be created once Department and
+                // Location are both present and resolvable on this row (mirrors
+                // ImportLookupResolver.GetOrCreatePositionProfileAsync's own guard) — surfaced here
+                // as an error (not a "will be created" warning) so the same row can never pass
+                // validation only to fail unexpectedly at confirm time.
+                if (string.IsNullOrWhiteSpace(departmentName) || string.IsNullOrWhiteSpace(locationName))
+                {
+                    rowErrors.Add(
+                        $"Position Profile '{positionProfileTitle.Trim()}' could not be created because both Department and Location must be present and resolvable on this row.");
+                }
+                else
+                {
+                    rowWarnings.Add($"Position Profile '{positionProfileTitle.Trim()}' does not exist and will be created when this import is confirmed.");
+                }
             }
         }
 
@@ -285,7 +300,7 @@ internal sealed class EmployeeStagingRowValidator(
         }
     }
 
-    private async Task ValidateDuplicateAgainstExistingEmployeesAsync(
+    private async Task<Guid?> ValidateDuplicateAgainstExistingEmployeesAsync(
         Guid companyId,
         ParsedImportRow row,
         List<string> rowErrors,
@@ -298,21 +313,35 @@ internal sealed class EmployeeStagingRowValidator(
             rowErrors.Add($"Employee number '{employeeNumber}' already exists in this company.");
         }
 
-        await ValidateWorkEmailAgainstExistingEmployeesAsync(companyId, row, rowErrors, cancellationToken);
+        return await ValidateWorkEmailAgainstExistingEmployeesAsync(companyId, row, rowErrors, cancellationToken);
     }
 
-    private async Task ValidateWorkEmailAgainstExistingEmployeesAsync(
+    // Returns the company's seed admin employee id when this row's Work Email matches it — see
+    // Employee.IsInitialCompanyAdmin. That specific case is deliberately NOT a duplicate-email
+    // error: it is the one and only situation where an employee import updates an existing
+    // employee rather than creating a new one (see ConfirmImportSessionHandler). Every other
+    // Work Email match against an existing employee remains a hard validation error, exactly as
+    // before.
+    private async Task<Guid?> ValidateWorkEmailAgainstExistingEmployeesAsync(
         Guid companyId,
         ParsedImportRow row,
         List<string> rowErrors,
         CancellationToken cancellationToken)
     {
         var workEmail = GetField(row, "WorkEmail");
-        if (!string.IsNullOrWhiteSpace(workEmail) &&
-            await lookupReader.WorkEmailExistsAsync(companyId, workEmail, cancellationToken))
-        {
+        if (string.IsNullOrWhiteSpace(workEmail))
+            return null;
+
+        var seedAdminEmployeeId = await lookupReader.TryFindInitialCompanyAdminEmployeeIdByWorkEmailAsync(
+            companyId, workEmail, cancellationToken);
+
+        if (seedAdminEmployeeId is not null)
+            return seedAdminEmployeeId;
+
+        if (await lookupReader.WorkEmailExistsAsync(companyId, workEmail, cancellationToken))
             rowErrors.Add($"Work email '{workEmail}' already exists in this company.");
-        }
+
+        return null;
     }
 
     private async Task ValidateManagerReferenceAsync(
@@ -363,20 +392,6 @@ internal sealed class EmployeeStagingRowValidator(
         var currency = GetField(row, "Currency");
         if (!string.IsNullOrWhiteSpace(currency) && !CurrencyCodePattern.IsMatch(currency.Trim().ToUpperInvariant()))
             rowErrors.Add($"'Currency' value '{currency}' must be a 3-letter currency code.");
-
-        var hoursPerWeek = GetField(row, "HoursPerWeek");
-        if (!string.IsNullOrWhiteSpace(hoursPerWeek))
-        {
-            if (!decimal.TryParse(hoursPerWeek, NumberStyles.Number, CultureInfo.InvariantCulture, out var hours) || hours <= 0)
-                rowErrors.Add($"'HoursPerWeek' value '{hoursPerWeek}' must be a positive number.");
-        }
-
-        var fte = GetField(row, "FTE");
-        if (!string.IsNullOrWhiteSpace(fte))
-        {
-            if (!decimal.TryParse(fte, NumberStyles.Number, CultureInfo.InvariantCulture, out var fteValue) || fteValue < 0 || fteValue > 1)
-                rowErrors.Add($"'FTE' value '{fte}' must be between 0 and 1.");
-        }
     }
 
     private static void ValidateWorkingPatternFields(ParsedImportRow row, List<string> rowErrors)

@@ -106,6 +106,44 @@ public class ListCandidatesHandlerTests
         Assert.Empty(result.Value!.Items);
     }
 
+    [Fact]
+    public async Task HandleAsync_Excludes_Inactive_Candidates_By_Default()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var activeCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var inactiveCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        inactiveCandidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
+        db.Candidates.AddRange(activeCandidate, inactiveCandidate);
+        await db.SaveChangesAsync();
+
+        var result = await new ListCandidatesHandler(db).HandleAsync(
+            new ListCandidatesRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Single(result.Value!.Items);
+        Assert.Equal(activeCandidate.Id, result.Value.Items[0].Id);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Includes_Inactive_Candidates_When_IncludeInactive_Is_True()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var activeCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var inactiveCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        inactiveCandidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
+        db.Candidates.AddRange(activeCandidate, inactiveCandidate);
+        await db.SaveChangesAsync();
+
+        var result = await new ListCandidatesHandler(db).HandleAsync(
+            new ListCandidatesRequest { CompanyId = companyId, IncludeInactive = true },
+            CancellationToken.None);
+
+        Assert.Equal(2, result.Value!.Items.Count);
+        Assert.Contains(result.Value.Items, i => i.Id == inactiveCandidate.Id && !i.IsActive);
+    }
+
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))

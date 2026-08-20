@@ -1,10 +1,6 @@
 @page "/dashboard/manager"
 @rendermode InteractiveServer
 @using HR.Web.Components.Pages.Tasks
-@using HR.Web.Components.Pages.Probation
-@using HR.Web.Components.Pages.Sickness
-@using HR.Web.Components.Pages.Leave
-@using HR.Web.Components.Pages.Onboarding
 @using HR.Web.Components.Pages.Employees
 @using HR.Web.Components.Pages.Reporting
 @inject AppSession Session
@@ -18,52 +14,74 @@
         <div class="dashboard-greeting mb-4">
             <h1 class="dashboard-heading">@Greeting(), @Session.FirstName</h1>
             <p class="text-muted mb-0">@DateTime.Now.ToString("dddd, d MMMM yyyy")</p>
+            @if (_attentionCount is not null || _awayTodayCount is not null)
+            {
+                <p class="dashboard-activity-summary mb-0">@ActivitySummary()</p>
+            }
         </div>
 
         <DashboardSwitcher />
 
+        <section class="dashboard-section" aria-label="Requires your attention">
+            <ManagerAttentionQueueWidget OnAlertCountsChanged="OnAlertCountsChanged" OnItemCountChanged="OnItemCountChanged" />
+        </section>
+
         <section class="dashboard-section">
-            <h2 class="dashboard-section-title">Tasks &amp; Team Wellbeing</h2>
-            <div class="dashboard-grid-3col">
-                <TeamTasksWidget />
-                <LeaveRequestsWidget OnOpenTask="OpenTask" />
-                <UpcomingProbationReviewsWidget OnOpenTask="OpenTask" />
-                <TeamOnboardingWidget />
-                <TeamSicknessTodayWidget />
-                <OverdueReturnToWorkReviewsWidget OnOpenTask="OpenTask" />
-                <MissingFitNotesWidget />
-            </div>
+            <TeamStatusSummary OnAwayTodayChanged="OnAwayTodayChanged" />
         </section>
 
         <section class="dashboard-section">
             <h2 class="dashboard-section-title">My Team</h2>
             <div class="dashboard-detail-grid">
-                <MyTeamWidget />
+                <MyTeamWidget AlertCounts="_alertCounts" />
             </div>
         </section>
 
-        <section class="dashboard-section">
+        <section class="dashboard-section dashboard-section--secondary">
             <h2 class="dashboard-section-title">Reports</h2>
-            <div class="dashboard-detail-grid">
-                <TeamReportsWidget />
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <TeamReportsWidget />
+                </div>
             </div>
         </section>
     </div>
-
-    <TaskViewDialog CompanyId="Session.CompanyId"
-                    TaskId="_openTaskId"
-                    IsOpen="_taskDialogOpen"
-                    OnClosed="@(() => _taskDialogOpen = false)" />
 }
 
 @code {
-    private Guid? _openTaskId;
-    private bool _taskDialogOpen;
+    private IReadOnlyDictionary<Guid, int>? _alertCounts;
+    private int? _attentionCount;
+    private int? _awayTodayCount;
 
-    private void OpenTask(Guid taskId)
+    private Task OnAlertCountsChanged(IReadOnlyDictionary<Guid, int> counts)
     {
-        _openTaskId = taskId;
-        _taskDialogOpen = true;
+        _alertCounts = counts;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task OnItemCountChanged(int count)
+    {
+        _attentionCount = count;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task OnAwayTodayChanged(int count)
+    {
+        _awayTodayCount = count;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private string ActivitySummary()
+    {
+        var parts = new List<string>();
+        if (_attentionCount is { } a)
+            parts.Add(a == 1 ? "1 item needs your attention" : $"{a} items need your attention");
+        if (_awayTodayCount is { } w)
+            parts.Add(w == 1 ? "1 team member away today" : $"{w} team members away today");
+        return string.Join(" · ", parts);
     }
 
     // Guarded like CompanyEdit.razor: URL-typing into this dashboard without the

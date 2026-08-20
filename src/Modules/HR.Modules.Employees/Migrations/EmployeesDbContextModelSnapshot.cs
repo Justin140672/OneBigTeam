@@ -18,7 +18,7 @@ namespace HR.Modules.Employees.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("employees")
-                .HasAnnotation("ProductVersion", "10.0.9")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -299,6 +299,12 @@ namespace HR.Modules.Employees.Migrations
                         .HasPrecision(4, 2)
                         .HasColumnType("numeric(4,2)")
                         .HasColumnName("hours_per_day_override");
+
+                    b.Property<bool>("IsInitialCompanyAdmin")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_initial_company_admin");
 
                     b.Property<string>("LastName")
                         .IsRequired()

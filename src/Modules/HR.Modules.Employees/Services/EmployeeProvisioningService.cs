@@ -1,11 +1,16 @@
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
+using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Services;
 
-internal sealed class EmployeeProvisioningService(CreateEmployeeHandler createEmployeeHandler) : IEmployeeProvisioningService
+internal sealed class EmployeeProvisioningService(
+    CreateEmployeeHandler createEmployeeHandler,
+    EmployeesDbContext dbContext,
+    IClock clock) : IEmployeeProvisioningService
 {
     public async Task<Result<Guid>> CreateFromCandidateAsync(
         EmployeeProvisioningRequest request,
@@ -37,5 +42,17 @@ internal sealed class EmployeeProvisioningService(CreateEmployeeHandler createEm
         return result.IsSuccess
             ? Result.Success(result.Value!.Id)
             : Result.Failure<Guid>(result.Error);
+    }
+
+    public async Task MarkAsInitialCompanyAdminAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken)
+    {
+        var employee = await dbContext.Employees
+            .SingleOrDefaultAsync(e => e.Id == employeeId && e.CompanyId == companyId, cancellationToken);
+
+        if (employee is null)
+            return;
+
+        employee.MarkAsInitialCompanyAdmin(clock.UtcNowOffset());
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

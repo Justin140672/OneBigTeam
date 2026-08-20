@@ -25,9 +25,6 @@ else
             {
                 <span class="widget-count-badge">@_favourites.Count</span>
             }
-            <a href="/companies/@Session.CompanyId/reporting" class="widget-view-all ms-auto">
-                Browse all<i class="fa-solid fa-arrow-right fa-xs" aria-hidden="true"></i>
-            </a>
         </div>
 
         <div class="widget-body">
@@ -53,6 +50,12 @@ else
                     </div>
                 }
             }
+        </div>
+
+        <div class="widget-footer">
+            <a href="/companies/@Session.CompanyId/reporting" class="widget-view-all">
+                Browse all<i class="fa-solid fa-arrow-right fa-xs" aria-hidden="true"></i>
+            </a>
         </div>
     </div>
 }

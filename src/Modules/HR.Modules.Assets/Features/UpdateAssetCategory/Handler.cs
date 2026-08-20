@@ -16,8 +16,22 @@ internal sealed class UpdateAssetCategoryHandler(AssetsDbContext db, IClock cloc
         if (category is null)
             return Result.Failure<UpdateAssetCategoryResponse>(Error.NotFound("Asset category not found."));
 
+        var newName = request.Name.Trim();
+        if (!string.Equals(category.Name, newName, StringComparison.OrdinalIgnoreCase))
+        {
+            var nameExists = await db.AssetCategories.AnyAsync(
+                c => c.CompanyId == request.CompanyId && c.Id != request.Id && c.Name.ToLower() == newName.ToLower(),
+                cancellationToken);
+
+            if (nameExists)
+            {
+                return Result.Failure<UpdateAssetCategoryResponse>(
+                    Error.Conflict($"An asset category named '{newName}' already exists."));
+            }
+        }
+
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
-        category.Update(request.Name, request.Description, now);
+        category.Update(newName, request.Description, now);
 
         await db.SaveChangesAsync(cancellationToken);
 

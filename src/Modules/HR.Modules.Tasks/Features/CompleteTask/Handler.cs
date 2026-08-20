@@ -75,9 +75,39 @@ internal sealed class CompleteTaskHandler(
 
         var previousStatus = task.Status.ToString();
 
+        // Idempotency: TaskItem.Complete() is itself a no-op when the task is already
+        // Completed (see TaskItem.cs), but the handler was previously writing a fresh
+        // notification/audit event/dispatch on every call regardless — a second completion
+        // request for an already-completed task would violate the notifications table's
+        // (employee_id, source_entity_id, type) uniqueness constraint and 500, plus fire
+        // duplicate audit events and downstream actions (e.g. leave/probation/asset
+        // completion side effects) a second time. Side effects must only fire on the actual
+        // Open/InProgress -> Completed transition, not on a repeat call.
+        var wasAlreadyCompleted = task.Status == TaskItemStatus.Completed;
+
         task.Complete(request.CompletedBy, clock.UtcNowOffset());
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (wasAlreadyCompleted)
+        {
+            return Result.Success(new CompleteTaskResponse(
+                task.Id,
+                task.CompanyId,
+                task.Title,
+                task.Description,
+                task.Status.ToString(),
+                task.Priority.ToString(),
+                task.Source.ToString(),
+                task.DueDate,
+                task.AssignedEmployeeId,
+                task.AssignedUserId,
+                task.CreatedBy,
+                task.CompletedBy,
+                task.CompletedAt,
+                task.CreatedAt,
+                task.UpdatedAt));
+        }
 
         if (task.AssignedEmployeeId.HasValue)
         {

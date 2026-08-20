@@ -440,6 +440,18 @@ app.MapGet("/companies/{companyId:guid}/data-import/employees/template/download"
         ?? response.Content.Headers.ContentDisposition?.FileName
         ?? "employee-import-template.xlsx";
 
+    // Best-effort: mark the "Download the Employee import template" onboarding task complete now
+    // that the file has actually been streamed back successfully. Failure here must never block
+    // or fail the download itself — the checklist item is a non-mandatory helper step.
+    try
+    {
+        await http.PostAsync("api/company-onboarding/checklist/tasks/download-employee-import-template/mark-complete", null);
+    }
+    catch
+    {
+        // Swallow — the download already succeeded and is the primary outcome of this request.
+    }
+
     return Results.File(bytes, contentType, fileName);
 }).RequireAuthorization();
 

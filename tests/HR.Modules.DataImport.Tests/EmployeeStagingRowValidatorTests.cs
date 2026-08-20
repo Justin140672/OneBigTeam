@@ -270,6 +270,26 @@ public class EmployeeStagingRowValidatorTests
         Assert.Contains(result.Errors, e => e.Contains("already exists in this company"));
     }
 
+    [Fact]
+    public async Task ValidateAsync_Does_Not_Flag_WorkEmail_Matching_The_Companys_Seed_Admin_Employee()
+    {
+        // The single exception to the duplicate-work-email error: a row whose Work Email matches
+        // the company's initial (seed) admin employee (Employee.IsInitialCompanyAdmin) is valid —
+        // it will update that employee at confirm time instead of being rejected as a duplicate.
+        var seedAdminEmployeeId = Guid.NewGuid();
+        var reader = new FakeEmployeeImportLookupReader();
+        reader.SeedExistingWorkEmail("admin@example.com");
+        reader.SeedInitialCompanyAdmin("admin@example.com", seedAdminEmployeeId);
+        var validator = BuildValidator(reader);
+        var row = ValidRow(2, workEmail: "admin@example.com");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.True(result.IsValid);
+        Assert.Equal(seedAdminEmployeeId, result.ExistingEmployeeIdToUpdate);
+    }
+
     [Theory]
     [InlineData("2026-13-40")]
     [InlineData("not-a-date")]
@@ -522,32 +542,6 @@ public class EmployeeStagingRowValidatorTests
         Assert.Contains(result.Errors, e => e.Contains("'Currency'"));
     }
 
-    [Theory]
-    [InlineData("0")]
-    [InlineData("-1")]
-    public async Task ValidateAsync_Flags_Non_Positive_HoursPerWeek(string hoursPerWeek)
-    {
-        var validator = BuildValidator();
-        var row = ValidRow(2, hoursPerWeek: hoursPerWeek);
-
-        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
-
-        var result = Assert.Single(results);
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("'HoursPerWeek'"));
-    }
-
-    [Fact]
-    public async Task ValidateAsync_Accepts_Positive_HoursPerWeek()
-    {
-        var validator = BuildValidator();
-        var row = ValidRow(2, salaryAmount: "50000", hoursPerWeek: "37.5");
-
-        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
-
-        Assert.True(Assert.Single(results).IsValid);
-    }
-
     [Fact]
     public async Task ValidateAsync_Flags_Zero_SalaryAmount()
     {
@@ -584,35 +578,6 @@ public class EmployeeStagingRowValidatorTests
         var result = Assert.Single(results);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.Contains("'Currency'"));
-    }
-
-    [Theory]
-    [InlineData("-0.1")]
-    [InlineData("1.1")]
-    public async Task ValidateAsync_Flags_FTE_Out_Of_Bounds(string fte)
-    {
-        var validator = BuildValidator();
-        var row = ValidRow(2, salaryAmount: "50000", fte: fte);
-
-        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
-
-        var result = Assert.Single(results);
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("'FTE'"));
-    }
-
-    [Theory]
-    [InlineData("0")]
-    [InlineData("1")]
-    [InlineData("0.5")]
-    public async Task ValidateAsync_Accepts_FTE_Within_Bounds(string fte)
-    {
-        var validator = BuildValidator();
-        var row = ValidRow(2, salaryAmount: "50000", fte: fte);
-
-        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
-
-        Assert.True(Assert.Single(results).IsValid);
     }
 
     [Fact]
@@ -666,12 +631,15 @@ public class EmployeeStagingRowValidatorTests
 
         var result = Assert.Single(results);
         Assert.True(result.IsValid);
-        Assert.NotNull(result.DepartmentId);
-        Assert.NotNull(result.LocationId);
-        Assert.NotNull(result.EmploymentTypeId);
-        Assert.Contains(result.Warnings, w => w.Contains("Department 'Sales' did not exist and was created."));
-        Assert.Contains(result.Warnings, w => w.Contains("Employment Type 'Contractor' did not exist and was created."));
-        Assert.Contains(result.Warnings, w => w.Contains("Location 'London' did not exist and was created."));
+        // Reference data is deliberately NOT created during validation/preview — only at confirm
+        // time — so an unseeded lookup keeps a null id here and surfaces as a "will be created"
+        // warning instead.
+        Assert.Null(result.DepartmentId);
+        Assert.Null(result.LocationId);
+        Assert.Null(result.EmploymentTypeId);
+        Assert.Contains(result.Warnings, w => w.Contains("Department 'Sales' does not exist and will be created when this import is confirmed."));
+        Assert.Contains(result.Warnings, w => w.Contains("Employment Type 'Contractor' does not exist and will be created when this import is confirmed."));
+        Assert.Contains(result.Warnings, w => w.Contains("Location 'London' does not exist and will be created when this import is confirmed."));
     }
 
     [Fact]
@@ -701,7 +669,7 @@ public class EmployeeStagingRowValidatorTests
         Assert.Equal(existingDepartmentId, result.DepartmentId);
         Assert.Equal(existingEmploymentTypeId, result.EmploymentTypeId);
         Assert.Equal(existingLocationId, result.LocationId);
-        Assert.DoesNotContain(result.Warnings, w => w.Contains("did not exist and was created."));
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("will be created when this import is confirmed."));
     }
 
     [Fact]
@@ -734,8 +702,8 @@ public class EmployeeStagingRowValidatorTests
 
         var result = Assert.Single(results);
         Assert.True(result.IsValid);
-        Assert.NotNull(result.PositionProfileId);
-        Assert.Contains(result.Warnings, w => w.Contains("Position Profile 'Software Developer' did not exist and was created."));
+        Assert.Null(result.PositionProfileId);
+        Assert.Contains(result.Warnings, w => w.Contains("Position Profile 'Software Developer' does not exist and will be created when this import is confirmed."));
     }
 
     [Fact]

@@ -34,6 +34,18 @@ internal sealed class OfferCandidateHandler(
             return Result.Failure<OfferCandidateResponse>(
                 Error.Validation("Cannot make an offer for an application that has been withdrawn."));
 
+        // Server-side enforcement (not just UI hiding): an inactive candidate must not be able to
+        // pick up new recruitment activity, per the candidate deactivation ticket.
+        var candidateIsActive = await db.Candidates
+            .AsNoTracking()
+            .Where(c => c.Id == application.CandidateId && c.CompanyId == request.CompanyId)
+            .Select(c => c.IsActive)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (!candidateIsActive)
+            return Result.Failure<OfferCandidateResponse>(
+                Error.Validation("Cannot make an offer to an inactive candidate."));
+
         var currentStage = await db.RecruitmentStages
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.Id == application.CurrentStageId && s.CompanyId == request.CompanyId, cancellationToken);

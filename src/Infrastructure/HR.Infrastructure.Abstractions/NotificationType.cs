@@ -38,4 +38,5 @@ public enum NotificationType
     SharedCompanyDocumentManagerEscalation        = 34,
     LeavingProcessStarted                         = 35,
     IncompleteOffboardingAtDeparture              = 36,
+    SupportRequestStatusChanged                   = 37,
 }

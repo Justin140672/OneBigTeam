@@ -95,16 +95,31 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".ec-card, .alert", new() { Timeout = 15_000 });
     }
 
+    /// <summary>
+    /// Opens the (merged) "Documents" tab — MyProfileDocumentsTab.razor — which now shows a
+    /// single grid combining the employee's personal documents AND published company-wide
+    /// documents (each row tagged via its "Source" column), replacing what used to be two
+    /// separate tabs ("Documents" and "Company Documents"). ".e-grid"'s own row selector (or its
+    /// empty-row/"no documents" text sibling) is the only wait actually tied to the async document
+    /// fetch having completed — the grid card mounts before Syncfusion populates its
+    /// .e-row/.e-headercell DOM on a separate JS tick, so waiting on a bare ".card" (as before)
+    /// could resolve before the grid had actually finished rendering.
+    /// </summary>
     public async Task OpenDocumentsTabAsync()
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Documents", Exact = true }).ClickAsync();
-        await page.WaitForSelectorAsync(".card", new() { Timeout = 15_000 });
+        await page.WaitForSelectorAsync(
+            "[data-testid='my-profile-documents-grid-section'] .e-grid .e-row, " +
+            "[data-testid='my-profile-documents-grid-section'] .e-grid .e-emptyrow",
+            new() { Timeout = 15_000 });
     }
 
     /// <summary>
     /// Returns true if the given document type's row in the (self-service) Document Requests
-    /// grid has an "Upload" button — only present while that request's Status is "Requested"
-    /// (EmployeeDocumentsTab.razor, EmployeeSelfUpload branch).
+    /// section has an "Upload" button — only present while that request's Status is "Requested"
+    /// (MyProfileDocumentsTab.razor's own Document Requests table, data-testid=
+    /// "my-profile-document-requests-section" — distinct from EmployeeDocumentsTab.razor's admin
+    /// equivalent, "admin-document-requests-section").
     /// </summary>
     public Task<bool> HasUploadButtonForDocumentRequestAsync(string documentTypeName) =>
         DocumentRequestRow(documentTypeName).GetByRole(AriaRole.Button, new() { Name = "Upload" }).IsVisibleAsync();
@@ -131,106 +146,84 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     }
 
     private ILocator DocumentRequestRow(string documentTypeName) =>
-        page.Locator("[data-testid='admin-document-requests-section'] tbody tr")
+        page.Locator("[data-testid='my-profile-document-requests-section'] tbody tr")
             .Filter(new() { HasText = documentTypeName })
             .First;
 
-    // ── Company Documents tab (MyProfileCompanyDocumentsTab — published shared company
-    // documents visible to the employee; distinct from the personal "Documents" tab above) ──
+    // ── Documents grid rows (MyProfileDocumentsTab — merged personal + company documents) ──
 
-    public async Task OpenCompanyDocumentsTabAsync()
+    /// <summary>
+    /// Returns the merged Documents grid row matching <paramref name="title"/> (matched against
+    /// the Title column's text — see MyProfileDocumentsTab.razor's Title GridColumn Template,
+    /// which renders company-sourced rows as a link and personal rows as plain text) — used as the
+    /// anchor for all of the grid-row helpers below. Call <see cref="OpenDocumentsTabAsync"/> first.
+    /// </summary>
+    private ILocator DocumentRow(string title) =>
+        page.Locator("[data-testid='my-profile-documents-grid-section'] .e-grid .e-row")
+            .Filter(new() { HasText = title })
+            .First;
+
+    /// <summary>
+    /// Returns true if a document row with the given title is currently shown in the merged
+    /// Documents grid, regardless of source. Call <see cref="OpenDocumentsTabAsync"/> first.
+    /// </summary>
+    public async Task<bool> HasDocumentRowAsync(string title) =>
+        await DocumentRow(title).CountAsync() > 0 && await DocumentRow(title).IsVisibleAsync();
+
+    /// <summary>
+    /// Returns the "Source" column's badge text ("Personal" or "Company") for the document row
+    /// matching <paramref name="title"/> — see MyProfileDocumentRow.Source /
+    /// MyProfileDocumentsTab.razor's Source GridColumn Template. Call
+    /// <see cref="OpenDocumentsTabAsync"/> first.
+    /// </summary>
+    public async Task<string> GetDocumentRowSourceAsync(string title)
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Company Documents" }).ClickAsync();
-        // Renders as a data grid (HrGrid, Title/Category/Effective Date/Acknowledgement columns —
-        // "Render Company Documents As Grid" story), not the older icon-card layout. ".e-grid"'s
-        // own row selector (or its empty-row/"no documents" text sibling) is the only wait
-        // actually tied to the async document fetch having completed, same reasoning as
-        // VacancyListPage.RowsRenderedSelector. Deliberately excludes ".overview-card" — the four
-        // summary tiles render in the same Blazor commit as <HrGrid> mounting, but Syncfusion
-        // builds the actual .e-grid/.e-headercell DOM asynchronously afterward via its own JS
-        // interop, so waiting on ".overview-card" resolves before the grid has actually finished
-        // rendering (e.g. GetCompanyDocumentsGridColumnHeadersAsync reading zero header cells).
-        await page.WaitForSelectorAsync(
-            ".e-grid .e-row, .e-grid .e-emptyrow, p.text-muted",
-            new() { Timeout = 15_000 });
-    }
-
-    /// <summary>
-    /// Reads the number on one of the four summary tiles at the top of the Company Documents tab
-    /// ("Total Available", "Requires Acknowledgement", "Outstanding", "Completed"). Call
-    /// <see cref="OpenCompanyDocumentsTabAsync"/> first. Returns -1 if the tile's value can't be
-    /// parsed as an integer.
-    /// </summary>
-    public async Task<int> GetCompanyDocumentsSummaryTileValueAsync(string label)
-    {
-        var tile = page.Locator(".overview-card.text-center").Filter(new() { HasText = label }).First;
-        var text = (await tile.Locator(".fs-4").InnerTextAsync()).Trim();
-        return int.TryParse(text, out var value) ? value : -1;
-    }
-
-    /// <summary>
-    /// Returns the Company Documents grid row matching <paramref name="title"/> (matched against
-    /// the Title column's link text — see MyProfileCompanyDocumentsTab.razor's Title GridColumn
-    /// Template) — used as the anchor for all of the grid-row helpers below.
-    /// </summary>
-    private ILocator CompanyDocumentRow(string title) =>
-        page.Locator(".e-grid .e-row").Filter(new() { HasText = title }).First;
-
-    /// <summary>
-    /// Returns true if a document row with the given title is currently shown on the Company
-    /// Documents tab. Call <see cref="OpenCompanyDocumentsTabAsync"/> first.
-    /// </summary>
-    public async Task<bool> HasCompanyDocumentCardAsync(string title) =>
-        await CompanyDocumentRow(title).CountAsync() > 0 && await CompanyDocumentRow(title).IsVisibleAsync();
-
-    /// <summary>
-    /// The acknowledgement-status badge text (e.g. "Acknowledgement Required · Due 28 July 2026"
-    /// or "Acknowledged 14 Jul 2026") shown in the grid row's "Acknowledgement" column for the
-    /// document matching <paramref name="title"/>, or null if that row currently has no such badge
-    /// (the document requires no acknowledgement — see MyProfileCompanyDocumentsTab.razor's
-    /// Acknowledgement GridColumn Template, which otherwise renders a plain "—").
-    /// </summary>
-    public async Task<string?> GetCompanyDocumentAcknowledgementBadgeTextAsync(string title)
-    {
-        var row = CompanyDocumentRow(title);
-
-        // CountAsync() below reads the DOM synchronously — it does not auto-wait like Playwright's
-        // action methods do. OpenCompanyDocumentsTabAsync only waits for *some* row to exist, not
-        // specifically this document's row, so without first waiting for this row to actually be
-        // visible, a call made right after opening the tab can read the badge before this row (and
-        // its Acknowledgement-column template) has rendered at all — a false "no badge" negative,
-        // not a genuine one.
+        var row = DocumentRow(title);
         await row.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
-        var badge = row.Locator(".badge").Filter(new() { HasText = "Acknowledg" });
-        var placeholder = row.Locator(".text-muted", new() { HasTextString = "—" });
-
-        // The Acknowledgement column itself renders in the same pass as the rest of the row, but
-        // wait for whichever of its two possible states (badge or "no acknowledgement needed"
-        // placeholder) shows up rather than assuming the row being visible is enough — same
-        // reasoning as the row-visibility wait above.
-        await Task.WhenAny(
-            badge.First.WaitForAsync(new() { Timeout = 15_000 }),
-            placeholder.First.WaitForAsync(new() { Timeout = 15_000 }));
-
-        if (await badge.CountAsync() == 0) return null;
-        return (await badge.First.InnerTextAsync()).Trim();
+        // The Source column is the second grid column, always rendered as a single badge — unlike
+        // the Status column (badge text varies/absent), there's exactly one badge to match here.
+        var badge = row.Locator(".badge").First;
+        await badge.WaitForAsync(new() { Timeout = 15_000 });
+        return (await badge.InnerTextAsync()).Trim();
     }
 
     /// <summary>
-    /// Reads the trimmed text of the Company Documents grid's column headers (expected: Title,
-    /// Category, Effective Date, Description, Acknowledgement — see
-    /// MyProfileCompanyDocumentsTab.razor's GridColumns). Call
-    /// <see cref="OpenCompanyDocumentsTabAsync"/> first.
+    /// The Status column's badge text for the document row matching <paramref name="title"/> —
+    /// e.g. "Active"/"Expiring Soon" for a personal document, or "Acknowledgement Required"/
+    /// "Acknowledged 14 Jul 2026"/"No acknowledgement required" for a company document (see
+    /// MyProfileDocumentsTab.razor's GetPersonalStatusBadge/GetCompanyStatusBadge). Call
+    /// <see cref="OpenDocumentsTabAsync"/> first.
     /// </summary>
-    public async Task<IReadOnlyList<string>> GetCompanyDocumentsGridColumnHeadersAsync()
+    public async Task<string?> GetDocumentRowStatusTextAsync(string title)
     {
-        // See OpenCompanyDocumentsTabAsync's doc comment — its own row/empty-state wait doesn't
-        // guarantee the header cells have finished their own separate Syncfusion JS render pass,
-        // so an instant AllAsync() here can read zero headers. Wait for at least one before reading.
-        await page.WaitForSelectorAsync(".e-grid .e-headercell", new() { Timeout = 15_000 });
+        var row = DocumentRow(title);
+        await row.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
-        var headers = await page.Locator(".e-grid .e-headercell").AllAsync();
+        // Two badges exist per row (Source, then Status) — Status is always the second/last one,
+        // since every row (personal or company) always renders exactly one Status badge, unlike
+        // the old Company Documents tab's Acknowledgement column which could render a plain "—"
+        // placeholder instead of a badge.
+        var badges = row.Locator(".badge");
+        await badges.Last.WaitForAsync(new() { Timeout = 15_000 });
+        var count = await badges.CountAsync();
+        return count >= 2 ? (await badges.Nth(count - 1).InnerTextAsync()).Trim() : null;
+    }
+
+    /// <summary>
+    /// Reads the trimmed text of the merged Documents grid's column headers (expected: Title,
+    /// Source, Type / Category, Date, Status — see MyProfileDocumentsTab.razor's GridColumns).
+    /// Call <see cref="OpenDocumentsTabAsync"/> first.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetDocumentsGridColumnHeadersAsync()
+    {
+        // See OpenDocumentsTabAsync's doc comment — its own row/empty-state wait doesn't guarantee
+        // the header cells have finished their own separate Syncfusion JS render pass, so an
+        // instant AllAsync() here can read zero headers. Wait for at least one before reading.
+        var headerCell = page.Locator("[data-testid='my-profile-documents-grid-section'] .e-grid .e-headercell");
+        await headerCell.First.WaitForAsync(new() { Timeout = 15_000 });
+
+        var headers = await headerCell.AllAsync();
         var result = new List<string>();
         foreach (var header in headers)
             result.Add((await header.TextContentAsync())?.Trim() ?? "");
@@ -238,12 +231,21 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Clicks the document row's title link with the given title on the Company Documents tab,
-    /// triggering its navigation to the published-document detail page. Call
-    /// <see cref="OpenCompanyDocumentsTabAsync"/> first.
+    /// Clicks the document row's title link with the given title in the merged Documents grid —
+    /// only meaningful for a company-sourced row (personal rows render plain, unlinked text — see
+    /// MyProfileDocumentsTab.razor's Title GridColumn Template) — triggering navigation to the
+    /// published-document detail page. Call <see cref="OpenDocumentsTabAsync"/> first.
     /// </summary>
-    public Task ClickCompanyDocumentCardAsync(string title) =>
-        CompanyDocumentRow(title).Locator("a").Filter(new() { HasText = title }).First.ClickAsync();
+    public Task ClickDocumentTitleLinkAsync(string title) =>
+        DocumentRow(title).Locator("a").Filter(new() { HasText = title }).First.ClickAsync();
+
+    /// <summary>
+    /// Clicks the row's Actions-column button for the document matching <paramref name="title"/> —
+    /// "Download" for a personal row, "View" for a company row (see MyProfileDocumentsTab.razor's
+    /// final GridColumn Template). Call <see cref="OpenDocumentsTabAsync"/> first.
+    /// </summary>
+    public Task ClickDocumentRowActionAsync(string title, string actionName) =>
+        DocumentRow(title).GetByRole(AriaRole.Button, new() { Name = actionName }).ClickAsync();
 
     public async Task OpenTasksTabAsync()
     {

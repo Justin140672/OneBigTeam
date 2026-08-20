@@ -17,7 +17,7 @@ internal sealed class UpdateLocationTypeHandler(EmployeesDbContext db, IClock cl
             return Result.Failure<UpdateLocationTypeResponse>(Error.NotFound("Location type not found."));
 
         var nameConflict = await db.LocationTypes.AnyAsync(
-            e => e.CompanyId == request.CompanyId && e.Name == request.Name && e.Id != request.Id,
+            e => e.CompanyId == request.CompanyId && e.Name.ToLower() == request.Name.Trim().ToLower() && e.Id != request.Id,
             cancellationToken);
 
         if (nameConflict)

@@ -12,7 +12,7 @@ internal sealed class CreateLocationTypeHandler(EmployeesDbContext db, IClock cl
         CancellationToken cancellationToken)
     {
         var exists = await db.LocationTypes.AnyAsync(
-            e => e.CompanyId == request.CompanyId && e.Name == request.Name,
+            e => e.CompanyId == request.CompanyId && e.Name.ToLower() == request.Name.Trim().ToLower(),
             cancellationToken);
 
         if (exists)

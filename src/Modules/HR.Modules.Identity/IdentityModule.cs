@@ -81,6 +81,7 @@ public static class IdentityModule
         services.AddSingleton<IClock, SystemClock>();
 
         services.AddScoped<IEmployeeUserAccountStatusReader, EmployeeUserAccountStatusReader>();
+        services.AddScoped<IHrAdministratorDirectory, HrAdministratorDirectory>();
         services.AddScoped<IUserEmailReader, UserEmailReader>();
         services.AddScoped<ICompanyUserEmailSearchReader, CompanyUserEmailSearchReader>();
         services.AddScoped<ICompanyUserCountReader, CompanyUserCountReader>();

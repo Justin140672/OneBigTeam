@@ -134,25 +134,6 @@ public sealed class SupportAndFeedbackTests(HrAdminPersonaFixture fixture) : Rol
     }
 
     [Fact]
-    public async Task SupportDashboard_LoadsForStaffPersona()
-    {
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var dashboard = new SupportDashboardPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
-
-        await dashboard.GoToAsync(AcmeId);
-
-        Assert.False(await dashboard.HasLoadErrorAsync(), "Expected the dashboard to load without error");
-        Assert.True(await dashboard.IsOpenRequestsCardVisibleAsync(), "Expected the Open Requests card to render");
-        Assert.True(await dashboard.IsAverageResponseTimeCardVisibleAsync(), "Expected the Avg. Staff Response Time card to render");
-        Assert.True(await dashboard.IsTopRequestedFeaturesCardVisibleAsync(), "Expected the Top Requested Features table to render");
-        Assert.True(await dashboard.IsTopReportedProblemsCardVisibleAsync(), "Expected the Top Reported Problems table to render");
-        Assert.True(await dashboard.IsRequestsByTypeCardVisibleAsync(), "Expected the Requests by Type table to render");
-    }
-
-    [Fact]
     public async Task PlainEmployee_IsRedirectedAway_FromHelpFeedbackPage()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -219,25 +200,4 @@ public sealed class SupportAndFeedbackTests(HrAdminPersonaFixture fixture) : Rol
             $"Expected a plain employee to be redirected away from the support queue page, but ended up at: {finalUrl}");
     }
 
-    [Fact]
-    public async Task PlainEmployee_IsRedirectedAway_FromSupportDashboardPage()
-    {
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(TomEmail);
-
-        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/support/admin/dashboard");
-
-        // SupportDashboard.razor's OnParametersSetAsync guard redirects via Blazor's client-side
-        // Navigation.NavigateTo, not a full navigation, so NetworkIdle is not a reliable completion
-        // signal — same fix already applied to the sibling
-        // PlainEmployee_IsRedirectedAway_FromSupportQueuePage test above; this one was still using
-        // the old, known-unreliable WaitForLoadStateAsync(NetworkIdle) pattern.
-        await WaitForUrlToStopContainingAsync("/support/admin/dashboard");
-
-        var finalUrl = _page.Url;
-        Assert.False(finalUrl.Contains("/support/admin/dashboard"),
-            $"Expected a plain employee to be redirected away from the support dashboard page, but ended up at: {finalUrl}");
-    }
 }

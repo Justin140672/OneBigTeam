@@ -33,6 +33,16 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     // defaults false on any fetch failure so a broken/absent endpoint never blocks sign-in.
     public bool ShowGettingStarted { get; private set; }
 
+    // AppSession is initialised once per Blazor circuit (InteractiveServer keeps a persistent
+    // SignalR circuit across in-app navigations), so ShowGettingStarted is otherwise only ever
+    // refreshed once, at session init. Without this, a checklist that reaches 100% or gets
+    // dismissed WHILE the current circuit is already live (i.e. GettingStarted.razor's own fetch
+    // just persisted IsHidden=true server-side) would still show "Getting Started" in the nav
+    // menu and still redirect back to it via LandingUrl until the user's next fresh login/reload
+    // starts a brand-new circuit — call this the moment either happens so the current session's
+    // cached flag matches reality immediately, not just on the next login.
+    public void MarkGettingStartedHidden() => ShowGettingStarted = false;
+
     // Trial/subscription status (Getting Started + Subscription/Billing epic, Phase B) — drives
     // TrialBanner visibility and (in a later phase) read-only UI gating. Defaults to a
     // non-blocking "Active" status on any fetch failure, same fail-open convention as

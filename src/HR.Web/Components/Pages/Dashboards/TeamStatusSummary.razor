@@ -1,0 +1,122 @@
+@* Compact team-status metric strip for the redesigned Manager Dashboard. Deliberately not another
+   tall card list — a single row of small metric tiles giving an at-a-glance headcount snapshot,
+   reusing data already fetched by sibling widgets rather than adding new endpoints.
+
+   Data sources / assumptions (see PRODUCT ticket "Reorganise the Team Manager Dashboard around
+   priority actions" for full context):
+   - At work / On leave / Sick: derived from EmployeeService.GetMyTeamAsync (all reports,
+     includeIndirect: true), grouped by TeamMemberItem.Status.
+   - In probation: there is no direct "current headcount in probation" endpoint, so this uses the
+     distinct employee count from ProbationService.GetUpcomingReviewsAsync as a proxy for "has an
+     active/upcoming probation review, i.e. is in probation". This is an imperfect measure — an
+     employee mid-probation with no review due soon would not be counted — called out again in the
+     redesign report.
+   - Missing fit notes: SicknessService.GetMissingFitNotesAsync count, reused as-is.
+
+   Linking: only "At work" / "On leave" / "Sick" would conceptually map to a filtered team view,
+   but EmployeeList.razor has no query-string filter support for employment/leave/sickness status
+   today, so none of these tiles link anywhere — all render as plain metric tiles rather than
+   fabricating a filter parameter that doesn't exist. *@
+@inject EmployeeService EmployeeService
+@inject ProbationService ProbationService
+@inject SicknessService SicknessService
+@inject AppSession Session
+
+@if (Session.IsManager)
+{
+    <div class="widget-card team-status-summary">
+        <div class="widget-header">
+            <i class="fa-solid fa-chart-simple widget-icon"></i>
+            <span class="widget-title">Team Status</span>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+                <HrLoadingIndicator Label="Loading team status…" />
+            </div>
+        }
+        else if (_teamSize == 0)
+        {
+            <div class="widget-empty">
+                <i class="fa-solid fa-people-group fa-lg mb-2"></i>
+                <p class="mb-0">No one reports up to you yet.</p>
+            </div>
+        }
+        else
+        {
+            <div class="team-status-strip" role="list" aria-label="Team status summary">
+                <div class="team-status-tile" role="listitem">
+                    <span class="team-status-value">@_atWork</span>
+                    <span class="team-status-label">At work</span>
+                </div>
+                <div class="team-status-tile" role="listitem">
+                    <span class="team-status-value">@_awayToday</span>
+                    <span class="team-status-label">Away today</span>
+                </div>
+                <div class="team-status-tile" role="listitem">
+                    <span class="team-status-value">@_onLeave</span>
+                    <span class="team-status-label">On leave</span>
+                </div>
+                <div class="team-status-tile" role="listitem">
+                    <span class="team-status-value">@_sick</span>
+                    <span class="team-status-label">Sick</span>
+                </div>
+                <div class="team-status-tile @(_inProbation > 0 ? "team-status-tile--warning" : "")" role="listitem">
+                    <span class="team-status-value">@_inProbation</span>
+                    <span class="team-status-label">In probation</span>
+                </div>
+                <div class="team-status-tile @(_missingFitNotes > 0 ? "team-status-tile--warning" : "")" role="listitem">
+                    <span class="team-status-value">@_missingFitNotes</span>
+                    <span class="team-status-label">Missing fit notes</span>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    // Reports the "away today" count up to ManagerDashboard for its one-line activity summary.
+    [Parameter] public EventCallback<int> OnAwayTodayChanged { get; set; }
+
+    private bool _loading = true;
+    private int _teamSize;
+    private int _atWork;
+    private int _onLeave;
+    private int _sick;
+    private int _awayToday;
+    private int _inProbation;
+    private int _missingFitNotes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsManager)
+        {
+            _loading = false;
+            return;
+        }
+
+        var teamTask = EmployeeService.GetMyTeamAsync(Session.CompanyId, includeIndirect: true);
+        var probationTask = ProbationService.GetUpcomingReviewsAsync(Session.CompanyId);
+        var fitNotesTask = SicknessService.GetMissingFitNotesAsync(Session.CompanyId);
+
+        await Task.WhenAll(teamTask, probationTask, fitNotesTask);
+
+        var team = (await teamTask)?.Items ?? [];
+        var probation = await probationTask ?? [];
+        var fitNotes = (await fitNotesTask)?.Items ?? [];
+
+        _teamSize = team.Count;
+        _sick = team.Count(m => m.Status == "Sick");
+        _onLeave = team.Count(m => m.Status == "OnLeave");
+        _atWork = _teamSize - _sick - _onLeave;
+        _awayToday = _sick + _onLeave;
+        _inProbation = probation.Select(p => p.EmployeeId).Distinct().Count();
+        _missingFitNotes = fitNotes.Count;
+
+        _loading = false;
+
+        if (OnAwayTodayChanged.HasDelegate)
+            await OnAwayTodayChanged.InvokeAsync(_awayToday);
+    }
+}

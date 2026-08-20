@@ -73,7 +73,9 @@ public class GetCustomerBillingHistoryEndpointTests
         var response = await client.GetAsync(
             $"/api/companies/admin/customers/{Guid.NewGuid()}/billing-history");
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
+        // is Forbidden (403), not Unauthorized (401).
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

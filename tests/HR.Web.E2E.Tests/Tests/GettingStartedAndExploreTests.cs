@@ -7,10 +7,13 @@ using Microsoft.Playwright;
 namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
-/// Verifies the "Getting Started" onboarding checklist (/getting-started) and "Explore One Big
-/// Team" (/explore) pages, plus the Help menu (MainLayout.razor's top bar) that links to both.
-/// Both pages are gated to HR Administrator / Company Administrator (Session.IsHrAdministrator
-/// || Session.CanManageCompany) — see GettingStarted.razor / Explore.razor.
+/// Verifies the "Getting Started" onboarding checklist (/getting-started) page, plus the Help
+/// menu (MainLayout.razor's top bar) that links to it. The page is gated to HR Administrator /
+/// Company Administrator (Session.IsHrAdministrator || Session.CanManageCompany) — see
+/// GettingStarted.razor. The "Explore One Big Team" feature (cards + /explore page) has been
+/// removed entirely; this class was renamed from GettingStartedAndExploreTests accordingly, but
+/// kept as one file rather than a rename-only churn since most of its E2E fixture/helper plumbing
+/// is shared with what remains.
 ///
 /// Getting Started has no create/edit CRUD form of its own (it's a read-only checklist derived
 /// from other modules' data), so the CRUD-shaped conventions used elsewhere in this suite don't
@@ -256,45 +259,8 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
         Assert.DoesNotContain("/getting-started", _page.Url);
     }
 
-    /// <summary>
-    /// Explore card LinkUrl values (see GetExploreCardsHandler) contain a "{companyId}"
-    /// placeholder resolved by ExploreCard.razor into the actual company-scoped route (e.g.
-    /// "/companies/{id}/employees"), matching HR.Web's registered routes.
-    /// </summary>
     [Fact]
-    public async Task Explore_RendersSixCards_ReportsDisabled_OthersClickable()
-    {
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var explore = new ExploreCardsPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(HrAdminEmail);
-
-        await explore.GoToAsync();
-
-        Assert.Equal(6, await explore.GetCardCountAsync());
-
-        foreach (var cardName in new[] { "Employees", "Leave", "Recruitment", "Documents", "Reports", "Company Settings" })
-        {
-            Assert.True(await explore.HasCardAsync(cardName),
-                $"Expected an explore card named '{cardName}' to be visible");
-        }
-
-        Assert.True(await explore.IsComingSoonAsync("Reports"),
-            "Expected the Reports card to show a 'Coming Soon' badge/button");
-        Assert.False(await explore.IsCardClickableAsync("Reports"),
-            "Expected the Reports card to have no clickable 'Explore' link");
-
-        Assert.True(await explore.IsCardClickableAsync("Employees"),
-            "Expected the Employees card to have a clickable 'Explore' link");
-
-        await explore.ClickCardAsync("Employees");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
-        Assert.Contains("/employees", _page.Url);
-    }
-
-    [Fact]
-    public async Task HelpMenu_NavigatesToGettingStartedAndExplore_ForHrAdministrator()
+    public async Task HelpMenu_NavigatesToGettingStarted_ForHrAdministrator()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var helpMenu = new HelpMenu(_page);
@@ -309,11 +275,6 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
         await helpMenu.ClickGettingStartedAsync();
         await _page.WaitForURLAsync(new Regex("/getting-started"), new() { Timeout = 15_000 });
         Assert.Contains("/getting-started", _page.Url);
-
-        await helpMenu.OpenAsync();
-        await helpMenu.ClickExploreAsync();
-        await _page.WaitForURLAsync(new Regex("/explore"), new() { Timeout = 15_000 });
-        Assert.Contains("/explore", _page.Url);
     }
 
     [Fact]
@@ -330,7 +291,7 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
     }
 
     [Fact]
-    public async Task PlainEmployee_IsRedirectedAway_FromGettingStartedAndExplore()
+    public async Task PlainEmployee_IsRedirectedAway_FromGettingStarted()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
@@ -340,9 +301,5 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/getting-started");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
         Assert.DoesNotContain("/getting-started", _page.Url);
-
-        await _page.GotoAsync($"{_fixture.WebBaseUrl}/explore");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
-        Assert.DoesNotContain("/explore", _page.Url);
     }
 }

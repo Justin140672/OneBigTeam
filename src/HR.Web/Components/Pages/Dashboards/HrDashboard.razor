@@ -19,7 +19,14 @@
         <DashboardSwitcher />
 
         <section class="dashboard-section" aria-label="Needs your attention">
-            <AttentionQueueWidget />
+            <div class="row g-3">
+                <div class="col-lg-8">
+                    <AttentionQueueWidget />
+                </div>
+                <div class="col-lg-4">
+                    <FavouriteReportsWidget />
+                </div>
+            </div>
         </section>
 
         <section class="dashboard-section">
@@ -37,7 +44,6 @@
                 <CurrentSicknessAbsenceWidget />
                 <MissingFitNotesWidget />
                 <RecentEmployeeChangesWidget />
-                <FavouriteReportsWidget />
             </div>
         </section>
     </div>

@@ -216,6 +216,19 @@
                     </GridColumns>
                 </HrGrid>
 
+                @if (_preview.ReferenceDataCreatedWarnings.Count > 0)
+                {
+                    <details class="mb-3">
+                        <summary>Reference data that will be created (@_preview.ReferenceDataCreatedWarnings.Count)</summary>
+                        <ul class="mt-2">
+                            @foreach (var warning in _preview.ReferenceDataCreatedWarnings)
+                            {
+                                <li>Row @warning.RowNumber: @warning.Message</li>
+                            }
+                        </ul>
+                    </details>
+                }
+
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="mb-0">Row Errors</h6>
                     @if (_preview.RowErrors.Count > 0)
@@ -253,19 +266,6 @@
                             <GridColumn Field="@nameof(ImportPreviewRowError.Message)" HeaderText="Message" Width="300" />
                         </GridColumns>
                     </HrGrid>
-                }
-
-                @if (_preview.ReferenceDataCreatedWarnings.Count > 0)
-                {
-                    <details class="mb-3">
-                        <summary>Reference data that will be created (@_preview.ReferenceDataCreatedWarnings.Count)</summary>
-                        <ul class="mt-2">
-                            @foreach (var warning in _preview.ReferenceDataCreatedWarnings)
-                            {
-                                <li>Row @warning.RowNumber: @warning.Message</li>
-                            }
-                        </ul>
-                    </details>
                 }
 
                 <div class="d-flex gap-2 mt-2">
@@ -373,10 +373,7 @@
         ("Salary Amount", true, "Positive number"),
         ("Salary Type", false, "One of: Annual, Hourly, Daily"),
         ("Currency", false, "3-letter currency code (e.g. GBP, USD)"),
-        ("Hours Per Week", false, "Positive number"),
-        ("FTE", false, "Number between 0 and 1"),
-        ("Leave Type Code", false, "Free text"),
-        ("Leave Balance Days", false, "Non-negative number"),
+        ("Leave Balance Days", false, "Non-negative number; sets the employee's Annual Leave balance (the only leave type imported)"),
         ("Working Days", false, "Comma-separated day names, e.g. Monday,Tuesday,Wednesday,Thursday,Friday"),
         ("Hours Per Day", false, "Positive number"),
     ];

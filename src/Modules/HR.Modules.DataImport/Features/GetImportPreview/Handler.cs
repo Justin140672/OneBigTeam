@@ -39,16 +39,16 @@ internal sealed class GetImportPreviewHandler(DataImportDbContext db)
             .ToList();
 
         // Warning-severity row messages produced by the validator's lookup resolution step
-        // consistently start with the entity kind followed by "did not exist and was created" —
+        // consistently start with the entity kind followed by "will be created when this import is confirmed" —
         // treat those as the "reference data created" list; every other message (errors, and any
         // other warnings) goes into the general row-errors list.
         var referenceDataCreated = rowErrors
-            .Where(e => e.Severity == ImportRowErrorSeverity.Warning && e.ErrorMessage.Contains("did not exist and was created"))
+            .Where(e => e.Severity == ImportRowErrorSeverity.Warning && e.ErrorMessage.Contains("will be created when this import is confirmed"))
             .Select(e => new ImportPreviewRowError(e.RowNumber, e.Severity.ToString(), e.ErrorMessage))
             .ToList();
 
         var otherRowErrors = rowErrors
-            .Where(e => !(e.Severity == ImportRowErrorSeverity.Warning && e.ErrorMessage.Contains("did not exist and was created")))
+            .Where(e => !(e.Severity == ImportRowErrorSeverity.Warning && e.ErrorMessage.Contains("will be created when this import is confirmed")))
             .Select(e => new ImportPreviewRowError(e.RowNumber, e.Severity.ToString(), e.ErrorMessage))
             .ToList();
 

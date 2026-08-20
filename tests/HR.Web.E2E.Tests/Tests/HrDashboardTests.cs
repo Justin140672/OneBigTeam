@@ -11,14 +11,14 @@ namespace HR.Web.E2E.Tests.Tests;
 /// other role to Session.MyProfileUrl, so a non-HR-administrator can never see any of the
 /// widgets below at all.
 ///
-/// Layout (top to bottom): greeting header -> DashboardSwitcher -> AttentionQueueWidget
-/// ("Needs your attention", a unified priority-sorted queue that replaced the standalone
+/// Layout (top to bottom): greeting header -> DashboardSwitcher -> "Needs your attention" row
+/// (AttentionQueueWidget, a unified priority-sorted queue that replaced the standalone
 /// HrInboxWidget, LeaveRequestsWidget, UpcomingProbationReviewsWidget,
-/// OverdueReturnToWorkReviewsWidget, ComplianceDocumentExpiryWidget and DocumentReviewsWidget) ->
-/// an "Analytics" section with a 3-chart grid (HeadcountByDepartmentChart,
-/// GenderSplitChart, EmploymentTypeSplitChart — all now plain horizontal-bar charts, not
-/// Syncfusion donuts) -> a "More" section (CurrentSicknessAbsenceWidget, MissingFitNotesWidget,
-/// RecentEmployeeChangesWidget, FavouriteReportsWidget).
+/// OverdueReturnToWorkReviewsWidget, ComplianceDocumentExpiryWidget and DocumentReviewsWidget —
+/// alongside FavouriteReportsWidget in the same row, item 46) -> an "Analytics" section with a
+/// 3-chart grid (HeadcountByDepartmentChart, GenderSplitChart, EmploymentTypeSplitChart — all now
+/// plain horizontal-bar charts, not Syncfusion donuts) -> a "More" section (CurrentSicknessAbsenceWidget,
+/// MissingFitNotesWidget, RecentEmployeeChangesWidget).
 ///
 /// Uses seeded personas: Laura Bennett (HR Administrator only) and Tom Williams (plain Employee).
 ///

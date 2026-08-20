@@ -30,7 +30,8 @@ public class EmployeeImportWriterTests
             new FakeClock(FixedUtcNow),
             probationDateResolver ?? new FakeProbationDateResolver(),
             auditPublisher ?? new FakeAuditPublisher(),
-            employeeNumberGenerator ?? new FakeEmployeeNumberGenerator());
+            employeeNumberGenerator ?? new FakeEmployeeNumberGenerator(),
+            new WorkingPatternCompensationCalculator(new FakeCompanyWorkingPatternSettingsReader()));
 
     private static EmployeeImportCreateRequest BuildCreateRequest(
         Guid companyId,
@@ -63,8 +64,10 @@ public class EmployeeImportWriterTests
             actorUserId ?? Guid.NewGuid());
 
     [Fact]
-    public async Task CreateEmployeeAsync_Creates_Active_Employee_And_Returns_Expected_Result()
+    public async Task CreateEmployeeAsync_Leaves_Employee_Draft_When_StartDate_Is_In_The_Future()
     {
+        // StartDate (2026-07-01) is after FixedUtcNow (2026-06-08) in this test fixture — an
+        // imported employee who hasn't started yet must stay Draft, not be force-activated.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var writer = BuildWriter(context);
@@ -78,9 +81,40 @@ public class EmployeeImportWriterTests
         Assert.Equal(StartDate.AddMonths(6), result.ProbationEndDate);
 
         var saved = await context.Employees.SingleAsync(e => e.Id == request.Id);
-        Assert.Equal(EmploymentStatus.Active, saved.Status);
+        Assert.Equal(EmploymentStatus.Draft, saved.Status);
         Assert.Equal("alice@example.com", saved.WorkEmail);
         Assert.Equal("Alice", saved.PreferredName);
+    }
+
+    [Fact]
+    public async Task CreateEmployeeAsync_Activates_Employee_When_StartDate_Has_Already_Passed()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var writer = BuildWriter(context);
+
+        var pastStartDate = DateOnly.FromDateTime(FixedUtcNow).AddDays(-30);
+        var request = BuildCreateRequest(companyId) with { StartDate = pastStartDate };
+
+        var result = await writer.CreateEmployeeAsync(request, CancellationToken.None);
+
+        var saved = await context.Employees.SingleAsync(e => e.Id == request.Id);
+        Assert.Equal(EmploymentStatus.Active, saved.Status);
+    }
+
+    [Fact]
+    public async Task CreateEmployeeAsync_Activates_Employee_When_StartDate_Is_Today()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var writer = BuildWriter(context);
+
+        var request = BuildCreateRequest(companyId) with { StartDate = DateOnly.FromDateTime(FixedUtcNow) };
+
+        var result = await writer.CreateEmployeeAsync(request, CancellationToken.None);
+
+        var saved = await context.Employees.SingleAsync(e => e.Id == request.Id);
+        Assert.Equal(EmploymentStatus.Active, saved.Status);
     }
 
     [Fact]

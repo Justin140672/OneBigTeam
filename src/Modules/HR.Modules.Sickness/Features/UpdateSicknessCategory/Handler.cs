@@ -17,7 +17,7 @@ internal sealed class UpdateSicknessCategoryHandler(SicknessDbContext db, IClock
             return Result.Failure<UpdateSicknessCategoryResponse>(Error.NotFound("Sickness category not found."));
 
         var nameConflict = await db.SicknessCategories
-            .AnyAsync(c => c.CompanyId == request.CompanyId && c.Name == request.Name && c.Id != request.Id, cancellationToken);
+            .AnyAsync(c => c.CompanyId == request.CompanyId && c.Name.ToLower() == request.Name.Trim().ToLower() && c.Id != request.Id, cancellationToken);
 
         if (nameConflict)
             return Result.Failure<UpdateSicknessCategoryResponse>(Error.Conflict("A sickness category with this name already exists."));

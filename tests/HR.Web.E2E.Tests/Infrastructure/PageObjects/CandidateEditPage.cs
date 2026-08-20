@@ -119,4 +119,84 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         await page.WaitForURLAsync("**/candidates", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
+
+    // ── Deactivate / Reactivate (CandidateDetail.razor) ──────────────────────────────
+
+    /// <summary>Returns true if the "This candidate is inactive" alert banner is visible.</summary>
+    public Task<bool> HasInactiveBannerAsync() =>
+        page.Locator(".alert-secondary:has-text('inactive')").WaitUntilVisibleAsync();
+
+    /// <summary>Text of the inactive banner, including the "Reason: ..." suffix when present.</summary>
+    public Task<string?> GetInactiveBannerTextAsync() =>
+        page.Locator(".alert-secondary:has-text('inactive')").TextContentAsync();
+
+    /// <summary>Text of the action-error alert shown when a deactivate/reactivate call fails server-side.</summary>
+    public async Task<string?> GetActionErrorAsync()
+    {
+        var locator = page.Locator(".alert-danger.alert-dismissible");
+        if (!await locator.WaitUntilVisibleAsync())
+            return null;
+        return (await locator.TextContentAsync())?.Trim();
+    }
+
+    public Task ClickDeactivateAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true }).ClickAsync();
+
+    public Task ClickReactivateAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Reactivate", Exact = true }).ClickAsync();
+
+    // The deactivate dialog is a plain custom SfDialog (not HrConfirmDialog) with a header of
+    // "Deactivate Candidate" and a <textarea class="form-control"> reason field — there is no
+    // data-testid or role='dialog' name to anchor to besides the header text, so it's scoped via
+    // :has-text on the dialog container the same way CandidateEditPage's UnsavedChangesDialog is.
+    private ILocator DeactivateDialog => page.Locator("[role='dialog']:has-text('Deactivate Candidate')");
+
+    public Task<bool> IsDeactivateDialogVisibleAsync() => DeactivateDialog.WaitUntilVisibleAsync();
+
+    public Task FillDeactivateReasonAsync(string reason) =>
+        DeactivateDialog.Locator("textarea.form-control").FillAsync(reason);
+
+    /// <summary>
+    /// Clicks the dialog's "Deactivate" confirm button without waiting for the dialog to close —
+    /// for the client-side "reason is required" guard, which keeps the dialog open and shows an
+    /// inline validation message instead of calling the API.
+    /// </summary>
+    public Task ClickConfirmDeactivateAsync() =>
+        DeactivateDialog.GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true }).ClickAsync();
+
+    /// <summary>Confirms deactivation and waits for the dialog to close (successful deactivation).</summary>
+    public async Task ConfirmDeactivateAndCloseAsync()
+    {
+        await ClickConfirmDeactivateAsync();
+        await DeactivateDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
+
+    public Task CancelDeactivateAsync() =>
+        DeactivateDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+
+    /// <summary>
+    /// True if the inline "A reason is required." validation message is visible inside the
+    /// deactivate dialog (client-side guard in ConfirmDeactivateAsync).
+    /// </summary>
+    public Task<bool> HasDeactivateReasonErrorAsync() =>
+        DeactivateDialog.Locator(".text-danger.small").WaitUntilVisibleAsync();
+
+    // The reactivate dialog is an HrConfirmDialog with Title="Reactivate Candidate" and its own
+    // confirm button labelled "Reactivate" (DangerConfirm="false", no "e-danger" styling) — scoped
+    // the same way ExternalRecruiterListPage scopes its HrConfirmDialog confirm button, since the
+    // toolbar/detail-page "Reactivate" button shares its accessible name with the dialog's own.
+    private ILocator ReactivateDialog => page.GetByRole(AriaRole.Dialog).Filter(new() { HasText = "Reactivate Candidate" });
+
+    public Task<bool> IsReactivateDialogVisibleAsync() => ReactivateDialog.WaitUntilVisibleAsync();
+
+    public async Task ConfirmReactivateAsync()
+    {
+        var confirmButton = ReactivateDialog.GetByRole(AriaRole.Button, new() { Name = "Reactivate", Exact = true });
+        await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await confirmButton.ClickAsync();
+        await ReactivateDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
+
+    public Task CancelReactivateAsync() =>
+        ReactivateDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
 }

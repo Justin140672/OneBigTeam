@@ -29,8 +29,13 @@ internal sealed class HireCandidateValidator : AbstractValidator<HireCandidateRe
             .NotEmpty().WithMessage("Gender is required.")
             .MaximumLength(50);
 
+        // NotEmpty is intentionally not enforced here: in Automatic employee-numbering mode the
+        // request may omit EmployeeNumber entirely — HireCandidateHandler forwards it through to
+        // IEmployeeProvisioningService/CreateEmployeeHandler, which already generates one in that
+        // case (and enforces requiredness itself in Manual mode, since that depends on a company
+        // settings read this validator does not perform). Mirrors CreateEmployeeValidator's own
+        // EmployeeNumber rule exactly.
         RuleFor(r => r.EmployeeNumber)
-            .NotEmpty().WithMessage("Employee number is required.")
             .MaximumLength(50);
 
         RuleFor(r => r.EmploymentTypeId)

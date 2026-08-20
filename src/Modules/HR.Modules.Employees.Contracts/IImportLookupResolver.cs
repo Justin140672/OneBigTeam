@@ -14,4 +14,18 @@ public interface IImportLookupResolver
 
     Task<PositionProfileImportLookupResult> GetOrCreatePositionProfileAsync(
         Guid companyId, string title, Guid? departmentId, Guid? locationId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Read-only existence check used during import preview/validation: does NOT create anything.
+    /// Returns the existing id, or null if a name/title matching this value does not yet exist for
+    /// the company (in which case it will be created later, at ConfirmImportSession time, via the
+    /// corresponding GetOrCreate* method).
+    /// </summary>
+    Task<Guid?> TryFindDepartmentAsync(Guid companyId, string name, CancellationToken cancellationToken);
+
+    Task<Guid?> TryFindEmploymentTypeAsync(Guid companyId, string name, CancellationToken cancellationToken);
+
+    Task<Guid?> TryFindLocationAsync(Guid companyId, string name, CancellationToken cancellationToken);
+
+    Task<Guid?> TryFindPositionProfileAsync(Guid companyId, string title, CancellationToken cancellationToken);
 }

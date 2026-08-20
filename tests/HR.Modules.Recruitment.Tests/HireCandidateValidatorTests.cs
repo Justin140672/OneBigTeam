@@ -28,6 +28,18 @@ public class HireCandidateValidatorTests
     }
 
     [Fact]
+    public void Validate_Passes_When_EmployeeNumber_Is_Blank()
+    {
+        // Deliberately not enforced by NotEmpty here: in Automatic employee-numbering mode the
+        // Hire Candidate dialog no longer shows the field at all (see item 31), and
+        // HireCandidateHandler forwards a blank value through to CreateEmployeeHandler, which
+        // generates one and separately enforces requiredness for Manual-mode companies.
+        var result = _validator.Validate(ValidRequest() with { EmployeeNumber = string.Empty });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void Validate_Fails_When_ApplicationId_Is_Empty()
     {
         var result = _validator.Validate(ValidRequest() with { ApplicationId = Guid.Empty });

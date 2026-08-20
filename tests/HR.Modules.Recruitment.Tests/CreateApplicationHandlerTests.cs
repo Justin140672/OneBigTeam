@@ -226,6 +226,27 @@ public class CreateApplicationHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_Candidate_Is_Inactive()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        candidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new CreateApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, CandidateId = candidate.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(await db.Applications.ToListAsync());
+    }
+
     private static CreateApplicationHandler handler(RecruitmentDbContext db) =>
         new(db, new FakeClock(FixedUtcNow), new Infrastructure.FakeAuditPublisher(), new RecruitmentStageSeeder(db));
 

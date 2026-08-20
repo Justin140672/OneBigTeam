@@ -243,16 +243,6 @@ else
 
         <!-- Actions -->
         <div class="overview-sidebar">
-            @* Hidden for a plain Employee (no elevated/manager+ role) — mirrors TeamReportsWidget's
-               access gating, since the underlying report catalog is only populated for
-               Manager/HR Administrator/Recruiter roles and a plain employee would just see an
-               empty widget. *@
-            @if (Session.IsHrAdministrator || Session.IsManager || Session.IsRecruiter)
-            {
-                <div class="mb-3">
-                    <FavouriteReportsWidget />
-                </div>
-            }
             <div class="overview-card overview-actions-card">
                 <div class="overview-card-header">
                     <i class="fa-solid fa-bolt overview-card-icon"></i>
@@ -281,6 +271,16 @@ else
                     </button>
                 </div>
             </div>
+            @* Hidden for a plain Employee (no elevated/manager+ role) — mirrors TeamReportsWidget's
+               access gating, since the underlying report catalog is only populated for
+               Manager/HR Administrator/Recruiter roles and a plain employee would just see an
+               empty widget. *@
+            @if (Session.IsHrAdministrator || Session.IsManager || Session.IsRecruiter)
+            {
+                <div class="mt-3">
+                    <FavouriteReportsWidget />
+                </div>
+            }
         </div>
     </div>
 

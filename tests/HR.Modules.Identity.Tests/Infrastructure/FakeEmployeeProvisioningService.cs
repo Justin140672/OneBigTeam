@@ -14,6 +14,14 @@ internal sealed class FakeEmployeeProvisioningService : IEmployeeProvisioningSer
 
     public Guid EmployeeIdToReturn { get; set; } = Guid.NewGuid();
 
+    public List<(Guid CompanyId, Guid EmployeeId)> MarkedAsInitialCompanyAdmin { get; } = [];
+
+    public Task MarkAsInitialCompanyAdminAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken)
+    {
+        MarkedAsInitialCompanyAdmin.Add((companyId, employeeId));
+        return Task.CompletedTask;
+    }
+
     public Task<Result<Guid>> CreateFromCandidateAsync(
         EmployeeProvisioningRequest request,
         CancellationToken cancellationToken)

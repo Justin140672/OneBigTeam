@@ -97,6 +97,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         services.AddScoped<IValidator<DeactivateLeaveTypeRequest>, DeactivateLeaveTypeValidator>();
         services.AddScoped<ILeavePolicyReader, LeavePolicyReader>();
         services.AddScoped<ILeavePolicyProvisioner, LeavePolicyProvisioner>();
+        services.AddScoped<ILeaveTypeDefaultsProvisioner, LeaveTypeDefaultsProvisioner>();
         services.AddScoped<ILeaveImportWriter, LeaveImportWriter>();
         services.AddScoped<IEmployeeLeaveStatusReader, EmployeeLeaveStatusReader>();
         services.AddScoped<ILeaveSummaryReader, LeaveSummaryReader>();
@@ -126,7 +127,6 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         {
             db.LeaveTypes.AddRange(
                 LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000001"), companyId, "Annual Leave",        "ANNUAL",        25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now),
-                LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000002"), companyId, "Sick Leave",          "SICK",          10, AccrualMethod.None,    LeaveTypeBehaviour.Sickness,  now),
                 LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000003"), companyId, "Unpaid Leave",        "UNPAID",         0, AccrualMethod.None,    LeaveTypeBehaviour.Unpaid,    now, hasBalance: false),
                 LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000004"), companyId, "Compassionate Leave", "COMPASSIONATE",  5, AccrualMethod.None,    LeaveTypeBehaviour.Standard,  now),
                 LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000005"), companyId, "Parental Leave",      "PARENTAL",      52, AccrualMethod.None,    LeaveTypeBehaviour.Parental,  now),
@@ -205,7 +205,6 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         {
             db.LeaveTypes.AddRange(
                 LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000011"), betaCorpId, "Annual Leave",  "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now),
-                LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000012"), betaCorpId, "Sick Leave",    "SICK",   10, AccrualMethod.None,    LeaveTypeBehaviour.Sickness,  now),
                 LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000013"), betaCorpId, "Unpaid Leave",  "UNPAID",  0, AccrualMethod.None,    LeaveTypeBehaviour.Unpaid,    now, hasBalance: false));
 
             await db.SaveChangesAsync();

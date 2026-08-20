@@ -13,4 +13,5 @@ internal sealed record CandidateListItem(
     string LastName,
     string Email,
     string? Phone,
+    bool IsActive,
     DateTimeOffset CreatedAt);

@@ -40,7 +40,7 @@ internal sealed class GetOnboardingChecklistHandler(
 
         foreach (var task in registry.Tasks)
         {
-            var isCompleted = await task.IsCompletedAsync(companyId, cancellationToken);
+            var liveComputedCompleted = await task.IsCompletedAsync(companyId, cancellationToken);
             var linkUrl = await task.GetLinkUrlAsync(companyId, cancellationToken);
 
             if (!completionsByKey.TryGetValue(task.Key, out var completion))
@@ -49,6 +49,11 @@ internal sealed class GetOnboardingChecklistHandler(
                 dbContext.TaskCompletions.Add(completion);
                 completionsByKey[task.Key] = completion;
             }
+
+            // Sticky: a manual completion (e.g. via MarkOnboardingTaskComplete, used for
+            // "Download the Employee import template") is never reverted by a later checklist
+            // load just because the task's own live computation currently evaluates to false.
+            var isCompleted = liveComputedCompleted || completion.IsCompleted;
 
             completion.SetStatus(isCompleted, now);
 

@@ -37,6 +37,28 @@
             </div>
         }
 
+        @if (_candidate is not null && !_candidate.IsActive)
+        {
+            <div class="alert alert-secondary d-flex align-items-center gap-2">
+                <i class="fa-solid fa-circle-xmark"></i>
+                <span>
+                    This candidate is <strong>inactive</strong>@(_candidate.DeactivatedAt is not null ? $" (deactivated {_candidate.DeactivatedAt.Value.LocalDateTime:d})" : "").
+                    @if (!string.IsNullOrWhiteSpace(_candidate.DeactivationReason))
+                    {
+                        <span> Reason: @_candidate.DeactivationReason</span>
+                    }
+                </span>
+            </div>
+        }
+
+        @if (_actionError is not null)
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @_actionError
+                <button type="button" class="btn-close" @onclick="@(() => _actionError = null)"></button>
+            </div>
+        }
+
         <EditForm EditContext="EditContext">
             <DataAnnotationsValidator />
             <div class="row">
@@ -75,6 +97,21 @@
                     </div>
 
                     <div class="d-flex gap-2 mt-3 justify-content-end">
+                        @if (!IsNew && _candidate is not null)
+                        {
+                            @if (_candidate.IsActive)
+                            {
+                                <SfButton CssClass="e-danger" Disabled="@(Saving || _actionBusy)" OnClick="@(() => _showDeactivateDialog = true)">
+                                    Deactivate
+                                </SfButton>
+                            }
+                            else
+                            {
+                                <SfButton Disabled="@(Saving || _actionBusy)" OnClick="@(() => _showReactivateDialog = true)">
+                                    Reactivate
+                                </SfButton>
+                            }
+                        }
                         @if (!IsViewMode)
                         {
                             <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
@@ -98,6 +135,44 @@
                           OnSaveAndClose="ConfirmSaveAndCloseAsync"
                           OnDiscard="DiscardChangesAndClose"
                           OnCancel="CancelCloseDialog" />
+
+    @if (_showDeactivateDialog)
+    {
+        <SfDialog Visible="_showDeactivateDialog" IsModal="true" Width="420px" ShowCloseIcon="false">
+            <DialogTemplates>
+                <Header>Deactivate Candidate</Header>
+                <Content>
+                    <p>Are you sure you want to deactivate @Model.FirstName @Model.LastName?</p>
+                    <label class="form-label">Reason <span class="text-danger">*</span></label>
+                    <textarea class="form-control" rows="3" @bind="_deactivateReason" placeholder="Explain why this candidate is being deactivated"></textarea>
+                    @if (!string.IsNullOrWhiteSpace(_deactivateReasonError))
+                    {
+                        <div class="text-danger small mt-1">@_deactivateReasonError</div>
+                    }
+                </Content>
+                <FooterTemplate>
+                    <SfButton IsPrimary="true" CssClass="e-danger" Disabled="_actionBusy" OnClick="ConfirmDeactivateAsync">
+                        @if (_actionBusy)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Deactivate
+                    </SfButton>
+                    <SfButton Disabled="_actionBusy" OnClick="@(() => _showDeactivateDialog = false)">Cancel</SfButton>
+                </FooterTemplate>
+            </DialogTemplates>
+        </SfDialog>
+    }
+
+    <HrConfirmDialog Visible="_showReactivateDialog"
+                     Title="Reactivate Candidate"
+                     Message="@($"Are you sure you want to reactivate {Model.FirstName} {Model.LastName}?")"
+                     ConfirmText="Reactivate"
+                     CancelText="Cancel"
+                     DangerConfirm="false"
+                     Busy="_actionBusy"
+                     OnConfirmed="ConfirmReactivateAsync"
+                     OnCancelled="@(() => _showReactivateDialog = false)" />
 </div>
 
 @code {
@@ -114,6 +189,14 @@
     public string? ReturnUrl { get; set; }
 
     private GetCandidateResponse? _candidate;
+    private string? _actionError;
+    private bool _actionBusy;
+
+    private bool _showDeactivateDialog;
+    private string _deactivateReason = string.Empty;
+    private string? _deactivateReasonError;
+
+    private bool _showReactivateDialog;
 
     private string PageTitle => IsNew ? "Add Candidate"
         : Model.FirstName.Trim().Length > 0 ? $"{Model.FirstName} {Model.LastName}"
@@ -132,4 +215,49 @@
     protected override string? ListUrl => !string.IsNullOrWhiteSpace(ReturnUrl)
         ? ReturnUrl
         : $"/companies/{CompanyId}/candidates";
+
+    private async Task ConfirmDeactivateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_deactivateReason))
+        {
+            _deactivateReasonError = "A reason is required.";
+            return;
+        }
+        _deactivateReasonError = null;
+        _actionError = null;
+        _actionBusy = true;
+
+        var (result, error) = await CandidateService.DeactivateCandidateAsync(CompanyId, Id!.Value, _deactivateReason.Trim());
+
+        _actionBusy = false;
+
+        if (error is not null)
+        {
+            _actionError = error;
+            return;
+        }
+
+        _showDeactivateDialog = false;
+        _deactivateReason = string.Empty;
+        _candidate = await CandidateService.GetCandidateAsync(CompanyId, Id!.Value);
+    }
+
+    private async Task ConfirmReactivateAsync()
+    {
+        _actionError = null;
+        _actionBusy = true;
+
+        var (result, error) = await CandidateService.ReactivateCandidateAsync(CompanyId, Id!.Value);
+
+        _actionBusy = false;
+
+        if (error is not null)
+        {
+            _actionError = error;
+            return;
+        }
+
+        _showReactivateDialog = false;
+        _candidate = await CandidateService.GetCandidateAsync(CompanyId, Id!.Value);
+    }
 }

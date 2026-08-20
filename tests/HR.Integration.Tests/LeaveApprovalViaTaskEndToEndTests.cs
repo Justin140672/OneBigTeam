@@ -70,8 +70,13 @@ public class LeaveApprovalViaTaskEndToEndTests
         var policy = await policyResp.Content.ReadFromJsonAsync<IdPayload>();
 
         // ── Step 3: Create manager and employee ───────────────────────────────
+        // The manager's Employee record id is pinned to managerId (the auth user id used by
+        // managerClient below) — Employee ID and User ID are the same value by construction
+        // throughout this app (see CompleteTaskHandler.cs remarks), and SEC-003's assignee
+        // check compares the task's AssignedEmployeeId against the authenticated caller's id.
+        // Without this, the manager completing their own assigned task would 403.
         var refData      = await CreateReferenceDataAsync(adminClient, companyId);
-        var managerEmpId = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Manager", refData);
+        var managerEmpId = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Manager", refData, managerId);
         var empId        = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Employee", refData);
 
         // ── Step 4: Assign manager relationship ───────────────────────────────
@@ -165,8 +170,10 @@ public class LeaveApprovalViaTaskEndToEndTests
         policyResp.EnsureSuccessStatusCode();
         var policy = await policyResp.Content.ReadFromJsonAsync<IdPayload>();
 
+        // See SEC-003 note in the approval test above — the manager Employee id must match
+        // managerId (the auth user id) for the manager to be recognized as the task assignee.
         var refData2     = await CreateReferenceDataAsync(adminClient, companyId);
-        var managerEmpId = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Manager", refData2);
+        var managerEmpId = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Manager", refData2, managerId);
         var empId        = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Employee", refData2);
 
         var managerAssignResp = await adminClient.PutAsJsonAsync(
@@ -276,12 +283,13 @@ public class LeaveApprovalViaTaskEndToEndTests
     }
 
     private static async Task<Guid> CreateEmployeeAsync(
-        HttpClient client, Guid companyId, string firstName, string lastName, ReferenceData refData)
+        HttpClient client, Guid companyId, string firstName, string lastName, ReferenceData refData, Guid? id = null)
     {
         var resp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
             new
             {
+                id,
                 companyId,
                 firstName,
                 lastName,

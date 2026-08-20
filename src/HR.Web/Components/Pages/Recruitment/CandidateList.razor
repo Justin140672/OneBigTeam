@@ -49,12 +49,22 @@
                 <GridColumn Field="@nameof(CandidateListItemModel.Email)" HeaderText="Email" Width="220" />
                 <GridColumn Field="@nameof(CandidateListItemModel.Phone)" HeaderText="Phone" Width="160" />
                 <GridColumn Field="@nameof(CandidateListItemModel.CreatedAt)" HeaderText="Added" Width="140" Format="d" />
+                <GridColumn Field="@nameof(CandidateListItemModel.IsActive)" HeaderText="Status" Width="110">
+                    <Template>
+                        @{
+                            var row = (context as CandidateListItemModel)!;
+                            <ActiveStatusBadge IsActive="row.IsActive" />
+                        }
+                    </Template>
+                </GridColumn>
             </GridColumns>
         </HrGrid>
     }
 </div>
 
 @code {
+    protected override bool SupportsActiveFilter => true;
+
     protected override Task OnBeforeLoadAsync()
     {
         if (!Session.IsRecruiter)
@@ -64,7 +74,7 @@
 
     protected override async Task<IReadOnlyList<CandidateListItemModel>?> FetchItemsAsync(string? search)
     {
-        var result = await CandidateService.ListCandidatesAsync(CompanyId, search, pageSize: 100);
+        var result = await CandidateService.ListCandidatesAsync(CompanyId, search, pageSize: 100, includeInactive: ShowInactive);
         return result?.Items;
     }
 

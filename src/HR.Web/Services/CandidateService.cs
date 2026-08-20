@@ -8,12 +8,13 @@ public sealed class CandidateService(IHttpClientFactory httpClientFactory) : IEd
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
-    public async Task<ListCandidatesResponse?> ListCandidatesAsync(Guid companyId, string? search = null, int pageNumber = 1, int pageSize = 20)
+    public async Task<ListCandidatesResponse?> ListCandidatesAsync(Guid companyId, string? search = null, int pageNumber = 1, int pageSize = 20, bool includeInactive = false)
     {
         try
         {
             var url = $"api/companies/{companyId}/candidates?pageNumber={pageNumber}&pageSize={pageSize}";
             if (!string.IsNullOrWhiteSpace(search)) url += $"&search={Uri.EscapeDataString(search)}";
+            if (includeInactive) url += "&includeInactive=true";
 
             return await Http.GetFromJsonAsync<ListCandidatesResponse>(url, HrApiJsonOptions.Default);
         }
@@ -54,6 +55,28 @@ public sealed class CandidateService(IHttpClientFactory httpClientFactory) : IEd
             return (await response.Content.ReadFromJsonAsync<UpdateCandidateResponse>(), null);
 
         return (null, await ReadErrorAsync(response, "Failed to update candidate."));
+    }
+
+    public async Task<(DeactivateCandidateResponse? Result, string? Error)> DeactivateCandidateAsync(Guid companyId, Guid candidateId, string reason)
+    {
+        var request = new DeactivateCandidateRequest(companyId, candidateId, reason);
+        var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/candidates/{candidateId}/deactivate", request);
+
+        if (response.IsSuccessStatusCode)
+            return (await response.Content.ReadFromJsonAsync<DeactivateCandidateResponse>(), null);
+
+        return (null, await ReadErrorAsync(response, "Failed to deactivate candidate."));
+    }
+
+    public async Task<(ReactivateCandidateResponse? Result, string? Error)> ReactivateCandidateAsync(Guid companyId, Guid candidateId)
+    {
+        var request = new ReactivateCandidateRequest(companyId, candidateId);
+        var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/candidates/{candidateId}/reactivate", request);
+
+        if (response.IsSuccessStatusCode)
+            return (await response.Content.ReadFromJsonAsync<ReactivateCandidateResponse>(), null);
+
+        return (null, await ReadErrorAsync(response, "Failed to reactivate candidate."));
     }
 
     // ── IEditService<CandidateEditModel, Guid> ──────────────────────────────────

@@ -32,9 +32,11 @@
                 TValue="AssetListItemModel"
                 DataSource="@Items"
                 Toolbar="@GridToolbar"
-                AllowFiltering="true">
+                AllowFiltering="true"
+                AllowGrouping="true">
             <GridEvents TValue="AssetListItemModel" OnToolbarClick="OnToolbarClick"
                         RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
+            <GridGroupSettings Columns="@(new[] { nameof(AssetListItemModel.CategoryName) })" />
             <GridPageSettings PageSize="20" />
             <GridColumns>
                 <GridColumn Field="@nameof(AssetListItemModel.AssetNumber)" HeaderText="Asset #" Width="140">
@@ -46,6 +48,7 @@
                     </Template>
                 </GridColumn>
                 <GridColumn Field="@nameof(AssetListItemModel.Name)" HeaderText="Name" Width="220" />
+                <GridColumn Field="@nameof(AssetListItemModel.CategoryName)" HeaderText="Asset Category" Width="160" />
                 <GridColumn Field="@nameof(AssetListItemModel.Manufacturer)" HeaderText="Manufacturer" Width="160" />
                 <GridColumn Field="@nameof(AssetListItemModel.Model)" HeaderText="Model" Width="160" />
                 <GridColumn Field="@nameof(AssetListItemModel.Status)" HeaderText="Status" Width="120">

@@ -97,7 +97,7 @@ public class GetImportPreviewHandlerTests
 
         db.ImportRowErrors.Add(ImportRowError.Create(
             Guid.NewGuid(), companyId, session.Id, 2, ImportRowErrorSeverity.Warning,
-            "Department 'Sales' did not exist and was created.", null, FixedNow));
+            "Department 'Sales' does not exist and will be created when this import is confirmed.", null, FixedNow));
         db.ImportRowErrors.Add(ImportRowError.Create(
             Guid.NewGuid(), companyId, session.Id, 3, ImportRowErrorSeverity.Error,
             "'FirstName' is required.", null, FixedNow));
@@ -115,7 +115,7 @@ public class GetImportPreviewHandlerTests
         Assert.True(result.IsSuccess);
         var referenceWarning = Assert.Single(result.Value!.ReferenceDataCreatedWarnings);
         Assert.Equal(2, referenceWarning.RowNumber);
-        Assert.Contains("did not exist and was created", referenceWarning.Message);
+        Assert.Contains("will be created when this import is confirmed", referenceWarning.Message);
 
         Assert.Equal(2, result.Value.RowErrors.Count);
         Assert.Contains(result.Value.RowErrors, e => e.RowNumber == 3);

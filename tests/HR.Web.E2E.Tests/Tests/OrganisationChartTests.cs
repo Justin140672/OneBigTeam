@@ -152,8 +152,10 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
     }
 
     [Fact]
-    public async Task OrganisationChart_HasExportButton()
+    public async Task OrganisationChart_Does_Not_Have_Export_Button()
     {
+        // The Export/Download toolbar button was removed — it never actually worked (see
+        // backlog item on removing dead Org Chart Download button).
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
@@ -164,8 +166,8 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
 
         await _page.Locator(".org-chart-zoom-toolbar").WaitForAsync(new() { Timeout = 15_000 });
 
-        Assert.True(await _page.GetByTitle("Export as image").IsVisibleAsync(),
-            "Expected an Export button on the organisation chart toolbar");
+        Assert.False(await _page.GetByTitle("Export as image").IsVisibleAsync(),
+            "Expected no Export button on the organisation chart toolbar");
     }
 
     [Fact]

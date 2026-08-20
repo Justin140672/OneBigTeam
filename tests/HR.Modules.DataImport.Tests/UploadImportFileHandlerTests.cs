@@ -212,8 +212,11 @@ public class UploadImportFileHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Empty_Xlsx_Produces_Zero_TotalRows()
+    public async Task HandleAsync_Empty_Xlsx_Is_Rejected_With_No_Data_Rows_Error()
     {
+        // A file with only a header row (zero data rows) must be rejected upfront with a clear
+        // validation error, rather than silently creating a session/import that can never produce
+        // any employees.
         await using var db = BuildContext();
         var handler        = BuildHandler(db);
 
@@ -224,8 +227,10 @@ public class UploadImportFileHandlerTests
             Guid.NewGuid(),
             CancellationToken.None);
 
-        Assert.True(result.IsSuccess);
-        Assert.Equal(0, result.Value!.TotalRows);
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("no data rows", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(await db.ImportSessions.ToListAsync());
     }
 
     [Fact]

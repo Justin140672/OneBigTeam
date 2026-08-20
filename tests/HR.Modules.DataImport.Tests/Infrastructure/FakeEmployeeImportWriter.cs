@@ -16,6 +16,7 @@ internal sealed class FakeEmployeeImportWriter : IEmployeeImportWriter
     private bool _failAllManagerAssignments;
 
     public List<EmployeeImportCreateRequest> CreateRequests { get; } = [];
+    public List<(Guid ExistingEmployeeId, EmployeeImportCreateRequest Request)> UpdateRequests { get; } = [];
     public List<(Guid CompanyId, Guid EmployeeId, EmployeeImportWorkingPattern Pattern)> WorkingPatternCalls { get; } = [];
     public List<(Guid CompanyId, Guid EmployeeId, EmployeeImportCompensation Compensation)> CompensationCalls { get; } = [];
     public List<(Guid CompanyId, Guid EmployeeId, Guid ManagerId)> ManagerAssignmentAttempts { get; } = [];
@@ -36,6 +37,24 @@ internal sealed class FakeEmployeeImportWriter : IEmployeeImportWriter
 
         return Task.FromResult(new EmployeeImportCreateResult(
             request.Id,
+            string.IsNullOrWhiteSpace(request.EmployeeNumber) ? "AUTO-00001" : request.EmployeeNumber,
+            request.StartDate,
+            ManagerId: null,
+            request.PositionProfileId,
+            ProbationEndDate: request.StartDate.AddMonths(6),
+            DefaultLeavePolicyId: null));
+    }
+
+    public Task<EmployeeImportCreateResult> UpdateEmployeeAsync(
+        Guid existingEmployeeId, EmployeeImportCreateRequest request, CancellationToken cancellationToken)
+    {
+        UpdateRequests.Add((existingEmployeeId, request));
+
+        if (_workEmailsThatThrow.Contains(request.WorkEmail.Trim()))
+            throw new InvalidOperationException($"Simulated failure updating '{request.WorkEmail}'.");
+
+        return Task.FromResult(new EmployeeImportCreateResult(
+            existingEmployeeId,
             string.IsNullOrWhiteSpace(request.EmployeeNumber) ? "AUTO-00001" : request.EmployeeNumber,
             request.StartDate,
             ManagerId: null,
