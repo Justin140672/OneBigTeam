@@ -45,7 +45,7 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
     private const string TomEmail = "tom.williams@acme.example";
 
     [Fact]
-    public async Task GettingStarted_LoadsWithSevenTasksAndProgressIndicator()
+    public async Task GettingStarted_LoadsWithNineTasksAndProgressIndicator()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var gettingStarted = new GettingStartedPage(_page, _fixture.WebBaseUrl);
@@ -55,7 +55,7 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
 
         await gettingStarted.GoToAsync();
 
-        Assert.Equal(8, await gettingStarted.GetTaskCardCountAsync());
+        Assert.Equal(9, await gettingStarted.GetTaskCardCountAsync());
 
         // All seven of the currently-registered task names (Order 1-7) — see
         // CompleteCompanyDetailsTask, ConfigureHrSettingsTask, ReviewDefaultLeavePolicyTask,

@@ -17,7 +17,7 @@ public class CreateEmployeeNoteHandlerTests
     {
         await using var context = BuildContext();
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeEmployeeTimelineWriter());
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher);
 
         var result = await handler.HandleAsync(
             new CreateEmployeeNoteRequest(Guid.NewGuid(), Guid.NewGuid(), NoteCategory.General, "Some note.", false),
@@ -41,7 +41,7 @@ public class CreateEmployeeNoteHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeEmployeeTimelineWriter());
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher);
 
         var result = await handler.HandleAsync(
             new CreateEmployeeNoteRequest(companyId, employee.Id, NoteCategory.Performance, "  Great quarter.  ", true),
@@ -82,7 +82,7 @@ public class CreateEmployeeNoteHandlerTests
     [Theory]
     [InlineData(0, false)]
     [InlineData(1, true)]
-    internal async Task HandleAsync_Writes_Generic_HrOnly_Timeline_Entry_Never_Containing_Note_Text_Or_Category(
+    internal async Task HandleAsync_Does_Not_Write_Timeline_Entry_For_Note_Creation(
         int categoryValue, bool isImportant)
     {
         var category = (NoteCategory)categoryValue;
@@ -93,8 +93,7 @@ public class CreateEmployeeNoteHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var timelineWriter = new FakeEmployeeTimelineWriter();
-        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), timelineWriter);
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var confidentialText = "Highly confidential performance concerns about the employee.";
         var result = await handler.HandleAsync(
@@ -104,20 +103,6 @@ public class CreateEmployeeNoteHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-
-        var entry = Assert.Single(timelineWriter.Added);
-        Assert.Equal(companyId, entry.CompanyId);
-        Assert.Equal(employee.Id, entry.EmployeeId);
-        Assert.Equal(EmployeeTimelineEventType.HrNoteAdded, entry.EventType);
-        Assert.Equal(EmployeeTimelineCategory.HrNotes, entry.Category);
-        Assert.Equal(EmployeeTimelineVisibility.HrOnly, entry.Visibility);
-
-        // Redaction rule: note text and category must never leak into Title/Summary, regardless
-        // of the note's own category/importance.
-        Assert.DoesNotContain(confidentialText, entry.Title);
-        Assert.DoesNotContain(confidentialText, entry.Summary);
-        Assert.DoesNotContain(category.ToString(), entry.Title);
-        Assert.DoesNotContain(category.ToString(), entry.Summary);
     }
 
     [Fact]
@@ -125,7 +110,7 @@ public class CreateEmployeeNoteHandlerTests
     {
         await using var context = BuildContext();
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeEmployeeTimelineWriter());
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher);
 
         await handler.HandleAsync(
             new CreateEmployeeNoteRequest(Guid.NewGuid(), Guid.NewGuid(), NoteCategory.General, "Some note.", false),

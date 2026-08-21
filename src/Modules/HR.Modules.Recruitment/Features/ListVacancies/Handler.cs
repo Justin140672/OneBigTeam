@@ -35,8 +35,19 @@ internal sealed class ListVacanciesHandler(RecruitmentDbContext db, IPositionPro
             query = query.Where(v => positionProfileIdsInDepartment.Contains(v.PositionProfileId));
         }
 
-        var vacancies = await query
-            .OrderByDescending(v => v.CreatedAt)
+        var orderedQuery = query.OrderByDescending(v => v.CreatedAt).AsQueryable();
+
+        // Bound the expensive per-row enrichment below (a batched, but still per-vacancy-scaling,
+        // Position Profile summary lookup plus a GroupBy application-count query) at the SQL level
+        // when there's no search text to honour — the common "just open the dropdown" case. When
+        // Search is also supplied, defer bounding until after the in-memory search filter further
+        // down instead (see there), since Search itself only runs in-memory over whatever this
+        // query already fetched — bounding here first could silently exclude the very vacancy the
+        // caller is typing to find.
+        if (request.PageSize is > 0 && string.IsNullOrWhiteSpace(request.Search))
+            orderedQuery = orderedQuery.Take(request.PageSize.Value);
+
+        var vacancies = await orderedQuery
             .Select(v => new
             {
                 v.Id,
@@ -104,6 +115,9 @@ internal sealed class ListVacanciesHandler(RecruitmentDbContext db, IPositionPro
                     i.EffectiveTitle.Contains(request.Search, StringComparison.OrdinalIgnoreCase) ||
                     (i.PositionProfileTitle?.Contains(request.Search, StringComparison.OrdinalIgnoreCase) ?? false))
                 .ToList();
+
+            if (request.PageSize is > 0)
+                items = items.Take(request.PageSize.Value).ToList();
         }
 
         return Result.Success(new ListVacanciesResponse(items));

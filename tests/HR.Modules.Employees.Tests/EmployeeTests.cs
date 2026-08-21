@@ -39,4 +39,66 @@ public class EmployeeTests
 
         Assert.Equal(expected, employee.EmployeeNumber);
     }
+
+    [Fact]
+    public void Create_Defaults_RequiresInitialSetup_To_False()
+    {
+        var employee = CreateEmployee("EMP-100");
+
+        Assert.False(employee.RequiresInitialSetup);
+        Assert.Null(employee.InitialSetupCompletedAt);
+    }
+
+    [Fact]
+    public void MarkRequiresInitialSetup_Sets_Flag_And_UpdatedAt()
+    {
+        var employee = CreateEmployee("EMP-101");
+        var later = Now.AddHours(1);
+
+        employee.MarkRequiresInitialSetup(later);
+
+        Assert.True(employee.RequiresInitialSetup);
+        Assert.Equal(later, employee.UpdatedAt);
+    }
+
+    [Fact]
+    public void CompleteInitialSetup_Clears_Flag_And_Sets_CompletedAt()
+    {
+        var employee = CreateEmployee("EMP-102");
+        employee.MarkRequiresInitialSetup(Now);
+        var later = Now.AddHours(2);
+
+        employee.CompleteInitialSetup(later);
+
+        Assert.False(employee.RequiresInitialSetup);
+        Assert.Equal(later, employee.InitialSetupCompletedAt);
+        Assert.Equal(later, employee.UpdatedAt);
+    }
+
+    [Fact]
+    public void CompleteInitialSetup_Is_Idempotent_When_Called_Without_Prior_MarkRequiresInitialSetup()
+    {
+        // Guards against a caller invoking CompleteInitialSetup on an employee that never required
+        // it — the flag is already false, and the method still no-ops safely rather than throwing.
+        var employee = CreateEmployee("EMP-103");
+
+        employee.CompleteInitialSetup(Now);
+
+        Assert.False(employee.RequiresInitialSetup);
+        Assert.Equal(Now, employee.InitialSetupCompletedAt);
+    }
+
+    [Fact]
+    public void CompleteInitialSetup_Called_Twice_Leaves_Flag_False_And_Updates_CompletedAt_To_Latest_Call()
+    {
+        var employee = CreateEmployee("EMP-104");
+        employee.MarkRequiresInitialSetup(Now);
+        employee.CompleteInitialSetup(Now.AddHours(1));
+
+        var secondCall = Now.AddHours(2);
+        employee.CompleteInitialSetup(secondCall);
+
+        Assert.False(employee.RequiresInitialSetup);
+        Assert.Equal(secondCall, employee.InitialSetupCompletedAt);
+    }
 }

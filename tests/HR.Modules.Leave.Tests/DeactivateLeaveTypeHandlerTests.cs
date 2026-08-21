@@ -117,6 +117,64 @@ public class DeactivateLeaveTypeHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_LeaveType_Is_System()
+    {
+        // Item 50: a system leave type (e.g. the platform-provisioned Annual Leave) can never be
+        // deactivated, regardless of whether it's currently assigned to any employees.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var entity = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now, isSystem: true);
+        db.LeaveTypes.Add(entity);
+        await db.SaveChangesAsync();
+
+        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader());
+
+        var result = await handler.HandleAsync(new DeactivateLeaveTypeRequest
+        {
+            CompanyId = companyId,
+            Id = entity.Id
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Contains("system leave type", result.Error.Message);
+
+        var saved = await db.LeaveTypes.SingleAsync();
+        Assert.True(saved.IsActive);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Deactivates_NonSystem_LeaveType_Unaffected_By_IsSystem_Restriction()
+    {
+        // Confirms the IsSystem guard is opt-in: an ordinary (non-system) leave type can still be
+        // deactivated exactly as before.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var entity = LeaveType.Create(Guid.NewGuid(), companyId, "Compassionate Leave", "COMPASSIONATE", 5,
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now, isSystem: false);
+        db.LeaveTypes.Add(entity);
+        await db.SaveChangesAsync();
+
+        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader());
+
+        var result = await handler.HandleAsync(new DeactivateLeaveTypeRequest
+        {
+            CompanyId = companyId,
+            Id = entity.Id
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var saved = await db.LeaveTypes.SingleAsync();
+        Assert.False(saved.IsActive);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_Conflict_When_Already_Inactive()
     {
         await using var db = BuildContext();

@@ -48,6 +48,7 @@ using HR.Modules.Employees.Features.UpdateDepartment;
 using HR.Modules.Employees.Features.GetPositionProfile;
 using HR.Modules.Employees.Features.ListPositionProfiles;
 using HR.Modules.Employees.Features.UpdateEmployeeProfile;
+using HR.Modules.Employees.Features.CompleteInitialEmployeeSetup;
 using HR.Modules.Employees.Features.UpdateEmploymentDetails;
 using HR.Modules.Employees.Features.AddRequiredDocumentToPositionProfile;
 using HR.Modules.Employees.Features.ListRequiredDocumentsForPositionProfile;
@@ -94,7 +95,6 @@ using HR.Modules.Employees.Features.CreateTimelineEntryOnOnboardingCompleted;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnProbationPassed;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnSharedCompanyDocumentAcknowledged;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnEmployeeDocumentUploaded;
-using HR.Modules.Employees.Features.CreateTimelineEntryOnEmployeeDetailsCorrected;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnOffboardingStarted;
 using HR.Modules.Employees.Features.BackfillEmployeeTimeline;
 using HR.Modules.Employees.Jobs;
@@ -225,6 +225,9 @@ public static class EmployeesModule
 
         services.AddScoped<UpdateEmployeeProfileHandler>();
         services.AddScoped<IValidator<UpdateEmployeeProfileRequest>, UpdateEmployeeProfileValidator>();
+
+        services.AddScoped<CompleteInitialEmployeeSetupHandler>();
+        services.AddScoped<IValidator<CompleteInitialEmployeeSetupRequest>, CompleteInitialEmployeeSetupValidator>();
 
         services.AddScoped<UpdateEmploymentDetailsHandler>();
         services.AddScoped<IValidator<UpdateEmploymentDetailsRequest>, UpdateEmploymentDetailsValidator>();
@@ -361,7 +364,6 @@ public static class EmployeesModule
         services.AddScoped<IIntegrationEventHandler<ProbationPassedIntegrationEvent>, ProbationPassedHandler>();
         services.AddScoped<IIntegrationEventHandler<SharedCompanyDocumentAcknowledgedIntegrationEvent>, SharedCompanyDocumentAcknowledgedHandler>();
         services.AddScoped<IIntegrationEventHandler<EmployeeDocumentUploadedIntegrationEvent>, EmployeeDocumentUploadedHandler>();
-        services.AddScoped<IIntegrationEventHandler<EmployeeDetailsCorrectedIntegrationEvent>, EmployeeDetailsCorrectedHandler>();
         services.AddScoped<IIntegrationEventHandler<OffboardingStartedIntegrationEvent>, OffboardingStartedHandler>();
 
         services.AddScoped<BackfillEmployeeTimelineHandler>();
@@ -398,6 +400,7 @@ public static class EmployeesModule
         // Getting Started checklist task definitions (HR.Modules.CompanyOnboarding epic, Phase A).
         services.AddScoped<IOnboardingTaskDefinition, DownloadEmployeeImportTemplateTask>();
         services.AddScoped<IOnboardingTaskDefinition, ImportEmployeesTask>();
+        services.AddScoped<IOnboardingTaskDefinition, CompleteEmployeeRecordTask>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)
@@ -506,6 +509,20 @@ public static class EmployeesModule
             // Priya Shah (see below) is a Company Administrator, not a line role in the org chart —
             // she still needs a real position/department pair like any other employee.
             var posCfoId        = Guid.Parse("20000000-0000-0000-0000-000000000009");
+            // Deliberately unoccupied — no MakeAcme(...) employee below is assigned this profile.
+            // Used by VacancyDetail's "New Vacancy" Position Profile dropdown, which filters to
+            // profiles with no currently-active employee assigned.
+            var posMarketingCoordId = Guid.Parse("20000000-0000-0000-0000-00000000000A");
+            // Deliberately unoccupied at seed time, with the same Department (Engineering) and
+            // Location (London Office) as "Senior Software Engineer" — dedicated to E2E tests that
+            // need to create/promote an employee into a profile without permanently occupying
+            // "Senior Software Engineer" itself. That profile's own vacancy (VacancyModule's dev
+            // seed) is depended on by many Recruitment E2E tests' "New Vacancy" Position Profile
+            // dropdown, which excludes profiles with any currently-active employee — a test that
+            // creates/promotes an employee onto "Senior Software Engineer" would otherwise
+            // permanently hide it from those unrelated tests for the rest of the run (see
+            // CreateEmployeeTests and EmployeePromotionTabTests).
+            var posQaEngId = Guid.Parse("20000000-0000-0000-0000-00000000000B");
 
             db.PositionProfiles.AddRange(
                 PositionProfile.Create(posCtoId,        acmeId, deptEngId,     locLondonId, "Chief Technology Officer", null, null, null, null, null, null, null, acmeLeavePolicyId, now),
@@ -516,7 +533,9 @@ public static class EmployeesModule
                 PositionProfile.Create(posFinanceMgrId, acmeId, deptFinanceId, locLondonId, "Finance Manager",          null, null, null, null, null, null, null, acmeLeavePolicyId, now),
                 PositionProfile.Create(posSalesMgrId,   acmeId, deptSalesId,   locLondonId, "Sales Manager",            null, null, null, null, null, null, null, acmeLeavePolicyId, now),
                 PositionProfile.Create(posAeId,         acmeId, deptSalesId,   locLondonId, "Account Executive",        null, null, null, null, null, null, null, acmeLeavePolicyId, now),
-                PositionProfile.Create(posCfoId,        acmeId, deptFinanceId, locLondonId, "Chief Financial Officer",  null, null, null, null, null, null, null, acmeLeavePolicyId, now));
+                PositionProfile.Create(posCfoId,        acmeId, deptFinanceId, locLondonId, "Chief Financial Officer",  null, null, null, null, null, null, null, acmeLeavePolicyId, now),
+                PositionProfile.Create(posMarketingCoordId, acmeId, deptSalesId, locLondonId, "Marketing Coordinator",  null, null, null, null, null, null, null, acmeLeavePolicyId, now),
+                PositionProfile.Create(posQaEngId,      acmeId, deptEngId,     locLondonId, "QA Engineer",              null, null, null, null, null, null, null, acmeLeavePolicyId, now));
 
             var empCtoId      = Guid.Parse("30000000-0000-0000-0000-000000000001");
             var empSenDev1Id  = Guid.Parse("30000000-0000-0000-0000-000000000002");

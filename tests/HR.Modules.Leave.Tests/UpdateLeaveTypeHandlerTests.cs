@@ -92,6 +92,113 @@ public class UpdateLeaveTypeHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Renaming_System_LeaveType()
+    {
+        // Item 50: a system leave type (e.g. the platform-provisioned Annual Leave) can never be
+        // renamed. Other fields (code, default entitlement, accrual method, behaviour,
+        // tracks-balance) remain editable.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var entity = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now, isSystem: true);
+        db.LeaveTypes.Add(entity);
+        await db.SaveChangesAsync();
+
+        var handler = new UpdateLeaveTypeHandler(db, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateLeaveTypeRequest
+        {
+            CompanyId = companyId,
+            Id = entity.Id,
+            Name = "Annual Holiday",
+            Code = "ANNUAL",
+            DefaultEntitlementDays = 28,
+            AccrualMethod = AccrualMethod.Monthly,
+            Behaviour = LeaveTypeBehaviour.Standard
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Contains("system leave type", result.Error.Message);
+
+        var saved = await db.LeaveTypes.SingleAsync();
+        Assert.Equal("Annual Leave", saved.Name);
+        // Non-name fields remain editable even though the rename was rejected — the whole request
+        // fails atomically, so DefaultEntitlementDays should also be unchanged here.
+        Assert.Equal(25, saved.DefaultEntitlementDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Updates_NonName_Fields_On_System_LeaveType_When_Name_Unchanged()
+    {
+        // A system leave type's other fields (default entitlement, etc.) remain editable as long
+        // as the Name itself is submitted unchanged.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var entity = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now, isSystem: true);
+        db.LeaveTypes.Add(entity);
+        await db.SaveChangesAsync();
+
+        var handler = new UpdateLeaveTypeHandler(db, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateLeaveTypeRequest
+        {
+            CompanyId = companyId,
+            Id = entity.Id,
+            Name = "Annual Leave",
+            Code = "ANNUAL",
+            DefaultEntitlementDays = 30,
+            AccrualMethod = AccrualMethod.Monthly,
+            Behaviour = LeaveTypeBehaviour.Standard
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var saved = await db.LeaveTypes.SingleAsync();
+        Assert.Equal("Annual Leave", saved.Name);
+        Assert.Equal(30, saved.DefaultEntitlementDays);
+        Assert.True(saved.IsSystem);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Renames_NonSystem_LeaveType_Unaffected_By_IsSystem_Restriction()
+    {
+        // Confirms the IsSystem guard is opt-in: an ordinary (non-system) leave type can still be
+        // renamed exactly as before.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var entity = LeaveType.Create(Guid.NewGuid(), companyId, "Compassionate Leave", "COMPASSIONATE", 5,
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now, isSystem: false);
+        db.LeaveTypes.Add(entity);
+        await db.SaveChangesAsync();
+
+        var handler = new UpdateLeaveTypeHandler(db, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateLeaveTypeRequest
+        {
+            CompanyId = companyId,
+            Id = entity.Id,
+            Name = "Bereavement Leave",
+            Code = "COMPASSIONATE",
+            DefaultEntitlementDays = 5,
+            AccrualMethod = AccrualMethod.None,
+            Behaviour = LeaveTypeBehaviour.Standard
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var saved = await db.LeaveTypes.SingleAsync();
+        Assert.Equal("Bereavement Leave", saved.Name);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_Conflict_When_Code_Taken_By_Another_Type()
     {
         await using var db = BuildContext();

@@ -1,6 +1,8 @@
 using HR.Marketing.Components;
 using HR.Marketing.Models;
 using HR.Marketing.Services;
+using System.Security;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
@@ -53,6 +55,36 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+
+app.MapGet("/robots.txt", (HttpRequest request) =>
+{
+    var origin = $"{request.Scheme}://{request.Host}";
+    return Results.Text($"User-agent: *\nAllow: /\n\nSitemap: {origin}/sitemap.xml\n", "text/plain");
+});
+
+app.MapGet("/sitemap.xml", (HttpRequest request) =>
+{
+    var origin = $"{request.Scheme}://{request.Host}";
+    var paths = new[]
+    {
+        "", "features", "pricing", "contact", "roadmap", "security", "privacy-policy",
+        "subprocessors", "terms-of-service", "cookie-policy", "acceptable-use-policy",
+        "data-processing-agreement"
+    }.Concat(FeatureCatalog.All.Select(feature => $"features/{feature.Slug}"));
+
+    var xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+        .AppendLine("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
+    foreach (var path in paths)
+    {
+        xml.Append("  <url><loc>")
+            .Append(SecurityElement.Escape($"{origin}/{path}"))
+            .AppendLine("</loc></url>");
+    }
+    xml.AppendLine("</urlset>");
+    return Results.Text(xml.ToString(), "application/xml");
+});
+
+app.MapGet("/coming-soon", () => Results.Redirect("/roadmap", permanent: true));
 app.MapRazorComponents<App>();
 app.MapDefaultEndpoints();
 

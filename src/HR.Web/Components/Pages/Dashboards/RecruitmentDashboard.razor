@@ -2,80 +2,178 @@
 @rendermode InteractiveServer
 @using HR.Web.Components.Pages.Recruitment
 @using HR.Web.Components.Pages.Employees
+@using Syncfusion.Blazor.Inputs
 @inject AppSession Session
 @inject NavigationManager Navigation
 @inject VacancyService VacancyService
+@inject InterviewService InterviewService
+@inject ApplicationService ApplicationService
+@inject RecruitmentStageService RecruitmentStageService
 
 <PageTitle>Recruitment Dashboard</PageTitle>
 
 @if (_ready)
 {
-    <div class="container-fluid py-4">
-        <div class="dashboard-greeting mb-4">
-            <h1 class="dashboard-heading">@Greeting(), @Session.FirstName</h1>
-            <p class="text-muted mb-0">@DateTime.Now.ToString("dddd, d MMMM yyyy")</p>
+    <div class="container-fluid py-4 recruitment-dashboard">
+        <div class="recruitment-dashboard-header mb-3">
+            <div>
+                <h1 class="dashboard-heading mb-1">Recruitment</h1>
+                <p class="text-muted mb-0">@HeaderSummary()</p>
+            </div>
+            <div class="recruitment-dashboard-actions">
+                <SfButton IsPrimary="true" CssClass="recruitment-dashboard-action-btn"
+                          OnClick="NavigateToNewVacancy" data-testid="recruitment-dashboard-create-vacancy-btn">
+                    <i class="fa-solid fa-plus me-1"></i>Create vacancy
+                </SfButton>
+                <SfButton CssClass="recruitment-dashboard-action-btn"
+                          OnClick="NavigateToNewCandidate" data-testid="recruitment-dashboard-add-candidate-btn">
+                    <i class="fa-solid fa-user-plus me-1"></i>Add candidate
+                </SfButton>
+            </div>
         </div>
 
         <DashboardSwitcher />
 
-        <div class="dashboard-overview-row">
-            <HiringPipelineChart />
-            <NewHiresTrendChart />
-        </div>
-
-        <section class="dashboard-section">
-            <h2 class="dashboard-section-title">Recruitment</h2>
-            <div class="dashboard-detail-grid">
-                <RecruitmentSummaryWidget />
-                <UpcomingInterviewsWidget />
-                <OffersAwaitingResponseWidget />
-                <OpenVacanciesNoActivityWidget />
-            </div>
-        </section>
-
-        <section class="dashboard-section">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                <h2 class="dashboard-section-title mb-0">Recruitment Pipeline</h2>
-                <div class="recruitment-dashboard-view-toggle" data-testid="recruitment-view-toggle">
-                    <SfButton CssClass="@(_view == PipelineView.Board ? "e-active" : "")" OnClick="() => SetView(PipelineView.Board)" data-testid="recruitment-view-board-btn">
-                        <i class="fa-solid fa-table-columns me-1"></i>Board
-                    </SfButton>
-                    <SfButton CssClass="@(_view == PipelineView.List ? "e-active" : "")" OnClick="() => SetView(PipelineView.List)" data-testid="recruitment-view-list-btn">
-                        <i class="fa-solid fa-list me-1"></i>List
-                    </SfButton>
-                </div>
-            </div>
-
-            @if (_view == PipelineView.Board)
+        <!-- Compact, actionable metric row (redesign brief §2). Kept separate from the more
+             detailed RecruitmentSummaryWidget (reused below, in the Activity tab) rather than
+             replacing it — this row is about "where should I click next", the widget below is
+             about the same few numbers presented as a normal dashboard KPI card. -->
+        <section class="dashboard-section mb-4" aria-label="Recruitment summary">
+            @if (_summaryLoading)
             {
-                <div class="mb-3 recruitment-dashboard-vacancy-picker">
-                    <label class="form-label">Vacancy</label>
-                    <SfDropDownList TValue="Guid?" TItem="VacancyListItemModel"
-                                    DataSource="@_vacancies" @bind-Value="_selectedVacancyId"
-                                    Placeholder="Select a vacancy" AllowFiltering="true"
-                                    data-testid="recruitment-board-vacancy-picker">
-                        <DropDownListFieldSettings Value="Id" Text="EffectiveTitle" />
-                    </SfDropDownList>
-                </div>
-
-                @if (_vacanciesLoading)
-                {
-                    <HrLoadingIndicator Label="Loading vacancies…" />
-                }
-                else if (_vacancies.Count == 0)
-                {
-                    <p class="text-muted">No open vacancies to show on the board yet.</p>
-                }
-                else if (_selectedVacancyId is Guid vacancyId && vacancyId != Guid.Empty)
-                {
-                    <VacancyKanbanBoard CompanyId="Session.CompanyId" VacancyId="vacancyId" @bind-SearchText="_boardSearchText" />
-                }
+                <HrLoadingIndicator Label="Loading recruitment summary…" />
             }
             else
             {
-                <VacancyList CompanyId="Session.CompanyId" />
+                <div class="widget-card">
+                    <div class="widget-kpi-row" role="list">
+                        <RecruitmentSummaryTile Label="Open vacancies" Value="_openVacancies"
+                                                 Href="@($"/companies/{Session.CompanyId}/vacancies")" />
+                        <RecruitmentSummaryTile Label="New applications" Value="_newApplications"
+                                                 Href="@($"/companies/{Session.CompanyId}/vacancies")" />
+                        <RecruitmentSummaryTile Label="Interviews requiring action" Value="_interviewsRequiringAction"
+                                                 Href="#" OnClick="@(() => SetTab(DashboardTab.Activity))" />
+                        <RecruitmentSummaryTile Label="Offers awaiting response" Value="_offersAwaitingResponse"
+                                                 Href="#" OnClick="@(() => SetTab(DashboardTab.Activity))" />
+                        <RecruitmentSummaryTile Label="Stale vacancies" Value="_staleVacancies"
+                                                 Href="@($"/companies/{Session.CompanyId}/vacancies")" Muted="@(_staleVacancies == 0)" />
+                    </div>
+                </div>
             }
         </section>
+
+        <ul class="nav nav-tabs recruitment-dashboard-tabs mb-3" role="tablist" aria-label="Recruitment dashboard sections">
+            <li class="nav-item" role="presentation">
+                <button type="button" class="nav-link @(_tab == DashboardTab.Pipeline ? "active" : "")"
+                        role="tab" aria-selected="@(_tab == DashboardTab.Pipeline ? "true" : "false")"
+                        data-testid="recruitment-tab-pipeline" @onclick="() => SetTab(DashboardTab.Pipeline)">
+                    <i class="fa-solid fa-diagram-project me-1"></i>Pipeline
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button type="button" class="nav-link @(_tab == DashboardTab.Activity ? "active" : "")"
+                        role="tab" aria-selected="@(_tab == DashboardTab.Activity ? "true" : "false")"
+                        data-testid="recruitment-tab-activity" @onclick="() => SetTab(DashboardTab.Activity)">
+                    <i class="fa-solid fa-bell me-1"></i>Activity
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button type="button" class="nav-link @(_tab == DashboardTab.Insights ? "active" : "")"
+                        role="tab" aria-selected="@(_tab == DashboardTab.Insights ? "true" : "false")"
+                        data-testid="recruitment-tab-insights" @onclick="() => SetTab(DashboardTab.Insights)">
+                    <i class="fa-solid fa-chart-simple me-1"></i>Insights
+                </button>
+            </li>
+        </ul>
+
+        @if (_tab == DashboardTab.Pipeline)
+        {
+            <section class="dashboard-section" aria-label="Recruitment pipeline">
+                <h2 class="dashboard-section-title">Pipeline</h2>
+
+                <div class="recruitment-dashboard-toolbar mb-3">
+                    @if (_view == PipelineView.Board)
+                    {
+                        <div class="recruitment-dashboard-vacancy-picker">
+                            <SfDropDownList TValue="Guid?" TItem="VacancyListItemModel"
+                                            DataSource="@_vacancies" @bind-Value="_selectedVacancyId"
+                                            Placeholder="Select a vacancy" AllowFiltering="true"
+                                            data-testid="recruitment-board-vacancy-picker">
+                                <DropDownListFieldSettings Value="Id" Text="EffectiveTitle" />
+                            </SfDropDownList>
+                        </div>
+                        <SfTextBox Placeholder="Search by name or email…"
+                                   Value="@_boardSearchText"
+                                   ValueChange="OnBoardSearchChanged"
+                                   CssClass="recruitment-dashboard-search"
+                                   data-testid="kanban-search-box" />
+                        <div class="form-check recruitment-dashboard-terminal-toggle">
+                            <input class="form-check-input" type="checkbox" id="show-terminal-stages"
+                                   checked="@_showTerminalStages" @onchange="OnShowTerminalStagesChanged" />
+                            <label class="form-check-label" for="show-terminal-stages">
+                                Show closed candidates
+                            </label>
+                        </div>
+                    }
+                    <div class="recruitment-dashboard-view-toggle ms-auto" data-testid="recruitment-view-toggle">
+                        <SfButton CssClass="@(_view == PipelineView.Board ? "e-active" : "")" OnClick="() => SetView(PipelineView.Board)" data-testid="recruitment-view-board-btn">
+                            <i class="fa-solid fa-table-columns me-1"></i>Board
+                        </SfButton>
+                        <SfButton CssClass="@(_view == PipelineView.List ? "e-active" : "")" OnClick="() => SetView(PipelineView.List)" data-testid="recruitment-view-list-btn">
+                            <i class="fa-solid fa-list me-1"></i>List
+                        </SfButton>
+                    </div>
+                </div>
+
+                @if (_view == PipelineView.Board)
+                {
+                    @if (_vacanciesLoading)
+                    {
+                        <HrLoadingIndicator Label="Loading vacancies…" />
+                    }
+                    else if (_vacancies.Count == 0)
+                    {
+                        <div class="widget-empty">
+                            <i class="fa-solid fa-user-tie fa-lg mb-2"></i>
+                            <p class="mb-0">No open vacancies to show on the board yet.</p>
+                        </div>
+                    }
+                    else if (_selectedVacancyId is Guid vacancyId && vacancyId != Guid.Empty)
+                    {
+                        <VacancyKanbanBoard CompanyId="Session.CompanyId" VacancyId="vacancyId"
+                                             @bind-SearchText="_boardSearchText"
+                                             ShowTerminalStages="_showTerminalStages"
+                                             ShowToolbar="false" />
+                    }
+                }
+                else
+                {
+                    <VacancyList CompanyId="Session.CompanyId" />
+                }
+            </section>
+        }
+        else if (_tab == DashboardTab.Activity)
+        {
+            <section class="dashboard-section" aria-label="Recruitment activity">
+                <h2 class="dashboard-section-title">Activity</h2>
+                <div class="dashboard-detail-grid">
+                    <RecruitmentSummaryWidget />
+                    <UpcomingInterviewsWidget />
+                    <OffersAwaitingResponseWidget />
+                    <OpenVacanciesNoActivityWidget />
+                </div>
+            </section>
+        }
+        else
+        {
+            <section class="dashboard-section" aria-label="Recruitment insights">
+                <h2 class="dashboard-section-title">Insights</h2>
+                <div class="dashboard-overview-row">
+                    <HiringPipelineChart />
+                    <NewHiresTrendChart />
+                </div>
+            </section>
+        }
     </div>
 }
 
@@ -84,19 +182,33 @@
     // Recruiter role bounces to MyProfileUrl. The switcher/redirect only pick a default.
     private bool _ready;
 
+    private enum DashboardTab { Pipeline, Activity, Insights }
+    private DashboardTab _tab = DashboardTab.Pipeline;
+
     // Judgement call ("remembers filters"): the Kanban board is per-vacancy (see
-    // GetRecruitmentKanban's contract), so the dashboard needs a vacancy picker above it. Board/List
-    // toggle state, the selected vacancy, and the board's search text are all held here as plain
-    // in-memory fields — scoped to this component instance's circuit lifetime, same as any other
-    // Blazor Server page state. No new persistence mechanism (session storage, cookies, etc.) exists
-    // elsewhere in this codebase for "remember during session" UI state, so none was introduced here;
-    // navigating away and back within the same circuit keeps the selection, a full reload resets it.
+    // GetRecruitmentKanban's contract), so the dashboard needs a vacancy picker above it. Tab
+    // selection, Board/List toggle state, the selected vacancy, the board's search text, and the
+    // terminal-stage toggle are all held here as plain in-memory fields — scoped to this component
+    // instance's circuit lifetime, same as any other Blazor Server page state. No new persistence
+    // mechanism (session storage, cookies, etc.) exists elsewhere in this codebase for "remember
+    // during session" UI state, so none was introduced here; navigating away and back within the
+    // same circuit keeps the selection (including which tab was active), a full reload resets it.
     private enum PipelineView { Board, List }
     private PipelineView _view = PipelineView.Board;
     private List<VacancyListItemModel> _vacancies = [];
     private bool _vacanciesLoading = true;
     private Guid? _selectedVacancyId;
     private string _boardSearchText = string.Empty;
+    private bool _showTerminalStages;
+
+    // ── Summary row state ───────────────────────────────────────────────────
+    private bool _summaryLoading = true;
+    private int _openVacancies;
+    private int _newApplications;
+    private int _interviewsRequiringAction;
+    private int _offersAwaitingResponse;
+    private int _staleVacancies;
+    private int _candidatesInProgress;
 
     protected override async Task OnInitializedAsync()
     {
@@ -110,17 +222,77 @@
 
         _ready = true;
 
-        var result = await VacancyService.ListVacanciesAsync(Session.CompanyId, status: "Open");
-        _vacancies = result?.Items.ToList() ?? [];
+        var vacancyResultTask = VacancyService.ListVacanciesAsync(Session.CompanyId, status: "Open");
+        var pipelineTask = VacancyService.GetPipelineSummaryAsync(Session.CompanyId);
+        var interviewsTodayTask = InterviewService.GetInterviewsTodayCountAsync(Session.CompanyId);
+        var staleTask = VacancyService.GetStaleVacanciesAsync(Session.CompanyId);
+        var stagesTask = RecruitmentStageService.ListStagesAsync(Session.CompanyId);
+
+        await Task.WhenAll(vacancyResultTask, pipelineTask, interviewsTodayTask, staleTask, stagesTask);
+
+        var vacancyResult = await vacancyResultTask;
+        _vacancies = vacancyResult?.Items.ToList() ?? [];
         _selectedVacancyId = _vacancies.FirstOrDefault()?.Id;
         _vacanciesLoading = false;
+        _openVacancies = _vacancies.Count;
+
+        // GetPipelineSummary returns the company's active, non-terminal stages in DisplayOrder
+        // (see HiringPipelineChart's identical use of this endpoint). "New applications" has no
+        // dedicated backend signal, so the closest available one is the application count sitting
+        // in the very first (entry) non-terminal stage — i.e. candidates who have applied but not
+        // yet been moved anywhere.
+        var pipeline = (await pipelineTask)?.Items ?? [];
+        _newApplications = pipeline.FirstOrDefault()?.ApplicationCount ?? 0;
+        _candidatesInProgress = pipeline.Sum(p => p.ApplicationCount);
+
+        // "Interviews requiring action" — no dedicated "needs action" flag exists on interviews, so
+        // today's scheduled interview count (the same figure RecruitmentSummaryWidget's "Interviews
+        // Today" KPI already uses) is the closest available proxy: an interview happening today is
+        // the one most likely to need a recruiter's attention right now.
+        _interviewsRequiringAction = (await interviewsTodayTask)?.Count ?? 0;
+
+        _staleVacancies = (await staleTask)?.Items.Count ?? 0;
+
+        // Mirrors OffersAwaitingResponseWidget's own derivation exactly (see that component's
+        // comments for the full rationale): the last active non-terminal stage, ordered by
+        // DisplayOrder, is the same definition OfferCandidateHandler uses server-side for "Offer".
+        var stages = (await stagesTask)?.Items ?? [];
+        var offerStageId = stages
+            .Where(s => s.IsActive && !s.IsTerminal)
+            .OrderByDescending(s => s.DisplayOrder)
+            .FirstOrDefault()?.Id;
+
+        if (offerStageId is { } offerId)
+        {
+            var offersResult = await ApplicationService.GetApplicationsByStatusAsync(Session.CompanyId, offerId);
+            _offersAwaitingResponse = offersResult?.Items.Count ?? 0;
+        }
+
+        _summaryLoading = false;
     }
+
+    private string HeaderSummary() =>
+        $"{Pluralize(_openVacancies, "open vacancy", "open vacancies")} · " +
+        $"{Pluralize(_candidatesInProgress, "candidate", "candidates")} in progress";
+
+    // Small pluralization helper (matches ManagerDashboard.razor's ActivitySummary pattern) — avoids
+    // grammatically wrong copy like "1 open vacancies" on the header summary line.
+    private static string Pluralize(int count, string singular, string plural) =>
+        count == 1 ? $"1 {singular}" : $"{count} {plural}";
+
+    private void SetTab(DashboardTab tab) => _tab = tab;
 
     private void SetView(PipelineView view) => _view = view;
 
-    private static string Greeting()
-    {
-        var hour = DateTime.Now.Hour;
-        return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-    }
+    private void OnShowTerminalStagesChanged(Microsoft.AspNetCore.Components.ChangeEventArgs args) =>
+        _showTerminalStages = args.Value is bool b && b;
+
+    private void OnBoardSearchChanged(Syncfusion.Blazor.Inputs.ChangedEventArgs args) =>
+        _boardSearchText = args.Value ?? string.Empty;
+
+    private void NavigateToNewVacancy() =>
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/vacancies/new");
+
+    private void NavigateToNewCandidate() =>
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/candidates/new");
 }

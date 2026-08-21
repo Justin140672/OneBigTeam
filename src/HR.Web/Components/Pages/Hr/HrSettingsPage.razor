@@ -9,7 +9,7 @@
 
 <PageTitle>HR Settings</PageTitle>
 
-<div class="container py-4">
+<div class="container py-4 hr-settings-page">
     @if (IsLoading)
     {
         <HrLoadingIndicator />
@@ -26,200 +26,263 @@
 
         <EditForm EditContext="EditContext">
             <DataAnnotationsValidator />
-            <div class="card">
-                <div class="card-body">
-                    <div class="row g-4">
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Working Week</label>
-                            <div class="d-flex flex-wrap gap-3 mt-1">
-                                @foreach (var day in AllDays)
-                                {
-                                    <SfCheckBox TChecked="bool" Label="@day"
-                                                Checked="@Model.WorkingWeek.Contains(day)"
-                                                CheckedChanged="@(e => ToggleDay(day, e))" />
-                                }
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Hours Per Day</label>
-                            <SfNumericTextBox TValue="decimal" @bind-Value="Model.HoursPerDay"
-                                              ShowSpinButton="false"
-                                              Min="0.5m" Max="24m" Step="0.5m" />
-                            <ValidationMessage For="@(() => Model.HoursPerDay)" />
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Leave Year Start Month</label>
-                            <SfDropDownList TValue="int" TItem="MonthItem"
-                                            @bind-Value="Model.LeaveYearStartMonth"
-                                            DataSource="@Months">
-                                <DropDownListFieldSettings Value="Number" Text="Name" />
-                            </SfDropDownList>
-                            <div class="form-text">The month each employee's annual leave allowance resets.</div>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Default Holiday Allowance (days)</label>
-                            <SfNumericTextBox TValue="decimal" @bind-Value="Model.DefaultHolidayAllowance"
-                                              ShowSpinButton="false"
-                                              Min="0" Max="365" />
-                            <ValidationMessage For="@(() => Model.DefaultHolidayAllowance)" />
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Probation Months</label>
-                            <SfNumericTextBox TValue="int" @bind-Value="Model.ProbationMonths"
-                                              ShowSpinButton="false"
-                                              Min="0" Max="24" />
-                            <ValidationMessage For="@(() => Model.ProbationMonths)" />
-                        </div>
-                        <div class="col-12">
-                            <SfCheckBox TChecked="bool" Label="Exclude public holidays from leave"
-                                        Checked="@Model.ExcludePublicHolidaysFromLeave"
-                                        CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromLeave = v)" />
-                        </div>
-                        <div class="col-12">
-                            <SfCheckBox TChecked="bool" Label="Display salary to employees on their profile"
-                                        Checked="@Model.DisplaySalaryOnEmployeeProfile"
-                                        CheckedChanged="@((bool v) => Model.DisplaySalaryOnEmployeeProfile = v)" />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Sickness</label>
-                        </div>
-                        <div class="col-12">
-                            <SfCheckBox TChecked="bool" Label="Exclude public holidays from sickness"
-                                        Checked="@Model.ExcludePublicHolidaysFromSickness"
-                                        CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromSickness = v)" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Fit Note Required After (Days)</label>
-                            <SfNumericTextBox TValue="int" @bind-Value="Model.FitNoteRequiredAfterDays"
-                                              ShowSpinButton="false"
-                                              Min="1" />
-                            <ValidationMessage For="@(() => Model.FitNoteRequiredAfterDays)" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Return-to-Work Review Required After (Days)</label>
-                            <SfNumericTextBox TValue="int" @bind-Value="Model.ReturnToWorkRequiredAfterDays"
-                                              ShowSpinButton="false"
-                                              Min="1" />
-                            <ValidationMessage For="@(() => Model.ReturnToWorkRequiredAfterDays)" />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Document Acknowledgement</label>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Default Acknowledgement Statement</label>
-                            <HrTextBox @bind-Value="Model.DefaultAcknowledgementStatement"
-                                       Placeholder="I confirm that I have read and understood this document."
-                                       Multiline="true"
-                                       Maxlength="2000" />
-                            <div class="form-text">
-                                Shown to employees by default when a shared document requires acknowledgement and no
-                                document-specific statement is set. Plain text only — line breaks are preserved but no
-                                formatting/markup.
-                            </div>
-                            <div class="text-muted small text-end">@(Model.DefaultAcknowledgementStatement?.Length ?? 0) / 2000</div>
-                            <ValidationMessage For="@(() => Model.DefaultAcknowledgementStatement)" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Acknowledgement Reminder Interval (days)</label>
-                            <SfNumericTextBox TValue="int" @bind-Value="Model.AcknowledgementReminderIntervalDays"
-                                              ShowSpinButton="false"
-                                              Min="1" />
-                            <ValidationMessage For="@(() => Model.AcknowledgementReminderIntervalDays)" />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Leaving Process</label>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Default Notice Period <span class="text-danger">*</span></label>
-                            <SfDropDownList TValue="string" TItem="NoticePeriodPresetItem"
-                                            Value="_selectedNoticePeriodPreset"
-                                            ValueChanged="@OnNoticePeriodPresetChanged"
-                                            DataSource="@NoticePeriodPresets">
-                                <DropDownListFieldSettings Value="Value" Text="Label" />
-                            </SfDropDownList>
-                        </div>
-                        @if (_selectedNoticePeriodPreset == CustomPresetValue)
-                        {
-                            <div class="col-md-4">
-                                <label class="form-label">Unit <span class="text-danger">*</span></label>
-                                <SfDropDownList TValue="NoticePeriodUnit" TItem="NoticePeriodUnitOption"
-                                                @bind-Value="Model.NoticePeriodUnit"
-                                                DataSource="@NoticePeriodUnitOptions">
-                                    <DropDownListFieldSettings Value="Value" Text="Label" />
-                                </SfDropDownList>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Length</label>
-                                <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
-                                                  ShowSpinButton="false"
-                                                  Min="1" />
-                                <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
-                            </div>
-                        }
-                        <div class="col-12">
-                            <SfCheckBox TChecked="bool" Label="Automatically disable system access on the employee's leaving date"
-                                        Checked="@Model.AutoDisableAccessOnLeavingDate"
-                                        CheckedChanged="@((bool v) => Model.AutoDisableAccessOnLeavingDate = v)" />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Employee Numbering</label>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Numbering Mode</label>
-                            <SfDropDownList TValue="EmployeeNumberMode" TItem="EmployeeNumberModeOption"
-                                            @bind-Value="Model.EmployeeNumberMode"
-                                            DataSource="@EmployeeNumberModeOptions">
-                                <DropDownListFieldSettings Value="Value" Text="Label" />
-                            </SfDropDownList>
-                        </div>
-                        @if (Model.EmployeeNumberMode == EmployeeNumberMode.Automatic)
-                        {
-                            <div class="col-md-4">
-                                <label class="form-label">Prefix</label>
-                                <HrTextBox @bind-Value="Model.EmployeeNumberPrefix" Placeholder="Prefix (e.g. EMP-)" />
-                                <div class="form-text">
-                                    Changing the prefix only affects employee numbers assigned in the future —
-                                    existing employees' numbers are never changed retroactively.
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Next Number</label>
-                                <SfNumericTextBox TValue="int" @bind-Value="Model.NextEmployeeNumber"
-                                                  ShowSpinButton="false"
-                                                  Min="1" />
-                                <ValidationMessage For="@(() => Model.NextEmployeeNumber)" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Minimum Numeric Length</label>
-                                <SfNumericTextBox TValue="int" @bind-Value="Model.EmployeeNumberMinimumLength"
-                                                  ShowSpinButton="false"
-                                                  Min="1" Max="10" />
-                                <ValidationMessage For="@(() => Model.EmployeeNumberMinimumLength)" />
-                            </div>
-                            <div class="col-12">
-                                <p class="text-muted mb-0">Preview: <strong>@PreviewEmployeeNumber</strong></p>
-                            </div>
-                            @if (Session.CanManageEmployees)
-                            {
-                                <div class="col-12">
-                                    <SfButton OnClick="OpenBackfillDialog">Backfill Employee Numbers…</SfButton>
-                                    <div class="form-text">
-                                        Assigns employee numbers to existing employees who don't have one yet, in start-date order.
+
+            <SfTab @bind-SelectedItem="_activeTabIndex" OverflowMode="OverflowMode.Scrollable" CssClass="hr-settings-tabs">
+                <TabItems>
+                    <TabItem>
+                        <ChildContent>
+                            <TabHeader Text="Working & Leave" IconCss="@ErrorIconCss(0)" />
+                        </ChildContent>
+                        <ContentTemplate>
+                            <div class="card mt-3">
+                                <div class="card-body">
+                                    <div class="row g-4">
+                                        <div class="col-12">
+                                            <label class="form-label fw-semibold">Working Week</label>
+                                            <div class="d-flex flex-wrap gap-3 mt-1">
+                                                @foreach (var day in AllDays)
+                                                {
+                                                    <SfCheckBox TChecked="bool" Label="@day"
+                                                                Checked="@Model.WorkingWeek.Contains(day)"
+                                                                CheckedChanged="@(e => ToggleDay(day, e))" />
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Hours Per Day</label>
+                                            <SfNumericTextBox TValue="decimal" @bind-Value="Model.HoursPerDay"
+                                                              ShowSpinButton="false"
+                                                              Min="0.5m" Max="24m" Step="0.5m" />
+                                            <ValidationMessage For="@(() => Model.HoursPerDay)" />
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Leave Year Start Month</label>
+                                            <SfDropDownList TValue="int" TItem="MonthItem"
+                                                            @bind-Value="Model.LeaveYearStartMonth"
+                                                            DataSource="@Months">
+                                                <DropDownListFieldSettings Value="Number" Text="Name" />
+                                            </SfDropDownList>
+                                            <div class="form-text">The month each employee's annual leave allowance resets.</div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Default Holiday Allowance (days)</label>
+                                            <SfNumericTextBox TValue="decimal" @bind-Value="Model.DefaultHolidayAllowance"
+                                                              ShowSpinButton="false"
+                                                              Min="0" Max="365" />
+                                            <ValidationMessage For="@(() => Model.DefaultHolidayAllowance)" />
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Probation Months</label>
+                                            <SfNumericTextBox TValue="int" @bind-Value="Model.ProbationMonths"
+                                                              ShowSpinButton="false"
+                                                              Min="0" Max="24" />
+                                            <ValidationMessage For="@(() => Model.ProbationMonths)" />
+                                        </div>
+                                        <div class="col-12">
+                                            <SfCheckBox TChecked="bool" Label="Exclude public holidays from leave"
+                                                        Checked="@Model.ExcludePublicHolidaysFromLeave"
+                                                        CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromLeave = v)" />
+                                        </div>
+                                        <div class="col-12">
+                                            <SfCheckBox TChecked="bool" Label="Display salary to employees on their profile"
+                                                        Checked="@Model.DisplaySalaryOnEmployeeProfile"
+                                                        CheckedChanged="@((bool v) => Model.DisplaySalaryOnEmployeeProfile = v)" />
+                                        </div>
                                     </div>
                                 </div>
-                            }
-                            else
-                            {
-                                <div class="col-12">
-                                    <p class="text-muted mb-0">
-                                        Backfilling employee numbers requires HR Administrator permissions.
-                                    </p>
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+
+                    <TabItem>
+                        <ChildContent>
+                            <TabHeader Text="Sickness" IconCss="@ErrorIconCss(1)" />
+                        </ChildContent>
+                        <ContentTemplate>
+                            <div class="card mt-3">
+                                <div class="card-body">
+                                    <div class="row g-4">
+                                        <div class="col-12">
+                                            <SfCheckBox TChecked="bool" Label="Exclude public holidays from sickness"
+                                                        Checked="@Model.ExcludePublicHolidaysFromSickness"
+                                                        CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromSickness = v)" />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Fit Note Required After (Days)</label>
+                                            <SfNumericTextBox TValue="int" @bind-Value="Model.FitNoteRequiredAfterDays"
+                                                              ShowSpinButton="false"
+                                                              Min="1" />
+                                            <ValidationMessage For="@(() => Model.FitNoteRequiredAfterDays)" />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Return-to-Work Review Required After (Days)</label>
+                                            <SfNumericTextBox TValue="int" @bind-Value="Model.ReturnToWorkRequiredAfterDays"
+                                                              ShowSpinButton="false"
+                                                              Min="1" />
+                                            <ValidationMessage For="@(() => Model.ReturnToWorkRequiredAfterDays)" />
+                                        </div>
+                                    </div>
                                 </div>
-                            }
-                        }
-                    </div>
-                </div>
-            </div>
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+
+                    <TabItem>
+                        <ChildContent>
+                            <TabHeader Text="Documents" IconCss="@ErrorIconCss(2)" />
+                        </ChildContent>
+                        <ContentTemplate>
+                            <div class="card mt-3">
+                                <div class="card-body">
+                                    <div class="row g-4">
+                                        <div class="col-12">
+                                            <label class="form-label">Default Acknowledgement Statement</label>
+                                            <HrTextBox @bind-Value="Model.DefaultAcknowledgementStatement"
+                                                       Placeholder="I confirm that I have read and understood this document."
+                                                       Multiline="true"
+                                                       Maxlength="2000" />
+                                            <div class="form-text">
+                                                Shown to employees by default when a shared document requires acknowledgement and no
+                                                document-specific statement is set. Plain text only — line breaks are preserved but no
+                                                formatting/markup.
+                                            </div>
+                                            <div class="text-muted small text-end">@(Model.DefaultAcknowledgementStatement?.Length ?? 0) / 2000</div>
+                                            <ValidationMessage For="@(() => Model.DefaultAcknowledgementStatement)" />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Acknowledgement Reminder Interval (days)</label>
+                                            <SfNumericTextBox TValue="int" @bind-Value="Model.AcknowledgementReminderIntervalDays"
+                                                              ShowSpinButton="false"
+                                                              Min="1" />
+                                            <ValidationMessage For="@(() => Model.AcknowledgementReminderIntervalDays)" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+
+                    <TabItem>
+                        <ChildContent>
+                            <TabHeader Text="Leaving Process" IconCss="@ErrorIconCss(3)" />
+                        </ChildContent>
+                        <ContentTemplate>
+                            <div class="card mt-3">
+                                <div class="card-body">
+                                    <div class="row g-4">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Default Notice Period <span class="text-danger">*</span></label>
+                                            <SfDropDownList TValue="string" TItem="NoticePeriodPresetItem"
+                                                            Value="_selectedNoticePeriodPreset"
+                                                            ValueChanged="@OnNoticePeriodPresetChanged"
+                                                            DataSource="@NoticePeriodPresets">
+                                                <DropDownListFieldSettings Value="Value" Text="Label" />
+                                            </SfDropDownList>
+                                        </div>
+                                        @if (_selectedNoticePeriodPreset == CustomPresetValue)
+                                        {
+                                            <div class="col-md-4">
+                                                <label class="form-label">Unit <span class="text-danger">*</span></label>
+                                                <SfDropDownList TValue="NoticePeriodUnit" TItem="NoticePeriodUnitOption"
+                                                                @bind-Value="Model.NoticePeriodUnit"
+                                                                DataSource="@NoticePeriodUnitOptions">
+                                                    <DropDownListFieldSettings Value="Value" Text="Label" />
+                                                </SfDropDownList>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Length</label>
+                                                <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
+                                                                  ShowSpinButton="false"
+                                                                  Min="1" />
+                                                <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
+                                            </div>
+                                        }
+                                        <div class="col-12">
+                                            <SfCheckBox TChecked="bool" Label="Automatically disable system access on the employee's leaving date"
+                                                        Checked="@Model.AutoDisableAccessOnLeavingDate"
+                                                        CheckedChanged="@((bool v) => Model.AutoDisableAccessOnLeavingDate = v)" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+
+                    <TabItem>
+                        <ChildContent>
+                            <TabHeader Text="Employee Numbering" IconCss="@ErrorIconCss(4)" />
+                        </ChildContent>
+                        <ContentTemplate>
+                            <div class="card mt-3">
+                                <div class="card-body">
+                                    <div class="row g-4">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Numbering Mode</label>
+                                            <SfDropDownList TValue="EmployeeNumberMode" TItem="EmployeeNumberModeOption"
+                                                            @bind-Value="Model.EmployeeNumberMode"
+                                                            DataSource="@EmployeeNumberModeOptions">
+                                                <DropDownListFieldSettings Value="Value" Text="Label" />
+                                            </SfDropDownList>
+                                        </div>
+                                        @if (Model.EmployeeNumberMode == EmployeeNumberMode.Automatic)
+                                        {
+                                            <div class="col-md-4">
+                                                <label class="form-label">Prefix</label>
+                                                <HrTextBox @bind-Value="Model.EmployeeNumberPrefix" Placeholder="Prefix (e.g. EMP-)" />
+                                                <div class="form-text">
+                                                    Changing the prefix only affects employee numbers assigned in the future —
+                                                    existing employees' numbers are never changed retroactively.
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Next Number</label>
+                                                <SfNumericTextBox TValue="int" @bind-Value="Model.NextEmployeeNumber"
+                                                                  ShowSpinButton="false"
+                                                                  Min="1" />
+                                                <ValidationMessage For="@(() => Model.NextEmployeeNumber)" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Minimum Numeric Length</label>
+                                                <SfNumericTextBox TValue="int" @bind-Value="Model.EmployeeNumberMinimumLength"
+                                                                  ShowSpinButton="false"
+                                                                  Min="1" Max="10" />
+                                                <ValidationMessage For="@(() => Model.EmployeeNumberMinimumLength)" />
+                                            </div>
+                                            <div class="col-12">
+                                                <p class="text-muted mb-0">Preview: <strong>@PreviewEmployeeNumber</strong></p>
+                                            </div>
+
+                                            <div class="col-12">
+                                                <div class="hr-settings-action-card">
+                                                    <div class="hr-settings-action-card__body">
+                                                        <div>
+                                                            <h6 class="mb-1">Backfill Employee Numbers</h6>
+                                                            <p class="text-muted mb-0 small">
+                                                                Assigns employee numbers to existing employees who don't have one yet,
+                                                                in start-date order. This is an operational action, not a saved setting.
+                                                            </p>
+                                                        </div>
+                                                        @if (Session.CanManageEmployees)
+                                                        {
+                                                            <SfButton CssClass="flex-shrink-0" OnClick="OpenBackfillDialog">Backfill Employee Numbers…</SfButton>
+                                                        }
+                                                        else
+                                                        {
+                                                            <p class="text-muted mb-0 small flex-shrink-0">
+                                                                Requires HR Administrator permissions.
+                                                            </p>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                </TabItems>
+            </SfTab>
         </EditForm>
 
         <BackfillEmployeeNumbersDialog CompanyId="Id"
@@ -227,13 +290,13 @@
                                         OnClosed="@(() => _backfillDialogOpen = false)"
                                         OnCommitted="HandleBackfillCommittedAsync" />
 
-        <div class="mt-4 d-flex gap-2 align-items-center">
+        <div class="hr-settings-footer mt-4 d-flex gap-2 align-items-center">
             @if (!string.IsNullOrEmpty(SuccessMsg))
             {
                 <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@SuccessMsg</div>
             }
             <div class="ms-auto d-flex gap-2">
-                <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveClickedAsync">
                     @(Saving ? "Saving…" : "Save")
                 </SfButton>
                 <SfButton OnClick="RequestClose" Disabled="@Saving">Cancel</SfButton>
@@ -251,6 +314,13 @@
 
 @code {
     [Parameter] public Guid Id { get; set; }
+
+    // Selected tab persists across a hard page refresh via this query param (see
+    // SyncActiveTabFromQuery/OnAfterRenderAsync below) — 1-based in the URL for readability,
+    // 0-based internally to match SfTab's SelectedItem index.
+    [SupplyParameterFromQuery(Name = "tab")]
+    [Parameter]
+    public int? Tab { get; set; }
 
     private static readonly string[] AllDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -297,6 +367,111 @@
         // Refresh settings so the "Next Number" preview reflects the numbers just assigned.
         await LoadAsync();
         CaptureBaseline();
+    }
+
+    // ── Tabs ─────────────────────────────────────────────────────────────────────────────────
+
+    private int _activeTabIndex;
+
+    // Guards against EditPageBase's OnParametersSetAsync re-running LoadAsync() (which would
+    // overwrite in-progress edits with server data) every time we update the "?tab=" query
+    // string ourselves after a tab switch. LoadAsync() should only ever run once per real page
+    // visit — a fresh navigation to this route (including a hard refresh) — not on every
+    // parameter set caused by our own replace-navigation below.
+    private bool _initialised;
+
+    // Maps each validated field to the tab it lives on, so the tab header can show an error
+    // badge and a failed save can jump to the first tab containing an invalid field.
+    private static readonly (int Tab, string Field)[] TabFieldMap =
+    [
+        (0, nameof(HrSettingsEditModel.HoursPerDay)),
+        (0, nameof(HrSettingsEditModel.DefaultHolidayAllowance)),
+        (0, nameof(HrSettingsEditModel.ProbationMonths)),
+        (1, nameof(HrSettingsEditModel.FitNoteRequiredAfterDays)),
+        (1, nameof(HrSettingsEditModel.ReturnToWorkRequiredAfterDays)),
+        (2, nameof(HrSettingsEditModel.DefaultAcknowledgementStatement)),
+        (2, nameof(HrSettingsEditModel.AcknowledgementReminderIntervalDays)),
+        (3, nameof(HrSettingsEditModel.NoticePeriodLength)),
+        (4, nameof(HrSettingsEditModel.NextEmployeeNumber)),
+        (4, nameof(HrSettingsEditModel.EmployeeNumberMinimumLength)),
+    ];
+
+    private HashSet<int> _tabsWithErrors = [];
+
+    private string? ErrorIconCss(int tabIndex) =>
+        _tabsWithErrors.Contains(tabIndex) ? "fa-solid fa-circle-exclamation hr-settings-tab-error-icon" : null;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        EditContext.OnValidationStateChanged += (_, _) =>
+        {
+            RecomputeTabErrors();
+            StateHasChanged();
+        };
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_initialised)
+        {
+            SyncActiveTabFromQuery();
+            return;
+        }
+
+        _initialised = true;
+        await base.OnParametersSetAsync();
+        SyncActiveTabFromQuery();
+    }
+
+    private void SyncActiveTabFromQuery()
+    {
+        if (Tab is >= 1 and <= 5)
+            _activeTabIndex = Tab.Value - 1;
+
+        _lastSyncedTabIndex = _activeTabIndex;
+    }
+
+    // Tracks the last tab index reflected in the URL, so OnAfterRenderAsync only pushes a new
+    // "?tab=" query value when the user actually switches tabs (SfTab's @bind-SelectedItem),
+    // not on every render.
+    private int _lastSyncedTabIndex;
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_activeTabIndex != _lastSyncedTabIndex)
+        {
+            _lastSyncedTabIndex = _activeTabIndex;
+            var uri = Navigation.GetUriWithQueryParameter("tab", _activeTabIndex + 1);
+
+            // This only updates the "?tab=" query string to reflect the already-active tab — not
+            // a real navigation away from the page — so it must not trip the unsaved-changes
+            // guard (which would otherwise pop the "unsaved changes" dialog every time the user
+            // switches tabs while mid-edit).
+            SuppressNextNavigationGuard();
+            Navigation.NavigateTo(uri, replace: true);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void RecomputeTabErrors()
+    {
+        _tabsWithErrors = TabFieldMap
+            .Where(m => EditContext.GetValidationMessages(new FieldIdentifier(Model, m.Field)).Any())
+            .Select(m => m.Tab)
+            .ToHashSet();
+    }
+
+    private async Task SaveClickedAsync()
+    {
+        await SaveAsync();
+
+        // On failure, jump to the first tab (in tab order) containing an invalid field so the
+        // user immediately sees the problem. If the failure was a server-side error with no
+        // associated field (GlobalError set but no field-level messages), leave the tab as-is.
+        if (GlobalError is not null && _tabsWithErrors.Count > 0)
+            _activeTabIndex = _tabsWithErrors.Min();
     }
 
     protected override async Task LoadAsync()

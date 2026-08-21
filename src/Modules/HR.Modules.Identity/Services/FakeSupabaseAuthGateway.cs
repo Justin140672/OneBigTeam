@@ -29,8 +29,15 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
 {
     private readonly SupabaseAuthGateway _real = new(httpClientFactory, options);
 
+    // Must derive the SAME deterministic id SignInWithPasswordAsync will later compute for this
+    // email (see DeriveFakeUserId below) — self-service SignUp persists this returned id as
+    // UserProfile.SupabaseAuthUserId, and LoginHandler looks up the UserProfile by the id
+    // SignInWithPasswordAsync returns after a real form login. Previously returned Guid.NewGuid(),
+    // an unrelated random id that could never match the deterministic one sign-in computes, so
+    // every self-service-signed-up E2E account failed login with "Invalid email or password" even
+    // though Supabase-side auth itself "succeeded" (see LoginHandler's UserProfile-not-found path).
     public Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken) =>
-        Task.FromResult(Guid.NewGuid());
+        Task.FromResult(DeriveFakeUserId(email));
 
     public Task ResendVerificationEmailAsync(string email, string redirectTo, CancellationToken cancellationToken) =>
         Task.CompletedTask;

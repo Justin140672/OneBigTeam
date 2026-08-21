@@ -68,4 +68,17 @@ public sealed class SupabaseSessionAccessor(IHttpContextAccessor httpContextAcce
             Path = "/",
         });
     }
+
+    /// <summary>
+    /// Deletes the Supabase access-token session cookie set by <see cref="SetSessionCookie"/>. Used
+    /// by the "/logout" minimal API endpoint (see Program.cs) — same "must be a real HTTP
+    /// request/response, not mid-circuit" constraint as SetSessionCookie itself.
+    /// </summary>
+    public static void ClearSessionCookie(HttpContext context)
+    {
+        context.Response.Cookies.Delete(CookieName, new CookieOptions
+        {
+            Path = "/",
+        });
+    }
 }

@@ -41,7 +41,11 @@
                             <div class="row g-3">
                                 <div class="col-md-8">
                                     <label class="form-label">Name <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Annual Leave" />
+                                    <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Annual Leave" Enabled="@(!Model.IsSystem && !IsViewMode)" />
+                                    @if (Model.IsSystem)
+                                    {
+                                        <p class="text-muted small mb-0">This is a system leave type and cannot be renamed.</p>
+                                    }
                                     <ValidationMessage For="@(() => Model.Name)" />
                                 </div>
                                 <div class="col-md-4">
@@ -158,13 +162,14 @@
 
     protected override string? ListUrl => $"/companies/{CompanyId}/leave-types";
 
-    // Only the Annual Leave type record is allowed a default entitlement — matched by name since
-    // the domain model has no other "this is the annual leave type" concept to key off. Any other
-    // leave type's Default Days field is hidden in the form above and forced to 0 here before
-    // saving, so a value entered before a rename away from "Annual Leave" (or any other stale
-    // value) can never be silently persisted for a non-Annual-Leave type.
-    private bool IsAnnualLeave =>
-        string.Equals(Model.Name?.Trim(), "Annual Leave", StringComparison.OrdinalIgnoreCase);
+    // Only the Annual Leave type record is allowed a default entitlement — keyed off the
+    // IsSystem flag (see LeaveType.IsSystem / item 50) rather than matching Name, since Annual
+    // Leave can no longer be renamed anyway and this is more robust than a name comparison. Any
+    // other leave type's Default Days field is hidden in the form above and forced to 0 here
+    // before saving, so a stale value can never be silently persisted for a non-system type. For
+    // a brand-new (not-yet-saved) leave type, Model.IsSystem is always false — there is no way to
+    // create a system leave type via this form.
+    private bool IsAnnualLeave => Model.IsSystem;
 
     protected override async Task<string?> SaveCoreAsync()
     {

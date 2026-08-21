@@ -22,6 +22,7 @@ internal sealed class GetMyEmployeeHandler(EmployeesDbContext dbContext)
                 e.WorkingDaysOverride,
                 e.HoursPerDayOverride,
                 e.ProfileImageUrl,
+                e.RequiresInitialSetup,
                 JobTitle = dbContext.PositionProfiles
                     .Where(p => p.Id == e.PositionProfileId)
                     .Select(p => p.Title)
@@ -40,6 +41,7 @@ internal sealed class GetMyEmployeeHandler(EmployeesDbContext dbContext)
             result.JobTitle,
             result.WorkingDaysOverride,
             result.HoursPerDayOverride,
-            result.ProfileImageUrl));
+            result.ProfileImageUrl,
+            result.RequiresInitialSetup));
     }
 }

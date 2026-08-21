@@ -7,6 +7,15 @@ namespace HR.Web.E2E.Tests.Tests;
 /// <summary>
 /// Verifies that an HR Administrator can create a new employee and that
 /// the employee appears in the employee list afterwards.
+///
+/// Uses the seeded "QA Engineer" position profile (Engineering / London Office — same Department
+/// and Location as "Senior Software Engineer") rather than "Senior Software Engineer" itself for
+/// employee creation/assignment. VacancyDetail's "New Vacancy" Position Profile dropdown excludes
+/// any profile currently held by an active employee, and many Recruitment E2E tests depend on
+/// "Senior Software Engineer" remaining selectable there — since xUnit runs test classes in
+/// parallel with no ordering guarantee, assigning employees to "Senior Software Engineer" here
+/// would permanently hide it from those unrelated tests for the rest of the run once any test in
+/// this class executes.
 /// </summary>
 public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
@@ -63,9 +72,9 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
 
         // Department and Location are required too — selecting a Position Profile that has both
-        // attached ("Senior Software Engineer" is seeded with Engineering / London Office)
+        // attached ("QA Engineer" is seeded with Engineering / London Office)
         // pre-populates them, satisfying all three required fields in one step.
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
 
         // ── Step 5: Save the new employee ─────────────────────────────────────
         await empEdit.SaveNewEmployeeAsync();
@@ -90,7 +99,7 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
 
         // Department starts unset; selecting a profile with a Department attached should
         // pre-populate it and reveal the read-only "From Position Profile" summary card.
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
 
         Assert.True(await empEdit.HasPositionProfileDefaultsSummaryAsync(),
             "Expected the 'From Position Profile' defaults summary card to appear after selecting a profile");
@@ -113,9 +122,9 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
         await empList.GoToAsync(AcmeId);
         await empList.ClickNewEmployeeAsync();
 
-        // "Senior Software Engineer" is seeded with both a Department and a Location
+        // "QA Engineer" is seeded with both a Department and a Location
         // ("London Office") — selecting it should unconditionally overwrite both fields.
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
 
         Assert.True(await empEdit.HasPositionProfileDefaultsSummaryAsync(),
             "Expected the 'From Position Profile' defaults summary card to appear after selecting a profile");
@@ -135,7 +144,7 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
         // Emma Jones starts in Sales / Account Executive with no location assigned, so
-        // switching her to "Senior Software Engineer" (Engineering / London Office) produces
+        // switching her to "QA Engineer" (Engineering / London Office) produces
         // a visible change in both the Department and Location dropdowns.
         var emmaJonesId = Guid.Parse("30000000-0000-0000-0000-000000000009");
 
@@ -145,7 +154,7 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
         await empEdit.GoToAsync(AcmeId, emmaJonesId);
         await empEdit.OpenEmploymentTabAsync();
 
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
 
         var departmentText = await empEdit.GetSelectedDepartmentTextAsync();
         Assert.Equal("Engineering", departmentText);
@@ -211,7 +220,7 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
         // ── Step 2: Open the Employment tab and change Position Profile ────────
         await empEdit.OpenEmploymentTabAsync();
 
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
 
         // Changing Position Profile auto-populates Department/Location from the newly-selected
         // profile via a server round-trip — reading the Department field immediately can race that
@@ -415,7 +424,7 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
         await empEdit.FillDateOfBirthAsync("15/06/1990");
         await empEdit.FillStartDateAsync("01/03/2026");
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
 
         await _page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
 
@@ -450,7 +459,7 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
         await empEdit.FillDateOfBirthAsync("15/06/1990");
         await empEdit.FillStartDateAsync("01/03/2026");
         await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
 
         await _page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
 
@@ -577,7 +586,7 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
             await empEdit.FillDateOfBirthAsync("15/06/1990");
             await empEdit.FillStartDateAsync("01/03/2026");
             await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-            await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+            await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
 
             await empEdit.SaveNewEmployeeAsync();
 

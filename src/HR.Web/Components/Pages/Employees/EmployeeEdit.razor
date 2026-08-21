@@ -463,10 +463,6 @@
                                                     <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Personal Email" })" @bind-Value="Model.PersonalEmail" Placeholder="personal@example.com" ReadOnly="@IsViewMode" />
                                                     <ValidationMessage For="@(() => Model.PersonalEmail)" />
                                                 </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label" for="employee-start-date">Start Date <span class="text-danger">*</span></label>
-                                                    <SfDatePicker ID="employee-start-date" TValue="DateOnly" @bind-Value="Model.StartDate" Enabled="@(!IsViewMode)" />
-                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -965,7 +961,15 @@
         var locationResult = await LocationService.ListLocationsAsync(CompanyId);
         _locations = locationResult?.Items ?? [];
 
-        var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
+        // Bounded — same fix as EmployeeEmploymentTab.razor's Position Profile field (see its own
+        // remarks): an unbounded fetch here was the other half of the same user-observed slow-
+        // combobox regression, since this "Add Employee" single-page form has its own separate
+        // Position Profile dropdown. Unlike the Employment tab's, this one has no server-side
+        // search-as-you-type wired up (a brand-new employee never has a pre-existing selection to
+        // preserve outside the first page), so AllowFiltering below only searches within these
+        // first 100 for now — a follow-up could add the same OnPositionProfileFilteringAsync-style
+        // handler here if that turns out to matter in practice.
+        var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId, pageSize: 100);
         _positionProfiles = profileResult?.Items.ToList() ?? [];
 
         var employmentTypeResult = await EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
@@ -1256,6 +1260,11 @@
                 string.IsNullOrWhiteSpace(Model.PreferredName)  ? null : Model.PreferredName.Trim(),
                 Model.WorkEmail,
                 Model.PersonalEmail,
+                // Start Date is no longer editable on the Details tab (item 37 — it now lives
+                // exclusively on the Employment tab, same as Department/Location above). This is
+                // just the unedited value populated at load time (see PopulateModel below); the
+                // Employment tab's own save runs second (below) and always has the final say, the
+                // same pattern already used for the shared working-pattern fields.
                 Model.StartDate,
                 Model.DateOfBirth,
                 string.IsNullOrWhiteSpace(Model.Nationality)    ? null : Model.Nationality.Trim(),

@@ -1,0 +1,93 @@
+/* ── Page container ──────────────────────────────────── */
+
+.doc-detail-page {
+    max-width: 1240px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* ── Header ───────────────────────────────────────────── */
+
+.doc-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.doc-detail-heading {
+    min-width: 0;
+}
+
+.doc-detail-title {
+    word-break: break-word;
+}
+
+.doc-detail-status-badge {
+    font-size: 0.75rem;
+    vertical-align: middle;
+}
+
+.doc-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+}
+
+.doc-detail-actions-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Separates the destructive actions (Archive / Mark Expired) from the safe actions so
+   they aren't visually clustered next to Publish/Edit/Download and are less likely to be
+   clicked by accident. */
+.doc-detail-actions-danger {
+    padding-left: 16px;
+    border-left: 1px solid #e5e7eb;
+}
+
+@media (max-width: 575.98px) {
+    .doc-detail-actions-danger {
+        padding-left: 0;
+        border-left: none;
+        padding-top: 8px;
+        border-top: 1px solid #e5e7eb;
+        width: 100%;
+    }
+}
+
+/* ── Cards ────────────────────────────────────────────── */
+
+/* Keeps the label column width consistent across the Document Metadata, Audience, and
+   Acknowledgement cards instead of each dl's "auto" label column reflowing independently
+   to its own longest label. */
+.doc-detail-card ::deep .overview-dl {
+    grid-template-columns: 140px 1fr;
+}
+
+/* ── History grids ────────────────────────────────────── */
+
+.doc-detail-card ::deep .hr-grid {
+    min-height: 0;
+    height: auto;
+}
+
+.doc-detail-empty-state {
+    padding: 24px 8px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.875rem;
+}
+
+html[data-theme="dark"] .doc-detail-actions-danger {
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .doc-detail-empty-state {
+    color: var(--hr-gray-400);
+}

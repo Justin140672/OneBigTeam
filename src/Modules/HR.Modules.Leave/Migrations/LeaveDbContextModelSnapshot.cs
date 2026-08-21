@@ -18,7 +18,7 @@ namespace HR.Modules.Leave.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("leave")
-                .HasAnnotation("ProductVersion", "10.0.9")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -380,6 +380,12 @@ namespace HR.Modules.Leave.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
                         .HasColumnName("is_active");
+
+                    b.Property<bool>("IsSystem")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_system");
 
                     b.Property<string>("Name")
                         .IsRequired()

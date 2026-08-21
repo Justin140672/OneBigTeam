@@ -1,6 +1,7 @@
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -52,7 +53,45 @@ internal sealed class EmployeeProvisioningService(
         if (employee is null)
             return;
 
-        employee.MarkAsInitialCompanyAdmin(clock.UtcNowOffset());
+        var now = clock.UtcNowOffset();
+        employee.MarkAsInitialCompanyAdmin(now);
+
+        // The initial admin's employee record is created with placeholder personal details (see
+        // SignUpHandler.CreateAdminEmployeeAsync) — flag it as requiring the first-login "Complete
+        // your employee profile" flow so HR.Web can block normal access until the real details (and
+        // at least one compensation record) are entered. Only ever set for this specific record.
+        employee.MarkRequiresInitialSetup(now);
+
+        // CompleteInitialEmployeeSetupHandler requires at least one compensation record to exist
+        // before initial setup can be completed, but salary is deliberately NOT one of the fields
+        // the first-login dialog collects (same reasoning as Department/Location/Position/
+        // EmploymentType being out of scope there) — seed a zero-value placeholder here, alongside
+        // the placeholder DateOfBirth/Nationality/Gender already set by
+        // SignUpHandler.CreateAdminEmployeeAsync, for an HR admin to correct later via the normal
+        // Compensation screens.
+        var hasCompensation = await dbContext.Compensations
+            .AnyAsync(c => c.EmployeeId == employeeId, cancellationToken);
+
+        if (!hasCompensation)
+        {
+            var compensation = Compensation.Create(
+                Guid.NewGuid(),
+                companyId,
+                employeeId,
+                employee.StartDate,
+                SalaryType.Annual,
+                salary: 0m,
+                currency: "GBP",
+                hoursPerWeek: null,
+                fte: null,
+                notes: "Placeholder compensation created during company signup — review and update.",
+                CompensationChangeReason.NewHire,
+                createdBy: employeeId,
+                now);
+
+            dbContext.Compensations.Add(compensation);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

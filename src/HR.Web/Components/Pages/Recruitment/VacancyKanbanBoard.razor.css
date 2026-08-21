@@ -18,3 +18,41 @@
 .vacancy-kanban-board__kanban {
     height: 640px;
 }
+
+/* ── Column spacing / header treatment ──────────────────────────────────
+   Reuses the same gray-50 header / gray-200 border language as .hr-grid's
+   header (app.css) so the Kanban board reads as part of the same design
+   system instead of Syncfusion's stock look. */
+
+::deep .vacancy-kanban-board__kanban.e-kanban .e-kanban-table {
+    gap: 0.75rem;
+}
+
+::deep .vacancy-kanban-board__kanban.e-kanban .e-column-header {
+    background: var(--hr-gray-50);
+    border-radius: var(--hr-radius-md) var(--hr-radius-md) 0 0;
+    border-color: var(--hr-gray-200);
+    padding: 0.6rem 0.75rem;
+}
+
+::deep .vacancy-kanban-board__kanban.e-kanban .e-header-text {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--hr-gray-700);
+}
+
+::deep .vacancy-kanban-board__kanban.e-kanban .e-item-count {
+    background: var(--hr-color-primary-subtle);
+    color: var(--hr-color-primary);
+    font-weight: 600;
+}
+
+::deep .vacancy-kanban-board__kanban.e-kanban .e-content-row .e-column-content {
+    background: var(--hr-gray-50);
+    border-color: var(--hr-gray-200);
+    padding: 0.5rem;
+}
+
+::deep .vacancy-kanban-board__kanban.e-kanban .e-card-wrapper {
+    margin-bottom: 0.6rem;
+}

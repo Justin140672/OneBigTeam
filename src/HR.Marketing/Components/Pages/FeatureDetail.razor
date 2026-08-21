@@ -3,7 +3,9 @@
 
 @if (feature is null)
 {
-    <PageTitle>Features | One Big Team</PageTitle>
+    <SeoHead Title="Feature not found | One Big Team"
+             Description="The requested One Big Team feature page could not be found."
+             NoIndex="true" />
     <SiteHeader CurrentPage="features" />
     <main>
         <section class="section">
@@ -17,10 +19,9 @@
 }
 else
 {
-    <PageTitle>@feature.Title | One Big Team</PageTitle>
-    <HeadContent>
-        <meta name="description" content="@feature.Summary">
-    </HeadContent>
+    <SeoHead Title="@($"{feature.Title} HR Software | One Big Team")"
+             Description="@feature.Summary"
+             CanonicalPath="@($"/features/{feature.Slug}")" />
 
     <SiteHeader CurrentPage="features" />
 
@@ -39,12 +40,15 @@ else
         <section class="section pricing-section" id="trial">
             <div class="section-inner">
                 <div class="feature-detail">
-                    <ul class="feature-benefits">
-                        @foreach (var benefit in feature.Benefits)
-                        {
-                            <li>@benefit</li>
-                        }
-                    </ul>
+                    <div class="feature-benefit-column">
+                        <h2>What it helps you manage</h2>
+                        <ul class="feature-benefits">
+                            @foreach (var benefit in feature.Benefits)
+                            {
+                                <li>@benefit</li>
+                            }
+                        </ul>
+                    </div>
                     <VideoCard Title="@feature.Title"
                                YouTubeId="@feature.YouTubeId"
                                Caption="@($"See {feature.Title} in One Big Team.")" />
@@ -88,6 +92,7 @@ else
 
 @code {
     [Parameter] public string Slug { get; set; } = "";
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
 
     private FeatureInfo? feature;
     private List<FeatureInfo> relatedFeatures = [];
@@ -95,6 +100,10 @@ else
     protected override void OnParametersSet()
     {
         FeatureCatalog.TryGet(Slug, out feature);
+        if (feature is null && HttpContext is not null)
+        {
+            HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+        }
         relatedFeatures = feature is null
             ? []
             : FeatureCatalog.All.Where(f => f.Slug != feature.Slug).Take(3).ToList();

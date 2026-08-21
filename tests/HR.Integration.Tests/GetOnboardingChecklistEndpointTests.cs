@@ -73,7 +73,7 @@ public class GetOnboardingChecklistEndpointTests
 
         var payload = await response.Content.ReadFromJsonAsync<ChecklistPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(8, payload!.Tasks.Count);
+        Assert.Equal(9, payload!.Tasks.Count);
         Assert.InRange(payload.CompletionPercentage, 0, 100);
     }
 
@@ -89,7 +89,7 @@ public class GetOnboardingChecklistEndpointTests
 
         var payload = await response.Content.ReadFromJsonAsync<ChecklistPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(8, payload!.Tasks.Count);
+        Assert.Equal(9, payload!.Tasks.Count);
     }
 
     private sealed record OnboardingTaskItemPayload(

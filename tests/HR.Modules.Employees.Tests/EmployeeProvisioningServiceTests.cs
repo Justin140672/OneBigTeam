@@ -76,6 +76,88 @@ public class EmployeeProvisioningServiceTests
         Assert.Equal("conflict", result.Error.Code);
     }
 
+    [Fact]
+    public async Task MarkAsInitialCompanyAdminAsync_Sets_RequiresInitialSetup_And_Seeds_Placeholder_Compensation()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (departmentId, locationId, employmentTypeId, positionProfileId) = await SeedMandatoryLookupsAsync(context, companyId);
+
+        var createEmployeeHandler = new CreateEmployeeHandler(
+            context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
+            new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+        var service = new EmployeeProvisioningService(createEmployeeHandler, context, new FakeClock(FixedUtcNow));
+
+        var created = await service.CreateFromCandidateAsync(
+            new EmployeeProvisioningRequest(
+                companyId, "Ada", "Lovelace", "ada@example.com",
+                StartDate, DateOfBirth, "British", "Female",
+                "EMP-0001", employmentTypeId, departmentId, locationId, positionProfileId),
+            CancellationToken.None);
+        Assert.True(created.IsSuccess);
+
+        await service.MarkAsInitialCompanyAdminAsync(companyId, created.Value, CancellationToken.None);
+
+        var saved = await context.Employees.SingleAsync(e => e.Id == created.Value);
+        Assert.True(saved.IsInitialCompanyAdmin);
+        Assert.True(saved.RequiresInitialSetup);
+
+        var compensation = await context.Compensations.SingleAsync(c => c.EmployeeId == created.Value);
+        Assert.Equal(SalaryType.Annual, compensation.SalaryType);
+        Assert.Equal(0m, compensation.Salary);
+        Assert.Equal("GBP", compensation.Currency);
+        Assert.Equal(CompensationChangeReason.NewHire, compensation.Reason);
+    }
+
+    [Fact]
+    public async Task MarkAsInitialCompanyAdminAsync_Does_Not_Duplicate_Compensation_When_One_Already_Exists()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (departmentId, locationId, employmentTypeId, positionProfileId) = await SeedMandatoryLookupsAsync(context, companyId);
+
+        var createEmployeeHandler = new CreateEmployeeHandler(
+            context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
+            new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+        var service = new EmployeeProvisioningService(createEmployeeHandler, context, new FakeClock(FixedUtcNow));
+
+        var created = await service.CreateFromCandidateAsync(
+            new EmployeeProvisioningRequest(
+                companyId, "Ada", "Lovelace", "ada2@example.com",
+                StartDate, DateOfBirth, "British", "Female",
+                "EMP-0002", employmentTypeId, departmentId, locationId, positionProfileId),
+            CancellationToken.None);
+        Assert.True(created.IsSuccess);
+
+        context.Compensations.Add(Compensation.Create(
+            Guid.NewGuid(), companyId, created.Value, StartDate, SalaryType.Annual, 50000m, "GBP",
+            null, null, "Existing", CompensationChangeReason.NewHire, created.Value, Now));
+        await context.SaveChangesAsync();
+
+        await service.MarkAsInitialCompanyAdminAsync(companyId, created.Value, CancellationToken.None);
+
+        var compensations = await context.Compensations.Where(c => c.EmployeeId == created.Value).ToListAsync();
+        Assert.Single(compensations);
+        Assert.Equal(50000m, compensations[0].Salary);
+    }
+
+    [Fact]
+    public async Task MarkAsInitialCompanyAdminAsync_Is_A_NoOp_When_Employee_Does_Not_Exist()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var createEmployeeHandler = new CreateEmployeeHandler(
+            context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
+            new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+        var service = new EmployeeProvisioningService(createEmployeeHandler, context, new FakeClock(FixedUtcNow));
+
+        await service.MarkAsInitialCompanyAdminAsync(companyId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Empty(await context.Employees.ToListAsync());
+        Assert.Empty(await context.Compensations.ToListAsync());
+    }
+
     private static async Task<(Guid DepartmentId, Guid LocationId, Guid EmploymentTypeId, Guid PositionProfileId)> SeedMandatoryLookupsAsync(
         EmployeesDbContext context, Guid companyId)
     {

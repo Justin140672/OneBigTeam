@@ -10,5 +10,6 @@ internal sealed record CreateLeaveTypeResponse(
     string Behaviour,
     bool IsActive,
     bool HasBalance,
+    bool IsSystem,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

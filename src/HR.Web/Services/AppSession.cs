@@ -43,6 +43,15 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     // cached flag matches reality immediately, not just on the next login.
     public void MarkGettingStartedHidden() => ShowGettingStarted = false;
 
+    // True only for the initial Company Admin employee auto-created at signup, until they've
+    // completed the "Complete Initial Employee Record on First Login" dialog. MainLayout blocks
+    // the whole app shell behind that dialog while this is true.
+    public bool RequiresInitialEmployeeSetup { get; private set; }
+
+    // Mirrors MarkGettingStartedHidden's pattern — lets EmployeeCompletionDialog flip this back
+    // to false immediately after a successful save, without needing a full session reload.
+    public void MarkInitialEmployeeSetupComplete() => RequiresInitialEmployeeSetup = false;
+
     // Trial/subscription status (Getting Started + Subscription/Billing epic, Phase B) — drives
     // TrialBanner visibility and (in a later phase) read-only UI gating. Defaults to a
     // non-blocking "Active" status on any fetch failure, same fail-open convention as
@@ -212,6 +221,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
             WorkingDaysOverride = employee.WorkingDaysOverride;
             HoursPerDayOverride = employee.HoursPerDayOverride;
             ProfileImageUrl     = employee.ProfileImageUrl;
+            RequiresInitialEmployeeSetup = employee.RequiresInitialSetup;
         }
 
         IsLoaded = true;

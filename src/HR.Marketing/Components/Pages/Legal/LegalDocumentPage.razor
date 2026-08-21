@@ -1,6 +1,7 @@
 @using HR.Marketing.Services
 
-<PageTitle>@Document.Title | One Big Team</PageTitle>
+<SeoHead Title="@($"{Document.Title} | One Big Team")"
+         Description="@Description" />
 
 <SiteHeader />
 
@@ -22,12 +23,12 @@
       {
         <nav class="legal-toc" aria-label="On this page">
           <p class="summary-label">On this page</p>
-          <ol>
+          <ul>
             @foreach (var heading in Document.Headings)
             {
               <li><a href="#@heading.Id">@heading.Text</a></li>
             }
-          </ol>
+          </ul>
         </nav>
       }
 
@@ -102,6 +103,18 @@
 
     private (string Href, string Label)[] RelatedPages =>
         RelatedPagesBySlug.TryGetValue(DocumentSlug, out var related) ? related : [];
+
+    private string Description => DocumentSlug switch
+    {
+        "security" => "Learn how One Big Team protects employee and company data with secure access, isolation and operational safeguards.",
+        "privacy-policy" => "Read the One Big Team privacy policy and learn how personal information is collected, used, stored and protected.",
+        "subprocessors" => "Review the third-party subprocessors One Big Team uses to provide and secure its HR software service.",
+        "data-processing-agreement" => "Read the One Big Team Data Processing Agreement covering data protection responsibilities and processing terms.",
+        "terms-of-service" => "Read the terms governing access to and use of the One Big Team HR software service.",
+        "cookie-policy" => "Learn how One Big Team uses cookies and similar technologies on its website and HR software service.",
+        "acceptable-use-policy" => "Read the acceptable use rules for the One Big Team HR software service.",
+        _ => $"Read the {Document.Title} for One Big Team."
+    };
 
     protected override void OnInitialized()
     {

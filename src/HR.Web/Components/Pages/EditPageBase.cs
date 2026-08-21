@@ -66,6 +66,13 @@ public abstract class EditPageBase : ComponentBase, IDisposable
     // reopen in an infinite loop instead of actually leaving the page.
     private bool _navigationConfirmed;
 
+    // Lets a subclass issue its own same-page NavigateTo (e.g. updating a "?tab=" query param to
+    // reflect the active tab) without tripping the unsaved-changes guard above — that guard exists
+    // to catch the user navigating AWAY from a dirty page, not a page updating its own URL to
+    // reflect in-page UI state. Must be called immediately before the NavigateTo call it's meant
+    // to cover, same as the internal _navigationConfirmed usages in this class.
+    protected void SuppressNextNavigationGuard() => _navigationConfirmed = true;
+
     protected override void OnInitialized()
     {
         // Catches in-app navigation attempts (NavLink clicks, menu items, NavigateTo calls)

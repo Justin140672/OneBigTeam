@@ -4,10 +4,9 @@
 @inject IOptions<PricingOptions> PricingOptionsAccessor
 @inject IMarketingAnalytics Analytics
 
-<PageTitle>Pricing | One Big Team</PageTitle>
-<HeadContent>
-    <meta name="description" content="Only pay for active employees. Every feature included.">
-</HeadContent>
+<SeoHead Title="Simple HR Software Pricing | One Big Team"
+         Description="Simple HR software pricing from £20 per month. Pay only for active employees, with every feature included and no setup fees."
+         StructuredDataJson="@PricingStructuredData" />
 
 <SiteHeader CurrentPage="pricing" />
 
@@ -17,7 +16,7 @@
             <h1>Simple, transparent pricing.</h1>
             <p class="hero-text">
                 Only pay for active employees. Every feature included.
-                No setup fees • No contracts • Cancel anytime
+                No setup fees • No long-term contracts • Cancel anytime
             </p>
         </div>
     </section>
@@ -28,10 +27,6 @@
                 <p class="summary-label">Pricing Tiers</p>
                 <div class="pricing-headline">&pound;20/month minimum</div>
 
-                <p class="tier-list-intro">
-                    Pricing is banded: each employee is charged at the rate for their band, not your whole headcount.
-                    Every plan has a &pound;20.00/month minimum charge, regardless of headcount.
-                </p>
                 <ul class="tier-list">
                     <li>
                         <span>For your 1st-50th employee</span>
@@ -47,23 +42,20 @@
                     </li>
                 </ul>
 
-                <div class="minimum-charge-row">
-                    <span>Minimum monthly charge</span>
-                    <strong>&pound;20.00/month</strong>
-                </div>
-
-                <p>All prices exclude VAT where applicable.</p>
-
-                <p class="tier-worked-example">
-                    <strong>Worked example (75 employees):</strong>
-                    50 &times; &pound;2.00 = &pound;100.00, plus 25 &times; &pound;1.75 = &pound;43.75.
-                    Total: &pound;143.75/month (before VAT and any minimum charge adjustment).
-                </p>
+                <details class="tier-worked-example">
+                    <summary>How tiered pricing works</summary>
+                    <p>
+                        Each rate applies only to employees within that band. For 75 employees:
+                        50 &times; &pound;2.00 plus 25 &times; &pound;1.75 equals &pound;143.75/month.
+                    </p>
+                </details>
 
                 <p class="tier-list-intro">
                     Every feature included: employee management, leave, recruitment, onboarding/offboarding,
                     documents, employee assets, reporting and unlimited users &mdash; with no feature limits at any tier.
                 </p>
+
+                <p class="small-note">All prices exclude VAT where applicable.</p>
             </div>
 
             <form class="estimator-card"
@@ -170,6 +162,31 @@
 <SiteFooter />
 
 @code {
+    private const string PricingStructuredData = """
+        {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Who counts as an active employee?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Employees whose employment has started and who have not left the company. Future starters and former employees are not billed."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is there a minimum contract or free trial?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "There is no minimum contract and you can cancel at any time. A free trial is available without speaking to sales."
+              }
+            }
+          ]
+        }
+        """;
+
     [SupplyParameterFromQuery(Name = "employees")]
     public string? EmployeesQuery { get; set; }
 

@@ -24,8 +24,18 @@ internal sealed class ListPositionProfilesHandler
         if (!request.IncludeInactive)
             profileQuery = profileQuery.Where(p => p.IsActive);
 
-        var items = await profileQuery
-            .OrderBy(p => p.Title)
+        // Opt-in only — see Request.cs's remarks. Without a PageSize, this remains the original
+        // unbounded "return every Position Profile the company has" query every other caller
+        // already depends on.
+        if (!string.IsNullOrWhiteSpace(request.Search))
+            profileQuery = profileQuery.Where(p => EF.Functions.ILike(p.Title, $"%{request.Search}%"));
+
+        var orderedQuery = profileQuery.OrderBy(p => p.Title).AsQueryable();
+
+        if (request.PageSize is > 0)
+            orderedQuery = orderedQuery.Take(request.PageSize.Value);
+
+        var items = await orderedQuery
             .GroupJoin(
                 _dbContext.Departments.AsNoTracking(),
                 p => p.DepartmentId,

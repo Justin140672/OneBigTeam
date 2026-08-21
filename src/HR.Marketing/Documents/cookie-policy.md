@@ -1,12 +1,38 @@
 ---
-title: Cookie Policy
-lastUpdated: 28 July 2026
+title: Cookies and Browser Storage Policy
+lastUpdated: 21 August 2026
 ---
 
-# Cookie Policy
+# Cookies and Browser Storage Policy
 
-We use essential cookies required for authentication, security and operation of the website.
+This policy explains how Crazy Cat Software Limited, trading as One Big Team, uses cookies and similar browser-storage technologies on the One Big Team marketing website and HR application.
 
-Where analytics or optional cookies are introduced, consent will be requested where required by law.
+## What these technologies are
 
-Users may manage cookies through their browser settings.
+Cookies are small pieces of information stored by a website in your browser. Similar technologies include local storage and session storage. They can keep you signed in, protect a service, remember preferences or preserve interface state.
+
+## Technologies currently used
+
+| Name | Technology | Purpose | Duration |
+|---|---|---|---|
+| `obt_supabase_at` | Essential, first-party cookie | Maintains an authenticated session and allows authorised API requests | Until the authentication session expires or you sign out |
+| `theme` | First-party local storage | Remembers the light or dark display preference | Until removed through the browser |
+| `orgChartZoom` | First-party local storage | Remembers the organisation-chart zoom preference | Until removed through the browser |
+| `lastDashboard` | First-party local storage | Returns an authorised user to their previously selected dashboard | Until removed through the browser |
+| `scrollPos:*` | First-party session storage | Restores page position during the current browser session | Until the browser tab or session ends |
+
+The authentication cookie is marked HttpOnly and SameSite=Lax and is sent securely over HTTPS in production. It is strictly necessary to provide the signed-in service. The preference and interface-storage entries support functionality requested through use of the application and are not used for advertising or cross-site tracking.
+
+The marketing website does not currently set analytics or advertising cookies. Embedded video is loaded from YouTube's privacy-enhanced domain only after you choose to play it; YouTube may then store or access information according to its own policies.
+
+## Consent
+
+We do not ask for consent for technologies that are strictly necessary to provide or secure a service requested by the user. If we introduce analytics, advertising or another non-essential technology, it will remain disabled until any consent required by law has been obtained. Refusing optional technologies will not prevent access to essential service functions.
+
+## Managing stored information
+
+You can remove cookies and browser storage through your browser settings. Blocking or deleting the authentication cookie will sign you out. Removing preference storage will reset the relevant display or navigation preference.
+
+## Changes and contact
+
+We will update this policy if the technologies or purposes change. Questions can be sent to [privacy@onebigteam.co.uk](mailto:privacy@onebigteam.co.uk).

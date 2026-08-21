@@ -10,4 +10,5 @@ internal sealed record UpdateLeaveTypeResponse(
     string Behaviour,
     bool IsActive,
     bool HasBalance,
+    bool IsSystem,
     DateTimeOffset UpdatedAt);

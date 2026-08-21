@@ -14,6 +14,7 @@ public record LeaveTypeListItemModel(
     string Behaviour,
     bool IsActive,
     bool HasBalance,
+    bool IsSystem,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -36,6 +37,7 @@ public record CreateLeaveTypeResponse(
     string Behaviour,
     bool IsActive,
     bool HasBalance,
+    bool IsSystem,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -59,6 +61,7 @@ public record UpdateLeaveTypeResponse(
     string Behaviour,
     bool IsActive,
     bool HasBalance,
+    bool IsSystem,
     DateTimeOffset UpdatedAt);
 
 public sealed class LeaveTypeEditModel
@@ -72,4 +75,11 @@ public sealed class LeaveTypeEditModel
     public string AccrualMethod { get; set; } = "None";
     public string Behaviour { get; set; } = "Standard";
     public bool HasBalance { get; set; } = true;
+
+    /// <summary>
+    /// True for the platform-provisioned "Annual Leave" record — see LeaveType.IsSystem on the
+    /// backend. Read-only here: there is no way to set this via Create, and it drives the
+    /// Name-field-disabled / no-delete UI in LeaveTypeEdit.razor / LeaveTypeList.razor.
+    /// </summary>
+    public bool IsSystem { get; set; }
 }

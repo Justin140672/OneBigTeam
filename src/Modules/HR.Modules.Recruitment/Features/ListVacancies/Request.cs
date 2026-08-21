@@ -32,4 +32,14 @@ internal sealed record ListVacanciesRequest
     // VacancyList.razor no longer needs its own client-side filtering property, matching every
     // other SearchPageBase list page (see VacancyList.razor's own remarks on the bug this fixes).
     public string? Search { get; init; }
+
+    // Optional/backward-compatible — omitted by every existing caller (VacancyList.razor's admin
+    // grid needs the full company set for its own client-side paging), so their behavior is
+    // unchanged. Added for callers that only need a bounded, type-to-search dropdown (see
+    // RecruitmentDashboard.razor's vacancy picker) — the "vacancy counts per company are small"
+    // assumption behind Search's own in-memory filtering above stopped holding once a long-lived
+    // shared company accumulates vacancies across hundreds of E2E test runs that each create a
+    // fresh one and never close/clean it up, which is exactly the same shape of real,
+    // user-observed slow-dropdown regression already found and fixed for Position Profiles.
+    public int? PageSize { get; init; }
 }

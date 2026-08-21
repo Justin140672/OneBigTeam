@@ -59,6 +59,11 @@ internal sealed class LeaveTypeConfiguration : IEntityTypeConfiguration<LeaveTyp
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(t => t.IsSystem)
+            .HasColumnName("is_system")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(t => t.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

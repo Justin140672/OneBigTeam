@@ -1,0 +1,37 @@
+@* Compact, clickable metric tile used in RecruitmentDashboard's summary row. Reuses the same
+   .widget-kpi tile treatment as RecruitmentSummaryWidget and other dashboard KPI rows (app.css)
+   rather than inventing bespoke styling for this page. Zero-count metrics are rendered muted
+   (per the redesign brief: "do not render a large card for a zero-count metric") rather than
+   hidden, so the row's layout stays stable and a recruiter can still see at a glance that a
+   metric is currently at zero. *@
+@inject NavigationManager Navigation
+
+<a href="@Href" role="listitem"
+   class="widget-kpi widget-kpi--link @(IsZero ? "text-muted" : "")"
+   aria-label="@($"{Label}: {Value}")"
+   @onclick="HandleClick" @onclick:preventDefault="true">
+    <span class="widget-kpi-value">@Value</span>
+    <span class="widget-kpi-label">@Label</span>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter] public int Value { get; set; }
+    [Parameter] public string Href { get; set; } = "#";
+    [Parameter] public bool Muted { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private bool IsZero => Muted || Value == 0;
+
+    private async Task HandleClick()
+    {
+        if (OnClick.HasDelegate)
+        {
+            await OnClick.InvokeAsync();
+        }
+        else if (!string.IsNullOrEmpty(Href) && Href != "#")
+        {
+            Navigation.NavigateTo(Href);
+        }
+    }
+}

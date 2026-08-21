@@ -514,6 +514,19 @@
         // computation ordering upstream), so a full reload keeps this consistent with every other
         // filter change on this page, even though the actual grouped *rendering* itself is now
         // entirely client-side (Syncfusion's native Group By via GroupColumns).
+        //
+        // NOTE (investigation left open): an earlier attempt here explicitly drove Syncfusion's
+        // ClearGroupingAsync/GroupColumnAsync grid API after every load, on the theory that handing
+        // <GridGroupSettings Columns="@GroupColumns" /> a new array reference on re-render isn't
+        // reliably enough on its own to make the grid re-group already-rendered rows. That was
+        // reverted — it was unverified (this environment's Aspire/DCP orchestrator cannot allocate
+        // ports for any service, blocking every attempt to actually run the E2E suite here, so the
+        // theory was never confirmed against a live browser) and plausibly *worse*: if a reload
+        // yields zero rows, RenderGrid never runs and the @ref field would be left pointing at an
+        // unmounted grid instance, so calling grid API methods on it could throw and crash the
+        // whole page. Reverted to the plain reactive Columns binding, which is Syncfusion's
+        // documented supported pattern for runtime grouping changes, rather than layering another
+        // unverified guess on top. See WorkloadActionsReportTests.GroupByActionType_RendersGroupedSections.
         _groupBy = value;
         await LoadAsync();
     }

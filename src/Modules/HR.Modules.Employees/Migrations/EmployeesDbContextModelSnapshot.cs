@@ -300,6 +300,10 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("numeric(4,2)")
                         .HasColumnName("hours_per_day_override");
 
+                    b.Property<DateTimeOffset?>("InitialSetupCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("initial_setup_completed_at");
+
                     b.Property<bool>("IsInitialCompanyAdmin")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -376,6 +380,12 @@ namespace HR.Modules.Employees.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)")
                         .HasColumnName("profile_image_url");
+
+                    b.Property<bool>("RequiresInitialSetup")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("requires_initial_setup");
 
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date")

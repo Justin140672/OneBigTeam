@@ -21,6 +21,12 @@ internal sealed class Employee
     // employee is treated as an update to the seed record rather than a duplicate-email error —
     // see EmployeeStagingRowValidator/ConfirmImportSessionHandler. Never set for any other employee.
     public bool IsInitialCompanyAdmin { get; private set; }
+    // Set when this employee is the initial company admin auto-created at signup with placeholder
+    // personal details (see EmployeeProvisioningService.MarkAsInitialCompanyAdminAsync) — drives
+    // the blocking "Complete your employee profile" dialog in HR.Web and the first Getting Started
+    // checklist item until CompleteInitialSetup is called.
+    public bool RequiresInitialSetup { get; private set; }
+    public DateTimeOffset? InitialSetupCompletedAt { get; private set; }
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
     public string WorkEmail { get; private set; } = string.Empty;
@@ -83,6 +89,7 @@ internal sealed class Employee
             StartDate = startDate,
             Status = EmploymentStatus.Draft,
             HasSystemAccess = hasSystemAccess,
+            RequiresInitialSetup = false,
             DateOfBirth = dateOfBirth,
             Nationality = nationality,
             Gender = gender,
@@ -240,6 +247,19 @@ internal sealed class Employee
     public void MarkAsInitialCompanyAdmin(DateTimeOffset now)
     {
         IsInitialCompanyAdmin = true;
+        UpdatedAt = now;
+    }
+
+    public void MarkRequiresInitialSetup(DateTimeOffset now)
+    {
+        RequiresInitialSetup = true;
+        UpdatedAt = now;
+    }
+
+    public void CompleteInitialSetup(DateTimeOffset now)
+    {
+        RequiresInitialSetup = false;
+        InitialSetupCompletedAt = now;
         UpdatedAt = now;
     }
 

@@ -37,7 +37,7 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empEdit.FillStartDateAsync("01/03/2026");
         await empEdit.FillEmployeeNumberAsync($"E2E-UIL-{uniqueSuffix}");
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", positionProfile ?? "Senior Software Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", positionProfile ?? "QA Engineer");
         await empEdit.SaveNewEmployeeAsync();
 
         return lastName;

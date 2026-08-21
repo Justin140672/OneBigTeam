@@ -426,6 +426,31 @@ public sealed record CancelLeavingProcessResponse(
 
 // ── NATIONALITIES ─────────────────────────────────────────────────────────────
 
+// ── COMPLETE INITIAL EMPLOYEE SETUP ─────────────────────────────────────────────
+
+public record CompleteInitialEmployeeSetupRequest(
+    string FirstName,
+    string LastName,
+    string? PreferredName,
+    DateOnly DateOfBirth,
+    string Nationality,
+    string Gender,
+    string? GenderOther,
+    string? PersonalEmail,
+    string? PhoneNumber,
+    string? HomePhone,
+    string AddressLine1,
+    string? AddressLine2,
+    string City,
+    string? County,
+    string PostCode,
+    string? Country);
+
+public record CompleteInitialEmployeeSetupResponse(
+    Guid EmployeeId,
+    bool RequiresInitialSetup,
+    string Status);
+
 public record ListNationalitiesResponse(IReadOnlyList<NationalityListItem> Items);
 
 public record NationalityListItem(int Id, string Name);

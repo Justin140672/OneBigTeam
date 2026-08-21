@@ -23,7 +23,7 @@ internal sealed class LeaveTypeDefaultsProvisioner(LeaveDbContext dbContext, ICl
         var now = clock.UtcNowOffset();
 
         dbContext.LeaveTypes.AddRange(
-            LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now),
+            LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now, isSystem: true),
             LeaveType.Create(Guid.NewGuid(), companyId, "Unpaid Leave", "UNPAID", 0, AccrualMethod.None, LeaveTypeBehaviour.Unpaid, now, hasBalance: false),
             LeaveType.Create(Guid.NewGuid(), companyId, "Compassionate Leave", "COMPASSIONATE", 5, AccrualMethod.None, LeaveTypeBehaviour.Standard, now),
             LeaveType.Create(Guid.NewGuid(), companyId, "Parental Leave", "PARENTAL", 52, AccrualMethod.None, LeaveTypeBehaviour.Parental, now),

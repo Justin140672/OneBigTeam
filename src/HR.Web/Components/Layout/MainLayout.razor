@@ -17,6 +17,10 @@
         </div>
     </div>
 }
+else if (Session.RequiresInitialEmployeeSetup)
+{
+    <EmployeeCompletionDialog OnCompleted="@(() => StateHasChanged())" />
+}
 else
 {
 

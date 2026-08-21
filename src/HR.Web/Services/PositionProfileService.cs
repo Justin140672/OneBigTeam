@@ -6,12 +6,19 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
-    public async Task<ListPositionProfilesResponse?> ListPositionProfilesAsync(Guid companyId, bool includeInactive = false)
+    public async Task<ListPositionProfilesResponse?> ListPositionProfilesAsync(
+        Guid companyId, bool includeInactive = false, string? search = null, int? pageSize = null)
     {
         try
         {
+            var query = System.Web.HttpUtility.ParseQueryString(string.Empty);
+            if (includeInactive) query["includeInactive"] = "true";
+            if (!string.IsNullOrWhiteSpace(search)) query["search"] = search;
+            if (pageSize is > 0) query["pageSize"] = pageSize.Value.ToString();
+
             var url = $"api/companies/{companyId}/position-profiles";
-            if (includeInactive) url += "?includeInactive=true";
+            if (query.Count > 0) url += $"?{query}";
+
             return await Http.GetFromJsonAsync<ListPositionProfilesResponse>(url, HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)

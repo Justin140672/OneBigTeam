@@ -694,8 +694,8 @@ a.card:focus-visible,
         content: "";
         position: absolute;
         top: 17px;
-        left: calc(50% + 21px);
-        width: calc(100% - 21px);
+        left: 42px;
+        width: calc(100% + 20px - 50px);
         height: 2px;
         background: var(--color-border-strong);
     }
@@ -1084,7 +1084,7 @@ a.card:focus-visible,
 
 .pricing-card-grid {
     display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: clamp(32px, 6vw, 72px);
     align-items: start;
 }
@@ -1130,21 +1130,22 @@ a.card:focus-visible,
         color: var(--color-ink-soft);
     }
 
-.minimum-charge-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 16px 0;
+.tier-worked-example {
+    margin: 0 0 24px;
+    padding: 14px 0;
     border-top: 1px solid var(--color-border);
     border-bottom: 1px solid var(--color-border);
-    margin-bottom: 18px;
-    font-family: var(--font-display);
-    font-weight: 600;
 }
 
-    .minimum-charge-row span {
+    .tier-worked-example summary {
+        cursor: pointer;
+        font-family: var(--font-display);
+        font-weight: 600;
+    }
+
+    .tier-worked-example p {
+        margin: 12px 0 0;
         color: var(--color-ink-soft);
-        font-weight: 400;
     }
 
 .pricing-examples-table table {
@@ -1286,11 +1287,15 @@ a.card:focus-visible,
 
 .feature-benefits {
     display: grid;
-    gap: 10px;
     padding: 0;
     margin: 0;
     list-style: none;
     align-content: start;
+}
+
+.feature-benefit-column h2 {
+    margin: 0 0 12px;
+    font-size: 1.35rem;
 }
 
 .feature-detail-actions {
@@ -1299,23 +1304,30 @@ a.card:focus-visible,
 
     .feature-benefits li {
         position: relative;
-        padding: 16px 18px 16px 42px;
-        background: var(--color-surface);
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-sm);
+        padding: 18px 0 18px 38px;
+        border-bottom: 1px solid var(--color-border);
         color: var(--color-ink-soft);
         font-weight: 500;
     }
 
+        .feature-benefits li:first-child {
+            border-top: 1px solid var(--color-border);
+        }
+
         .feature-benefits li::before {
-            content: "";
+            content: "\2713";
             position: absolute;
-            top: 21px;
-            left: 18px;
-            width: 8px;
-            height: 8px;
+            top: 18px;
+            left: 0;
+            display: grid;
+            place-items: center;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
-            background: var(--color-accent);
+            background: var(--color-accent-soft);
+            color: var(--color-accent);
+            font-size: 0.8rem;
+            font-weight: 800;
         }
 
 /* ---------------------------------------------------------------------
@@ -1622,11 +1634,16 @@ a.card:focus-visible,
     top: 24px;
 }
 
-    .legal-toc ol {
+    .legal-toc ul {
         margin: 8px 0 0;
-        padding-left: 18px;
+        padding: 0;
+        list-style: none;
         color: var(--color-ink-soft);
         font-size: var(--text-meta);
+    }
+
+    .legal-toc li + li {
+        margin-top: 4px;
     }
 
     .legal-toc a {
@@ -1648,6 +1665,19 @@ a.card:focus-visible,
         flex-wrap: wrap;
         gap: 16px;
     }
+
+    .legal-related a {
+        color: var(--color-accent);
+        font-weight: 600;
+        text-decoration: underline;
+        text-decoration-thickness: 1px;
+        text-underline-offset: 3px;
+    }
+
+        .legal-related a:hover,
+        .legal-related a:focus-visible {
+            text-decoration-thickness: 2px;
+        }
 
 @media (max-width: 900px) {
     .legal-layout {
@@ -1823,8 +1853,33 @@ a.card:focus-visible,
     color: var(--color-dark-ink-soft);
 }
 
-.footer-brand .brand-word {
+.footer-brand .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.footer-brand-mark {
+    display: block;
+    width: 64px;
+    height: 64px;
+    overflow: hidden;
+    flex: 0 0 64px;
+}
+
+    .footer-brand-mark img {
+        display: block;
+        width: auto;
+        max-width: none;
+        height: 64px;
+    }
+
+.footer-brand-name {
     color: var(--color-dark-ink);
+    font-family: var(--font-display);
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
 }
 
 .footer-links {
@@ -2064,11 +2119,7 @@ a.card:focus-visible,
     }
 
 .trust-terms-note {
-    margin-top: 28px;
-    padding: 16px 20px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    margin: 14px 0 0;
     color: var(--color-ink-soft);
 }
 
@@ -2157,6 +2208,10 @@ a.card:focus-visible,
 
     .steps,
     .timeline-steps {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .footer-links {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 

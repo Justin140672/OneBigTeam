@@ -22,4 +22,5 @@ public sealed record MyEmployeeResponse(
     string? JobTitle,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
-    string? ProfileImageUrl);
+    string? ProfileImageUrl,
+    bool RequiresInitialSetup);

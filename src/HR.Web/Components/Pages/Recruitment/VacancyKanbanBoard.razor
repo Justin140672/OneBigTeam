@@ -6,17 +6,20 @@
 @inject IJSRuntime JS
 
 <div class="vacancy-kanban-board" data-testid="vacancy-kanban-board">
-    <div class="vacancy-kanban-board__toolbar mb-3">
-        <SfTextBox Placeholder="Search by name or email…"
-                   Value="@SearchText"
-                   ValueChange="OnSearchChanged"
-                   CssClass="vacancy-kanban-board__search"
-                   data-testid="kanban-search-box" />
-        @if (_vacancyTitle is not null)
-        {
-            <a href="/companies/@CompanyId/vacancies/@VacancyId" class="vacancy-kanban-board__vacancy-link">@_vacancyTitle</a>
-        }
-    </div>
+    @if (ShowToolbar)
+    {
+        <div class="vacancy-kanban-board__toolbar mb-3">
+            <SfTextBox Placeholder="Search by name or email…"
+                       Value="@SearchText"
+                       ValueChange="OnSearchChanged"
+                       CssClass="vacancy-kanban-board__search"
+                       data-testid="kanban-search-box" />
+            @if (_vacancyTitle is not null)
+            {
+                <a href="/companies/@CompanyId/vacancies/@VacancyId" class="vacancy-kanban-board__vacancy-link">@_vacancyTitle</a>
+            }
+        </div>
+    }
 
     @if (!string.IsNullOrEmpty(_error))
     {
@@ -49,7 +52,7 @@
                 </Template>
             </KanbanCardSettings>
             <KanbanColumns>
-                @foreach (var column in _columns)
+                @foreach (var column in VisibleColumns)
                 {
                     <KanbanColumn HeaderText="@column.StageName" KeyField="@(new List<string> { column.StageId.ToString() })" ShowItemCount="true" />
                 }
@@ -69,6 +72,31 @@
     // tab) via the getter/setter pair below.
     [Parameter] public string SearchText { get; set; } = string.Empty;
     [Parameter] public EventCallback<string> SearchTextChanged { get; set; }
+
+    // UI-only toggle (no backend change) — the Kanban response already tags every column with
+    // IsTerminal (see KanbanColumnModel), so hiding Hired/Rejected columns is a pure client-side
+    // filter of the already-loaded _columns/FilteredCards. Defaults to false (terminal columns
+    // hidden) per the dashboard redesign brief, so a recruiter's default board view stays focused
+    // on in-flight applicants; callers that want the old "always show everything" behaviour can
+    // pass ShowTerminalStages="true".
+    //
+    // IMPORTANT for any embedding site: this parameter's default is "hide terminal columns," which
+    // is only correct for RecruitmentDashboard.razor's own "Show Hired / Rejected columns"
+    // checkbox-driven usage. VacancyDetail.razor's Kanban tab and the standalone VacancyKanbanPage
+    // route both predate this parameter and have no toggle of their own — they must always pass
+    // ShowTerminalStages="true" explicitly to preserve their original "show every configured
+    // stage, including Hired/Rejected" behaviour. Omitting it there silently drops the Hired/
+    // Rejected columns entirely (not just hides applicants in them) — this exact regression broke
+    // VacancyKanbanBoardTests.Board_RendersOneColumnPerConfiguredStage_InDisplayOrder_
+    // IncludingEmptyColumns when this parameter was first introduced.
+    [Parameter] public bool ShowTerminalStages { get; set; }
+
+    // UI-only toggle — when the board is embedded in a page that already renders its own search
+    // box / vacancy context above the board (RecruitmentDashboard.razor's unified toolbar row),
+    // the board's own internal toolbar would be a redundant duplicate. Defaults to true so
+    // standalone callers (VacancyDetail's Kanban tab, VacancyKanbanPage) keep their existing
+    // toolbar unchanged.
+    [Parameter] public bool ShowToolbar { get; set; } = true;
 
     private bool _loading = true;
     private string? _error;
@@ -143,15 +171,21 @@
     private RecruitmentStageTerminalOutcome StageOutcome(Guid stageId) =>
         _stageOutcomes.GetValueOrDefault(stageId, RecruitmentStageTerminalOutcome.None);
 
+    private IEnumerable<KanbanColumnModel> VisibleColumns =>
+        ShowTerminalStages ? _columns : _columns.Where(c => !c.IsTerminal);
+
     private IEnumerable<KanbanApplicantModel> FilteredCards
     {
         get
         {
+            var visibleStageIds = VisibleColumns.Select(c => c.StageId).ToHashSet();
+            var cards = _cards.Where(c => visibleStageIds.Contains(c.StageId));
+
             if (string.IsNullOrWhiteSpace(SearchText))
-                return _cards;
+                return cards;
 
             var term = SearchText.Trim();
-            return _cards.Where(c =>
+            return cards.Where(c =>
                 c.CandidateFullName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
                 (_candidateEmails.TryGetValue(c.CandidateId, out var email) &&
                  email.Contains(term, StringComparison.OrdinalIgnoreCase)));

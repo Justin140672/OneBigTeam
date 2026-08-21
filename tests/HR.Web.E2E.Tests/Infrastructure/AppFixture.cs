@@ -67,7 +67,8 @@ public sealed class AppFixture : IAsyncLifetime
             // combobox-heavy tests) as part of the same speedup pass, so SlowMo is no longer needed
             // either. If headless flakiness ever reappears, flip Headless back to false here as a
             // quick diagnostic, but the throttling args should mean that's no longer necessary.
-            Headless = true,
+            Headless = false,
+            SlowMo = 1000,
             Args =
             [
                 "--disable-background-timer-throttling",

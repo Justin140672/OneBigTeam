@@ -35,6 +35,6 @@ internal sealed class CreateLeaveTypeHandler(LeaveDbContext db, IClock clock)
             entity.DefaultEntitlementDays,
             entity.AccrualMethod.ToString(),
             entity.Behaviour.ToString(),
-            entity.IsActive, entity.HasBalance, entity.CreatedAt, entity.UpdatedAt));
+            entity.IsActive, entity.HasBalance, entity.IsSystem, entity.CreatedAt, entity.UpdatedAt));
     }
 }

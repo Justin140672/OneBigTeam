@@ -6,26 +6,24 @@ using Microsoft.Extensions.Logging;
 namespace HR.Admin.Web.Services;
 
 // Drives Blazor's own AuthorizeRouteView/AuthorizeView. Determines *authentication* only (does a
-// valid Supabase session exist at all) — never platform-admin authorisation, which every
+// valid Supabase session exist at all) — never fine-grained authorisation, which every
 // individual page/service already enforces separately via its own API call and null-means-"show
 // error banner" contract (see e.g. CustomerDetailsService.GetCustomerDetailsOrNullAsync).
 //
-// This used to reuse the customer-dashboard call (a business endpoint with its own
-// "PlatformAdmin:AllowedEmails" gate baked in) as a combined authentication+authorisation probe.
-// That conflated the two: a real, logged-in-but-not-allow-listed persona (e.g. a plain employee)
-// got treated as *not authenticated at all* by Blazor's router, which redirected them to /login
-// instead of letting CustomerDetails.razor/FailedPayments.razor render their own intended "you're
-// authenticated but not authorised" banners. It also meant any bug/slow query/transient failure
-// on the dashboard endpoint didn't just break the dashboard — it hung or crashed navigation on
-// every single page in the app, including /login itself (AuthorizeRouteView awaits this before
-// evaluating even an [AllowAnonymous] page's own policy).
+// This used to call the tenant-oriented /api/me (HR.Modules.Identity's GetMe feature), the same
+// endpoint HR.Web's own AppSessionAuthStateProvider uses. That endpoint requires "role:employee"
+// and unconditionally resolves a TenantId/company, so a platform-administrator-only account (no
+// UserRole/Employee/tenant at all — e.g. justinetherington@hotmail.com, seeded purely via
+// PlatformAdmin:AllowedEmails / identity.platform_administrators) got a 403 and was treated as
+// *not authenticated at all* by Blazor's router, bouncing them to /login despite having a
+// perfectly valid platform-administrator session.
 //
-// Calls the same lightweight /api/me (HR.Modules.Identity's GetMe feature) HR.Web's own
-// AppSessionAuthStateProvider uses — a pure "who is the current user" check requiring only
-// "role:employee" and a resolved company, nothing platform-admin-specific. Every seeded persona
-// used by this portal's E2E tests carries SystemRoles.Employee alongside their specific role, so
-// this correctly succeeds for any real logged-in user regardless of platform-admin allow-list
-// status.
+// Now calls HR.Modules.Identity's GetPlatformAdminMe feature (GET /api/platform-admin/me),
+// gated on the "platform:admin" policy instead — the same DB-backed policy already used by
+// ~30 other Admin-facing endpoints (see PlatformAdminAuthorizationHandler). It does not resolve
+// any tenant/company, so it succeeds for platform-admin-only accounts as well as tenant users who
+// also happen to be platform administrators. The Admin Portal is platform-admin-only by design,
+// so this is the correct authentication probe for every page in this app.
 public sealed class AppSessionAuthStateProvider(
     IHttpClientFactory httpClientFactory, ILogger<AppSessionAuthStateProvider> logger)
     : AuthenticationStateProvider
@@ -42,7 +40,7 @@ public sealed class AppSessionAuthStateProvider(
         try
         {
             var http = httpClientFactory.CreateClient("hrapi");
-            var response = await http.GetAsync("api/me", cts.Token);
+            var response = await http.GetAsync("api/platform-admin/me", cts.Token);
 
             if (!response.IsSuccessStatusCode)
                 return Anonymous;
@@ -57,12 +55,14 @@ public sealed class AppSessionAuthStateProvider(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to resolve authentication state via /api/me");
+            logger.LogWarning(ex, "Failed to resolve authentication state via /api/platform-admin/me");
             return Anonymous;
         }
     }
 
-    // Minimal projection of HR.Modules.Identity.Features.GetMe.GetMeResponse — only the fields
-    // this probe actually needs (proving the call succeeded, plus a display name for the claim).
+    // Minimal projection of HR.Modules.Identity.Features.GetPlatformAdminMe.GetPlatformAdminMeResponse
+    // — only the fields this probe actually needs (proving the call succeeded, plus a display name
+    // for the claim). Role is intentionally not projected here; no Admin.Web page currently reads it
+    // from auth state.
     private sealed record MeResponse(Guid UserId, string? Email);
 }

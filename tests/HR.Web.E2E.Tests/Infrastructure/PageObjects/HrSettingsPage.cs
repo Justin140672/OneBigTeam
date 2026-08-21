@@ -297,11 +297,22 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
 
     // ── Employee Numbering ────────────────────────────────────────────────────
 
-    public Task SelectEmployeeNumberModeAsync(string modeLabel) =>
-        DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Numbering Mode" }).First, modeLabel);
+    // HrSettingsPage.razor now groups its fields into an SfTab (Working & Leave, Sickness,
+    // Documents, Leaving Process, Employee Numbering) instead of one flat card — GoToAsync always
+    // lands on the first tab, so every Employee Numbering accessor below must activate that tab
+    // before touching its fields, the same way MyProfilePage.OpenTasksTabAsync does for its tabs.
+    private Task SwitchToEmployeeNumberingTabAsync() =>
+        page.GetByRole(AriaRole.Tab, new() { Name = "Employee Numbering" }).ClickAsync();
+
+    public async Task SelectEmployeeNumberModeAsync(string modeLabel)
+    {
+        await SwitchToEmployeeNumberingTabAsync();
+        await DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Numbering Mode" }).First, modeLabel);
+    }
 
     public async Task<string> GetEmployeeNumberModeAsync()
     {
+        await SwitchToEmployeeNumberingTabAsync();
         var group = page.Locator(".col-md-4")
             .Filter(new() { HasText = "Numbering Mode" })
             .First;
@@ -309,33 +320,48 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         return (await combobox.Locator("input").InputValueAsync()).Trim();
     }
 
-    public Task<bool> IsEmployeeNumberAutomaticFieldsVisibleAsync() =>
-        page.GetByPlaceholder("e.g. EMP-").IsVisibleAsync();
+    public async Task<bool> IsEmployeeNumberAutomaticFieldsVisibleAsync()
+    {
+        await SwitchToEmployeeNumberingTabAsync();
+        return await page.GetByPlaceholder("e.g. EMP-").IsVisibleAsync();
+    }
 
     public async Task SetEmployeeNumberPrefixAsync(string value)
     {
+        await SwitchToEmployeeNumberingTabAsync();
         await page.GetByPlaceholder("e.g. EMP-").FillAsync(value);
         await page.Keyboard.PressAsync("Tab");
     }
 
-    public Task<string> GetEmployeeNumberPrefixAsync() =>
-        page.GetByPlaceholder("e.g. EMP-").InputValueAsync();
+    public async Task<string> GetEmployeeNumberPrefixAsync()
+    {
+        await SwitchToEmployeeNumberingTabAsync();
+        return await page.GetByPlaceholder("e.g. EMP-").InputValueAsync();
+    }
 
-    public Task SetNextEmployeeNumberAsync(int value) =>
-        FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Next Number"), value.ToString(), value);
+    public async Task SetNextEmployeeNumberAsync(int value)
+    {
+        await SwitchToEmployeeNumberingTabAsync();
+        await FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Next Number"), value.ToString(), value);
+    }
 
     public async Task<int> GetNextEmployeeNumberAsync()
     {
+        await SwitchToEmployeeNumberingTabAsync();
         var input = NumericBoxByLabel(".col-md-4", "Next Number");
         var value = await input.InputValueAsync();
         return int.Parse(value);
     }
 
-    public Task SetEmployeeNumberMinimumLengthAsync(int value) =>
-        FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Minimum Numeric Length"), value.ToString(), value);
+    public async Task SetEmployeeNumberMinimumLengthAsync(int value)
+    {
+        await SwitchToEmployeeNumberingTabAsync();
+        await FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Minimum Numeric Length"), value.ToString(), value);
+    }
 
     public async Task<int> GetEmployeeNumberMinimumLengthAsync()
     {
+        await SwitchToEmployeeNumberingTabAsync();
         var input = NumericBoxByLabel(".col-md-4", "Minimum Numeric Length");
         var value = await input.InputValueAsync();
         return int.Parse(value);
@@ -343,6 +369,7 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
 
     public async Task<string?> GetEmployeeNumberPreviewAsync()
     {
+        await SwitchToEmployeeNumberingTabAsync();
         var paragraph = page.Locator("p").Filter(new() { HasText = "Preview:" }).First;
         if (!await paragraph.IsVisibleAsync())
             return null;
@@ -356,11 +383,17 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
     private ILocator BackfillEmployeeNumbersButton =>
         page.GetByRole(AriaRole.Button, new() { Name = "Backfill Employee Numbers…" });
 
-    public Task<bool> IsBackfillEmployeeNumbersButtonVisibleAsync() =>
-        BackfillEmployeeNumbersButton.IsVisibleAsync();
+    public async Task<bool> IsBackfillEmployeeNumbersButtonVisibleAsync()
+    {
+        await SwitchToEmployeeNumberingTabAsync();
+        return await BackfillEmployeeNumbersButton.IsVisibleAsync();
+    }
 
-    public Task OpenBackfillEmployeeNumbersDialogAsync() =>
-        BackfillEmployeeNumbersButton.ClickAsync();
+    public async Task OpenBackfillEmployeeNumbersDialogAsync()
+    {
+        await SwitchToEmployeeNumberingTabAsync();
+        await BackfillEmployeeNumbersButton.ClickAsync();
+    }
 
     // ── Save / Cancel ────────────────────────────────────────────────────────
 

@@ -109,7 +109,8 @@ else
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <label class="form-label">Position Profile</label>
-                                <SfDropDownList TValue="Guid?"
+                                <SfDropDownList @ref="_positionProfileDropdown"
+                                                TValue="Guid?"
                                                 TItem="PositionProfileListItemModel"
                                                 DataSource="@_positionProfiles"
                                                 @bind-Value="Model.PositionProfileId"
@@ -117,7 +118,9 @@ else
                                                 AllowFiltering="true"
                                                 Enabled="@(!IsViewMode)">
                                     <DropDownListFieldSettings Value="Id" Text="Title" />
-                                    <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?" ValueChange="OnPositionProfileChanged" />
+                                    <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?"
+                                                         ValueChange="OnPositionProfileChanged"
+                                                         Filtering="OnPositionProfileFilteringAsync" />
                                 </SfDropDownList>
                             </div>
                             <div class="col-md-4">
@@ -360,6 +363,7 @@ else
     private List<DepartmentListItemModel> _departments = [];
     private List<LocationListItemModel> _locations = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
+    private SfDropDownList<Guid?, PositionProfileListItemModel> _positionProfileDropdown = default!;
     private SfDropDownList<Guid?, ManagerOption> _managerDropdown = default!;
     private List<ManagerOption> _managerOptions = [];
     private List<EmploymentTypeListItemModel> _employmentTypes = [];
@@ -454,7 +458,15 @@ else
     {
         var deptTask       = DepartmentService.ListDepartmentsAsync(CompanyId);
         var locationTask   = LocationService.ListLocationsAsync(CompanyId);
-        var profileTask    = PositionProfileService.ListPositionProfilesAsync(CompanyId);
+        // Bounded — a long-lived shared company can accumulate far more Position Profiles over
+        // time than any dropdown needs to browse without typing (e.g. this suite's own E2E runs
+        // create a uniquely-named one per test, unbounded, across hundreds of runs). An unbounded
+        // fetch here was a real, user-observed multi-second delay before this field became
+        // interactable at all — see OnPositionProfileFilteringAsync for how the rest of the
+        // company is reached by typing (same pattern as OnManagerFilteringAsync below), and the
+        // explicit merge-in after `employee` loads for why the currently-assigned profile is
+        // never silently missing just because it falls outside this first page.
+        var profileTask    = PositionProfileService.ListPositionProfilesAsync(CompanyId, pageSize: 100);
         var empListTask    = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
         var probationTask  = ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
         var empTypesTask   = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
@@ -474,6 +486,24 @@ else
         _employee = employee;
         if (employee is not null)
             PopulateModel(employee);
+
+        // Same "merge in the currently-assigned option even if it fell outside the bounded first
+        // page" pattern as _managerOptions below — otherwise an employee whose Position Profile
+        // happens to sort past the first 100 (alphabetically by Title) would render with a blank
+        // Position Profile field until the user typed something to search for it.
+        if (employee?.PositionProfileId is { } currentProfileId &&
+            _positionProfiles.All(p => p.Id != currentProfileId))
+        {
+            var currentProfile = await PositionProfileService.GetPositionProfileAsync(CompanyId, currentProfileId);
+            if (currentProfile is not null)
+            {
+                _positionProfiles.Add(new PositionProfileListItemModel(
+                    currentProfile.Id, DepartmentName: null, currentProfile.Title, currentProfile.Description,
+                    currentProfile.IsActive, currentProfile.SalaryMin, currentProfile.SalaryMax,
+                    currentProfile.SalaryType, currentProfile.NoticePeriodUnitOverride,
+                    currentProfile.NoticePeriodLengthOverride));
+            }
+        }
 
         // A first page (browsable without typing anything) — same purpose as the initial
         // pageSize:200 fetch in VacancyApplicationsTab.OpenAddDialog. The rest of the company
@@ -625,6 +655,22 @@ else
                 Model.LocationId = profile.LocationId;
             }
         }
+    }
+
+    // Same "search server-side as the user types instead of requiring the whole company be
+    // preloaded" pattern as OnManagerFilteringAsync above, and for the same reason: the bounded
+    // first page loaded in LoadAsync (see profileTask's remarks) only covers the first 100
+    // Position Profiles by Title, so anything past that is only reachable by typing.
+    private int _profileFilterRequestId;
+
+    private async Task OnPositionProfileFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var requestId = ++_profileFilterRequestId;
+        var result = await PositionProfileService.ListPositionProfilesAsync(CompanyId, search: args.Text, pageSize: 100);
+        if (requestId != _profileFilterRequestId) return;
+        var options = (result?.Items ?? []).ToList();
+        await _positionProfileDropdown.FilterAsync(options, new Query());
     }
 
     private void ToggleWorkingDay(string day, bool isChecked)

@@ -24,7 +24,7 @@ internal sealed class ListLeaveTypesHandler(LeaveDbContext db)
                 t.DefaultEntitlementDays,
                 t.AccrualMethod.ToString(),
                 t.Behaviour.ToString(),
-                t.IsActive, t.HasBalance, t.CreatedAt, t.UpdatedAt))
+                t.IsActive, t.HasBalance, t.IsSystem, t.CreatedAt, t.UpdatedAt))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new ListLeaveTypesResponse(items));

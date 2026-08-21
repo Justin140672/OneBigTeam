@@ -1,7 +1,10 @@
 ﻿@page "/not-found"
 @layout MainLayout
 
-<PageTitle>Not found | One Big Team</PageTitle>
+<SeoHead Title="Page not found | One Big Team"
+         Description="The requested page could not be found."
+         CanonicalPath="/not-found"
+         NoIndex="true" />
 
 <SiteHeader />
 
@@ -13,3 +16,15 @@
 </main>
 
 <SiteFooter />
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (HttpContext is not null)
+        {
+            HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+        }
+    }
+}

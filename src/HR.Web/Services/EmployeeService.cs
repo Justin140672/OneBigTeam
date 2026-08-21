@@ -153,6 +153,37 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         return (false, "Failed to save profile.");
     }
 
+    public async Task<(bool Success, string? Error)> CompleteInitialSetupAsync(
+        Guid companyId,
+        CompleteInitialEmployeeSetupRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync(
+                $"api/companies/{companyId}/employees/me/complete-initial-setup", request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return (true, null);
+
+            // A 409 here means setup was already completed (e.g. a double-submit/race) — treat it
+            // as a soft success rather than an error so the caller just closes the dialog.
+            if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+                return (true, null);
+
+            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
+                return (false, businessMessage);
+
+            if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
+                return (false, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
+
+            return (false, $"Failed to complete your profile ({(int)response.StatusCode} {response.StatusCode}).");
+        }
+        catch { return (false, "An unexpected error occurred."); }
+    }
+
     public async Task<GetMyPersonalDetailsResponse?> GetMyPersonalDetailsAsync(
         Guid companyId,
         CancellationToken cancellationToken = default)

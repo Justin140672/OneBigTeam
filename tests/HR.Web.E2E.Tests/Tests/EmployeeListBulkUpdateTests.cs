@@ -47,7 +47,7 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await empEdit.FillStartDateAsync("01/03/2026");
         await empEdit.FillEmployeeNumberAsync(employeeNumber);
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
         await empEdit.SaveNewEmployeeAsync();
 
         // Matches the guid directly rather than splitting on the trailing "/view" segment
@@ -274,7 +274,7 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await empEdit.FillStartDateAsync("01/03/2026");
         await empEdit.FillEmployeeNumberAsync($"E2E-BLN-{unique}");
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
         await empEdit.SaveNewEmployeeAsync();
 
         await empList.GoToAsync(AcmeId);

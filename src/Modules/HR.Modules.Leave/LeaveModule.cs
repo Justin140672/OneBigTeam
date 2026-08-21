@@ -126,7 +126,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         if (!await db.LeaveTypes.AnyAsync(lt => lt.CompanyId == companyId))
         {
             db.LeaveTypes.AddRange(
-                LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000001"), companyId, "Annual Leave",        "ANNUAL",        25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now),
+                LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000001"), companyId, "Annual Leave",        "ANNUAL",        25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now, isSystem: true),
                 LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000003"), companyId, "Unpaid Leave",        "UNPAID",         0, AccrualMethod.None,    LeaveTypeBehaviour.Unpaid,    now, hasBalance: false),
                 LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000004"), companyId, "Compassionate Leave", "COMPASSIONATE",  5, AccrualMethod.None,    LeaveTypeBehaviour.Standard,  now),
                 LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000005"), companyId, "Parental Leave",      "PARENTAL",      52, AccrualMethod.None,    LeaveTypeBehaviour.Parental,  now),
@@ -204,7 +204,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         if (!await db.LeaveTypes.AnyAsync(lt => lt.CompanyId == betaCorpId))
         {
             db.LeaveTypes.AddRange(
-                LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000011"), betaCorpId, "Annual Leave",  "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now),
+                LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000011"), betaCorpId, "Annual Leave",  "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now, isSystem: true),
                 LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000013"), betaCorpId, "Unpaid Leave",  "UNPAID",  0, AccrualMethod.None,    LeaveTypeBehaviour.Unpaid,    now, hasBalance: false));
 
             await db.SaveChangesAsync();

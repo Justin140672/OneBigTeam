@@ -143,7 +143,12 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
 
         await empEdit.OpenPromotionHistoryTabAsync();
         await wizard.OpenAsync();
-        await wizard.SelectNewPositionProfileAsync("Senior Software Engineer");
+        // "QA Engineer" (not "Senior Software Engineer") — submitting this promotion permanently
+        // occupies the target profile, and many Recruitment E2E tests depend on "Senior Software
+        // Engineer" remaining selectable in VacancyDetail's "New Vacancy" Position Profile dropdown
+        // (which excludes profiles held by any active employee). "QA Engineer" is a seeded profile
+        // dedicated to tests like this one — see EmployeesModule's dev seed and CreateEmployeeTests.
+        await wizard.SelectNewPositionProfileAsync("QA Engineer");
         // A few days ahead of "today" — future enough to be after the run date, near enough not
         // to require guessing far into the future. See EmployeePromotionTabTests for the same
         // one-week-ahead convention used elsewhere in this suite.

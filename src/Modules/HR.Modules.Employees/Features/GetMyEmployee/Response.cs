@@ -11,4 +11,5 @@ internal sealed record GetMyEmployeeResponse(
     string? JobTitle,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
-    string? ProfileImageUrl);
+    string? ProfileImageUrl,
+    bool RequiresInitialSetup);

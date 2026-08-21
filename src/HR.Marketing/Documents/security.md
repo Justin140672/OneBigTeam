@@ -1,6 +1,6 @@
 ---
 title: Security
-lastUpdated: 18 August 2026
+lastUpdated: 21 August 2026
 ---
 
 # Security
@@ -20,10 +20,16 @@ One Big Team is a multi-tenant platform. Every company's data is kept isolated f
 other company's, and access is scoped to a user's own organisation.
 
 ## Encryption
-Data is encrypted in transit and at rest.
+Data is encrypted in transit using HTTPS and by the production hosting providers at rest.
+Private documents use restricted storage and time-limited signed access links. Additional
+application-level protection for equal-opportunities information is a production launch
+requirement and will be verified before that information is collected.
 
 ## Backups
-We take regular backups of customer data as part of our operational processes.
+The production database will use the database provider's managed backups. Private files will
+be backed up daily to encrypted, private AWS storage in London, independently of the primary
+file store, and automatically deleted after 30 days. Restoration will be tested before live
+customer files are stored and periodically thereafter.
 
 ## Audit logging
 Security-relevant activity is logged so that changes can be reviewed and investigated.
@@ -42,8 +48,7 @@ services. A current list is available on our [Subprocessors](/subprocessors) pag
 
 ## Formal certifications
 We have not yet obtained formal third-party security certifications (such as SOC 2 or ISO
-27001) or completed an independent penetration test. This is not yet formalised, and we will
-update this page if that changes.
+27001) or completed an independent penetration test. We will update this page if that changes.
 
 ## Contact
-For additional information, contact security@onebigteam.co.uk.
+For additional information, contact [security@onebigteam.co.uk](mailto:security@onebigteam.co.uk).

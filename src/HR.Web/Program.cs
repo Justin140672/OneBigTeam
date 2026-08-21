@@ -294,6 +294,16 @@ app.MapGet("/login-complete", (HttpContext context, string accessToken, int expi
     return Results.Redirect($"/?st={Uri.EscapeDataString(accessToken)}&se={expiresIn}");
 }).AllowAnonymous();
 
+// Clears the Supabase session cookie and returns to /login. Same "must be a real HTTP
+// request/response, not mid-circuit" constraint as /login-complete above — MainLayout.razor's
+// logout button (top bar, and the blocking first-login "Complete your employee profile" dialog)
+// must navigate here via app.js's hardNavigate, not NavigationManager.NavigateTo.
+app.MapGet("/logout", (HttpContext context) =>
+{
+    SupabaseSessionAccessor.ClearSessionCookie(context);
+    return Results.Redirect("/login");
+}).AllowAnonymous();
+
 // Development-only: establishes a real Supabase session cookie for the dev persona switcher.
 // Blazor Server's interactive circuit (a live SignalR connection, not a normal HTTP
 // request/response) cannot set cookies mid-render — same constraint as /verify-email-complete

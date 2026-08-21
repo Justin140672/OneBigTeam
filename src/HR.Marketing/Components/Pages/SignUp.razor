@@ -2,10 +2,10 @@
 @using Microsoft.AspNetCore.WebUtilities
 @using HR.Marketing.Services
 
-<PageTitle>Start your free trial | One Big Team</PageTitle>
-<HeadContent>
-    <meta name="description" content="Start your free 14-day trial of One Big Team — no credit card required.">
-</HeadContent>
+<SeoHead Title="Start Your Free HR Software Trial | One Big Team"
+         Description="Start your free 14-day trial of One Big Team HR software. No credit card required."
+         CanonicalPath="/signup"
+         NoIndex="true" />
 
 <SignupHeader />
 
@@ -69,7 +69,7 @@
             <label for="email">Work email</label>
             <input id="email" name="email" type="email" autocomplete="email"
                    value="@Email"
-                   pattern="[^\s@@]+@@[^\s@@]+\.[^\s@@]+" title="Enter a valid email address, e.g. name@@company.com" required
+                   pattern="[^\s@@]+@@[^\s@@]+\.[^\s@@]+" title="Enter a valid email address, e.g. hello@@onebigteam.co.uk" required
                    aria-required="true" aria-describedby="email-error">
             <p class="field-error" id="email-error" data-error-for="email">Enter a valid work email address.</p>
           </div>
@@ -100,8 +100,11 @@
           <button class="button button-primary button-large" type="submit" data-signup-submit>Start free trial</button>
           <p class="small-note">
             By continuing you agree to our
-            <a href="/terms-of-service" data-legal-modal-trigger="terms-of-service-modal">Terms of Service</a> and
-            <a href="/privacy-policy" data-legal-modal-trigger="privacy-policy-modal">Privacy Policy</a>.
+            <a href="/terms-of-service" data-legal-modal-trigger="terms-of-service-modal">Terms of Service</a>,
+            which include our <a href="/acceptable-use-policy">Acceptable Use Policy</a> and
+            <a href="/data-processing-agreement">Data Processing Agreement</a> where applicable.
+            See our <a href="/privacy-policy" data-legal-modal-trigger="privacy-policy-modal">Privacy Policy</a>
+            and <a href="/cookie-policy">Cookies and Browser Storage Policy</a>.
           </p>
         </div>
       </form>

@@ -132,7 +132,7 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await empEdit.FillStartDateAsync("01/03/2026");
         await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
         await empEdit.SaveNewEmployeeAsync();
 
         await empList.ClickEmployeeAsync(lastName);
@@ -177,7 +177,7 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await empEdit.FillStartDateAsync("01/03/2026");
         await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
         await empEdit.SaveNewEmployeeAsync();
 
         await empList.ClickEmployeeAsync(lastName);

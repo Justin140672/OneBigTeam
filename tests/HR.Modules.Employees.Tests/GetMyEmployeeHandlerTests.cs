@@ -52,6 +52,43 @@ public class GetMyEmployeeHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_RequiresInitialSetup_True_For_Employee_Pending_First_Login_Setup()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        employee.MarkRequiresInitialSetup(now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new GetMyEmployeeHandler(context);
+        var result = await handler.HandleAsync(companyId, employee.Id, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.RequiresInitialSetup);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_RequiresInitialSetup_False_For_Employee_Without_Pending_Setup()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new GetMyEmployeeHandler(context);
+        var result = await handler.HandleAsync(companyId, employee.Id, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.RequiresInitialSetup);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_When_No_Employee_Linked_To_User()
     {
         await using var context = BuildContext();

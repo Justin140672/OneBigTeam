@@ -24,6 +24,13 @@ namespace HR.Web.E2E.Tests.Tests;
 /// file (which asserts Tom's *current* position is still plain "Software Engineer") under real
 /// parallel/re-run execution. It now creates its own fresh employee instead — see that test's own
 /// comment for why a fresh "Software Engineer" employee is a safe, valid target.
+///
+/// That same submitting test also promotes into "QA Engineer" rather than "Senior Software
+/// Engineer" — promoting an employee into "Senior Software Engineer" would permanently occupy it,
+/// which (like CreateEmployeeTests) would hide it from VacancyDetail's "New Vacancy" Position
+/// Profile dropdown that many Recruitment E2E tests depend on, for the rest of the parallel test
+/// run. "QA Engineer" is a seeded profile dedicated to this kind of test (same Department/Location
+/// as "Senior Software Engineer" — Engineering / London Office — see EmployeesModule's dev seed).
 /// </summary>
 public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
@@ -139,7 +146,7 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
         Assert.Equal("1. Position", await wizard.GetActiveStepLabelAsync());
         Assert.Contains("Software Engineer", await wizard.GetCurrentPositionTextAsync());
 
-        await wizard.SelectNewPositionProfileAsync("Senior Software Engineer");
+        await wizard.SelectNewPositionProfileAsync("QA Engineer");
         await wizard.FillEffectiveDateAsync("01/08/2026");
         await wizard.FillReasonAsync("Annual review promotion");
         await wizard.FillNotesAsync("Consistently exceeded expectations this cycle.");
@@ -154,19 +161,19 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
         await wizard.ClickNextAsync();
         Assert.Equal("4. Confirm", await wizard.GetActiveStepLabelAsync());
 
-        Assert.Equal("Senior Software Engineer", await wizard.GetConfirmationValueAsync("New Position"));
+        Assert.Equal("QA Engineer", await wizard.GetConfirmationValueAsync("New Position"));
         Assert.Equal("Annual review promotion", await wizard.GetConfirmationValueAsync("Reason"));
 
         await wizard.SubmitAsync();
 
         Assert.False(await wizard.IsVisibleAsync(), "Expected the wizard dialog to close after a successful promotion");
 
-        var row = empEdit.PromotionHistoryRow("Senior Software Engineer");
+        var row = empEdit.PromotionHistoryRow("QA Engineer");
         Assert.True(await row.First.IsVisibleAsync(), "Expected the newly created promotion to appear in the history grid");
 
         var rowText = await row.First.TextContentAsync();
         Assert.Contains("Software Engineer", rowText);
-        Assert.Contains("Senior Software Engineer", rowText);
+        Assert.Contains("QA Engineer", rowText);
         Assert.Contains("Annual review promotion", rowText);
         Assert.Contains("Laura Bennett", rowText);
     }

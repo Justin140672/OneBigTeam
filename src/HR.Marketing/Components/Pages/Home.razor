@@ -1,9 +1,9 @@
 @page "/"
 
-<PageTitle>One Big Team | HR Software for Growing SME Teams</PageTitle>
-<HeadContent>
-    <meta name="description" content="One Big Team is HR software built for SME HR teams — manage the whole employee lifecycle from onboarding to offboarding, track sickness and absence trends, run recruitment and keep records in one shared workspace.">
-</HeadContent>
+<SeoHead Title="One Big Team | HR Software for Growing SME Teams"
+         Description="One Big Team is HR software built for SME HR teams — manage onboarding, leave, sickness, recruitment and employee records in one workspace."
+         CanonicalPath="/"
+         StructuredDataJson="@HomeStructuredData" />
 
 <SiteHeader />
 
@@ -49,14 +49,8 @@
         </a>
         <a class="card" href="/features/leave-management">
           <span class="card-icon" aria-hidden="true"><Icon Name="calendar-days" /></span>
-          <h3>Leave management</h3>
-          <p>Give teams a clear way to request, review and track time away from work.</p>
-          <span class="card-arrow" aria-hidden="true"><Icon Name="arrow-right" /></span>
-        </a>
-        <a class="card" href="/features/sickness-absence">
-          <span class="card-icon" aria-hidden="true"><Icon Name="heart-pulse" /></span>
-          <h3>Sickness tracking</h3>
-          <p>Record absences consistently and see Bradford Factor trends, so patterns surface before they become a problem.</p>
+          <h3>Leave &amp; absence</h3>
+          <p>Manage leave requests and balances, record sickness consistently and spot absence trends earlier.</p>
           <span class="card-arrow" aria-hidden="true"><Icon Name="arrow-right" /></span>
         </a>
         <a class="card" href="/features/recruitment">
@@ -163,3 +157,31 @@
 </main>
 
 <SiteFooter />
+
+@code {
+  private const string HomeStructuredData = """
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "name": "One Big Team",
+          "url": "__SITE_URL__"
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "One Big Team",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "description": "HR software for growing SME teams, covering employee records, leave, sickness, recruitment, onboarding and offboarding.",
+          "offers": {
+            "@type": "Offer",
+            "priceCurrency": "GBP",
+            "price": "20.00",
+            "url": "__SITE_URL__/pricing"
+          }
+        }
+      ]
+    }
+    """;
+}

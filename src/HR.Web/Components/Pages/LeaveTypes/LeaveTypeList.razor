@@ -103,6 +103,14 @@
             onClick: item =>
             {
                 if (!item.IsActive) return Task.CompletedTask;
+                // System leave types (e.g. Annual Leave — see LeaveType.IsSystem) can never be
+                // deactivated; the backend rejects this too (DeactivateLeaveTypeHandler), but
+                // short-circuit here so the confirm dialog never even opens for one (item 50).
+                if (item.IsSystem)
+                {
+                    SetActionError($"'{item.Name}' is a system leave type and cannot be deactivated.");
+                    return Task.CompletedTask;
+                }
                 _deactivateTarget = item;
                 return Task.CompletedTask;
             },

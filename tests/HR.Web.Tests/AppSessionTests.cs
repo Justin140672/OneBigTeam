@@ -41,7 +41,7 @@ public class AppSessionTests
             "I confirm that I have read and understood this document.", 3,
             NoticePeriodUnit.Months, 1, true,
             EmployeeNumberMode.Automatic, "EMP-", 1, 4, DateTime.UtcNow);
-        var employee = new MyEmployeeResponse(employeeId, "Alice", "Smith", "Engineer", null, null, "avatar.png");
+        var employee = new MyEmployeeResponse(employeeId, "Alice", "Smith", "Engineer", null, null, "avatar.png", false);
 
         return new RoutingHandler(new()
         {

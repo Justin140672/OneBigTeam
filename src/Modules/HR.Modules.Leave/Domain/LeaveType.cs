@@ -22,6 +22,16 @@ internal sealed class LeaveType
     /// </summary>
     public bool HasBalance { get; private set; }
 
+    /// <summary>
+    /// True for the platform-provisioned "Annual Leave" record (dev seed data and
+    /// ILeaveTypeDefaultsProvisioner) — item 50's replacement for matching that record by its
+    /// Name string. A system leave type can never be renamed or deactivated (see
+    /// UpdateLeaveTypeHandler/DeactivateLeaveTypeHandler); other fields (code, default
+    /// entitlement, accrual method, behaviour, tracks-balance) remain editable. Never true for a
+    /// company-created leave type — there is no API surface to set this on Create.
+    /// </summary>
+    public bool IsSystem { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -34,7 +44,8 @@ internal sealed class LeaveType
         AccrualMethod accrualMethod,
         LeaveTypeBehaviour behaviour,
         DateTimeOffset now,
-        bool hasBalance = true)
+        bool hasBalance = true,
+        bool isSystem = false)
     {
         return new LeaveType
         {
@@ -47,6 +58,7 @@ internal sealed class LeaveType
             Behaviour = behaviour,
             IsActive = true,
             HasBalance = hasBalance,
+            IsSystem = isSystem,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -61,7 +73,10 @@ internal sealed class LeaveType
         DateTimeOffset now,
         bool hasBalance = true)
     {
-        Name = name;
+        // System leave types (e.g. Annual Leave) can never be renamed — see IsSystem's doc
+        // comment. Callers (UpdateLeaveTypeHandler) are expected to reject a rename attempt
+        // before calling Update, but this is enforced here too as the domain invariant of record.
+        Name = IsSystem ? Name : name;
         Code = code.ToUpperInvariant();
         DefaultEntitlementDays = defaultEntitlementDays;
         AccrualMethod = accrualMethod;

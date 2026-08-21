@@ -1,0 +1,37 @@
+/* Scrollable tab strip: keeps the tab headers on one horizontally-scrollable row instead of
+   wrapping/overflowing the page at narrow (tablet/mobile) widths. */
+::deep .hr-settings-tabs .e-tab-header {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+}
+
+::deep .hr-settings-tab-error-icon {
+    color: var(--bs-danger, #dc3545);
+    margin-inline-end: 0.35rem;
+}
+
+/* Sticky footer: Save/Cancel stay visible without scrolling the whole page. */
+.hr-settings-footer {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding-block: 0.75rem;
+    border-top: 1px solid var(--hr-gray-200, #e5e7eb);
+    z-index: 5;
+}
+
+/* Backfill action: visually separated from ordinary form fields as an operational action. */
+::deep .hr-settings-action-card {
+    border: 1px solid var(--hr-gray-200, #e5e7eb);
+    background: var(--hr-gray-50, #f9fafb);
+    border-radius: var(--hr-radius-md, 8px);
+    padding: 1rem 1.25rem;
+}
+
+::deep .hr-settings-action-card__body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}

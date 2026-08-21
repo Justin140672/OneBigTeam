@@ -1,0 +1,278 @@
+@rendermode InteractiveServer
+@inject EmployeeService EmployeeService
+@inject AppSession Session
+@inject IJSRuntime JS
+@using HR.Web.Models
+
+<SfDialog Visible="true"
+          IsModal="true"
+          Width="720px"
+          ShowCloseIcon="false"
+          CloseOnEscape="false"
+          AllowDragging="false"
+          CssClass="employee-completion-dialog">
+    <DialogTemplates>
+        <Header>Complete your employee profile</Header>
+        <Content>
+            <p class="text-muted mb-3">
+                Before you can start using the app, we need a few personal details from you.
+                This only takes a minute — you can update it later from your profile.
+            </p>
+
+            @if (!string.IsNullOrEmpty(GlobalError))
+            {
+                <div class="alert alert-danger">@GlobalError</div>
+            }
+
+            <EditForm EditContext="_editContext">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">First Name <span class="text-danger">*</span></label>
+                        <HrTextBox @bind-Value="Model.FirstName" Placeholder="First name" />
+                        <ValidationMessage For="@(() => Model.FirstName)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                        <HrTextBox @bind-Value="Model.LastName" Placeholder="Last name" />
+                        <ValidationMessage For="@(() => Model.LastName)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Preferred Name</label>
+                        <HrTextBox @bind-Value="Model.PreferredName" Placeholder="Defaults to first name" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
+                        <SfDatePicker TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" />
+                        <ValidationMessage For="@(() => Model.DateOfBirth)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Nationality <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="string"
+                                        TItem="NationalityListItem"
+                                        DataSource="@_nationalities"
+                                        @bind-Value="Model.Nationality"
+                                        Placeholder="Select nationality"
+                                        AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Name" Text="Name" />
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => Model.Nationality)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Gender <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="string"
+                                        TItem="string"
+                                        DataSource="@_genderOptions"
+                                        @bind-Value="Model.Gender"
+                                        Placeholder="Select gender">
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => Model.Gender)" />
+                        @if (Model.Gender == "Other")
+                        {
+                            <div class="mt-2">
+                                <HrTextBox @bind-Value="Model.GenderOther" Placeholder="Please specify" />
+                            </div>
+                        }
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Personal Email</label>
+                        <HrTextBox @bind-Value="Model.PersonalEmail" Placeholder="personal@example.com" />
+                        <ValidationMessage For="@(() => Model.PersonalEmail)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Phone Number</label>
+                        <HrTextBox @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" />
+                        <ValidationMessage For="@(() => Model.PhoneNumber)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Home Phone</label>
+                        <HrTextBox @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" />
+                        <ValidationMessage For="@(() => Model.HomePhone)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Address Line 1 <span class="text-danger">*</span></label>
+                        <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" />
+                        <ValidationMessage For="@(() => Model.AddressLine1)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Address Line 2</label>
+                        <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">City <span class="text-danger">*</span></label>
+                        <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" />
+                        <ValidationMessage For="@(() => Model.City)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">County</label>
+                        <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Postcode <span class="text-danger">*</span></label>
+                        <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" />
+                        <ValidationMessage For="@(() => Model.PostCode)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Country</label>
+                        <HrTextBox @bind-Value="Model.Country" Placeholder="e.g. United Kingdom" />
+                    </div>
+                </div>
+            </EditForm>
+        </Content>
+        <FooterTemplate>
+            <div class="d-flex justify-content-between align-items-center w-100">
+                <a href="javascript:void(0)" @onclick="LogoutAsync">Log out</a>
+                <SfButton CssClass="e-primary" OnClick="SaveAsync" Disabled="_saving">
+                    @(_saving ? "Saving…" : "Save and continue")
+                </SfButton>
+            </div>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private EmployeeInitialSetupModel Model { get; } = new();
+    private EditContext _editContext = default!;
+    private bool _saving;
+    private string? GlobalError;
+
+    private static readonly string[] _genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
+    private List<NationalityListItem> _nationalities = [];
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(Model);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Model.PostcodeRegexPattern = Session.PostcodeRegex;
+        Model.TelephoneRegexPattern = Session.TelephoneRegex;
+        Model.MobileRegexPattern = Session.MobileRegex;
+
+        var natResult = await EmployeeService.ListNationalitiesAsync();
+        _nationalities = natResult?.Items.ToList() ?? [];
+    }
+
+    private async Task SaveAsync()
+    {
+        GlobalError = null;
+
+        if (!_editContext.Validate())
+        {
+            GlobalError = "Please correct the highlighted fields below.";
+            return;
+        }
+
+        _saving = true;
+        StateHasChanged();
+
+        var request = new CompleteInitialEmployeeSetupRequest(
+            Model.FirstName.Trim(),
+            Model.LastName.Trim(),
+            string.IsNullOrWhiteSpace(Model.PreferredName) ? null : Model.PreferredName.Trim(),
+            Model.DateOfBirth ?? default,
+            Model.Nationality.Trim(),
+            Model.Gender.Trim(),
+            string.IsNullOrWhiteSpace(Model.GenderOther) ? null : Model.GenderOther.Trim(),
+            string.IsNullOrWhiteSpace(Model.PersonalEmail) ? null : Model.PersonalEmail.Trim(),
+            string.IsNullOrWhiteSpace(Model.PhoneNumber) ? null : Model.PhoneNumber.Trim(),
+            string.IsNullOrWhiteSpace(Model.HomePhone) ? null : Model.HomePhone.Trim(),
+            Model.AddressLine1.Trim(),
+            string.IsNullOrWhiteSpace(Model.AddressLine2) ? null : Model.AddressLine2.Trim(),
+            Model.City.Trim(),
+            string.IsNullOrWhiteSpace(Model.County) ? null : Model.County.Trim(),
+            Model.PostCode.Trim(),
+            string.IsNullOrWhiteSpace(Model.Country) ? null : Model.Country.Trim());
+
+        var (success, error) = await EmployeeService.CompleteInitialSetupAsync(Session.CompanyId, request);
+
+        _saving = false;
+
+        if (success)
+        {
+            Session.MarkInitialEmployeeSetupComplete();
+            await OnCompleted.InvokeAsync();
+        }
+        else
+        {
+            GlobalError = error ?? "Failed to save your details.";
+            StateHasChanged();
+        }
+    }
+
+    // Uses the same hardNavigate pattern as MainLayout's OnPersonaSwitchAsync — a genuine browser
+    // navigation is required to reach /logout since Blazor Server's interactive circuit can't
+    // set/clear the Supabase session cookie mid-render. This is the ONLY other way out of this
+    // blocking dialog besides a successful save.
+    private async Task LogoutAsync() => await JS.InvokeVoidAsync("hardNavigate", "/logout");
+
+    // Mirrors the server-side validator's rule (DateOfBirth must be strictly after 1900-01-01) so
+    // the client catches the placeholder DOB before it ever reaches the server.
+    private sealed class DateAfter1900Attribute : System.ComponentModel.DataAnnotations.ValidationAttribute
+    {
+        protected override System.ComponentModel.DataAnnotations.ValidationResult? IsValid(
+            object? value, System.ComponentModel.DataAnnotations.ValidationContext validationContext)
+        {
+            if (value is not DateOnly date)
+                return System.ComponentModel.DataAnnotations.ValidationResult.Success;
+
+            return date > new DateOnly(1900, 1, 1)
+                ? System.ComponentModel.DataAnnotations.ValidationResult.Success
+                : new System.ComponentModel.DataAnnotations.ValidationResult(
+                    ErrorMessage ?? "Date of birth must be after 1 January 1900.",
+                    validationContext.MemberName is null ? null : [validationContext.MemberName]);
+        }
+    }
+
+    private sealed class EmployeeInitialSetupModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "First name is required.")]
+        public string FirstName { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Last name is required.")]
+        public string LastName { get; set; } = string.Empty;
+        public string PreferredName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Date of birth is required.")]
+        [DateAfter1900(ErrorMessage = "Date of birth must be after 1 January 1900.")]
+        public DateOnly? DateOfBirth { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nationality is required.")]
+        public string Nationality { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Gender is required.")]
+        public string Gender { get; set; } = string.Empty;
+        public string GenderOther { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Enter a valid email address.")]
+        public string PersonalEmail { get; set; } = string.Empty;
+
+        [DynamicRegex(nameof(MobileRegexPattern), ErrorMessage = "Enter a valid mobile number.")]
+        public string PhoneNumber { get; set; } = string.Empty;
+        [DynamicRegex(nameof(TelephoneRegexPattern), ErrorMessage = "Enter a valid phone number.")]
+        public string HomePhone { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Address line 1 is required.")]
+        public string AddressLine1 { get; set; } = string.Empty;
+        public string AddressLine2 { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "City is required.")]
+        public string City { get; set; } = string.Empty;
+        public string County { get; set; } = string.Empty;
+
+        private string _postCode = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Postcode is required.")]
+        [DynamicRegex(nameof(PostcodeRegexPattern), ErrorMessage = "Enter a valid postcode.")]
+        public string PostCode
+        {
+            get => _postCode;
+            set => _postCode = value.ToUpperInvariant();
+        }
+
+        public string Country { get; set; } = string.Empty;
+
+        public string? PostcodeRegexPattern { get; set; }
+        public string? TelephoneRegexPattern { get; set; }
+        public string? MobileRegexPattern { get; set; }
+    }
+}

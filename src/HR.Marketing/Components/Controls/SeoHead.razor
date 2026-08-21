@@ -1,0 +1,46 @@
+@inject NavigationManager Navigation
+
+<PageTitle>@Title</PageTitle>
+<HeadContent>
+    <meta name="description" content="@Description" />
+    <link rel="canonical" href="@CanonicalUrl" />
+    @if (NoIndex)
+    {
+        <meta name="robots" content="noindex,follow" />
+    }
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="One Big Team" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:title" content="@Title" />
+    <meta property="og:description" content="@Description" />
+    <meta property="og:url" content="@CanonicalUrl" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="@Title" />
+    <meta name="twitter:description" content="@Description" />
+    @if (!string.IsNullOrWhiteSpace(StructuredDataJson))
+    {
+        <script type="application/ld+json">@((MarkupString)RenderedStructuredDataJson)</script>
+    }
+</HeadContent>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Description { get; set; } = string.Empty;
+    [Parameter] public string? CanonicalPath { get; set; }
+    [Parameter] public bool NoIndex { get; set; }
+    [Parameter] public string? StructuredDataJson { get; set; }
+
+    private string CanonicalUrl
+    {
+        get
+        {
+            var current = new Uri(Navigation.Uri);
+            var path = CanonicalPath ?? current.AbsolutePath;
+            return new Uri(new Uri(Navigation.BaseUri), path.TrimStart('/')).AbsoluteUri.TrimEnd('/');
+        }
+    }
+
+    private string RenderedStructuredDataJson => StructuredDataJson!
+        .Replace("__SITE_URL__", new Uri(Navigation.BaseUri).AbsoluteUri.TrimEnd('/'), StringComparison.Ordinal)
+        .Replace("__CANONICAL_URL__", CanonicalUrl, StringComparison.Ordinal);
+}

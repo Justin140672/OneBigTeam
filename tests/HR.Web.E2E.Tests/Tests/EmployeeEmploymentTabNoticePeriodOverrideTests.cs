@@ -55,7 +55,7 @@ public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(HrAdminPerson
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
         // "Software Engineer" is seeded with both Department (Engineering) and Location
         // (London Office) attached, satisfying those required fields in one step (same
-        // reasoning as CreateEmployeeTests' "Senior Software Engineer" selections), and has
+        // reasoning as CreateEmployeeTests' "QA Engineer" selections), and has
         // no notice period override of its own.
         await empEdit.SelectDropdownAsync("Position Profile", "Software Engineer");
 

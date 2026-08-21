@@ -33,6 +33,7 @@ public class LeaveTypeService(IHttpClientFactory httpClientFactory) : IEditServi
             AccrualMethod = existing.AccrualMethod,
             Behaviour = existing.Behaviour,
             HasBalance = existing.HasBalance,
+            IsSystem = existing.IsSystem,
         };
     }
 

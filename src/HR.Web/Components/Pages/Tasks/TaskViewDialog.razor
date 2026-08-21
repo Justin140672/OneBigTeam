@@ -131,7 +131,16 @@
         _loading = false;
     }
 
-    private async Task OnActionCompletedAsync() => await LoadAsync();
+    // Every panel above (LeaveTaskPanel, ProbationReviewPanel, DocumentUploadTaskPanel,
+    // CompleteTaskPanel, etc.) only ever invokes OnCompleted once its task's terminal action has
+    // actually finished server-side — none of them use it as a mid-flow "refresh and keep going"
+    // signal (confirmed by reading each panel's own call site). This used to call LoadAsync()
+    // instead, which re-fetched the now-completed task and re-rendered this same dialog with its
+    // action panel gone (none of the ActionType/Source branches above match a completed task) —
+    // visually indistinguishable from "a second, empty dialog" popping up rather than the dialog
+    // just closing, for every task type uniformly. Close it instead, matching what completing a
+    // task actually means from here.
+    private async Task OnActionCompletedAsync() => await HandleDialogClosed();
 
     private async Task HandleDialogClosed()
     {

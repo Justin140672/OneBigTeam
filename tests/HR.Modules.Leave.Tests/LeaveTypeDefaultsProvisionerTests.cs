@@ -29,6 +29,26 @@ public class LeaveTypeDefaultsProvisionerTests
     }
 
     [Fact]
+    public async Task EnsureDefaultLeaveTypesAsync_Seeds_AnnualLeave_As_System()
+    {
+        // Item 50: production provisioning must mark Annual Leave IsSystem=true (matching the
+        // dev/E2E seed set in LeaveModule.SeedLeaveAsync), not just match it by name.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var provisioner = new LeaveTypeDefaultsProvisioner(context, new FakeClock(FixedUtcNow));
+
+        await provisioner.EnsureDefaultLeaveTypesAsync(companyId, CancellationToken.None);
+
+        var annualLeave = await context.LeaveTypes.SingleAsync(lt => lt.CompanyId == companyId && lt.Name == "Annual Leave");
+        Assert.True(annualLeave.IsSystem);
+
+        var others = await context.LeaveTypes
+            .Where(lt => lt.CompanyId == companyId && lt.Name != "Annual Leave")
+            .ToListAsync();
+        Assert.All(others, lt => Assert.False(lt.IsSystem));
+    }
+
+    [Fact]
     public async Task EnsureDefaultLeaveTypesAsync_Does_Nothing_When_Company_Already_Has_Leave_Types()
     {
         await using var context = BuildContext();

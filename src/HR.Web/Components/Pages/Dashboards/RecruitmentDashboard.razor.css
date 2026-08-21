@@ -1,10 +1,52 @@
+.recruitment-dashboard {
+    max-width: 1400px;
+    margin-inline: auto;
+}
+
+.recruitment-dashboard-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
 .recruitment-dashboard-actions {
     display: flex;
     gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 .recruitment-dashboard-action-btn {
     min-width: 160px;
+}
+
+/* ── Tabs (Pipeline | Activity | Insights) ─────────────────────────────
+   Plain Bootstrap nav-tabs — app.css already re-points .nav-tabs .nav-link.active
+   to the brand teal underline, so this reuses the same tab treatment as the rest
+   of the app instead of a bespoke button group. */
+
+.recruitment-dashboard-tabs .nav-link {
+    display: flex;
+    align-items: center;
+    color: var(--hr-gray-500);
+    font-weight: 600;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+}
+
+.recruitment-dashboard-tabs .nav-link:hover {
+    color: var(--hr-color-primary);
+}
+
+/* ── Pipeline toolbar (vacancy picker + search + toggle + view switch) ── */
+
+.recruitment-dashboard-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
 }
 
 .recruitment-dashboard-view-toggle {
@@ -13,5 +55,17 @@
 }
 
 .recruitment-dashboard-vacancy-picker {
-    max-width: 360px;
+    max-width: 280px;
+    min-width: 200px;
+    flex: 1;
+}
+
+.recruitment-dashboard-search {
+    max-width: 280px;
+    min-width: 200px;
+    flex: 1;
+}
+
+.recruitment-dashboard-terminal-toggle {
+    white-space: nowrap;
 }

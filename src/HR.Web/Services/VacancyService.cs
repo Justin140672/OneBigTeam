@@ -14,7 +14,8 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
         Guid? positionProfileId = null,
         Guid? departmentId = null,
         bool excludeClosed = false,
-        string? search = null)
+        string? search = null,
+        int? pageSize = null)
     {
         try
         {
@@ -25,6 +26,7 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
             if (departmentId is not null) query.Add($"departmentId={departmentId}");
             if (excludeClosed) query.Add("excludeClosed=true");
             if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+            if (pageSize is > 0) query.Add($"pageSize={pageSize.Value}");
             if (query.Count > 0) url += "?" + string.Join("&", query);
 
             return await Http.GetFromJsonAsync<ListVacanciesResponse>(url, HrApiJsonOptions.Default);
