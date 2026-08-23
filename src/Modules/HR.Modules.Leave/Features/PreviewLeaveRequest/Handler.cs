@@ -63,18 +63,39 @@ internal sealed class PreviewLeaveRequestHandler(
             .Select(r => new PreviewConflict(r.Id, r.LeaveTypeId, r.StartDate, r.EndDate, r.Status.ToString()))
             .ToListAsync(cancellationToken);
 
-        var policyYear = LeaveYearCalculator.GetPolicyYear(clock.UtcNowOffset(), leaveSettings.LeaveYearStartMonth);
+        // Cross-year requests are rejected rather than split/partially deducted across two policy
+        // years - callers must submit two separate leave requests, one per policy year. TOIL is
+        // exempt: it is not year-bound by design (earned in one year, taken in another). This
+        // mirrors SubmitLeaveRequestHandler so preview and submit stay consistent.
+        if (leaveType.Behaviour != LeaveTypeBehaviour.Toil)
+        {
+            var startPolicyYear = LeaveYearCalculator.GetPolicyYear(request.StartDate, leaveSettings.LeaveYearStartMonth);
+            var endPolicyYear = LeaveYearCalculator.GetPolicyYear(request.EndDate, leaveSettings.LeaveYearStartMonth);
 
-        var balance = await dbContext.LeaveBalances
-            .SingleOrDefaultAsync(
-                b => b.EmployeeId == request.EmployeeId
-                  && b.CompanyId == request.CompanyId
-                  && b.LeaveTypeId == request.LeaveTypeId
-                  && b.PolicyYear == policyYear,
-                cancellationToken);
+            if (startPolicyYear != endPolicyYear)
+                return Result.Failure<PreviewLeaveRequestResponse>(
+                    Error.Validation(
+                        "This request spans two leave policy years. Please submit two separate leave requests, one for each policy year."));
+        }
 
-        decimal? remainingBalance = balance?.RemainingDays;
-        var wouldExceedBalance = totalDays > 0 && (remainingBalance is null || remainingBalance < totalDays);
+        decimal? remainingBalance = null;
+        var wouldExceedBalance = false;
+
+        if (leaveType.HasBalance)
+        {
+            var policyYear = LeaveYearCalculator.GetPolicyYear(request.StartDate, leaveSettings.LeaveYearStartMonth);
+
+            var balance = await dbContext.LeaveBalances
+                .SingleOrDefaultAsync(
+                    b => b.EmployeeId == request.EmployeeId
+                      && b.CompanyId == request.CompanyId
+                      && b.LeaveTypeId == request.LeaveTypeId
+                      && b.PolicyYear == policyYear,
+                    cancellationToken);
+
+            remainingBalance = balance?.RemainingDays;
+            wouldExceedBalance = totalDays > 0 && (remainingBalance is null || remainingBalance < totalDays);
+        }
 
         return Result.Success(new PreviewLeaveRequestResponse(
             totalDays,

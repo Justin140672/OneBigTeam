@@ -32,7 +32,7 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, INoti
         var leaveType = await dbContext.LeaveTypes
             .SingleOrDefaultAsync(lt => lt.Id == leaveRequest.LeaveTypeId, cancellationToken);
 
-        LeaveBalance? balance;
+        LeaveBalance? balance = null;
         if (leaveType?.Behaviour == LeaveTypeBehaviour.Toil)
         {
             // TOIL is not year-bound: earned in one year, taken in another. Search all years
@@ -47,7 +47,7 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, INoti
             balance = toilBalances.FirstOrDefault(b => b.RemainingDays > 0)
                       ?? toilBalances.FirstOrDefault();
         }
-        else
+        else if (leaveType is null || leaveType.HasBalance)
         {
             var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(leaveRequest.CompanyId, cancellationToken);
             var policyYear = LeaveYearCalculator.GetPolicyYear(leaveRequest.StartDate, leaveSettings.LeaveYearStartMonth);
@@ -59,6 +59,13 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, INoti
                       && b.LeaveTypeId == leaveRequest.LeaveTypeId
                       && b.PolicyYear == policyYear,
                     cancellationToken);
+
+            // A balance-tracked leave type must have a balance row for the request's policy year -
+            // approving without one would silently skip deducting usage. Fail cleanly instead.
+            if (balance is null)
+                return Result.Failure<ApproveLeaveRequestResponse>(
+                    Error.Validation(
+                        $"No leave balance found for policy year {policyYear}. The request cannot be approved until a balance exists for this employee and leave type."));
         }
 
         leaveRequest.Approve(request.ReviewedByEmployeeId, now);

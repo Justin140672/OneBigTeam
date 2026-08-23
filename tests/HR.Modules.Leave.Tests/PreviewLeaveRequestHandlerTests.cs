@@ -319,4 +319,109 @@ public class PreviewLeaveRequestHandlerTests
         Assert.Null(result.Value!.RemainingBalance);
         Assert.True(result.Value.WouldExceedBalance);
     }
+
+    [Fact]
+    public async Task HandleAsync_Reports_Balance_For_Requests_StartDate_Policy_Year_Not_Todays()
+    {
+        // Today is in policy year 2026, but the request's StartDate falls in 2027. Preview must
+        // report the 2027 balance, not the (non-existent / irrelevant) 2026 balance.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, Now);
+        var balance2027 = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
+            2027, 25m, Now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveBalances.Add(balance2027);
+        await context.SaveChangesAsync();
+
+        var result = await BuildHandler(context).HandleAsync(
+            BaseRequest(companyId, employeeId, leaveType.Id) with
+            {
+                // 2027-01-04 = Monday, 2027-01-08 = Friday
+                StartDate = new DateOnly(2027, 1, 4),
+                EndDate = new DateOnly(2027, 1, 8)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(25m, result.Value!.RemainingBalance);
+        Assert.False(result.Value.WouldExceedBalance);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Null_Balance_And_WouldNotExceedBalance_When_LeaveType_HasBalance_Is_False()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Unpaid Leave", "UNPAID", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, Now, hasBalance: false);
+
+        // A stale/irrelevant balance row exists but must be ignored entirely since HasBalance is false.
+        var staleBalance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
+            2026, 0m, Now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveBalances.Add(staleBalance);
+        await context.SaveChangesAsync();
+
+        var result = await BuildHandler(context).HandleAsync(
+            BaseRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.RemainingBalance);
+        Assert.False(result.Value.WouldExceedBalance);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_Request_Spans_Two_Policy_Years()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, Now);
+        context.LeaveTypes.Add(leaveType);
+        await context.SaveChangesAsync();
+
+        var result = await BuildHandler(context).HandleAsync(
+            BaseRequest(companyId, employeeId, leaveType.Id) with
+            {
+                StartDate = new DateOnly(2026, 12, 28),
+                EndDate = new DateOnly(2027, 1, 4)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Reject_Cross_Year_Request_For_Toil_Leave_Type()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "TOIL", "TOIL", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Toil, Now);
+        context.LeaveTypes.Add(leaveType);
+        await context.SaveChangesAsync();
+
+        var result = await BuildHandler(context).HandleAsync(
+            BaseRequest(companyId, employeeId, leaveType.Id) with
+            {
+                StartDate = new DateOnly(2026, 12, 28),
+                EndDate = new DateOnly(2027, 1, 4)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
 }

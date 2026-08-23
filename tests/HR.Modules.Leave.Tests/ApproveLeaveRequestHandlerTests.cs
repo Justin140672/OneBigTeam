@@ -28,6 +28,31 @@ public class ApproveLeaveRequestHandlerTests
             new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
             5m, "Holiday", now);
 
+    /// <summary>
+    /// Creates a pending leave request together with a matching HasBalance == false LeaveType, so
+    /// tests that only care about approval mechanics (audit/notification/event publication) do not
+    /// need to also set up a LeaveBalance row to reach a successful approval.
+    /// </summary>
+    private static async Task<LeaveRequest> CreatePendingRequestWithNonBalanceTypeAsync(
+        LeaveDbContext context, Guid companyId, Guid employeeId, DateTimeOffset now)
+    {
+        var leaveTypeId = Guid.NewGuid();
+        var leaveType = LeaveType.Create(leaveTypeId, companyId, "Unpaid Leave", "UNPAID", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now, hasBalance: false);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Holiday", now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        return leaveRequest;
+    }
+
     private static ApproveLeaveRequestRequest ApproveRequest(Guid companyId, Guid employeeId, Guid leaveRequestId, Guid reviewerId) =>
         new()
         {
@@ -46,9 +71,7 @@ public class ApproveLeaveRequestHandlerTests
         var reviewerId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var leaveRequest = CreatePendingRequest(companyId, employeeId, now);
-        context.LeaveRequests.Add(leaveRequest);
-        await context.SaveChangesAsync();
+        var leaveRequest = await CreatePendingRequestWithNonBalanceTypeAsync(context, companyId, employeeId, now);
 
         var approvalTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
         var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(approvalTime), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
@@ -76,9 +99,7 @@ public class ApproveLeaveRequestHandlerTests
         var reviewerId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var leaveRequest = CreatePendingRequest(companyId, employeeId, now);
-        context.LeaveRequests.Add(leaveRequest);
-        await context.SaveChangesAsync();
+        var leaveRequest = await CreatePendingRequestWithNonBalanceTypeAsync(context, companyId, employeeId, now);
 
         var auditPublisher = new CapturingAuditEventPublisher();
         var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), auditPublisher);
@@ -235,8 +256,48 @@ public class ApproveLeaveRequestHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Succeeds_When_No_Balance_Record_Exists()
+    public async Task HandleAsync_Returns_Validation_Error_When_No_Balance_Record_Exists_For_Balance_Tracked_Type()
     {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveTypeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(leaveTypeId, companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Holiday", now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+
+        // Guard must not mutate the request status or persist any change.
+        var saved = await context.LeaveRequests.SingleAsync();
+        Assert.Equal(LeaveRequestStatus.Pending, saved.Status);
+        Assert.Null(saved.ReviewedByEmployeeId);
+        Assert.Null(saved.ReviewedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_No_Balance_Record_Exists_And_LeaveType_Not_Found()
+    {
+        // Legacy/orphaned leave requests whose LeaveType row no longer exists are treated as
+        // "unknown" and fall into the balance-tracked branch (leaveType is null); with no balance
+        // row present, approval must fail rather than silently approving without deduction.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -251,8 +312,84 @@ public class ApproveLeaveRequestHandlerTests
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
 
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Approves_Without_Balance_Lookup_When_LeaveType_HasBalance_Is_False()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveTypeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(leaveTypeId, companyId, "Unpaid Leave", "UNPAID", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now, hasBalance: false);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Unpaid", now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
         Assert.True(result.IsSuccess);
         Assert.Equal("Approved", result.Value!.Status);
+
+        var saved = await context.LeaveRequests.SingleAsync();
+        Assert.Equal(LeaveRequestStatus.Approved, saved.Status);
+        Assert.Empty(context.LeaveBalances);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Approves_Using_Balance_For_Requests_StartDate_Policy_Year_Not_Todays()
+    {
+        // Approving today (2026-06-12, policy year 2026) a request whose StartDate falls in a
+        // future policy year (2027) must look up the 2027 balance row, not the 2026 one.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveTypeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(leaveTypeId, companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
+            new DateOnly(2027, 1, 5), LeaveDayPart.FullDay,
+            new DateOnly(2027, 1, 6), LeaveDayPart.FullDay,
+            2m, "New year holiday", now);
+
+        // Only the 2027 balance exists — a 2026 (today's) balance would produce the wrong deduction.
+        var balance2027 = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(), 2027, 25m, now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveRequests.Add(leaveRequest);
+        context.LeaveBalances.Add(balance2027);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(2m, savedBalance.UsedDays);
+        Assert.Equal(23m, savedBalance.RemainingDays);
     }
 
     [Fact]
@@ -406,13 +543,7 @@ public class ApproveLeaveRequestHandlerTests
         var reviewerId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var leaveRequest = LeaveRequest.Create(
-            Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
-            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
-            5m, "Holiday", now);
-        context.LeaveRequests.Add(leaveRequest);
-        await context.SaveChangesAsync();
+        var leaveRequest = await CreatePendingRequestWithNonBalanceTypeAsync(context, companyId, employeeId, now);
 
         var publisher = new CapturingIntegrationEventPublisher();
         var approvalTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
@@ -443,9 +574,7 @@ public class ApproveLeaveRequestHandlerTests
         var reviewerId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var leaveRequest = CreatePendingRequest(companyId, employeeId, now);
-        context.LeaveRequests.Add(leaveRequest);
-        await context.SaveChangesAsync();
+        var leaveRequest = await CreatePendingRequestWithNonBalanceTypeAsync(context, companyId, employeeId, now);
 
         var auditPublisher = new CapturingAuditEventPublisher();
         var approvalTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
@@ -475,9 +604,7 @@ public class ApproveLeaveRequestHandlerTests
         var now        = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var notif      = new FakeNotificationWriter();
 
-        var leaveRequest = CreatePendingRequest(companyId, employeeId, now);
-        context.LeaveRequests.Add(leaveRequest);
-        await context.SaveChangesAsync();
+        var leaveRequest = await CreatePendingRequestWithNonBalanceTypeAsync(context, companyId, employeeId, now);
 
         var handler = new ApproveLeaveRequestHandler(context, notif, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         await handler.HandleAsync(ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId), CancellationToken.None);

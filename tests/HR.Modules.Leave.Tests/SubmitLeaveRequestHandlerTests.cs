@@ -574,5 +574,165 @@ public class SubmitLeaveRequestHandlerTests
         Assert.Equal("Family holiday", auditEvent.Reason);
         Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), auditEvent.OccurredAt);
     }
+
+    [Fact]
+    public async Task HandleAsync_Checks_Balance_For_Requests_StartDate_Policy_Year_Not_Todays()
+    {
+        // Today (FixedUtcNow) is in policy year 2026, but the request's StartDate falls in 2027.
+        // Only a 2027 balance row exists with sufficient days — submission must succeed because the
+        // policy year is derived from the request's StartDate, not from "today".
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, false, now);
+        var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
+            DateOnly.FromDateTime(FixedUtcNow), now);
+        var balance2027 = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            2027, 25m, now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.EmployeeLeavePolicyAssignments.Add(assignment);
+        context.LeaveBalances.Add(balance2027);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var result = await handler.HandleAsync(
+            ValidRequest(companyId, employeeId, leaveType.Id) with
+            {
+                // 2027-01-04 = Monday, 2027-01-08 = Friday
+                StartDate = new DateOnly(2027, 1, 4),
+                EndDate = new DateOnly(2027, 1, 8)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Checks_Future_Years_Balance_Even_When_Current_Years_Balance_Is_Insufficient()
+    {
+        // Proves the policy year is derived from StartDate, not the clock: the *current* policy
+        // year (2026) balance is insufficient, but the *future* year (2027, matching StartDate)
+        // has enough days. With the fix this must succeed — the old buggy code checked the 2026
+        // balance regardless of the request's actual policy year and would have failed here.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, false, now);
+        var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
+            DateOnly.FromDateTime(FixedUtcNow), now);
+        var balance2026 = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            2026, 1m, now); // insufficient for the 5-day request
+        var balance2027 = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            2027, 25m, now); // sufficient, and matches the request's StartDate policy year
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.EmployeeLeavePolicyAssignments.Add(assignment);
+        context.LeaveBalances.AddRange(balance2026, balance2027);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var result = await handler.HandleAsync(
+            ValidRequest(companyId, employeeId, leaveType.Id) with
+            {
+                StartDate = new DateOnly(2027, 1, 4),
+                EndDate = new DateOnly(2027, 1, 8)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_With_No_Balance_Rows_When_LeaveType_HasBalance_Is_False()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Unpaid Leave", "UNPAID", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now, hasBalance: false);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, false, now);
+        var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
+            DateOnly.FromDateTime(FixedUtcNow), now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.EmployeeLeavePolicyAssignments.Add(assignment);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(context.LeaveBalances);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_Request_Spans_Two_Policy_Years()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var result = await handler.HandleAsync(
+            ValidRequest(companyId, employeeId, leaveType.Id) with
+            {
+                StartDate = new DateOnly(2026, 12, 28),
+                EndDate = new DateOnly(2027, 1, 4)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Reject_Cross_Year_Request_For_Toil_Leave_Type()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "TOIL", "TOIL", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Toil, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, false, now);
+        var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
+            DateOnly.FromDateTime(FixedUtcNow), now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 0m, now);
+        balance.Adjust(10m, now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.EmployeeLeavePolicyAssignments.Add(assignment);
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var result = await handler.HandleAsync(
+            ValidRequest(companyId, employeeId, leaveType.Id) with
+            {
+                StartDate = new DateOnly(2026, 12, 28),
+                EndDate = new DateOnly(2027, 1, 4)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
 }
 

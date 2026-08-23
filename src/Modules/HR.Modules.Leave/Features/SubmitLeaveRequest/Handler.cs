@@ -79,9 +79,23 @@ internal sealed class SubmitLeaveRequestHandler
             return Result.Failure<SubmitLeaveRequestResponse>(
                 Error.Validation("The requested date range contains no working days."));
 
-        if (policy is not null && !policy.AllowNegativeBalance)
+        // Cross-year requests are rejected rather than split/partially deducted across two policy
+        // years - callers must submit two separate leave requests, one per policy year. TOIL is
+        // exempt: it is not year-bound by design (earned in one year, taken in another).
+        if (leaveType.Behaviour != LeaveTypeBehaviour.Toil)
         {
-            var policyYear = LeaveYearCalculator.GetPolicyYear(_clock.UtcNowOffset(), leaveSettings.LeaveYearStartMonth);
+            var startPolicyYear = LeaveYearCalculator.GetPolicyYear(request.StartDate, leaveSettings.LeaveYearStartMonth);
+            var endPolicyYear = LeaveYearCalculator.GetPolicyYear(request.EndDate, leaveSettings.LeaveYearStartMonth);
+
+            if (startPolicyYear != endPolicyYear)
+                return Result.Failure<SubmitLeaveRequestResponse>(
+                    Error.Validation(
+                        "This request spans two leave policy years. Please submit two separate leave requests, one for each policy year."));
+        }
+
+        if (leaveType.HasBalance && policy is not null && !policy.AllowNegativeBalance)
+        {
+            var policyYear = LeaveYearCalculator.GetPolicyYear(request.StartDate, leaveSettings.LeaveYearStartMonth);
 
             var balance = await _dbContext.LeaveBalances
                 .SingleOrDefaultAsync(
