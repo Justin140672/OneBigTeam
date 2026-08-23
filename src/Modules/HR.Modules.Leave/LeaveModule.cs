@@ -24,12 +24,15 @@ using HR.Modules.Leave.Features.ListLeaveTypes;
 using HR.Modules.Leave.Features.CreateLeaveType;
 using HR.Modules.Leave.Features.UpdateLeaveType;
 using HR.Modules.Leave.Features.DeactivateLeaveType;
+using HR.Modules.Leave.Jobs;
 using HR.Modules.Leave.Persistence;
 using HR.Modules.Leave.Services;
 using HR.Modules.Leave.Services.OnboardingTasks;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
+using Hangfire;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -50,6 +53,16 @@ public static class LeaveModule
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "leave")));
 
         return services;
+    }
+
+    public static WebApplication UseLeaveRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        jobManager.AddOrUpdate<LeaveYearRolloverJob>(
+            "leave-year-rollover",
+            job => job.ExecuteAsync(),
+            Cron.Daily(0));
+        return app;
     }
 
     private static void AddFeatureServices(IServiceCollection services)
@@ -105,6 +118,8 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         services.AddScoped<ILeaveSummaryReader, LeaveSummaryReader>();
         services.AddScoped<ILeaveCalendarReader, LeaveCalendarReader>();
         services.AddScoped<LeaveResourceAuthorizer>();
+        services.AddScoped<LeaveYearRolloverService>();
+        services.AddScoped<LeaveYearRolloverJob>();
 
         // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
         services.AddScoped<IOnboardingTaskDefinition, ReviewDefaultLeavePolicyTask>();
