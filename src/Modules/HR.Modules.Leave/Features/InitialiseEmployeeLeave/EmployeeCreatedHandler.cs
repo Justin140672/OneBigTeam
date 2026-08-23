@@ -54,6 +54,7 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
         var leaveSettings = await _leaveSettingsReader.GetLeaveSettingsAsync(integrationEvent.CompanyId, cancellationToken);
         var now = _clock.UtcNowOffset();
         var policyYear = LeaveYearCalculator.GetPolicyYear(now, leaveSettings.LeaveYearStartMonth);
+        var (policyYearStart, policyYearEnd) = LeaveYearCalculator.GetPolicyYearBounds(policyYear, leaveSettings.LeaveYearStartMonth);
 
         // Idempotency guard (per 04-event-architecture.md — integration event consumers must
         // tolerate repeated/duplicate delivery). Without this check, a redelivered
@@ -68,6 +69,10 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
             .Select(b => b.LeaveTypeId)
             .ToListAsync(cancellationToken);
 
+        // Entitlement is pro-rated for employees whose start date falls after the first day of
+        // the company's leave year (LeaveEntitlementCalculator is the single source of truth for
+        // this, also reused by RecalculateEntitlementOnStartDateChange when a start date is later
+        // corrected). Employees starting on or before the leave year start get full entitlement.
         var balances = activeLeaveTypes
             .Where(lt => !existingLeaveTypeIds.Contains(lt.Id))
             .Select(lt => LeaveBalance.Create(
@@ -77,7 +82,10 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
                 lt.Id,
                 assignment.LeavePolicyId,
                 policyYear,
-                lt.Behaviour == LeaveTypeBehaviour.Toil ? 0 : lt.DefaultEntitlementDays,
+                lt.Behaviour == LeaveTypeBehaviour.Toil
+                    ? 0
+                    : LeaveEntitlementCalculator.CalculateEntitlement(
+                        lt.DefaultEntitlementDays, policyYearStart, policyYearEnd, integrationEvent.StartDate),
                 now)).ToList();
 
         if (balances.Count > 0)

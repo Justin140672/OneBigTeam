@@ -48,4 +48,22 @@ public class LeaveYearCalculatorTests
             LeaveYearCalculator.GetPolicyYear(date, startMonth: 4),
             LeaveYearCalculator.GetPolicyYear(dto, startMonth: 4));
     }
+
+    [Fact]
+    public void GetPolicyYearBounds_Returns_Calendar_Year_When_StartMonth_Is_January()
+    {
+        var (start, end) = LeaveYearCalculator.GetPolicyYearBounds(2026, startMonth: 1);
+
+        Assert.Equal(new DateOnly(2026, 1, 1), start);
+        Assert.Equal(new DateOnly(2026, 12, 31), end);
+    }
+
+    [Fact]
+    public void GetPolicyYearBounds_Returns_AprilToMarch_Bounds_For_NonCalendar_LeaveYear()
+    {
+        var (start, end) = LeaveYearCalculator.GetPolicyYearBounds(2026, startMonth: 4);
+
+        Assert.Equal(new DateOnly(2026, 4, 1), start);
+        Assert.Equal(new DateOnly(2027, 3, 31), end);
+    }
 }

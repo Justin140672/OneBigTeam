@@ -19,6 +19,7 @@ using HR.Modules.Leave.Features.AdjustLeaveBalance;
 using HR.Modules.Leave.Features.GetLeaveBalanceHistory;
 using HR.Modules.Leave.Features.GetRecentLeaveRequests;
 using HR.Modules.Leave.Features.InitialiseEmployeeLeave;
+using HR.Modules.Leave.Features.RecalculateEntitlementOnStartDateChange;
 using HR.Modules.Leave.Features.ListLeaveTypes;
 using HR.Modules.Leave.Features.CreateLeaveType;
 using HR.Modules.Leave.Features.UpdateLeaveType;
@@ -86,6 +87,7 @@ public static class LeaveModule
         services.AddScoped<GetLeaveBalanceHistoryHandler>();
         services.AddScoped<IValidator<GetLeaveBalanceHistoryRequest>, GetLeaveBalanceHistoryValidator>();
 services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeDetailsCorrectedIntegrationEvent>, EmployeeDetailsCorrectedHandler>();
         services.AddScoped<ILeaveApprovalService, LeaveApprovalService>();
         services.AddScoped<ListLeaveTypesHandler>();
         services.AddScoped<IValidator<ListLeaveTypesRequest>, ListLeaveTypesValidator>();

@@ -44,6 +44,19 @@ internal sealed class LeaveBalance
         };
     }
 
+    /// <summary>
+    /// Recalculates the entitlement for this balance (e.g. after the employee's start date is
+    /// corrected). Callers must only invoke this when the balance is still "untouched" — i.e. no
+    /// usage recorded and no manual adjustment applied — since AdjustmentDays/UsedDays already
+    /// preserve any manual changes or leave transactions separately from EntitlementDays and must
+    /// never be silently overwritten by a recalculation.
+    /// </summary>
+    public void RecalculateEntitlement(decimal entitlementDays, DateTimeOffset now)
+    {
+        EntitlementDays = entitlementDays;
+        UpdatedAt = now;
+    }
+
     public void Adjust(decimal adjustmentDays, DateTimeOffset now)
     {
         AdjustmentDays += adjustmentDays;

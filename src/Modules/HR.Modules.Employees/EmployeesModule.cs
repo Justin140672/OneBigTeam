@@ -383,6 +383,7 @@ public static class EmployeesModule
         services.AddScoped<IEmployeeNameReader, EmployeeNameReader>();
         services.AddScoped<IEmployeeAudienceReader, EmployeeAudienceReader>();
         services.AddScoped<IManagerReader, ManagerReader>();
+        services.AddScoped<IEmployeeStartDateReader, EmployeeStartDateReader>();
         services.AddScoped<IPositionProfileDocumentsReader, PositionProfileDocumentsReader>();
         services.AddScoped<IPositionProfileAssetsReader, PositionProfileAssetsReader>();
         services.AddScoped<IPositionProfileReader, PositionProfileReader>();
