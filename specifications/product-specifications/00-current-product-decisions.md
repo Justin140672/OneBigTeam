@@ -2,9 +2,17 @@
 
 ## Status and precedence
 
-Last confirmed: 19 August 2026
+Last confirmed: 23 August 2026
 
 This document records current product decisions that supersede conflicting older requirements. Update it when a decision changes, including the date and the superseded behaviour.
+
+## Leaving and offboarding
+
+- `SPEC-OFF-01` in `34-leaving-offboarding.md` is the authoritative end-to-end leaving and offboarding contract from 23 August 2026.
+- The leaving date is the inclusive final date of employment; the last working day is the final day work is expected and may be earlier.
+- Employment finalises on the leaving date even if offboarding is incomplete. Mandatory unresolved obligations remain open, transfer to an available owner or HR queue, and escalate after departure.
+- Resignation, redundancy, dismissal, retirement, end of contract, mutual agreement and other routes use the same controlled lifecycle, audit and recovery rules.
+- Payroll processing remains outside scope. Leave supplies a final balance statement and the product records an auditable payroll hand-off.
 
 ## Roles and employee access
 

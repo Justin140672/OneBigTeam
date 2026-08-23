@@ -110,6 +110,8 @@ Position Profile determines:
 
 ## Termination Workflow
 
+The authoritative leaving and offboarding contract is `34-leaving-offboarding.md` (`SPEC-OFF-01`). Its date definitions, routes, state transitions, finalisation, cancellation and cross-module rules supersede any conflicting interpretation in this section.
+
 Termination should support:
 
 - Termination date

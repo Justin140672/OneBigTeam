@@ -1,9 +1,14 @@
 using FastEndpoints;
+using HR.Modules.Leave.Services;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Leave.Features.PreviewLeaveRequest;
 
-internal sealed class Endpoint(PreviewLeaveRequestHandler handler)
+internal sealed class Endpoint(
+    PreviewLeaveRequestHandler handler,
+    ICurrentUser currentUser,
+    LeaveResourceAuthorizer authorizer)
     : Endpoint<PreviewLeaveRequestRequest, PreviewLeaveRequestResponse>
 {
     public override void Configure()
@@ -16,6 +21,19 @@ internal sealed class Endpoint(PreviewLeaveRequestHandler handler)
         PreviewLeaveRequestRequest request,
         CancellationToken cancellationToken)
     {
+        // LEAVE-01: preview mirrors submit's self-service-only scope.
+        if (currentUser.UserId is not { } callerId)
+        {
+            await Send.ResultAsync(TypedResults.Unauthorized());
+            return;
+        }
+
+        if (!await authorizer.CanActOnOwnLeaveAsync(callerId, request.EmployeeId, cancellationToken))
+        {
+            await Send.ResultAsync(TypedResults.Forbid());
+            return;
+        }
+
         var result = await handler.HandleAsync(request, cancellationToken);
 
         if (result.IsFailure)

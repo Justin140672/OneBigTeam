@@ -1,10 +1,14 @@
 using FastEndpoints;
+using HR.Modules.Leave.Services;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Leave.Features.SubmitLeaveRequest;
 
 internal sealed class Endpoint(
-    SubmitLeaveRequestHandler handler) : Endpoint<SubmitLeaveRequestRequest, SubmitLeaveRequestResponse>
+    SubmitLeaveRequestHandler handler,
+    ICurrentUser currentUser,
+    LeaveResourceAuthorizer authorizer) : Endpoint<SubmitLeaveRequestRequest, SubmitLeaveRequestResponse>
 {
     public override void Configure()
     {
@@ -16,6 +20,20 @@ internal sealed class Endpoint(
         SubmitLeaveRequestRequest request,
         CancellationToken cancellationToken)
     {
+        // LEAVE-01: submitting leave is self-service only — an employee can never submit on
+        // behalf of another employee. HR Administrators retain the override.
+        if (currentUser.UserId is not { } callerId)
+        {
+            await Send.ResultAsync(TypedResults.Unauthorized());
+            return;
+        }
+
+        if (!await authorizer.CanActOnOwnLeaveAsync(callerId, request.EmployeeId, cancellationToken))
+        {
+            await Send.ResultAsync(TypedResults.Forbid());
+            return;
+        }
+
         var result = await handler.HandleAsync(request, cancellationToken);
 
         if (result.IsFailure)

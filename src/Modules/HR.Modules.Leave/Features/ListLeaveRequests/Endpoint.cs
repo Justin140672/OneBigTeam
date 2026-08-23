@@ -1,10 +1,14 @@
 using FastEndpoints;
+using HR.Modules.Leave.Services;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Leave.Features.ListLeaveRequests;
 
 internal sealed class Endpoint(
-    ListLeaveRequestsHandler handler) : Endpoint<ListLeaveRequestsRequest, ListLeaveRequestsResponse>
+    ListLeaveRequestsHandler handler,
+    ICurrentUser currentUser,
+    LeaveResourceAuthorizer authorizer) : Endpoint<ListLeaveRequestsRequest, ListLeaveRequestsResponse>
 {
     public override void Configure()
     {
@@ -16,6 +20,19 @@ internal sealed class Endpoint(
         ListLeaveRequestsRequest request,
         CancellationToken cancellationToken)
     {
+        // LEAVE-01: self, manager-in-hierarchy, or HR Administrator may view.
+        if (currentUser.UserId is not { } callerId)
+        {
+            await Send.ResultAsync(TypedResults.Unauthorized());
+            return;
+        }
+
+        if (!await authorizer.CanViewAsync(request.CompanyId, callerId, request.EmployeeId, cancellationToken))
+        {
+            await Send.ResultAsync(TypedResults.Forbid());
+            return;
+        }
+
         var result = await handler.HandleAsync(request, cancellationToken);
         await Send.ResultAsync(TypedResults.Ok(result));
     }

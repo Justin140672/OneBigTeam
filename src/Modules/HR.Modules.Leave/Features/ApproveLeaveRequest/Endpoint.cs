@@ -1,10 +1,14 @@
 using FastEndpoints;
+using HR.Modules.Leave.Services;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Leave.Features.ApproveLeaveRequest;
 
 internal sealed class Endpoint(
-    ApproveLeaveRequestHandler handler) : Endpoint<ApproveLeaveRequestRequest, ApproveLeaveRequestResponse>
+    ApproveLeaveRequestHandler handler,
+    ICurrentUser currentUser,
+    LeaveResourceAuthorizer authorizer) : Endpoint<ApproveLeaveRequestRequest, ApproveLeaveRequestResponse>
 {
     public override void Configure()
     {
@@ -16,6 +20,25 @@ internal sealed class Endpoint(
         ApproveLeaveRequestRequest request,
         CancellationToken cancellationToken)
     {
+        if (currentUser.UserId is not { } reviewerId)
+        {
+            await Send.ResultAsync(TypedResults.Unauthorized());
+            return;
+        }
+
+        // SEC: the acting reviewer must always be the authenticated caller, never trusted from
+        // request data — any client-supplied ReviewedByEmployeeId is discarded here and replaced
+        // with the server-resolved identity before authorization or persistence.
+        request = request with { ReviewedByEmployeeId = reviewerId };
+
+        // LEAVE-01: only HR Administrators or a manager anywhere above the target employee in
+        // the reporting hierarchy may approve.
+        if (!await authorizer.CanApproveOrRejectAsync(request.CompanyId, reviewerId, request.EmployeeId, cancellationToken))
+        {
+            await Send.ResultAsync(TypedResults.Forbid());
+            return;
+        }
+
         var result = await handler.HandleAsync(request, cancellationToken);
 
         if (result.IsFailure)

@@ -104,6 +104,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         services.AddScoped<IEmployeeLeaveStatusReader, EmployeeLeaveStatusReader>();
         services.AddScoped<ILeaveSummaryReader, LeaveSummaryReader>();
         services.AddScoped<ILeaveCalendarReader, LeaveCalendarReader>();
+        services.AddScoped<LeaveResourceAuthorizer>();
 
         // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
         services.AddScoped<IOnboardingTaskDefinition, ReviewDefaultLeavePolicyTask>();
