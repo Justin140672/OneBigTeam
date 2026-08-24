@@ -63,6 +63,7 @@ public static class ProbationModule
         services.AddScoped<CompleteProbationReviewHandler>();
         services.AddScoped<IValidator<CompleteProbationReviewRequest>, CompleteProbationReviewValidator>();
         services.AddScoped<ITaskCompletionAction, CompleteProbationReviewFromTaskAction>();
+        services.AddScoped<Services.ProbationExtensionService>();
         services.AddScoped<IProbationSummaryReader, ProbationSummaryReader>();
         services.AddScoped<IProbationStatusReader, ProbationStatusReader>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();

@@ -1,6 +1,7 @@
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
+using HR.Modules.Probation.Services;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +12,8 @@ internal sealed class CompleteProbationReviewFromTaskAction(
     ProbationDbContext dbContext,
     IClock clock,
     IAuditEventPublisher auditPublisher,
-    IIntegrationEventPublisher integrationEventPublisher) : ITaskCompletionAction
+    IIntegrationEventPublisher integrationEventPublisher,
+    ProbationExtensionService extensionService) : ITaskCompletionAction
 {
     public TaskSource Source => TaskSource.Probation;
     public TaskActionType ActionType => TaskActionType.Review;
@@ -25,7 +27,7 @@ internal sealed class CompleteProbationReviewFromTaskAction(
                 r => r.Id == context.SourceEntityId && r.CompanyId == context.CompanyId,
                 cancellationToken);
 
-        if (review is null || review.Status == ProbationReviewStatus.Completed) return;
+        if (review is null || review.Status != ProbationReviewStatus.Pending) return;
 
         var record = await dbContext.ProbationRecords
             .FirstOrDefaultAsync(
@@ -38,13 +40,15 @@ internal sealed class CompleteProbationReviewFromTaskAction(
         var decisionDate = DateOnly.FromDateTime(now.DateTime);
 
         var (outcome, extensionEndDate) = ParseOutcome(context.OutcomeDecision);
+        var previousExpectedEndDate = record.ExpectedEndDate;
+        var extensionReason = context.OutcomeReason ?? "Probation extended.";
 
         if (outcome == ProbationOutcome.Pass)
             record.Pass(context.CompletedBy, decisionDate, context.OutcomeReason, now);
         else if (outcome == ProbationOutcome.Fail)
             record.Fail(context.CompletedBy, decisionDate, context.OutcomeReason, now);
         else if (outcome == ProbationOutcome.Extend && extensionEndDate.HasValue)
-            record.Extend(extensionEndDate.Value, context.OutcomeReason ?? "Probation extended.", context.CompletedBy, decisionDate, now);
+            record.Extend(extensionEndDate.Value, extensionReason, context.CompletedBy, decisionDate, now);
 
         review.Complete(context.CompletedBy, outcome, context.OutcomeReason, now);
 
@@ -60,6 +64,20 @@ internal sealed class CompleteProbationReviewFromTaskAction(
             review.Outcome?.ToString(),
             review.Notes,
             now), cancellationToken);
+
+        if (outcome == ProbationOutcome.Extend && extensionEndDate.HasValue)
+        {
+            await extensionService.ApplyAsync(
+                record,
+                review,
+                previousExpectedEndDate,
+                extensionEndDate.Value,
+                extensionReason,
+                context.CompletedBy,
+                decisionDate,
+                now,
+                cancellationToken);
+        }
 
         if (outcome == ProbationOutcome.Pass)
         {

@@ -39,4 +39,5 @@ public enum NotificationType
     LeavingProcessStarted                         = 35,
     IncompleteOffboardingAtDeparture              = 36,
     SupportRequestStatusChanged                   = 37,
+    ProbationExtended                             = 38,
 }

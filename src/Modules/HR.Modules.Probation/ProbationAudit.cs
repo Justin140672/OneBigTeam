@@ -47,6 +47,32 @@ internal sealed record ProbationReviewCreatedAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
+internal sealed record ProbationExtendedAuditEvent(
+    Guid CompanyId,
+    Guid ProbationRecordId,
+    Guid EmployeeId,
+    Guid DecisionMakerEmployeeId,
+    DateOnly PreviousExpectedEndDate,
+    DateOnly NewExpectedEndDate,
+    string ExtensionReason,
+    DateOnly DecisionDate,
+    Guid ExtensionConfirmationReviewId,
+    Guid NewFinalReviewId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType        => "probation-record.extended";
+    string IAuditEvent.EntityType       => "ProbationRecord";
+    Guid   IAuditEvent.EntityId         => ProbationRecordId;
+    Guid?  IAuditEvent.EmployeeId       => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId      => null;
+    Guid?  IAuditEvent.ActorEmployeeId  => DecisionMakerEmployeeId;
+    Guid?  IAuditEvent.CorrelationId    => null;
+    string? IAuditEvent.Summary         => $"Probation extended to {NewExpectedEndDate:d MMM yyyy}";
+    object? IAuditEvent.Before          => new { ExpectedEndDate = PreviousExpectedEndDate };
+    object? IAuditEvent.After           => new { ExpectedEndDate = NewExpectedEndDate, ExtensionReason, DecisionDate };
+    object? IAuditEvent.Metadata        => new { ExtensionConfirmationReviewId, NewFinalReviewId };
+}
+
 internal sealed record ProbationReviewCompletedAuditEvent(
     Guid CompanyId,
     Guid ProbationReviewId,

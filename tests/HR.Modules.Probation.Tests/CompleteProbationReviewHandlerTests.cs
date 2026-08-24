@@ -21,7 +21,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ManagerCheckIn);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -49,7 +49,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.HrReview);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -75,7 +75,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -107,7 +107,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -139,7 +139,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ExtensionConfirmation);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -172,7 +172,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -195,7 +195,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -225,7 +225,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ExtensionConfirmation);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -246,7 +246,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ExtensionConfirmation);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -269,7 +269,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ManagerCheckIn);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -294,7 +294,7 @@ public class CompleteProbationReviewHandlerTests
         review.Complete(Guid.NewGuid(), null, null, Now);
         await context.SaveChangesAsync();
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -312,7 +312,7 @@ public class CompleteProbationReviewHandlerTests
     {
         await using var context = BuildContext();
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = Guid.NewGuid(),
@@ -336,7 +336,7 @@ public class CompleteProbationReviewHandlerTests
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = Guid.NewGuid(),
@@ -361,7 +361,7 @@ public class CompleteProbationReviewHandlerTests
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -394,7 +394,7 @@ public class CompleteProbationReviewHandlerTests
         context.ProbationReviews.Add(review);
         await context.SaveChangesAsync();
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -416,7 +416,7 @@ public class CompleteProbationReviewHandlerTests
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ManagerCheckIn);
 
         var publisher = new FakeAuditPublisher();
-        await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), publisher, new NoOpIntegrationEventPublisher())
+        await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), publisher, new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -439,7 +439,7 @@ public class CompleteProbationReviewHandlerTests
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
         var integrationPublisher = new Infrastructure.CapturingIntegrationEventPublisher();
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), integrationPublisher)
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), integrationPublisher, TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -467,7 +467,7 @@ public class CompleteProbationReviewHandlerTests
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
         var integrationPublisher = new Infrastructure.CapturingIntegrationEventPublisher();
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), integrationPublisher)
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), integrationPublisher, TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -492,7 +492,7 @@ public class CompleteProbationReviewHandlerTests
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ExtensionConfirmation);
 
         var integrationPublisher = new Infrastructure.CapturingIntegrationEventPublisher();
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), integrationPublisher)
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), integrationPublisher, TestProbationExtensionServiceFactory.Build(context))
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -507,6 +507,204 @@ public class CompleteProbationReviewHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Empty(integrationPublisher.Published);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Extend_Creates_ExtensionConfirmation_And_New_FinalDecision_Review_And_Tasks()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+        var newEndDate = new DateOnly(2026, 12, 1);
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var taskCreator = new Infrastructure.FakeTaskCreator();
+        var extensionService = TestProbationExtensionServiceFactory.Build(context, taskCreator: taskCreator);
+
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), extensionService)
+            .HandleAsync(new CompleteProbationReviewRequest
+            {
+                CompanyId = companyId,
+                ProbationRecordId = record.Id,
+                ReviewId = review.Id,
+                CompletedByEmployeeId = completedBy,
+                Outcome = ProbationOutcome.Extend,
+                DecisionDate = new DateOnly(2026, 9, 1),
+                NewExpectedEndDate = newEndDate,
+                ExtensionReason = "Needs more time."
+            }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var extensionConfirmation = await context.ProbationReviews
+            .SingleAsync(r => r.ReviewType == ProbationReviewType.ExtensionConfirmation);
+        Assert.Equal(ProbationReviewStatus.Pending, extensionConfirmation.Status);
+
+        var newFinalReview = await context.ProbationReviews
+            .SingleAsync(r => r.ReviewType == ProbationReviewType.FinalDecision && r.Id != review.Id);
+        Assert.Equal(ProbationReviewStatus.Pending, newFinalReview.Status);
+        Assert.Equal(newEndDate, newFinalReview.DueDate);
+
+        Assert.Equal(2, taskCreator.Created.Count);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Repeated_Execution_Fails_And_Does_Not_Duplicate_Extension_Reviews()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+        var newEndDate = new DateOnly(2026, 12, 1);
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var request = new CompleteProbationReviewRequest
+        {
+            CompanyId = companyId,
+            ProbationRecordId = record.Id,
+            ReviewId = review.Id,
+            CompletedByEmployeeId = completedBy,
+            Outcome = ProbationOutcome.Extend,
+            DecisionDate = new DateOnly(2026, 9, 1),
+            NewExpectedEndDate = newEndDate,
+            ExtensionReason = "Needs more time."
+        };
+
+        var firstResult = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
+            .HandleAsync(request, CancellationToken.None);
+        Assert.True(firstResult.IsSuccess);
+
+        var reviewCountAfterFirst = await context.ProbationReviews.CountAsync();
+
+        var secondResult = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
+            .HandleAsync(request, CancellationToken.None);
+
+        Assert.True(secondResult.IsFailure);
+        Assert.Equal("validation", secondResult.Error.Code);
+
+        var reviewCountAfterSecond = await context.ProbationReviews.CountAsync();
+        Assert.Equal(reviewCountAfterFirst, reviewCountAfterSecond);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_ValidationError_When_Review_Is_Cancelled()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+        review.Cancel(Guid.NewGuid(), Now);
+        await context.SaveChangesAsync();
+
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
+            .HandleAsync(new CompleteProbationReviewRequest
+            {
+                CompanyId = companyId,
+                ProbationRecordId = record.Id,
+                ReviewId = review.Id,
+                CompletedByEmployeeId = Guid.NewGuid(),
+                Outcome = ProbationOutcome.Pass,
+                DecisionDate = new DateOnly(2026, 9, 1)
+            }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("superseded", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Second_Extension_Via_Newly_Created_FinalDecision_Review_Reflects_Latest_Decision()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var firstCompletedBy = Guid.NewGuid();
+        var secondCompletedBy = Guid.NewGuid();
+        var firstNewEndDate = new DateOnly(2026, 12, 1);
+        var secondNewEndDate = new DateOnly(2027, 3, 1);
+
+        var (record, reviewA) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var firstResult = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
+            .HandleAsync(new CompleteProbationReviewRequest
+            {
+                CompanyId = companyId,
+                ProbationRecordId = record.Id,
+                ReviewId = reviewA.Id,
+                CompletedByEmployeeId = firstCompletedBy,
+                Outcome = ProbationOutcome.Extend,
+                DecisionDate = new DateOnly(2026, 9, 1),
+                NewExpectedEndDate = firstNewEndDate,
+                ExtensionReason = "First extension."
+            }, CancellationToken.None);
+        Assert.True(firstResult.IsSuccess);
+
+        var reviewB = await context.ProbationReviews
+            .SingleAsync(r => r.ReviewType == ProbationReviewType.FinalDecision && r.Id != reviewA.Id);
+
+        var secondResult = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
+            .HandleAsync(new CompleteProbationReviewRequest
+            {
+                CompanyId = companyId,
+                ProbationRecordId = record.Id,
+                ReviewId = reviewB.Id,
+                CompletedByEmployeeId = secondCompletedBy,
+                Outcome = ProbationOutcome.Extend,
+                DecisionDate = new DateOnly(2026, 12, 1),
+                NewExpectedEndDate = secondNewEndDate,
+                ExtensionReason = "Second extension."
+            }, CancellationToken.None);
+        Assert.True(secondResult.IsSuccess);
+
+        var extensionConfirmations = await context.ProbationReviews
+            .Where(r => r.ReviewType == ProbationReviewType.ExtensionConfirmation)
+            .CountAsync();
+        Assert.Equal(2, extensionConfirmations);
+
+        var persistedRecord = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.Extended, persistedRecord.Status);
+        Assert.Equal(secondNewEndDate, persistedRecord.ExpectedEndDate);
+        Assert.Equal("Second extension.", persistedRecord.ExtensionReason);
+        Assert.Equal(secondCompletedBy, persistedRecord.DecisionMakerEmployeeId);
+        Assert.Equal(new DateOnly(2026, 12, 1), persistedRecord.DecisionDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Extend_Supersedes_PreExisting_Pending_FinalDecision_Review()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+        var newEndDate = new DateOnly(2026, 12, 1);
+
+        var (record, reviewBeingCompleted) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        // Simulate the daily scheduling job already having created a second, distinct Pending
+        // FinalDecision review/task for the original expected end date (e.g. a re-scheduled
+        // review generated before the manager completed reviewBeingCompleted).
+        var preExistingFinalReview = ProbationReview.Create(
+            Guid.NewGuid(), companyId, record.Id, ProbationReviewType.FinalDecision,
+            record.ExpectedEndDate, Now);
+        context.ProbationReviews.Add(preExistingFinalReview);
+        await context.SaveChangesAsync();
+
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context))
+            .HandleAsync(new CompleteProbationReviewRequest
+            {
+                CompanyId = companyId,
+                ProbationRecordId = record.Id,
+                ReviewId = reviewBeingCompleted.Id,
+                CompletedByEmployeeId = completedBy,
+                Outcome = ProbationOutcome.Extend,
+                DecisionDate = new DateOnly(2026, 9, 1),
+                NewExpectedEndDate = newEndDate,
+                ExtensionReason = "Needs more time."
+            }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var reloaded = await context.ProbationReviews.SingleAsync(r => r.Id == preExistingFinalReview.Id);
+        Assert.Equal(ProbationReviewStatus.Cancelled, reloaded.Status);
     }
 
     private static async Task<(ProbationRecord record, ProbationReview review)> SeedRecordAndReview(

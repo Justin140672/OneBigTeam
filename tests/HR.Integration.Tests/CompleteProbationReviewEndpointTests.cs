@@ -17,6 +17,9 @@ public class CompleteProbationReviewEndpointTests
     private static readonly Guid User5 = new("aaaaaaaa-0000-0000-0000-000000000005");
     private static readonly Guid User6 = new("aaaaaaaa-0000-0000-0000-000000000006");
     private static readonly Guid User7 = new("aaaaaaaa-0000-0000-0000-000000000007");
+    private static readonly Guid User8 = new("aaaaaaaa-0000-0000-0000-000000000008");
+    private static readonly Guid User9 = new("aaaaaaaa-0000-0000-0000-000000000009");
+    private static readonly Guid User10 = new("aaaaaaaa-0000-0000-0000-000000000010");
 
     public CompleteProbationReviewEndpointTests(ApiWebApplicationFactory factory)
     {
@@ -31,6 +34,9 @@ public class CompleteProbationReviewEndpointTests
             await TestRoleSeeder.AssignRoleAsync(factory, User5, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, User6, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, User7, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User8, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User9, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User10, SystemRoles.HrAdministrator);
         }).GetAwaiter().GetResult();
     }
 
@@ -266,6 +272,121 @@ public class CompleteProbationReviewEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, secondComplete.StatusCode);
     }
 
+    [Fact]
+    public async Task Post_Complete_FinalDecision_With_Extend_Returns_Ok_And_Reflects_Extend_Outcome()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User8.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User8, SystemRoles.HrAdministrator, companyId);
+
+        var (recordId, reviewId) = await CreateRecordAndReview(client, companyId, "FinalDecision");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{recordId}/reviews/{reviewId}/complete",
+            new
+            {
+                companyId,
+                probationRecordId = recordId,
+                reviewId,
+                completedByEmployeeId = completedBy,
+                outcome = "Extend",
+                decisionDate = "2026-09-01",
+                newExpectedEndDate = "2026-12-01",
+                extensionReason = "Needs more time to meet targets."
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var review = await response.Content.ReadFromJsonAsync<ReviewPayload>();
+        Assert.Equal("Completed", review!.Status);
+        Assert.Equal("Extend", review.Outcome);
+
+        var record = await GetRecord(client, companyId, recordId);
+        Assert.Equal("Extended", record.Status);
+        Assert.Equal(new DateOnly(2026, 12, 1), record.ExpectedEndDate);
+        Assert.Equal("Needs more time to meet targets.", record.ExtensionReason);
+        Assert.Equal(completedBy, record.DecisionMakerEmployeeId);
+    }
+
+    [Fact]
+    public async Task Post_Complete_Returns_NotFound_For_Unknown_Company()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User9.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User9, SystemRoles.HrAdministrator, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{Guid.NewGuid()}/reviews/{Guid.NewGuid()}/complete",
+            new
+            {
+                companyId,
+                probationRecordId = Guid.NewGuid(),
+                reviewId = Guid.NewGuid(),
+                completedByEmployeeId = Guid.NewGuid()
+            });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_Complete_Returns_BadRequest_When_Extend_Outcome_Missing_NewExpectedEndDate()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User10.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User10, SystemRoles.HrAdministrator, companyId);
+
+        var (recordId, reviewId) = await CreateRecordAndReview(client, companyId, "FinalDecision");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{recordId}/reviews/{reviewId}/complete",
+            new
+            {
+                companyId,
+                probationRecordId = recordId,
+                reviewId,
+                completedByEmployeeId = Guid.NewGuid(),
+                outcome = "Extend",
+                decisionDate = "2026-09-01",
+                extensionReason = "Needs more time."
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_Complete_Returns_BadRequest_When_Extend_Outcome_Missing_ExtensionReason()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
+
+        var (recordId, reviewId) = await CreateRecordAndReview(client, companyId, "FinalDecision");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{recordId}/reviews/{reviewId}/complete",
+            new
+            {
+                companyId,
+                probationRecordId = recordId,
+                reviewId,
+                completedByEmployeeId = Guid.NewGuid(),
+                outcome = "Extend",
+                decisionDate = "2026-09-01",
+                newExpectedEndDate = "2026-12-01"
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
     private async Task<(Guid recordId, Guid reviewId)> CreateRecordAndReview(
         HttpClient client,
         Guid companyId,
@@ -323,5 +444,6 @@ public class CompleteProbationReviewEndpointTests
         string Status,
         DateTimeOffset? CompletedAt,
         Guid? CompletedByEmployeeId,
+        string? Outcome,
         string? Notes);
 }

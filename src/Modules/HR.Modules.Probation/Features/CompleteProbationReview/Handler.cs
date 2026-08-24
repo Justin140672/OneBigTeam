@@ -1,5 +1,6 @@
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
+using HR.Modules.Probation.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,17 +12,20 @@ internal sealed class CompleteProbationReviewHandler
     private readonly IClock _clock;
     private readonly IAuditEventPublisher _auditPublisher;
     private readonly IIntegrationEventPublisher _integrationEventPublisher;
+    private readonly ProbationExtensionService _extensionService;
 
     public CompleteProbationReviewHandler(
         ProbationDbContext dbContext,
         IClock clock,
         IAuditEventPublisher auditPublisher,
-        IIntegrationEventPublisher integrationEventPublisher)
+        IIntegrationEventPublisher integrationEventPublisher,
+        ProbationExtensionService extensionService)
     {
         _dbContext = dbContext;
         _clock = clock;
         _auditPublisher = auditPublisher;
         _integrationEventPublisher = integrationEventPublisher;
+        _extensionService = extensionService;
     }
 
     public async Task<Result<CompleteProbationReviewResponse>> HandleAsync(
@@ -52,6 +56,10 @@ internal sealed class CompleteProbationReviewHandler
             return Result.Failure<CompleteProbationReviewResponse>(
                 Error.Validation("Probation review is already completed."));
 
+        if (review.Status == ProbationReviewStatus.Cancelled)
+            return Result.Failure<CompleteProbationReviewResponse>(
+                Error.Validation("Probation review has been superseded and can no longer be completed."));
+
         if (review.ReviewType == ProbationReviewType.FinalDecision
             && request.Outcome is not (ProbationOutcome.Pass or ProbationOutcome.Fail or ProbationOutcome.Extend))
             return Result.Failure<CompleteProbationReviewResponse>(
@@ -68,6 +76,7 @@ internal sealed class CompleteProbationReviewHandler
                 Error.Validation("Outcome can only be set on FinalDecision or ExtensionConfirmation reviews."));
 
         var now = _clock.UtcNowOffset();
+        var previousExpectedEndDate = record.ExpectedEndDate;
 
         if (request.Outcome == ProbationOutcome.Pass)
             record.Pass(request.CompletedByEmployeeId, request.DecisionDate!.Value, request.Notes, now);
@@ -79,6 +88,20 @@ internal sealed class CompleteProbationReviewHandler
         review.Complete(request.CompletedByEmployeeId, request.Outcome, request.Notes, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        if (request.Outcome == ProbationOutcome.Extend)
+        {
+            await _extensionService.ApplyAsync(
+                record,
+                review,
+                previousExpectedEndDate,
+                request.NewExpectedEndDate!.Value,
+                request.ExtensionReason!,
+                request.CompletedByEmployeeId,
+                request.DecisionDate!.Value,
+                now,
+                cancellationToken);
+        }
 
         await _auditPublisher.PublishAsync(new ProbationReviewCompletedAuditEvent(
             review.CompanyId,

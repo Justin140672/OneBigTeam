@@ -30,6 +30,7 @@ internal sealed class ProbationReviewConfiguration : IEntityTypeConfiguration<Pr
             .HasMaxLength(20)
             .HasConversion<string>();
         builder.Property(r => r.Notes).HasColumnName("notes").HasMaxLength(2000);
+        builder.Property(r => r.SupersededByReviewId).HasColumnName("superseded_by_review_id");
         builder.Property(r => r.CreatedAt).HasColumnName("created_at");
         builder.Property(r => r.UpdatedAt).HasColumnName("updated_at");
 
