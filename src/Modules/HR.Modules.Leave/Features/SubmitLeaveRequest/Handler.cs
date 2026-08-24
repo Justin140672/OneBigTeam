@@ -105,10 +105,29 @@ internal sealed class SubmitLeaveRequestHandler
                          b.PolicyYear == policyYear,
                     cancellationToken);
 
-            if (balance is null || balance.RemainingDays < totalDays)
+            // Uses the same LeaveAccrualCalculator as balance display (GetEmployeeLeaveBalanceHandler)
+            // and preview (PreviewLeaveRequestHandler) so the figure enforced here can never diverge
+            // from what the employee was shown before submitting (LEAVE-04).
+            decimal? availableDays = null;
+            if (balance is not null)
+            {
+                var (_, balancePolicyYearEnd) = LeaveYearCalculator.GetPolicyYearBounds(policyYear, leaveSettings.LeaveYearStartMonth);
+                var accruedDays = leaveType.Behaviour == LeaveTypeBehaviour.Toil
+                    ? balance.EntitlementDays
+                    : LeaveAccrualCalculator.CalculateAccruedDays(
+                        balance.EntitlementDays,
+                        leaveType.AccrualMethod,
+                        balance.AccrualStartDate,
+                        balancePolicyYearEnd,
+                        DateOnly.FromDateTime(_clock.UtcNowOffset().Date));
+
+                availableDays = accruedDays + balance.AdjustmentDays - balance.UsedDays;
+            }
+
+            if (availableDays is null || availableDays < totalDays)
                 return Result.Failure<SubmitLeaveRequestResponse>(
                     Error.Validation(
-                        $"Insufficient leave balance. Requested {totalDays} day(s) but only {balance?.RemainingDays ?? 0} remaining."));
+                        $"Insufficient leave balance. Requested {totalDays} day(s) but only {availableDays ?? 0} remaining."));
         }
 
         var now = _clock.UtcNowOffset();

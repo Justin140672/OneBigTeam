@@ -26,7 +26,14 @@ internal sealed record GetPositionProfileResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     IReadOnlyList<RequiredDocumentItem> RequiredDocuments,
-    IReadOnlyList<RequiredAssetItem> RequiredAssets);
+    IReadOnlyList<RequiredAssetItem> RequiredAssets,
+    IReadOnlyList<AssignedEmployeeItem> AssignedEmployees);
+
+internal sealed record AssignedEmployeeItem(
+    Guid EmployeeId,
+    string FirstName,
+    string LastName,
+    EmploymentStatus Status);
 
 internal sealed record RequiredDocumentItem(
     Guid Id,

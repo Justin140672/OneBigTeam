@@ -87,4 +87,94 @@ public class LeaveEntitlementCalculatorTests
         Assert.Equal(14.66m, fullTimeResult);
         Assert.Equal(8.79m, partTimeResult); // 15 * 214 / 365 = 8.7945... rounded to 8.79
     }
+
+    [Fact]
+    public void CalculateEntitlement_ProRates_For_MidYear_Leaver_Who_Started_Before_LeaveYear()
+    {
+        // Employee started well before the leave year (full joiner eligibility), leaves 2026-06-30.
+        // Jan 1 - Jun 30 inclusive = 181 days out of 365.
+        var result = LeaveEntitlementCalculator.CalculateEntitlement(
+            25m, new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), new DateOnly(2020, 1, 1),
+            new DateOnly(2026, 6, 30));
+
+        Assert.Equal(12.4m, result); // 25 * 181 / 365 = 12.397... rounded to 12.4
+    }
+
+    [Fact]
+    public void CalculateEntitlement_ProRates_For_Employee_Who_Both_Joined_And_Left_MidYear()
+    {
+        // Started 2026-03-01, left 2026-09-30: Mar 1 - Sep 30 inclusive = 214 days out of 365.
+        var result = LeaveEntitlementCalculator.CalculateEntitlement(
+            25m, new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), new DateOnly(2026, 3, 1),
+            new DateOnly(2026, 9, 30));
+
+        Assert.Equal(14.66m, result); // 25 * 214 / 365 = 14.657... rounded to 14.66
+    }
+
+    [Fact]
+    public void CalculateEntitlement_Returns_Full_Entitlement_When_LeavingDate_Is_LeaveYear_End()
+    {
+        var result = LeaveEntitlementCalculator.CalculateEntitlement(
+            25m, new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), new DateOnly(2020, 1, 1),
+            new DateOnly(2026, 12, 31));
+
+        Assert.Equal(25m, result);
+    }
+
+    [Fact]
+    public void CalculateEntitlement_Returns_Full_Entitlement_When_LeavingDate_Is_After_LeaveYear_End()
+    {
+        var result = LeaveEntitlementCalculator.CalculateEntitlement(
+            25m, new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), new DateOnly(2020, 1, 1),
+            new DateOnly(2027, 3, 1));
+
+        Assert.Equal(25m, result);
+    }
+
+    [Fact]
+    public void CalculateEntitlement_Returns_Zero_When_LeavingDate_Is_Before_LeaveYear_Start()
+    {
+        var result = LeaveEntitlementCalculator.CalculateEntitlement(
+            25m, new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), new DateOnly(2020, 1, 1),
+            new DateOnly(2025, 12, 31));
+
+        Assert.Equal(0m, result);
+    }
+
+    [Fact]
+    public void CalculateEntitlement_With_Null_LeavingDate_Matches_Original_Joiner_Only_Behaviour()
+    {
+        var withoutLeavingDateArg = LeaveEntitlementCalculator.CalculateEntitlement(
+            25m, new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), new DateOnly(2026, 6, 1));
+
+        var withExplicitNullLeavingDate = LeaveEntitlementCalculator.CalculateEntitlement(
+            25m, new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), new DateOnly(2026, 6, 1), null);
+
+        Assert.Equal(14.66m, withoutLeavingDateArg);
+        Assert.Equal(withoutLeavingDateArg, withExplicitNullLeavingDate);
+    }
+
+    [Fact]
+    public void CalculateEntitlement_Rounds_AwayFromZero_To_TwoDecimalPlaces_For_Leaver()
+    {
+        // Started before the leave year, leaves 2026-01-05: 5 days out of 365.
+        // 25 * 5 / 365 = 0.34246... which rounds away from zero to 0.34.
+        var result = LeaveEntitlementCalculator.CalculateEntitlement(
+            25m, new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), new DateOnly(2020, 1, 1),
+            new DateOnly(2026, 1, 5));
+
+        Assert.Equal(0.34m, result);
+    }
+
+    [Fact]
+    public void CalculateEntitlement_ProRates_Leaver_Correctly_For_NonCalendar_LeaveYear()
+    {
+        // April-to-March leave year. Employee started before the year, leaves 2026-10-31.
+        // Apr 1 - Oct 31 inclusive = 30 + 31 + 30 + 31 + 31 + 30 + 31 = 214 days out of 365.
+        var result = LeaveEntitlementCalculator.CalculateEntitlement(
+            25m, new DateOnly(2026, 4, 1), new DateOnly(2027, 3, 31), new DateOnly(2020, 1, 1),
+            new DateOnly(2026, 10, 31));
+
+        Assert.Equal(14.66m, result); // 25 * 214 / 365 = 14.657... rounded to 14.66
+    }
 }

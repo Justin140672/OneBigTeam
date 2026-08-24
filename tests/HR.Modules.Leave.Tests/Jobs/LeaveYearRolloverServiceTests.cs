@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Jobs;
 using HR.Modules.Leave.Persistence;
@@ -26,8 +27,8 @@ public class LeaveYearRolloverServiceTests
     }
 
     private static LeaveYearRolloverService BuildService(
-        LeaveDbContext context, IAuditEventPublisher? auditPublisher = null) =>
-        new(context, new FakeClock(FixedUtcNow), auditPublisher ?? new NoOpAuditEventPublisher());
+        LeaveDbContext context, IAuditEventPublisher? auditPublisher = null, ICompanyLeaveSettingsReader? leaveSettingsReader = null) =>
+        new(context, new FakeClock(FixedUtcNow), leaveSettingsReader ?? new FakeCompanyLeaveSettingsReader(), auditPublisher ?? new NoOpAuditEventPublisher());
 
     private static LeaveType CreateLeaveType(
         Guid companyId,
@@ -47,12 +48,21 @@ public class LeaveYearRolloverServiceTests
     private static LeavePolicy CreatePolicy(Guid companyId, int carryOverDays) =>
         LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, carryOverDays, false, false, Now);
 
+    // An active EmployeeLeavePolicyAssignment is now required for rollover eligibility (see
+    // LeaveYearRolloverService — "no active assignment" is itself the signal that an employee has
+    // left and should not be rolled over). Real usage always creates a LeaveBalance alongside an
+    // assignment (EmployeeCreatedHandler / AssignLeavePolicyToEmployeeHandler), so tests that only
+    // set up a LeaveBalance also need this to represent a currently-active employee.
+    private static EmployeeLeavePolicyAssignment CreateAssignment(Guid companyId, Guid employeeId, Guid leavePolicyId) =>
+        EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, leavePolicyId, new DateOnly(2026, 1, 1), Now);
+
     private static LeaveBalance CreateBalance(
         Guid companyId, Guid employeeId, Guid leaveTypeId, Guid policyId, int policyYear,
         decimal entitlementDays, decimal usedDays = 0, decimal adjustmentDays = 0)
     {
         var balance = LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId, policyYear, entitlementDays, Now);
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId, policyYear, entitlementDays,
+            new DateOnly(policyYear, 1, 1), Now);
         if (usedDays != 0)
             balance.RecordUsage(usedDays, Now);
         if (adjustmentDays != 0)
@@ -77,6 +87,7 @@ public class LeaveYearRolloverServiceTests
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
         context.LeaveBalances.Add(previousBalance);
+        context.EmployeeLeavePolicyAssignments.Add(CreateAssignment(companyId, employeeId, policy.Id));
         await context.SaveChangesAsync();
 
         var service = BuildService(context);
@@ -92,6 +103,9 @@ public class LeaveYearRolloverServiceTests
         Assert.Equal(leaveType.Id, newBalance.LeaveTypeId);
         Assert.Equal(policy.Id, newBalance.LeavePolicyId);
         Assert.Empty(context.LeaveBalanceAdjustments);
+        // A continuing employee's new policy-year balance accrues (for Monthly/Fortnightly leave
+        // types) from the new policy year's own start date - see LeaveYearRolloverService (LEAVE-04).
+        Assert.Equal(new DateOnly(2027, 1, 1), newBalance.AccrualStartDate);
     }
 
     [Fact]
@@ -108,6 +122,7 @@ public class LeaveYearRolloverServiceTests
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
         context.LeaveBalances.Add(previousBalance);
+        context.EmployeeLeavePolicyAssignments.Add(CreateAssignment(companyId, employeeId, policy.Id));
         await context.SaveChangesAsync();
 
         var service = BuildService(context);
@@ -132,6 +147,7 @@ public class LeaveYearRolloverServiceTests
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
         context.LeaveBalances.Add(previousBalance);
+        context.EmployeeLeavePolicyAssignments.Add(CreateAssignment(companyId, employeeId, policy.Id));
         await context.SaveChangesAsync();
 
         var auditPublisher = new CapturingAuditEventPublisher();
@@ -183,6 +199,7 @@ public class LeaveYearRolloverServiceTests
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
         context.LeaveBalances.Add(previousBalance);
+        context.EmployeeLeavePolicyAssignments.Add(CreateAssignment(companyId, employeeId, policy.Id));
         await context.SaveChangesAsync();
 
         var service = BuildService(context);
@@ -206,6 +223,7 @@ public class LeaveYearRolloverServiceTests
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
         context.LeaveBalances.Add(previousBalance);
+        context.EmployeeLeavePolicyAssignments.Add(CreateAssignment(companyId, employeeId, policy.Id));
         await context.SaveChangesAsync();
 
         var auditPublisher = new CapturingAuditEventPublisher();
@@ -235,6 +253,7 @@ public class LeaveYearRolloverServiceTests
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
         context.LeaveBalances.Add(previousBalance);
+        context.EmployeeLeavePolicyAssignments.Add(CreateAssignment(companyId, employeeId, policy.Id));
         await context.SaveChangesAsync();
 
         var service = BuildService(context);
@@ -259,6 +278,7 @@ public class LeaveYearRolloverServiceTests
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
         context.LeaveBalances.Add(previousBalance);
+        context.EmployeeLeavePolicyAssignments.Add(CreateAssignment(companyId, employeeId, policy.Id));
         await context.SaveChangesAsync();
 
         var service = BuildService(context);
@@ -361,8 +381,12 @@ public class LeaveYearRolloverServiceTests
     }
 
     [Fact]
-    public async Task RolloverCompanyAsync_Falls_Back_To_Previous_Balance_Policy_When_No_Current_Assignment_Exists()
+    public async Task RolloverCompanyAsync_Skips_Employee_When_No_Active_Assignment_Exists()
     {
+        // Superseded behaviour: this used to fall back to the previous balance's own policy when no
+        // current assignment existed. Now "no active assignment" (never assigned, or deactivated
+        // because the employee's departure was finalised) is itself the eligibility signal — such
+        // employees are skipped entirely rather than defaulted to their old policy.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -378,11 +402,127 @@ public class LeaveYearRolloverServiceTests
         await context.SaveChangesAsync();
 
         var service = BuildService(context);
-        await service.RolloverCompanyAsync(companyId, 2027, CancellationToken.None);
+        var result = await service.RolloverCompanyAsync(companyId, 2027, CancellationToken.None);
 
+        Assert.Equal(LeaveYearRolloverResult.Empty, result);
+        Assert.False(await context.LeaveBalances.AnyAsync(b => b.PolicyYear == 2027));
+    }
+
+    [Fact]
+    public async Task RolloverCompanyAsync_Skips_Terminated_Employee_With_Deactivated_Assignment()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var terminatedEmployeeId = Guid.NewGuid();
+        var activeEmployeeId = Guid.NewGuid();
+
+        var leaveType = CreateLeaveType(companyId, defaultEntitlementDays: 25);
+        var policy = CreatePolicy(companyId, carryOverDays: 5);
+
+        var terminatedBalance = CreateBalance(companyId, terminatedEmployeeId, leaveType.Id, policy.Id, 2026, 25m, usedDays: 10m);
+        var activeBalance = CreateBalance(companyId, activeEmployeeId, leaveType.Id, policy.Id, 2026, 25m, usedDays: 10m);
+
+        var terminatedAssignment = EmployeeLeavePolicyAssignment.Create(
+            Guid.NewGuid(), companyId, terminatedEmployeeId, policy.Id, new DateOnly(2026, 1, 1), Now);
+        terminatedAssignment.Deactivate(Now);
+
+        var activeAssignment = EmployeeLeavePolicyAssignment.Create(
+            Guid.NewGuid(), companyId, activeEmployeeId, policy.Id, new DateOnly(2026, 1, 1), Now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.LeaveBalances.AddRange(terminatedBalance, activeBalance);
+        context.EmployeeLeavePolicyAssignments.AddRange(terminatedAssignment, activeAssignment);
+        await context.SaveChangesAsync();
+
+        var service = BuildService(context);
+        var result = await service.RolloverCompanyAsync(companyId, 2027, CancellationToken.None);
+
+        Assert.Equal(1, result.BalancesCreated);
+        Assert.False(await context.LeaveBalances.AnyAsync(b => b.PolicyYear == 2027 && b.EmployeeId == terminatedEmployeeId));
+        Assert.True(await context.LeaveBalances.AnyAsync(b => b.PolicyYear == 2027 && b.EmployeeId == activeEmployeeId));
+    }
+
+    [Fact]
+    public async Task RolloverCompanyAsync_Does_Not_Alter_Existing_NewYear_Balance_When_Assignment_Deactivated_After_Rollover_Already_Ran()
+    {
+        // The employee had already rolled over into 2027 (still active at that point) — their
+        // departure is only finalised afterwards. A subsequent rerun of RolloverCompanyAsync for
+        // 2027 must be a no-op for them: the idempotency guard (existing new-year balance already
+        // present) is checked before the active-assignment check, so their existing balance is left
+        // untouched rather than retroactively removed or altered.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var leaveType = CreateLeaveType(companyId, defaultEntitlementDays: 25);
+        var policy = CreatePolicy(companyId, carryOverDays: 5);
+        var previousBalance = CreateBalance(companyId, employeeId, leaveType.Id, policy.Id, 2026, 25m, usedDays: 10m);
+        var existingNewYearBalance = CreateBalance(companyId, employeeId, leaveType.Id, policy.Id, 2027, 25m);
+
+        var assignment = EmployeeLeavePolicyAssignment.Create(
+            Guid.NewGuid(), companyId, employeeId, policy.Id, new DateOnly(2026, 1, 1), Now);
+        // Deactivated after the 2027 balance already exists.
+        assignment.Deactivate(Now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.LeaveBalances.AddRange(previousBalance, existingNewYearBalance);
+        context.EmployeeLeavePolicyAssignments.Add(assignment);
+        await context.SaveChangesAsync();
+
+        var service = BuildService(context);
+        var result = await service.RolloverCompanyAsync(companyId, 2027, CancellationToken.None);
+
+        Assert.Equal(LeaveYearRolloverResult.Empty, result);
         var newBalance = await context.LeaveBalances.SingleAsync(b => b.PolicyYear == 2027);
-        Assert.Equal(policy.Id, newBalance.LeavePolicyId);
-        Assert.Equal(5m, newBalance.AdjustmentDays); // capped at previous balance's own policy limit
+        Assert.Equal(existingNewYearBalance.Id, newBalance.Id);
+        Assert.Equal(0m, newBalance.AdjustmentDays);
+        Assert.Equal(25m, newBalance.EntitlementDays);
+    }
+
+    [Fact]
+    public async Task RolloverCompanyAsync_Rerun_After_Termination_Remains_Idempotent_For_Both_Active_And_Terminated_Employees()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var terminatedEmployeeId = Guid.NewGuid();
+        var activeEmployeeId = Guid.NewGuid();
+
+        var leaveType = CreateLeaveType(companyId, defaultEntitlementDays: 25);
+        var policy = CreatePolicy(companyId, carryOverDays: 5);
+
+        var terminatedBalance = CreateBalance(companyId, terminatedEmployeeId, leaveType.Id, policy.Id, 2026, 25m, usedDays: 10m);
+        var activeBalance = CreateBalance(companyId, activeEmployeeId, leaveType.Id, policy.Id, 2026, 25m, usedDays: 10m);
+
+        var terminatedAssignment = EmployeeLeavePolicyAssignment.Create(
+            Guid.NewGuid(), companyId, terminatedEmployeeId, policy.Id, new DateOnly(2026, 1, 1), Now);
+        var activeAssignment = EmployeeLeavePolicyAssignment.Create(
+            Guid.NewGuid(), companyId, activeEmployeeId, policy.Id, new DateOnly(2026, 1, 1), Now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.LeaveBalances.AddRange(terminatedBalance, activeBalance);
+        context.EmployeeLeavePolicyAssignments.AddRange(terminatedAssignment, activeAssignment);
+        await context.SaveChangesAsync();
+
+        var service = BuildService(context);
+
+        // First run: both employees still active — both get a new-year balance.
+        var firstRun = await service.RolloverCompanyAsync(companyId, 2027, CancellationToken.None);
+        Assert.Equal(2, firstRun.BalancesCreated);
+
+        // Employee is terminated between the two runs.
+        terminatedAssignment.Deactivate(Now.AddDays(1));
+        await context.SaveChangesAsync();
+
+        var secondRun = await service.RolloverCompanyAsync(companyId, 2027, CancellationToken.None);
+
+        Assert.Equal(LeaveYearRolloverResult.Empty, secondRun);
+        Assert.Single(await context.LeaveBalances.Where(b => b.PolicyYear == 2027).ToListAsync(),
+            b => b.EmployeeId == activeEmployeeId);
+        Assert.Single(await context.LeaveBalances.Where(b => b.PolicyYear == 2027).ToListAsync(),
+            b => b.EmployeeId == terminatedEmployeeId);
     }
 
     [Fact]
@@ -399,6 +539,7 @@ public class LeaveYearRolloverServiceTests
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
         context.LeaveBalances.Add(previousBalance);
+        context.EmployeeLeavePolicyAssignments.Add(CreateAssignment(companyId, employeeId, policy.Id));
         await context.SaveChangesAsync();
 
         var auditPublisher = new CapturingAuditEventPublisher();
@@ -437,6 +578,7 @@ public class LeaveYearRolloverServiceTests
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
         context.LeaveBalances.Add(previousBalance);
+        context.EmployeeLeavePolicyAssignments.Add(CreateAssignment(companyId, employeeId, policy.Id));
         await context.SaveChangesAsync();
 
         var service = BuildService(context);

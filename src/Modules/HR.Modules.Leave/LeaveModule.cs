@@ -19,7 +19,9 @@ using HR.Modules.Leave.Features.AdjustLeaveBalance;
 using HR.Modules.Leave.Features.GetLeaveBalanceHistory;
 using HR.Modules.Leave.Features.GetRecentLeaveRequests;
 using HR.Modules.Leave.Features.InitialiseEmployeeLeave;
+using HR.Modules.Leave.Features.DeactivateLeavePolicyAssignmentOnEmployeeDeparture;
 using HR.Modules.Leave.Features.RecalculateEntitlementOnStartDateChange;
+using HR.Modules.Leave.Features.RecalculateEntitlementOnLeavingDateChange;
 using HR.Modules.Leave.Features.ListLeaveTypes;
 using HR.Modules.Leave.Features.CreateLeaveType;
 using HR.Modules.Leave.Features.UpdateLeaveType;
@@ -101,6 +103,9 @@ public static class LeaveModule
         services.AddScoped<IValidator<GetLeaveBalanceHistoryRequest>, GetLeaveBalanceHistoryValidator>();
 services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<IIntegrationEventHandler<EmployeeDetailsCorrectedIntegrationEvent>, EmployeeDetailsCorrectedHandler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>, EmployeeDepartureFinalisedHandler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeLeavingDateSetIntegrationEvent>, LeavingDateChangeHandler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeLeavingProcessCancelledIntegrationEvent>, LeavingDateChangeHandler>();
         services.AddScoped<ILeaveApprovalService, LeaveApprovalService>();
         services.AddScoped<ListLeaveTypesHandler>();
         services.AddScoped<IValidator<ListLeaveTypesRequest>, ListLeaveTypesValidator>();
@@ -210,6 +215,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
                     policyId,
                     policyYear,
                     lt.Behaviour == LeaveTypeBehaviour.Toil ? 0 : lt.DefaultEntitlementDays,
+                    effectiveFrom,
                     now)));
             }
 
@@ -261,7 +267,8 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
 
                 db.LeaveBalances.AddRange(betaLeaveTypes.Select(lt => LeaveBalance.Create(
                     Guid.NewGuid(), betaCorpId, empId, lt.Id, betaPolicyId, betaPolicyYear,
-                    lt.Behaviour == LeaveTypeBehaviour.Toil ? 0 : lt.DefaultEntitlementDays, now)));
+                    lt.Behaviour == LeaveTypeBehaviour.Toil ? 0 : lt.DefaultEntitlementDays,
+                    betaEffectiveFrom, now)));
             }
 
             await db.SaveChangesAsync();

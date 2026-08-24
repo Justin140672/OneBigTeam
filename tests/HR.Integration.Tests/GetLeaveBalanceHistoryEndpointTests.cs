@@ -159,7 +159,8 @@ public class GetLeaveBalanceHistoryEndpointTests
 
         var policyId = Guid.NewGuid();
         var balance = LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId, DateTimeOffset.UtcNow.Year, 25m, DateTimeOffset.UtcNow);
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId, DateTimeOffset.UtcNow.Year, 25m,
+            new DateOnly(DateTimeOffset.UtcNow.Year, 1, 1), DateTimeOffset.UtcNow);
         db.LeaveBalances.Add(balance);
 
         var approved = LeaveRequest.Create(

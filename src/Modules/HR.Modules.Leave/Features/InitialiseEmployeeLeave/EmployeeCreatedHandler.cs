@@ -73,6 +73,11 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
         // the company's leave year (LeaveEntitlementCalculator is the single source of truth for
         // this, also reused by RecalculateEntitlementOnStartDateChange when a start date is later
         // corrected). Employees starting on or before the leave year start get full entitlement.
+        // Accrual (Monthly/Fortnightly - LEAVE-04) is paced from the employee's actual eligible-
+        // from date within this policy year, which is their start date for the year in which they
+        // join (never before the policy year itself starts).
+        var accrualStartDate = integrationEvent.StartDate < policyYearStart ? policyYearStart : integrationEvent.StartDate;
+
         var balances = activeLeaveTypes
             .Where(lt => !existingLeaveTypeIds.Contains(lt.Id))
             .Select(lt => LeaveBalance.Create(
@@ -86,6 +91,7 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
                     ? 0
                     : LeaveEntitlementCalculator.CalculateEntitlement(
                         lt.DefaultEntitlementDays, policyYearStart, policyYearEnd, integrationEvent.StartDate),
+                accrualStartDate,
                 now)).ToList();
 
         if (balances.Count > 0)

@@ -67,6 +67,12 @@ internal sealed class AssignLeavePolicyToEmployeeHandler(
             {
                 var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(request.CompanyId, cancellationToken);
                 var policyYear = LeaveYearCalculator.GetPolicyYear(now, leaveSettings.LeaveYearStartMonth);
+                var (policyYearStart, _) = LeaveYearCalculator.GetPolicyYearBounds(policyYear, leaveSettings.LeaveYearStartMonth);
+
+                // Accrual (Monthly/Fortnightly - LEAVE-04) is paced from the later of the policy
+                // year start and the date this assignment takes effect (mirrors
+                // EmployeeCreatedHandler's equivalent joiner logic).
+                var accrualStartDate = request.EffectiveFrom < policyYearStart ? policyYearStart : request.EffectiveFrom;
 
                 var existingLeaveTypeIds = await dbContext.LeaveBalances
                     .Where(b => b.CompanyId == request.CompanyId
@@ -85,6 +91,7 @@ internal sealed class AssignLeavePolicyToEmployeeHandler(
                         request.LeavePolicyId,
                         policyYear,
                         lt.Behaviour == LeaveTypeBehaviour.Toil ? 0 : lt.DefaultEntitlementDays,
+                        accrualStartDate,
                         now));
 
                 dbContext.LeaveBalances.AddRange(newBalances);

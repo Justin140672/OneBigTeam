@@ -63,6 +63,7 @@ internal static class StandardEmployeeColumnMapping
         ["PositionProfileTitle"] = "Position Profile",
         ["ContinuousServiceDate"] = "Continuous Service Date",
         ["ProbationEndDate"] = "Probation End Date",
+        ["Address"] = "Address",
         ["SalaryAmount"] = "Salary Amount",
         ["SalaryType"] = "Salary Type",
         ["Currency"] = "Currency",

@@ -11,6 +11,7 @@ namespace HR.Modules.Leave.Tests;
 public class GetEmployeeLeaveBalanceHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateOnly PolicyYearStart = new(2026, 1, 1);
 
     [Fact]
     public async Task HandleAsync_Returns_All_Balances_For_Employee_And_Year()
@@ -25,15 +26,15 @@ public class GetEmployeeLeaveBalanceHandlerTests
         var sickTypeId = Guid.NewGuid();
 
         context.LeaveTypes.AddRange(
-            LeaveType.Create(annualTypeId, companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now),
+            LeaveType.Create(annualTypeId, companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.None, LeaveTypeBehaviour.Standard, now),
             LeaveType.Create(sickTypeId, companyId, "Sick Leave", "SICK", 10, AccrualMethod.None, LeaveTypeBehaviour.Sickness, now));
 
-        var annualBalance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, annualTypeId, policyId, 2026, 25m, now);
-        var sickBalance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, sickTypeId, policyId, 2026, 10m, now);
+        var annualBalance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, annualTypeId, policyId, 2026, 25m, PolicyYearStart, now);
+        var sickBalance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, sickTypeId, policyId, 2026, 10m, PolicyYearStart, now);
         context.LeaveBalances.AddRange(annualBalance, sickBalance);
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeLeaveBalanceHandler(context, new FakeWorkingPatternProvider());
+        var handler = new GetEmployeeLeaveBalanceHandler(context, new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(
             new GetEmployeeLeaveBalanceRequest { CompanyId = companyId, EmployeeId = employeeId, PolicyYear = 2026 },
@@ -70,7 +71,7 @@ public class GetEmployeeLeaveBalanceHandlerTests
     public async Task HandleAsync_Returns_Empty_List_When_No_Active_Leave_Types_Exist()
     {
         await using var context = BuildContext();
-        var handler = new GetEmployeeLeaveBalanceHandler(context, new FakeWorkingPatternProvider());
+        var handler = new GetEmployeeLeaveBalanceHandler(context, new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(
             new GetEmployeeLeaveBalanceRequest { CompanyId = Guid.NewGuid(), EmployeeId = Guid.NewGuid(), PolicyYear = 2026 },
@@ -92,13 +93,13 @@ public class GetEmployeeLeaveBalanceHandlerTests
 
         var typeId = Guid.NewGuid();
         context.LeaveTypes.Add(
-            LeaveType.Create(typeId, companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now));
+            LeaveType.Create(typeId, companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.None, LeaveTypeBehaviour.Standard, now));
 
         context.LeaveBalances.Add(
-            LeaveBalance.Create(Guid.NewGuid(), companyId, otherEmployee, typeId, policyId, 2026, 25m, now));
+            LeaveBalance.Create(Guid.NewGuid(), companyId, otherEmployee, typeId, policyId, 2026, 25m, PolicyYearStart, now));
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeLeaveBalanceHandler(context, new FakeWorkingPatternProvider());
+        var handler = new GetEmployeeLeaveBalanceHandler(context, new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(
             new GetEmployeeLeaveBalanceRequest { CompanyId = companyId, EmployeeId = targetEmployee, PolicyYear = 2026 },
@@ -125,13 +126,13 @@ public class GetEmployeeLeaveBalanceHandlerTests
 
         var typeId = Guid.NewGuid();
         context.LeaveTypes.Add(
-            LeaveType.Create(typeId, companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now));
+            LeaveType.Create(typeId, companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.None, LeaveTypeBehaviour.Standard, now));
 
         context.LeaveBalances.Add(
-            LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, typeId, policyId, 2025, 25m, now));
+            LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, typeId, policyId, 2025, 25m, PolicyYearStart, now));
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeLeaveBalanceHandler(context, new FakeWorkingPatternProvider());
+        var handler = new GetEmployeeLeaveBalanceHandler(context, new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(
             new GetEmployeeLeaveBalanceRequest { CompanyId = companyId, EmployeeId = employeeId, PolicyYear = 2026 },
@@ -153,15 +154,15 @@ public class GetEmployeeLeaveBalanceHandlerTests
 
         var typeId = Guid.NewGuid();
         context.LeaveTypes.Add(
-            LeaveType.Create(typeId, companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now));
+            LeaveType.Create(typeId, companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.None, LeaveTypeBehaviour.Standard, now));
 
-        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, typeId, policyId, 2026, 25m, now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, typeId, policyId, 2026, 25m, PolicyYearStart, now);
         balance.Adjust(2m, now);       // +2 carry-over adjustment
         balance.RecordUsage(5m, now);  // 5 days used
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeLeaveBalanceHandler(context, new FakeWorkingPatternProvider());
+        var handler = new GetEmployeeLeaveBalanceHandler(context, new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakeClock(FixedUtcNow));
         var result = await handler.HandleAsync(
             new GetEmployeeLeaveBalanceRequest { CompanyId = companyId, EmployeeId = employeeId, PolicyYear = 2026 },
             CancellationToken.None);
@@ -187,14 +188,14 @@ public class GetEmployeeLeaveBalanceHandlerTests
 
         var typeId = Guid.NewGuid();
         context.LeaveTypes.Add(
-            LeaveType.Create(typeId, companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now));
+            LeaveType.Create(typeId, companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.None, LeaveTypeBehaviour.Standard, now));
 
         context.LeaveBalances.Add(
-            LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, typeId, policyId, 2026, 20m, now));
+            LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, typeId, policyId, 2026, 20m, PolicyYearStart, now));
         await context.SaveChangesAsync();
 
         var customPattern = new WorkingPattern(WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday, 8m);
-        var handler = new GetEmployeeLeaveBalanceHandler(context, new FakeWorkingPatternProvider(customPattern));
+        var handler = new GetEmployeeLeaveBalanceHandler(context, new FakeWorkingPatternProvider(customPattern), new FakeCompanyLeaveSettingsReader(), new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(
             new GetEmployeeLeaveBalanceRequest { CompanyId = companyId, EmployeeId = employeeId, PolicyYear = 2026 },
@@ -204,6 +205,44 @@ public class GetEmployeeLeaveBalanceHandlerTests
         var item = Assert.Single(result.Value!.Balances);
         Assert.Equal(160m, item.EntitlementHours); // 20 days * 8 hours/day
         Assert.Equal(160m, item.RemainingHours);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Reports_AccruedDays_Less_Than_EntitlementDays_And_Bases_RemainingDays_On_Accrued_For_Monthly_Type()
+    {
+        // LEAVE-04 wiring: Monthly accrual with an accrual start date of Feb 1 2026 means, by
+        // FixedUtcNow (Jun 8 2026), only complete monthly periods Feb1->Mar1->Apr1->May1->Jun1 = 4
+        // of the 10 total periods (Feb1..Dec1) have elapsed. AccruedDays = 24 * 4/10 = 9.60, and
+        // RemainingDays/RemainingHours must be derived from that accrued figure, not the raw
+        // 24-day EntitlementDays.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var policyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var typeId = Guid.NewGuid();
+        context.LeaveTypes.Add(
+            LeaveType.Create(typeId, companyId, "Annual Leave", "ANNUAL", 24, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now));
+
+        context.LeaveBalances.Add(
+            LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, typeId, policyId, 2026, 24m, new DateOnly(2026, 2, 1), now));
+        await context.SaveChangesAsync();
+
+        var handler = new GetEmployeeLeaveBalanceHandler(
+            context, new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeLeaveBalanceRequest { CompanyId = companyId, EmployeeId = employeeId, PolicyYear = 2026 },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Balances);
+        Assert.Equal(24m, item.EntitlementDays);
+        Assert.Equal(9.60m, item.AccruedDays);
+        Assert.True(item.AccruedDays < item.EntitlementDays);
+        Assert.Equal(9.60m, item.RemainingDays); // accrued + 0 adjustment - 0 used
+        Assert.Equal(9.60m * WorkingPattern.Default.HoursPerDay, item.RemainingHours);
     }
 
     private static LeaveDbContext BuildContext()

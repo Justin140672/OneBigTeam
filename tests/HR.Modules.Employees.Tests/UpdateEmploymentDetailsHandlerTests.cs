@@ -23,7 +23,8 @@ public class UpdateEmploymentDetailsHandlerTests
             context,
             clock,
             integrationEventPublisher ?? new NoOpIntegrationEventPublisher(),
-            auditPublisher ?? new FakeAuditPublisher());
+            auditPublisher ?? new FakeAuditPublisher(),
+            new FakeCompanyEmployeeNumberSettingsReader());
 
     // ── probation date — employee override ────────────────────────────────────
 

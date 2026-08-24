@@ -133,6 +133,14 @@ internal sealed class UpdateEmployeeProfileHandler
         employee.SetSystemAccess(request.HasSystemAccess, now);
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
 
+        // The initial company admin employee (auto-created at self-service signup, see
+        // Employee.IsInitialCompanyAdmin/RequiresInitialSetup) starts life in Draft. Once the user
+        // completes/saves this record via the normal profile edit, move it out of Draft into
+        // Active — this is the one and only automatic Draft -> Active transition in the system,
+        // scoped deliberately to just this seed-admin completion flow.
+        if (employee.IsInitialCompanyAdmin && employee.Status == HR.Modules.Employees.Domain.EmploymentStatus.Draft)
+            employee.Activate(now);
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var after = new EmployeeProfileSnapshot(

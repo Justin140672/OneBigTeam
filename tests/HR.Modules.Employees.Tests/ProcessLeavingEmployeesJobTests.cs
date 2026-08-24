@@ -69,6 +69,7 @@ public class ProcessLeavingEmployeesJobTests
         var departureFinalizer = new EmployeeDepartureFinalizer(
             dbContext,
             auditPublisher ?? new FakeAuditPublisher(),
+            new NoOpIntegrationEventPublisher(),
             offboardingStatusReader ?? new FakeOffboardingStatusReader(new OffboardingStatusSummary("Completed")),
             leavingSettingsReader ?? new FakeCompanyLeavingSettingsReader(),
             notificationWriter ?? new FakeNotificationWriter(),

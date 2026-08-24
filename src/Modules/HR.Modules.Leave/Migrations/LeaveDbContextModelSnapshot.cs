@@ -37,6 +37,10 @@ namespace HR.Modules.Leave.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTimeOffset?>("DeactivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deactivated_at");
+
                     b.Property<DateOnly>("EffectiveFrom")
                         .HasColumnType("date")
                         .HasColumnName("effective_from");
@@ -44,6 +48,12 @@ namespace HR.Modules.Leave.Migrations
                     b.Property<Guid>("EmployeeId")
                         .HasColumnType("uuid")
                         .HasColumnName("employee_id");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
 
                     b.Property<Guid>("LeavePolicyId")
                         .HasColumnType("uuid")
@@ -58,6 +68,8 @@ namespace HR.Modules.Leave.Migrations
                     b.HasIndex("CompanyId", "EmployeeId")
                         .IsUnique();
 
+                    b.HasIndex("CompanyId", "IsActive");
+
                     b.HasIndex("CompanyId", "LeavePolicyId");
 
                     b.ToTable("employee_leave_policy_assignments", "leave");
@@ -68,6 +80,10 @@ namespace HR.Modules.Leave.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<DateOnly>("AccrualStartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("accrual_start_date");
 
                     b.Property<decimal>("AdjustmentDays")
                         .ValueGeneratedOnAdd()

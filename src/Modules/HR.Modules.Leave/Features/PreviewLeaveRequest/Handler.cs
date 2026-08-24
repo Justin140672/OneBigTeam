@@ -93,7 +93,23 @@ internal sealed class PreviewLeaveRequestHandler(
                       && b.PolicyYear == policyYear,
                     cancellationToken);
 
-            remainingBalance = balance?.RemainingDays;
+            // Same LeaveAccrualCalculator call as SubmitLeaveRequestHandler's validation - see its
+            // comment (LEAVE-04) for why this must stay identical.
+            if (balance is not null)
+            {
+                var (_, balancePolicyYearEnd) = LeaveYearCalculator.GetPolicyYearBounds(policyYear, leaveSettings.LeaveYearStartMonth);
+                var accruedDays = leaveType.Behaviour == LeaveTypeBehaviour.Toil
+                    ? balance.EntitlementDays
+                    : LeaveAccrualCalculator.CalculateAccruedDays(
+                        balance.EntitlementDays,
+                        leaveType.AccrualMethod,
+                        balance.AccrualStartDate,
+                        balancePolicyYearEnd,
+                        DateOnly.FromDateTime(clock.UtcNowOffset().Date));
+
+                remainingBalance = accruedDays + balance.AdjustmentDays - balance.UsedDays;
+            }
+
             wouldExceedBalance = totalDays > 0 && (remainingBalance is null || remainingBalance < totalDays);
         }
 

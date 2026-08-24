@@ -132,6 +132,76 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
+    [Fact]
+    public async Task HandleAsync_Initialises_Balance_With_AccrualStartDate_Equal_To_EffectiveFrom_When_MidYear()
+    {
+        // EffectiveDate (2026-07-01) is later than the policy year start (2026-01-01), so the
+        // new balance's AccrualStartDate should track the assignment's own effective date, mirroring
+        // EmployeeCreatedHandler's joiner logic (LEAVE-04).
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, now);
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+        context.LeavePolicies.Add(policy);
+        context.LeaveTypes.Add(leaveType);
+        await context.SaveChangesAsync();
+
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+
+        var result = await handler.HandleAsync(
+            new AssignLeavePolicyToEmployeeRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                LeavePolicyId = policy.Id,
+                EffectiveFrom = EffectiveDate
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var balance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(EffectiveDate, balance.AccrualStartDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Initialises_Balance_With_AccrualStartDate_Equal_To_PolicyYearStart_When_EffectiveFrom_Is_Earlier()
+    {
+        // EffectiveFrom (2025-06-01) predates the current policy year start (2026-01-01) - the
+        // policy year start wins, since accrual for the year in question cannot begin before the
+        // year itself does (LEAVE-04).
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, now);
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+        context.LeavePolicies.Add(policy);
+        context.LeaveTypes.Add(leaveType);
+        await context.SaveChangesAsync();
+
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+
+        var result = await handler.HandleAsync(
+            new AssignLeavePolicyToEmployeeRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                LeavePolicyId = policy.Id,
+                EffectiveFrom = new DateOnly(2025, 6, 1)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var balance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(new DateOnly(2026, 1, 1), balance.AccrualStartDate);
+    }
+
     private static LeaveDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<LeaveDbContext>()

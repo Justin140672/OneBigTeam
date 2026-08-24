@@ -66,7 +66,7 @@ internal sealed class EmployeeImportWriter(
             now);
 
         employee.UpdateContactDetails(
-            request.PersonalEmail, null, null, null, null, null, null, null, null, now);
+            request.PersonalEmail, null, null, request.Address, null, null, null, null, null, now);
 
         var positionProfile = await dbContext.PositionProfiles
             .AsNoTracking()
@@ -74,7 +74,9 @@ internal sealed class EmployeeImportWriter(
                 p => p.Id == request.PositionProfileId && p.CompanyId == request.CompanyId,
                 cancellationToken);
 
-        var probationEndDate = await probationDateResolver.ResolveEndDateAsync(
+        // Use the imported Probation End Date when the file specified one; otherwise fall back to
+        // the company's default calculation, exactly as before this field was captured.
+        var probationEndDate = request.ProbationEndDate ?? await probationDateResolver.ResolveEndDateAsync(
             request.CompanyId, positionProfile?.ProbationMonthsOverride, employee.StartDate, cancellationToken);
         employee.SetProbationEndDate(probationEndDate, now);
 
@@ -127,13 +129,20 @@ internal sealed class EmployeeImportWriter(
 
         employee.Assign(request.DepartmentId, request.PositionProfileId, request.LocationId, employee.ManagerId, now);
 
+        if (!string.IsNullOrWhiteSpace(request.Address))
+        {
+            employee.UpdateContactDetails(
+                employee.PersonalEmail, employee.PhoneNumber, employee.HomePhone, request.Address,
+                employee.AddressLine2, employee.City, employee.County, employee.PostCode, employee.Country, now);
+        }
+
         var positionProfile = await dbContext.PositionProfiles
             .AsNoTracking()
             .SingleOrDefaultAsync(
                 p => p.Id == request.PositionProfileId && p.CompanyId == request.CompanyId,
                 cancellationToken);
 
-        var probationEndDate = await probationDateResolver.ResolveEndDateAsync(
+        var probationEndDate = request.ProbationEndDate ?? await probationDateResolver.ResolveEndDateAsync(
             request.CompanyId, positionProfile?.ProbationMonthsOverride, employee.StartDate, cancellationToken);
         employee.SetProbationEndDate(probationEndDate, now);
 
@@ -194,7 +203,7 @@ internal sealed class EmployeeImportWriter(
             hoursPerWeek,
             fte,
             notes: "Imported",
-            CompensationChangeReason.NewHire,
+            CompensationChangeReason.DataImported,
             employeeId,
             now);
 

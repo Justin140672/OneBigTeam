@@ -58,6 +58,7 @@ public class StartLeavingProcessHandlerTests
         var departureFinalizer = new EmployeeDepartureFinalizer(
             context,
             auditPublisher,
+            new NoOpIntegrationEventPublisher(),
             offboardingStatusReader ?? new FakeOffboardingStatusReader(new OffboardingStatusSummary("Completed")),
             leavingSettingsReader ?? new FakeCompanyLeavingSettingsReader(),
             notificationWriter,
@@ -69,6 +70,7 @@ public class StartLeavingProcessHandlerTests
             companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
             new FakeEffectiveNoticePeriodResolver(effectiveNoticePeriod),
             auditPublisher,
+            new NoOpIntegrationEventPublisher(),
             notificationWriter,
             offboardingPlanCoordinator ?? new FakeOffboardingPlanCoordinator(),
             departureFinalizer);

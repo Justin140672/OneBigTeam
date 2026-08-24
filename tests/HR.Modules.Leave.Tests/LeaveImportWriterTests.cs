@@ -103,7 +103,7 @@ public class LeaveImportWriterTests
         var leaveType = CreateBalanceTrackedLeaveType(companyId);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, Now);
         // Baseline entitlement of 25 days, no adjustment yet.
-        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, PolicyYear, 25m, Now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, PolicyYear, 25m, new DateOnly(2026, 1, 1), Now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -141,7 +141,7 @@ public class LeaveImportWriterTests
 
         var leaveType = CreateBalanceTrackedLeaveType(companyId);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, Now);
-        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, PolicyYear, 25m, Now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, PolicyYear, 25m, new DateOnly(2026, 1, 1), Now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -171,7 +171,7 @@ public class LeaveImportWriterTests
         // case-insensitive) match, so a lowercase request code will not resolve it.
         var leaveType = CreateBalanceTrackedLeaveType(companyId, code: "annual");
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, Now);
-        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, PolicyYear, 25m, Now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, PolicyYear, 25m, new DateOnly(2026, 1, 1), Now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);

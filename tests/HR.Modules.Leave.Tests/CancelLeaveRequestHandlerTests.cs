@@ -227,7 +227,7 @@ public class CancelLeaveRequestHandlerTests
 
         var balance = LeaveBalance.Create(
             Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
-            2026, 25m, now);
+            2026, 25m, new DateOnly(2026, 1, 1), now);
         balance.RecordUsage(5m, now);
 
         context.LeaveRequests.Add(leaveRequest);
@@ -268,7 +268,7 @@ public class CancelLeaveRequestHandlerTests
 
         var balance = LeaveBalance.Create(
             Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
-            2026, 25m, now);
+            2026, 25m, new DateOnly(2026, 1, 1), now);
 
         context.LeaveRequests.Add(leaveRequest);
         context.LeaveBalances.Add(balance);
@@ -337,7 +337,7 @@ public class CancelLeaveRequestHandlerTests
         leaveRequest.Approve(Guid.NewGuid(), now);
 
         var balance = LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2026, 0m, now);
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2026, 0m, new DateOnly(2026, 1, 1), now);
         balance.Adjust(5m, now);
         balance.RecordUsage(3m, now);
 
@@ -383,7 +383,7 @@ public class CancelLeaveRequestHandlerTests
         leaveRequest.Approve(Guid.NewGuid(), now);
 
         var balance2025 = LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2025, 0m, now);
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2025, 0m, new DateOnly(2025, 1, 1), now);
         balance2025.Adjust(4m, now);
         balance2025.RecordUsage(3m, now);
 

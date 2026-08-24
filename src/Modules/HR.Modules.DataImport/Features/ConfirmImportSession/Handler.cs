@@ -127,7 +127,9 @@ internal sealed class ConfirmImportSessionHandler(
                     positionProfileId,
                     row.EmployeeNumber,
                     session.Id,
-                    actorUserId);
+                    actorUserId,
+                    fields.GetValueOrDefault("Address"),
+                    ParseDate(fields.GetValueOrDefault("ProbationEndDate")));
 
                 // Rows whose Work Email matched the company's seed admin employee (see
                 // Employee.IsInitialCompanyAdmin) update that existing employee rather than
@@ -230,7 +232,11 @@ internal sealed class ConfirmImportSessionHandler(
                 r.RowNumber != rowNumber &&
                 createdByRow.ContainsKey(r.RowNumber) &&
                 (string.Equals(r.EmployeeNumber?.Trim(), normalizedReference, StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(r.WorkEmail?.Trim(), normalizedReference, StringComparison.OrdinalIgnoreCase)));
+                 string.Equals(r.WorkEmail?.Trim(), normalizedReference, StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(
+                     $"{ParseRawData(r.RawData).GetValueOrDefault("FirstName")?.Trim()} {ParseRawData(r.RawData).GetValueOrDefault("LastName")?.Trim()}",
+                     normalizedReference,
+                     StringComparison.OrdinalIgnoreCase)));
 
             if (matchInFile is not null)
                 managerId = createdByRow[matchInFile.RowNumber].EmployeeId;

@@ -39,7 +39,8 @@ internal sealed class EmployeeImportLookupReader(EmployeesDbContext dbContext) :
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId &&
                         ((e.EmployeeNumber != null && e.EmployeeNumber.ToLower() == normalized) ||
-                         e.WorkEmail == normalized))
+                         e.WorkEmail == normalized ||
+                         (e.FirstName + " " + e.LastName).ToLower() == normalized))
             .Select(e => (Guid?)e.Id)
             .FirstOrDefaultAsync(cancellationToken);
 

@@ -68,7 +68,20 @@ internal sealed class AdjustLeaveBalanceHandler(
 
             if (!allowNegative)
             {
-                var projectedRemaining = balance.EntitlementDays + balance.AdjustmentDays + adjustmentDays - balance.UsedDays;
+                // Uses accrued (not raw) entitlement so a manual adjustment can't push a
+                // Monthly/Fortnightly balance below zero relative to what has actually accrued -
+                // consistent with SubmitLeaveRequestHandler's balance-sufficiency check (LEAVE-04).
+                var (_, adjustPolicyYearEnd) = LeaveYearCalculator.GetPolicyYearBounds(policyYear, leaveSettings.LeaveYearStartMonth);
+                var accruedDays = leaveType.Behaviour == LeaveTypeBehaviour.Toil
+                    ? balance.EntitlementDays
+                    : LeaveAccrualCalculator.CalculateAccruedDays(
+                        balance.EntitlementDays,
+                        leaveType.AccrualMethod,
+                        balance.AccrualStartDate,
+                        adjustPolicyYearEnd,
+                        DateOnly.FromDateTime(clock.UtcNowOffset().Date));
+
+                var projectedRemaining = accruedDays + balance.AdjustmentDays + adjustmentDays - balance.UsedDays;
                 if (projectedRemaining < 0)
                     return Result.Failure<AdjustLeaveBalanceResponse>(
                         Error.Validation("This adjustment would take the balance below zero. Enable the override to allow it."));

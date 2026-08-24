@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.Modules.Employees.Domain;
 
 namespace HR.Modules.Employees.Features.CreateCompensationRecord;
 
@@ -20,7 +21,9 @@ internal sealed class CreateCompensationRecordValidator : AbstractValidator<Crea
             .IsInEnum();
 
         RuleFor(r => r.Reason)
-            .IsInEnum();
+            .IsInEnum()
+            .NotEqual(CompensationChangeReason.DataImported)
+            .WithMessage("'Data Imported' is a system-only reason and cannot be selected here.");
 
         RuleFor(r => r.Salary)
             .GreaterThan(0);

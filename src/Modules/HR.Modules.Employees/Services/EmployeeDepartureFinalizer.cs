@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Contracts;
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
@@ -8,13 +9,14 @@ namespace HR.Modules.Employees.Services;
 
 // Extracted from ProcessLeavingEmployeesJob so the exact same finalisation steps (status
 // transition, conditional access disabling, offboarding-completeness check, manager notification,
-// audit publish) run whether triggered by the daily job reaching a due LeavingDate, or by HR
-// confirming a backdated LeavingDate via Start/AmendLeavingProcess. Both Employee/EmployeeLeavingProcess
-// guard their own state transitions (Complete throws unless InProgress), which is what keeps
-// repeated calls for the same process safe.
+// audit publish, integration event publish) run whether triggered by the daily job reaching a due
+// LeavingDate, or by HR confirming a backdated LeavingDate via Start/AmendLeavingProcess. Both
+// Employee/EmployeeLeavingProcess guard their own state transitions (Complete throws unless
+// InProgress), which is what keeps repeated calls for the same process safe.
 internal sealed class EmployeeDepartureFinalizer(
     EmployeesDbContext dbContext,
     IAuditEventPublisher auditEventPublisher,
+    IIntegrationEventPublisher integrationEventPublisher,
     IOffboardingStatusReader offboardingStatusReader,
     ICompanyLeavingSettingsReader leavingSettingsReader,
     INotificationWriter notificationWriter,
@@ -65,6 +67,18 @@ internal sealed class EmployeeDepartureFinalizer(
                 now,
                 accessDisabled,
                 offboardingIncomplete),
+            cancellationToken);
+
+        // Cross-module notification so consuming modules (e.g. Leave) can stop treating this
+        // employee as active — e.g. no new policy-year balance/carry-over should be generated for
+        // them from this point on. Published after the audit event, mirroring the ordering used
+        // elsewhere in this codebase (state change -> audit -> integration event).
+        await integrationEventPublisher.PublishAsync(
+            new EmployeeDepartureFinalisedIntegrationEvent(
+                employee.CompanyId,
+                employee.Id,
+                process.LeavingDate,
+                now),
             cancellationToken);
 
         await timelineWriter.TryAddAsync(

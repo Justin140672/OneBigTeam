@@ -56,6 +56,11 @@ internal sealed class LeaveBalanceConfiguration : IEntityTypeConfiguration<Leave
             .IsRequired()
             .HasDefaultValue(0m);
 
+        builder.Property(b => b.AccrualStartDate)
+            .HasColumnName("accrual_start_date")
+            .HasColumnType("date")
+            .IsRequired();
+
         builder.Ignore(b => b.RemainingDays);
 
         builder.Property(b => b.CreatedAt)

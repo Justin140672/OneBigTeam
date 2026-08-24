@@ -46,6 +46,13 @@ internal sealed class CompanySettings
     // generous enough for any realistic company size without being an absurd column width.
     public int EmployeeNumberMinimumLength { get; private set; }
 
+    public AssetNumberMode AssetNumberMode { get; private set; }
+    public string? AssetNumberPrefix { get; private set; }
+    public int NextAssetNumber { get; private set; }
+
+    // Same 1-10 rationale as EmployeeNumberMinimumLength.
+    public int AssetNumberMinimumLength { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -84,6 +91,13 @@ internal sealed class CompanySettings
             EmployeeNumberPrefix = null,
             NextEmployeeNumber = 1,
             EmployeeNumberMinimumLength = 4,
+            // Manual by default — unlike employee numbering, there is no pre-existing "always
+            // automatic" behaviour to preserve for assets, so the same conservative default as
+            // every other opt-in numbering scheme applies.
+            AssetNumberMode = AssetNumberMode.Manual,
+            AssetNumberPrefix = null,
+            NextAssetNumber = 1,
+            AssetNumberMinimumLength = 4,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -151,6 +165,25 @@ internal sealed class CompanySettings
         EmployeeNumberPrefix = string.IsNullOrWhiteSpace(employeeNumberPrefix) ? null : employeeNumberPrefix.Trim();
         NextEmployeeNumber = nextEmployeeNumber;
         EmployeeNumberMinimumLength = employeeNumberMinimumLength;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Updates the asset-numbering fields. Kept separate from <see cref="UpdateHrPolicy"/> so the
+    /// Asset numbering setting can be authorized/audited independently, mirroring how employee
+    /// numbering fields are grouped within HR policy but asset numbering is its own concern.
+    /// </summary>
+    public void UpdateAssetNumberSettings(
+        AssetNumberMode assetNumberMode,
+        string? assetNumberPrefix,
+        int nextAssetNumber,
+        int assetNumberMinimumLength,
+        DateTimeOffset now)
+    {
+        AssetNumberMode = assetNumberMode;
+        AssetNumberPrefix = string.IsNullOrWhiteSpace(assetNumberPrefix) ? null : assetNumberPrefix.Trim();
+        NextAssetNumber = nextAssetNumber;
+        AssetNumberMinimumLength = assetNumberMinimumLength;
         UpdatedAt = now;
     }
 }

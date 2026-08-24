@@ -48,6 +48,7 @@ public class AmendLeavingProcessHandlerTests
         var departureFinalizer = new EmployeeDepartureFinalizer(
             context,
             auditPublisher,
+            new NoOpIntegrationEventPublisher(),
             offboardingStatusReader,
             leavingSettingsReader ?? new FakeCompanyLeavingSettingsReader(),
             notificationWriter ?? new FakeNotificationWriter(),
@@ -58,6 +59,7 @@ public class AmendLeavingProcessHandlerTests
             new FakeClock(fixedUtcNow ?? FixedUtcNow),
             companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
             auditPublisher,
+            new NoOpIntegrationEventPublisher(),
             offboardingStatusReader,
             departureFinalizer);
     }

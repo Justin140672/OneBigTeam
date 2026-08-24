@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Contracts;
@@ -13,17 +14,20 @@ internal sealed class UpdateEmploymentDetailsHandler
     private readonly IClock _clock;
     private readonly IIntegrationEventPublisher _integrationEventPublisher;
     private readonly IAuditEventPublisher _auditEventPublisher;
+    private readonly ICompanyEmployeeNumberSettingsReader _employeeNumberSettingsReader;
 
     public UpdateEmploymentDetailsHandler(
         EmployeesDbContext dbContext,
         IClock clock,
         IIntegrationEventPublisher integrationEventPublisher,
-        IAuditEventPublisher auditEventPublisher)
+        IAuditEventPublisher auditEventPublisher,
+        ICompanyEmployeeNumberSettingsReader employeeNumberSettingsReader)
     {
         _dbContext = dbContext;
         _clock = clock;
         _integrationEventPublisher = integrationEventPublisher;
         _auditEventPublisher = auditEventPublisher;
+        _employeeNumberSettingsReader = employeeNumberSettingsReader;
     }
 
     public async Task<Result<UpdateEmploymentDetailsResponse>> HandleAsync(
@@ -40,11 +44,22 @@ internal sealed class UpdateEmploymentDetailsHandler
             return Result.Failure<UpdateEmploymentDetailsResponse>(
                 Error.NotFound($"Employee with id '{request.Id}' was not found."));
 
-        // Employee number can be corrected here by HR regardless of company numbering mode. This
-        // never touches CompanySettings.NextEmployeeNumber (it's a direct field edit, not the
-        // generator), but it must still satisfy the same uniqueness rule Wave 1 enforces on
-        // create, normalized the same way Employee.UpdateEmploymentDetails normalizes it.
-        var normalizedEmployeeNumber = request.EmployeeNumber?.Trim().ToUpperInvariant() ?? employee.EmployeeNumber;
+        // Employee number can only be corrected here by HR when the company's numbering mode is
+        // Manual. In Automatic mode the number is system-generated and must remain read-only on
+        // edit — mirrors the read-only handling already enforced elsewhere for Automatic mode.
+        var employeeNumberMode = await _employeeNumberSettingsReader.GetModeAsync(request.CompanyId, cancellationToken);
+
+        var normalizedEmployeeNumber = employeeNumberMode == EmployeeNumberMode.Automatic
+            ? employee.EmployeeNumber
+            : request.EmployeeNumber?.Trim().ToUpperInvariant() ?? employee.EmployeeNumber;
+
+        if (employeeNumberMode == EmployeeNumberMode.Automatic &&
+            !string.IsNullOrWhiteSpace(request.EmployeeNumber) &&
+            !string.Equals(request.EmployeeNumber.Trim(), employee.EmployeeNumber, StringComparison.OrdinalIgnoreCase))
+        {
+            return Result.Failure<UpdateEmploymentDetailsResponse>(
+                Error.Validation("Employee number is auto-generated for this company and cannot be changed."));
+        }
 
         if (!string.Equals(employee.EmployeeNumber, normalizedEmployeeNumber, StringComparison.Ordinal))
         {
@@ -140,15 +155,21 @@ internal sealed class UpdateEmploymentDetailsHandler
             return Result.Failure<UpdateEmploymentDetailsResponse>(
                 Error.Validation("Cannot set employment status to Draft."));
 
-        // Leaving and FormerEmployee are not settable through this generic edit form — they are
-        // only ever entered via the dedicated Employee Leaving Process action (Leaving) and the
-        // scheduled job that follows it (FormerEmployee). Same shape as the Draft guard above:
-        // only rejects an actual attempted transition, so an employee already in one of these
-        // states can still have their other fields edited without the request being rejected.
-        if ((request.Status == EmploymentStatus.Leaving || request.Status == EmploymentStatus.FormerEmployee) &&
-            employee.Status != request.Status)
+        // FormerEmployee is never settable through this generic edit form — it is only ever
+        // entered via the scheduled job that follows the Employee Leaving Process. Same shape as
+        // the Draft guard above: only rejects an actual attempted transition.
+        if (request.Status == EmploymentStatus.FormerEmployee && employee.Status != request.Status)
             return Result.Failure<UpdateEmploymentDetailsResponse>(
-                Error.Validation("Cannot set employment status to Leaving or Former Employee directly."));
+                Error.Validation("Cannot set employment status to Former Employee directly."));
+
+        // Leaving is only selectable through this generic edit form once the employee already has
+        // a LeavingDate set (i.e. the Start Leaving Process action has already been used) — it is
+        // not a free-choice status for an employee who has not yet started leaving.
+        if (request.Status == EmploymentStatus.Leaving &&
+            employee.Status != EmploymentStatus.Leaving &&
+            employee.LeavingDate is null)
+            return Result.Failure<UpdateEmploymentDetailsResponse>(
+                Error.Validation("Cannot set employment status to Leaving without a leaving date. Use the Start Leaving Process action instead."));
 
         var now = _clock.UtcNowOffset();
 
@@ -158,6 +179,7 @@ internal sealed class UpdateEmploymentDetailsHandler
             {
                 case EmploymentStatus.Active:     employee.Activate(now);    break;
                 case EmploymentStatus.Suspended:  employee.Suspend(now);     break;
+                case EmploymentStatus.Leaving:    employee.SetLeaving(now);  break;
             }
         }
 

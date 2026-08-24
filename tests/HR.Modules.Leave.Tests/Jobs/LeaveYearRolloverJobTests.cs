@@ -34,7 +34,8 @@ public class LeaveYearRolloverJobTests
         IAuditEventPublisher? auditPublisher = null)
     {
         var clock = new FakeClock(fixedUtcNow);
-        var rolloverService = new LeaveYearRolloverService(context, clock, auditPublisher ?? new NoOpAuditEventPublisher());
+        var rolloverService = new LeaveYearRolloverService(
+            context, clock, new FakeCompanyLeaveSettingsReader(settings), auditPublisher ?? new NoOpAuditEventPublisher());
 
         return new LeaveYearRolloverJob(
             context,
@@ -59,7 +60,8 @@ public class LeaveYearRolloverJobTests
             LeaveTypeBehaviour.Standard, now);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, now);
         var balance = LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, previousPolicyYear, 25m, now);
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, previousPolicyYear, 25m,
+            new DateOnly(previousPolicyYear, 1, 1), now);
         var assignment = EmployeeLeavePolicyAssignment.Create(
             Guid.NewGuid(), companyId, employeeId, policy.Id, new DateOnly(previousPolicyYear, 1, 1), now);
 
@@ -197,7 +199,10 @@ public class LeaveYearRolloverJobTests
             new FakeClock(fixedUtcNow),
             new PerCompanyLeaveSettingsReader(notDueCompanyId, 4, dueCompanyId, 1),
             new FakeCompanyTimeZoneReader("UTC"),
-            new LeaveYearRolloverService(context, new FakeClock(fixedUtcNow), new NoOpAuditEventPublisher()),
+            new LeaveYearRolloverService(
+                context, new FakeClock(fixedUtcNow),
+                new PerCompanyLeaveSettingsReader(notDueCompanyId, 4, dueCompanyId, 1),
+                new NoOpAuditEventPublisher()),
             NullLogger<LeaveYearRolloverJob>.Instance);
 
         await job.ExecuteAsync();

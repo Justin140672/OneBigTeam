@@ -22,6 +22,12 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             tableBuilder.HasCheckConstraint(
                 "CK_company_settings_employee_number_minimum_length",
                 "employee_number_minimum_length BETWEEN 1 AND 10");
+            tableBuilder.HasCheckConstraint(
+                "CK_company_settings_next_asset_number",
+                "next_asset_number > 0");
+            tableBuilder.HasCheckConstraint(
+                "CK_company_settings_asset_number_minimum_length",
+                "asset_number_minimum_length BETWEEN 1 AND 10");
         });
 
         builder.HasKey(settings => settings.CompanyId);
@@ -152,6 +158,28 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
 
         builder.Property(settings => settings.EmployeeNumberMinimumLength)
             .HasColumnName("employee_number_minimum_length")
+            .IsRequired()
+            .HasDefaultValue(1);
+
+        builder.Property(settings => settings.AssetNumberMode)
+            .HasColumnName("asset_number_mode")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired()
+            .HasDefaultValue(AssetNumberMode.Manual);
+
+        builder.Property(settings => settings.AssetNumberPrefix)
+            .HasColumnName("asset_number_prefix")
+            .HasMaxLength(20)
+            .IsRequired(false);
+
+        builder.Property(settings => settings.NextAssetNumber)
+            .HasColumnName("next_asset_number")
+            .IsRequired()
+            .HasDefaultValue(1);
+
+        builder.Property(settings => settings.AssetNumberMinimumLength)
+            .HasColumnName("asset_number_minimum_length")
             .IsRequired()
             .HasDefaultValue(1);
 

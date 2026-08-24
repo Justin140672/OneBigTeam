@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Contracts;
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
@@ -13,6 +14,7 @@ internal sealed class AmendLeavingProcessHandler(
     IClock clock,
     ICompanyTimeZoneReader companyTimeZoneReader,
     IAuditEventPublisher auditEventPublisher,
+    IIntegrationEventPublisher integrationEventPublisher,
     IOffboardingStatusReader offboardingStatusReader,
     IEmployeeDepartureFinalizer departureFinalizer)
 {
@@ -87,6 +89,15 @@ internal sealed class AmendLeavingProcessHandler(
                 before,
                 after,
                 offboardingAlreadyStarted),
+            cancellationToken);
+
+        // Cross-module notification so consuming modules (e.g. Leave, LEAVE-05) recalculate the
+        // employee's current policy year entitlement pro-rated through the amended LeavingDate.
+        // Always recalculated from the current LeavingDate (never an incremental delta), so a
+        // chain of amendments converges rather than compounding reductions.
+        await integrationEventPublisher.PublishAsync(
+            new EmployeeLeavingDateSetIntegrationEvent(
+                leavingProcess.CompanyId, leavingProcess.EmployeeId, leavingProcess.LeavingDate, now),
             cancellationToken);
 
         // request.ConfirmBackdatedLeavingDate is guaranteed true here — the unconfirmed case

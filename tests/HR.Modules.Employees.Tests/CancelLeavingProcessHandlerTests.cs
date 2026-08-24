@@ -42,6 +42,7 @@ public class CancelLeavingProcessHandlerTests
             context,
             new FakeClock(FixedUtcNow),
             auditPublisher ?? new FakeAuditPublisher(),
+            new NoOpIntegrationEventPublisher(),
             offboardingStatusReader ?? new FakeOffboardingStatusReader(),
             offboardingPlanCoordinator ?? new FakeOffboardingPlanCoordinator());
 

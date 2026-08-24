@@ -225,6 +225,8 @@ public static class CompaniesModule
         services.AddScoped<ICompanyEmployeeNumberSettingsReader, CompanyEmployeeNumberSettingsReader>();
         services.AddScoped<ICompanyWorkingPatternSettingsReader, CompanyWorkingPatternSettingsReader>();
         services.AddScoped<IEmployeeNumberGenerator, EmployeeNumberGenerator>();
+        services.AddScoped<ICompanyAssetNumberSettingsReader, CompanyAssetNumberSettingsReader>();
+        services.AddScoped<IAssetNumberGenerator, AssetNumberGenerator>();
         services.AddScoped<IPublicHolidayReader, PublicHolidayReader>();
         services.AddScoped<ISubscriptionStatusReader, SubscriptionStatusReader>();
         services.AddScoped<ICompanyProvisioner, CompanyProvisioner>();

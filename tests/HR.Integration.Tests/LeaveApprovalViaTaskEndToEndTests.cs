@@ -331,7 +331,7 @@ public class LeaveApprovalViaTaskEndToEndTests
         {
             db.LeaveBalances.Add(LeaveBalance.Create(
                 Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId,
-                policyYear, 25m, DateTimeOffset.UtcNow));
+                policyYear, 25m, new DateOnly(policyYear, 1, 1), DateTimeOffset.UtcNow));
             await db.SaveChangesAsync();
         }
     }

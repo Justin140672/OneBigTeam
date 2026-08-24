@@ -686,7 +686,7 @@ public class LeaveLifecycleIntegrationTests
         {
             db.LeaveBalances.Add(LeaveBalance.Create(
                 Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId,
-                policyYear, entitlementDays, DateTimeOffset.UtcNow));
+                policyYear, entitlementDays, new DateOnly(policyYear, 1, 1), DateTimeOffset.UtcNow));
             await db.SaveChangesAsync();
         }
     }

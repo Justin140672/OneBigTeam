@@ -25,8 +25,6 @@ using HR.Modules.Employees.Features.UpdateMyContactDetails;
 using HR.Modules.Employees.Features.UpdateMyEmergencyContact;
 using HR.Modules.Employees.Features.CreateDepartment;
 using HR.Modules.Employees.Features.CreateEmployee;
-using HR.Modules.Employees.Features.PreviewBackfillEmployeeNumbers;
-using HR.Modules.Employees.Features.CommitBackfillEmployeeNumbers;
 using HR.Modules.Employees.Features.CreatePositionProfile;
 using HR.Modules.Employees.Features.DeactivateDepartment;
 using HR.Modules.Employees.Features.DeactivatePositionProfile;
@@ -188,12 +186,6 @@ public static class EmployeesModule
         // ICompanyEmployeeNumberSettingsReader and IEmployeeNumberGenerator are registered by
         // CompaniesModule (they are implemented in HR.Modules.Companies, the owning module for
         // company settings); Employees only depends on the Infrastructure.Abstractions interfaces.
-
-        services.AddScoped<PreviewBackfillEmployeeNumbersHandler>();
-        services.AddScoped<IValidator<PreviewBackfillEmployeeNumbersRequest>, PreviewBackfillEmployeeNumbersValidator>();
-
-        services.AddScoped<CommitBackfillEmployeeNumbersHandler>();
-        services.AddScoped<IValidator<CommitBackfillEmployeeNumbersRequest>, CommitBackfillEmployeeNumbersValidator>();
 
         services.AddScoped<GetEmployeeHandler>();
         services.AddScoped<GetMyEmployeeHandler>();

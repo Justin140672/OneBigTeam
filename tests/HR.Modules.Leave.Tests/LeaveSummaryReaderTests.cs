@@ -27,7 +27,7 @@ public class LeaveSummaryReaderTests
         db.LeaveTypes.Add(leaveType);
 
         var balance = LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2026, 25m, Now);
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2026, 25m, new DateOnly(2026, 1, 1), Now);
         db.LeaveBalances.Add(balance);
 
         var pendingRequest = LeaveRequest.Create(
@@ -58,9 +58,9 @@ public class LeaveSummaryReaderTests
         db.LeaveTypes.Add(leaveType);
 
         db.LeaveBalances.Add(LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeIdIncluded, leaveType.Id, Guid.NewGuid(), 2026, 25m, Now));
+            Guid.NewGuid(), companyId, employeeIdIncluded, leaveType.Id, Guid.NewGuid(), 2026, 25m, new DateOnly(2026, 1, 1), Now));
         db.LeaveBalances.Add(LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeIdExcluded, leaveType.Id, Guid.NewGuid(), 2026, 25m, Now));
+            Guid.NewGuid(), companyId, employeeIdExcluded, leaveType.Id, Guid.NewGuid(), 2026, 25m, new DateOnly(2026, 1, 1), Now));
 
         await db.SaveChangesAsync();
 
@@ -81,7 +81,7 @@ public class LeaveSummaryReaderTests
         var leaveType = SeedLeaveType(db, companyId);
         db.LeaveTypes.Add(leaveType);
         db.LeaveBalances.Add(LeaveBalance.Create(
-            Guid.NewGuid(), companyId, Guid.NewGuid(), leaveType.Id, Guid.NewGuid(), 2026, 25m, Now));
+            Guid.NewGuid(), companyId, Guid.NewGuid(), leaveType.Id, Guid.NewGuid(), 2026, 25m, new DateOnly(2026, 1, 1), Now));
         await db.SaveChangesAsync();
 
         var reader = new LeaveSummaryReader(db);
@@ -103,7 +103,7 @@ public class LeaveSummaryReaderTests
         var leaveType = SeedLeaveType(db, companyId);
         db.LeaveTypes.Add(leaveType);
         db.LeaveBalances.Add(LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2025, 25m, Now));
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2025, 25m, new DateOnly(2025, 1, 1), Now));
         await db.SaveChangesAsync();
 
         var reader = new LeaveSummaryReader(db);

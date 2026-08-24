@@ -40,13 +40,17 @@ public class SubmitLeaveRequestHandlerTests
     {
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
+        // AccrualMethod.None: this shared fixture is reused by tests covering conflicts, working
+        // days, policy years etc — none of which are exercising accrual pacing itself (that is
+        // covered directly by dedicated Monthly/Fortnightly accrual-gating tests below and by
+        // LeaveAccrualCalculatorTests), so the full entitlement is available immediately (LEAVE-04).
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", (int)entitlementDays,
-            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, false, now);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             DateOnly.FromDateTime(FixedUtcNow), now);
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
-            FixedUtcNow.Year, entitlementDays, now);
+            FixedUtcNow.Year, entitlementDays, new DateOnly(FixedUtcNow.Year, 1, 1), now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -469,12 +473,12 @@ public class SubmitLeaveRequestHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 0,
-            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 0, allowNegativeBalance: false, false, now);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             DateOnly.FromDateTime(FixedUtcNow), now);
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
-            FixedUtcNow.Year, 0.4m, now);
+            FixedUtcNow.Year, 0.4m, new DateOnly(FixedUtcNow.Year, 1, 1), now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -586,13 +590,20 @@ public class SubmitLeaveRequestHandlerTests
         var employeeId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
+        // AccrualMethod.None: "today" (clock) is in policy year 2026, before this 2027 balance's
+        // own accrual start date - Monthly accrual would (correctly) report zero accrued here,
+        // which is not what this test is verifying (year resolution, not accrual pacing).
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
-            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, false, now);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             DateOnly.FromDateTime(FixedUtcNow), now);
+        // AccrualStartDate set before "today" (FixedUtcNow, still in 2026), not the balance's own
+        // 2027 policy year start, since AccrualMethod.None still requires asOfDate >= accrualStartDate
+        // to clear the gate (see LeaveAccrualCalculator) - not what this test is verifying (policy
+        // year resolution, not accrual pacing).
         var balance2027 = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
-            2027, 25m, now);
+            2027, 25m, new DateOnly(2026, 1, 1), now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -625,15 +636,17 @@ public class SubmitLeaveRequestHandlerTests
         var employeeId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
+        // AccrualMethod.None: pacing is not the point of this test (see comment above); the full
+        // stored entitlement must be available immediately in both policy years.
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
-            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, false, now);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             DateOnly.FromDateTime(FixedUtcNow), now);
         var balance2026 = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
-            2026, 1m, now); // insufficient for the 5-day request
+            2026, 1m, new DateOnly(2026, 1, 1), now); // insufficient for the 5-day request
         var balance2027 = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
-            2027, 25m, now); // sufficient, and matches the request's StartDate policy year
+            2027, 25m, new DateOnly(2026, 1, 1), now); // sufficient, and matches the request's StartDate policy year
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -714,7 +727,7 @@ public class SubmitLeaveRequestHandlerTests
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, false, now);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             DateOnly.FromDateTime(FixedUtcNow), now);
-        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 0m, now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 0m, new DateOnly(2026, 1, 1), now);
         balance.Adjust(10m, now);
 
         context.LeaveTypes.Add(leaveType);
@@ -731,6 +744,81 @@ public class SubmitLeaveRequestHandlerTests
                 EndDate = new DateOnly(2027, 1, 4)
             },
             CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Rejects_Request_Exceeding_Accrued_Balance_Even_Though_Raw_Entitlement_Would_Cover_It()
+    {
+        // LEAVE-04 wiring: Monthly accrual with an accrual start date of Feb 1 2026 means, by
+        // FixedUtcNow (Jun 12 2026), only complete monthly periods Feb1->Mar1->Apr1->May1->Jun1 = 4
+        // of the 10 total periods (Feb1..Dec1) in this Jan-Dec policy year have elapsed.
+        // Accrued = 24 * 4/10 = 9.60 - comfortably enough to cover a 5-day request against the
+        // *raw* 24-day entitlement, but the handler must gate on the accrued figure and reject a
+        // 10-day request that exceeds it.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 24,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 0, allowNegativeBalance: false, false, now);
+        var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
+            new DateOnly(2026, 2, 1), now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            2026, 24m, new DateOnly(2026, 2, 1), now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.EmployeeLeavePolicyAssignments.Add(assignment);
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+
+        // 2026-08-03 (Mon) - 2026-08-14 (Fri, next week) = 10 working days > 9.60 accrued.
+        var result = await handler.HandleAsync(
+            ValidRequest(companyId, employeeId, leaveType.Id) with
+            {
+                StartDate = new DateOnly(2026, 8, 3),
+                EndDate = new DateOnly(2026, 8, 14)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("9.6", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_When_Request_Is_Within_Accrued_Balance_Though_Below_Raw_Entitlement()
+    {
+        // Same accrual setup as above (9.60 accrued of a 24-day raw entitlement) but the request
+        // (5 days) fits within what has actually accrued.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 24,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 0, allowNegativeBalance: false, false, now);
+        var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
+            new DateOnly(2026, 2, 1), now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            2026, 24m, new DateOnly(2026, 2, 1), now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.EmployeeLeavePolicyAssignments.Add(assignment);
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+
+        var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
     }

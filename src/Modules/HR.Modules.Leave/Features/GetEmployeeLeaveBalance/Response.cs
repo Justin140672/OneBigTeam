@@ -18,6 +18,11 @@ internal sealed record LeaveBalanceItem(
     string LeaveTypeCode,
     bool HasBalance,
     decimal? EntitlementDays,
+    // The portion of EntitlementDays actually accrued as of today, per the leave type's configured
+    // AccrualMethod (LEAVE-04). Equal to EntitlementDays for None/Annual accrual methods (both
+    // granted upfront) or TOIL; less than or equal to it for Monthly/Fortnightly. This is the
+    // figure request submission/preview validation enforces.
+    decimal? AccruedDays,
     decimal? UsedDays,
     decimal? AdjustmentDays,
     decimal? RemainingDays,

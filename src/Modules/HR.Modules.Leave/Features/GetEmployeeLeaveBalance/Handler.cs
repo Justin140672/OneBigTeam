@@ -11,11 +11,19 @@ internal sealed class GetEmployeeLeaveBalanceHandler
 {
     private readonly LeaveDbContext _dbContext;
     private readonly IWorkingPatternProvider _workingPatternProvider;
+    private readonly ICompanyLeaveSettingsReader _leaveSettingsReader;
+    private readonly IClock _clock;
 
-    public GetEmployeeLeaveBalanceHandler(LeaveDbContext dbContext, IWorkingPatternProvider workingPatternProvider)
+    public GetEmployeeLeaveBalanceHandler(
+        LeaveDbContext dbContext,
+        IWorkingPatternProvider workingPatternProvider,
+        ICompanyLeaveSettingsReader leaveSettingsReader,
+        IClock clock)
     {
         _dbContext = dbContext;
         _workingPatternProvider = workingPatternProvider;
+        _leaveSettingsReader = leaveSettingsReader;
+        _clock = clock;
     }
 
     public async Task<Result<GetEmployeeLeaveBalanceResponse>> HandleAsync(
@@ -37,8 +45,12 @@ internal sealed class GetEmployeeLeaveBalanceHandler
         var leaveTypes = await _dbContext.LeaveTypes
             .AsNoTracking()
             .Where(lt => lt.CompanyId == request.CompanyId && lt.IsActive)
-            .Select(lt => new { lt.Id, lt.Name, lt.Code, lt.HasBalance })
+            .Select(lt => new { lt.Id, lt.Name, lt.Code, lt.HasBalance, lt.AccrualMethod, lt.Behaviour })
             .ToListAsync(cancellationToken);
+
+        var leaveSettings = await _leaveSettingsReader.GetLeaveSettingsAsync(request.CompanyId, cancellationToken);
+        var (_, policyYearEnd) = LeaveYearCalculator.GetPolicyYearBounds(request.PolicyYear, leaveSettings.LeaveYearStartMonth);
+        var today = DateOnly.FromDateTime(_clock.UtcNowOffset().Date);
 
         var balancesByType = await _dbContext.LeaveBalances
             .AsNoTracking()
@@ -63,7 +75,20 @@ internal sealed class GetEmployeeLeaveBalanceHandler
                 // requested policy year.
                 if (lt.HasBalance && balancesByType.TryGetValue(lt.Id, out var balance))
                 {
-                    var remainingDays = balance.EntitlementDays + balance.AdjustmentDays - balance.UsedDays;
+                    // Accrued (not raw) entitlement is what's actually available - identical
+                    // calculation to SubmitLeaveRequestHandler/PreviewLeaveRequestHandler so the
+                    // figure shown here can never diverge from what request validation enforces
+                    // (LEAVE-04).
+                    var accruedDays = lt.Behaviour == LeaveTypeBehaviour.Toil
+                        ? balance.EntitlementDays
+                        : LeaveAccrualCalculator.CalculateAccruedDays(
+                            balance.EntitlementDays,
+                            lt.AccrualMethod,
+                            balance.AccrualStartDate,
+                            policyYearEnd,
+                            today);
+
+                    var remainingDays = accruedDays + balance.AdjustmentDays - balance.UsedDays;
 
                     return new LeaveBalanceItem(
                         balance.Id,
@@ -72,11 +97,12 @@ internal sealed class GetEmployeeLeaveBalanceHandler
                         lt.Code,
                         HasBalance: true,
                         balance.EntitlementDays,
+                        accruedDays,
                         balance.UsedDays,
                         balance.AdjustmentDays,
                         remainingDays,
                         pendingDays,
-                        balance.EntitlementDays * workingPattern.HoursPerDay,
+                        accruedDays * workingPattern.HoursPerDay,
                         remainingDays * workingPattern.HoursPerDay,
                         pendingHours);
                 }
@@ -87,6 +113,7 @@ internal sealed class GetEmployeeLeaveBalanceHandler
                     lt.Name,
                     lt.Code,
                     HasBalance: false,
+                    null,
                     null,
                     null,
                     null,

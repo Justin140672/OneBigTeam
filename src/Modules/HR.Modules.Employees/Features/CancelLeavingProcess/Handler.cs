@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
@@ -10,6 +11,7 @@ internal sealed class CancelLeavingProcessHandler(
     EmployeesDbContext dbContext,
     IClock clock,
     IAuditEventPublisher auditEventPublisher,
+    IIntegrationEventPublisher integrationEventPublisher,
     IOffboardingStatusReader offboardingStatusReader,
     IOffboardingPlanCoordinator offboardingPlanCoordinator)
 {
@@ -70,6 +72,15 @@ internal sealed class CancelLeavingProcessHandler(
                 now,
                 request.CancellationReason,
                 offboardingAlreadyStarted),
+            cancellationToken);
+
+        // Cross-module notification so consuming modules (e.g. Leave, LEAVE-05) restore the
+        // employee's current policy year entitlement to the figure it would have been had they
+        // never entered the leaving process, while leaving any usage/manual adjustment recorded
+        // during the leaving-pending period untouched.
+        await integrationEventPublisher.PublishAsync(
+            new EmployeeLeavingProcessCancelledIntegrationEvent(
+                leavingProcess.CompanyId, leavingProcess.EmployeeId, now),
             cancellationToken);
 
         return Result.Success(new CancelLeavingProcessResponse(

@@ -71,7 +71,7 @@ public class GetLeaveBalanceHistoryHandlerTests
                 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, ApprovedLeaveDate));
         }
 
-        var balance = LeaveBalance.Create(Guid.NewGuid(), company, employee, leaveType, policyId, 2026, 25m, ApprovedLeaveDate);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), company, employee, leaveType, policyId, 2026, 25m, new DateOnly(2026, 1, 1), ApprovedLeaveDate);
         context.LeaveBalances.Add(balance);
 
         var approved = LeaveRequest.Create(

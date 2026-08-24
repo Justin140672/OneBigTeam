@@ -86,9 +86,11 @@ internal sealed class EmployeeDetailsCorrectedHandler : IIntegrationEventHandler
             var recalculated = LeaveEntitlementCalculator.CalculateEntitlement(
                 leaveType.DefaultEntitlementDays, policyYearStart, policyYearEnd, startDate.Value);
 
-            if (recalculated != balance.EntitlementDays)
+            var recalculatedAccrualStartDate = startDate.Value < policyYearStart ? policyYearStart : startDate.Value;
+
+            if (recalculated != balance.EntitlementDays || recalculatedAccrualStartDate != balance.AccrualStartDate)
             {
-                balance.RecalculateEntitlement(recalculated, now);
+                balance.RecalculateEntitlement(recalculated, recalculatedAccrualStartDate, now);
                 changed = true;
             }
         }

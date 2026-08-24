@@ -59,10 +59,12 @@ public class EmployeeDepartureFinalizerTests
         FakeOffboardingStatusReader? offboardingStatusReader = null,
         FakeCompanyLeavingSettingsReader? leavingSettingsReader = null,
         FakeNotificationWriter? notificationWriter = null,
-        FakeEmployeeTimelineWriter? timelineWriter = null) =>
+        FakeEmployeeTimelineWriter? timelineWriter = null,
+        CapturingIntegrationEventPublisher? integrationEventPublisher = null) =>
         new(
             dbContext,
             auditPublisher ?? new FakeAuditPublisher(),
+            integrationEventPublisher ?? new CapturingIntegrationEventPublisher(),
             offboardingStatusReader ?? new FakeOffboardingStatusReader(new OffboardingStatusSummary("Completed")),
             leavingSettingsReader ?? new FakeCompanyLeavingSettingsReader(),
             notificationWriter ?? new FakeNotificationWriter(),

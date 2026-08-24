@@ -168,7 +168,7 @@ public class RejectLeaveRequestHandlerTests
 
         var balance = LeaveBalance.Create(
             Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
-            2026, 25m, now);
+            2026, 25m, new DateOnly(2026, 1, 1), now);
         balance.RecordUsage(5m, now);
 
         context.LeaveRequests.Add(leaveRequest);
@@ -204,7 +204,7 @@ public class RejectLeaveRequestHandlerTests
 
         var balance = LeaveBalance.Create(
             Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
-            2026, 25m, now);
+            2026, 25m, new DateOnly(2026, 1, 1), now);
 
         context.LeaveRequests.Add(leaveRequest);
         context.LeaveBalances.Add(balance);

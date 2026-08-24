@@ -21,7 +21,12 @@ public sealed record EmployeeImportCreateRequest(
     // (guaranteed by EmployeeStagingRowValidator's mode-aware requiredness check at staging time).
     string? EmployeeNumber,
     Guid ImportSessionId,
-    Guid? ActorUserId);
+    Guid? ActorUserId,
+    string? Address = null,
+    // When null, the writer falls back to the company's default probation-length calculation
+    // (IProbationDateResolver). When populated (from the import file's Probation End Date column),
+    // the imported value is used as-is instead.
+    DateOnly? ProbationEndDate = null);
 
 public sealed record EmployeeImportCreateResult(
     Guid EmployeeId,

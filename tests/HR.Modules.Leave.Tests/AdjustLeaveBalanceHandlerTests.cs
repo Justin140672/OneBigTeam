@@ -13,6 +13,7 @@ public class AdjustLeaveBalanceHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 15, 9, 0, 0, DateTimeKind.Utc);
     private static readonly DateTimeOffset Now = new(FixedUtcNow, TimeSpan.Zero);
+    private static readonly DateOnly AccrualStartDate = new(2026, 1, 1);
 
     private static LeaveDbContext BuildContext()
     {
@@ -126,7 +127,7 @@ public class AdjustLeaveBalanceHandlerTests
 
         var leaveType = CreateActiveLeaveType(companyId);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, Now);
-        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 25m, Now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 25m, AccrualStartDate, Now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -188,7 +189,7 @@ public class AdjustLeaveBalanceHandlerTests
 
         var leaveType = CreateActiveLeaveType(companyId, LeaveTypeBehaviour.Toil);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, Now);
-        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 25m, Now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 25m, AccrualStartDate, Now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -235,7 +236,7 @@ public class AdjustLeaveBalanceHandlerTests
 
         var leaveType = CreateActiveLeaveType(companyId);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, allowNegativeBalance: false, false, Now);
-        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 5m, Now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 5m, AccrualStartDate, Now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -265,7 +266,7 @@ public class AdjustLeaveBalanceHandlerTests
 
         var leaveType = CreateActiveLeaveType(companyId);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Flexible", null, 5, allowNegativeBalance: true, false, Now);
-        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 5m, Now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 5m, AccrualStartDate, Now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -293,7 +294,7 @@ public class AdjustLeaveBalanceHandlerTests
 
         var leaveType = CreateActiveLeaveType(companyId);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, allowNegativeBalance: false, false, Now);
-        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 5m, Now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 5m, AccrualStartDate, Now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -327,7 +328,7 @@ public class AdjustLeaveBalanceHandlerTests
 
         var leaveType = CreateActiveLeaveType(companyId);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, allowNegativeBalance: false, false, Now);
-        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 25m, Now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 25m, AccrualStartDate, Now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);

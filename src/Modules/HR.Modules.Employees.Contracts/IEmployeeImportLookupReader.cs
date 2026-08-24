@@ -7,8 +7,9 @@ public interface IEmployeeImportLookupReader
     Task<bool> WorkEmailExistsAsync(Guid companyId, string workEmail, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Resolves a human-readable reference (an employee number OR a work email) to a real employee's id,
-    /// for manager-reference validation. Null if no match.
+    /// Resolves a human-readable reference (an employee number, a work email, OR a full name
+    /// "First Last", case-insensitive) to a real employee's id, for manager-reference validation.
+    /// Null if no match.
     /// </summary>
     Task<Guid?> FindEmployeeIdByReferenceAsync(Guid companyId, string reference, CancellationToken cancellationToken);
 

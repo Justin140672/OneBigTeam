@@ -41,6 +41,12 @@ internal sealed class GetPositionProfileHandler
             .Select(a => new RequiredAssetItem(a.Id, a.AssetCategoryId, a.IsMandatory, a.Quantity))
             .ToList();
 
+        var assignedEmployees = await _dbContext.Employees
+            .AsNoTracking()
+            .Where(e => e.CompanyId == request.CompanyId && e.PositionProfileId == profile.Id)
+            .Select(e => new AssignedEmployeeItem(e.Id, e.FirstName, e.LastName, e.Status))
+            .ToListAsync(cancellationToken);
+
         return Result.Success(new GetPositionProfileResponse(
             profile.Id,
             profile.CompanyId,
@@ -62,6 +68,7 @@ internal sealed class GetPositionProfileHandler
             profile.CreatedAt,
             profile.UpdatedAt,
             requiredDocuments,
-            requiredAssets));
+            requiredAssets,
+            assignedEmployees));
     }
 }

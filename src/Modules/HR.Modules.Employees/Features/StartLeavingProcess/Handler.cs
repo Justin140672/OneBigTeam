@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Contracts;
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
@@ -14,6 +15,7 @@ internal sealed class StartLeavingProcessHandler(
     ICompanyTimeZoneReader companyTimeZoneReader,
     IEffectiveNoticePeriodResolver noticePeriodResolver,
     IAuditEventPublisher auditEventPublisher,
+    IIntegrationEventPublisher integrationEventPublisher,
     INotificationWriter notificationWriter,
     IOffboardingPlanCoordinator offboardingPlanCoordinator,
     IEmployeeDepartureFinalizer departureFinalizer)
@@ -113,6 +115,13 @@ internal sealed class StartLeavingProcessHandler(
             cancellationToken);
 
         await NotifyLeavingProcessStartedAsync(employee, leavingProcess, now, cancellationToken);
+
+        // Cross-module notification so consuming modules (e.g. Leave, LEAVE-05) recalculate the
+        // employee's current policy year entitlement pro-rated through the new LeavingDate.
+        await integrationEventPublisher.PublishAsync(
+            new EmployeeLeavingDateSetIntegrationEvent(
+                leavingProcess.CompanyId, leavingProcess.EmployeeId, leavingProcess.LeavingDate, now),
+            cancellationToken);
 
         // request.ConfirmBackdatedLeavingDate is guaranteed true here — the unconfirmed case
         // already returned a Conflict above before anything was persisted.

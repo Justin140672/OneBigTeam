@@ -53,9 +53,11 @@ public class LeaveYearHandlerTests
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Policy", null, 0, allowNegativeBalance: false, false, JanuaryNow);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             new DateOnly(2026, 4, 1), JanuaryNow);
-        // Balance in policy year 2026 — the correct year for Jan 2027 with April start
+        // Balance in policy year 2026 — the correct year for Jan 2027 with April start.
+        // AccrualStartDate is the policy year's own April 1 2026 start, so ~9 months of Monthly
+        // accrual have elapsed by Jan 2027 — comfortably enough to cover the 3-day request.
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
-            2026, 25m, JanuaryNow);
+            2026, 25m, new DateOnly(2026, 4, 1), JanuaryNow);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -94,7 +96,7 @@ public class LeaveYearHandlerTests
             new DateOnly(2026, 4, 1), JanuaryNow);
         // Balance incorrectly stored in calendar year 2027 — handler should look in 2026 and not find it
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
-            2027, 25m, JanuaryNow);
+            2027, 25m, new DateOnly(2027, 4, 1), JanuaryNow);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -138,7 +140,7 @@ public class LeaveYearHandlerTests
 
         var balance = LeaveBalance.Create(
             Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
-            2026, 25m, JanuaryNow);
+            2026, 25m, new DateOnly(2026, 4, 1), JanuaryNow);
 
         context.LeaveRequests.Add(leaveRequest);
         context.LeaveBalances.Add(balance);
@@ -180,7 +182,7 @@ public class LeaveYearHandlerTests
 
         var balance = LeaveBalance.Create(
             Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
-            2026, 25m, JanuaryNow);
+            2026, 25m, new DateOnly(2026, 4, 1), JanuaryNow);
         balance.RecordUsage(3m, JanuaryNow);
 
         context.LeaveRequests.Add(leaveRequest);
@@ -221,7 +223,7 @@ public class LeaveYearHandlerTests
 
         var balance = LeaveBalance.Create(
             Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
-            2026, 25m, JanuaryNow);
+            2026, 25m, new DateOnly(2026, 4, 1), JanuaryNow);
         balance.RecordUsage(3m, JanuaryNow);
 
         context.LeaveRequests.Add(leaveRequest);

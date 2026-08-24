@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
 using HR.SharedKernel;
@@ -8,9 +9,12 @@ namespace HR.Modules.Leave.Jobs;
 /// <summary>
 /// Core, per-company leave-year rollover logic (LEAVE-03). Creates the new policy-year
 /// <see cref="LeaveBalance"/> for every employee/leave-type combination that had a balance in the
-/// previous policy year, carrying forward unused entitlement up to the employee's current leave
-/// policy's <see cref="LeavePolicy.CarryOverDays"/> limit. Negative balances are never carried
-/// forward.
+/// previous policy year AND still has an active <see cref="EmployeeLeavePolicyAssignment"/>,
+/// carrying forward unused entitlement up to the employee's current leave policy's
+/// <see cref="LeavePolicy.CarryOverDays"/> limit. Negative balances are never carried forward.
+/// Employees whose assignment has been deactivated (their departure was finalised — see
+/// EmployeeDepartureFinalisedHandler) are skipped entirely: they keep their historical balances
+/// but do not receive a new policy-year balance or carry-over.
 ///
 /// Idempotent by design: before creating anything it checks which (EmployeeId, LeaveTypeId) pairs
 /// already have a balance for the target policy year and skips them. The underlying
@@ -26,6 +30,7 @@ namespace HR.Modules.Leave.Jobs;
 internal sealed class LeaveYearRolloverService(
     LeaveDbContext dbContext,
     IClock clock,
+    ICompanyLeaveSettingsReader leaveSettingsReader,
     IAuditEventPublisher auditPublisher)
 {
     // Background-job actor convention used elsewhere in the codebase (e.g.
@@ -40,6 +45,13 @@ internal sealed class LeaveYearRolloverService(
     {
         var previousPolicyYear = newPolicyYear - 1;
         var now = clock.UtcNowOffset();
+
+        // New policy-year balances start accruing (for Monthly/Fortnightly leave types - LEAVE-04)
+        // from the new policy year's start date - the employee is a continuing employee by
+        // definition here (a departed employee's assignment was deactivated and is filtered out
+        // below), so there is no partial-year pro-rating to account for.
+        var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(companyId, cancellationToken);
+        var (newPolicyYearStart, _) = LeaveYearCalculator.GetPolicyYearBounds(newPolicyYear, leaveSettings.LeaveYearStartMonth);
 
         var previousBalances = await dbContext.LeaveBalances
             .Where(b => b.CompanyId == companyId && b.PolicyYear == previousPolicyYear)
@@ -57,12 +69,19 @@ internal sealed class LeaveYearRolloverService(
         var employeeIds = previousBalances.Select(b => b.EmployeeId).Distinct().ToList();
 
         // Employees may have been reassigned to a different policy since the previous policy
-        // year — the *current* assignment governs the new year's carry-over limit. Fall back to
-        // the previous balance's own policy if no current assignment record exists (should not
-        // normally happen, but avoids silently dropping the employee from rollover).
-        var assignments = await dbContext.EmployeeLeavePolicyAssignments
-            .Where(a => a.CompanyId == companyId && employeeIds.Contains(a.EmployeeId))
-            .ToDictionaryAsync(a => a.EmployeeId, cancellationToken);
+        // year — the *current* assignment governs the new year's carry-over limit. Only employees
+        // with an active assignment are eligible: a departed employee's assignment is deactivated
+        // (not deleted) by EmployeeDepartureFinalisedHandler when their leaving process is
+        // finalised, and rollover must not generate a new policy-year balance/carry-over for them
+        // — see EmployeeDepartureFinalisedHandler for the full rationale. Employees who still have
+        // an active assignment but none was found are treated the same way as an inactive
+        // assignment (skip) rather than silently falling back to the previous balance's policy,
+        // since "no active assignment" is itself the signal that the employee is no longer
+        // eligible for rollover.
+        var assignments = (await dbContext.EmployeeLeavePolicyAssignments
+                .Where(a => a.CompanyId == companyId && employeeIds.Contains(a.EmployeeId) && a.IsActive)
+                .ToListAsync(cancellationToken))
+            .ToDictionary(a => a.EmployeeId);
 
         var assignmentPolicyIds = assignments.Values.Select(a => a.LeavePolicyId);
         var allPolicyIds = policyIds.Union(assignmentPolicyIds).Distinct().ToList();
@@ -92,9 +111,13 @@ internal sealed class LeaveYearRolloverService(
                 !leaveType.HasBalance)
                 continue;
 
-            var leavePolicyId = assignments.TryGetValue(previous.EmployeeId, out var assignment)
-                ? assignment.LeavePolicyId
-                : previous.LeavePolicyId;
+            // No active policy assignment (never assigned, or the employee's departure has been
+            // finalised and their assignment was deactivated) — do not generate a new policy-year
+            // balance or carry-over for them.
+            if (!assignments.TryGetValue(previous.EmployeeId, out var assignment))
+                continue;
+
+            var leavePolicyId = assignment.LeavePolicyId;
 
             if (!policies.TryGetValue(leavePolicyId, out var policy))
                 continue;
@@ -111,6 +134,7 @@ internal sealed class LeaveYearRolloverService(
                 leavePolicyId,
                 newPolicyYear,
                 baseEntitlement,
+                newPolicyYearStart,
                 now);
 
             // Never carry a negative balance forward — an exhausted/over-drawn balance simply

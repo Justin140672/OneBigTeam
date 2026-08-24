@@ -5,11 +5,12 @@ namespace HR.Modules.Leave.Tests;
 public class LeaveBalanceTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 1, 0, 0, 0, TimeSpan.Zero);
+    private static readonly DateOnly AccrualStartDate = new(2026, 1, 1);
 
-    private static LeaveBalance CreateBalance(decimal entitlementDays = 20m) =>
+    private static LeaveBalance CreateBalance(decimal entitlementDays = 20m, DateOnly? accrualStartDate = null) =>
         LeaveBalance.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            2026, entitlementDays, Now);
+            2026, entitlementDays, accrualStartDate ?? AccrualStartDate, Now);
 
     [Fact]
     public void Create_Sets_UsedDays_And_AdjustmentDays_To_Zero()
@@ -19,6 +20,40 @@ public class LeaveBalanceTests
         Assert.Equal(0m, balance.UsedDays);
         Assert.Equal(0m, balance.AdjustmentDays);
         Assert.Equal(20m, balance.EntitlementDays);
+    }
+
+    [Fact]
+    public void Create_Sets_AccrualStartDate()
+    {
+        var balance = CreateBalance(20m, new DateOnly(2026, 3, 15));
+
+        Assert.Equal(new DateOnly(2026, 3, 15), balance.AccrualStartDate);
+    }
+
+    [Fact]
+    public void RecalculateEntitlement_Updates_EntitlementDays_And_AccrualStartDate()
+    {
+        var balance = CreateBalance(20m, new DateOnly(2026, 1, 1));
+        var later = Now.AddDays(1);
+
+        balance.RecalculateEntitlement(14.66m, new DateOnly(2026, 6, 1), later);
+
+        Assert.Equal(14.66m, balance.EntitlementDays);
+        Assert.Equal(new DateOnly(2026, 6, 1), balance.AccrualStartDate);
+        Assert.Equal(later, balance.UpdatedAt);
+    }
+
+    [Fact]
+    public void RecalculateEntitlement_Does_Not_Reset_UsedDays_Or_AdjustmentDays()
+    {
+        var balance = CreateBalance(20m);
+        balance.Adjust(2m, Now);
+        balance.RecordUsage(3m, Now);
+
+        balance.RecalculateEntitlement(14.66m, new DateOnly(2026, 6, 1), Now);
+
+        Assert.Equal(2m, balance.AdjustmentDays);
+        Assert.Equal(3m, balance.UsedDays);
     }
 
     [Fact]

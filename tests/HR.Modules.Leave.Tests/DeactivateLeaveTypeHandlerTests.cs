@@ -63,7 +63,7 @@ public class DeactivateLeaveTypeHandlerTests
         db.LeaveTypes.Add(entity);
 
         var balance = LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeId, entity.Id, Guid.NewGuid(), 2026, 25, now);
+            Guid.NewGuid(), companyId, employeeId, entity.Id, Guid.NewGuid(), 2026, 25, new DateOnly(2026, 1, 1), now);
         db.LeaveBalances.Add(balance);
         await db.SaveChangesAsync();
 
@@ -96,7 +96,7 @@ public class DeactivateLeaveTypeHandlerTests
         db.LeaveTypes.Add(entity);
 
         var balance = LeaveBalance.Create(
-            Guid.NewGuid(), companyId, terminatedEmployeeId, entity.Id, Guid.NewGuid(), 2026, 25, now);
+            Guid.NewGuid(), companyId, terminatedEmployeeId, entity.Id, Guid.NewGuid(), 2026, 25, new DateOnly(2026, 1, 1), now);
         db.LeaveBalances.Add(balance);
         await db.SaveChangesAsync();
 

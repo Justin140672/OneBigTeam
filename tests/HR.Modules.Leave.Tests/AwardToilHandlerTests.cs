@@ -99,7 +99,7 @@ public class AwardToilHandlerTests
         var leaveType = CreateToilLeaveType(companyId, now);
         var assignment = CreateAssignment(companyId, employeeId, now);
         var existingBalance = LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeId, leaveType.Id, assignment.LeavePolicyId, 2026, 0m, now);
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, assignment.LeavePolicyId, 2026, 0m, new DateOnly(2026, 1, 1), now);
         existingBalance.Adjust(2m, now);
 
         context.LeaveTypes.Add(leaveType);
@@ -162,7 +162,7 @@ public class AwardToilHandlerTests
         var leaveType = CreateToilLeaveType(companyId, now);
         var assignment = CreateAssignment(companyId, employeeId, now);
         var existingBalance = LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeId, leaveType.Id, assignment.LeavePolicyId, 2026, 0m, now);
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, assignment.LeavePolicyId, 2026, 0m, new DateOnly(2026, 1, 1), now);
 
         context.LeaveTypes.Add(leaveType);
         context.EmployeeLeavePolicyAssignments.Add(assignment);

@@ -45,6 +45,9 @@ public class EmployeeCreatedHandlerTests
         // StartDate 2026-06-01 is mid-year on a Jan-Dec leave year: 25 * 214/365 = 14.66 (pro-rated).
         Assert.Equal(14.66m, balances[0].EntitlementDays);
         Assert.Equal(FixedUtcNow.Year, balances[0].PolicyYear);
+        // A mid-year joiner accrues (for Monthly/Fortnightly leave types) from their own start
+        // date, not the policy year start - see LeaveBalance.AccrualStartDate (LEAVE-04).
+        Assert.Equal(new DateOnly(2026, 6, 1), balances[0].AccrualStartDate);
     }
 
     [Fact]
@@ -72,6 +75,9 @@ public class EmployeeCreatedHandlerTests
 
         var balance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(25, balance.EntitlementDays);
+        // Continuing/starting-on-day-one employee: accrual start date is the policy year start
+        // itself, since their start date is not later than it (LEAVE-04).
+        Assert.Equal(new DateOnly(2026, 1, 1), balance.AccrualStartDate);
     }
 
     [Fact]

@@ -46,6 +46,11 @@ internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, I
                 return Result.Failure<AwardToilResponse>(
                     Error.NotFound($"Employee '{request.EmployeeId}' has no leave policy assignment."));
 
+            // TOIL is exempt from AccrualMethod entirely (it is earned ad hoc via AwardToil, not
+            // via a leave type's configured periodic/annual accrual - see LeaveAccrualCalculator
+            // remarks and the existing Behaviour == Toil exemptions in Submit/PreviewLeaveRequest).
+            // AccrualStartDate is set to today purely to satisfy the column's NOT NULL constraint;
+            // it is never read for TOIL balances.
             balance = LeaveBalance.Create(
                 Guid.NewGuid(),
                 request.CompanyId,
@@ -54,6 +59,7 @@ internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, I
                 assignment.LeavePolicyId,
                 policyYear,
                 0m,
+                DateOnly.FromDateTime(now.Date),
                 now);
 
             dbContext.LeaveBalances.Add(balance);

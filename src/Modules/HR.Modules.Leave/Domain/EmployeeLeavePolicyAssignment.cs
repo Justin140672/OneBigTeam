@@ -9,6 +9,8 @@ internal sealed class EmployeeLeavePolicyAssignment
     public Guid EmployeeId { get; private set; }
     public Guid LeavePolicyId { get; private set; }
     public DateOnly EffectiveFrom { get; private set; }
+    public bool IsActive { get; private set; }
+    public DateTimeOffset? DeactivatedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -27,6 +29,8 @@ internal sealed class EmployeeLeavePolicyAssignment
             EmployeeId = employeeId,
             LeavePolicyId = leavePolicyId,
             EffectiveFrom = effectiveFrom,
+            IsActive = true,
+            DeactivatedAt = null,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -36,6 +40,21 @@ internal sealed class EmployeeLeavePolicyAssignment
     {
         LeavePolicyId = leavePolicyId;
         EffectiveFrom = effectiveFrom;
+        UpdatedAt = now;
+    }
+
+    // Called when the employee's departure has been finalised (EmployeeDepartureFinalisedIntegrationEvent).
+    // The row is kept — not deleted — so historical LeaveBalance/LeaveBalanceAdjustment rows for
+    // this employee still resolve a policy via LeaveYearRolloverService's dictionary lookups, and
+    // so re-hiring the same person later has a clear prior record. Idempotent: reactivating is not
+    // supported by this type today, and repeated Deactivate calls are harmless no-ops.
+    public void Deactivate(DateTimeOffset now)
+    {
+        if (!IsActive)
+            return;
+
+        IsActive = false;
+        DeactivatedAt = now;
         UpdatedAt = now;
     }
 }

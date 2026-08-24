@@ -7,7 +7,10 @@ internal sealed class CreateAssetValidator : AbstractValidator<CreateAssetReques
     public CreateAssetValidator()
     {
         RuleFor(r => r.CompanyId).NotEmpty();
-        RuleFor(r => r.AssetNumber).NotEmpty().MaximumLength(50);
+        // Requiredness depends on the company's AssetNumberMode (Manual vs Automatic), which this
+        // shape-only validator has no DB access to check — that check lives in the handler,
+        // mirroring CreateEmployeeValidator/CreateEmployeeHandler's own EmployeeNumber split.
+        RuleFor(r => r.AssetNumber).MaximumLength(50);
         RuleFor(r => r.CategoryId).NotEmpty();
         RuleFor(r => r.Name).NotEmpty().MaximumLength(200);
         RuleFor(r => r.Manufacturer).MaximumLength(100);

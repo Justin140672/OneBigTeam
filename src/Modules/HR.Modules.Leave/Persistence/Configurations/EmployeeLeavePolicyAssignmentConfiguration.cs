@@ -32,6 +32,14 @@ internal sealed class EmployeeLeavePolicyAssignmentConfiguration : IEntityTypeCo
             .HasColumnName("effective_from")
             .IsRequired();
 
+        builder.Property(a => a.IsActive)
+            .HasColumnName("is_active")
+            .IsRequired()
+            .HasDefaultValue(true);
+
+        builder.Property(a => a.DeactivatedAt)
+            .HasColumnName("deactivated_at");
+
         builder.Property(a => a.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
@@ -44,5 +52,7 @@ internal sealed class EmployeeLeavePolicyAssignmentConfiguration : IEntityTypeCo
             .IsUnique();
 
         builder.HasIndex(a => new { a.CompanyId, a.LeavePolicyId });
+
+        builder.HasIndex(a => new { a.CompanyId, a.IsActive });
     }
 }

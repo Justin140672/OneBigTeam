@@ -360,7 +360,11 @@ internal sealed class EmployeeStagingRowValidator(
         var matchesRowInFile = allRows.Any(r =>
             r.RowNumber != row.RowNumber &&
             (string.Equals(GetField(r, "EmployeeNumber")?.Trim(), normalizedReference, StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(GetField(r, "WorkEmail")?.Trim(), normalizedReference, StringComparison.OrdinalIgnoreCase)));
+             string.Equals(GetField(r, "WorkEmail")?.Trim(), normalizedReference, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(
+                 $"{GetField(r, "FirstName")?.Trim()} {GetField(r, "LastName")?.Trim()}",
+                 normalizedReference,
+                 StringComparison.OrdinalIgnoreCase)));
 
         if (matchesRowInFile)
             return;
