@@ -21,8 +21,12 @@ public class SicknessCategoryDefaultsProvisionerTests
 
         var names = await context.SicknessCategories.Where(c => c.CompanyId == companyId).Select(c => c.Name).ToListAsync();
 
+        // SICK-05: broad, non-diagnostic category set — see SicknessCategoryDefaultsProvisioner's
+        // doc comment and specifications/product-specifications/00-current-product-decisions.md
+        // ("Sickness management"). This assertion is the drift-prevention test: it must be updated
+        // in lockstep with the provisioner and the spec, never independently.
         Assert.Equal(
-            new[] { "Cold/Flu", "Back Pain", "Migraine" }.OrderBy(n => n),
+            new[] { "Illness", "Injury", "Mental health", "Medical appointment", "Dependant care", "Other" }.OrderBy(n => n),
             names.OrderBy(n => n));
     }
 

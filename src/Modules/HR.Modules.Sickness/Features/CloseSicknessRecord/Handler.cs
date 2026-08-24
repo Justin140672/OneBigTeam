@@ -67,6 +67,14 @@ internal sealed class CloseSicknessRecordHandler(
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
 
         // Mandatory, always set (no opt-out) — see CompanySettings.ReturnToWorkRequiredAfterDays.
+        //
+        // SICK-05: `totalDays` here is a *working-day* count (SicknessCalculator), not calendar
+        // days. That is intentional for this specific threshold — "how many days were actually
+        // missed" is a defensible basis for deciding whether a return-to-work chat is warranted —
+        // and must not be confused with the fit-note threshold above, which is deliberately
+        // evaluated in calendar days (see FitNoteEvaluator's doc comment). Do not swap TotalDays
+        // for a calendar-day calculation here without updating the decision record in
+        // specifications/product-specifications/00-current-product-decisions.md.
         ReturnToWorkReview? returnToWorkReview = null;
         if (totalDays >= sicknessSettings.ReturnToWorkRequiredAfterDays)
         {

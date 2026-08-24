@@ -87,6 +87,16 @@ internal sealed class CompanySettings
             DisplaySalaryOnEmployeeProfile = false,
             // Mandatory, no opt-out — every company requires fit-note evidence after a week of
             // sickness and a return-to-work review after 1 day by default.
+            //
+            // SICK-05: ReturnToWorkRequiredAfterDays is confirmed as 1 working day (not the 3
+            // working days an earlier draft of the sickness spec described) — a lightweight
+            // "was this a real absence, does it need a chat" check is meant to happen almost
+            // immediately after any absence, not just longer ones. It is evaluated against
+            // SicknessRecord.TotalDays, which is a *working-day* count (see SicknessCalculator) —
+            // that is intentional and different from the calendar-day basis used for the fit-note
+            // threshold (see FitNoteEvaluator's doc comment). Confirmed decision recorded in
+            // specifications/product-specifications/00-current-product-decisions.md
+            // ("Sickness management").
             FitNoteRequiredAfterDays = 7,
             ReturnToWorkRequiredAfterDays = 1,
             // SICK-04 defaults: 4+ absence spells in a rolling 12 months ("frequent"), a single

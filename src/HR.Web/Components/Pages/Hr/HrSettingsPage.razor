@@ -108,14 +108,14 @@
                                                         CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromSickness = v)" />
                                         </div>
                                         <div class="col-md-4">
-                                            <label class="form-label">Fit Note Required After (Days)</label>
+                                            <label class="form-label">Fit Note Required After (Calendar Days)</label>
                                             <SfNumericTextBox TValue="int" @bind-Value="Model.FitNoteRequiredAfterDays"
                                                               ShowSpinButton="false"
                                                               Min="1" />
                                             <ValidationMessage For="@(() => Model.FitNoteRequiredAfterDays)" />
                                         </div>
                                         <div class="col-md-4">
-                                            <label class="form-label">Return-to-Work Review Required After (Days)</label>
+                                            <label class="form-label">Return-to-Work Review Required After (Working Days)</label>
                                             <SfNumericTextBox TValue="int" @bind-Value="Model.ReturnToWorkRequiredAfterDays"
                                                               ShowSpinButton="false"
                                                               Min="1" />

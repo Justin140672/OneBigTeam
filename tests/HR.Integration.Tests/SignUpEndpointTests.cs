@@ -141,7 +141,7 @@ public class SignUpEndpointTests
         var sicknessCategoryNames = await sicknessDb.SicknessCategories
             .Where(c => c.CompanyId == payload.CompanyId).Select(c => c.Name).ToListAsync();
         Assert.Equal(
-            new[] { "Cold/Flu", "Back Pain", "Migraine" }.OrderBy(n => n),
+            new[] { "Illness", "Injury", "Mental health", "Medical appointment", "Dependant care", "Other" }.OrderBy(n => n),
             sicknessCategoryNames.OrderBy(n => n));
 
         var documentsDb = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();

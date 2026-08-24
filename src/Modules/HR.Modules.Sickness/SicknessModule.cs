@@ -123,13 +123,21 @@ public static class SicknessModule
         var now    = DateTimeOffset.UtcNow;
         var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-        var coldFluId  = Guid.Parse("70000000-0000-0000-0000-000000000001");
-        var backPainId = Guid.Parse("70000000-0000-0000-0000-000000000002");
-        var migraineId = Guid.Parse("70000000-0000-0000-0000-000000000003");
+        // SICK-05: mirrors SicknessCategoryDefaultsProvisioner's broad, non-diagnostic category set
+        // (see that class's doc comment) so dev/E2E data matches what production provisions.
+        var illnessId    = Guid.Parse("70000000-0000-0000-0000-000000000001");
+        var injuryId     = Guid.Parse("70000000-0000-0000-0000-000000000002");
+        var mentalHealthId  = Guid.Parse("70000000-0000-0000-0000-000000000003");
+        var appointmentId   = Guid.Parse("70000000-0000-0000-0000-000000000004");
+        var dependantCareId = Guid.Parse("70000000-0000-0000-0000-000000000005");
+        var otherId         = Guid.Parse("70000000-0000-0000-0000-000000000006");
 
-        db.SicknessCategories.Add(SicknessCategory.Create(coldFluId,  acmeId, "Cold/Flu",  1, now));
-        db.SicknessCategories.Add(SicknessCategory.Create(backPainId, acmeId, "Back Pain", 2, now));
-        db.SicknessCategories.Add(SicknessCategory.Create(migraineId, acmeId, "Migraine",  3, now));
+        db.SicknessCategories.Add(SicknessCategory.Create(illnessId,      acmeId, "Illness", 1, now));
+        db.SicknessCategories.Add(SicknessCategory.Create(injuryId,       acmeId, "Injury", 2, now));
+        db.SicknessCategories.Add(SicknessCategory.Create(mentalHealthId, acmeId, "Mental health", 3, now));
+        db.SicknessCategories.Add(SicknessCategory.Create(appointmentId,  acmeId, "Medical appointment", 4, now));
+        db.SicknessCategories.Add(SicknessCategory.Create(dependantCareId, acmeId, "Dependant care", 5, now));
+        db.SicknessCategories.Add(SicknessCategory.Create(otherId,        acmeId, "Other", 6, now));
 
         // Sarah Chen (CTO) — a closed record and a currently-open one, so both the
         // Active/Closed status badge and the fit-note evidence badge can be seen
@@ -138,7 +146,7 @@ public static class SicknessModule
 
         var closedRecord = SicknessRecord.Create(
             Guid.Parse("71000000-0000-0000-0000-000000000001"),
-            acmeId, sarahId, coldFluId,
+            acmeId, sarahId, illnessId,
             new DateOnly(2026, 5, 4), SicknessDayPart.FullDay,
             new DateOnly(2026, 5, 6), SicknessDayPart.FullDay,
             totalDays: 3m,
@@ -150,7 +158,7 @@ public static class SicknessModule
         var openStartDate = DateOnly.FromDateTime(now.UtcDateTime.AddDays(-10));
         var openRecord = SicknessRecord.Create(
             Guid.Parse("71000000-0000-0000-0000-000000000002"),
-            acmeId, sarahId, backPainId,
+            acmeId, sarahId, injuryId,
             openStartDate, SicknessDayPart.FullDay,
             endDate: null, endDayPart: null,
             totalDays: null,

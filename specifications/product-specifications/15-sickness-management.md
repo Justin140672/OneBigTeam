@@ -69,7 +69,14 @@ Return-to-work checks are triggered after a configurable threshold.
 
 Default:
 
-- 3 working days
+- 1 working day
+
+The threshold is evaluated against the sickness record's working-day `TotalDays` total (i.e. the
+employee's own working pattern, excluding non-working days and, if the company opts in, public
+holidays) — not calendar days. This is a deliberately different basis from the fit-note threshold
+above, which is evaluated in calendar days. See
+`00-current-product-decisions.md` ("Sickness management") for the confirmed decision and rationale
+(SICK-05, superseding an earlier "3 working days" draft of this document).
 
 Return-to-work checks capture:
 
