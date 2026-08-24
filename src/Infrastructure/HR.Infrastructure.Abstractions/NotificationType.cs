@@ -40,4 +40,6 @@ public enum NotificationType
     IncompleteOffboardingAtDeparture              = 36,
     SupportRequestStatusChanged                   = 37,
     ProbationExtended                             = 38,
+    ProbationReviewDue                            = 39,
+    ProbationOutcomeRecorded                      = 40,
 }

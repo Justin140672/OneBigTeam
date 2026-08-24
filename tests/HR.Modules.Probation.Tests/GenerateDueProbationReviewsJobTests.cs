@@ -343,6 +343,145 @@ public class GenerateDueProbationReviewsJobTests
         Assert.Equal(new DateOnly(2026, 1, 15), reviews[0].DueDate);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_HrReview_Task_Assigned_To_Hr_Admin_Not_Manager_When_Single_Admin()
+    {
+        await using var context = BuildContext();
+        var managerId = Guid.NewGuid();
+        var hrAdminId = Guid.NewGuid();
+        var record = await SeedActiveRecord(context, managerEmployeeId: managerId);
+
+        var hrAdministratorDirectory = new FakeHrAdministratorDirectory();
+        hrAdministratorDirectory.Seed(record.CompanyId, hrAdminId);
+
+        var taskCreator = new FakeTaskCreator();
+        // Mar 15: ManagerCheckIn (Jan 31) and HrReview (Mar 2) both due.
+        await BuildJob(
+            context,
+            today: new DateTime(2026, 3, 15, 0, 0, 0, DateTimeKind.Utc),
+            taskCreator: taskCreator,
+            hrAdministratorDirectory: hrAdministratorDirectory).ExecuteAsync();
+
+        var hrReview = await context.ProbationReviews.SingleAsync(r => r.ReviewType == ProbationReviewType.HrReview);
+        var hrReviewTask = taskCreator.Created.Single(t => t.SourceEntityId == hrReview.Id);
+
+        Assert.Equal(hrAdminId, hrReviewTask.AssignedEmployeeId);
+        Assert.NotEqual(managerId, hrReviewTask.AssignedEmployeeId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_HrReview_Task_Assignee_Is_Deterministic_And_All_Hr_Admins_Notified_When_Multiple_Admins()
+    {
+        await using var context = BuildContext();
+        var record = await SeedActiveRecord(context);
+
+        var lowest = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var higher = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
+        var middle = Guid.Parse("77777777-7777-7777-7777-777777777777");
+
+        var hrAdministratorDirectory = new FakeHrAdministratorDirectory();
+        hrAdministratorDirectory.Seed(record.CompanyId, higher, lowest, middle);
+
+        var taskCreator = new FakeTaskCreator();
+        var notificationWriter = new FakeNotificationWriter();
+        await BuildJob(
+            context,
+            today: new DateTime(2026, 3, 15, 0, 0, 0, DateTimeKind.Utc),
+            taskCreator: taskCreator,
+            hrAdministratorDirectory: hrAdministratorDirectory,
+            notificationWriter: notificationWriter).ExecuteAsync();
+
+        var hrReview = await context.ProbationReviews.SingleAsync(r => r.ReviewType == ProbationReviewType.HrReview);
+        var hrReviewTask = taskCreator.Created.Single(t => t.SourceEntityId == hrReview.Id);
+        Assert.Equal(lowest, hrReviewTask.AssignedEmployeeId);
+
+        var hrReviewNotifications = notificationWriter.Written
+            .Where(n => n.SourceEntityId == hrReview.Id && n.Type == NotificationType.ProbationReviewDue)
+            .ToList();
+        Assert.Equal(3, hrReviewNotifications.Count);
+        Assert.Contains(hrReviewNotifications, n => n.EmployeeId == lowest);
+        Assert.Contains(hrReviewNotifications, n => n.EmployeeId == higher);
+        Assert.Contains(hrReviewNotifications, n => n.EmployeeId == middle);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ManagerCheckIn_Task_And_Notification_Go_To_Current_Manager()
+    {
+        await using var context = BuildContext();
+        var managerId = Guid.NewGuid();
+        var record = await SeedActiveRecord(context, managerEmployeeId: managerId);
+
+        var taskCreator = new FakeTaskCreator();
+        var notificationWriter = new FakeNotificationWriter();
+        await BuildJob(
+            context,
+            today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
+            taskCreator: taskCreator,
+            notificationWriter: notificationWriter).ExecuteAsync();
+
+        var review = await context.ProbationReviews.SingleAsync();
+        var task = Assert.Single(taskCreator.Created);
+        Assert.Equal(managerId, task.AssignedEmployeeId);
+
+        var notification = Assert.Single(notificationWriter.Written.Where(n => n.SourceEntityId == review.Id));
+        Assert.Equal(managerId, notification.EmployeeId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_HrReview_With_No_Hr_Admins_Creates_Task_With_Null_Assignee_And_No_Notification_But_Does_Not_Crash()
+    {
+        await using var context = BuildContext();
+        var record = await SeedActiveRecord(context);
+
+        var taskCreator = new FakeTaskCreator();
+        var notificationWriter = new FakeNotificationWriter();
+        // Mar 15: ManagerCheckIn and HrReview both due; no HR admins configured (default empty).
+        var exception = await Record.ExceptionAsync(() => BuildJob(
+            context,
+            today: new DateTime(2026, 3, 15, 0, 0, 0, DateTimeKind.Utc),
+            taskCreator: taskCreator,
+            notificationWriter: notificationWriter).ExecuteAsync());
+
+        Assert.Null(exception);
+
+        var hrReview = await context.ProbationReviews.SingleAsync(r => r.ReviewType == ProbationReviewType.HrReview);
+        var hrReviewTask = taskCreator.Created.Single(t => t.SourceEntityId == hrReview.Id);
+        Assert.Null(hrReviewTask.AssignedEmployeeId);
+        Assert.Empty(notificationWriter.Written.Where(n => n.SourceEntityId == hrReview.Id));
+
+        // The ManagerCheckIn review for the same record is still created and notified normally.
+        var managerCheckInReview = await context.ProbationReviews
+            .SingleAsync(r => r.ReviewType == ProbationReviewType.ManagerCheckIn);
+        Assert.Contains(taskCreator.Created, t => t.SourceEntityId == managerCheckInReview.Id);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Running_Job_Twice_Does_Not_Create_Duplicate_ReviewDue_Notifications()
+    {
+        await using var context = BuildContext();
+        var managerId = Guid.NewGuid();
+        await SeedActiveRecord(context, managerEmployeeId: managerId);
+
+        var notificationWriter = new FakeNotificationWriter();
+
+        await BuildJob(
+            context,
+            today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
+            notificationWriter: notificationWriter).ExecuteAsync();
+
+        var notificationCountAfterFirst = notificationWriter.Written.Count;
+        Assert.Equal(1, notificationCountAfterFirst);
+
+        // Second run over the same day: no new reviews are due (guarded by the "duplicate pending
+        // review" check), so re-running should not add any further notifications either.
+        await BuildJob(
+            context,
+            today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
+            notificationWriter: notificationWriter).ExecuteAsync();
+
+        Assert.Equal(notificationCountAfterFirst, notificationWriter.Written.Count);
+    }
+
     private async Task<ProbationRecord> SeedActiveRecord(
         ProbationDbContext context,
         Guid? employeeId = null,
@@ -364,13 +503,17 @@ public class GenerateDueProbationReviewsJobTests
         FakeTaskCreator? taskCreator = null,
         FakeEmployeeNameReader? employeeNameReader = null,
         FakeCompanyTimeZoneReader? companyTimeZoneReader = null,
-        FakeCompanyProbationSettingsReader? companyProbationSettingsReader = null) =>
+        FakeCompanyProbationSettingsReader? companyProbationSettingsReader = null,
+        FakeHrAdministratorDirectory? hrAdministratorDirectory = null,
+        FakeNotificationWriter? notificationWriter = null) =>
         new(context,
             new FakeClock(today),
             companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
             companyProbationSettingsReader ?? new FakeCompanyProbationSettingsReader(),
             taskCreator ?? new FakeTaskCreator(),
             employeeNameReader ?? new FakeEmployeeNameReader(),
+            hrAdministratorDirectory ?? new FakeHrAdministratorDirectory(),
+            notificationWriter ?? new FakeNotificationWriter(),
             NullLogger<GenerateDueProbationReviewsJob>.Instance);
 
     private static ProbationDbContext BuildContext() =>

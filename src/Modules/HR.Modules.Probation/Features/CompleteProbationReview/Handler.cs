@@ -2,6 +2,7 @@ using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Services;
 using HR.SharedKernel;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Features.CompleteProbationReview;
@@ -13,19 +14,22 @@ internal sealed class CompleteProbationReviewHandler
     private readonly IAuditEventPublisher _auditPublisher;
     private readonly IIntegrationEventPublisher _integrationEventPublisher;
     private readonly ProbationExtensionService _extensionService;
+    private readonly INotificationWriter _notificationWriter;
 
     public CompleteProbationReviewHandler(
         ProbationDbContext dbContext,
         IClock clock,
         IAuditEventPublisher auditPublisher,
         IIntegrationEventPublisher integrationEventPublisher,
-        ProbationExtensionService extensionService)
+        ProbationExtensionService extensionService,
+        INotificationWriter notificationWriter)
     {
         _dbContext = dbContext;
         _clock = clock;
         _auditPublisher = auditPublisher;
         _integrationEventPublisher = integrationEventPublisher;
         _extensionService = extensionService;
+        _notificationWriter = notificationWriter;
     }
 
     public async Task<Result<CompleteProbationReviewResponse>> HandleAsync(
@@ -121,6 +125,15 @@ internal sealed class CompleteProbationReviewHandler
             await _integrationEventPublisher.PublishAsync(
                 new ProbationPassedIntegrationEvent(record.CompanyId, record.EmployeeId, record.Id, now),
                 cancellationToken);
+        }
+
+        // PROB-04: notify the employee when a Pass/Fail outcome is recorded. Extend is handled
+        // separately by ProbationExtensionService.ApplyAsync (called above), which already sends
+        // its own "probation extended" notification — sending another one here would duplicate it.
+        if (request.Outcome is ProbationOutcome.Pass or ProbationOutcome.Fail)
+        {
+            await ProbationOutcomeNotifier.NotifyAsync(
+                _notificationWriter, record, review, now, cancellationToken);
         }
 
         return Result.Success(new CompleteProbationReviewResponse(

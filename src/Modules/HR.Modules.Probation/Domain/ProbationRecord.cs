@@ -72,6 +72,18 @@ internal sealed class ProbationRecord
         UpdatedAt = now;
     }
 
+    /// <summary>
+    /// PROB-04: applies a manager change originating from the Employees module
+    /// (<c>EmployeeManagerChangedIntegrationEvent</c>) so that ManagerCheckIn/FinalDecision/
+    /// ExtensionConfirmation tasks created after this point resolve to the employee's current
+    /// responsible manager rather than whoever was recorded at probation-record creation time.
+    /// </summary>
+    public void ChangeManager(Guid newManagerEmployeeId, DateTimeOffset now)
+    {
+        ManagerEmployeeId = newManagerEmployeeId;
+        UpdatedAt = now;
+    }
+
     public void Extend(
         DateOnly newExpectedEndDate,
         string extensionReason,

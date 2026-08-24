@@ -13,7 +13,8 @@ internal sealed class CompleteProbationReviewFromTaskAction(
     IClock clock,
     IAuditEventPublisher auditPublisher,
     IIntegrationEventPublisher integrationEventPublisher,
-    ProbationExtensionService extensionService) : ITaskCompletionAction
+    ProbationExtensionService extensionService,
+    INotificationWriter notificationWriter) : ITaskCompletionAction
 {
     public TaskSource Source => TaskSource.Probation;
     public TaskActionType ActionType => TaskActionType.Review;
@@ -84,6 +85,15 @@ internal sealed class CompleteProbationReviewFromTaskAction(
             await integrationEventPublisher.PublishAsync(
                 new ProbationPassedIntegrationEvent(record.CompanyId, record.EmployeeId, record.Id, now),
                 cancellationToken);
+        }
+
+        // PROB-04: same employee-facing "outcome recorded" notification as the direct API path.
+        // Extend is handled separately by extensionService.ApplyAsync above, which sends its own
+        // notification.
+        if (outcome is ProbationOutcome.Pass or ProbationOutcome.Fail)
+        {
+            await ProbationOutcomeNotifier.NotifyAsync(
+                notificationWriter, record, review, now, cancellationToken);
         }
     }
 

@@ -3,6 +3,7 @@ using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Services;
@@ -34,7 +35,9 @@ internal sealed class ProbationReviewRecalculationService(
     ProbationDbContext dbContext,
     ITaskCreator taskCreator,
     ITaskCanceller taskCanceller,
-    IEmployeeNameReader employeeNameReader)
+    IEmployeeNameReader employeeNameReader,
+    IHrAdministratorDirectory hrAdministratorDirectory,
+    INotificationWriter notificationWriter)
 {
     private static readonly ProbationReviewType[] RecalculatedTypes =
     [
@@ -84,8 +87,14 @@ internal sealed class ProbationReviewRecalculationService(
         var names = await employeeNameReader.GetNamesAsync(record.CompanyId, [record.EmployeeId], cancellationToken);
         var employeeName = names.GetValueOrDefault(record.EmployeeId, "Unknown Employee");
 
+        var hrAdministratorIds = await hrAdministratorDirectory.GetHrAdministratorEmployeeIdsAsync(
+            record.CompanyId, cancellationToken);
+
         foreach (var review in newReviews)
         {
+            var assigneeId = ProbationReviewAssignment.ResolveTaskAssignee(
+                record, review.ReviewType, hrAdministratorIds);
+
             await taskCreator.CreateAsync(
                 record.CompanyId,
                 record.ManagerEmployeeId,
@@ -95,11 +104,57 @@ internal sealed class ProbationReviewRecalculationService(
                 TaskSource.Probation,
                 TaskActionType.Review,
                 review.DueDate,
-                assignedEmployeeId: record.ManagerEmployeeId,
-                assignedUserId: record.ManagerEmployeeId,
+                assignedEmployeeId: assigneeId,
+                assignedUserId: assigneeId,
                 sourceEntityId: review.Id,
                 cancellationToken,
                 notifyAssignee: false);
+
+            await NotifyReviewDueAsync(record, review, employeeName, hrAdministratorIds, now, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Same idempotent "review due" notification pattern used by GenerateDueProbationReviewsJob —
+    /// duplicated in each caller rather than sharing a service because the two paths run in
+    /// different transactional contexts (job batch vs. inline recalculation) and shipping a review
+    /// due notification for a review created seconds ago is intentional here (recalculation
+    /// replaces a still-open review with an immediate replacement, so the audience should learn
+    /// about the new due date immediately rather than waiting for the next daily job run).
+    /// </summary>
+    private async Task NotifyReviewDueAsync(
+        ProbationRecord record,
+        ProbationReview review,
+        string employeeName,
+        IReadOnlyList<Guid> hrAdministratorIds,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var recipients = ProbationReviewAssignment.ResolveNotificationRecipients(
+            record, review.ReviewType, hrAdministratorIds);
+
+        var title = $"Probation {ReviewTypeLabel(review.ReviewType)} due — {employeeName}";
+        var body = $"Probation {ReviewTypeLabel(review.ReviewType)} for {employeeName} is due {review.DueDate:d MMM yyyy} (rescheduled).";
+
+        foreach (var recipientId in recipients)
+        {
+            var alreadySent = await notificationWriter.ExistsAsync(
+                recipientId, review.Id, NotificationType.ProbationReviewDue, cancellationToken);
+
+            if (alreadySent)
+                continue;
+
+            await notificationWriter.WriteAsync(
+                Guid.NewGuid(),
+                record.CompanyId,
+                recipientId,
+                title,
+                body,
+                review.Id,
+                NotificationType.ProbationReviewDue,
+                NotificationPriority.High,
+                now,
+                cancellationToken);
         }
     }
 

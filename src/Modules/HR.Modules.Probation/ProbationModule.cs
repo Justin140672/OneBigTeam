@@ -5,6 +5,7 @@ using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Features.CompleteProbationReview;
 using HR.Modules.Probation.Features.CompleteProbationReviewFromTask;
 using HR.Modules.Probation.Features.CreateProbationOnEmployeeCreated;
+using HR.Modules.Probation.Features.ReassignReviewsOnManagerChanged;
 using HR.Modules.Probation.Features.CreateProbationRecord;
 using HR.Modules.Probation.Features.CreateProbationReview;
 using HR.Modules.Probation.Features.GetProbationRecord;
@@ -68,6 +69,7 @@ public static class ProbationModule
         services.AddScoped<IProbationSummaryReader, ProbationSummaryReader>();
         services.AddScoped<IProbationStatusReader, ProbationStatusReader>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeManagerChangedIntegrationEvent>, ManagerChangedHandler>();
         services.AddScoped<GenerateDueProbationReviewsJob>();
         services.AddScoped<IProbationHistoryReplayer, ProbationHistoryReplayer>();
         services.AddScoped<IProbationReportReader, ProbationReportReader>();

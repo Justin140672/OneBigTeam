@@ -29,7 +29,8 @@ public class UpdateProbationRecordHandlerTests
             context,
             new FakeClock(FixedUtcNow),
             new ProbationReviewRecalculationService(
-                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader()),
+                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
             new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
@@ -66,7 +67,8 @@ public class UpdateProbationRecordHandlerTests
             context,
             new FakeClock(FixedUtcNow),
             new ProbationReviewRecalculationService(
-                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader()),
+                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
             new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
@@ -103,7 +105,8 @@ public class UpdateProbationRecordHandlerTests
             context,
             new FakeClock(FixedUtcNow),
             new ProbationReviewRecalculationService(
-                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader()),
+                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
             new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
@@ -133,7 +136,8 @@ public class UpdateProbationRecordHandlerTests
             context,
             new FakeClock(FixedUtcNow),
             new ProbationReviewRecalculationService(
-                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader()),
+                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
             new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
@@ -167,7 +171,8 @@ public class UpdateProbationRecordHandlerTests
             context,
             new FakeClock(FixedUtcNow),
             new ProbationReviewRecalculationService(
-                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader()),
+                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
             new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
@@ -207,7 +212,8 @@ public class UpdateProbationRecordHandlerTests
             context,
             new FakeClock(FixedUtcNow),
             new ProbationReviewRecalculationService(
-                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader()),
+                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
             new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
@@ -254,7 +260,8 @@ public class UpdateProbationRecordHandlerTests
             context,
             new FakeClock(FixedUtcNow),
             new ProbationReviewRecalculationService(
-                context, taskCreator, new FakeTaskCanceller(), new FakeEmployeeNameReader()),
+                context, taskCreator, new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
             new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest

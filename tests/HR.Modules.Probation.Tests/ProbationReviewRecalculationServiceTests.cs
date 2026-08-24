@@ -3,6 +3,7 @@ using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Services;
 using HR.Modules.Probation.Tests.Infrastructure;
 using HR.Modules.Tasks.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Tests;
@@ -114,19 +115,28 @@ public class ProbationReviewRecalculationServiceTests
         UpdateExpectedEndDate(record, new DateOnly(2026, 6, 1));
         await context.SaveChangesAsync();
 
+        var hrAdminId = Guid.NewGuid();
+        var hrAdministratorDirectory = new FakeHrAdministratorDirectory();
+        hrAdministratorDirectory.Seed(record.CompanyId, hrAdminId);
+
         var taskCreator = new FakeTaskCreator();
         var taskCanceller = new FakeTaskCanceller();
         var service = new ProbationReviewRecalculationService(
-            context, taskCreator, taskCanceller, new FakeEmployeeNameReader());
+            context, taskCreator, taskCanceller, new FakeEmployeeNameReader(),
+            hrAdministratorDirectory, new FakeNotificationWriter());
 
         await service.RecalculateAsync(record, [30, 60, 90], RecalcNow, CancellationToken.None);
 
         Assert.Equal(3, taskCreator.Created.Count);
-        Assert.All(taskCreator.Created, t =>
-        {
-            Assert.Equal(record.ManagerEmployeeId, t.AssignedEmployeeId);
-            Assert.False(t.NotifyAssignee);
-        });
+        Assert.All(taskCreator.Created, t => Assert.False(t.NotifyAssignee));
+
+        var newHrReview = await context.ProbationReviews
+            .SingleAsync(r => r.ReviewType == ProbationReviewType.HrReview && r.Status == ProbationReviewStatus.Pending);
+        var hrReviewTask = taskCreator.Created.Single(t => t.SourceEntityId == newHrReview.Id);
+        Assert.Equal(hrAdminId, hrReviewTask.AssignedEmployeeId);
+
+        var nonHrTasks = taskCreator.Created.Where(t => t.SourceEntityId != newHrReview.Id);
+        Assert.All(nonHrTasks, t => Assert.Equal(record.ManagerEmployeeId, t.AssignedEmployeeId));
 
         Assert.Equal(3, taskCanceller.Calls.Count);
         var cancelledSourceIds = taskCanceller.Calls.Select(c => c.SourceEntityId).ToList();
@@ -172,6 +182,68 @@ public class ProbationReviewRecalculationServiceTests
             r => r.ReviewType == ProbationReviewType.HrReview && r.Status == ProbationReviewStatus.Pending);
     }
 
+    [Fact]
+    public async Task RecalculateAsync_HrReview_Task_Assigned_To_Hr_Admin_Not_Manager()
+    {
+        await using var context = BuildContext();
+        var record = await SeedRecord(context, expectedEndDate: new DateOnly(2026, 4, 1));
+
+        var oldHrReview = ProbationReview.Create(
+            Guid.NewGuid(), record.CompanyId, record.Id,
+            ProbationReviewType.HrReview, StartDate.AddDays(60), SeedNow);
+        context.ProbationReviews.Add(oldHrReview);
+        await context.SaveChangesAsync();
+
+        UpdateExpectedEndDate(record, new DateOnly(2026, 6, 1));
+        await context.SaveChangesAsync();
+
+        var hrAdminId = Guid.NewGuid();
+        var hrAdministratorDirectory = new FakeHrAdministratorDirectory();
+        hrAdministratorDirectory.Seed(record.CompanyId, hrAdminId);
+
+        var taskCreator = new FakeTaskCreator();
+        var service = new ProbationReviewRecalculationService(
+            context, taskCreator, new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+            hrAdministratorDirectory, new FakeNotificationWriter());
+
+        await service.RecalculateAsync(record, [30, 60, 90], RecalcNow, CancellationToken.None);
+
+        var newHrReview = await context.ProbationReviews
+            .SingleAsync(r => r.ReviewType == ProbationReviewType.HrReview && r.Status == ProbationReviewStatus.Pending);
+        var hrReviewTask = taskCreator.Created.Single(t => t.SourceEntityId == newHrReview.Id);
+
+        Assert.Equal(hrAdminId, hrReviewTask.AssignedEmployeeId);
+        Assert.NotEqual(record.ManagerEmployeeId, hrReviewTask.AssignedEmployeeId);
+    }
+
+    [Fact]
+    public async Task RecalculateAsync_Sends_ReviewDue_Notification_For_Each_New_Review()
+    {
+        await using var context = BuildContext();
+        var record = await SeedRecord(context, expectedEndDate: new DateOnly(2026, 4, 1));
+
+        UpdateExpectedEndDate(record, new DateOnly(2026, 6, 1));
+        await context.SaveChangesAsync();
+
+        var hrAdministratorDirectory = new FakeHrAdministratorDirectory();
+        hrAdministratorDirectory.Seed(record.CompanyId, Guid.NewGuid());
+        var notificationWriter = new FakeNotificationWriter();
+        var service = BuildService(context, hrAdministratorDirectory, notificationWriter);
+
+        await service.RecalculateAsync(record, [30, 60, 90], RecalcNow, CancellationToken.None);
+
+        var pendingReviews = await context.ProbationReviews
+            .Where(r => r.Status == ProbationReviewStatus.Pending)
+            .ToListAsync();
+
+        foreach (var review in pendingReviews)
+        {
+            Assert.Contains(
+                notificationWriter.Written,
+                n => n.SourceEntityId == review.Id && n.Type == NotificationType.ProbationReviewDue);
+        }
+    }
+
     private static void UpdateExpectedEndDate(ProbationRecord record, DateOnly expectedEndDate) =>
         record.Update(
             record.ManagerEmployeeId,
@@ -184,8 +256,13 @@ public class ProbationReviewRecalculationServiceTests
             record.OutcomeNotes,
             RecalcNow);
 
-    private static ProbationReviewRecalculationService BuildService(ProbationDbContext context) =>
-        new(context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader());
+    private static ProbationReviewRecalculationService BuildService(
+        ProbationDbContext context,
+        FakeHrAdministratorDirectory? hrAdministratorDirectory = null,
+        FakeNotificationWriter? notificationWriter = null) =>
+        new(context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+            hrAdministratorDirectory ?? new FakeHrAdministratorDirectory(),
+            notificationWriter ?? new FakeNotificationWriter());
 
     private static async Task<ProbationRecord> SeedRecord(
         ProbationDbContext context, DateOnly expectedEndDate)

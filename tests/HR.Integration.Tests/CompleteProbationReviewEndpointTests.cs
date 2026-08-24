@@ -20,6 +20,7 @@ public class CompleteProbationReviewEndpointTests
     private static readonly Guid User8 = new("aaaaaaaa-0000-0000-0000-000000000008");
     private static readonly Guid User9 = new("aaaaaaaa-0000-0000-0000-000000000009");
     private static readonly Guid User10 = new("aaaaaaaa-0000-0000-0000-000000000010");
+    private static readonly Guid User11 = new("aaaaaaaa-0000-0000-0000-000000000011");
 
     public CompleteProbationReviewEndpointTests(ApiWebApplicationFactory factory)
     {
@@ -37,6 +38,7 @@ public class CompleteProbationReviewEndpointTests
             await TestRoleSeeder.AssignRoleAsync(factory, User8, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, User9, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, User10, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User11, SystemRoles.HrAdministrator);
         }).GetAwaiter().GetResult();
     }
 
@@ -152,6 +154,47 @@ public class CompleteProbationReviewEndpointTests
         var record = await GetRecord(client, companyId, recordId);
         Assert.Equal("Failed", record.Status);
         Assert.Equal(completedBy, record.DecisionMakerEmployeeId);
+    }
+
+    [Fact]
+    public async Task Post_Complete_FinalDecision_With_Pass_Notifies_Employee()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User11.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User11, SystemRoles.HrAdministrator, companyId);
+
+        var (recordId, reviewId) = await CreateRecordAndReview(client, companyId, "FinalDecision", employeeId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{recordId}/reviews/{reviewId}/complete",
+            new
+            {
+                companyId,
+                probationRecordId = recordId,
+                reviewId,
+                completedByEmployeeId = completedBy,
+                notes = "Excellent work.",
+                outcome = "Pass",
+                decisionDate = "2026-09-01"
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var employeeClient = _factory.CreateClient();
+        employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
+        employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
+
+        var notifResponse = await employeeClient.GetAsync($"/api/companies/{companyId}/notifications/my");
+        Assert.Equal(HttpStatusCode.OK, notifResponse.StatusCode);
+
+        var payload = await notifResponse.Content.ReadFromJsonAsync<NotifListPayload>();
+        Assert.NotNull(payload);
+        Assert.Contains(payload!.Items, n => n.Type == "ProbationOutcomeRecorded");
     }
 
     [Fact]
@@ -390,12 +433,13 @@ public class CompleteProbationReviewEndpointTests
     private async Task<(Guid recordId, Guid reviewId)> CreateRecordAndReview(
         HttpClient client,
         Guid companyId,
-        string reviewType)
+        string reviewType,
+        Guid? employeeId = null)
     {
         var recordResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
         {
             companyId,
-            employeeId = Guid.NewGuid(),
+            employeeId = employeeId ?? Guid.NewGuid(),
             managerEmployeeId = Guid.NewGuid(),
             startDate = "2026-06-01",
             expectedEndDate = "2026-09-01"
@@ -446,4 +490,7 @@ public class CompleteProbationReviewEndpointTests
         Guid? CompletedByEmployeeId,
         string? Outcome,
         string? Notes);
+
+    private sealed record NotifListPayload(int UnreadCount, IReadOnlyList<NotifItem> Items);
+    private sealed record NotifItem(Guid Id, string Title, bool IsRead, string Type);
 }
