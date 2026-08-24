@@ -64,6 +64,7 @@ public static class SicknessModule
         services.AddScoped<GetMissingFitNotesHandler>();
         services.AddScoped<GetReturnToWorkReviewHandler>();
         services.AddScoped<GetMySicknessRecordsHandler>();
+        services.AddScoped<Services.FitNoteEvidenceRequestService>();
         services.AddScoped<FitNoteRequestJob>();
         services.AddScoped<SicknessEvidenceReminderJob>();
         services.AddScoped<ReturnToWorkReminderJob>();

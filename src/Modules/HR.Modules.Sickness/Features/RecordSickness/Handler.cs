@@ -1,5 +1,6 @@
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Persistence;
+using HR.Modules.Sickness.Services;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
@@ -17,7 +18,8 @@ internal sealed class RecordSicknessHandler(
     IAuditEventPublisher auditPublisher,
     IManagerReader managerReader,
     IEmployeeNameReader employeeNameReader,
-    INotificationWriter notificationWriter)
+    INotificationWriter notificationWriter,
+    FitNoteEvidenceRequestService fitNoteEvidenceRequestService)
 {
     public async Task<Result<RecordSicknessResponse>> HandleAsync(
         RecordSicknessRequest request,
@@ -59,7 +61,8 @@ internal sealed class RecordSicknessHandler(
                 workingPattern, publicHolidays);
         }
 
-        var evidenceStatus = FitNoteEvaluator.EvaluateOnCreate(sicknessSettings.FitNoteRequiredAfterDays, totalDays);
+        var evidenceStatus = FitNoteEvaluator.EvaluateOnCreate(
+            sicknessSettings.FitNoteRequiredAfterDays, request.StartDate, request.EndDate);
 
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
         var entity = SicknessRecord.Create(
@@ -78,6 +81,15 @@ internal sealed class RecordSicknessHandler(
 
         db.SicknessRecords.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
+
+        // One-time evaluation at creation time (SICK-01) — catches an absence that is already at or
+        // over the fit-note threshold when recorded (e.g. a backdated ongoing absence, or a closed
+        // absence entered/imported after the fact) instead of waiting for the next daily
+        // FitNoteRequestJob run. For an ongoing absence the evaluation date is today; for one
+        // recorded already closed, it's the absence's own end date.
+        var fitNoteEvaluationDate = entity.EndDate ?? DateOnly.FromDateTime(now.UtcDateTime);
+        await fitNoteEvidenceRequestService.RequestIfEligibleAsync(
+            entity, sicknessSettings.FitNoteRequiredAfterDays, fitNoteEvaluationDate, now, cancellationToken);
 
         var managerId = await managerReader.GetManagerIdAsync(entity.CompanyId, entity.EmployeeId, cancellationToken);
         if (managerId.HasValue)

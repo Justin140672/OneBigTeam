@@ -93,18 +93,20 @@ public class FitNoteRequestCreatesTaskTests
     }
 
     [Fact]
-    public async Task FitNoteRequestJob_Does_Not_Create_Task_When_TotalDays_Below_Threshold()
+    public async Task FitNoteRequestJob_Does_Not_Create_Task_When_CalendarDaysElapsed_Below_Threshold()
     {
+        // SICK-01: the threshold is evaluated in calendar days elapsed since StartDate, not the
+        // TotalDays (working-day) total — see FitNoteEvaluator. StartDate = 2 days before "today"
+        // → 3 calendar days elapsed (inclusive), which is below a threshold of 5.
         var (companyAdminClient, hrClient, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
         using var _1 = companyAdminClient;
         using var _2 = hrClient;
 
-        // Threshold is 5 but TotalDays will be 1
         await SetFitNoteThresholdAsync(hrClient, companyId, fitNoteRequiredAfterDays: 5);
         var employeeId = await CreateEmployeeAsync(hrClient, companyId);
         var categoryId = await CreateSicknessCategoryAsync(hrClient, companyId);
-        await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId);
-        await SetSicknessRecordTotalDaysAsync(companyId, employeeId, totalDays: 1m);
+        var startDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-2);
+        await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId, startDate);
 
         await RunFitNoteRequestJobAsync();
 
@@ -131,6 +133,32 @@ public class FitNoteRequestCreatesTaskTests
         var task       = Assert.Single(tasks);
         var expectedDue = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7);
         Assert.Equal(expectedDue, task.DueDate);
+    }
+
+    [Fact]
+    public async Task CloseSicknessRecord_Creates_Upload_Task_Immediately_When_ClosedSpanMeetsThreshold()
+    {
+        // SICK-01: closing a record whose calendar-day span already meets the fit-note threshold
+        // must create the evidence request (and downstream Upload task) immediately at close time —
+        // it must not require a subsequent FitNoteRequestJob run to catch it.
+        var (companyAdminClient, hrClient, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
+        using var _1 = companyAdminClient;
+        using var _2 = hrClient;
+
+        await SetFitNoteThresholdAsync(hrClient, companyId, fitNoteRequiredAfterDays: 3);
+        var employeeId = await CreateEmployeeAsync(hrClient, companyId);
+        var categoryId = await CreateSicknessCategoryAsync(hrClient, companyId);
+
+        var startDate = new DateOnly(2026, 6, 1);
+        var endDate = new DateOnly(2026, 6, 10); // 10 calendar days elapsed, threshold 3 → met
+        var recordId = await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId, startDate);
+        await CloseSicknessRecordAsync(hrClient, companyId, employeeId, recordId, startDate, endDate);
+
+        // No FitNoteRequestJob run — the handler itself must have created the request/task.
+        var tasks = await GetSicknessTasksForEmployeeAsync(hrClient, companyId, employeeId);
+        var fitNoteTask = Assert.Single(tasks);
+        Assert.Equal("Upload fit note", fitNoteTask.Title);
+        Assert.Equal(endDate.AddDays(7), fitNoteTask.DueDate);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -268,7 +296,8 @@ public class FitNoteRequestCreatesTaskTests
         return (await resp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }
 
-    private async Task CreateSicknessRecordAsync(HttpClient client, Guid companyId, Guid employeeId, Guid categoryId)
+    private async Task<Guid> CreateSicknessRecordAsync(
+        HttpClient client, Guid companyId, Guid employeeId, Guid categoryId, DateOnly? startDate = null)
     {
         var resp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records",
@@ -277,8 +306,25 @@ public class FitNoteRequestCreatesTaskTests
                 companyId,
                 employeeId,
                 categoryId,
-                startDate    = "2026-06-20",
+                startDate    = (startDate ?? new DateOnly(2026, 6, 20)).ToString("yyyy-MM-dd"),
                 startDayPart = "FullDay"
+            });
+        resp.EnsureSuccessStatusCode();
+        return (await resp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+    }
+
+    private async Task CloseSicknessRecordAsync(
+        HttpClient client, Guid companyId, Guid employeeId, Guid recordId, DateOnly startDate, DateOnly endDate)
+    {
+        var resp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/{recordId}/close",
+            new
+            {
+                companyId,
+                employeeId,
+                id           = recordId,
+                endDate      = endDate.ToString("yyyy-MM-dd"),
+                endDayPart   = "FullDay"
             });
         resp.EnsureSuccessStatusCode();
     }

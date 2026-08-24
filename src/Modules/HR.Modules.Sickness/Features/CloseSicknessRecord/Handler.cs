@@ -1,5 +1,6 @@
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Persistence;
+using HR.Modules.Sickness.Services;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Contracts;
 using HR.Modules.Employees.Contracts;
@@ -15,7 +16,8 @@ internal sealed class CloseSicknessRecordHandler(
     ICompanySicknessSettingsReader sicknessSettingsReader,
     IPublicHolidayReader publicHolidayReader,
     IAuditEventPublisher auditPublisher,
-    IIntegrationEventPublisher eventPublisher)
+    IIntegrationEventPublisher eventPublisher,
+    FitNoteEvidenceRequestService fitNoteEvidenceRequestService)
 {
     public async Task<Result<CloseSicknessRecordResponse>> HandleAsync(
         CloseSicknessRecordRequest request,
@@ -59,7 +61,8 @@ internal sealed class CloseSicknessRecordHandler(
         var updatedEvidenceStatus = FitNoteEvaluator.EvaluateOnClose(
             record.EvidenceStatus,
             sicknessSettings.FitNoteRequiredAfterDays,
-            totalDays);
+            record.StartDate,
+            request.EndDate);
 
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
 
@@ -106,6 +109,13 @@ internal sealed class CloseSicknessRecordHandler(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // One-time evaluation at close time (SICK-01) — an absence that already reached the
+        // fit-note threshold by the time it was closed (including one closed before the daily
+        // FitNoteRequestJob last ran) gets its evidence request immediately rather than waiting for
+        // the next job run.
+        await fitNoteEvidenceRequestService.RequestIfEligibleAsync(
+            record, sicknessSettings.FitNoteRequiredAfterDays, request.EndDate, now, cancellationToken);
 
         await auditPublisher.PublishAsync(new SicknessClosedAuditEvent(
             record.CompanyId,

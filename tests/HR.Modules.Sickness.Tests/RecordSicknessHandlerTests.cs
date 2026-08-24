@@ -1,6 +1,7 @@
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Features.RecordSickness;
 using HR.Modules.Sickness.Persistence;
+using HR.Modules.Sickness.Services;
 using HR.Modules.Sickness.Tests.Infrastructure;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
@@ -40,16 +41,25 @@ public class RecordSicknessHandlerTests
         int fitNoteRequiredAfterDays = 7,
         FakeManagerReader? managerReader = null,
         FakeEmployeeNameReader? employeeNameReader = null,
-        FakeNotificationWriter? notificationWriter = null) =>
-        new(db,
+        FakeNotificationWriter? notificationWriter = null,
+        FakeIntegrationEventPublisher? eventPublisher = null)
+    {
+        var resolvedAuditPublisher = auditPublisher ?? new FakeAuditEventPublisher();
+        return new RecordSicknessHandler(
+            db,
             new FakeClock(FixedUtcNow),
             new FakeWorkingPatternProvider(pattern ?? DefaultPattern),
             new FakeCompanySicknessSettingsReader(excludePublicHolidays, fitNoteRequiredAfterDays),
             new FakePublicHolidayReader(publicHolidays),
-            auditPublisher ?? new FakeAuditEventPublisher(),
+            resolvedAuditPublisher,
             managerReader ?? new FakeManagerReader(),
             employeeNameReader ?? new FakeEmployeeNameReader(),
-            notificationWriter ?? new FakeNotificationWriter());
+            notificationWriter ?? new FakeNotificationWriter(),
+            new FitNoteEvidenceRequestService(
+                db,
+                eventPublisher ?? new FakeIntegrationEventPublisher(),
+                resolvedAuditPublisher));
+    }
 
     [Fact]
     public async Task HandleAsync_Creates_SicknessRecord_With_No_EndDate()
@@ -563,6 +573,63 @@ public class RecordSicknessHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(SicknessEvidenceStatus.Pending, result.Value!.EvidenceStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CreatesEvidenceRequest_Immediately_ForBackdatedOpenAbsence_AlreadyOverThreshold()
+    {
+        // Backdated open (no end date) absence: StartDate far enough in the past relative to
+        // FixedUtcNow (2026-07-01) that calendar days already exceed the threshold. This must be
+        // caught immediately at creation time rather than waiting for the next FitNoteRequestJob run.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+
+        // 2026-06-20 to 2026-07-01 (FixedUtcNow date) = 12 calendar days elapsed, threshold 7 → met
+        var result = await BuildHandler(db, fitNoteRequiredAfterDays: 7).HandleAsync(new RecordSicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            CategoryId = categoryId,
+            StartDate = new DateOnly(2026, 6, 20),
+            StartDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var request = await db.SicknessEvidenceRequests.SingleAsync();
+        Assert.Equal(result.Value!.Id, request.SicknessRecordId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CreatesEvidenceRequest_Immediately_ForClosedBackdatedImportedAbsence()
+    {
+        // Already-closed backdated/imported record: StartDate and EndDate both in the past, span
+        // meets threshold. This must also be caught immediately at creation time.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+
+        var start = new DateOnly(2026, 6, 1);
+        var end = new DateOnly(2026, 6, 10); // 10 calendar days elapsed, threshold 7 → met
+        var result = await BuildHandler(db, fitNoteRequiredAfterDays: 7).HandleAsync(new RecordSicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            CategoryId = categoryId,
+            StartDate = start,
+            StartDayPart = SicknessDayPart.FullDay,
+            EndDate = end,
+            EndDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var request = await db.SicknessEvidenceRequests.SingleAsync();
+        Assert.Equal(result.Value!.Id, request.SicknessRecordId);
+        Assert.Equal(end.AddDays(7), request.DueDate);
     }
 
     [Fact]

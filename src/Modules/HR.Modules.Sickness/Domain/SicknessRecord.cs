@@ -79,6 +79,17 @@ internal sealed class SicknessRecord
         UpdatedAt = now;
     }
 
+    /// <summary>
+    /// Used by FitNoteEvidenceRequestService when it creates an evidence request for a record whose
+    /// EvidenceStatus wasn't already Pending (e.g. a legacy/imported record evaluated by the daily
+    /// job). Never called for Received/Waived records — the service checks that first.
+    /// </summary>
+    public void MarkEvidencePending(DateTimeOffset now)
+    {
+        EvidenceStatus = SicknessEvidenceStatus.Pending;
+        UpdatedAt = now;
+    }
+
     public void Update(
         Guid categoryId,
         DateOnly startDate,

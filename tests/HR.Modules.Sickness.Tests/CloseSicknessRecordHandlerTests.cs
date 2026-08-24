@@ -1,6 +1,7 @@
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Features.CloseSicknessRecord;
 using HR.Modules.Sickness.Persistence;
+using HR.Modules.Sickness.Services;
 using HR.Modules.Sickness.Tests.Infrastructure;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
@@ -62,14 +63,20 @@ public class CloseSicknessRecordHandlerTests
         // exercise this behavior always pass an explicit low value.
         int fitNoteRequiredAfterDays = 9999,
         int returnToWorkRequiredAfterDays = 9999,
-        FakeIntegrationEventPublisher? eventPublisher = null) =>
-        new(db,
+        FakeIntegrationEventPublisher? eventPublisher = null)
+    {
+        var resolvedAuditPublisher = auditPublisher ?? new FakeAuditEventPublisher();
+        var resolvedEventPublisher = eventPublisher ?? new FakeIntegrationEventPublisher();
+        return new CloseSicknessRecordHandler(
+            db,
             new FakeClock(FixedUtcNow),
             new FakeWorkingPatternProvider(pattern ?? DefaultPattern),
             new FakeCompanySicknessSettingsReader(excludePublicHolidays, fitNoteRequiredAfterDays, returnToWorkRequiredAfterDays),
             new FakePublicHolidayReader(publicHolidays),
-            auditPublisher ?? new FakeAuditEventPublisher(),
-            eventPublisher ?? new FakeIntegrationEventPublisher());
+            resolvedAuditPublisher,
+            resolvedEventPublisher,
+            new FitNoteEvidenceRequestService(db, resolvedEventPublisher, resolvedAuditPublisher));
+    }
 
     private static async Task<SicknessRecord> SeedOpenRecordWithEvidenceStatus(
         SicknessDbContext db, Guid companyId, Guid employeeId, Guid categoryId,
@@ -496,4 +503,56 @@ public class CloseSicknessRecordHandlerTests
     // ReturnToWorkRequiredAfterDays is mandatory now (no opt-out — see
     // CompanySettings.ReturnToWorkRequiredAfterDays), so the "setting is null, no review created"
     // case this used to cover can no longer occur and has been removed.
+
+    [Fact]
+    public async Task HandleAsync_CreatesEvidenceRequest_Immediately_WhenClosedSpanMeetsThreshold()
+    {
+        // Distinct from the EvidenceStatus-only assertions above: this confirms the handler itself
+        // creates the SicknessEvidenceRequest row at close time (rather than waiting for the daily
+        // FitNoteRequestJob's catch-all pass over closed records without a request).
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
+
+        var endDate = new DateOnly(2026, 7, 3); // StartDate 2026-07-01 → 3 calendar days elapsed
+
+        var result = await BuildHandler(db, fitNoteRequiredAfterDays: 3).HandleAsync(new CloseSicknessRecordRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Id = record.Id,
+            EndDate = endDate,
+            EndDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var request = await db.SicknessEvidenceRequests.SingleAsync();
+        Assert.Equal(record.Id, request.SicknessRecordId);
+        Assert.Equal(endDate.AddDays(7), request.DueDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_DoesNotCreateEvidenceRequest_WhenEvidenceAlreadyReceived_EvenIfSpanIsLarge()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecordWithEvidenceStatus(db, companyId, employeeId, categoryId, SicknessEvidenceStatus.Received);
+
+        var result = await BuildHandler(db, fitNoteRequiredAfterDays: 3).HandleAsync(new CloseSicknessRecordRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Id = record.Id,
+            EndDate = new DateOnly(2026, 8, 1), // large span, well over threshold
+            EndDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(await db.SicknessEvidenceRequests.ToListAsync());
+    }
 }
