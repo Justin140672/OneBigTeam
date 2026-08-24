@@ -1,6 +1,7 @@
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
+using HR.Modules.Probation.Services;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
@@ -14,6 +15,7 @@ internal sealed class GenerateDueProbationReviewsJob(
     ProbationDbContext dbContext,
     IClock clock,
     ICompanyTimeZoneReader timeZoneReader,
+    ICompanyProbationSettingsReader probationSettingsReader,
     ITaskCreator taskCreator,
     IEmployeeNameReader employeeNameReader,
     ILogger<GenerateDueProbationReviewsJob> logger)
@@ -29,14 +31,17 @@ internal sealed class GenerateDueProbationReviewsJob(
         if (activeRecords.Count == 0)
             return;
 
-        // Records may belong to different companies each with their own configured time zone, so
-        // "today" (used as the review due-date boundary) must be resolved per company rather than
-        // once globally.
+        // Records may belong to different companies each with their own configured time zone and
+        // checkpoint schedule, so "today" (the review due-date boundary) and the checkpoint days
+        // must both be resolved per company rather than once globally.
         var todayByCompany = new Dictionary<Guid, DateOnly>();
+        var checkpointDaysByCompany = new Dictionary<Guid, IReadOnlyList<int>>();
         foreach (var companyId in activeRecords.Select(r => r.CompanyId).Distinct())
         {
             var timeZoneId = await timeZoneReader.GetTimeZoneAsync(companyId, CancellationToken.None);
             todayByCompany[companyId] = clock.TodayIn(timeZoneId);
+            checkpointDaysByCompany[companyId] =
+                await probationSettingsReader.GetCheckpointDaysAsync(companyId, CancellationToken.None);
         }
 
         var recordIds = activeRecords.Select(r => r.Id).ToList();
@@ -62,7 +67,10 @@ internal sealed class GenerateDueProbationReviewsJob(
 
             var createdAny = false;
 
-            foreach (var (reviewType, dueDate) in ComputeSchedule(record))
+            var checkpointDays = checkpointDaysByCompany[record.CompanyId];
+
+            foreach (var (reviewType, dueDate) in ProbationReviewScheduler.BuildSchedule(
+                record.StartDate, record.ExpectedEndDate, checkpointDays))
             {
                 if (existing.Contains(reviewType) || dueDate > today)
                     continue;
@@ -113,18 +121,6 @@ internal sealed class GenerateDueProbationReviewsJob(
                     CancellationToken.None);
             }
         }
-    }
-
-    // Reviews are scheduled proportionally across the probation period:
-    // ManagerCheckIn at 1/3, HrReview at 2/3, FinalDecision at the end.
-    private static IEnumerable<(ProbationReviewType ReviewType, DateOnly DueDate)> ComputeSchedule(
-        ProbationRecord record)
-    {
-        var totalDays = record.ExpectedEndDate.DayNumber - record.StartDate.DayNumber;
-
-        yield return (ProbationReviewType.ManagerCheckIn, record.StartDate.AddDays(totalDays / 3));
-        yield return (ProbationReviewType.HrReview, record.StartDate.AddDays(2 * totalDays / 3));
-        yield return (ProbationReviewType.FinalDecision, record.ExpectedEndDate);
     }
 
     private static string ReviewTypeLabel(ProbationReviewType reviewType) => reviewType switch

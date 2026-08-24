@@ -118,6 +118,18 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .IsRequired()
             .HasDefaultValue(365);
 
+        builder.Property(settings => settings.ProbationCheckpointDay1)
+            .HasColumnName("probation_checkpoint_day_1")
+            .HasDefaultValue(30);
+
+        builder.Property(settings => settings.ProbationCheckpointDay2)
+            .HasColumnName("probation_checkpoint_day_2")
+            .HasDefaultValue(60);
+
+        builder.Property(settings => settings.ProbationCheckpointDay3)
+            .HasColumnName("probation_checkpoint_day_3")
+            .HasDefaultValue(90);
+
         builder.Property(settings => settings.PostcodeRegex)
             .HasColumnName("postcode_regex")
             .HasMaxLength(500)

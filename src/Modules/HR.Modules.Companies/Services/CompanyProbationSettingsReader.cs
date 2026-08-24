@@ -18,4 +18,30 @@ internal sealed class CompanyProbationSettingsReader(CompaniesDbContext dbContex
 
         return settings?.ProbationMonths ?? DefaultProbationMonths;
     }
+
+    public async Task<IReadOnlyList<int>> GetCheckpointDaysAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        var settings = await dbContext.CompanySettings
+            .AsNoTracking()
+            .SingleOrDefaultAsync(s => s.CompanyId == companyId, cancellationToken);
+
+        if (settings is null)
+            return CompanyProbationSettings.DefaultCheckpointDays;
+
+        var configured = new[]
+            {
+                settings.ProbationCheckpointDay1,
+                settings.ProbationCheckpointDay2,
+                settings.ProbationCheckpointDay3
+            }
+            .Where(day => day is > 0)
+            .Select(day => day!.Value)
+            .Distinct()
+            .OrderBy(day => day)
+            .ToList();
+
+        return configured.Count == 0
+            ? CompanyProbationSettings.DefaultCheckpointDays
+            : configured;
+    }
 }

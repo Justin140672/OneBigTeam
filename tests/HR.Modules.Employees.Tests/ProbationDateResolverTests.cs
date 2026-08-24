@@ -65,5 +65,8 @@ public class ProbationDateResolverTests
             CallCount++;
             return Task.FromResult(companyMonths);
         }
+
+        public Task<IReadOnlyList<int>> GetCheckpointDaysAsync(Guid companyId, CancellationToken cancellationToken)
+            => Task.FromResult<IReadOnlyList<int>>([30, 60, 90]);
     }
 }

@@ -147,6 +147,133 @@ public class UpdateProbationRecordEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Put_ProbationRecord_Changing_ExpectedEndDate_Recalculates_Pending_Reviews()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
+
+        var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
+        {
+            companyId,
+            employeeId = Guid.NewGuid(),
+            managerEmployeeId = managerId,
+            startDate = "2026-06-01",
+            expectedEndDate = "2026-09-01"
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<ProbationRecordPayload>();
+
+        await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
+        {
+            companyId,
+            probationRecordId = created!.Id,
+            reviewType = "FinalDecision",
+            dueDate = "2026-09-01"
+        });
+
+        var beforeReviewsResponse = await client.GetAsync(
+            $"/api/companies/{companyId}/probation-records/{created.Id}/reviews");
+        var beforeReviews = await beforeReviewsResponse.Content.ReadFromJsonAsync<ReviewsPayload>();
+        var originalFinalDecisionId = Assert.Single(beforeReviews!.Items).Id;
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                managerEmployeeId = managerId,
+                expectedEndDate = "2026-12-01",
+                status = "Active"
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var afterReviewsResponse = await client.GetAsync(
+            $"/api/companies/{companyId}/probation-records/{created.Id}/reviews");
+        var afterReviews = await afterReviewsResponse.Content.ReadFromJsonAsync<ReviewsPayload>();
+
+        var originalReview = afterReviews!.Items.Single(r => r.Id == originalFinalDecisionId);
+        Assert.Equal("Cancelled", originalReview.Status);
+
+        var newFinalDecision = afterReviews.Items.Single(r =>
+            r.Id != originalFinalDecisionId && r.ReviewType == "FinalDecision");
+        Assert.Equal("Pending", newFinalDecision.Status);
+        Assert.Equal(new DateOnly(2026, 12, 1), newFinalDecision.DueDate);
+    }
+
+    [Fact]
+    public async Task Put_ProbationRecord_Unchanged_ExpectedEndDate_Does_Not_Recalculate_Reviews()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
+
+        var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
+        {
+            companyId,
+            employeeId = Guid.NewGuid(),
+            managerEmployeeId = managerId,
+            startDate = "2026-06-01",
+            expectedEndDate = "2026-09-01"
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<ProbationRecordPayload>();
+
+        await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
+        {
+            companyId,
+            probationRecordId = created!.Id,
+            reviewType = "FinalDecision",
+            dueDate = "2026-09-01"
+        });
+
+        var beforeReviewsResponse = await client.GetAsync(
+            $"/api/companies/{companyId}/probation-records/{created.Id}/reviews");
+        var beforeReviews = await beforeReviewsResponse.Content.ReadFromJsonAsync<ReviewsPayload>();
+        var originalFinalDecisionId = Assert.Single(beforeReviews!.Items).Id;
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                managerEmployeeId = managerId,
+                expectedEndDate = "2026-09-01", // unchanged
+                status = "Active",
+                notes = "No date change."
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var afterReviewsResponse = await client.GetAsync(
+            $"/api/companies/{companyId}/probation-records/{created.Id}/reviews");
+        var afterReviews = await afterReviewsResponse.Content.ReadFromJsonAsync<ReviewsPayload>();
+
+        var onlyReview = Assert.Single(afterReviews!.Items);
+        Assert.Equal(originalFinalDecisionId, onlyReview.Id);
+        Assert.Equal("Pending", onlyReview.Status);
+    }
+
+    private sealed record ReviewsPayload(IReadOnlyList<ReviewItem> Items);
+
+    private sealed record ReviewItem(
+        Guid Id,
+        Guid ProbationRecordId,
+        string ReviewType,
+        DateOnly DueDate,
+        string Status,
+        DateTimeOffset? CompletedAt,
+        Guid? CompletedByEmployeeId,
+        string? Notes);
+
     private sealed record ProbationRecordPayload(
         Guid Id,
         Guid CompanyId,

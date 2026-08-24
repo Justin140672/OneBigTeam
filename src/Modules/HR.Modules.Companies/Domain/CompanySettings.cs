@@ -35,6 +35,21 @@ internal sealed class CompanySettings
     public int LongAbsenceDayThreshold { get; private set; }
     public int WeekdayPatternOccurrenceThreshold { get; private set; }
     public int WeekdayPatternWindowDays { get; private set; }
+
+    // PROB-03: configurable probation review checkpoint days (offsets in days from the probation
+    // start date). Stored as 3 nullable int columns rather than a delimited/JSON column — the
+    // schedule is always exactly "up to 3 checkpoints" (documented mapping: the first surviving
+    // checkpoint is the manager check-in, the second is the HR review; the final decision review
+    // is always scheduled separately at the expected end date, never one of these checkpoints —
+    // see ProbationReviewScheduler), so a fixed small set of nullable columns is simpler than a
+    // structured column and still lets a company disable a checkpoint (set it to null) or tune the
+    // day offsets. Not yet exposed through UpdateHrPolicy/the HR settings UI — mirrors the
+    // FrequentAbsenceCountThreshold precedent above: this establishes the persisted, per-company
+    // configurable home for the schedule; wiring an editable UI is a deliberately deferred
+    // follow-up rather than something PROB-03 requires.
+    public int? ProbationCheckpointDay1 { get; private set; }
+    public int? ProbationCheckpointDay2 { get; private set; }
+    public int? ProbationCheckpointDay3 { get; private set; }
     public string PostcodeRegex { get; private set; } = UkContactRegexDefaults.Postcode;
     public string TelephoneRegex { get; private set; } = UkContactRegexDefaults.Telephone;
     public string MobileRegex { get; private set; } = UkContactRegexDefaults.Mobile;
@@ -107,6 +122,11 @@ internal sealed class CompanySettings
             LongAbsenceDayThreshold = 28,
             WeekdayPatternOccurrenceThreshold = 3,
             WeekdayPatternWindowDays = 365,
+            // PROB-03 defaults: manager check-in at 30 days, HR review at 60 days, reserved third
+            // checkpoint at 90 days (see doc comment on the properties above).
+            ProbationCheckpointDay1 = 30,
+            ProbationCheckpointDay2 = 60,
+            ProbationCheckpointDay3 = 90,
             PostcodeRegex = UkContactRegexDefaults.Postcode,
             TelephoneRegex = UkContactRegexDefaults.Telephone,
             MobileRegex = UkContactRegexDefaults.Mobile,
@@ -204,6 +224,25 @@ internal sealed class CompanySettings
     /// Asset numbering setting can be authorized/audited independently, mirroring how employee
     /// numbering fields are grouped within HR policy but asset numbering is its own concern.
     /// </summary>
+    /// <summary>
+    /// PROB-03: updates the configured probation review checkpoint days. Kept separate from
+    /// <see cref="UpdateHrPolicy"/> as its own concern, matching how asset numbering is split out
+    /// via <see cref="UpdateAssetNumberSettings"/>. Not currently invoked by any feature handler
+    /// (no UI wiring yet — see the doc comment on the properties) but available for that future
+    /// follow-up, and exercised directly by unit tests.
+    /// </summary>
+    public void UpdateProbationCheckpoints(
+        int? checkpointDay1,
+        int? checkpointDay2,
+        int? checkpointDay3,
+        DateTimeOffset now)
+    {
+        ProbationCheckpointDay1 = checkpointDay1;
+        ProbationCheckpointDay2 = checkpointDay2;
+        ProbationCheckpointDay3 = checkpointDay3;
+        UpdatedAt = now;
+    }
+
     public void UpdateAssetNumberSettings(
         AssetNumberMode assetNumberMode,
         string? assetNumberPrefix,

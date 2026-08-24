@@ -308,6 +308,41 @@ public class GenerateDueProbationReviewsJobTests
         Assert.Equal(ProbationReviewType.ManagerCheckIn, reviews[0].ReviewType);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_Uses_Company_Custom_Checkpoint_Days_When_Configured()
+    {
+        // Custom [14, 45] checkpoints instead of default [30, 60, 90]: ManagerCheckIn due 2026-01-15.
+        await using var context = BuildContext();
+        await SeedActiveRecord(context);
+
+        await BuildJob(
+            context,
+            today: new DateTime(2026, 1, 16, 0, 0, 0, DateTimeKind.Utc),
+            companyProbationSettingsReader: new FakeCompanyProbationSettingsReader([14, 45])).ExecuteAsync();
+
+        var reviews = await context.ProbationReviews.ToListAsync();
+        Assert.Single(reviews);
+        Assert.Equal(ProbationReviewType.ManagerCheckIn, reviews[0].ReviewType);
+        Assert.Equal(new DateOnly(2026, 1, 15), reviews[0].DueDate);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Not_Create_Review_For_Default_Checkpoint_Day_When_Company_Uses_Custom_Days()
+    {
+        // Default day-30 checkpoint (2026-01-31) must not fire for a company configured with [14, 45].
+        await using var context = BuildContext();
+        await SeedActiveRecord(context);
+
+        await BuildJob(
+            context,
+            today: new DateTime(2026, 1, 31, 0, 0, 0, DateTimeKind.Utc),
+            companyProbationSettingsReader: new FakeCompanyProbationSettingsReader([14, 45])).ExecuteAsync();
+
+        var reviews = await context.ProbationReviews.ToListAsync();
+        Assert.Single(reviews); // only the day-14 ManagerCheckIn, already due by Jan 31
+        Assert.Equal(new DateOnly(2026, 1, 15), reviews[0].DueDate);
+    }
+
     private async Task<ProbationRecord> SeedActiveRecord(
         ProbationDbContext context,
         Guid? employeeId = null,
@@ -328,10 +363,12 @@ public class GenerateDueProbationReviewsJobTests
         DateTime today,
         FakeTaskCreator? taskCreator = null,
         FakeEmployeeNameReader? employeeNameReader = null,
-        FakeCompanyTimeZoneReader? companyTimeZoneReader = null) =>
+        FakeCompanyTimeZoneReader? companyTimeZoneReader = null,
+        FakeCompanyProbationSettingsReader? companyProbationSettingsReader = null) =>
         new(context,
             new FakeClock(today),
             companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
+            companyProbationSettingsReader ?? new FakeCompanyProbationSettingsReader(),
             taskCreator ?? new FakeTaskCreator(),
             employeeNameReader ?? new FakeEmployeeNameReader(),
             NullLogger<GenerateDueProbationReviewsJob>.Instance);
