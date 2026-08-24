@@ -42,7 +42,7 @@ public class GetMissingFitNotesHandlerTests
         await db.SaveChangesAsync();
 
         var handler = new GetMissingFitNotesHandler(db);
-        var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), null, CancellationToken.None);
 
         var item = Assert.Single(result.Items);
         Assert.Equal(request.Id, item.RequestId);
@@ -65,7 +65,7 @@ public class GetMissingFitNotesHandlerTests
         await db.SaveChangesAsync();
 
         var handler = new GetMissingFitNotesHandler(db);
-        var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), null, CancellationToken.None);
 
         var item = Assert.Single(result.Items);
         Assert.Equal("Overdue", item.Status);
@@ -87,7 +87,7 @@ public class GetMissingFitNotesHandlerTests
         await db.SaveChangesAsync();
 
         var handler = new GetMissingFitNotesHandler(db);
-        var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), null, CancellationToken.None);
 
         Assert.Empty(result.Items);
     }
@@ -105,7 +105,7 @@ public class GetMissingFitNotesHandlerTests
         await db.SaveChangesAsync();
 
         var handler = new GetMissingFitNotesHandler(db);
-        var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), null, CancellationToken.None);
 
         Assert.Empty(result.Items);
     }

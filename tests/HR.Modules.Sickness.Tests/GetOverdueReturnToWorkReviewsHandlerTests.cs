@@ -32,7 +32,7 @@ public class GetOverdueReturnToWorkReviewsHandlerTests
         await db.SaveChangesAsync();
 
         var handler = new GetOverdueReturnToWorkReviewsHandler(db, new FakeOpenTaskBySourceEntityReader());
-        var result = await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), null, CancellationToken.None);
 
         var item = Assert.Single(result.Items);
         Assert.Equal(review.Id, item.ReviewId);
@@ -56,7 +56,7 @@ public class GetOverdueReturnToWorkReviewsHandlerTests
         var reader = new FakeOpenTaskBySourceEntityReader(new Dictionary<Guid, Guid> { [review.Id] = taskId });
 
         var handler = new GetOverdueReturnToWorkReviewsHandler(db, reader);
-        var result = await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), null, CancellationToken.None);
 
         var item = Assert.Single(result.Items);
         Assert.Equal(taskId, item.TaskId);
@@ -76,7 +76,7 @@ public class GetOverdueReturnToWorkReviewsHandlerTests
         var reader = new FakeOpenTaskBySourceEntityReader();
 
         var handler = new GetOverdueReturnToWorkReviewsHandler(db, reader);
-        var result = await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), null, CancellationToken.None);
 
         var item = Assert.Single(result.Items);
         Assert.Null(item.TaskId);
@@ -96,7 +96,7 @@ public class GetOverdueReturnToWorkReviewsHandlerTests
         var reader = new FakeOpenTaskBySourceEntityReader();
 
         var handler = new GetOverdueReturnToWorkReviewsHandler(db, reader);
-        await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), CancellationToken.None);
+        await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), null, CancellationToken.None);
 
         Assert.Equal(companyId, reader.LastCompanyId);
         Assert.Equal(TaskActionType.Review, reader.LastActionType);
@@ -114,7 +114,7 @@ public class GetOverdueReturnToWorkReviewsHandlerTests
         await db.SaveChangesAsync();
 
         var handler = new GetOverdueReturnToWorkReviewsHandler(db, new FakeOpenTaskBySourceEntityReader());
-        var result = await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), null, CancellationToken.None);
 
         Assert.Empty(result.Items);
     }
@@ -131,7 +131,7 @@ public class GetOverdueReturnToWorkReviewsHandlerTests
         await db.SaveChangesAsync();
 
         var handler = new GetOverdueReturnToWorkReviewsHandler(db, new FakeOpenTaskBySourceEntityReader());
-        var result = await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), null, CancellationToken.None);
 
         Assert.Empty(result.Items);
     }
@@ -149,7 +149,7 @@ public class GetOverdueReturnToWorkReviewsHandlerTests
         await db.SaveChangesAsync();
 
         var handler = new GetOverdueReturnToWorkReviewsHandler(db, new FakeOpenTaskBySourceEntityReader());
-        var result = await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetOverdueReturnToWorkReviewsRequest(companyId), null, CancellationToken.None);
 
         Assert.Empty(result.Items);
     }

@@ -73,6 +73,7 @@ public static class SicknessModule
         services.AddScoped<IEmployeeSicknessStatusReader, EmployeeSicknessStatusReader>();
         services.AddScoped<ISicknessCategoryDefaultsProvisioner, SicknessCategoryDefaultsProvisioner>();
         services.AddScoped<ISicknessReportReader, SicknessReportReader>();
+        services.AddScoped<Services.SicknessResourceAuthorizer>();
     }
 
     public static WebApplication UseSicknessRecurringJobs(this WebApplication app)

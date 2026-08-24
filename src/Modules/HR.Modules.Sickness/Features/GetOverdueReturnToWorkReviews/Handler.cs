@@ -12,11 +12,20 @@ internal sealed class GetOverdueReturnToWorkReviewsHandler(
 {
     public async Task<GetOverdueReturnToWorkReviewsResponse> HandleAsync(
         GetOverdueReturnToWorkReviewsRequest request,
+        IReadOnlySet<Guid>? authorizedEmployeeIds,
         CancellationToken cancellationToken)
     {
+        // authorizedEmployeeIds is null for HR Administrators (company-wide, unrestricted).
+        // For managers it is their full reporting hierarchy — resolved server-side by the
+        // endpoint via SicknessResourceAuthorizer, never trusted from the client (SICK-02).
+        if (authorizedEmployeeIds is not null && authorizedEmployeeIds.Count == 0)
+            return new GetOverdueReturnToWorkReviewsResponse([]);
+
         var rows = await dbContext.ReturnToWorkReviews
             .AsNoTracking()
-            .Where(r => r.CompanyId == request.CompanyId && r.Status == ReturnToWorkReviewStatus.Overdue)
+            .Where(r => r.CompanyId == request.CompanyId
+                     && r.Status == ReturnToWorkReviewStatus.Overdue
+                     && (authorizedEmployeeIds == null || authorizedEmployeeIds.Contains(r.EmployeeId)))
             .OrderBy(r => r.DueDate)
             .Select(r => new
             {

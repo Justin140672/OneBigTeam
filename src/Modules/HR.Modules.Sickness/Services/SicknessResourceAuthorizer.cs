@@ -1,0 +1,65 @@
+using HR.Modules.Employees.Contracts;
+using HR.SharedKernel;
+
+namespace HR.Modules.Sickness.Services;
+
+/// <summary>
+/// Resource-level (manager-hierarchy / HR administrator) authorization for Sickness endpoints
+/// guarded by the "sickness:view-team" or "sickness:review" policies. Those policies only prove
+/// the caller holds the Manager or HrAdministrator role — they never prove the caller has a
+/// reporting relationship to the specific employee(s) whose sickness workflow data is being
+/// requested, so that check lives here and is applied per endpoint before/around the handler
+/// call. Mirrors HR.Modules.Leave.Services.LeaveResourceAuthorizer (SICK-02, following LEAVE-02's
+/// established pattern and its "complete reporting hierarchy" scope decision).
+/// </summary>
+internal sealed class SicknessResourceAuthorizer(
+    IAuthorizationService authorizationService,
+    IDirectReportsReader directReportsReader)
+{
+    // Mirrors HR.Modules.Identity.Domain.SystemPermissions.SicknessManage. Sickness cannot
+    // reference Identity's internal SystemPermissions directly, so the permission id is
+    // duplicated here as the sanctioned escape hatch — same pattern already used by
+    // GetTeamSicknessToday/Endpoint.cs and RecordSickness/Endpoint.cs. Only the HrAdministrator
+    // role is currently granted this permission, making it a reliable "is HR administrator" and
+    // "has company-wide sickness access" proxy.
+    private static readonly Guid SicknessManagePermissionId = new("00000000-0000-0000-0001-000000000015");
+
+    public async Task<bool> IsHrAdministratorAsync(Guid callerEmployeeId, CancellationToken cancellationToken)
+        => await authorizationService.HasPermissionAsync(callerEmployeeId, SicknessManagePermissionId, cancellationToken);
+
+    /// <summary>
+    /// Resolves the set of employee ids the caller may view sickness workflow data for.
+    /// Returns null when the caller is an HR Administrator, meaning access is unrestricted
+    /// (company-wide) — callers should skip employee-id filtering entirely in that case rather
+    /// than materialising the whole company as a set.
+    /// </summary>
+    public async Task<IReadOnlySet<Guid>?> GetAuthorizedEmployeeIdsAsync(
+        Guid companyId, Guid callerEmployeeId, CancellationToken cancellationToken)
+    {
+        if (await IsHrAdministratorAsync(callerEmployeeId, cancellationToken))
+            return null;
+
+        var descendantIds = await directReportsReader.GetAllDescendantIdsAsync(
+            companyId, callerEmployeeId, cancellationToken);
+
+        return descendantIds.ToHashSet();
+    }
+
+    /// <summary>
+    /// Single-resource authorization: HR Administrator, or a manager anywhere above the target
+    /// employee in the full reporting hierarchy (direct or indirect), may view. Used for
+    /// individual return-to-work review reads, where the review id is a route value that must
+    /// not be guessable/enumerable by an unrelated manager.
+    /// </summary>
+    public async Task<bool> CanViewEmployeeAsync(
+        Guid companyId, Guid callerEmployeeId, Guid targetEmployeeId, CancellationToken cancellationToken)
+    {
+        if (await IsHrAdministratorAsync(callerEmployeeId, cancellationToken))
+            return true;
+
+        var descendantIds = await directReportsReader.GetAllDescendantIdsAsync(
+            companyId, callerEmployeeId, cancellationToken);
+
+        return descendantIds.Contains(targetEmployeeId);
+    }
+}
