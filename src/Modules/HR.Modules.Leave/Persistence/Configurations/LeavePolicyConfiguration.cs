@@ -38,6 +38,11 @@ internal sealed class LeavePolicyConfiguration : IEntityTypeConfiguration<LeaveP
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(p => p.RequiresApproval)
+            .HasColumnName("requires_approval")
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.Property(p => p.IsActive)
             .HasColumnName("is_active")
             .IsRequired()

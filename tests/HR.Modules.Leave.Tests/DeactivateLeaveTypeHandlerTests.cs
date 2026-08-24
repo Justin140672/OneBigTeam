@@ -21,7 +21,7 @@ public class DeactivateLeaveTypeHandlerTests
         db.LeaveTypes.Add(entity);
         await db.SaveChangesAsync();
 
-        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader());
+        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new DeactivateLeaveTypeRequest
         {
@@ -39,7 +39,7 @@ public class DeactivateLeaveTypeHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Id_Does_Not_Exist()
     {
         await using var db = BuildContext();
-        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader());
+        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new DeactivateLeaveTypeRequest
         {
@@ -67,7 +67,7 @@ public class DeactivateLeaveTypeHandlerTests
         db.LeaveBalances.Add(balance);
         await db.SaveChangesAsync();
 
-        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader([employeeId]));
+        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader([employeeId]), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new DeactivateLeaveTypeRequest
         {
@@ -102,7 +102,7 @@ public class DeactivateLeaveTypeHandlerTests
 
         // FakeCurrentEmployeeReader returns an empty list by default, simulating that
         // terminatedEmployeeId is not among the current (non-terminated) employees.
-        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader());
+        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new DeactivateLeaveTypeRequest
         {
@@ -130,7 +130,7 @@ public class DeactivateLeaveTypeHandlerTests
         db.LeaveTypes.Add(entity);
         await db.SaveChangesAsync();
 
-        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader());
+        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new DeactivateLeaveTypeRequest
         {
@@ -160,7 +160,7 @@ public class DeactivateLeaveTypeHandlerTests
         db.LeaveTypes.Add(entity);
         await db.SaveChangesAsync();
 
-        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader());
+        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new DeactivateLeaveTypeRequest
         {
@@ -186,7 +186,7 @@ public class DeactivateLeaveTypeHandlerTests
         db.LeaveTypes.Add(entity);
         await db.SaveChangesAsync();
 
-        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader());
+        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new DeactivateLeaveTypeRequest
         {
@@ -196,6 +196,38 @@ public class DeactivateLeaveTypeHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("conflict", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_LeaveTypeDeactivatedAuditEvent()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var actorId = Guid.NewGuid();
+
+        var entity = LeaveType.Create(Guid.NewGuid(), companyId, "Compassionate Leave", "COMPASSIONATE", 5, AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
+        db.LeaveTypes.Add(entity);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new CapturingAuditEventPublisher();
+        var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader(), auditPublisher);
+
+        var result = await handler.HandleAsync(new DeactivateLeaveTypeRequest
+        {
+            CompanyId = companyId,
+            Id = entity.Id,
+            ActorEmployeeId = actorId
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var published = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<LeaveTypeDeactivatedAuditEvent>(published);
+        Assert.Equal(companyId, auditEvent.CompanyId);
+        Assert.Equal(entity.Id, auditEvent.LeaveTypeId);
+        Assert.Equal("Compassionate Leave", auditEvent.Name);
+        Assert.Equal(actorId, auditEvent.ActorEmployeeIdValue);
     }
 
     private static LeaveDbContext BuildContext()

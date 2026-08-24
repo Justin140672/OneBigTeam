@@ -31,7 +31,7 @@ public class ReviewDefaultLeavePolicyTaskTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Default", null, 5, false, isDefault: true, Now);
-        policy.Update("Default Policy", "Updated description", 5, false, Now.AddDays(1));
+        policy.Update("Default Policy", "Updated description", 5, false, true, Now.AddDays(1));
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
@@ -48,7 +48,7 @@ public class ReviewDefaultLeavePolicyTaskTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Non-default", null, 5, false, isDefault: false, Now);
-        policy.Update("Non-default", "Updated description", 5, false, Now.AddDays(1));
+        policy.Update("Non-default", "Updated description", 5, false, true, Now.AddDays(1));
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 

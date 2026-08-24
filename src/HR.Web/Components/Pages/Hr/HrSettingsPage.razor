@@ -5,7 +5,7 @@
 @inherits EditPageBase<HrSettingsEditModel>
 @using HR.Infrastructure.Abstractions
 @using HR.SharedKernel
-@using HR.Web.Components.Pages.Companies
+@using HR.Modules.Companies.Contracts
 
 <PageTitle>HR Settings</PageTitle>
 
@@ -251,29 +251,51 @@
                                             <div class="col-12">
                                                 <p class="text-muted mb-0">Preview: <strong>@PreviewEmployeeNumber</strong></p>
                                             </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
 
+                    <TabItem>
+                        <ChildContent>
+                            <TabHeader Text="Asset Numbering" IconCss="@ErrorIconCss(5)" />
+                        </ChildContent>
+                        <ContentTemplate>
+                            <div class="card mt-3">
+                                <div class="card-body">
+                                    <div class="row g-4">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Numbering Mode</label>
+                                            <SfDropDownList TValue="AssetNumberMode" TItem="AssetNumberModeOption"
+                                                            @bind-Value="Model.AssetNumberMode"
+                                                            DataSource="@AssetNumberModeOptions">
+                                                <DropDownListFieldSettings Value="Value" Text="Label" />
+                                            </SfDropDownList>
+                                        </div>
+                                        @if (Model.AssetNumberMode == AssetNumberMode.Automatic)
+                                        {
+                                            <div class="col-md-4">
+                                                <label class="form-label">Prefix</label>
+                                                <HrTextBox @bind-Value="Model.AssetNumberPrefix" Placeholder="Prefix (e.g. AST-)" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Next Number</label>
+                                                <SfNumericTextBox TValue="int" @bind-Value="Model.NextAssetNumber"
+                                                                  ShowSpinButton="false"
+                                                                  Min="1" />
+                                                <ValidationMessage For="@(() => Model.NextAssetNumber)" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Minimum Numeric Length</label>
+                                                <SfNumericTextBox TValue="int" @bind-Value="Model.AssetNumberMinimumLength"
+                                                                  ShowSpinButton="false"
+                                                                  Min="1" Max="10" />
+                                                <ValidationMessage For="@(() => Model.AssetNumberMinimumLength)" />
+                                            </div>
                                             <div class="col-12">
-                                                <div class="hr-settings-action-card">
-                                                    <div class="hr-settings-action-card__body">
-                                                        <div>
-                                                            <h6 class="mb-1">Backfill Employee Numbers</h6>
-                                                            <p class="text-muted mb-0 small">
-                                                                Assigns employee numbers to existing employees who don't have one yet,
-                                                                in start-date order. This is an operational action, not a saved setting.
-                                                            </p>
-                                                        </div>
-                                                        @if (Session.CanManageEmployees)
-                                                        {
-                                                            <SfButton CssClass="flex-shrink-0" OnClick="OpenBackfillDialog">Backfill Employee Numbers…</SfButton>
-                                                        }
-                                                        else
-                                                        {
-                                                            <p class="text-muted mb-0 small flex-shrink-0">
-                                                                Requires HR Administrator permissions.
-                                                            </p>
-                                                        }
-                                                    </div>
-                                                </div>
+                                                <p class="text-muted mb-0">Preview: <strong>@PreviewAssetNumber</strong></p>
                                             </div>
                                         }
                                     </div>
@@ -285,10 +307,23 @@
             </SfTab>
         </EditForm>
 
-        <BackfillEmployeeNumbersDialog CompanyId="Id"
-                                        IsOpen="_backfillDialogOpen"
-                                        OnClosed="@(() => _backfillDialogOpen = false)"
-                                        OnCommitted="HandleBackfillCommittedAsync" />
+        @if (_showRenumberWarning)
+        {
+            <SfDialog IsModal="true" Width="440px" Visible="true" ShowCloseIcon="false">
+                <DialogTemplates>
+                    <Header>Renumber existing employees?</Header>
+                    <Content>
+                        Changing the employee number prefix or minimum length while in Automatic mode will
+                        automatically renumber all existing employees to the new format. This cannot be undone.
+                        Do you want to continue?
+                    </Content>
+                </DialogTemplates>
+                <DialogButtons>
+                    <DialogButton Content="Cancel" OnClick="CancelRenumberWarning" />
+                    <DialogButton Content="Continue" IsPrimary="true" OnClick="ConfirmRenumberWarningAsync" />
+                </DialogButtons>
+            </SfDialog>
+        }
 
         <div class="hr-settings-footer mt-4 d-flex gap-2 align-items-center">
             @if (!string.IsNullOrEmpty(SuccessMsg))
@@ -358,16 +393,14 @@
     private string PreviewEmployeeNumber =>
         $"{Model.EmployeeNumberPrefix}{Model.NextEmployeeNumber.ToString().PadLeft(Model.EmployeeNumberMinimumLength, '0')}";
 
-    private bool _backfillDialogOpen;
+    private static readonly List<AssetNumberModeOption> AssetNumberModeOptions =
+    [
+        new(AssetNumberMode.Manual, "Manual"),
+        new(AssetNumberMode.Automatic, "Automatic"),
+    ];
 
-    private void OpenBackfillDialog() => _backfillDialogOpen = true;
-
-    private async Task HandleBackfillCommittedAsync()
-    {
-        // Refresh settings so the "Next Number" preview reflects the numbers just assigned.
-        await LoadAsync();
-        CaptureBaseline();
-    }
+    private string PreviewAssetNumber =>
+        $"{Model.AssetNumberPrefix}{Model.NextAssetNumber.ToString().PadLeft(Model.AssetNumberMinimumLength, '0')}";
 
     // ── Tabs ─────────────────────────────────────────────────────────────────────────────────
 
@@ -394,6 +427,8 @@
         (3, nameof(HrSettingsEditModel.NoticePeriodLength)),
         (4, nameof(HrSettingsEditModel.NextEmployeeNumber)),
         (4, nameof(HrSettingsEditModel.EmployeeNumberMinimumLength)),
+        (5, nameof(HrSettingsEditModel.NextAssetNumber)),
+        (5, nameof(HrSettingsEditModel.AssetNumberMinimumLength)),
     ];
 
     private HashSet<int> _tabsWithErrors = [];
@@ -426,7 +461,7 @@
 
     private void SyncActiveTabFromQuery()
     {
-        if (Tab is >= 1 and <= 5)
+        if (Tab is >= 1 and <= 6)
             _activeTabIndex = Tab.Value - 1;
 
         _lastSyncedTabIndex = _activeTabIndex;
@@ -463,7 +498,42 @@
             .ToHashSet();
     }
 
+    private bool _showRenumberWarning;
+
+    // True when the user has changed the Employee or Asset numbering FORMAT (prefix or minimum
+    // length) while staying in Automatic mode — a Manual<->Automatic mode switch alone doesn't
+    // count. The backend performs the actual renumber of existing records synchronously on save,
+    // so this is purely a confirmation gate in front of that existing behaviour.
+    private bool IsRenumberingFormatChange() =>
+        (Model.EmployeeNumberMode == EmployeeNumberMode.Automatic
+            && Model.EmployeeNumberOriginalMode == EmployeeNumberMode.Automatic
+            && (Model.EmployeeNumberPrefix != Model.EmployeeNumberOriginalPrefix
+                || Model.EmployeeNumberMinimumLength != Model.EmployeeNumberOriginalMinimumLength))
+        || (Model.AssetNumberMode == AssetNumberMode.Automatic
+            && Model.AssetNumberOriginalMode == AssetNumberMode.Automatic
+            && (Model.AssetNumberPrefix != Model.AssetNumberOriginalPrefix
+                || Model.AssetNumberMinimumLength != Model.AssetNumberOriginalMinimumLength));
+
     private async Task SaveClickedAsync()
+    {
+        if (IsRenumberingFormatChange())
+        {
+            _showRenumberWarning = true;
+            return;
+        }
+
+        await SaveClickedCoreAsync();
+    }
+
+    private void CancelRenumberWarning() => _showRenumberWarning = false;
+
+    private async Task ConfirmRenumberWarningAsync()
+    {
+        _showRenumberWarning = false;
+        await SaveClickedCoreAsync();
+    }
+
+    private async Task SaveClickedCoreAsync()
     {
         await SaveAsync();
 
@@ -510,6 +580,17 @@
             Model.EmployeeNumberPrefix = settings.EmployeeNumberPrefix;
             Model.NextEmployeeNumber = settings.NextEmployeeNumber;
             Model.EmployeeNumberMinimumLength = settings.EmployeeNumberMinimumLength;
+            Model.AssetNumberMode = settings.AssetNumberMode;
+            Model.AssetNumberPrefix = settings.AssetNumberPrefix;
+            Model.NextAssetNumber = settings.NextAssetNumber;
+            Model.AssetNumberMinimumLength = settings.AssetNumberMinimumLength;
+            Model.AssetNumberOriginalMode = Model.AssetNumberMode;
+            Model.AssetNumberOriginalPrefix = Model.AssetNumberPrefix;
+            Model.AssetNumberOriginalMinimumLength = Model.AssetNumberMinimumLength;
+
+            Model.EmployeeNumberOriginalMode = Model.EmployeeNumberMode;
+            Model.EmployeeNumberOriginalPrefix = Model.EmployeeNumberPrefix;
+            Model.EmployeeNumberOriginalMinimumLength = Model.EmployeeNumberMinimumLength;
 
             var matchedPreset = NoticePeriodPresets.FirstOrDefault(p =>
                 p.Unit == settings.NoticePeriodUnit && p.Length == settings.NoticePeriodLength);
@@ -538,7 +619,11 @@
             Model.EmployeeNumberMode,
             string.IsNullOrWhiteSpace(Model.EmployeeNumberPrefix) ? null : Model.EmployeeNumberPrefix.Trim(),
             Model.NextEmployeeNumber,
-            Model.EmployeeNumberMinimumLength);
+            Model.EmployeeNumberMinimumLength,
+            Model.AssetNumberMode,
+            string.IsNullOrWhiteSpace(Model.AssetNumberPrefix) ? null : Model.AssetNumberPrefix.Trim(),
+            Model.NextAssetNumber,
+            Model.AssetNumberMinimumLength);
 
         var result = await CompanyService.UpdateHrSettingsAsync(Id, request);
         return result is not null ? null : "Failed to save HR settings.";
@@ -580,4 +665,6 @@
     private sealed record NoticePeriodUnitOption(NoticePeriodUnit Value, string Label);
 
     private sealed record EmployeeNumberModeOption(EmployeeNumberMode Value, string Label);
+
+    private sealed record AssetNumberModeOption(AssetNumberMode Value, string Label);
 }

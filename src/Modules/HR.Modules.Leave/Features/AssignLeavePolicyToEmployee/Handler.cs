@@ -9,7 +9,8 @@ namespace HR.Modules.Leave.Features.AssignLeavePolicyToEmployee;
 internal sealed class AssignLeavePolicyToEmployeeHandler(
     LeaveDbContext dbContext,
     IClock clock,
-    ICompanyLeaveSettingsReader leaveSettingsReader)
+    ICompanyLeaveSettingsReader leaveSettingsReader,
+    IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<AssignLeavePolicyToEmployeeResponse>> HandleAsync(
         AssignLeavePolicyToEmployeeRequest request,
@@ -34,6 +35,7 @@ internal sealed class AssignLeavePolicyToEmployeeHandler(
                 cancellationToken);
 
         bool isNewAssignment = existing is null;
+        Guid? previousLeavePolicyId = existing?.LeavePolicyId;
         EmployeeLeavePolicyAssignment assignment;
 
         if (existing is not null)
@@ -99,6 +101,15 @@ internal sealed class AssignLeavePolicyToEmployeeHandler(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new LeavePolicyAssignedAuditEvent(
+            assignment.CompanyId,
+            assignment.EmployeeId,
+            assignment.LeavePolicyId,
+            previousLeavePolicyId,
+            assignment.EffectiveFrom,
+            request.ActorEmployeeId,
+            now), cancellationToken);
 
         return Result.Success(new AssignLeavePolicyToEmployeeResponse(
             assignment.Id,

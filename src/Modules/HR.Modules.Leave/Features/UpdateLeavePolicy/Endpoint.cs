@@ -1,10 +1,11 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Leave.Features.UpdateLeavePolicy;
 
 internal sealed class Endpoint(
-    UpdateLeavePolicyHandler handler) : Endpoint<UpdateLeavePolicyRequest, UpdateLeavePolicyResponse>
+    UpdateLeavePolicyHandler handler, ICurrentUser currentUser) : Endpoint<UpdateLeavePolicyRequest, UpdateLeavePolicyResponse>
 {
     public override void Configure()
     {
@@ -16,7 +17,9 @@ internal sealed class Endpoint(
         UpdateLeavePolicyRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var result = await handler.HandleAsync(
+            request with { ActorEmployeeId = currentUser.UserId },
+            cancellationToken);
 
         if (result.IsFailure)
         {

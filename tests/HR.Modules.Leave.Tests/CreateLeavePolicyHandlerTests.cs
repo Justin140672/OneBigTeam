@@ -14,7 +14,7 @@ public class CreateLeavePolicyHandlerTests
     public async Task HandleAsync_Creates_LeavePolicy_And_Returns_Response()
     {
         await using var context = BuildContext();
-        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
         var companyId = Guid.NewGuid();
 
         var result = await handler.HandleAsync(
@@ -46,7 +46,7 @@ public class CreateLeavePolicyHandlerTests
     public async Task HandleAsync_Forces_First_Policy_For_Company_To_Be_Default_Even_When_Not_Requested()
     {
         await using var context = BuildContext();
-        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
         var companyId = Guid.NewGuid();
 
         var result = await handler.HandleAsync(
@@ -76,7 +76,7 @@ public class CreateLeavePolicyHandlerTests
         context.LeavePolicies.Add(first);
         await context.SaveChangesAsync();
 
-        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateLeavePolicyRequest { CompanyId = companyId, Name = "Second Policy", IsDefault = true },
@@ -100,7 +100,7 @@ public class CreateLeavePolicyHandlerTests
         context.LeavePolicies.Add(first);
         await context.SaveChangesAsync();
 
-        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateLeavePolicyRequest { CompanyId = companyId, Name = "Second Policy", IsDefault = false },
@@ -124,7 +124,7 @@ public class CreateLeavePolicyHandlerTests
             LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 0, false, false, now));
         await context.SaveChangesAsync();
 
-        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateLeavePolicyRequest { CompanyId = companyId, Name = "Standard Policy" },
@@ -132,6 +132,36 @@ public class CreateLeavePolicyHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("conflict", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_LeavePolicyCreatedAuditEvent()
+    {
+        await using var context = BuildContext();
+        var auditPublisher = new CapturingAuditEventPublisher();
+        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), auditPublisher);
+        var companyId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+
+        var result = await handler.HandleAsync(
+            new CreateLeavePolicyRequest
+            {
+                CompanyId = companyId,
+                Name = "Standard Policy",
+                CarryOverDays = 5,
+                AllowNegativeBalance = false,
+                ActorEmployeeId = actorId
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var published = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<LeavePolicyCreatedAuditEvent>(published);
+        Assert.Equal(companyId, auditEvent.CompanyId);
+        Assert.Equal(result.Value!.Id, auditEvent.LeavePolicyId);
+        Assert.Equal("Standard Policy", auditEvent.Name);
+        Assert.Equal(actorId, auditEvent.ActorEmployeeIdValue);
     }
 
     [Fact]
@@ -146,7 +176,7 @@ public class CreateLeavePolicyHandlerTests
             LeavePolicy.Create(Guid.NewGuid(), companyA, "Standard Policy", null, 0, false, false, now));
         await context.SaveChangesAsync();
 
-        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateLeavePolicyRequest { CompanyId = companyB, Name = "Standard Policy" },

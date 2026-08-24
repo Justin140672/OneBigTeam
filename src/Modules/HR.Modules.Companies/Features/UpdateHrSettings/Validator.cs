@@ -53,5 +53,15 @@ internal sealed class UpdateHrSettingsValidator : AbstractValidator<UpdateHrSett
 		RuleFor(request => request.EmployeeNumberPrefix)
 			.MaximumLength(20)
 			.When(request => !string.IsNullOrWhiteSpace(request.EmployeeNumberPrefix));
+
+		RuleFor(request => request.NextAssetNumber)
+			.GreaterThan(0);
+
+		RuleFor(request => request.AssetNumberMinimumLength)
+			.InclusiveBetween(1, 10);
+
+		RuleFor(request => request.AssetNumberPrefix)
+			.MaximumLength(20)
+			.When(request => !string.IsNullOrWhiteSpace(request.AssetNumberPrefix));
 	}
 }

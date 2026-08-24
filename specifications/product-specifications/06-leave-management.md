@@ -1,5 +1,7 @@
 # Leave Management
 
+> Superseded by `14-leave-management.md` and the "Leave management" section of `00-current-product-decisions.md`, which take precedence wherever they conflict with this document (e.g. default leave types, Sick Leave, conflict-warning scope).
+
 ## Purpose
 Policy-driven leave management with approvals, accrual, carry-over, and TOIL.
 

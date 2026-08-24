@@ -11,4 +11,6 @@ internal sealed record UpdateLeaveTypeResponse(
     bool IsActive,
     bool HasBalance,
     bool IsSystem,
+    int? ToilExpiryDays,
+    bool AllowNegativeToilBalance,
     DateTimeOffset UpdatedAt);

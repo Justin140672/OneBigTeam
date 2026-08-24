@@ -25,6 +25,7 @@ internal sealed class ListLeavePoliciesHandler(LeaveDbContext dbContext)
                 p.Description,
                 p.CarryOverDays,
                 p.AllowNegativeBalance,
+                p.RequiresApproval,
                 p.IsActive,
                 p.IsDefault,
                 p.CreatedAt))

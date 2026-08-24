@@ -1,3 +1,4 @@
+using HR.Modules.Leave.Services;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.ApproveLeaveRequest;
 using HR.Modules.Leave.Features.CancelLeaveRequest;
@@ -66,7 +67,8 @@ public class LeaveYearHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc),
-            new FakeWorkingPatternProvider(), AprilStartSettings, new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+            new FakeWorkingPatternProvider(), AprilStartSettings, new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(),
+            new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), AprilStartSettings, new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
 
         var result = await handler.HandleAsync(new SubmitLeaveRequestRequest
         {
@@ -105,7 +107,8 @@ public class LeaveYearHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc),
-            new FakeWorkingPatternProvider(), AprilStartSettings, new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+            new FakeWorkingPatternProvider(), AprilStartSettings, new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(),
+            new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), AprilStartSettings, new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
 
         var result = await handler.HandleAsync(new SubmitLeaveRequestRequest
         {
@@ -146,8 +149,8 @@ public class LeaveYearHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(JanuaryClockUtc),
-            new NoOpIntegrationEventPublisher(), AprilStartSettings, new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc),
+            new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), AprilStartSettings, new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
 
         var result = await handler.HandleAsync(new ApproveLeaveRequestRequest
         {
@@ -189,7 +192,7 @@ public class LeaveYearHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc), AprilStartSettings, new NoOpAuditEventPublisher());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc), AprilStartSettings, new NoOpAuditEventPublisher(), new ToilLedgerService(context));
 
         var result = await handler.HandleAsync(new CancelLeaveRequestRequest
         {

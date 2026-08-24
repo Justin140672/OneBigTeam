@@ -152,7 +152,7 @@
                     <Template>
                         @{
                             var row = (context as EmployeeListItemModel)!;
-                            <a class="employee-cell" href="/companies/@CompanyId/employees/@row.Id/view" aria-label="@($"Open profile for {row.FullName}")">
+                            <a class="employee-cell" href="/companies/@CompanyId/employees/@row.Id" aria-label="@($"Open profile for {row.FullName}")">
                                 <ProfilePhotoAvatar PhotoUrl="@row.ProfilePhotoUrl" Initials="@GetInitials(row)" SizePx="32" />
                                 <span class="employee-cell-text">
                                     <span class="employee-cell-name">@row.FullName</span>
@@ -167,6 +167,7 @@
                 </GridColumn>
                 <GridColumn Field="@nameof(EmployeeListItemModel.WorkEmail)" HeaderText="Work Email" Width="220" />
                 <GridColumn Field="@nameof(EmployeeListItemModel.DepartmentName)" HeaderText="Department" Width="160" />
+                <GridColumn Field="@nameof(EmployeeListItemModel.LocationName)" HeaderText="Location" Width="150" />
                 <GridColumn Field="@nameof(EmployeeListItemModel.PositionProfileTitle)" HeaderText="Position" Width="180" />
                 <GridColumn Field="@nameof(EmployeeListItemModel.ManagerFullName)" HeaderText="Manager" Width="150" />
                 <GridColumn Field="@nameof(EmployeeListItemModel.StartDate)" HeaderText="Start Date" Width="120" Format="d" />
@@ -509,7 +510,7 @@
     private void OnRecordClick(Syncfusion.Blazor.Grids.RecordClickEventArgs<EmployeeListItemModel> args)
     {
         if (args.Column?.Type == Syncfusion.Blazor.Grids.ColumnType.CheckBox) return;
-        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{args.RowData.Id}/view");
+        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{args.RowData.Id}");
     }
 
     private static string GetInitials(EmployeeListItemModel row)

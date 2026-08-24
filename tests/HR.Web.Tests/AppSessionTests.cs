@@ -40,7 +40,8 @@ public class AppSessionTests
             companyId, 31, 7.5m, 1, 25m, 6, true, false, true, 7, 1,
             "I confirm that I have read and understood this document.", 3,
             NoticePeriodUnit.Months, 1, true,
-            EmployeeNumberMode.Automatic, "EMP-", 1, 4, DateTime.UtcNow);
+            EmployeeNumberMode.Automatic, "EMP-", 1, 4,
+            AssetNumberMode.Manual, null, 1, 1, DateTime.UtcNow);
         var employee = new MyEmployeeResponse(employeeId, "Alice", "Smith", "Engineer", null, null, "avatar.png", false);
 
         return new RoutingHandler(new()

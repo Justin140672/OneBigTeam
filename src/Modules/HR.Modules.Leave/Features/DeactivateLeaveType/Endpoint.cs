@@ -1,9 +1,10 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Leave.Features.DeactivateLeaveType;
 
-internal sealed class Endpoint(DeactivateLeaveTypeHandler handler)
+internal sealed class Endpoint(DeactivateLeaveTypeHandler handler, ICurrentUser currentUser)
     : Endpoint<DeactivateLeaveTypeRequest>
 {
     public override void Configure()
@@ -14,7 +15,9 @@ internal sealed class Endpoint(DeactivateLeaveTypeHandler handler)
 
     public override async Task HandleAsync(DeactivateLeaveTypeRequest request, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var result = await handler.HandleAsync(
+            request with { ActorEmployeeId = currentUser.UserId },
+            cancellationToken);
         if (result.IsFailure)
         {
             if (result.Error.Code == "not_found")

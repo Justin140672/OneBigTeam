@@ -337,7 +337,7 @@
     private void NavigateToEmployee(OrganisationChartDiagramItem item)
     {
         var returnUrl = Uri.EscapeDataString($"/companies/{CompanyId}/organisation-chart");
-        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{item.Id}/view?returnUrl={returnUrl}");
+        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{item.Id}?returnUrl={returnUrl}");
     }
 
     // Fires once the diagram has finished laying itself out from DataSourceSettings — the

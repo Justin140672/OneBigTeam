@@ -127,6 +127,161 @@ internal sealed record LeaveBalanceAdjustedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
+internal sealed record ToilExpiredAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid TransactionId,
+    Guid LeaveBalanceId,
+    Guid BucketTransactionId,
+    decimal Days,
+    DateOnly OccurredOn,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "toil.expired";
+    string IAuditEvent.EntityType => "ToilTransaction";
+    Guid IAuditEvent.EntityId => TransactionId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"{Days} day(s) TOIL expired";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { Days, OccurredOn, BucketTransactionId };
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record LeavePolicyCreatedAuditEvent(
+    Guid CompanyId,
+    Guid LeavePolicyId,
+    string Name,
+    decimal CarryOverDays,
+    bool AllowNegativeBalance,
+    bool RequiresApproval,
+    bool IsDefault,
+    Guid? ActorEmployeeIdValue,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "leave-policy.created";
+    string IAuditEvent.EntityType => "LeavePolicy";
+    Guid IAuditEvent.EntityId => LeavePolicyId;
+    Guid? IAuditEvent.EmployeeId => null;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeIdValue;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Leave policy '{Name}' created";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { Name, CarryOverDays, AllowNegativeBalance, RequiresApproval, IsDefault };
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record LeavePolicyUpdatedAuditEvent(
+    Guid CompanyId,
+    Guid LeavePolicyId,
+    object Before,
+    object After,
+    Guid? ActorEmployeeIdValue,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "leave-policy.updated";
+    string IAuditEvent.EntityType => "LeavePolicy";
+    Guid IAuditEvent.EntityId => LeavePolicyId;
+    Guid? IAuditEvent.EmployeeId => null;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeIdValue;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Leave policy updated";
+    object? IAuditEvent.Before => Before;
+    object? IAuditEvent.After => After;
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record LeavePolicyAssignedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid LeavePolicyId,
+    Guid? PreviousLeavePolicyId,
+    DateOnly EffectiveFrom,
+    Guid? ActorEmployeeIdValue,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "leave-policy.assigned";
+    string IAuditEvent.EntityType => "EmployeeLeavePolicyAssignment";
+    Guid IAuditEvent.EntityId => LeavePolicyId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeIdValue;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Leave policy assigned to employee";
+    object? IAuditEvent.Before => PreviousLeavePolicyId is null ? null : new { LeavePolicyId = PreviousLeavePolicyId };
+    object? IAuditEvent.After => new { LeavePolicyId, EffectiveFrom };
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record LeaveTypeCreatedAuditEvent(
+    Guid CompanyId,
+    Guid LeaveTypeId,
+    string Name,
+    string Code,
+    decimal DefaultEntitlementDays,
+    string AccrualMethod,
+    string Behaviour,
+    Guid? ActorEmployeeIdValue,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "leave-type.created";
+    string IAuditEvent.EntityType => "LeaveType";
+    Guid IAuditEvent.EntityId => LeaveTypeId;
+    Guid? IAuditEvent.EmployeeId => null;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeIdValue;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Leave type '{Name}' created";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { Name, Code, DefaultEntitlementDays, AccrualMethod, Behaviour };
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record LeaveTypeUpdatedAuditEvent(
+    Guid CompanyId,
+    Guid LeaveTypeId,
+    object Before,
+    object After,
+    Guid? ActorEmployeeIdValue,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "leave-type.updated";
+    string IAuditEvent.EntityType => "LeaveType";
+    Guid IAuditEvent.EntityId => LeaveTypeId;
+    Guid? IAuditEvent.EmployeeId => null;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeIdValue;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Leave type updated";
+    object? IAuditEvent.Before => Before;
+    object? IAuditEvent.After => After;
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record LeaveTypeDeactivatedAuditEvent(
+    Guid CompanyId,
+    Guid LeaveTypeId,
+    string Name,
+    Guid? ActorEmployeeIdValue,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "leave-type.deactivated";
+    string IAuditEvent.EntityType => "LeaveType";
+    Guid IAuditEvent.EntityId => LeaveTypeId;
+    Guid? IAuditEvent.EmployeeId => null;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeIdValue;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Leave type '{Name}' deactivated";
+    object? IAuditEvent.Before => new { IsActive = true };
+    object? IAuditEvent.After => new { IsActive = false };
+    object? IAuditEvent.Metadata => null;
+}
+
 internal sealed record ToilAwardedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,

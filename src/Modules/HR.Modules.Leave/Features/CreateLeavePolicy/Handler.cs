@@ -1,5 +1,6 @@
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,11 +10,13 @@ internal sealed class CreateLeavePolicyHandler
 {
     private readonly LeaveDbContext _dbContext;
     private readonly IClock _clock;
+    private readonly IAuditEventPublisher _auditPublisher;
 
-    public CreateLeavePolicyHandler(LeaveDbContext dbContext, IClock clock)
+    public CreateLeavePolicyHandler(LeaveDbContext dbContext, IClock clock, IAuditEventPublisher auditPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
+        _auditPublisher = auditPublisher;
     }
 
     public async Task<Result<CreateLeavePolicyResponse>> HandleAsync(
@@ -56,10 +59,22 @@ internal sealed class CreateLeavePolicyHandler
             request.CarryOverDays,
             request.AllowNegativeBalance,
             isDefault,
-            now);
+            now,
+            request.RequiresApproval);
 
         _dbContext.LeavePolicies.Add(policy);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _auditPublisher.PublishAsync(new LeavePolicyCreatedAuditEvent(
+            policy.CompanyId,
+            policy.Id,
+            policy.Name,
+            policy.CarryOverDays,
+            policy.AllowNegativeBalance,
+            policy.RequiresApproval,
+            policy.IsDefault,
+            request.ActorEmployeeId,
+            now), cancellationToken);
 
         return Result.Success(new CreateLeavePolicyResponse(
             policy.Id,
@@ -68,6 +83,7 @@ internal sealed class CreateLeavePolicyHandler
             policy.Description,
             policy.CarryOverDays,
             policy.AllowNegativeBalance,
+            policy.RequiresApproval,
             policy.IsActive,
             policy.IsDefault,
             policy.CreatedAt));

@@ -21,7 +21,7 @@ public class UpdateLeavePolicyHandlerTests
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateLeavePolicyRequest
@@ -50,7 +50,7 @@ public class UpdateLeavePolicyHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Policy_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateLeavePolicyRequest
@@ -77,7 +77,7 @@ public class UpdateLeavePolicyHandlerTests
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateLeavePolicyRequest
@@ -104,7 +104,7 @@ public class UpdateLeavePolicyHandlerTests
         context.LeavePolicies.AddRange(existing, target);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateLeavePolicyRequest
@@ -130,7 +130,7 @@ public class UpdateLeavePolicyHandlerTests
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateLeavePolicyRequest
@@ -157,7 +157,7 @@ public class UpdateLeavePolicyHandlerTests
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateLeavePolicyRequest
@@ -190,7 +190,7 @@ public class UpdateLeavePolicyHandlerTests
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateLeavePolicyRequest
@@ -221,7 +221,7 @@ public class UpdateLeavePolicyHandlerTests
         context.LeavePolicies.AddRange(currentDefault, target);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateLeavePolicyRequest
@@ -238,6 +238,45 @@ public class UpdateLeavePolicyHandlerTests
 
         var reloadedCurrentDefault = await context.LeavePolicies.SingleAsync(p => p.Id == currentDefault.Id);
         Assert.False(reloadedCurrentDefault.IsDefault);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_LeavePolicyUpdatedAuditEvent_With_Before_And_After()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var actorId = Guid.NewGuid();
+
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Old Name", "Old desc", 3, false, false, now);
+        context.LeavePolicies.Add(policy);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new CapturingAuditEventPublisher();
+        var handler = new UpdateLeavePolicyHandler(context, new FakeClock(FixedUtcNow), auditPublisher);
+
+        var result = await handler.HandleAsync(
+            new UpdateLeavePolicyRequest
+            {
+                CompanyId = companyId,
+                PolicyId = policy.Id,
+                Name = "New Name",
+                Description = "New desc",
+                CarryOverDays = 10,
+                AllowNegativeBalance = true,
+                ActorEmployeeId = actorId
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var published = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<LeavePolicyUpdatedAuditEvent>(published);
+        Assert.Equal(companyId, auditEvent.CompanyId);
+        Assert.Equal(policy.Id, auditEvent.LeavePolicyId);
+        Assert.Equal(actorId, auditEvent.ActorEmployeeIdValue);
+        Assert.NotNull(auditEvent.Before);
+        Assert.NotNull(auditEvent.After);
     }
 
     private static LeaveDbContext BuildContext()

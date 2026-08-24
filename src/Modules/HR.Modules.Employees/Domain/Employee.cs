@@ -141,6 +141,15 @@ internal sealed class Employee
         UpdatedAt = now;
     }
 
+    // Used exclusively by EmployeeRenumberingService (IEmployeeRenumberingService) when a
+    // company's employee-number FORMAT changes while staying in Automatic mode — every employee
+    // is renumbered to the new format. Not used by any manual, user-facing edit path (see the
+    // Automatic-mode read-only guard in UpdateEmploymentDetailsHandler).
+    public void SetEmployeeNumber(string employeeNumber)
+    {
+        EmployeeNumber = employeeNumber;
+    }
+
     public void SetProbationEndDate(DateOnly probationEndDate, DateTimeOffset now)
     {
         ProbationEndDate = probationEndDate;

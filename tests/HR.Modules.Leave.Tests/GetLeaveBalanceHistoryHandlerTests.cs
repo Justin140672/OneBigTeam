@@ -88,9 +88,9 @@ public class GetLeaveBalanceHistoryHandlerTests
         cancelled.Cancel(CancelledLeaveDate);
         context.LeaveRequests.Add(cancelled);
 
-        var toilTransaction = ToilTransaction.Create(
+        var toilTransaction = ToilTransaction.CreateEarned(
             Guid.NewGuid(), company, employee, balance.Id, ToilAwarderId,
-            1m, new DateOnly(2026, 3, 8), "Overtime", ToilAwardDate);
+            1m, new DateOnly(2026, 3, 8), null, "Overtime", ToilAwardDate);
         context.ToilTransactions.Add(toilTransaction);
 
         // Adjustment amounts are stored in days (AdjustmentDays); AdjustmentHours is only

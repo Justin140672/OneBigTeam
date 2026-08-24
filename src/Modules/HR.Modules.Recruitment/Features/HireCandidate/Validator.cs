@@ -40,5 +40,13 @@ internal sealed class HireCandidateValidator : AbstractValidator<HireCandidateRe
 
         RuleFor(r => r.EmploymentTypeId)
             .NotEmpty().WithMessage("Employment type is required.");
+
+        // Mirrors the max lengths enforced on Employee.AddressLine1/AddressLine2/City/County/
+        // PostCode (EmployeeConfiguration) — all optional here, same as on Employee Edit.
+        RuleFor(r => r.AddressLine1).MaximumLength(200);
+        RuleFor(r => r.AddressLine2).MaximumLength(200);
+        RuleFor(r => r.City).MaximumLength(100);
+        RuleFor(r => r.County).MaximumLength(100);
+        RuleFor(r => r.PostCode).MaximumLength(20);
     }
 }

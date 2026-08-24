@@ -32,6 +32,21 @@ internal sealed class LeaveType
     /// </summary>
     public bool IsSystem { get; private set; }
 
+    /// <summary>
+    /// TOIL-only policy setting (LEAVE-06): number of days after an award's earn date at which its
+    /// remaining, unused balance expires. Null means TOIL earned under this leave type never
+    /// expires. Ignored for non-TOIL behaviours.
+    /// </summary>
+    public int? ToilExpiryDays { get; private set; }
+
+    /// <summary>
+    /// TOIL-only policy setting (LEAVE-06): whether an approval that would take the employee's TOIL
+    /// balance negative is permitted. Defaults to false - unlike entitled leave types (which may
+    /// allow negative balances via <see cref="LeavePolicy.AllowNegativeBalance"/>), earned TOIL
+    /// going negative is a distinct, deliberately conservative judgement call and is opt-in only.
+    /// </summary>
+    public bool AllowNegativeToilBalance { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -45,7 +60,9 @@ internal sealed class LeaveType
         LeaveTypeBehaviour behaviour,
         DateTimeOffset now,
         bool hasBalance = true,
-        bool isSystem = false)
+        bool isSystem = false,
+        int? toilExpiryDays = null,
+        bool allowNegativeToilBalance = false)
     {
         return new LeaveType
         {
@@ -59,6 +76,8 @@ internal sealed class LeaveType
             IsActive = true,
             HasBalance = hasBalance,
             IsSystem = isSystem,
+            ToilExpiryDays = toilExpiryDays,
+            AllowNegativeToilBalance = allowNegativeToilBalance,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -71,7 +90,9 @@ internal sealed class LeaveType
         AccrualMethod accrualMethod,
         LeaveTypeBehaviour behaviour,
         DateTimeOffset now,
-        bool hasBalance = true)
+        bool hasBalance = true,
+        int? toilExpiryDays = null,
+        bool allowNegativeToilBalance = false)
     {
         // System leave types (e.g. Annual Leave) can never be renamed — see IsSystem's doc
         // comment. Callers (UpdateLeaveTypeHandler) are expected to reject a rename attempt
@@ -82,6 +103,8 @@ internal sealed class LeaveType
         AccrualMethod = accrualMethod;
         Behaviour = behaviour;
         HasBalance = hasBalance;
+        ToilExpiryDays = toilExpiryDays;
+        AllowNegativeToilBalance = allowNegativeToilBalance;
         UpdatedAt = now;
     }
 

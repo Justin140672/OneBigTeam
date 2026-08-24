@@ -23,7 +23,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
-        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignLeavePolicyToEmployeeRequest
@@ -64,7 +64,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         context.EmployeeLeavePolicyAssignments.Add(existingAssignment);
         await context.SaveChangesAsync();
 
-        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignLeavePolicyToEmployeeRequest
@@ -90,7 +90,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Policy_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignLeavePolicyToEmployeeRequest
@@ -116,7 +116,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
-        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignLeavePolicyToEmployeeRequest
@@ -150,7 +150,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         context.LeaveTypes.Add(leaveType);
         await context.SaveChangesAsync();
 
-        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignLeavePolicyToEmployeeRequest
@@ -185,7 +185,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         context.LeaveTypes.Add(leaveType);
         await context.SaveChangesAsync();
 
-        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignLeavePolicyToEmployeeRequest
@@ -200,6 +200,44 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         Assert.True(result.IsSuccess);
         var balance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(new DateOnly(2026, 1, 1), balance.AccrualStartDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_LeavePolicyAssignedAuditEvent()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var actorId = Guid.NewGuid();
+
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, now);
+        context.LeavePolicies.Add(policy);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new CapturingAuditEventPublisher();
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), auditPublisher);
+
+        var result = await handler.HandleAsync(
+            new AssignLeavePolicyToEmployeeRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                LeavePolicyId = policy.Id,
+                EffectiveFrom = EffectiveDate,
+                ActorEmployeeId = actorId
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var published = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<LeavePolicyAssignedAuditEvent>(published);
+        Assert.Equal(companyId, auditEvent.CompanyId);
+        Assert.Equal(employeeId, auditEvent.EmployeeId);
+        Assert.Equal(policy.Id, auditEvent.LeavePolicyId);
+        Assert.Null(auditEvent.PreviousLeavePolicyId);
+        Assert.Equal(actorId, auditEvent.ActorEmployeeIdValue);
     }
 
     private static LeaveDbContext BuildContext()

@@ -78,6 +78,16 @@ This document records current product decisions that supersede conflicting older
 - Commands, imports, webhooks, jobs and event consumers must still be transactional or idempotent as appropriate.
 - A module may adopt a local outbox for a concrete delivery requirement. The Companies module currently has a scoped outbox; that does not mandate outboxes elsewhere.
 
+## Leave management
+
+- `14-leave-management.md` is the authoritative Leave capability document; where `06-leave-management.md` conflicts with it, `14-leave-management.md` takes precedence.
+- Leave is distinct from the Sickness module. Leave owns leave requests, leave balances, leave policies, TOIL and general absence tracking. Sickness owns sickness records, evidence and return-to-work reviews as a separate domain, not a leave type. There is no "Sick Leave" leave type — it was removed (migration `RemoveSickLeaveType`) precisely to avoid double-tracking the same absence in two modules.
+- Default leave types provisioned for every new company (`LeaveTypeDefaultsProvisioner`): Annual Leave, Unpaid Leave, Compassionate Leave, Parental Leave, Time Off In Lieu (TOIL). Sick Leave is deliberately excluded — sickness absence is tracked exclusively by the Sickness module.
+- "Other" is not a provisioned default leave type. Leave types are fully configurable per company (`CreateLeaveType`/`UpdateLeaveType`/`DeactivateLeaveType`), so a company that wants a general/miscellaneous leave type can create one; MVP does not assume every company needs it.
+- Supported leave request warnings, returned consistently by `PreviewLeaveRequest`, `SubmitLeaveRequest` and `SubmitLeaveRequestDraft` via the shared `LeaveWarningCalculator`/conflict queries: public-holiday-in-range warnings and existing-leave-request overlap warnings. None of these warnings block submission by themselves — insufficient balance and cross-policy-year requests are the only blocking validations.
+- Team-clash warnings (concurrent leave across a team/department) and excessive-absence warnings are explicitly deferred, not implemented. They are not wired into `PreviewLeaveRequest`, `SubmitLeaveRequest` or `SubmitLeaveRequestDraft`, and are not MVP requirements. They may be introduced later for a demonstrated requirement.
+- All leave-policy, leave-type, policy-assignment, balance-adjustment and TOIL mutations publish an audit event (`LeaveAudit.cs`) carrying company, employee (where applicable), actor and before/after data.
+
 ## Product scope
 
 - Payroll processing is outside scope.

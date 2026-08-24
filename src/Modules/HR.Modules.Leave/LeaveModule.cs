@@ -13,6 +13,10 @@ using HR.Modules.Leave.Features.ListLeavePolicies;
 using HR.Modules.Leave.Features.GetLeaveRequest;
 using HR.Modules.Leave.Features.ListLeaveRequests;
 using HR.Modules.Leave.Features.SubmitLeaveRequest;
+using HR.Modules.Leave.Features.CreateLeaveRequestDraft;
+using HR.Modules.Leave.Features.UpdateLeaveRequestDraft;
+using HR.Modules.Leave.Features.SubmitLeaveRequestDraft;
+using HR.Modules.Leave.Features.DeleteLeaveRequestDraft;
 using HR.Modules.Leave.Features.PreviewLeaveRequest;
 using HR.Modules.Leave.Features.AwardToil;
 using HR.Modules.Leave.Features.AdjustLeaveBalance;
@@ -64,6 +68,10 @@ public static class LeaveModule
             "leave-year-rollover",
             job => job.ExecuteAsync(),
             Cron.Daily(0));
+        jobManager.AddOrUpdate<ToilExpiryJob>(
+            "toil-expiry",
+            job => job.ExecuteAsync(),
+            Cron.Daily(0));
         return app;
     }
 
@@ -87,6 +95,16 @@ public static class LeaveModule
         services.AddScoped<IValidator<GetRecentLeaveRequestsRequest>, GetRecentLeaveRequestsValidator>();
         services.AddScoped<SubmitLeaveRequestHandler>();
         services.AddScoped<IValidator<SubmitLeaveRequestRequest>, SubmitLeaveRequestValidator>();
+        services.AddScoped<CreateLeaveRequestDraftHandler>();
+        services.AddScoped<IValidator<CreateLeaveRequestDraftRequest>, CreateLeaveRequestDraftValidator>();
+        services.AddScoped<UpdateLeaveRequestDraftHandler>();
+        services.AddScoped<IValidator<UpdateLeaveRequestDraftRequest>, UpdateLeaveRequestDraftValidator>();
+        services.AddScoped<SubmitLeaveRequestDraftHandler>();
+        services.AddScoped<IValidator<SubmitLeaveRequestDraftRequest>, SubmitLeaveRequestDraftValidator>();
+        services.AddScoped<DeleteLeaveRequestDraftHandler>();
+        services.AddScoped<IValidator<DeleteLeaveRequestDraftRequest>, DeleteLeaveRequestDraftValidator>();
+        services.AddScoped<Services.LeaveApprovalEffectsService>();
+        services.AddScoped<Services.LeaveWarningCalculator>();
         services.AddScoped<PreviewLeaveRequestHandler>();
         services.AddScoped<IValidator<PreviewLeaveRequestRequest>, PreviewLeaveRequestValidator>();
         services.AddScoped<CancelLeaveRequestHandler>();
@@ -125,6 +143,9 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         services.AddScoped<LeaveResourceAuthorizer>();
         services.AddScoped<LeaveYearRolloverService>();
         services.AddScoped<LeaveYearRolloverJob>();
+        services.AddScoped<Services.ToilLedgerService>();
+        services.AddScoped<ToilExpiryService>();
+        services.AddScoped<ToilExpiryJob>();
 
         // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
         services.AddScoped<IOnboardingTaskDefinition, ReviewDefaultLeavePolicyTask>();

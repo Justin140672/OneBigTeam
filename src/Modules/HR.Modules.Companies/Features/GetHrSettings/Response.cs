@@ -4,6 +4,7 @@ using HR.Modules.Companies.Contracts;
 
 namespace HR.Modules.Companies.Features.GetHrSettings;
 
+
 internal sealed record GetHrSettingsResponse(
     Guid CompanyId,
     int WorkingDays,
@@ -25,4 +26,8 @@ internal sealed record GetHrSettingsResponse(
     string? EmployeeNumberPrefix,
     int NextEmployeeNumber,
     int EmployeeNumberMinimumLength,
+    AssetNumberMode AssetNumberMode,
+    string? AssetNumberPrefix,
+    int NextAssetNumber,
+    int AssetNumberMinimumLength,
     DateTimeOffset UpdatedAt);

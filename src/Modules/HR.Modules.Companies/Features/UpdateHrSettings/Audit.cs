@@ -24,7 +24,11 @@ internal sealed record HrSettingsAuditSnapshot(
     EmployeeNumberMode EmployeeNumberMode,
     string? EmployeeNumberPrefix,
     int NextEmployeeNumber,
-    int EmployeeNumberMinimumLength);
+    int EmployeeNumberMinimumLength,
+    AssetNumberMode AssetNumberMode,
+    string? AssetNumberPrefix,
+    int NextAssetNumber,
+    int AssetNumberMinimumLength);
 
 internal sealed record HrSettingsUpdatedAuditEvent(
     Guid CompanyId,

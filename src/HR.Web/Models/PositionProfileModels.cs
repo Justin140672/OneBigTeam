@@ -45,7 +45,17 @@ public record GetPositionProfileResponse(
     IReadOnlyList<PositionProfileRequiredDocumentModel> RequiredDocuments,
     IReadOnlyList<PositionProfileRequiredAssetModel> RequiredAssets,
     NoticePeriodUnit? NoticePeriodUnitOverride = null,
-    int? NoticePeriodLengthOverride = null);
+    int? NoticePeriodLengthOverride = null,
+    IReadOnlyList<PositionProfileAssignedEmployeeModel>? AssignedEmployees = null);
+
+public record PositionProfileAssignedEmployeeModel(
+    Guid EmployeeId,
+    string FirstName,
+    string LastName,
+    string Status)
+{
+    public string FullName => $"{FirstName} {LastName}";
+}
 
 public record PositionProfileRequiredDocumentModel(
     Guid Id,

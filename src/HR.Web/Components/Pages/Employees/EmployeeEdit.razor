@@ -11,6 +11,7 @@
 @inject InviteService InviteService
 @inject CompanyService CompanyService
 @inject AppSession Session
+@inject IJSRuntime JS
 @inherits EditPageBase<EmployeeProfileEditModel>
 @using HR.Infrastructure.Abstractions
 @using HR.SharedKernel
@@ -230,16 +231,6 @@
                         </div>
                         <div class="card-body">
                             <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Mobile / Work Phone</label>
-                                    <HrTextBox @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" />
-                                    <ValidationMessage For="@(() => Model.PhoneNumber)" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Home Phone</label>
-                                    <HrTextBox @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" />
-                                    <ValidationMessage For="@(() => Model.HomePhone)" />
-                                </div>
                                 <div class="col-12">
                                     <label class="form-label">Address Line 1</label>
                                     <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" />
@@ -256,14 +247,20 @@
                                     <label class="form-label">County / State</label>
                                     <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" />
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-4">
                                     <label class="form-label">Post Code</label>
                                     <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" />
                                     <ValidationMessage For="@(() => Model.PostCode)" />
                                 </div>
-                                <div class="col-md-2">
-                                    <label class="form-label">Country</label>
-                                    <HrTextBox @bind-Value="Model.Country" Placeholder="e.g. United Kingdom" />
+                                <div class="col-12">
+                                    <label class="form-label">Mobile / Work Phone</label>
+                                    <HrTextBox @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" />
+                                    <ValidationMessage For="@(() => Model.PhoneNumber)" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Home Phone</label>
+                                    <HrTextBox @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" />
+                                    <ValidationMessage For="@(() => Model.HomePhone)" />
                                 </div>
                             </div>
                         </div>
@@ -489,21 +486,17 @@
                                                     <label class="form-label">County / State</label>
                                                     <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "County / State" })" @bind-Value="Model.County" Placeholder="e.g. Greater London" ReadOnly="@IsViewMode" />
                                                 </div>
-                                                <div class="col-md-3">
+                                                <div class="col-md-4">
                                                     <label class="form-label">Post Code</label>
                                                     <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Post Code" })" @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" ReadOnly="@IsViewMode" />
                                                     <ValidationMessage For="@(() => Model.PostCode)" />
                                                 </div>
-                                                <div class="col-md-3">
-                                                    <label class="form-label">Country</label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Country" })" @bind-Value="Model.Country" Placeholder="e.g. United Kingdom" ReadOnly="@IsViewMode" />
-                                                </div>
-                                                <div class="col-md-6">
+                                                <div class="col-12">
                                                     <label class="form-label">Mobile / Work Phone</label>
                                                     <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Mobile / Work Phone" })" @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" ReadOnly="@IsViewMode" />
                                                     <ValidationMessage For="@(() => Model.PhoneNumber)" />
                                                 </div>
-                                                <div class="col-md-6">
+                                                <div class="col-12">
                                                     <label class="form-label">Home Phone</label>
                                                     <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Home Phone" })" @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" ReadOnly="@IsViewMode" />
                                                     <ValidationMessage For="@(() => Model.HomePhone)" />
@@ -900,6 +893,14 @@
     private EmployeeEmploymentTab? _employmentTab;
     private int _activeTabIndex;
 
+    // Remembers which tab was last active for this employee (per browser, via localStorage — see
+    // app.js's setLastEmployeeTab/getLastEmployeeTab) so reopening the same employee's edit/view
+    // lands back on the same tab. An explicit "?tab=" query param (deep links from elsewhere, e.g.
+    // "?tab=leave") always takes priority and is never overridden by the stored value.
+    private bool _hadTabQueryParam;
+    private bool _restoredTabFromStorage;
+    private int _lastPersistedTabIndex = -1;
+
     // Probation only gets a tab while an active record exists (Active/ReviewDue/Extended) —
     // hidden once Passed/Failed, or when the employee never had a record at all. Since Probation
     // sits above every other conditional/fixed tab in this markup, hiding it shifts every
@@ -1054,6 +1055,7 @@
         var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
         if (query.TryGetValue("tab", out var tab))
         {
+            _hadTabQueryParam = true;
             var tabValue = tab.ToString();
 
             _activeTabIndex = tabValue switch
@@ -1069,6 +1071,50 @@
         }
 
         BuildMoreActionsItems();
+    }
+
+    // Restores the last-active tab from localStorage on first render (JS interop isn't available
+    // until after the first render), unless an explicit "?tab=" deep link already set it above.
+    // Once restored (or once there's nothing to restore), subsequent renders just persist whatever
+    // tab the user is currently on.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (IsNew || _employee is null) return;
+
+        if (firstRender && !_hadTabQueryParam && !_restoredTabFromStorage)
+        {
+            _restoredTabFromStorage = true;
+            try
+            {
+                var storedTab = await JS.InvokeAsync<int?>("getLastEmployeeTab", Id);
+                if (storedTab is { } idx && idx != _activeTabIndex)
+                {
+                    _activeTabIndex = idx;
+                    _lastPersistedTabIndex = idx;
+                    StateHasChanged();
+                    return;
+                }
+            }
+            catch
+            {
+                // ignore — storage unavailable, just keep the default/query-derived tab.
+            }
+        }
+
+        if (_activeTabIndex != _lastPersistedTabIndex)
+        {
+            _lastPersistedTabIndex = _activeTabIndex;
+            try
+            {
+                await JS.InvokeVoidAsync("setLastEmployeeTab", Id, _activeTabIndex);
+            }
+            catch
+            {
+                // ignore — a failed write should never break tab navigation.
+            }
+        }
     }
 
     private bool _showStartLeavingProcessDialog;

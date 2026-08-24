@@ -278,6 +278,15 @@ html[data-theme="dark"] .hr-toolbar-bulk-update-btn.e-btn.e-flat {
     color: #fff;
 }
 
+/* Export's dropdown button renders on a solid brand-teal background whenever it has
+   keyboard/mouse focus (Syncfusion's own e-flat focus/active state) — its dark-grey default text
+   color (above) is unreadable against that background, so force it white while focused. */
+.hr-toolbar-export-btn.e-btn.e-flat:focus,
+.hr-toolbar-export-btn.e-btn.e-flat:focus-visible,
+.hr-toolbar-export-btn.e-btn.e-flat.e-active {
+    color: #fff;
+}
+
 .hr-toolbar-more-btn.e-btn.e-flat {
     color: var(--hr-gray-900);
 }

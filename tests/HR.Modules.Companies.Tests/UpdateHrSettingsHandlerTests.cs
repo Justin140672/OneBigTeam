@@ -28,7 +28,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
 
 		var result = await handler.HandleAsync(ValidRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -51,7 +51,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
 
 		var result = await handler.HandleAsync(ValidRequest(company.Id), CancellationToken.None);
 
@@ -75,7 +75,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 12, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with { ExcludePublicHolidaysFromLeave = excludePublicHolidays },
@@ -104,7 +104,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 12, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with { DisplaySalaryOnEmployeeProfile = displaySalaryOnEmployeeProfile },
@@ -130,7 +130,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher);
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService());
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -171,7 +171,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 7, 19, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with { DefaultAcknowledgementStatement = "Please confirm you have read this policy." },
@@ -198,7 +198,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 7, 19, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with { DefaultAcknowledgementStatement = "   " },
@@ -222,7 +222,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 7, 19, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher);
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService());
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with { DefaultAcknowledgementStatement = "New acknowledgement statement." },
@@ -250,7 +250,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 7, 24, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -285,7 +285,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 7, 24, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher);
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService());
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -323,7 +323,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 7, 26, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -361,7 +361,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 7, 26, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher);
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService());
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with

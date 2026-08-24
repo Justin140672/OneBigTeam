@@ -9,7 +9,8 @@ namespace HR.Modules.Leave.Features.DeactivateLeaveType;
 internal sealed class DeactivateLeaveTypeHandler(
     LeaveDbContext db,
     IClock clock,
-    ICurrentEmployeeReader currentEmployeeReader)
+    ICurrentEmployeeReader currentEmployeeReader,
+    IAuditEventPublisher auditPublisher)
 {
     public async Task<Result> HandleAsync(
         DeactivateLeaveTypeRequest request,
@@ -54,8 +55,16 @@ internal sealed class DeactivateLeaveTypeHandler(
                 $"{currentEmployeeBalanceCount} active employee{(currentEmployeeBalanceCount == 1 ? "" : "s")}."));
         }
 
-        entity.Deactivate(new DateTimeOffset(clock.UtcNow, TimeSpan.Zero));
+        var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
+        entity.Deactivate(now);
         await db.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new LeaveTypeDeactivatedAuditEvent(
+            entity.CompanyId,
+            entity.Id,
+            entity.Name,
+            request.ActorEmployeeId,
+            now), cancellationToken);
 
         return Result.Success();
     }

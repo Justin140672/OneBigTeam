@@ -14,7 +14,7 @@ public class CreateLeaveTypeHandlerTests
     public async Task HandleAsync_Creates_LeaveType()
     {
         await using var db = BuildContext();
-        var handler = new CreateLeaveTypeHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new CreateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
         var companyId = Guid.NewGuid();
 
         var result = await handler.HandleAsync(new CreateLeaveTypeRequest
@@ -52,7 +52,7 @@ public class CreateLeaveTypeHandlerTests
         db.LeaveTypes.Add(LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now));
         await db.SaveChangesAsync();
 
-        var handler = new CreateLeaveTypeHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new CreateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new CreateLeaveTypeRequest
         {
@@ -79,7 +79,7 @@ public class CreateLeaveTypeHandlerTests
         db.LeaveTypes.Add(LeaveType.Create(Guid.NewGuid(), companyA, "Annual Leave", "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now));
         await db.SaveChangesAsync();
 
-        var handler = new CreateLeaveTypeHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new CreateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new CreateLeaveTypeRequest
         {
@@ -92,6 +92,36 @@ public class CreateLeaveTypeHandlerTests
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_LeaveTypeCreatedAuditEvent()
+    {
+        await using var db = BuildContext();
+        var auditPublisher = new CapturingAuditEventPublisher();
+        var handler = new CreateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), auditPublisher);
+        var companyId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+
+        var result = await handler.HandleAsync(new CreateLeaveTypeRequest
+        {
+            CompanyId = companyId,
+            Name = "Annual Leave",
+            Code = "annual",
+            DefaultEntitlementDays = 25,
+            AccrualMethod = AccrualMethod.Monthly,
+            Behaviour = LeaveTypeBehaviour.Standard,
+            ActorEmployeeId = actorId
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var published = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<LeaveTypeCreatedAuditEvent>(published);
+        Assert.Equal(companyId, auditEvent.CompanyId);
+        Assert.Equal(result.Value!.Id, auditEvent.LeaveTypeId);
+        Assert.Equal("ANNUAL", auditEvent.Code);
+        Assert.Equal(actorId, auditEvent.ActorEmployeeIdValue);
     }
 
     private static LeaveDbContext BuildContext()

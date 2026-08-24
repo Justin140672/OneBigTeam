@@ -1,5 +1,6 @@
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
+using HR.Modules.Leave.Services;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
@@ -16,6 +17,8 @@ internal sealed class SubmitLeaveRequestHandler
     private readonly IPublicHolidayReader _publicHolidayReader;
     private readonly IIntegrationEventPublisher _publisher;
     private readonly IAuditEventPublisher _auditPublisher;
+    private readonly LeaveApprovalEffectsService _approvalEffects;
+    private readonly LeaveWarningCalculator _warningCalculator;
 
     public SubmitLeaveRequestHandler(
         LeaveDbContext dbContext,
@@ -24,7 +27,9 @@ internal sealed class SubmitLeaveRequestHandler
         ICompanyLeaveSettingsReader leaveSettingsReader,
         IPublicHolidayReader publicHolidayReader,
         IIntegrationEventPublisher publisher,
-        IAuditEventPublisher auditPublisher)
+        IAuditEventPublisher auditPublisher,
+        LeaveApprovalEffectsService approvalEffects,
+        LeaveWarningCalculator warningCalculator)
     {
         _dbContext = dbContext;
         _clock = clock;
@@ -33,6 +38,8 @@ internal sealed class SubmitLeaveRequestHandler
         _publicHolidayReader = publicHolidayReader;
         _publisher = publisher;
         _auditPublisher = auditPublisher;
+        _approvalEffects = approvalEffects;
+        _warningCalculator = warningCalculator;
     }
 
     public async Task<Result<SubmitLeaveRequestResponse>> HandleAsync(
@@ -156,7 +163,34 @@ internal sealed class SubmitLeaveRequestHandler
             .Select(r => new LeaveConflictWarning(r.Id, r.LeaveTypeId, r.StartDate, r.EndDate, r.Status.ToString()))
             .ToListAsync(cancellationToken);
 
+        // LEAVE-08: surfaces the same public-holiday-in-range warning PreviewLeaveRequestHandler
+        // returns, so a client that skipped preview still sees it on submission.
+        var excludedHolidays = (await _warningCalculator.GetExcludedPublicHolidaysAsync(
+                request.CompanyId, request.StartDate, request.EndDate, workingPattern,
+                leaveSettings.ExcludePublicHolidaysFromLeave, cancellationToken))
+            .Select(h => new SubmitExcludedPublicHolidayItem(h.Date, h.Name))
+            .ToList();
+
         _dbContext.LeaveRequests.Add(leaveRequest);
+
+        // LEAVE-07: RequiresApproval lives on the policy, defaulting to true (the safer choice)
+        // when the employee has no resolvable policy - see LeavePolicy.RequiresApproval.
+        var requiresApproval = policy?.RequiresApproval ?? true;
+
+        if (!requiresApproval)
+        {
+            // Auto-approval path: apply the exact same balance/TOIL-ledger mutation and Approve()
+            // call a manual reviewer's approval would trigger (LeaveApprovalEffectsService),
+            // reviewed-by defaults to the requesting employee since there is no separate approver
+            // for policies that skip manual review. No LeaveRequestedIntegrationEvent is
+            // published, so the Tasks module never creates an approval task for this request.
+            var effectResult = await _approvalEffects.ApplyBalanceEffectsAndApproveAsync(
+                leaveRequest, leaveType, request.EmployeeId, now, cancellationToken);
+
+            if (effectResult.IsFailure)
+                return Result.Failure<SubmitLeaveRequestResponse>(effectResult.Error);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         await _auditPublisher.PublishAsync(new LeaveSubmittedAuditEvent(
@@ -170,15 +204,23 @@ internal sealed class SubmitLeaveRequestHandler
             leaveRequest.Reason,
             now), cancellationToken);
 
-        await _publisher.PublishAsync(new LeaveRequestedIntegrationEvent(
-            leaveRequest.CompanyId,
-            leaveRequest.EmployeeId,
-            leaveRequest.Id,
-            leaveRequest.LeaveTypeId,
-            leaveRequest.StartDate,
-            leaveRequest.EndDate,
-            leaveRequest.TotalDays,
-            now), cancellationToken);
+        if (requiresApproval)
+        {
+            await _publisher.PublishAsync(new LeaveRequestedIntegrationEvent(
+                leaveRequest.CompanyId,
+                leaveRequest.EmployeeId,
+                leaveRequest.Id,
+                leaveRequest.LeaveTypeId,
+                leaveRequest.StartDate,
+                leaveRequest.EndDate,
+                leaveRequest.TotalDays,
+                now), cancellationToken);
+        }
+        else
+        {
+            // Produces the same audit/notification outcome a manual approval would (LEAVE-07 AC).
+            await _approvalEffects.PublishApprovalOutcomeAsync(leaveRequest, request.EmployeeId, now, cancellationToken);
+        }
 
         return Result.Success(new SubmitLeaveRequestResponse(
             leaveRequest.Id,
@@ -194,7 +236,8 @@ internal sealed class SubmitLeaveRequestHandler
             leaveRequest.TotalDays,
             leaveRequest.Reason,
             leaveRequest.CreatedAt,
-            conflicts));
+            conflicts,
+            excludedHolidays));
     }
 
 }

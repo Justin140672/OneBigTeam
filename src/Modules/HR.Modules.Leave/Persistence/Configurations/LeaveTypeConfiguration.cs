@@ -64,6 +64,14 @@ internal sealed class LeaveTypeConfiguration : IEntityTypeConfiguration<LeaveTyp
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(t => t.ToilExpiryDays)
+            .HasColumnName("toil_expiry_days");
+
+        builder.Property(t => t.AllowNegativeToilBalance)
+            .HasColumnName("allow_negative_toil_balance")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(t => t.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

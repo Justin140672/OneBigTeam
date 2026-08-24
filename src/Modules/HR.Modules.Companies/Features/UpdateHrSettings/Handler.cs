@@ -1,3 +1,4 @@
+using HR.Modules.Companies.Contracts;
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
 using HR.Infrastructure.Abstractions;
@@ -12,15 +13,18 @@ internal sealed class UpdateHrSettingsHandler
 	private readonly CompaniesDbContext _dbContext;
 	private readonly IClock _clock;
 	private readonly IAuditEventPublisher _auditEventPublisher;
+	private readonly IEmployeeRenumberingService _employeeRenumberingService;
 
 	public UpdateHrSettingsHandler(
 		CompaniesDbContext dbContext,
 		IClock clock,
-		IAuditEventPublisher auditEventPublisher)
+		IAuditEventPublisher auditEventPublisher,
+		IEmployeeRenumberingService employeeRenumberingService)
 	{
 		_dbContext = dbContext;
 		_clock = clock;
 		_auditEventPublisher = auditEventPublisher;
+		_employeeRenumberingService = employeeRenumberingService;
 	}
 
 	public async Task<Result<UpdateHrSettingsResponse>> HandleAsync(
@@ -59,7 +63,15 @@ internal sealed class UpdateHrSettingsHandler
 				company.Settings.EmployeeNumberMode,
 				company.Settings.EmployeeNumberPrefix,
 				company.Settings.NextEmployeeNumber,
-				company.Settings.EmployeeNumberMinimumLength);
+				company.Settings.EmployeeNumberMinimumLength,
+				company.Settings.AssetNumberMode,
+				company.Settings.AssetNumberPrefix,
+				company.Settings.NextAssetNumber,
+				company.Settings.AssetNumberMinimumLength);
+
+		var previousEmployeeNumberMode = company.Settings?.EmployeeNumberMode;
+		var previousEmployeeNumberPrefix = company.Settings?.EmployeeNumberPrefix;
+		var previousEmployeeNumberMinimumLength = company.Settings?.EmployeeNumberMinimumLength;
 
 		var settings = company.Settings ?? CompanySettings.CreateDefault(company.Id, now);
 		settings.UpdateHrPolicy(
@@ -84,9 +96,30 @@ internal sealed class UpdateHrSettingsHandler
 			request.EmployeeNumberMinimumLength,
 			now);
 
+		settings.UpdateAssetNumberSettings(
+			request.AssetNumberMode,
+			request.AssetNumberPrefix,
+			request.NextAssetNumber,
+			request.AssetNumberMinimumLength,
+			now);
+
 		company.SetSettings(settings, now);
 
 		await _dbContext.SaveChangesAsync(cancellationToken);
+
+		// Format-change renumbering (item 27): only triggered when the format actually changed
+		// while the company STAYS in Automatic mode — never on a Manual<->Automatic mode switch,
+		// and never for a Manual-mode company (nothing to renumber to).
+		var formatChanged =
+			previousEmployeeNumberPrefix != settings.EmployeeNumberPrefix ||
+			previousEmployeeNumberMinimumLength != settings.EmployeeNumberMinimumLength;
+
+		if (formatChanged &&
+			previousEmployeeNumberMode == EmployeeNumberMode.Automatic &&
+			settings.EmployeeNumberMode == EmployeeNumberMode.Automatic)
+		{
+			await _employeeRenumberingService.RenumberAllEmployeesAsync(company.Id, cancellationToken);
+		}
 
 		await _auditEventPublisher.PublishAsync(
 			new HrSettingsUpdatedAuditEvent(
@@ -113,7 +146,11 @@ internal sealed class UpdateHrSettingsHandler
 					settings.EmployeeNumberMode,
 					settings.EmployeeNumberPrefix,
 					settings.NextEmployeeNumber,
-					settings.EmployeeNumberMinimumLength)),
+					settings.EmployeeNumberMinimumLength,
+					settings.AssetNumberMode,
+					settings.AssetNumberPrefix,
+					settings.NextAssetNumber,
+					settings.AssetNumberMinimumLength)),
 			cancellationToken);
 
 		return Result.Success(new UpdateHrSettingsResponse(
@@ -137,6 +174,10 @@ internal sealed class UpdateHrSettingsHandler
 			settings.EmployeeNumberPrefix,
 			settings.NextEmployeeNumber,
 			settings.EmployeeNumberMinimumLength,
+			settings.AssetNumberMode,
+			settings.AssetNumberPrefix,
+			settings.NextAssetNumber,
+			settings.AssetNumberMinimumLength,
 			settings.UpdatedAt));
 	}
 }

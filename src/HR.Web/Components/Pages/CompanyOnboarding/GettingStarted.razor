@@ -39,6 +39,23 @@
                     <OnboardingTaskCard Task="task" CompanyId="Session.CompanyId" />
                 </div>
             }
+
+            @if (Session.EmployeeId is { } myEmployeeId)
+            {
+                <div class="col-md-4">
+                    <div class="card h-100" data-testid="edit-own-employee-record-card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Edit your own employee record</h6>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <p class="text-muted small mb-3">Review and update your personal, contact, and employment details.</p>
+                            <a href="/companies/@Session.CompanyId/employees/@myEmployeeId" class="btn btn-primary btn-sm align-self-start mt-auto">
+                                Go to task
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
     }
 </div>

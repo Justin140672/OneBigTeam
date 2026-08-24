@@ -327,6 +327,26 @@
                         <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnHireManagerFilteringAsync" />
                     </SfDropDownList>
                 </div>
+                <div class="col-12">
+                    <label class="form-label">Address Line 1</label>
+                    <HrTextBox @bind-Value="_addressLine1" Placeholder="Street address" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Address Line 2</label>
+                    <HrTextBox @bind-Value="_addressLine2" Placeholder="Apartment, suite, etc." />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">City</label>
+                    <HrTextBox @bind-Value="_city" Placeholder="e.g. London" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">County / State</label>
+                    <HrTextBox @bind-Value="_county" Placeholder="e.g. Greater London" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Post Code</label>
+                    <HrTextBox @bind-Value="_postCode" Placeholder="e.g. SW1A 1AA" />
+                </div>
             </div>
             @if (_dialogError is not null)
             {
@@ -436,6 +456,13 @@
     private EmployeeNumberMode _hireEmployeeNumberMode = EmployeeNumberMode.Manual;
     private Guid? _employmentTypeId;
     private Guid? _managerId;
+    // Not yet sent to the API — see the HireCandidateRequest UI model's remarks. Captured here so
+    // the fields are ready to wire up once HireCandidate's backend request/handler accepts them.
+    private string? _addressLine1;
+    private string? _addressLine2;
+    private string? _city;
+    private string? _county;
+    private string? _postCode;
     // Derived read-only display fields — populated from the Vacancy's linked Position Profile
     // (GetVacancyResponse) when the Hire dialog opens. The employee is always assigned to this
     // Position Profile (and its Department/Location) automatically by HireCandidateHandler; these are
@@ -495,7 +522,10 @@
 
     private StatusBadgeVariant StatusVariant(ApplicationListItemModel row)
     {
-        if (row.IsWithdrawn) return StatusBadgeVariant.Secondary;
+        // Withdrawn is treated the same as a Rejected terminal outcome — both mean the candidate is
+        // out of the pipeline, and rendering Withdrawn as a neutral "Secondary" grey (while Rejected
+        // renders as "Danger" red) made otherwise-equivalent rows look inconsistent side by side.
+        if (row.IsWithdrawn) return StatusBadgeVariant.Danger;
 
         var stage = Stage(row.CurrentStageId);
         return stage?.TerminalOutcome switch
@@ -754,6 +784,11 @@
         _managerId = Guid.Empty;
         _derivedLocationName = string.Empty;
         _derivedPositionProfileName = string.Empty;
+        _addressLine1 = null;
+        _addressLine2 = null;
+        _city = null;
+        _county = null;
+        _postCode = null;
 
         if (_nationalities.Count == 0)
         {
@@ -908,7 +943,13 @@
             _startDate.Value, _dateOfBirth.Value, _nationality, _gender,
             string.IsNullOrWhiteSpace(_genderOther) ? null : _genderOther.Trim(),
             employeeNumberRequired ? _employeeNumber.Trim() : string.Empty, _employmentTypeId.Value,
-            _managerId == Guid.Empty ? null : _managerId);
+            _managerId == Guid.Empty ? null : _managerId,
+            // Not yet consumed server-side — see HireCandidateRequest's remarks above.
+            string.IsNullOrWhiteSpace(_addressLine1) ? null : _addressLine1.Trim(),
+            string.IsNullOrWhiteSpace(_addressLine2) ? null : _addressLine2.Trim(),
+            string.IsNullOrWhiteSpace(_city) ? null : _city.Trim(),
+            string.IsNullOrWhiteSpace(_county) ? null : _county.Trim(),
+            string.IsNullOrWhiteSpace(_postCode) ? null : _postCode.Trim());
 
         var (result, error) = await ApplicationService.HireCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);
 

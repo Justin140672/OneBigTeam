@@ -17,6 +17,9 @@ internal sealed class GetLeaveBalanceHistoryHandler(
     private const string LeaveTakenReason = "Leave Taken";
     private const string LeaveCancelledReason = "Leave Cancelled";
     private const string ToilAwardReason = "TOIL Award";
+    private const string ToilUsedReason = "TOIL Used";
+    private const string ToilExpiredReason = "TOIL Expired";
+    private const string ToilAdjustedReason = "TOIL Adjusted";
     private const string CarryOverReason = "Carry Over";
 
     public async Task<Result<GetLeaveBalanceHistoryResponse>> HandleAsync(
@@ -71,25 +74,58 @@ internal sealed class GetLeaveBalanceHistoryHandler(
         // (cancellation reversal, TOIL award, or the adjustment's own signed amount).
         var raw = new List<(string Category, DateTimeOffset Date, decimal Change, string Reason, string Description, Guid ActorId)>();
 
-        raw.AddRange(leaveRequests.Select(r => (
-            Category: r.Status == LeaveRequestStatus.Approved ? "ApprovedLeave" : "CancelledLeave",
-            Date: r.UpdatedAt,
-            Change: r.Status == LeaveRequestStatus.Approved
-                ? -(r.TotalDays * workingPattern.HoursPerDay)
-                : r.TotalDays * workingPattern.HoursPerDay,
-            Reason: r.Status == LeaveRequestStatus.Approved ? LeaveTakenReason : LeaveCancelledReason,
-            Description: $"{(r.Status == LeaveRequestStatus.Approved ? "Leave approved" : "Leave cancelled")}: {r.StartDate:d MMM yyyy} - {r.EndDate:d MMM yyyy}" + (r.Reason is null ? "" : $" ({r.Reason})"),
-            // Approved leave is actioned by the reviewer; cancellation has no separate actor
-            // tracked on LeaveRequest (self-service action), so the employee is used.
-            ActorId: r.Status == LeaveRequestStatus.Approved ? (r.ReviewedByEmployeeId ?? r.EmployeeId) : r.EmployeeId)));
+        // For TOIL, usage/reversal is represented entirely by the ToilTransaction ledger (Used /
+        // Adjusted-reversal entries below) - including the generic leave-request-approved/
+        // cancelled entries here as well would double-count the same change. Every other leave
+        // type has no ledger and is represented purely by its approved/cancelled requests.
+        if (leaveType.Behaviour != LeaveTypeBehaviour.Toil)
+        {
+            raw.AddRange(leaveRequests.Select(r => (
+                Category: r.Status == LeaveRequestStatus.Approved ? "ApprovedLeave" : "CancelledLeave",
+                Date: r.UpdatedAt,
+                Change: r.Status == LeaveRequestStatus.Approved
+                    ? -(r.TotalDays * workingPattern.HoursPerDay)
+                    : r.TotalDays * workingPattern.HoursPerDay,
+                Reason: r.Status == LeaveRequestStatus.Approved ? LeaveTakenReason : LeaveCancelledReason,
+                Description: $"{(r.Status == LeaveRequestStatus.Approved ? "Leave approved" : "Leave cancelled")}: {r.StartDate:d MMM yyyy} - {r.EndDate:d MMM yyyy}" + (r.Reason is null ? "" : $" ({r.Reason})"),
+                // Approved leave is actioned by the reviewer; cancellation has no separate actor
+                // tracked on LeaveRequest (self-service action), so the employee is used.
+                ActorId: r.Status == LeaveRequestStatus.Approved ? (r.ReviewedByEmployeeId ?? r.EmployeeId) : r.EmployeeId)));
+        }
 
-        raw.AddRange(toilTransactions.Select(t => (
-            Category: "ToilAward",
-            Date: t.CreatedAt,
-            Change: t.Days * workingPattern.HoursPerDay,
-            Reason: ToilAwardReason,
-            Description: "TOIL awarded" + (t.Notes is null ? "" : $": {t.Notes}"),
-            ActorId: t.AwardedByEmployeeId)));
+        raw.AddRange(toilTransactions.Select(t => t.Type switch
+        {
+            ToilTransactionType.Earned => (
+                Category: "ToilAward",
+                Date: t.CreatedAt,
+                Change: t.Days * workingPattern.HoursPerDay,
+                Reason: ToilAwardReason,
+                Description: t.Description,
+                ActorId: t.ActorEmployeeId),
+            ToilTransactionType.Used => (
+                Category: "ToilUsed",
+                Date: t.CreatedAt,
+                Change: -(t.Days * workingPattern.HoursPerDay),
+                Reason: ToilUsedReason,
+                Description: t.Description,
+                ActorId: t.ActorEmployeeId),
+            ToilTransactionType.Expired => (
+                Category: "ToilExpired",
+                Date: t.CreatedAt,
+                Change: -(t.Days * workingPattern.HoursPerDay),
+                Reason: ToilExpiredReason,
+                Description: t.Description,
+                ActorId: t.ActorEmployeeId),
+            // Adjusted: either a reversal (ReversesTransactionId set, always a positive credit
+            // back) or a standalone manual correction, whose sign is carried by Days directly.
+            _ => (
+                Category: t.ReversesTransactionId.HasValue ? "ToilReversed" : "ToilAdjusted",
+                Date: t.CreatedAt,
+                Change: t.Days * workingPattern.HoursPerDay,
+                Reason: ToilAdjustedReason,
+                Description: t.Description,
+                ActorId: t.ActorEmployeeId)
+        }));
 
         raw.AddRange(adjustments.Where(a => a.Reason != LeaveBalanceAdjustmentReason.CarryOver).Select(a => (
             Category: "ManualAdjustment",

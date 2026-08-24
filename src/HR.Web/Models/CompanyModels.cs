@@ -94,6 +94,10 @@ public record GetHrSettingsResponse(
     string? EmployeeNumberPrefix,
     int NextEmployeeNumber,
     int EmployeeNumberMinimumLength,
+    AssetNumberMode AssetNumberMode,
+    string? AssetNumberPrefix,
+    int NextAssetNumber,
+    int AssetNumberMinimumLength,
     DateTime UpdatedAt);
 
 public record UpdateHrSettingsRequest(
@@ -116,7 +120,11 @@ public record UpdateHrSettingsRequest(
     EmployeeNumberMode EmployeeNumberMode,
     string? EmployeeNumberPrefix,
     int NextEmployeeNumber,
-    int EmployeeNumberMinimumLength);
+    int EmployeeNumberMinimumLength,
+    AssetNumberMode AssetNumberMode,
+    string? AssetNumberPrefix,
+    int NextAssetNumber,
+    int AssetNumberMinimumLength);
 
 public record UpdateHrSettingsResponse(
     Guid CompanyId,

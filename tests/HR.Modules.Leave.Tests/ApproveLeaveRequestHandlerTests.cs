@@ -1,3 +1,4 @@
+using HR.Modules.Leave.Services;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.ApproveLeaveRequest;
 using HR.Modules.Leave.Persistence;
@@ -74,7 +75,7 @@ public class ApproveLeaveRequestHandlerTests
         var leaveRequest = await CreatePendingRequestWithNonBalanceTypeAsync(context, companyId, employeeId, now);
 
         var approvalTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(approvalTime), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(approvalTime), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
             CancellationToken.None);
@@ -102,7 +103,7 @@ public class ApproveLeaveRequestHandlerTests
         var leaveRequest = await CreatePendingRequestWithNonBalanceTypeAsync(context, companyId, employeeId, now);
 
         var auditPublisher = new CapturingAuditEventPublisher();
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), auditPublisher);
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), auditPublisher, new ToilLedgerService(context)));
 
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
@@ -122,7 +123,7 @@ public class ApproveLeaveRequestHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Request_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
 
         var result = await handler.HandleAsync(
             ApproveRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
@@ -143,7 +144,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, Guid.NewGuid(), leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -166,7 +167,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
             CancellationToken.None);
@@ -188,7 +189,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -211,7 +212,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
             CancellationToken.None);
@@ -243,7 +244,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -277,7 +278,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -307,7 +308,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -338,7 +339,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -380,7 +381,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance2027);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -405,7 +406,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyB, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -413,6 +414,11 @@ public class ApproveLeaveRequestHandlerTests
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
     }
+
+    private static ToilTransaction CreateEarnedBucket(
+        Guid companyId, Guid employeeId, Guid balanceId, decimal days, DateOnly occurredOn, DateTimeOffset now) =>
+        ToilTransaction.CreateEarned(
+            Guid.NewGuid(), companyId, employeeId, balanceId, Guid.NewGuid(), days, occurredOn, null, null, now);
 
     [Fact]
     public async Task HandleAsync_Deducts_Toil_Balance_On_Approval()
@@ -434,13 +440,15 @@ public class ApproveLeaveRequestHandlerTests
         var balance = LeaveBalance.Create(
             Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2026, 0m, new DateOnly(2026, 1, 1), now);
         balance.Adjust(5m, now);
+        var bucket = CreateEarnedBucket(companyId, employeeId, balance.Id, 5m, new DateOnly(2026, 5, 1), now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeaveRequests.Add(leaveRequest);
         context.LeaveBalances.Add(balance);
+        context.ToilTransactions.Add(bucket);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -473,13 +481,15 @@ public class ApproveLeaveRequestHandlerTests
         var balance2025 = LeaveBalance.Create(
             Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2025, 0m, new DateOnly(2025, 1, 1), now);
         balance2025.Adjust(4m, now);
+        var bucket2025 = CreateEarnedBucket(companyId, employeeId, balance2025.Id, 4m, new DateOnly(2025, 6, 1), now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeaveRequests.Add(leaveRequest);
         context.LeaveBalances.Add(balance2025);
+        context.ToilTransactions.Add(bucket2025);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -511,17 +521,20 @@ public class ApproveLeaveRequestHandlerTests
         var balance2025 = LeaveBalance.Create(
             Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2025, 0m, new DateOnly(2025, 1, 1), now);
         balance2025.Adjust(2m, now);
+        var bucket2025 = CreateEarnedBucket(companyId, employeeId, balance2025.Id, 2m, new DateOnly(2025, 6, 1), now);
 
         var balance2026 = LeaveBalance.Create(
             Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2026, 0m, new DateOnly(2026, 1, 1), now);
         balance2026.Adjust(3m, now);
+        var bucket2026 = CreateEarnedBucket(companyId, employeeId, balance2026.Id, 3m, new DateOnly(2026, 2, 1), now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeaveRequests.Add(leaveRequest);
         context.LeaveBalances.AddRange(balance2025, balance2026);
+        context.ToilTransactions.AddRange(bucket2025, bucket2026);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -532,6 +545,137 @@ public class ApproveLeaveRequestHandlerTests
         var saved2026 = await context.LeaveBalances.SingleAsync(b => b.PolicyYear == 2026);
         Assert.Equal(1m, saved2025.UsedDays);  // deducted from the older balance
         Assert.Equal(0m, saved2026.UsedDays);  // 2026 balance untouched
+    }
+
+    [Fact]
+    public async Task HandleAsync_Approving_Toil_Request_Spanning_Multiple_Buckets_Creates_Multiple_Used_Transactions()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "TOIL", "TOIL", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Toil, now);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 6), LeaveDayPart.FullDay,
+            4m, null, now);
+
+        var balance = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2026, 0m, new DateOnly(2026, 1, 1), now);
+        balance.Adjust(6m, now);
+        var oldestBucket = CreateEarnedBucket(companyId, employeeId, balance.Id, 2m, new DateOnly(2026, 4, 1), now);
+        var newerBucket = CreateEarnedBucket(companyId, employeeId, balance.Id, 4m, new DateOnly(2026, 5, 1), now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveRequests.Add(leaveRequest);
+        context.LeaveBalances.Add(balance);
+        context.ToilTransactions.AddRange(oldestBucket, newerBucket);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var usedTransactions = await context.ToilTransactions
+            .Where(t => t.Type == ToilTransactionType.Used)
+            .ToListAsync();
+        Assert.Equal(2, usedTransactions.Count);
+        Assert.Equal(2m, usedTransactions.Single(t => t.RelatedTransactionId == oldestBucket.Id).Days);
+        Assert.Equal(2m, usedTransactions.Single(t => t.RelatedTransactionId == newerBucket.Id).Days);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(4m, savedBalance.UsedDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Fails_When_Insufficient_Toil_And_AllowNegativeToilBalance_Is_False()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "TOIL", "TOIL", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Toil, now, allowNegativeToilBalance: false);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 5), LeaveDayPart.FullDay,
+            3m, null, now);
+
+        var balance = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2026, 0m, new DateOnly(2026, 1, 1), now);
+        balance.Adjust(1m, now);
+        var bucket = CreateEarnedBucket(companyId, employeeId, balance.Id, 1m, new DateOnly(2026, 5, 1), now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveRequests.Add(leaveRequest);
+        context.LeaveBalances.Add(balance);
+        context.ToilTransactions.Add(bucket);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+
+        var saved = await context.LeaveRequests.SingleAsync();
+        Assert.Equal(LeaveRequestStatus.Pending, saved.Status); // must not be approved
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(0m, savedBalance.UsedDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_When_Insufficient_Toil_And_AllowNegativeToilBalance_Is_True()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "TOIL", "TOIL", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Toil, now, allowNegativeToilBalance: true);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 5), LeaveDayPart.FullDay,
+            3m, null, now);
+
+        var balance = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2026, 0m, new DateOnly(2026, 1, 1), now);
+        balance.Adjust(1m, now);
+        var bucket = CreateEarnedBucket(companyId, employeeId, balance.Id, 1m, new DateOnly(2026, 5, 1), now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveRequests.Add(leaveRequest);
+        context.LeaveBalances.Add(balance);
+        context.ToilTransactions.Add(bucket);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var saved = await context.LeaveRequests.SingleAsync();
+        Assert.Equal(LeaveRequestStatus.Approved, saved.Status);
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(3m, savedBalance.UsedDays);
+        Assert.Equal(-2m, savedBalance.RemainingDays); // 0 entitlement + 1 adjustment - 3 used
     }
 
     [Fact]
@@ -547,7 +691,7 @@ public class ApproveLeaveRequestHandlerTests
 
         var publisher = new CapturingIntegrationEventPublisher();
         var approvalTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(approvalTime), publisher, new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(approvalTime), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), publisher, new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
             CancellationToken.None);
@@ -578,7 +722,7 @@ public class ApproveLeaveRequestHandlerTests
 
         var auditPublisher = new CapturingAuditEventPublisher();
         var approvalTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
-        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(approvalTime), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), auditPublisher);
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(approvalTime), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), auditPublisher, new ToilLedgerService(context)));
         await handler.HandleAsync(ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId), CancellationToken.None);
 
         var auditEvt = Assert.Single(auditPublisher.Published);
@@ -606,7 +750,7 @@ public class ApproveLeaveRequestHandlerTests
 
         var leaveRequest = await CreatePendingRequestWithNonBalanceTypeAsync(context, companyId, employeeId, now);
 
-        var handler = new ApproveLeaveRequestHandler(context, notif, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, notif, new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
         await handler.HandleAsync(ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId), CancellationToken.None);
 
         var written = Assert.Single(notif.Written);

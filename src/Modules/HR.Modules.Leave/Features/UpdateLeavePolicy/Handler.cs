@@ -1,10 +1,11 @@
 using HR.Modules.Leave.Persistence;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.UpdateLeavePolicy;
 
-internal sealed class UpdateLeavePolicyHandler(LeaveDbContext dbContext, IClock clock)
+internal sealed class UpdateLeavePolicyHandler(LeaveDbContext dbContext, IClock clock, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<UpdateLeavePolicyResponse>> HandleAsync(
         UpdateLeavePolicyRequest request,
@@ -32,6 +33,16 @@ internal sealed class UpdateLeavePolicyHandler(LeaveDbContext dbContext, IClock 
 
         var now = clock.UtcNowOffset();
 
+        var before = new
+        {
+            policy.Name,
+            policy.Description,
+            policy.CarryOverDays,
+            policy.AllowNegativeBalance,
+            policy.RequiresApproval,
+            policy.IsDefault
+        };
+
         if (request.IsDefault && !policy.IsDefault)
         {
             var currentDefault = await dbContext.LeavePolicies
@@ -53,9 +64,26 @@ internal sealed class UpdateLeavePolicyHandler(LeaveDbContext dbContext, IClock 
             string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             request.CarryOverDays,
             request.AllowNegativeBalance,
+            request.RequiresApproval,
             now);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new LeavePolicyUpdatedAuditEvent(
+            policy.CompanyId,
+            policy.Id,
+            before,
+            new
+            {
+                policy.Name,
+                policy.Description,
+                policy.CarryOverDays,
+                policy.AllowNegativeBalance,
+                policy.RequiresApproval,
+                policy.IsDefault
+            },
+            request.ActorEmployeeId,
+            now), cancellationToken);
 
         return Result.Success(new UpdateLeavePolicyResponse(
             policy.Id,
@@ -64,6 +92,7 @@ internal sealed class UpdateLeavePolicyHandler(LeaveDbContext dbContext, IClock 
             policy.Description,
             policy.CarryOverDays,
             policy.AllowNegativeBalance,
+            policy.RequiresApproval,
             policy.IsActive,
             policy.IsDefault,
             policy.UpdatedAt));

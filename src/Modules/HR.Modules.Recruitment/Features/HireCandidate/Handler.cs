@@ -122,7 +122,12 @@ internal sealed class HireCandidateHandler(
                 request.GenderOther,
                 PersonalEmail: null,
                 candidate.Phone,
-                request.ManagerId),
+                request.ManagerId,
+                request.AddressLine1,
+                request.AddressLine2,
+                request.City,
+                request.County,
+                request.PostCode),
             cancellationToken);
 
         if (provisioningResult.IsFailure)

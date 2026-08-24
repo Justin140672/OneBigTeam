@@ -53,13 +53,19 @@
                         {
                             var m = member;
                             <div @key="m.EmployeeId" class="team-card">
-                                <span class="team-card-status team-card-status--@StatusCss(m.Status)">@StatusLabel(m.Status)</span>
-                                @if (AlertCounts is not null && AlertCounts.TryGetValue(m.EmployeeId, out var alertCount) && alertCount > 0)
-                                {
-                                    <span class="team-card-alert-badge" title="@($"{alertCount} item(s) need attention")" aria-label="@($"{alertCount} item(s) need attention")">
-                                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> @alertCount
-                                    </span>
-                                }
+                                <div class="team-card-top-row">
+                                    @if (AlertCounts is not null && AlertCounts.TryGetValue(m.EmployeeId, out var alertCount) && alertCount > 0)
+                                    {
+                                        <span class="team-card-alert-badge" title="@($"{alertCount} item(s) need attention")" aria-label="@($"{alertCount} item(s) need attention")">
+                                            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> @alertCount
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span></span>
+                                    }
+                                    <span class="team-card-status team-card-status--@StatusCss(m.Status)">@StatusLabel(m.Status)</span>
+                                </div>
                                 <ProfilePhotoAvatar PhotoUrl="@m.ProfilePhotoUrl" Initials="@Initials(m.FullName)" SizePx="48" />
                                 <span class="team-card-name" title="@m.FullName">@m.FullName</span>
                                 <span class="team-card-title" title="@(m.JobTitle ?? "—")">@(m.JobTitle ?? "—")</span>

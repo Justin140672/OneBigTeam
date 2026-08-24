@@ -37,6 +37,11 @@ internal sealed class EmployeeProvisioningService(
                 PhoneNumber       = request.PhoneNumber,
                 EmployeeNumber    = request.EmployeeNumber,
                 EmploymentTypeId  = request.EmploymentTypeId,
+                AddressLine1      = request.AddressLine1,
+                AddressLine2      = request.AddressLine2,
+                City              = request.City,
+                County            = request.County,
+                PostCode          = request.PostCode,
             },
             cancellationToken);
 

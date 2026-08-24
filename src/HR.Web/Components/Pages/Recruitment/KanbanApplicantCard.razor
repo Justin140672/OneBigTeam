@@ -31,12 +31,14 @@
             .ToUpperInvariant();
 
     // Withdrawn/Rejected/Hired get a visually distinct accent — see StatusBadge for the badge itself,
-    // this is the card container accent (muted/danger/success border). IsWithdrawn takes priority
-    // over the stage's terminal outcome since a withdrawn application can sit under any stage
-    // (see Applicant.IsWithdrawn's remarks) and that fact is more relevant to a recruiter scanning
-    // the board than which stage it happened to be on when withdrawn.
+    // this is the card container accent (danger/success border). IsWithdrawn takes priority over
+    // the stage's terminal outcome since a withdrawn application can sit under any stage (see
+    // Applicant.IsWithdrawn's remarks) and that fact is more relevant to a recruiter scanning the
+    // board than which stage it happened to be on when withdrawn. Withdrawn now shares Rejected's
+    // "danger" treatment (same as VacancyApplicationsTab's grid StatusVariant) rather than a
+    // separate muted/secondary style, so both views are visually consistent.
     private string StageCssClass =>
-        Applicant.IsWithdrawn ? "kanban-applicant-card--muted"
+        Applicant.IsWithdrawn ? "kanban-applicant-card--danger"
         : TerminalOutcome switch
         {
             RecruitmentStageTerminalOutcome.Hired => "kanban-applicant-card--success",
@@ -45,7 +47,7 @@
         };
 
     private StatusBadgeVariant StatusVariant =>
-        Applicant.IsWithdrawn ? StatusBadgeVariant.Secondary
+        Applicant.IsWithdrawn ? StatusBadgeVariant.Danger
         : TerminalOutcome switch
         {
             RecruitmentStageTerminalOutcome.Hired => StatusBadgeVariant.Success,

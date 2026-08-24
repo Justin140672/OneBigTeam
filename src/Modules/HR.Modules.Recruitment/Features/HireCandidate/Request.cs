@@ -22,4 +22,14 @@ internal sealed record HireCandidateRequest
     // IPositionProfileReader — exactly the same pattern CreateVacancyHandler already uses for
     // DepartmentId. Manager remains a genuinely independent choice HR makes for the new employee.
     public Guid? ManagerId { get; init; }
+
+    // Optional — captured on the Hire Candidate dialog and forwarded onto the new employee's
+    // contact details via IEmployeeProvisioningService/CreateEmployeeHandler (same address fields
+    // already used on Employee Edit). All optional since a candidate's address is not guaranteed
+    // to be known at hire time.
+    public string? AddressLine1 { get; init; }
+    public string? AddressLine2 { get; init; }
+    public string? City { get; init; }
+    public string? County { get; init; }
+    public string? PostCode { get; init; }
 }

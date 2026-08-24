@@ -67,7 +67,11 @@ internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, I
 
         balance.Adjust(request.Days, now);
 
-        var transaction = ToilTransaction.Create(
+        var expiresOn = toilLeaveType.ToilExpiryDays.HasValue
+            ? request.OccurredOn.AddDays(toilLeaveType.ToilExpiryDays.Value)
+            : (DateOnly?)null;
+
+        var transaction = ToilTransaction.CreateEarned(
             Guid.NewGuid(),
             request.CompanyId,
             request.EmployeeId,
@@ -75,6 +79,7 @@ internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, I
             request.AwardedByEmployeeId,
             request.Days,
             request.OccurredOn,
+            expiresOn,
             request.Notes,
             now);
 
@@ -97,7 +102,7 @@ internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, I
             transaction.EmployeeId,
             transaction.Id,
             transaction.LeaveBalanceId,
-            transaction.AwardedByEmployeeId,
+            transaction.ActorEmployeeId,
             transaction.Days,
             transaction.OccurredOn,
             transaction.Notes,
@@ -108,7 +113,7 @@ internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, I
             transaction.CompanyId,
             transaction.EmployeeId,
             transaction.LeaveBalanceId,
-            transaction.AwardedByEmployeeId,
+            transaction.ActorEmployeeId,
             transaction.Days,
             balance.RemainingDays,
             transaction.OccurredOn,

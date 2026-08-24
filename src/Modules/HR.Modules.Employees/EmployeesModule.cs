@@ -187,6 +187,8 @@ public static class EmployeesModule
         // CompaniesModule (they are implemented in HR.Modules.Companies, the owning module for
         // company settings); Employees only depends on the Infrastructure.Abstractions interfaces.
 
+        services.AddScoped<IEmployeeRenumberingService, EmployeeRenumberingService>();
+
         services.AddScoped<GetEmployeeHandler>();
         services.AddScoped<GetMyEmployeeHandler>();
         services.AddScoped<GetMyTeamHandler>();

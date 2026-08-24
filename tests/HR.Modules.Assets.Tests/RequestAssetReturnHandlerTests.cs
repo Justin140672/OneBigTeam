@@ -36,7 +36,7 @@ public class RequestAssetReturnHandlerTests
             Name = "Electronics"
         }, CancellationToken.None);
 
-        var assetResult = await new CreateAssetHandler(db, clock, new FakeAuditPublisher()).HandleAsync(new CreateAssetRequest
+        var assetResult = await new CreateAssetHandler(db, clock, new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator()).HandleAsync(new CreateAssetRequest
         {
             CompanyId = companyId,
             AssetNumber = "ASSET-001",

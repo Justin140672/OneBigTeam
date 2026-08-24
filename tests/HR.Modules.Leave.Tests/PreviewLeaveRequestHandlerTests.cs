@@ -1,6 +1,7 @@
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.PreviewLeaveRequest;
 using HR.Modules.Leave.Persistence;
+using HR.Modules.Leave.Services;
 using HR.Modules.Leave.Tests.Infrastructure;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
@@ -30,7 +31,8 @@ public class PreviewLeaveRequestHandlerTests
             new FakeClock(FixedUtcNow),
             workingPattern ?? new FakeWorkingPatternProvider(),
             settings ?? new FakeCompanyLeaveSettingsReader(),
-            publicHolidayReader ?? new FakePublicHolidayReader());
+            publicHolidayReader ?? new FakePublicHolidayReader(),
+            new LeaveWarningCalculator(publicHolidayReader ?? new FakePublicHolidayReader()));
 
     // 2026-08-03 = Monday, 2026-08-07 = Friday
     private static PreviewLeaveRequestRequest BaseRequest(Guid companyId, Guid employeeId, Guid leaveTypeId) => new()

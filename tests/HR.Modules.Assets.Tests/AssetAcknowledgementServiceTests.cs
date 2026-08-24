@@ -30,7 +30,7 @@ public class AssetAcknowledgementServiceTests
             new CreateAssetCategoryRequest { CompanyId = companyId, Name = "IT" },
             CancellationToken.None);
 
-        var assetResult = await new CreateAssetHandler(db, clock, new FakeAuditPublisher()).HandleAsync(
+        var assetResult = await new CreateAssetHandler(db, clock, new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator()).HandleAsync(
             new CreateAssetRequest
             {
                 CompanyId = companyId,

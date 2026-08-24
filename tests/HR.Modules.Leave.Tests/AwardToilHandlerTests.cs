@@ -206,7 +206,7 @@ public class AwardToilHandlerTests
         Assert.Equal(awardedById, result.Value!.AwardedByEmployeeId);
 
         var transaction = await context.ToilTransactions.SingleAsync();
-        Assert.Equal(awardedById, transaction.AwardedByEmployeeId);
+        Assert.Equal(awardedById, transaction.ActorEmployeeId);
     }
 
     [Fact]

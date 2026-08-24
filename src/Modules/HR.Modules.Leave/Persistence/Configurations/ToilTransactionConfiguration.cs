@@ -28,9 +28,12 @@ internal sealed class ToilTransactionConfiguration : IEntityTypeConfiguration<To
             .HasColumnName("leave_balance_id")
             .IsRequired();
 
-        builder.Property(t => t.AwardedByEmployeeId)
-            .HasColumnName("awarded_by_employee_id")
-            .IsRequired();
+        builder.Property(t => t.Type)
+            .HasColumnName("type")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired()
+            .HasDefaultValue(ToilTransactionType.Earned);
 
         builder.Property(t => t.Days)
             .HasColumnName("days")
@@ -41,9 +44,31 @@ internal sealed class ToilTransactionConfiguration : IEntityTypeConfiguration<To
             .HasColumnName("occurred_on")
             .IsRequired();
 
+        builder.Property(t => t.ExpiresOn)
+            .HasColumnName("expires_on");
+
+        builder.Property(t => t.RelatedTransactionId)
+            .HasColumnName("related_transaction_id");
+
+        builder.Property(t => t.ReversesTransactionId)
+            .HasColumnName("reverses_transaction_id");
+
+        builder.Property(t => t.SourceLeaveRequestId)
+            .HasColumnName("source_leave_request_id");
+
+        builder.Property(t => t.ActorEmployeeId)
+            .HasColumnName("actor_employee_id")
+            .IsRequired();
+
         builder.Property(t => t.Notes)
             .HasColumnName("notes")
             .HasMaxLength(500);
+
+        builder.Property(t => t.Description)
+            .HasColumnName("description")
+            .HasMaxLength(500)
+            .IsRequired()
+            .HasDefaultValue(string.Empty);
 
         builder.Property(t => t.CreatedAt)
             .HasColumnName("created_at")
@@ -56,5 +81,7 @@ internal sealed class ToilTransactionConfiguration : IEntityTypeConfiguration<To
         builder.HasIndex(t => new { t.CompanyId, t.EmployeeId });
         builder.HasIndex(t => new { t.CompanyId, t.LeaveBalanceId });
         builder.HasIndex(t => new { t.CompanyId, t.EmployeeId, t.OccurredOn });
+        builder.HasIndex(t => t.RelatedTransactionId);
+        builder.HasIndex(t => t.SourceLeaveRequestId);
     }
 }

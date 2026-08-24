@@ -6,6 +6,8 @@ The Leave Management capability manages employee leave requests, balances, appro
 
 Leave is policy-driven and working-schedule aware.
 
+Leave is distinct from the Sickness module (see `specifications/architecture/02-module-boundaries.md`). Sickness absence — sickness records, evidence and return-to-work reviews — is owned entirely by the Sickness module and is never modelled as a Leave type. There is no "Sick Leave" leave type; see the current-decisions register for the superseded behaviour.
+
 ---
 
 ## Business Objectives
@@ -26,17 +28,17 @@ The system shall:
 
 ## Leave Types
 
-Default leave types:
+Default leave types provisioned for every company:
 
 - Annual leave
-- Sick leave
 - Unpaid leave
 - Compassionate leave
 - Parental leave
 - TOIL
-- Other
 
-Leave types should be configurable.
+Sick leave is deliberately not a Leave type — sickness absence is tracked exclusively by the separate Sickness module.
+
+"Other" is not provisioned by default. Leave types are fully configurable per company (create/update/deactivate), so a company that needs a general/miscellaneous type can add one.
 
 ---
 
@@ -117,14 +119,19 @@ Flow:
 
 ## Conflict Warnings
 
-The system may warn about:
+Implemented, and returned consistently by preview (`PreviewLeaveRequest`) and both submission paths (`SubmitLeaveRequest`, `SubmitLeaveRequestDraft`) via the shared `LeaveWarningCalculator` and conflict queries:
 
-- Team clashes
+- Public holiday conflicts (a public holiday falls inside the requested range, when the company excludes public holidays from leave)
+- Existing leave overlap (another non-rejected/non-cancelled request for the employee overlaps the requested range)
+
+These warnings never block submission.
+
+Deferred — explicitly not implemented in MVP, not surfaced by any handler:
+
+- Team clashes (concurrent leave across a team/department)
 - Excessive absence
-- Public holiday conflicts
-- Existing leave overlap
 
-Warnings should not automatically block submission unless policy requires it.
+They may be introduced later for a demonstrated requirement. Balance sufficiency and cross-policy-year span are the only checks that block submission, and both are already enforced.
 
 ---
 
@@ -146,14 +153,21 @@ Can manage leave across company.
 
 ## Audit Events
 
-Audit:
+Audit, each carrying company, employee (where applicable), actor and meaningful before/after data:
 
 - Leave requested
 - Leave approved
 - Leave rejected
 - Leave cancelled
 - Balance adjusted
-- TOIL adjusted
+- TOIL awarded
+- TOIL expired
+- Leave policy created
+- Leave policy updated
+- Leave policy assigned to an employee
+- Leave type created
+- Leave type updated
+- Leave type deactivated
 
 ---
 

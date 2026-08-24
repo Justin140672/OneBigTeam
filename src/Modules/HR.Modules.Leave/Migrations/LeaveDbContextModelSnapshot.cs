@@ -242,6 +242,12 @@ namespace HR.Modules.Leave.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<bool>("RequiresApproval")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("requires_approval");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -361,6 +367,12 @@ namespace HR.Modules.Leave.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("accrual_method");
 
+                    b.Property<bool>("AllowNegativeToilBalance")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("allow_negative_toil_balance");
+
                     b.Property<string>("Behaviour")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -409,6 +421,10 @@ namespace HR.Modules.Leave.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
+                    b.Property<int?>("ToilExpiryDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("toil_expiry_days");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -429,9 +445,9 @@ namespace HR.Modules.Leave.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid>("AwardedByEmployeeId")
+                    b.Property<Guid>("ActorEmployeeId")
                         .HasColumnType("uuid")
-                        .HasColumnName("awarded_by_employee_id");
+                        .HasColumnName("actor_employee_id");
 
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
@@ -445,9 +461,21 @@ namespace HR.Modules.Leave.Migrations
                         .HasColumnType("numeric(6,2)")
                         .HasColumnName("days");
 
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("")
+                        .HasColumnName("description");
+
                     b.Property<Guid>("EmployeeId")
                         .HasColumnType("uuid")
                         .HasColumnName("employee_id");
+
+                    b.Property<DateOnly?>("ExpiresOn")
+                        .HasColumnType("date")
+                        .HasColumnName("expires_on");
 
                     b.Property<Guid>("LeaveBalanceId")
                         .HasColumnType("uuid")
@@ -462,11 +490,35 @@ namespace HR.Modules.Leave.Migrations
                         .HasColumnType("date")
                         .HasColumnName("occurred_on");
 
+                    b.Property<Guid?>("RelatedTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("related_transaction_id");
+
+                    b.Property<Guid?>("ReversesTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reverses_transaction_id");
+
+                    b.Property<Guid?>("SourceLeaveRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_leave_request_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Earned")
+                        .HasColumnName("type");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RelatedTransactionId");
+
+                    b.HasIndex("SourceLeaveRequestId");
 
                     b.HasIndex("CompanyId", "EmployeeId");
 

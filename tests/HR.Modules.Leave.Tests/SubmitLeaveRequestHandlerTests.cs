@@ -1,6 +1,7 @@
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.SubmitLeaveRequest;
 using HR.Modules.Leave.Persistence;
+using HR.Modules.Leave.Services;
 using HR.Modules.Leave.Tests.Infrastructure;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
@@ -70,7 +71,7 @@ public class SubmitLeaveRequestHandlerTests
 
         var (leaveType, policy, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -92,7 +93,7 @@ public class SubmitLeaveRequestHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_LeaveType_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(
             ValidRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
 
@@ -114,7 +115,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveTypes.Add(leaveType);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
@@ -134,7 +135,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveTypes.Add(leaveType);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(
             ValidRequest(companyId, Guid.NewGuid(), leaveType.Id), CancellationToken.None);
 
@@ -152,7 +153,7 @@ public class SubmitLeaveRequestHandlerTests
         // 2 days entitlement, requesting Mon–Fri (5 days)
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId, entitlementDays: 2);
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
@@ -179,7 +180,7 @@ public class SubmitLeaveRequestHandlerTests
         context.EmployeeLeavePolicyAssignments.Add(assignment);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
@@ -196,7 +197,7 @@ public class SubmitLeaveRequestHandlerTests
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
         // 2026-08-08 = Saturday, 2026-08-09 = Sunday
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id) with
             {
@@ -228,7 +229,8 @@ public class SubmitLeaveRequestHandlerTests
             new FakeWorkingPatternProvider(monToSat),
             new FakeCompanyLeaveSettingsReader(),
             new FakePublicHolidayReader(),
-            new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+            new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(),
+            new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
 
         // 2026-08-08 = Saturday — a working day in this pattern
         var result = await handler.HandleAsync(
@@ -252,7 +254,7 @@ public class SubmitLeaveRequestHandlerTests
 
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -278,7 +280,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveRequests.Add(existing);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -306,7 +308,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveRequests.Add(existing);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -340,7 +342,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveRequests.AddRange(cancelled, rejected);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -361,7 +363,8 @@ public class SubmitLeaveRequestHandlerTests
             new FakeWorkingPatternProvider(),
             new FakeCompanyLeaveSettingsReader(CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = false }),
             new FakePublicHolidayReader([new DateOnly(2026, 8, 5)]),
-            new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+            new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(),
+            new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
 
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
@@ -383,12 +386,42 @@ public class SubmitLeaveRequestHandlerTests
             new FakeWorkingPatternProvider(),
             new FakeCompanyLeaveSettingsReader(CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = true }),
             new FakePublicHolidayReader([new DateOnly(2026, 8, 5)]),
-            new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+            new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(),
+            new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
 
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(4m, result.Value!.TotalDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_ExcludedPublicHolidays_Consistent_With_PreviewLeaveRequestHandler()
+    {
+        // LEAVE-08: SubmitLeaveRequestHandler must surface the same public-holiday-in-range
+        // warning PreviewLeaveRequestHandler returns, using the same shared LeaveWarningCalculator.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
+
+        var holidayReader = new FakePublicHolidayReader([new DateOnly(2026, 8, 5)], "Summer Bank Holiday");
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow),
+            new FakeWorkingPatternProvider(),
+            new FakeCompanyLeaveSettingsReader(CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = true }),
+            holidayReader,
+            new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(),
+            new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)),
+            new LeaveWarningCalculator(holidayReader));
+
+        var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var excluded = Assert.Single(result.Value!.ExcludedPublicHolidays);
+        Assert.Equal(new DateOnly(2026, 8, 5), excluded.Date);
+        Assert.Equal("Summer Bank Holiday", excluded.Name);
     }
 
     [Fact]
@@ -410,7 +443,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveRequests.Add(otherRequest);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -426,7 +459,7 @@ public class SubmitLeaveRequestHandlerTests
 
         var (leaveType, _, _, balance) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -455,7 +488,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveRequests.Add(approved);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -486,7 +519,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id) with
             {
@@ -515,7 +548,8 @@ public class SubmitLeaveRequestHandlerTests
             new FakeWorkingPatternProvider(),
             new FakeCompanyLeaveSettingsReader(CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = true }),
             new FakePublicHolidayReader(),
-            new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+            new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(),
+            new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
 
         var result = await handler.HandleAsync(ValidRequest(companyB, employeeId, leaveType.Id), CancellationToken.None);
 
@@ -533,7 +567,7 @@ public class SubmitLeaveRequestHandlerTests
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
         var publisher = new CapturingIntegrationEventPublisher();
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), publisher, new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), publisher, new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var request = ValidRequest(companyId, employeeId, leaveType.Id);
         var result = await handler.HandleAsync(request, CancellationToken.None);
 
@@ -561,7 +595,7 @@ public class SubmitLeaveRequestHandlerTests
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
         var auditPublisher = new CapturingAuditEventPublisher();
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), auditPublisher);
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), auditPublisher, new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var request = ValidRequest(companyId, employeeId, leaveType.Id);
         var result = await handler.HandleAsync(request, CancellationToken.None);
 
@@ -611,7 +645,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance2027);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id) with
             {
@@ -654,7 +688,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveBalances.AddRange(balance2026, balance2027);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id) with
             {
@@ -685,7 +719,7 @@ public class SubmitLeaveRequestHandlerTests
         context.EmployeeLeavePolicyAssignments.Add(assignment);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -701,7 +735,7 @@ public class SubmitLeaveRequestHandlerTests
 
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id) with
             {
@@ -736,7 +770,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id) with
             {
@@ -776,7 +810,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
 
         // 2026-08-03 (Mon) - 2026-08-14 (Fri, next week) = 10 working days > 9.60 accrued.
         var result = await handler.HandleAsync(
@@ -816,11 +850,72 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
 
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RequiresApproval_False_Auto_Approves_Directly_And_Does_Not_Publish_LeaveRequestedIntegrationEvent()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Auto-approve Policy", null, 5,
+            allowNegativeBalance: false, isDefault: false, now, requiresApproval: false);
+        var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
+            DateOnly.FromDateTime(FixedUtcNow), now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            FixedUtcNow.Year, 25m, new DateOnly(FixedUtcNow.Year, 1, 1), now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.EmployeeLeavePolicyAssignments.Add(assignment);
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var publisher = new CapturingIntegrationEventPublisher();
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), publisher, new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), publisher, new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
+
+        var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Approved", result.Value!.Status);
+
+        var saved = await context.LeaveRequests.SingleAsync();
+        Assert.Equal(LeaveRequestStatus.Approved, saved.Status);
+        Assert.Equal(employeeId, saved.ReviewedByEmployeeId);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(5m, savedBalance.UsedDays);
+
+        Assert.DoesNotContain(publisher.Published, e => e is LeaveRequestedIntegrationEvent);
+        Assert.Contains(publisher.Published, e => e is LeaveApprovedIntegrationEvent);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RequiresApproval_True_Preserves_Pending_Behaviour()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
+
+        var publisher = new CapturingIntegrationEventPublisher();
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), publisher, new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
+
+        var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Pending", result.Value!.Status);
+        Assert.IsType<LeaveRequestedIntegrationEvent>(Assert.Single(publisher.Published));
     }
 }
 

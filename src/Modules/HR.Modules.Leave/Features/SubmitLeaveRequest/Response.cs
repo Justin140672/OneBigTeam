@@ -9,6 +9,8 @@ internal sealed record LeaveConflictWarning(
     DateOnly EndDate,
     string Status);
 
+internal sealed record SubmitExcludedPublicHolidayItem(DateOnly Date, string Name);
+
 internal sealed record SubmitLeaveRequestResponse(
     Guid Id,
     Guid CompanyId,
@@ -23,4 +25,5 @@ internal sealed record SubmitLeaveRequestResponse(
     decimal TotalDays,
     string? Reason,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<LeaveConflictWarning> Conflicts);
+    IReadOnlyList<LeaveConflictWarning> Conflicts,
+    IReadOnlyList<SubmitExcludedPublicHolidayItem> ExcludedPublicHolidays);

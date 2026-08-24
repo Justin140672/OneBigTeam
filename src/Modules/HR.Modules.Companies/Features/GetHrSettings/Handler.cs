@@ -48,6 +48,10 @@ internal sealed class GetHrSettingsHandler(CompaniesDbContext dbContext)
                 defaults.EmployeeNumberPrefix,
                 defaults.NextEmployeeNumber,
                 defaults.EmployeeNumberMinimumLength,
+                defaults.AssetNumberMode,
+                defaults.AssetNumberPrefix,
+                defaults.NextAssetNumber,
+                defaults.AssetNumberMinimumLength,
                 defaults.UpdatedAt));
         }
 
@@ -72,6 +76,10 @@ internal sealed class GetHrSettingsHandler(CompaniesDbContext dbContext)
             settings.EmployeeNumberPrefix,
             settings.NextEmployeeNumber,
             settings.EmployeeNumberMinimumLength,
+            settings.AssetNumberMode,
+            settings.AssetNumberPrefix,
+            settings.NextAssetNumber,
+            settings.AssetNumberMinimumLength,
             settings.UpdatedAt));
     }
 }

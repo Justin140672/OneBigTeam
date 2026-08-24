@@ -85,6 +85,19 @@ function getLastDashboard() {
     try { return localStorage.getItem('lastDashboard') ?? ''; } catch { return ''; }
 }
 
+// Remembers which tab was last active on the Employee edit/view page (Details/Employment/etc.),
+// keyed by employee id so switching between employees doesn't clobber each other's last tab.
+function setLastEmployeeTab(employeeId, tabIndex) {
+    try { localStorage.setItem('lastEmployeeTab:' + employeeId, tabIndex.toString()); } catch {}
+}
+
+function getLastEmployeeTab(employeeId) {
+    try {
+        const stored = localStorage.getItem('lastEmployeeTab:' + employeeId);
+        return stored ? parseInt(stored, 10) : null;
+    } catch { return null; }
+}
+
 // Session-scoped (per-tab) scroll position memory, used e.g. by the Recruitment Kanban board so
 // navigating away to a candidate's detail page and back restores where the user was scrolled to,
 // instead of resetting to the top. Keyed by caller-supplied string so multiple scroll containers

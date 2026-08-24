@@ -1,0 +1,6 @@
+/* Aligns the grid's row content with the input fields in the surrounding card body, which have
+   their own left padding/margin that the grid's default cell padding doesn't match. */
+::deep .e-grid .e-rowcell,
+::deep .e-grid .e-headercell {
+    padding-left: 1rem;
+}

@@ -48,11 +48,15 @@ public class CreateAssetValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_AssetNumber_Is_Empty()
+    public void Validate_Passes_When_AssetNumber_Is_Empty()
     {
+        // AssetNumber requiredness depends on the company's AssetNumberMode (Manual vs
+        // Automatic), which this shape-only validator has no DB access to check — that check now
+        // lives in CreateAssetHandler (mirrors CreateEmployeeValidator/Handler's own split for
+        // EmployeeNumber). An empty AssetNumber is valid at the validator level; it's only
+        // rejected here at the handler when the company is in Manual mode.
         var result = _validator.Validate(Valid() with { AssetNumber = string.Empty });
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateAssetRequest.AssetNumber));
+        Assert.True(result.IsValid);
     }
 
     [Fact]
@@ -147,11 +151,11 @@ public class CreateAssetValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_AssetNumber_Is_Whitespace_Only()
+    public void Validate_Passes_When_AssetNumber_Is_Whitespace_Only()
     {
+        // See Validate_Passes_When_AssetNumber_Is_Empty — requiredness is handler-level now.
         var result = _validator.Validate(Valid() with { AssetNumber = "   " });
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateAssetRequest.AssetNumber));
+        Assert.True(result.IsValid);
     }
 
     [Fact]

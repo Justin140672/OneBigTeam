@@ -35,7 +35,7 @@ public class GetAssetAssignmentHandlerTests
             Name = "Electronics"
         }, CancellationToken.None);
 
-        var assetHandler = new CreateAssetHandler(db, clock, new FakeAuditPublisher());
+        var assetHandler = new CreateAssetHandler(db, clock, new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
         var assetResult = await assetHandler.HandleAsync(new CreateAssetRequest
         {
             CompanyId = companyId,

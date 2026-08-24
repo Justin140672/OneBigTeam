@@ -9,4 +9,9 @@ internal sealed record UpdateLeavePolicyRequest
     public int CarryOverDays { get; init; }
     public bool AllowNegativeBalance { get; init; }
     public bool IsDefault { get; init; }
+    public bool RequiresApproval { get; init; } = true;
+
+    // Populated by the endpoint from the authenticated user's "sub" claim — never bound from the
+    // client body (internal properties are not touched by FastEndpoints' JSON model binding).
+    internal Guid? ActorEmployeeId { get; init; }
 }

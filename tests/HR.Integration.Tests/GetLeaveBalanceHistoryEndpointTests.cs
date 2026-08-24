@@ -170,9 +170,9 @@ public class GetLeaveBalanceHistoryEndpointTests
         approved.Approve(Guid.NewGuid(), new DateTimeOffset(2026, 1, 2, 9, 0, 0, TimeSpan.Zero));
         db.LeaveRequests.Add(approved);
 
-        var toilTransaction = ToilTransaction.Create(
+        var toilTransaction = ToilTransaction.CreateEarned(
             Guid.NewGuid(), companyId, employeeId, balance.Id, Guid.NewGuid(),
-            1m, new DateOnly(2026, 2, 1), "Overtime", new DateTimeOffset(2026, 2, 2, 9, 0, 0, TimeSpan.Zero));
+            1m, new DateOnly(2026, 2, 1), null, "Overtime", new DateTimeOffset(2026, 2, 2, 9, 0, 0, TimeSpan.Zero));
         db.ToilTransactions.Add(toilTransaction);
 
         // 2 days at the default 7.5 hours/day working pattern (no employee/company override

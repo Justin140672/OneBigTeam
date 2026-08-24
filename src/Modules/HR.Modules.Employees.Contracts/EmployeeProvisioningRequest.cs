@@ -17,4 +17,9 @@ public sealed record EmployeeProvisioningRequest(
     string? GenderOther = null,
     string? PersonalEmail = null,
     string? PhoneNumber = null,
-    Guid? ManagerId = null);
+    Guid? ManagerId = null,
+    string? AddressLine1 = null,
+    string? AddressLine2 = null,
+    string? City = null,
+    string? County = null,
+    string? PostCode = null);

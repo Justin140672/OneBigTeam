@@ -89,4 +89,22 @@ public sealed class HrSettingsEditModel
     public int NextEmployeeNumber { get; set; } = 1;
     [Range(1, 10, ErrorMessage = "Minimum numeric length must be between 1 and 10.")]
     public int EmployeeNumberMinimumLength { get; set; } = 1;
+
+    public AssetNumberMode AssetNumberMode { get; set; } = AssetNumberMode.Manual;
+    [MaxLength(20)]
+    public string? AssetNumberPrefix { get; set; }
+    [Range(1, int.MaxValue, ErrorMessage = "Next asset number must be greater than 0.")]
+    public int NextAssetNumber { get; set; } = 1;
+    [Range(1, 10, ErrorMessage = "Minimum numeric length must be between 1 and 10.")]
+    public int AssetNumberMinimumLength { get; set; } = 1;
+
+    // Baselines captured on load, used purely to detect a format change (prefix/minimum length)
+    // to Employee/Asset numbering while staying in Automatic mode, so the page can warn the user
+    // before save that this will trigger an automatic renumber of existing records.
+    public EmployeeNumberMode EmployeeNumberOriginalMode { get; set; }
+    public string? EmployeeNumberOriginalPrefix { get; set; }
+    public int EmployeeNumberOriginalMinimumLength { get; set; }
+    public AssetNumberMode AssetNumberOriginalMode { get; set; }
+    public string? AssetNumberOriginalPrefix { get; set; }
+    public int AssetNumberOriginalMinimumLength { get; set; }
 }

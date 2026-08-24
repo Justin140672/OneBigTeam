@@ -10,6 +10,14 @@ internal sealed class LeavePolicy
     public string? Description { get; private set; }
     public int CarryOverDays { get; private set; }
     public bool AllowNegativeBalance { get; private set; }
+
+    /// <summary>
+    /// LEAVE-07: whether leave requests submitted under this policy require manual approval
+    /// (Pending -> Approve/Reject) or are approved automatically at submission time. Defaults to
+    /// true — the safer default per LEAVE-07 design guidance — so a policy created without an
+    /// explicit choice never silently auto-approves leave.
+    /// </summary>
+    public bool RequiresApproval { get; private set; }
     public bool IsActive { get; private set; }
     public bool IsDefault { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -23,7 +31,8 @@ internal sealed class LeavePolicy
         int carryOverDays,
         bool allowNegativeBalance,
         bool isDefault,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        bool requiresApproval = true)
     {
         return new LeavePolicy
         {
@@ -33,6 +42,7 @@ internal sealed class LeavePolicy
             Description = description,
             CarryOverDays = carryOverDays,
             AllowNegativeBalance = allowNegativeBalance,
+            RequiresApproval = requiresApproval,
             IsActive = true,
             IsDefault = isDefault,
             CreatedAt = now,
@@ -45,12 +55,14 @@ internal sealed class LeavePolicy
         string? description,
         int carryOverDays,
         bool allowNegativeBalance,
+        bool requiresApproval,
         DateTimeOffset now)
     {
         Name = name;
         Description = description;
         CarryOverDays = carryOverDays;
         AllowNegativeBalance = allowNegativeBalance;
+        RequiresApproval = requiresApproval;
         UpdatedAt = now;
     }
 

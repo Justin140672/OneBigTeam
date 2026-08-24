@@ -1,12 +1,13 @@
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
+using HR.Modules.Leave.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.CancelLeaveRequest;
 
-internal sealed class CancelLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, ICompanyLeaveSettingsReader leaveSettingsReader, IAuditEventPublisher auditPublisher)
+internal sealed class CancelLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, ICompanyLeaveSettingsReader leaveSettingsReader, IAuditEventPublisher auditPublisher, ToilLedgerService toilLedgerService)
 {
     public async Task<Result<CancelLeaveRequestResponse>> HandleAsync(
         CancelLeaveRequestRequest request,
@@ -27,6 +28,12 @@ internal sealed class CancelLeaveRequestHandler(LeaveDbContext dbContext, IClock
             return Result.Failure<CancelLeaveRequestResponse>(
                 Error.Validation($"Cannot cancel a leave request with status '{leaveRequest.Status}'."));
 
+        // LEAVE-07: a Draft was never submitted, so "cancel" is not a meaningful action - use
+        // DeleteLeaveRequestDraft instead.
+        if (leaveRequest.Status is LeaveRequestStatus.Draft)
+            return Result.Failure<CancelLeaveRequestResponse>(
+                Error.Validation("Cannot cancel a draft leave request - delete the draft instead."));
+
         var now = clock.UtcNowOffset();
         var previousStatus = leaveRequest.Status.ToString();
 
@@ -35,36 +42,35 @@ internal sealed class CancelLeaveRequestHandler(LeaveDbContext dbContext, IClock
             var leaveType = await dbContext.LeaveTypes
                 .SingleOrDefaultAsync(lt => lt.Id == leaveRequest.LeaveTypeId, cancellationToken);
 
-            LeaveBalance? balance;
             if (leaveType?.Behaviour == LeaveTypeBehaviour.Toil)
             {
-                // Mirror the approval FIFO logic: reverse from the oldest balance that
-                // still has used days recorded against it.
-                var toilBalances = await dbContext.LeaveBalances
-                    .Where(b => b.EmployeeId == leaveRequest.EmployeeId
-                             && b.CompanyId == leaveRequest.CompanyId
-                             && b.LeaveTypeId == leaveRequest.LeaveTypeId)
-                    .OrderBy(b => b.PolicyYear)
-                    .ToListAsync(cancellationToken);
-
-                balance = toilBalances.FirstOrDefault(b => b.UsedDays > 0)
-                          ?? toilBalances.FirstOrDefault();
+                // Reverses every Used ledger transaction recorded against this leave request,
+                // restoring each specific bucket it drew from - not a lump sum credit - so future
+                // FIFO consumption ordering stays correct. See ToilLedgerService.ReverseAsync.
+                await toilLedgerService.ReverseAsync(
+                    leaveRequest.CompanyId,
+                    leaveRequest.EmployeeId,
+                    leaveRequest.Id,
+                    leaveRequest.EmployeeId,
+                    DateOnly.FromDateTime(now.Date),
+                    now,
+                    cancellationToken);
             }
             else
             {
                 var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(leaveRequest.CompanyId, cancellationToken);
                 var policyYear = LeaveYearCalculator.GetPolicyYear(leaveRequest.StartDate, leaveSettings.LeaveYearStartMonth);
 
-                balance = await dbContext.LeaveBalances
+                var balance = await dbContext.LeaveBalances
                     .SingleOrDefaultAsync(
                         b => b.EmployeeId == leaveRequest.EmployeeId
                           && b.CompanyId == leaveRequest.CompanyId
                           && b.LeaveTypeId == leaveRequest.LeaveTypeId
                           && b.PolicyYear == policyYear,
                         cancellationToken);
-            }
 
-            balance?.ReverseUsage(leaveRequest.TotalDays, now);
+                balance?.ReverseUsage(leaveRequest.TotalDays, now);
+            }
         }
 
         leaveRequest.Cancel(now);

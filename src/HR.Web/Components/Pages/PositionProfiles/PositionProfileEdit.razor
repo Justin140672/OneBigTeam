@@ -190,6 +190,32 @@
                             </div>
                         </ContentTemplate>
                     </TabItem>
+                    @if (!IsNew)
+                    {
+                        <TabItem>
+                            <ChildContent><TabHeader Text="Assigned Employees" /></ChildContent>
+                            <ContentTemplate>
+                                <div class="mt-4">
+                                    @if (_assignedEmployees.Count == 0)
+                                    {
+                                        <p class="text-muted">No employees are currently assigned to this position profile.</p>
+                                    }
+                                    else
+                                    {
+                                        <ul class="list-group">
+                                            @foreach (var employee in _assignedEmployees)
+                                            {
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    <a href="/companies/@CompanyId/employees/@employee.EmployeeId">@employee.FullName</a>
+                                                    <span class="badge @StatusBadgeClass(employee.Status)">@employee.Status</span>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </div>
+                            </ContentTemplate>
+                        </TabItem>
+                    }
                 </TabItems>
             </SfTab>
         }
@@ -285,9 +311,22 @@
                 {
                     Model.OverrideNoticePeriod = false;
                 }
+
+                _assignedEmployees = profile.AssignedEmployees ?? [];
             }
         }
     }
+
+    private IReadOnlyList<PositionProfileAssignedEmployeeModel> _assignedEmployees = [];
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Active"         => "bg-success",
+        "Suspended"      => "bg-danger",
+        "Leaving"        => "bg-warning text-dark",
+        "FormerEmployee" => "bg-secondary",
+        _                => "bg-light text-dark"
+    };
 
     protected override async Task<string?> SaveCoreAsync()
     {

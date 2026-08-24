@@ -445,14 +445,34 @@ else
     // display/round-trip of an already-Draft, already-Leaving, or already-FormerEmployee
     // employee — it doesn't relax those rules. Leaving is only ever actively entered via the
     // dedicated Start Leaving Process action, not this generic edit form.
-    private static readonly Option[] _statusOptions =
+    // "Leaving" is only offered as a selectable option once the employee already has a
+    // LeavingDate set — UpdateEmploymentDetailsHandler rejects an attempt to actively transition
+    // into "Leaving" via this generic form otherwise (that transition only happens via the
+    // dedicated Start Leaving Process action). Draft/FormerEmployee are still included whenever
+    // that's the employee's current status, purely so the dropdown round-trips that value without
+    // corrupting it (see remarks above) — never as something a user is meant to actively pick.
+    private List<Option> _statusOptions =
     [
         new("Draft",          "Draft"),
         new("Active",         "Active"),
         new("Suspended",      "Suspended"),
-        new("Leaving",        "Leaving"),
         new("FormerEmployee", "Former Employee"),
     ];
+
+    private void RebuildStatusOptions()
+    {
+        var hasLeavingDate = _employee?.LeavingDate is not null;
+        var options = new List<Option>
+        {
+            new("Draft",          "Draft"),
+            new("Active",         "Active"),
+            new("Suspended",      "Suspended"),
+        };
+        if (hasLeavingDate || Model.Status == "Leaving")
+            options.Add(new("Leaving", "Leaving"));
+        options.Add(new("FormerEmployee", "Former Employee"));
+        _statusOptions = options;
+    }
 
     protected override async Task LoadAsync()
     {
@@ -486,6 +506,7 @@ else
         _employee = employee;
         if (employee is not null)
             PopulateModel(employee);
+        RebuildStatusOptions();
 
         // Same "merge in the currently-assigned option even if it fell outside the bounded first
         // page" pattern as _managerOptions below — otherwise an employee whose Position Profile

@@ -34,7 +34,8 @@ internal sealed class LeaveRequest
         LeaveDayPart endPart,
         decimal totalDays,
         string? reason,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        LeaveRequestStatus status = LeaveRequestStatus.Pending)
     {
         return new LeaveRequest
         {
@@ -43,7 +44,7 @@ internal sealed class LeaveRequest
             EmployeeId = employeeId,
             LeaveTypeId = leaveTypeId,
             LeavePolicyId = leavePolicyId,
-            Status = LeaveRequestStatus.Pending,
+            Status = status,
             StartDate = startDate,
             StartPart = startPart,
             EndDate = endDate,
@@ -55,11 +56,60 @@ internal sealed class LeaveRequest
         };
     }
 
+    /// <summary>
+    /// Creates a Draft leave request (LEAVE-07). Drafts skip every blocking check that a real
+    /// submission enforces (cross-year rejection, balance sufficiency, conflict detection) — see
+    /// CreateLeaveRequestDraftHandler. TotalDays is still computed for display purposes only and
+    /// is recalculated authoritatively when the draft is submitted.
+    /// </summary>
+    public static LeaveRequest CreateDraft(
+        Guid id,
+        Guid companyId,
+        Guid employeeId,
+        Guid leaveTypeId,
+        Guid? leavePolicyId,
+        DateOnly startDate,
+        LeaveDayPart startPart,
+        DateOnly endDate,
+        LeaveDayPart endPart,
+        decimal totalDays,
+        string? reason,
+        DateTimeOffset now)
+        => Create(id, companyId, employeeId, leaveTypeId, leavePolicyId, startDate, startPart, endDate, endPart,
+            totalDays, reason, now, LeaveRequestStatus.Draft);
+
+    /// <summary>
+    /// Re-resolves the policy a Draft is submitted under (LEAVE-07). A draft can be created
+    /// before the employee has a resolvable policy assignment (LeavePolicyId null); submission
+    /// re-queries the assignment fresh, so this lets SubmitLeaveRequestDraftHandler keep the
+    /// stored LeavePolicyId in sync with what was actually used for the approval decision.
+    /// </summary>
+    public void AssignLeavePolicy(Guid? leavePolicyId)
+    {
+        LeavePolicyId = leavePolicyId;
+    }
+
     public void Approve(Guid reviewedByEmployeeId, DateTimeOffset now)
     {
         Status = LeaveRequestStatus.Approved;
         ReviewedByEmployeeId = reviewedByEmployeeId;
         ReviewedAt = now;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Transitions a Draft to Pending when the assigned leave policy requires manual approval.
+    /// Callers (SubmitLeaveRequestDraftHandler) must verify Status == Draft beforehand and
+    /// translate an invalid state into a Result failure — this throw is a defensive invariant,
+    /// not the primary validation path (see 09-coding-standards.md: Result pattern for business
+    /// flow, exceptions for unexpected failures only).
+    /// </summary>
+    public void MarkSubmittedPending(DateTimeOffset now)
+    {
+        if (Status != LeaveRequestStatus.Draft)
+            throw new InvalidOperationException($"Cannot submit a leave request with status '{Status}'.");
+
+        Status = LeaveRequestStatus.Pending;
         UpdatedAt = now;
     }
 
@@ -78,7 +128,13 @@ internal sealed class LeaveRequest
         UpdatedAt = now;
     }
 
-    public void UpdateDetails(
+    /// <summary>
+    /// Edits a Draft's details in place (LEAVE-07). Only callable while Status == Draft —
+    /// submitted/approved/rejected/cancelled requests can never re-enter draft editing.
+    /// UpdateLeaveRequestDraftHandler must check Status before calling; this throw is the
+    /// domain-level backstop for that guard, not the primary validation path.
+    /// </summary>
+    public void UpdateDraftDetails(
         Guid leaveTypeId,
         DateOnly startDate,
         LeaveDayPart startPart,
@@ -88,6 +144,9 @@ internal sealed class LeaveRequest
         string? reason,
         DateTimeOffset now)
     {
+        if (Status != LeaveRequestStatus.Draft)
+            throw new InvalidOperationException($"Cannot edit a leave request with status '{Status}' as a draft.");
+
         LeaveTypeId = leaveTypeId;
         StartDate = startDate;
         StartPart = startPart;

@@ -1,5 +1,6 @@
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
+using HR.Modules.Leave.Services;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
@@ -12,7 +13,8 @@ internal sealed class PreviewLeaveRequestHandler(
     IClock clock,
     IWorkingPatternProvider workingPatternProvider,
     ICompanyLeaveSettingsReader leaveSettingsReader,
-    IPublicHolidayReader publicHolidayReader)
+    IPublicHolidayReader publicHolidayReader,
+    LeaveWarningCalculator warningCalculator)
 {
     public async Task<Result<PreviewLeaveRequestResponse>> HandleAsync(
         PreviewLeaveRequestRequest request,
@@ -33,7 +35,6 @@ internal sealed class PreviewLeaveRequestHandler(
         var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(request.CompanyId, cancellationToken);
 
         List<DateOnly>? publicHolidayDates = null;
-        List<ExcludedPublicHolidayItem> excludedHolidays = [];
 
         if (leaveSettings.ExcludePublicHolidaysFromLeave)
         {
@@ -41,12 +42,13 @@ internal sealed class PreviewLeaveRequestHandler(
                 request.CompanyId, request.StartDate, request.EndDate, cancellationToken);
 
             publicHolidayDates = holidays.Select(h => h.Date).ToList();
-            excludedHolidays = holidays
-                .Where(h => workingPattern.IsWorkingDay(h.Date.DayOfWeek))
-                .OrderBy(h => h.Date)
-                .Select(h => new ExcludedPublicHolidayItem(h.Date, h.Name))
-                .ToList();
         }
+
+        var excludedHolidays = (await warningCalculator.GetExcludedPublicHolidaysAsync(
+                request.CompanyId, request.StartDate, request.EndDate, workingPattern,
+                leaveSettings.ExcludePublicHolidaysFromLeave, cancellationToken))
+            .Select(h => new ExcludedPublicHolidayItem(h.Date, h.Name))
+            .ToList();
 
         var totalDays = LeaveCalculator.CalculateTotalDays(
             request.StartDate, request.StartPart,

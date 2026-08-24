@@ -41,8 +41,17 @@
     transform: translateY(-1px);
 }
 
+/* Header row holding the "needs attention" alert badge (left) and the "where they are today"
+   status badge (right) — both in normal flow (not position:absolute) inside a shared row so their
+   baselines line up across every card regardless of whether a given member has an alert badge. */
+.team-card-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
 .team-card-status {
-    align-self: flex-end;
     font-size: 0.62rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -82,9 +91,6 @@ html[data-theme="dark"] .team-card-status--on-leave {
 }
 
 .team-card-alert-badge {
-    position: absolute;
-    top: 8px;
-    left: 8px;
     display: flex;
     align-items: center;
     gap: 3px;

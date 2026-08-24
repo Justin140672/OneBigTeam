@@ -27,4 +27,8 @@ internal sealed record UpdateHrSettingsRequest
 	public string? EmployeeNumberPrefix { get; init; }
 	public int NextEmployeeNumber { get; init; } = 1;
 	public int EmployeeNumberMinimumLength { get; init; } = 1;
+	public AssetNumberMode AssetNumberMode { get; init; } = AssetNumberMode.Manual;
+	public string? AssetNumberPrefix { get; init; }
+	public int NextAssetNumber { get; init; } = 1;
+	public int AssetNumberMinimumLength { get; init; } = 1;
 }

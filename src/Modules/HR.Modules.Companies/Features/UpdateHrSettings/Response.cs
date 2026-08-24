@@ -26,4 +26,8 @@ internal sealed record UpdateHrSettingsResponse(
 	string? EmployeeNumberPrefix,
 	int NextEmployeeNumber,
 	int EmployeeNumberMinimumLength,
+	AssetNumberMode AssetNumberMode,
+	string? AssetNumberPrefix,
+	int NextAssetNumber,
+	int AssetNumberMinimumLength,
 	DateTimeOffset UpdatedAt);
