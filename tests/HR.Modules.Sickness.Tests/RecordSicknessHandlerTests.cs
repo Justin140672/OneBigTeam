@@ -691,4 +691,85 @@ public class RecordSicknessHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Empty(notificationWriter.Written);
     }
+
+    // SICK-06: RecordSickness is the manager/HR-initiated path — the actor threaded onto the
+    // audit event is the authenticated caller (may differ from the affected employee), never
+    // implicitly assumed to be the employee.
+    [Fact]
+    public async Task HandleAsync_Audit_ActorEmployeeId_Reflects_Authenticated_Caller_Not_Employee()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var actorId = Guid.NewGuid(); // the manager/HR user, distinct from the employee
+        var categoryId = await SeedCategory(db, companyId);
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new RecordSicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            CategoryId = categoryId,
+            StartDate = StartDate,
+            StartDayPart = SicknessDayPart.FullDay,
+            ActorEmployeeId = actorId
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.IsType<SicknessRecordedAuditEvent>(Assert.Single(auditPublisher.PublishedEvents));
+        Assert.Equal(actorId, auditEvent.ActorEmployeeIdValue);
+        Assert.Equal(actorId, ((IAuditEvent)auditEvent).ActorEmployeeId);
+        Assert.NotEqual(employeeId, ((IAuditEvent)auditEvent).ActorEmployeeId);
+        Assert.Equal(employeeId, ((IAuditEvent)auditEvent).EmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Audit_ActorEmployeeId_Is_Null_When_Not_Supplied()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new RecordSicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = Guid.NewGuid(),
+            CategoryId = categoryId,
+            StartDate = StartDate,
+            StartDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.IsType<SicknessRecordedAuditEvent>(Assert.Single(auditPublisher.PublishedEvents));
+        Assert.Null(auditEvent.ActorEmployeeIdValue);
+    }
+
+    // SICK-06: Notes is free-text and may contain sensitive health content — it must never
+    // appear anywhere in the serialized audit event (checked via full-object JSON serialization
+    // rather than individual property assertions, to catch any accidental future leak).
+    [Fact]
+    public async Task HandleAsync_Audit_Event_Does_Not_Contain_Notes_Free_Text()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var auditPublisher = new FakeAuditEventPublisher();
+        const string sensitiveNotes = "DistinctiveSensitiveHealthDetail-Migraine-Diagnosis";
+
+        var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new RecordSicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = Guid.NewGuid(),
+            CategoryId = categoryId,
+            StartDate = StartDate,
+            StartDayPart = SicknessDayPart.FullDay,
+            Notes = sensitiveNotes
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.Single(auditPublisher.PublishedEvents);
+        var serialized = System.Text.Json.JsonSerializer.Serialize(auditEvent);
+        Assert.DoesNotContain(sensitiveNotes, serialized);
+    }
 }

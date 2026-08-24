@@ -1,10 +1,11 @@
 using HR.Modules.Sickness.Persistence;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Features.UpdateSicknessCategory;
 
-internal sealed class UpdateSicknessCategoryHandler(SicknessDbContext db, IClock clock)
+internal sealed class UpdateSicknessCategoryHandler(SicknessDbContext db, IClock clock, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<UpdateSicknessCategoryResponse>> HandleAsync(
         UpdateSicknessCategoryRequest request,
@@ -22,10 +23,26 @@ internal sealed class UpdateSicknessCategoryHandler(SicknessDbContext db, IClock
         if (nameConflict)
             return Result.Failure<UpdateSicknessCategoryResponse>(Error.Conflict("A sickness category with this name already exists."));
 
+        var beforeName = category.Name;
+        var beforeDisplayOrder = category.DisplayOrder;
+        var beforeIsActive = category.IsActive;
+
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
         category.Update(request.Name, request.DisplayOrder, category.IsActive, now);
 
         await db.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new SicknessCategoryUpdatedAuditEvent(
+            category.CompanyId,
+            category.Id,
+            request.ActorEmployeeId,
+            beforeName,
+            beforeDisplayOrder,
+            beforeIsActive,
+            category.Name,
+            category.DisplayOrder,
+            category.IsActive,
+            now), cancellationToken);
 
         return Result.Success(new UpdateSicknessCategoryResponse(
             category.Id, category.CompanyId, category.Name, category.IsActive, category.DisplayOrder, category.CreatedAt, category.UpdatedAt));

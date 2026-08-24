@@ -87,6 +87,7 @@ internal sealed class CompleteReturnToWorkReviewHandler(
                         sicknessRecord.EmployeeId,
                         sicknessRecord.Id,
                         review.Id,
+                        reviewedBy,
                         now), cancellationToken);
                 }
             }
@@ -101,8 +102,8 @@ internal sealed class CompleteReturnToWorkReviewHandler(
                 reviewedBy,
                 review.Outcome!.Value.ToString(),
                 review.AdjustmentsRequired,
-                review.AdjustmentDetails,
-                review.Notes,
+                HasAdjustmentDetails: !string.IsNullOrWhiteSpace(review.AdjustmentDetails),
+                HasNotes: !string.IsNullOrWhiteSpace(review.Notes),
                 now,
                 now), cancellationToken);
 

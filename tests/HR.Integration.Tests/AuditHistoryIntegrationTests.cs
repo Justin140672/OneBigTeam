@@ -437,6 +437,168 @@ public class AuditHistoryIntegrationTests
         Assert.Contains(newTitle, auditRecord.AfterJson);
     }
 
+    // SICK-06: actor attribution and sensitive-data exclusion, verified end-to-end through the
+    // real DbAuditEventPublisher/AuditDbContext (not just the fake publisher used by the unit
+    // tests in HR.Modules.Sickness.Tests).
+    [Fact]
+    public async Task RecordSickness_Persists_Audit_Record_With_Actor_And_Without_Notes_Content()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+        var categoryId = await CreateSicknessCategoryAsync(hrAdminClient, companyId);
+        const string sensitiveNotes = "AuditIntegration-Sensitive-Diagnosis-Detail";
+
+        var recordResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/sickness-records",
+            new
+            {
+                companyId,
+                employeeId,
+                categoryId,
+                startDate = "2026-07-01",
+                startDayPart = 0,
+                notes = sensitiveNotes
+            });
+        recordResp.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "sickness.recorded")
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("SicknessRecord", auditRecord!.EntityType);
+        Assert.Equal(employeeId, auditRecord.EmployeeId);
+        // HrAdminUser is the authenticated caller — the actor recorded on the audit event, not
+        // implicitly assumed to be the affected employee.
+        Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
+        Assert.NotEqual(employeeId, auditRecord.ActorEmployeeId);
+        Assert.DoesNotContain(sensitiveNotes, auditRecord.AfterJson ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task CloseSicknessRecord_Persists_Audit_Record_With_Actor_And_Without_Notes_Content()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+        var categoryId = await CreateSicknessCategoryAsync(hrAdminClient, companyId);
+        const string sensitiveNotes = "AuditIntegration-Sensitive-CloseNotes-Detail";
+
+        var recordResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/sickness-records",
+            new { companyId, employeeId, categoryId, startDate = "2026-07-01", startDayPart = 0 });
+        recordResp.EnsureSuccessStatusCode();
+        var recordId = (await recordResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var closeResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/{recordId}/close",
+            new
+            {
+                companyId,
+                employeeId,
+                id = recordId,
+                endDate = "2026-07-03",
+                endDayPart = 0,
+                notes = sensitiveNotes
+            });
+        closeResp.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "sickness.closed")
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("SicknessRecord", auditRecord!.EntityType);
+        Assert.Equal(employeeId, auditRecord.EmployeeId);
+        Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
+        Assert.NotEqual(employeeId, auditRecord.ActorEmployeeId);
+        Assert.DoesNotContain(sensitiveNotes, auditRecord.BeforeJson ?? string.Empty);
+        Assert.DoesNotContain(sensitiveNotes, auditRecord.AfterJson ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task CompleteReturnToWorkReview_Persists_Audit_Record_With_Reviewer_Actor_And_Without_Sensitive_Content()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+        var categoryId = await CreateSicknessCategoryAsync(hrAdminClient, companyId);
+        const string sensitiveAdjustmentDetails = "AuditIntegration-Sensitive-Adjustment-Detail";
+        const string sensitiveManagerNotes = "AuditIntegration-Sensitive-ManagerNotes-Detail";
+
+        var recordResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/sickness-records",
+            new { companyId, employeeId, categoryId, startDate = "2026-06-01", startDayPart = 0 });
+        recordResp.EnsureSuccessStatusCode();
+        var recordId = (await recordResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var closeResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/{recordId}/close",
+            new { companyId, employeeId, id = recordId, endDate = "2026-06-03", endDayPart = 0 });
+        closeResp.EnsureSuccessStatusCode();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var sicknessDb = scope.ServiceProvider.GetRequiredService<HR.Modules.Sickness.Persistence.SicknessDbContext>();
+            var review = await sicknessDb.ReturnToWorkReviews.AsNoTracking()
+                .SingleAsync(r => r.CompanyId == companyId && r.EmployeeId == employeeId);
+
+            var completeResp = await hrAdminClient.PostAsJsonAsync(
+                $"/api/companies/{companyId}/return-to-work-reviews/{review.Id}/complete",
+                new
+                {
+                    companyId,
+                    reviewId = review.Id,
+                    outcome = "FitWithAdjustments",
+                    adjustmentsRequired = true,
+                    adjustmentDetails = sensitiveAdjustmentDetails,
+                    managerNotes = sensitiveManagerNotes
+                });
+            completeResp.EnsureSuccessStatusCode();
+        }
+
+        using var auditScope = _factory.Services.CreateScope();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "sickness.return_to_work_review_completed")
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("ReturnToWorkReview", auditRecord!.EntityType);
+        Assert.Equal(employeeId, auditRecord.EmployeeId);
+        // Reviewer (HrAdminUser) is the actor, correctly distinct from the reviewed employee.
+        Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
+        Assert.NotEqual(employeeId, auditRecord.ActorEmployeeId);
+        Assert.DoesNotContain(sensitiveAdjustmentDetails, auditRecord.AfterJson ?? string.Empty);
+        Assert.DoesNotContain(sensitiveManagerNotes, auditRecord.AfterJson ?? string.Empty);
+    }
+
+    private async Task<Guid> CreateSicknessCategoryAsync(HttpClient client, Guid companyId)
+    {
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/sickness-categories", new
+        {
+            companyId,
+            name = $"Category-{Guid.NewGuid():N}",
+            displayOrder = 1
+        });
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+    }
+
     private static async Task<(Guid DepartmentId, Guid LocationId, Guid LeavePolicyId)> CreatePositionProfileReferenceDataAsync(HttpClient client, Guid companyId)
     {
         var deptResp = await client.PostAsJsonAsync(

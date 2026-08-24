@@ -48,7 +48,9 @@ internal sealed class Endpoint(
             }
         }
 
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var result = await handler.HandleAsync(
+            request with { ActorEmployeeId = currentUser.UserId },
+            cancellationToken);
         if (result.IsFailure)
         {
             if (result.Error.Code == "conflict")

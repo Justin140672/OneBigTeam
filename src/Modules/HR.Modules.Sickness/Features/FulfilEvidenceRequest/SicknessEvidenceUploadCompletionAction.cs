@@ -56,6 +56,7 @@ internal sealed class SicknessEvidenceUploadCompletionAction(
                     SicknessRecordId:  evidenceRequest.SicknessRecordId,
                     CompanyId:         evidenceRequest.CompanyId,
                     EmployeeId:        sicknessRecord.EmployeeId,
+                    ActorId:           context.CompletedBy,
                     FulfilledAt:       now,
                     OccurredAt:        now),
                 cancellationToken);

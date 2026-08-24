@@ -95,6 +95,7 @@ internal sealed class FitNoteEvidenceRequestService(
                 SicknessRecordId:  record.Id,
                 CompanyId:         record.CompanyId,
                 EmployeeId:        record.EmployeeId,
+                ActorId:           SystemActorId,
                 DueDate:           dueDate,
                 OccurredAt:        now),
             cancellationToken);

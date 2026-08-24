@@ -30,7 +30,9 @@ internal sealed class Endpoint(RecordMySicknessHandler handler, ICurrentUser cur
             return;
         }
 
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var result = await handler.HandleAsync(
+            request with { ActorEmployeeId = authenticatedEmployeeId },
+            cancellationToken);
 
         if (result.IsFailure)
         {

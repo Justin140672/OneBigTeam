@@ -1,9 +1,10 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Sickness.Features.UpdateSicknessCategory;
 
-internal sealed class Endpoint(UpdateSicknessCategoryHandler handler)
+internal sealed class Endpoint(UpdateSicknessCategoryHandler handler, ICurrentUser currentUser)
     : Endpoint<UpdateSicknessCategoryRequest, UpdateSicknessCategoryResponse>
 {
     public override void Configure()
@@ -14,7 +15,9 @@ internal sealed class Endpoint(UpdateSicknessCategoryHandler handler)
 
     public override async Task HandleAsync(UpdateSicknessCategoryRequest request, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var result = await handler.HandleAsync(
+            request with { ActorEmployeeId = currentUser.UserId },
+            cancellationToken);
         if (result.IsFailure)
         {
             if (result.Error.Code == "not_found")

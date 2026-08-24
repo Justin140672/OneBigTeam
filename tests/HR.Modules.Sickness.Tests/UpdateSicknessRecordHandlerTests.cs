@@ -204,4 +204,103 @@ public class UpdateSicknessRecordHandlerTests
 
         Assert.Empty(auditPublisher.PublishedEvents);
     }
+
+    // SICK-06: actor is the caller who submitted the update (manager/HR via ICurrentUser),
+    // threaded via UpdateSicknessRecordRequest.ActorEmployeeId.
+    [Fact]
+    public async Task HandleAsync_Audit_ActorEmployeeId_Reflects_Authenticated_Caller_Not_Employee()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new UpdateSicknessRecordRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Id = record.Id,
+            CategoryId = categoryId,
+            StartDate = StartDate,
+            StartDayPart = SicknessDayPart.FullDay,
+            ActorEmployeeId = actorId
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.IsType<SicknessUpdatedAuditEvent>(Assert.Single(auditPublisher.PublishedEvents));
+        Assert.Equal(actorId, ((HR.SharedKernel.IAuditEvent)auditEvent).ActorEmployeeId);
+        Assert.NotEqual(employeeId, ((HR.SharedKernel.IAuditEvent)auditEvent).ActorEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Audit_Before_Reflects_PreMutation_And_After_Reflects_PostMutation_Values()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var oldCategoryId = await SeedCategory(db, companyId);
+        var newCategoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, oldCategoryId);
+        var originalStartDate = record.StartDate;
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new UpdateSicknessRecordRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Id = record.Id,
+            CategoryId = newCategoryId,
+            StartDate = new DateOnly(2026, 7, 5),
+            StartDayPart = SicknessDayPart.HalfDayAM
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.IsType<SicknessUpdatedAuditEvent>(Assert.Single(auditPublisher.PublishedEvents));
+        Assert.Equal(oldCategoryId, auditEvent.BeforeCategoryId);
+        Assert.Equal(originalStartDate, auditEvent.BeforeStartDate);
+        Assert.Equal(newCategoryId, auditEvent.CategoryId);
+        Assert.Equal(new DateOnly(2026, 7, 5), auditEvent.StartDate);
+    }
+
+    // SICK-06: Notes is free-text and must never appear in the serialized audit event, whether
+    // supplied as the pre-existing value or the new value being set.
+    [Fact]
+    public async Task HandleAsync_Audit_Event_Does_Not_Contain_Notes_Free_Text()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        const string originalSensitiveNotes = "OriginalSensitive-Chemotherapy-Detail";
+        const string newSensitiveNotes = "UpdatedSensitive-Chemotherapy-Detail";
+
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var record = HR.Modules.Sickness.Domain.SicknessRecord.Create(
+            Guid.NewGuid(), companyId, employeeId, categoryId, StartDate, SicknessDayPart.FullDay,
+            null, null, null, originalSensitiveNotes, HR.Modules.Sickness.Domain.SicknessEvidenceStatus.NotRequired, now);
+        db.SicknessRecords.Add(record);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new UpdateSicknessRecordRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Id = record.Id,
+            CategoryId = categoryId,
+            StartDate = StartDate,
+            StartDayPart = SicknessDayPart.FullDay,
+            Notes = newSensitiveNotes
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.Single(auditPublisher.PublishedEvents);
+        var serialized = System.Text.Json.JsonSerializer.Serialize(auditEvent);
+        Assert.DoesNotContain(originalSensitiveNotes, serialized);
+        Assert.DoesNotContain(newSensitiveNotes, serialized);
+    }
 }

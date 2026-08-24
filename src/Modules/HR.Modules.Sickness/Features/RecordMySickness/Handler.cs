@@ -113,6 +113,7 @@ internal sealed class RecordMySicknessHandler(
             entity.CompanyId,
             entity.EmployeeId,
             entity.Id,
+            request.ActorEmployeeId,
             entity.CategoryId,
             entity.StartDate,
             entity.EndDate,

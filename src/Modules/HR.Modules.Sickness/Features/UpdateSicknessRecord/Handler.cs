@@ -60,6 +60,11 @@ internal sealed class UpdateSicknessRecordHandler(
                 workingPattern, publicHolidays);
         }
 
+        var beforeCategoryId = record.CategoryId;
+        var beforeStartDate = record.StartDate;
+        var beforeEndDate = record.EndDate;
+        var beforeTotalDays = record.TotalDays;
+
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
         record.Update(
             request.CategoryId,
@@ -80,6 +85,11 @@ internal sealed class UpdateSicknessRecordHandler(
             record.CompanyId,
             record.EmployeeId,
             record.Id,
+            request.ActorEmployeeId,
+            beforeCategoryId,
+            beforeStartDate,
+            beforeEndDate,
+            beforeTotalDays,
             record.CategoryId,
             record.StartDate,
             record.EndDate,

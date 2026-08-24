@@ -555,4 +555,120 @@ public class CloseSicknessRecordHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Empty(await db.SicknessEvidenceRequests.ToListAsync());
     }
+
+    // SICK-06: actor is the manager/HR user who performed the close action, never implicitly
+    // assumed to be the affected employee.
+    [Fact]
+    public async Task HandleAsync_Audit_ActorEmployeeId_Reflects_Authenticated_Caller_Not_Employee()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new CloseSicknessRecordRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Id = record.Id,
+            EndDate = new DateOnly(2026, 7, 3),
+            EndDayPart = SicknessDayPart.FullDay,
+            ActorEmployeeId = actorId
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.IsType<SicknessClosedAuditEvent>(Assert.Single(auditPublisher.PublishedEvents));
+        Assert.Equal(actorId, ((HR.SharedKernel.IAuditEvent)auditEvent).ActorEmployeeId);
+        Assert.NotEqual(employeeId, ((HR.SharedKernel.IAuditEvent)auditEvent).ActorEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Audit_Before_Reflects_PreMutation_And_After_Reflects_PostMutation_Values()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
+        var beforeStartDate = record.StartDate;
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new CloseSicknessRecordRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Id = record.Id,
+            EndDate = new DateOnly(2026, 7, 3),
+            EndDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.IsType<SicknessClosedAuditEvent>(Assert.Single(auditPublisher.PublishedEvents));
+        Assert.Equal(beforeStartDate, auditEvent.BeforeStartDate);
+        Assert.Null(auditEvent.BeforeEndDate); // open before close
+        Assert.Equal(new DateOnly(2026, 7, 3), auditEvent.EndDate);
+        Assert.Equal(3m, auditEvent.TotalDays);
+    }
+
+    // SICK-06: ReturnToWorkReviewRequiredAuditEvent's actor is the same person who closed the
+    // record (they caused this outcome directly), not the affected employee.
+    [Fact]
+    public async Task HandleAsync_ReturnToWorkReviewRequired_AuditEvent_ActorEmployeeId_Is_Closer_Not_Employee()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var result = await BuildHandler(db, returnToWorkRequiredAfterDays: 3, auditPublisher: auditPublisher)
+            .HandleAsync(new CloseSicknessRecordRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                Id = record.Id,
+                EndDate = new DateOnly(2026, 7, 3),
+                EndDayPart = SicknessDayPart.FullDay,
+                ActorEmployeeId = actorId
+            }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.IsType<ReturnToWorkReviewRequiredAuditEvent>(
+            Assert.Single(auditPublisher.PublishedEvents.OfType<ReturnToWorkReviewRequiredAuditEvent>()));
+        Assert.Equal(actorId, ((HR.SharedKernel.IAuditEvent)auditEvent).ActorEmployeeId);
+        Assert.NotEqual(employeeId, ((HR.SharedKernel.IAuditEvent)auditEvent).ActorEmployeeId);
+    }
+
+    // SICK-06: Notes is free-text and must never appear in the serialized audit event.
+    [Fact]
+    public async Task HandleAsync_Audit_Event_Does_Not_Contain_Notes_Free_Text()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
+        var auditPublisher = new FakeAuditEventPublisher();
+        const string sensitiveNotes = "CloseSensitive-Anxiety-Detail";
+
+        var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new CloseSicknessRecordRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Id = record.Id,
+            EndDate = new DateOnly(2026, 7, 3),
+            EndDayPart = SicknessDayPart.FullDay,
+            Notes = sensitiveNotes
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var closedEvent = auditPublisher.PublishedEvents.OfType<SicknessClosedAuditEvent>().Single();
+        var serialized = System.Text.Json.JsonSerializer.Serialize(closedEvent);
+        Assert.DoesNotContain(sensitiveNotes, serialized);
+    }
 }

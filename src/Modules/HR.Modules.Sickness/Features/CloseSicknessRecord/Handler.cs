@@ -64,6 +64,11 @@ internal sealed class CloseSicknessRecordHandler(
             record.StartDate,
             request.EndDate);
 
+        var beforeCategoryId = record.CategoryId;
+        var beforeStartDate = record.StartDate;
+        var beforeEndDate = record.EndDate;
+        var beforeTotalDays = record.TotalDays;
+
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
 
         // Mandatory, always set (no opt-out) — see CompanySettings.ReturnToWorkRequiredAfterDays.
@@ -129,6 +134,11 @@ internal sealed class CloseSicknessRecordHandler(
             record.CompanyId,
             record.EmployeeId,
             record.Id,
+            request.ActorEmployeeId,
+            beforeCategoryId,
+            beforeStartDate,
+            beforeEndDate,
+            beforeTotalDays,
             record.CategoryId,
             record.StartDate,
             record.EndDate!.Value,
@@ -150,6 +160,7 @@ internal sealed class CloseSicknessRecordHandler(
                 returnToWorkReview.SicknessRecordId,
                 returnToWorkReview.CompanyId,
                 returnToWorkReview.EmployeeId,
+                request.ActorEmployeeId,
                 returnToWorkReview.DueDate,
                 now), cancellationToken);
         }

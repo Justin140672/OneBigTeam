@@ -1,9 +1,10 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Sickness.Features.CloseSicknessRecord;
 
-internal sealed class Endpoint(CloseSicknessRecordHandler handler)
+internal sealed class Endpoint(CloseSicknessRecordHandler handler, ICurrentUser currentUser)
     : Endpoint<CloseSicknessRecordRequest, CloseSicknessRecordResponse>
 {
     public override void Configure()
@@ -14,7 +15,9 @@ internal sealed class Endpoint(CloseSicknessRecordHandler handler)
 
     public override async Task HandleAsync(CloseSicknessRecordRequest request, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var result = await handler.HandleAsync(
+            request with { ActorEmployeeId = currentUser.UserId },
+            cancellationToken);
         if (result.IsFailure)
         {
             if (result.Error.Code == "not_found")

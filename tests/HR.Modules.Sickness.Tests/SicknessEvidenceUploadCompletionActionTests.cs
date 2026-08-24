@@ -172,4 +172,29 @@ public class SicknessEvidenceUploadCompletionActionTests
 
         Assert.Empty(auditPublisher.PublishedEvents.OfType<SicknessEvidenceFulfilledAuditEvent>());
     }
+
+    // SICK-06: the actor is whoever completed the "upload fit note" task
+    // (TaskCompletionContext.CompletedBy) — usually the employee, but never assumed to be so.
+    // Verified here via a completer that is deliberately NOT the affected employee.
+    [Fact]
+    public async Task ExecuteAsync_AuditEvent_ActorId_Is_TaskCompletionContext_CompletedBy_Not_Assumed_Employee()
+    {
+        var db = BuildDbContext();
+        var (_, evidenceRequest) = await SeedData(db);
+        var auditPublisher = new FakeAuditEventPublisher();
+        var action = BuildAction(db, auditPublisher: auditPublisher);
+        var completedByHrUser = Guid.NewGuid(); // distinct from EmployeeId — uploaded on the employee's behalf
+
+        var context = new TaskCompletionContext(
+            CompanyId, Guid.NewGuid(), "Upload fit note", null,
+            TaskSource.Sickness, TaskActionType.Upload,
+            Guid.NewGuid(), completedByHrUser, Now, evidenceRequest.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var auditEvent = Assert.Single(auditPublisher.PublishedEvents.OfType<SicknessEvidenceFulfilledAuditEvent>());
+        Assert.Equal(completedByHrUser, auditEvent.ActorId);
+        Assert.NotEqual(EmployeeId, auditEvent.ActorId);
+        Assert.Equal(EmployeeId, ((HR.SharedKernel.IAuditEvent)auditEvent).EmployeeId);
+    }
 }

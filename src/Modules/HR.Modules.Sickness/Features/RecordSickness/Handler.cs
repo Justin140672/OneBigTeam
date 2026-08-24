@@ -112,6 +112,7 @@ internal sealed class RecordSicknessHandler(
             entity.CompanyId,
             entity.EmployeeId,
             entity.Id,
+            request.ActorEmployeeId,
             entity.CategoryId,
             entity.StartDate,
             entity.EndDate,

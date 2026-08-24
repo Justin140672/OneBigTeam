@@ -243,4 +243,50 @@ public class FitNoteEvidenceRequestServiceTests
         Assert.False(second);
         Assert.Single(await db.SicknessEvidenceRequests.ToListAsync());
     }
+
+    // SICK-06: evidence requests are always system/policy-triggered (never something an
+    // affected employee or manager "did"), so the actor is always the fixed SystemActorId
+    // (Guid.Empty) — regardless of caller/context.
+    [Fact]
+    public async Task RequestIfEligibleAsync_AuditEvent_ActorId_Is_SystemActorId()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var record = CreateRecord(companyId, EvaluationDate.AddDays(-6));
+        db.SicknessRecords.Add(record);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditEventPublisher();
+        var service = BuildService(db, auditPublisher: auditPublisher);
+
+        await service.RequestIfEligibleAsync(record, 7, EvaluationDate, Now, CancellationToken.None);
+
+        var auditEvent = Assert.Single(auditPublisher.PublishedEvents.OfType<SicknessEvidenceRequestedAuditEvent>());
+        Assert.Equal(Guid.Empty, auditEvent.ActorId);
+        Assert.Equal(FitNoteEvidenceRequestService.SystemActorId, auditEvent.ActorId);
+        Assert.Equal(Guid.Empty, ((HR.SharedKernel.IAuditEvent)auditEvent).ActorEmployeeId);
+    }
+
+    // SICK-06: no free-text content (Notes/EvidenceNotes) is ever carried on this event — the
+    // payload is limited to structured ids/dates.
+    [Fact]
+    public async Task RequestIfEligibleAsync_AuditEvent_Does_Not_Contain_Free_Text()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var record = CreateRecord(companyId, EvaluationDate.AddDays(-6));
+        db.SicknessRecords.Add(record);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditEventPublisher();
+        var service = BuildService(db, auditPublisher: auditPublisher);
+
+        await service.RequestIfEligibleAsync(record, 7, EvaluationDate, Now, CancellationToken.None);
+
+        var auditEvent = Assert.Single(auditPublisher.PublishedEvents.OfType<SicknessEvidenceRequestedAuditEvent>());
+        var serialized = System.Text.Json.JsonSerializer.Serialize(auditEvent);
+        // Nothing beyond ids/dates should be present — spot-check no free-text-shaped property exists.
+        Assert.DoesNotContain("EvidenceNotes", serialized);
+        Assert.DoesNotContain("Notes\":", serialized);
+    }
 }

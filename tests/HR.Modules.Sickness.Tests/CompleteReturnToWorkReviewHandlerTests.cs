@@ -253,4 +253,111 @@ public class CompleteReturnToWorkReviewHandlerTests
         var stored = await db.ReturnToWorkReviews.AsNoTracking().SingleAsync(r => r.Id == review.Id);
         Assert.Equal(reviewedBy, stored.ReviewedBy);
     }
+
+    // SICK-06: ActorEmployeeId on the completed event is the reviewer, correctly distinct from
+    // EmployeeId (the subject being reviewed).
+    [Fact]
+    public async Task HandleAsync_CompletedAuditEvent_ActorEmployeeId_Is_Reviewer_Distinct_From_Subject()
+    {
+        await using var db = BuildDbContext();
+        var (_, review) = await SeedClosedRecordWithReview(db);
+        var auditPublisher = new FakeAuditEventPublisher();
+        var reviewedBy = Guid.NewGuid();
+
+        var handler = BuildHandler(db, auditPublisher: auditPublisher);
+        var result = await handler.HandleAsync(BuildRequest(review.Id), reviewedBy, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var completedEvent = Assert.Single(auditPublisher.PublishedEvents.OfType<ReturnToWorkReviewCompletedAuditEvent>());
+        Assert.Equal(reviewedBy, ((HR.SharedKernel.IAuditEvent)completedEvent).ActorEmployeeId);
+        Assert.Equal(EmployeeId, ((HR.SharedKernel.IAuditEvent)completedEvent).EmployeeId);
+        Assert.NotEqual(EmployeeId, reviewedBy);
+    }
+
+    // SICK-06: AdjustmentDetails and Notes are free-text and must never be carried onto the
+    // audit event — only boolean flags indicating whether they were populated.
+    [Fact]
+    public async Task HandleAsync_CompletedAuditEvent_Carries_Flags_Not_FreeText_For_AdjustmentDetails_And_Notes()
+    {
+        await using var db = BuildDbContext();
+        var (_, review) = await SeedClosedRecordWithReview(db);
+        var auditPublisher = new FakeAuditEventPublisher();
+        const string sensitiveAdjustmentDetails = "SensitiveAdjustment-BackInjury-Detail";
+        const string sensitiveManagerNotes = "SensitiveManagerNote-Depression-Detail";
+
+        var handler = BuildHandler(db, auditPublisher: auditPublisher);
+        var result = await handler.HandleAsync(
+            BuildRequest(review.Id, FitToReturnOutcome.FitWithAdjustments, adjustmentsRequired: true,
+                adjustmentDetails: sensitiveAdjustmentDetails, managerNotes: sensitiveManagerNotes),
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var completedEvent = Assert.Single(auditPublisher.PublishedEvents.OfType<ReturnToWorkReviewCompletedAuditEvent>());
+        Assert.True(completedEvent.HasAdjustmentDetails);
+        Assert.True(completedEvent.HasNotes);
+
+        var serialized = System.Text.Json.JsonSerializer.Serialize(completedEvent);
+        Assert.DoesNotContain(sensitiveAdjustmentDetails, serialized);
+        Assert.DoesNotContain(sensitiveManagerNotes, serialized);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CompletedAuditEvent_Flags_False_When_AdjustmentDetails_And_Notes_Not_Supplied()
+    {
+        await using var db = BuildDbContext();
+        var (_, review) = await SeedClosedRecordWithReview(db);
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var handler = BuildHandler(db, auditPublisher: auditPublisher);
+        var result = await handler.HandleAsync(
+            BuildRequest(review.Id, FitToReturnOutcome.Fit, adjustmentsRequired: false,
+                adjustmentDetails: null, managerNotes: null),
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var completedEvent = Assert.Single(auditPublisher.PublishedEvents.OfType<ReturnToWorkReviewCompletedAuditEvent>());
+        Assert.False(completedEvent.HasAdjustmentDetails);
+        Assert.False(completedEvent.HasNotes);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CompletedAuditEvent_Flag_False_For_WhitespaceOnly_AdjustmentDetails()
+    {
+        // NotEmpty-style whitespace check: whitespace-only free text should not be treated as
+        // "present" for the boolean flag.
+        await using var db = BuildDbContext();
+        var (_, review) = await SeedClosedRecordWithReview(db);
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var handler = BuildHandler(db, auditPublisher: auditPublisher);
+        var result = await handler.HandleAsync(
+            BuildRequest(review.Id, FitToReturnOutcome.FitWithAdjustments, adjustmentsRequired: true,
+                adjustmentDetails: "   ", managerNotes: "   "),
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var completedEvent = Assert.Single(auditPublisher.PublishedEvents.OfType<ReturnToWorkReviewCompletedAuditEvent>());
+        Assert.False(completedEvent.HasAdjustmentDetails);
+        Assert.False(completedEvent.HasNotes);
+    }
+
+    // SICK-06: the reopened event's actor is the reviewer who completed the review that caused
+    // the reopen — never the affected employee.
+    [Fact]
+    public async Task HandleAsync_NotFitOutcome_ReopenedAuditEvent_ActorEmployeeId_Is_Reviewer_Not_Employee()
+    {
+        await using var db = BuildDbContext();
+        var (_, review) = await SeedClosedRecordWithReview(db);
+        var auditPublisher = new FakeAuditEventPublisher();
+        var reviewedBy = Guid.NewGuid();
+
+        var handler = BuildHandler(db, auditPublisher: auditPublisher);
+        var result = await handler.HandleAsync(
+            BuildRequest(review.Id, FitToReturnOutcome.NotFit), reviewedBy, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var reopenedEvent = Assert.Single(auditPublisher.PublishedEvents.OfType<SicknessRecordReopenedAuditEvent>());
+        Assert.Equal(reviewedBy, ((HR.SharedKernel.IAuditEvent)reopenedEvent).ActorEmployeeId);
+        Assert.NotEqual(EmployeeId, ((HR.SharedKernel.IAuditEvent)reopenedEvent).ActorEmployeeId);
+    }
 }
