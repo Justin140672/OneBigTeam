@@ -93,6 +93,31 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .IsRequired()
             .HasDefaultValue(1);
 
+        builder.Property(settings => settings.FrequentAbsenceCountThreshold)
+            .HasColumnName("frequent_absence_count_threshold")
+            .IsRequired()
+            .HasDefaultValue(4);
+
+        builder.Property(settings => settings.FrequentAbsenceWindowDays)
+            .HasColumnName("frequent_absence_window_days")
+            .IsRequired()
+            .HasDefaultValue(365);
+
+        builder.Property(settings => settings.LongAbsenceDayThreshold)
+            .HasColumnName("long_absence_day_threshold")
+            .IsRequired()
+            .HasDefaultValue(28);
+
+        builder.Property(settings => settings.WeekdayPatternOccurrenceThreshold)
+            .HasColumnName("weekday_pattern_occurrence_threshold")
+            .IsRequired()
+            .HasDefaultValue(3);
+
+        builder.Property(settings => settings.WeekdayPatternWindowDays)
+            .HasColumnName("weekday_pattern_window_days")
+            .IsRequired()
+            .HasDefaultValue(365);
+
         builder.Property(settings => settings.PostcodeRegex)
             .HasColumnName("postcode_regex")
             .HasMaxLength(500)

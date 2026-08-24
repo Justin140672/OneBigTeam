@@ -14,6 +14,7 @@ internal sealed class SicknessDbContext : DbContext
     public DbSet<SicknessRecord> SicknessRecords => Set<SicknessRecord>();
     public DbSet<SicknessEvidenceRequest> SicknessEvidenceRequests => Set<SicknessEvidenceRequest>();
     public DbSet<ReturnToWorkReview> ReturnToWorkReviews => Set<ReturnToWorkReview>();
+    public DbSet<AttendanceAlert> AttendanceAlerts => Set<AttendanceAlert>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

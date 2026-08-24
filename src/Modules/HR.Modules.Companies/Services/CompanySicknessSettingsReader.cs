@@ -20,6 +20,11 @@ internal sealed class CompanySicknessSettingsReader(CompaniesDbContext dbContext
         return new CompanySicknessSettings(
             settings.ExcludePublicHolidaysFromSickness,
             settings.FitNoteRequiredAfterDays,
-            settings.ReturnToWorkRequiredAfterDays);
+            settings.ReturnToWorkRequiredAfterDays,
+            settings.FrequentAbsenceCountThreshold,
+            settings.FrequentAbsenceWindowDays,
+            settings.LongAbsenceDayThreshold,
+            settings.WeekdayPatternOccurrenceThreshold,
+            settings.WeekdayPatternWindowDays);
     }
 }

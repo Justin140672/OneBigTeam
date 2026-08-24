@@ -14,6 +14,7 @@ using HR.Modules.Sickness.Features.GetOverdueReturnToWorkReviews;
 using HR.Modules.Sickness.Features.GetReturnToWorkReview;
 using HR.Modules.Sickness.Features.GetSicknessRecord;
 using HR.Modules.Sickness.Features.GetTeamSicknessToday;
+using HR.Modules.Sickness.Features.ListAttendanceAlerts;
 using HR.Modules.Sickness.Features.ListEmployeeSicknessRecords;
 using HR.Modules.Sickness.Features.ListSicknessCategories;
 using HR.Modules.Sickness.Features.RecordMySickness;
@@ -70,6 +71,9 @@ public static class SicknessModule
         services.AddScoped<FitNoteRequestJob>();
         services.AddScoped<SicknessEvidenceReminderJob>();
         services.AddScoped<ReturnToWorkReminderJob>();
+        services.AddScoped<AttendanceAlertEvaluationService>();
+        services.AddScoped<AttendanceAlertEvaluationJob>();
+        services.AddScoped<ListAttendanceAlertsHandler>();
         services.AddScoped<ITaskCompletionAction, SicknessEvidenceUploadCompletionAction>();
         services.AddScoped<ITaskCompletionAction, CompleteReturnToWorkReviewFromTaskAction>();
         services.AddScoped<IEmployeeSicknessStatusReader, EmployeeSicknessStatusReader>();
@@ -93,6 +97,10 @@ public static class SicknessModule
             "return-to-work-reminders",
             job => job.ExecuteAsync(),
             Cron.Daily(5));
+        jobManager.AddOrUpdate<AttendanceAlertEvaluationJob>(
+            "attendance-alert-evaluation",
+            job => job.ExecuteAsync(),
+            Cron.Daily(6));
         return app;
     }
 

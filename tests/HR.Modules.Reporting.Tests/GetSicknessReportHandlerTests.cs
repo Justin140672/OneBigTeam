@@ -29,8 +29,9 @@ public class GetSicknessReportHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_BradfordScore_Is_Always_Zero()
+    public async Task HandleAsync_BradfordScore_Is_Spells_Squared_Times_DaysAbsent()
     {
+        // SICK-04: Bradford Factor = S^2 * D. One spell (S=1), 2 days absent (D=2) => 1*1*2 = 2.
         var reader = new FakeSicknessReportReader(
         [
             new SicknessReportRecordItem(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 1, 1), null, 2m),
@@ -41,7 +42,26 @@ public class GetSicknessReportHandlerTests
             new GetSicknessReportRequest(Guid.NewGuid()), CancellationToken.None);
 
         var row = Assert.Single(result.Value!.Items);
-        Assert.Equal(0, row.BradfordScore);
+        Assert.Equal(2, row.BradfordScore);
+    }
+
+    [Fact]
+    public async Task HandleAsync_BradfordScore_Scales_With_Spell_Count_Squared()
+    {
+        // Two spells (S=2), 4 total days absent (D=4) => 2^2 * 4 = 16.
+        var employeeId = Guid.NewGuid();
+        var reader = new FakeSicknessReportReader(
+        [
+            new SicknessReportRecordItem(employeeId, Guid.NewGuid(), new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 3), 3m),
+            new SicknessReportRecordItem(employeeId, Guid.NewGuid(), new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 1), 1m),
+        ]);
+        var handler = new GetSicknessReportHandler(reader, new FakeEmployeeDepartmentReader());
+
+        var result = await handler.HandleAsync(
+            new GetSicknessReportRequest(Guid.NewGuid()), CancellationToken.None);
+
+        var row = Assert.Single(result.Value!.Items);
+        Assert.Equal(16, row.BradfordScore);
     }
 
     [Fact]

@@ -24,25 +24,34 @@ internal sealed class GetSicknessReportHandler(
         {
             SicknessReportGroupBy.Department => records
                 .GroupBy(r => departments.TryGetValue(r.EmployeeId, out var d) ? d.DepartmentId?.ToString() ?? "none" : "none")
-                .Select(g => new SicknessReportGroupRow(
+                .Select(g => BuildRow(
                     g.Key,
                     departments.Values.FirstOrDefault(d => d.DepartmentId?.ToString() == g.Key)?.DepartmentName ?? "No Department",
                     g.Count(),
-                    g.Sum(r => r.DaysAbsent),
-                    0))
+                    g.Sum(r => r.DaysAbsent)))
                 .ToList(),
 
             _ => records
                 .GroupBy(r => r.EmployeeId)
-                .Select(g => new SicknessReportGroupRow(
+                .Select(g => BuildRow(
                     g.Key.ToString(),
                     departments.TryGetValue(g.Key, out var d) ? d.EmployeeName : g.Key.ToString(),
                     g.Count(),
-                    g.Sum(r => r.DaysAbsent),
-                    0))
+                    g.Sum(r => r.DaysAbsent)))
                 .ToList(),
         };
 
         return Result.Success(new GetSicknessReportResponse(grouped));
+    }
+
+    /// <summary>
+    /// Bradford Factor = S^2 * D (S = separate absence spells, D = total days absent), evaluated
+    /// over the report's own requested date range — see the comment on SicknessReportGroupRow for
+    /// why there is no separately-enforced rolling window.
+    /// </summary>
+    private static SicknessReportGroupRow BuildRow(string groupKey, string groupLabel, int absenceCount, decimal daysAbsent)
+    {
+        var bradfordScore = (int)(absenceCount * absenceCount * daysAbsent);
+        return new SicknessReportGroupRow(groupKey, groupLabel, absenceCount, daysAbsent, bradfordScore);
     }
 }

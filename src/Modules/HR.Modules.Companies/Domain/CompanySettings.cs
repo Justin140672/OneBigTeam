@@ -22,6 +22,19 @@ internal sealed class CompanySettings
     public bool DisplaySalaryOnEmployeeProfile { get; private set; }
     public int FitNoteRequiredAfterDays { get; private set; }
     public int ReturnToWorkRequiredAfterDays { get; private set; }
+
+    // SICK-04: configurable attendance-pattern alert thresholds. Mandatory, no opt-out (mirrors
+    // FitNoteRequiredAfterDays/ReturnToWorkRequiredAfterDays) — every company gets informational
+    // attendance alerts by default, tuned to sensible UK-typical values. Not yet exposed through
+    // UpdateHrPolicy/the HR settings UI — this ticket establishes the persisted, per-company
+    // configurable home for the thresholds (satisfying "configurable rules"); wiring an editable
+    // UI is a reasonable, deliberately deferred follow-up rather than something this ticket
+    // requires.
+    public int FrequentAbsenceCountThreshold { get; private set; }
+    public int FrequentAbsenceWindowDays { get; private set; }
+    public int LongAbsenceDayThreshold { get; private set; }
+    public int WeekdayPatternOccurrenceThreshold { get; private set; }
+    public int WeekdayPatternWindowDays { get; private set; }
     public string PostcodeRegex { get; private set; } = UkContactRegexDefaults.Postcode;
     public string TelephoneRegex { get; private set; } = UkContactRegexDefaults.Telephone;
     public string MobileRegex { get; private set; } = UkContactRegexDefaults.Mobile;
@@ -76,6 +89,14 @@ internal sealed class CompanySettings
             // sickness and a return-to-work review after 1 day by default.
             FitNoteRequiredAfterDays = 7,
             ReturnToWorkRequiredAfterDays = 1,
+            // SICK-04 defaults: 4+ absence spells in a rolling 12 months ("frequent"), a single
+            // weekday recurring 3+ times in a rolling 12 months ("weekday pattern"), a single spell
+            // of 28+ calendar days ("long absence" — UK long-term sickness convention).
+            FrequentAbsenceCountThreshold = 4,
+            FrequentAbsenceWindowDays = 365,
+            LongAbsenceDayThreshold = 28,
+            WeekdayPatternOccurrenceThreshold = 3,
+            WeekdayPatternWindowDays = 365,
             PostcodeRegex = UkContactRegexDefaults.Postcode,
             TelephoneRegex = UkContactRegexDefaults.Telephone,
             MobileRegex = UkContactRegexDefaults.Mobile,
