@@ -1,10 +1,12 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Probation.Features.CompleteProbationReview;
 
 internal sealed class Endpoint(
-    CompleteProbationReviewHandler handler) : Endpoint<CompleteProbationReviewRequest, CompleteProbationReviewResponse>
+    CompleteProbationReviewHandler handler,
+    ICurrentUser currentUser) : Endpoint<CompleteProbationReviewRequest, CompleteProbationReviewResponse>
 {
     public override void Configure()
     {
@@ -16,7 +18,16 @@ internal sealed class Endpoint(
         CompleteProbationReviewRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        // PROB-05: the acting decision maker is always resolved server-side from the
+        // authenticated caller — never trusted from the request body — so DecisionMakerEmployeeId
+        // on the resulting record/audit trail can be trusted.
+        if (currentUser.UserId is not { } completedByEmployeeId)
+        {
+            await Send.ResultAsync(TypedResults.Unauthorized());
+            return;
+        }
+
+        var result = await handler.HandleAsync(request, completedByEmployeeId, cancellationToken);
 
         if (result.IsFailure)
         {

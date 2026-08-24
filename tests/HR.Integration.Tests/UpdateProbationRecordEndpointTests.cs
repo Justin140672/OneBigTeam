@@ -13,6 +13,8 @@ public class UpdateProbationRecordEndpointTests
     private static readonly Guid User1 = new("dddddddd-0000-0000-0000-000000000001");
     private static readonly Guid User2 = new("dddddddd-0000-0000-0000-000000000002");
     private static readonly Guid User3 = new("dddddddd-0000-0000-0000-000000000003");
+    private static readonly Guid User4 = new("dddddddd-0000-0000-0000-000000000004");
+    private static readonly Guid User5 = new("dddddddd-0000-0000-0000-000000000005");
 
     public UpdateProbationRecordEndpointTests(ApiWebApplicationFactory factory)
     {
@@ -23,6 +25,8 @@ public class UpdateProbationRecordEndpointTests
             await TestRoleSeeder.AssignRoleAsync(factory, User1, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User4, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User5, SystemRoles.HrAdministrator);
         }).GetAwaiter().GetResult();
     }
 
@@ -35,8 +39,7 @@ public class UpdateProbationRecordEndpointTests
         var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/probation-records/{Guid.NewGuid()}", new
         {
             managerEmployeeId = Guid.NewGuid(),
-            expectedEndDate = "2026-09-01",
-            status = "Active"
+            expectedEndDate = "2026-09-01"
         });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -70,7 +73,6 @@ public class UpdateProbationRecordEndpointTests
                 id = created.Id,
                 managerEmployeeId = newManagerId,
                 expectedEndDate = "2026-09-01",
-                status = "Active",
                 notes = "Updated via PUT."
             });
 
@@ -81,48 +83,6 @@ public class UpdateProbationRecordEndpointTests
         Assert.Equal(newManagerId, payload!.ManagerEmployeeId);
         Assert.Equal("Active", payload.Status);
         Assert.Equal("Updated via PUT.", payload.Notes);
-    }
-
-    [Fact]
-    public async Task Put_ProbationRecord_Transitions_To_Passed()
-    {
-        using var client = _factory.CreateClient();
-        var companyId = Guid.NewGuid();
-        var managerId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
-
-        var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
-        {
-            companyId,
-            employeeId = Guid.NewGuid(),
-            managerEmployeeId = managerId,
-            startDate = "2026-06-01",
-            expectedEndDate = "2026-09-01"
-        });
-        createResponse.EnsureSuccessStatusCode();
-        var created = await createResponse.Content.ReadFromJsonAsync<ProbationRecordPayload>();
-
-        var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/probation-records/{created!.Id}", new
-            {
-                companyId,
-                id = created.Id,
-                managerEmployeeId = managerId,
-                expectedEndDate = "2026-09-01",
-                status = "Passed",
-                decisionMakerEmployeeId = managerId,
-                decisionDate = "2026-09-01",
-                outcomeNotes = "Passed probation."
-            });
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var payload = await response.Content.ReadFromJsonAsync<UpdatedProbationRecordPayload>();
-        Assert.NotNull(payload);
-        Assert.Equal("Passed", payload!.Status);
-        Assert.Equal("Passed probation.", payload.OutcomeNotes);
     }
 
     [Fact]
@@ -140,11 +100,66 @@ public class UpdateProbationRecordEndpointTests
                 companyId,
                 id = Guid.NewGuid(),
                 managerEmployeeId = Guid.NewGuid(),
-                expectedEndDate = "2026-09-01",
-                status = "Active"
+                expectedEndDate = "2026-09-01"
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_ProbationRecord_Returns_Conflict_For_Passed_Record()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User4.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User4, SystemRoles.HrAdministrator, companyId);
+
+        var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
+        {
+            companyId,
+            employeeId = Guid.NewGuid(),
+            managerEmployeeId = managerId,
+            startDate = "2026-06-01",
+            expectedEndDate = "2026-09-01"
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<ProbationRecordPayload>();
+
+        var reviewResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
+        {
+            companyId,
+            probationRecordId = created!.Id,
+            reviewType = "FinalDecision",
+            dueDate = "2026-09-01"
+        });
+        reviewResponse.EnsureSuccessStatusCode();
+        var review = await reviewResponse.Content.ReadFromJsonAsync<ReviewItem>();
+
+        var completeResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{created.Id}/reviews/{review!.Id}/complete",
+            new
+            {
+                companyId,
+                probationRecordId = created.Id,
+                reviewId = review.Id,
+                outcome = "Pass",
+                decisionDate = "2026-09-01"
+            });
+        completeResponse.EnsureSuccessStatusCode();
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                managerEmployeeId = managerId,
+                expectedEndDate = "2026-12-01",
+                notes = "Attempted edit after decision."
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
     [Fact]
@@ -187,8 +202,7 @@ public class UpdateProbationRecordEndpointTests
                 companyId,
                 id = created.Id,
                 managerEmployeeId = managerId,
-                expectedEndDate = "2026-12-01",
-                status = "Active"
+                expectedEndDate = "2026-12-01"
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -247,7 +261,6 @@ public class UpdateProbationRecordEndpointTests
                 id = created.Id,
                 managerEmployeeId = managerId,
                 expectedEndDate = "2026-09-01", // unchanged
-                status = "Active",
                 notes = "No date change."
             });
 
@@ -260,6 +273,37 @@ public class UpdateProbationRecordEndpointTests
         var onlyReview = Assert.Single(afterReviews!.Items);
         Assert.Equal(originalFinalDecisionId, onlyReview.Id);
         Assert.Equal("Pending", onlyReview.Status);
+    }
+
+    [Fact]
+    public async Task Put_ProbationRecord_Returns_BadRequest_For_Missing_ExpectedEndDate()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User5.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User5, SystemRoles.HrAdministrator, companyId);
+
+        var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
+        {
+            companyId,
+            employeeId = Guid.NewGuid(),
+            managerEmployeeId = Guid.NewGuid(),
+            startDate = "2026-06-01",
+            expectedEndDate = "2026-09-01"
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<ProbationRecordPayload>();
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{created!.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                managerEmployeeId = Guid.NewGuid()
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
     private sealed record ReviewsPayload(IReadOnlyList<ReviewItem> Items);

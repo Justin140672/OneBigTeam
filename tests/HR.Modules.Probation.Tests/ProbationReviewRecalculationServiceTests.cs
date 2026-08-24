@@ -245,15 +245,10 @@ public class ProbationReviewRecalculationServiceTests
     }
 
     private static void UpdateExpectedEndDate(ProbationRecord record, DateOnly expectedEndDate) =>
-        record.Update(
+        record.ApplyAdministrativeCorrection(
             record.ManagerEmployeeId,
             expectedEndDate,
-            record.Status,
             record.Notes,
-            record.ExtensionReason,
-            record.DecisionMakerEmployeeId,
-            record.DecisionDate,
-            record.OutcomeNotes,
             RecalcNow);
 
     private static ProbationReviewRecalculationService BuildService(

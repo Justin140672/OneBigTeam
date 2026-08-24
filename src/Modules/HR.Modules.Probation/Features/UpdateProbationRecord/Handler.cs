@@ -39,19 +39,19 @@ internal sealed class UpdateProbationRecordHandler
             return Result.Failure<UpdateProbationRecordResponse>(
                 Error.NotFound("Probation record not found."));
 
-        var status = Enum.Parse<ProbationStatus>(request.Status, ignoreCase: true);
+        // PROB-05: a terminal record (Passed/Failed) represents a completed decision — direct
+        // "administrative correction" edits are not permitted once that decision has been made.
+        if (record.Status is ProbationStatus.Passed or ProbationStatus.Failed)
+            return Result.Failure<UpdateProbationRecordResponse>(
+                Error.Conflict($"Cannot edit a probation record that has already reached the terminal status '{record.Status}'."));
+
         var previousExpectedEndDate = record.ExpectedEndDate;
         var now = _clock.UtcNowOffset();
 
-        record.Update(
+        record.ApplyAdministrativeCorrection(
             request.ManagerEmployeeId,
             request.ExpectedEndDate,
-            status,
             string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
-            string.IsNullOrWhiteSpace(request.ExtensionReason) ? null : request.ExtensionReason.Trim(),
-            request.DecisionMakerEmployeeId,
-            request.DecisionDate,
-            string.IsNullOrWhiteSpace(request.OutcomeNotes) ? null : request.OutcomeNotes.Trim(),
             now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);

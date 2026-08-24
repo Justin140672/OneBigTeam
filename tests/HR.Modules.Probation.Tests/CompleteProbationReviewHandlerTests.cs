@@ -27,9 +27,8 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = completedBy,
                 Notes = "All targets met."
-            }, CancellationToken.None);
+            }, completedBy, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Completed", result.Value!.Status);
@@ -55,8 +54,7 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid()
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Completed", result.Value!.Status);
@@ -81,11 +79,10 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = completedBy,
                 Notes = "Excellent performance.",
                 Outcome = ProbationOutcome.Pass,
                 DecisionDate = decisionDate
-            }, CancellationToken.None);
+            }, completedBy, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Completed", result.Value!.Status);
@@ -113,11 +110,10 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = completedBy,
                 Notes = "Did not meet targets.",
                 Outcome = ProbationOutcome.Fail,
                 DecisionDate = decisionDate
-            }, CancellationToken.None);
+            }, completedBy, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Completed", result.Value!.Status);
@@ -145,13 +141,12 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = completedBy,
                 Notes = "Needs more time.",
                 Outcome = ProbationOutcome.Extend,
                 DecisionDate = decisionDate,
                 NewExpectedEndDate = newEndDate,
                 ExtensionReason = "Did not meet all targets yet."
-            }, CancellationToken.None);
+            }, completedBy, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Completed", result.Value!.Status);
@@ -178,8 +173,7 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid()
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -201,12 +195,11 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = completedBy,
                 Outcome = ProbationOutcome.Extend,
                 DecisionDate = new DateOnly(2026, 9, 1),
                 NewExpectedEndDate = newEndDate,
                 ExtensionReason = "Needs more time."
-            }, CancellationToken.None);
+            }, completedBy, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Completed", result.Value!.Status);
@@ -231,8 +224,7 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid()
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -252,10 +244,9 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid(),
                 Outcome = ProbationOutcome.Pass,
                 DecisionDate = new DateOnly(2026, 9, 1)
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -275,10 +266,9 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid(),
                 Outcome = ProbationOutcome.Pass,
                 DecisionDate = new DateOnly(2026, 9, 1)
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -300,8 +290,7 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid()
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -318,8 +307,7 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = Guid.NewGuid(),
                 ProbationRecordId = Guid.NewGuid(),
                 ReviewId = Guid.NewGuid(),
-                CompletedByEmployeeId = Guid.NewGuid()
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -342,8 +330,7 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = Guid.NewGuid(),
                 ProbationRecordId = record.Id,
                 ReviewId = Guid.NewGuid(),
-                CompletedByEmployeeId = Guid.NewGuid()
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -367,8 +354,7 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = Guid.NewGuid(),
-                CompletedByEmployeeId = Guid.NewGuid()
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -400,8 +386,7 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record1.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid()
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -422,8 +407,7 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid()
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         var published = (IAuditEvent)Assert.Single(publisher.Published);
         Assert.Equal(record.EmployeeId, published.EmployeeId);
@@ -445,10 +429,9 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = completedBy,
                 Outcome = ProbationOutcome.Pass,
                 DecisionDate = new DateOnly(2026, 9, 1)
-            }, CancellationToken.None);
+            }, completedBy, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var evt = Assert.IsType<ProbationPassedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
@@ -473,10 +456,9 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = completedBy,
                 Outcome = ProbationOutcome.Fail,
                 DecisionDate = new DateOnly(2026, 9, 1)
-            }, CancellationToken.None);
+            }, completedBy, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(integrationPublisher.Published);
@@ -498,12 +480,11 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = completedBy,
                 Outcome = ProbationOutcome.Extend,
                 DecisionDate = new DateOnly(2026, 9, 1),
                 NewExpectedEndDate = new DateOnly(2026, 12, 1),
                 ExtensionReason = "Needs more time."
-            }, CancellationToken.None);
+            }, completedBy, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(integrationPublisher.Published);
@@ -528,12 +509,11 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = completedBy,
                 Outcome = ProbationOutcome.Extend,
                 DecisionDate = new DateOnly(2026, 9, 1),
                 NewExpectedEndDate = newEndDate,
                 ExtensionReason = "Needs more time."
-            }, CancellationToken.None);
+            }, completedBy, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
 
@@ -564,7 +544,6 @@ public class CompleteProbationReviewHandlerTests
             CompanyId = companyId,
             ProbationRecordId = record.Id,
             ReviewId = review.Id,
-            CompletedByEmployeeId = completedBy,
             Outcome = ProbationOutcome.Extend,
             DecisionDate = new DateOnly(2026, 9, 1),
             NewExpectedEndDate = newEndDate,
@@ -572,13 +551,13 @@ public class CompleteProbationReviewHandlerTests
         };
 
         var firstResult = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
-            .HandleAsync(request, CancellationToken.None);
+            .HandleAsync(request, completedBy, CancellationToken.None);
         Assert.True(firstResult.IsSuccess);
 
         var reviewCountAfterFirst = await context.ProbationReviews.CountAsync();
 
         var secondResult = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
-            .HandleAsync(request, CancellationToken.None);
+            .HandleAsync(request, completedBy, CancellationToken.None);
 
         Assert.True(secondResult.IsFailure);
         Assert.Equal("validation", secondResult.Error.Code);
@@ -603,10 +582,9 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid(),
                 Outcome = ProbationOutcome.Pass,
                 DecisionDate = new DateOnly(2026, 9, 1)
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -631,12 +609,11 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = reviewA.Id,
-                CompletedByEmployeeId = firstCompletedBy,
                 Outcome = ProbationOutcome.Extend,
                 DecisionDate = new DateOnly(2026, 9, 1),
                 NewExpectedEndDate = firstNewEndDate,
                 ExtensionReason = "First extension."
-            }, CancellationToken.None);
+            }, firstCompletedBy, CancellationToken.None);
         Assert.True(firstResult.IsSuccess);
 
         var reviewB = await context.ProbationReviews
@@ -648,12 +625,11 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = reviewB.Id,
-                CompletedByEmployeeId = secondCompletedBy,
                 Outcome = ProbationOutcome.Extend,
                 DecisionDate = new DateOnly(2026, 12, 1),
                 NewExpectedEndDate = secondNewEndDate,
                 ExtensionReason = "Second extension."
-            }, CancellationToken.None);
+            }, secondCompletedBy, CancellationToken.None);
         Assert.True(secondResult.IsSuccess);
 
         var extensionConfirmations = await context.ProbationReviews
@@ -694,12 +670,11 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = reviewBeingCompleted.Id,
-                CompletedByEmployeeId = completedBy,
                 Outcome = ProbationOutcome.Extend,
                 DecisionDate = new DateOnly(2026, 9, 1),
                 NewExpectedEndDate = newEndDate,
                 ExtensionReason = "Needs more time."
-            }, CancellationToken.None);
+            }, completedBy, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
 
@@ -722,10 +697,9 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid(),
                 Outcome = ProbationOutcome.Pass,
                 DecisionDate = new DateOnly(2026, 9, 1)
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var notification = Assert.Single(notificationWriter.Written);
@@ -748,10 +722,9 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid(),
                 Outcome = ProbationOutcome.Fail,
                 DecisionDate = new DateOnly(2026, 9, 1)
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var notification = Assert.Single(notificationWriter.Written);
@@ -774,17 +747,129 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid(),
                 Outcome = ProbationOutcome.Extend,
                 DecisionDate = new DateOnly(2026, 9, 1),
                 NewExpectedEndDate = new DateOnly(2026, 12, 1),
                 ExtensionReason = "Needs more time."
-            }, CancellationToken.None);
+            }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.DoesNotContain(
             notificationWriter.Written,
             n => n.Type == HR.Infrastructure.Abstractions.NotificationType.ProbationOutcomeRecorded);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Extend_With_NewExpectedEndDate_Equal_To_Current_ExpectedEndDate_Fails_Without_Mutation()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+            .HandleAsync(new CompleteProbationReviewRequest
+            {
+                CompanyId = companyId,
+                ProbationRecordId = record.Id,
+                ReviewId = review.Id,
+                Outcome = ProbationOutcome.Extend,
+                DecisionDate = new DateOnly(2026, 7, 15),
+                NewExpectedEndDate = record.ExpectedEndDate, // equal to current ExpectedEndDate — not strictly forward
+                ExtensionReason = "Needs more time."
+            }, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("current expected end date", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+
+        var persistedRecord = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.Active, persistedRecord.Status);
+        Assert.Equal(record.ExpectedEndDate, persistedRecord.ExpectedEndDate);
+
+        var persistedReview = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
+        Assert.Equal(ProbationReviewStatus.Pending, persistedReview.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Extend_With_NewExpectedEndDate_After_Current_ExpectedEndDate_Succeeds()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+            .HandleAsync(new CompleteProbationReviewRequest
+            {
+                CompanyId = companyId,
+                ProbationRecordId = record.Id,
+                ReviewId = review.Id,
+                Outcome = ProbationOutcome.Extend,
+                DecisionDate = new DateOnly(2026, 7, 15),
+                NewExpectedEndDate = record.ExpectedEndDate.AddDays(1),
+                ExtensionReason = "Needs more time."
+            }, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Extend_With_NewExpectedEndDate_Equal_To_DecisionDate_Fails_Without_Mutation()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+        var decisionDate = record.ExpectedEndDate.AddMonths(1);
+
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+            .HandleAsync(new CompleteProbationReviewRequest
+            {
+                CompanyId = companyId,
+                ProbationRecordId = record.Id,
+                ReviewId = review.Id,
+                Outcome = ProbationOutcome.Extend,
+                DecisionDate = decisionDate,
+                NewExpectedEndDate = decisionDate, // equal to DecisionDate, and later than current ExpectedEndDate
+                ExtensionReason = "Needs more time."
+            }, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("decision date", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+
+        var persistedRecord = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.Active, persistedRecord.Status);
+
+        var persistedReview = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
+        Assert.Equal(ProbationReviewStatus.Pending, persistedReview.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CompletedByEmployeeId_Parameter_Drives_DecisionMakerEmployeeId_Not_Request_Body()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var completedByEmployeeId = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+            .HandleAsync(new CompleteProbationReviewRequest
+            {
+                CompanyId = companyId,
+                ProbationRecordId = record.Id,
+                ReviewId = review.Id,
+                Outcome = ProbationOutcome.Pass,
+                DecisionDate = new DateOnly(2026, 9, 1)
+            }, completedByEmployeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(completedByEmployeeId, result.Value!.CompletedByEmployeeId);
+
+        var persistedRecord = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(completedByEmployeeId, persistedRecord.DecisionMakerEmployeeId);
     }
 
     private static async Task<(ProbationRecord record, ProbationReview review)> SeedRecordAndReview(

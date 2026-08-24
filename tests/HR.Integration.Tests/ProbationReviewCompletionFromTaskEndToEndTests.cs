@@ -120,6 +120,41 @@ public class ProbationReviewCompletionFromTaskEndToEndTests
         Assert.Equal("Failed", record.Status);
     }
 
+    /// <summary>
+    /// PROB-05: a malformed/garbage OutcomeDecision string on a FinalDecision review completes the
+    /// underlying Task (Tasks module completion itself is outside Probation's control) but the
+    /// Probation review is left Pending and the record's status/outcome fields are left untouched.
+    /// </summary>
+    [Fact]
+    public async Task CompleteTask_With_Malformed_OutcomeDecision_Completes_Task_But_Leaves_Review_Pending()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(User1, companyId);
+
+        var (recordId, reviewId) = await CreateRecordAndReviewAsync(client, companyId, "FinalDecision");
+
+        var taskId = await TaskSeeder.SeedAsync(
+            _factory, companyId,
+            title: "Complete probation review — Test Employee",
+            source: TaskSource.Probation,
+            actionType: TaskActionType.Review,
+            sourceEntityId: reviewId,
+            assignedEmployeeId: Guid.NewGuid());
+
+        var completeResponse = await client.PostAsync(
+            $"/api/companies/{companyId}/tasks/{taskId}/complete",
+            Json(new { outcomeDecision = "garbage", outcomeReason = (string?)null }));
+        completeResponse.EnsureSuccessStatusCode();
+
+        var review = await GetSingleReviewAsync(client, companyId, recordId);
+        Assert.Equal("Pending", review.Status);
+        Assert.Null(review.CompletedAt);
+        Assert.Null(review.Outcome);
+
+        var record = await GetRecordAsync(client, companyId, recordId);
+        Assert.Equal("Active", record.Status);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)

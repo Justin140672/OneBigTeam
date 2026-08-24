@@ -15,7 +15,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid(),
             Notes = "Good progress."
         });
 
@@ -30,7 +29,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid(),
             Outcome = ProbationOutcome.Pass,
             DecisionDate = new DateOnly(2026, 9, 1)
         });
@@ -46,7 +44,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid(),
             Outcome = ProbationOutcome.Extend,
             DecisionDate = new DateOnly(2026, 9, 1),
             NewExpectedEndDate = new DateOnly(2026, 12, 1),
@@ -64,7 +61,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid(),
             Outcome = ProbationOutcome.Pass
         });
 
@@ -80,7 +76,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid(),
             Outcome = ProbationOutcome.Extend,
             DecisionDate = new DateOnly(2026, 9, 1),
             ExtensionReason = "Needs more time."
@@ -98,7 +93,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid(),
             Outcome = ProbationOutcome.Extend,
             DecisionDate = new DateOnly(2026, 9, 1),
             NewExpectedEndDate = new DateOnly(2026, 12, 1)
@@ -118,7 +112,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid(),
             Outcome = ProbationOutcome.Extend,
             DecisionDate = today,
             NewExpectedEndDate = today,
@@ -139,7 +132,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid(),
             Outcome = ProbationOutcome.Extend,
             DecisionDate = DateOnly.FromDateTime(DateTime.UtcNow),
             NewExpectedEndDate = tomorrow,
@@ -157,7 +149,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid(),
             Outcome = ProbationOutcome.Extend,
             DecisionDate = new DateOnly(2026, 9, 1),
             NewExpectedEndDate = new DateOnly(2026, 12, 1),
@@ -176,7 +167,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid(),
             Outcome = ProbationOutcome.Fail,
             DecisionDate = new DateOnly(2026, 9, 1)
         });
@@ -192,7 +182,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid(),
             Outcome = ProbationOutcome.Extend,
             DecisionDate = new DateOnly(2026, 9, 1),
             NewExpectedEndDate = new DateOnly(2026, 12, 1),
@@ -211,7 +200,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.Empty,
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid()
         });
 
         Assert.False(result.IsValid);
@@ -226,7 +214,6 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.Empty,
             ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.NewGuid()
         });
 
         Assert.False(result.IsValid);
@@ -241,25 +228,10 @@ public class CompleteProbationReviewValidatorTests
             CompanyId = Guid.NewGuid(),
             ProbationRecordId = Guid.NewGuid(),
             ReviewId = Guid.Empty,
-            CompletedByEmployeeId = Guid.NewGuid()
         });
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CompleteProbationReviewRequest.ReviewId));
     }
 
-    [Fact]
-    public async Task Empty_CompletedByEmployeeId_Fails()
-    {
-        var result = await _validator.ValidateAsync(new CompleteProbationReviewRequest
-        {
-            CompanyId = Guid.NewGuid(),
-            ProbationRecordId = Guid.NewGuid(),
-            ReviewId = Guid.NewGuid(),
-            CompletedByEmployeeId = Guid.Empty
-        });
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CompleteProbationReviewRequest.CompletedByEmployeeId));
-    }
 }

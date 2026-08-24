@@ -41,6 +41,37 @@ internal sealed class CompleteProbationReviewFromTaskAction(
         var decisionDate = DateOnly.FromDateTime(now.DateTime);
 
         var (outcome, extensionEndDate) = ParseOutcome(context.OutcomeDecision);
+
+        // PROB-05: the generic Tasks callback delivers the outcome as a raw string
+        // (context.OutcomeDecision), so it needs the same rigor as the strongly-typed direct
+        // CompleteProbationReview API path — reject malformed or absent outcomes cleanly before
+        // any mutation. ParseOutcome already uses Enum-safe/TryParse-style parsing (see below) and
+        // returns (null, null) for anything it doesn't recognise, so a null/mismatched outcome here
+        // always means "malformed or absent" for this review's required outcome shape.
+        if (review.ReviewType == ProbationReviewType.FinalDecision
+            && outcome is not (ProbationOutcome.Pass or ProbationOutcome.Fail or ProbationOutcome.Extend))
+            return;
+
+        if (review.ReviewType == ProbationReviewType.ExtensionConfirmation
+            && outcome != ProbationOutcome.Extend)
+            return;
+
+        if (review.ReviewType is not (ProbationReviewType.FinalDecision or ProbationReviewType.ExtensionConfirmation)
+            && outcome.HasValue)
+            return;
+
+        // An Extend outcome without a parseable extension date is malformed — reject rather than
+        // silently completing the review with no effective extension.
+        if (outcome == ProbationOutcome.Extend && !extensionEndDate.HasValue)
+            return;
+
+        // PROB-05: extension end date must move strictly forward against both the record's
+        // current expected end date and the decision date — same rule as the direct API path
+        // (CompleteProbationReviewHandler). Reject without mutating anything if violated.
+        if (outcome == ProbationOutcome.Extend
+            && (extensionEndDate!.Value <= record.ExpectedEndDate || extensionEndDate.Value <= decisionDate))
+            return;
+
         var previousExpectedEndDate = record.ExpectedEndDate;
         var extensionReason = context.OutcomeReason ?? "Probation extended.";
 

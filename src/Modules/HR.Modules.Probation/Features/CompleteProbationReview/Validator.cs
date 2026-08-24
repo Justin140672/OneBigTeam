@@ -10,7 +10,6 @@ internal sealed class CompleteProbationReviewValidator : AbstractValidator<Compl
         RuleFor(r => r.CompanyId).NotEmpty();
         RuleFor(r => r.ProbationRecordId).NotEmpty();
         RuleFor(r => r.ReviewId).NotEmpty();
-        RuleFor(r => r.CompletedByEmployeeId).NotEmpty();
 
         RuleFor(r => r.DecisionDate)
             .NotNull()

@@ -34,6 +34,7 @@ internal sealed class CompleteProbationReviewHandler
 
     public async Task<Result<CompleteProbationReviewResponse>> HandleAsync(
         CompleteProbationReviewRequest request,
+        Guid completedByEmployeeId,
         CancellationToken cancellationToken)
     {
         var record = await _dbContext.ProbationRecords
@@ -79,17 +80,33 @@ internal sealed class CompleteProbationReviewHandler
             return Result.Failure<CompleteProbationReviewResponse>(
                 Error.Validation("Outcome can only be set on FinalDecision or ExtensionConfirmation reviews."));
 
+        // PROB-05: extension end date must move strictly forward — both relative to the record's
+        // current expected end date and relative to the decision date itself. Checked here (in
+        // addition to the domain-level guard inside ProbationRecord.Extend) so a caller gets a
+        // clean validation Result instead of an unhandled exception, and so no review/task/record
+        // mutation happens when the check fails.
+        if (request.Outcome == ProbationOutcome.Extend)
+        {
+            if (request.NewExpectedEndDate!.Value <= record.ExpectedEndDate)
+                return Result.Failure<CompleteProbationReviewResponse>(
+                    Error.Validation("NewExpectedEndDate must be later than the current expected end date."));
+
+            if (request.NewExpectedEndDate!.Value <= request.DecisionDate!.Value)
+                return Result.Failure<CompleteProbationReviewResponse>(
+                    Error.Validation("NewExpectedEndDate must be later than the decision date."));
+        }
+
         var now = _clock.UtcNowOffset();
         var previousExpectedEndDate = record.ExpectedEndDate;
 
         if (request.Outcome == ProbationOutcome.Pass)
-            record.Pass(request.CompletedByEmployeeId, request.DecisionDate!.Value, request.Notes, now);
+            record.Pass(completedByEmployeeId, request.DecisionDate!.Value, request.Notes, now);
         else if (request.Outcome == ProbationOutcome.Fail)
-            record.Fail(request.CompletedByEmployeeId, request.DecisionDate!.Value, request.Notes, now);
+            record.Fail(completedByEmployeeId, request.DecisionDate!.Value, request.Notes, now);
         else if (request.Outcome == ProbationOutcome.Extend)
-            record.Extend(request.NewExpectedEndDate!.Value, request.ExtensionReason!, request.CompletedByEmployeeId, request.DecisionDate!.Value, now);
+            record.Extend(request.NewExpectedEndDate!.Value, request.ExtensionReason!, completedByEmployeeId, request.DecisionDate!.Value, now);
 
-        review.Complete(request.CompletedByEmployeeId, request.Outcome, request.Notes, now);
+        review.Complete(completedByEmployeeId, request.Outcome, request.Notes, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -101,7 +118,7 @@ internal sealed class CompleteProbationReviewHandler
                 previousExpectedEndDate,
                 request.NewExpectedEndDate!.Value,
                 request.ExtensionReason!,
-                request.CompletedByEmployeeId,
+                completedByEmployeeId,
                 request.DecisionDate!.Value,
                 now,
                 cancellationToken);
@@ -112,7 +129,7 @@ internal sealed class CompleteProbationReviewHandler
             review.Id,
             review.ProbationRecordId,
             record.EmployeeId,
-            request.CompletedByEmployeeId,
+            completedByEmployeeId,
             review.ReviewType.ToString(),
             review.Outcome?.ToString(),
             review.Notes,

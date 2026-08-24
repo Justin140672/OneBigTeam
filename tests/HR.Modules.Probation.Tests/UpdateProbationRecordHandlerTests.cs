@@ -39,7 +39,6 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = newManagerId,
             ExpectedEndDate = new DateOnly(2026, 9, 1),
-            Status = "Active",
             Notes = "Updated notes."
         }, CancellationToken.None);
 
@@ -50,7 +49,7 @@ public class UpdateProbationRecordHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Transitions_To_Extended()
+    public async Task HandleAsync_Does_Not_Change_Status_Or_Outcome_Fields()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -60,6 +59,50 @@ public class UpdateProbationRecordHandlerTests
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
             new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+        record.Extend(new DateOnly(2026, 12, 1), "Needs more time.", managerId, new DateOnly(2026, 9, 1), now);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateProbationRecordHandler(
+            context,
+            new FakeClock(FixedUtcNow),
+            new ProbationReviewRecalculationService(
+                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
+            new FakeCompanyProbationSettingsReader());
+
+        var newManagerId = Guid.NewGuid();
+        var result = await handler.HandleAsync(new UpdateProbationRecordRequest
+        {
+            CompanyId = companyId,
+            Id = record.Id,
+            ManagerEmployeeId = newManagerId,
+            ExpectedEndDate = new DateOnly(2026, 12, 15),
+            Notes = "Correcting details."
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Extended", result.Value!.Status);
+        Assert.Equal(newManagerId, result.Value.ManagerEmployeeId);
+        Assert.Equal(new DateOnly(2026, 12, 15), result.Value.ExpectedEndDate);
+        // Outcome fields set by the prior Extend() remain untouched by the administrative correction.
+        Assert.Equal("Needs more time.", result.Value.ExtensionReason);
+        Assert.Equal(managerId, result.Value.DecisionMakerEmployeeId);
+        Assert.Equal(new DateOnly(2026, 9, 1), result.Value.DecisionDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_For_Passed_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+        record.Pass(managerId, new DateOnly(2026, 9, 1), "Great job.", now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
@@ -75,20 +118,22 @@ public class UpdateProbationRecordHandlerTests
         {
             CompanyId = companyId,
             Id = record.Id,
-            ManagerEmployeeId = managerId,
+            ManagerEmployeeId = Guid.NewGuid(),
             ExpectedEndDate = new DateOnly(2026, 12, 1),
-            Status = "Extended",
-            ExtensionReason = "Needs more time to meet targets."
+            Notes = "Attempted edit."
         }, CancellationToken.None);
 
-        Assert.True(result.IsSuccess);
-        Assert.Equal("Extended", result.Value!.Status);
-        Assert.Equal(new DateOnly(2026, 12, 1), result.Value.ExpectedEndDate);
-        Assert.Equal("Needs more time to meet targets.", result.Value.ExtensionReason);
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+
+        var persisted = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.Passed, persisted.Status);
+        Assert.Equal(new DateOnly(2026, 9, 1), persisted.ExpectedEndDate);
+        Assert.Equal(managerId, persisted.ManagerEmployeeId);
     }
 
     [Fact]
-    public async Task HandleAsync_Transitions_To_Passed()
+    public async Task HandleAsync_Returns_Conflict_For_Failed_Record()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -98,6 +143,43 @@ public class UpdateProbationRecordHandlerTests
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
             new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+        record.Fail(managerId, new DateOnly(2026, 9, 1), "Did not meet targets.", now);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateProbationRecordHandler(
+            context,
+            new FakeClock(FixedUtcNow),
+            new ProbationReviewRecalculationService(
+                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
+            new FakeCompanyProbationSettingsReader());
+
+        var result = await handler.HandleAsync(new UpdateProbationRecordRequest
+        {
+            CompanyId = companyId,
+            Id = record.Id,
+            ManagerEmployeeId = Guid.NewGuid(),
+            ExpectedEndDate = new DateOnly(2026, 12, 1),
+            Notes = "Attempted edit."
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_For_ReviewDue_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+        record.MarkReviewDue(now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
@@ -115,17 +197,11 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = managerId,
             ExpectedEndDate = new DateOnly(2026, 9, 1),
-            Status = "Passed",
-            DecisionMakerEmployeeId = managerId,
-            DecisionDate = new DateOnly(2026, 9, 1),
-            OutcomeNotes = "Excellent performance."
+            Notes = "Still reviewing."
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Passed", result.Value!.Status);
-        Assert.Equal(managerId, result.Value.DecisionMakerEmployeeId);
-        Assert.Equal(new DateOnly(2026, 9, 1), result.Value.DecisionDate);
-        Assert.Equal("Excellent performance.", result.Value.OutcomeNotes);
+        Assert.Equal("ReviewDue", result.Value!.Status);
     }
 
     [Fact]
@@ -145,8 +221,7 @@ public class UpdateProbationRecordHandlerTests
             CompanyId = Guid.NewGuid(),
             Id = Guid.NewGuid(),
             ManagerEmployeeId = Guid.NewGuid(),
-            ExpectedEndDate = new DateOnly(2026, 9, 1),
-            Status = "Active"
+            ExpectedEndDate = new DateOnly(2026, 9, 1)
         }, CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -181,7 +256,6 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = managerId,
             ExpectedEndDate = new DateOnly(2026, 9, 1),
-            Status = "Active",
             Notes = "  Trimmed.  "
         }, CancellationToken.None);
 
@@ -221,8 +295,7 @@ public class UpdateProbationRecordHandlerTests
             CompanyId = companyId,
             Id = record.Id,
             ManagerEmployeeId = managerId,
-            ExpectedEndDate = new DateOnly(2026, 12, 1),
-            Status = "Active"
+            ExpectedEndDate = new DateOnly(2026, 12, 1)
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -270,7 +343,6 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = managerId,
             ExpectedEndDate = new DateOnly(2026, 9, 1), // unchanged
-            Status = "Active",
             Notes = "No date change."
         }, CancellationToken.None);
 

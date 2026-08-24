@@ -26,6 +26,12 @@ internal sealed class Endpoint(
                 return;
             }
 
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(new { error = result.Error.Message }));
+                return;
+            }
+
             await Send.ResultAsync(TypedResults.BadRequest(new { error = result.Error.Message }));
             return;
         }

@@ -56,8 +56,18 @@ public class ProbationOutcomeNotifierTests
     {
         var writer = new FakeNotificationWriter();
         const string sentinel = "SENSITIVE-OUTCOME-NOTES-SENTINEL";
-        var (record, review) = CreateCompletedRecordAndReview(ProbationOutcome.Pass);
+
+        // Pass directly with the sentinel as outcome notes (rather than reusing
+        // CreateCompletedRecordAndReview + a second Pass call) — PROB-05's transition guard now
+        // rejects Passed->Passed, so the record must only transition once.
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, null, SeedNow);
         record.Pass(Guid.NewGuid(), ExpectedEndDate, sentinel, SeedNow);
+
+        var review = ProbationReview.Create(
+            Guid.NewGuid(), record.CompanyId, record.Id, ProbationReviewType.FinalDecision, ExpectedEndDate, SeedNow);
+        review.Complete(Guid.NewGuid(), ProbationOutcome.Pass, null, SeedNow);
 
         await ProbationOutcomeNotifier.NotifyAsync(writer, record, review, NotifyNow, CancellationToken.None);
 
@@ -70,9 +80,19 @@ public class ProbationOutcomeNotifierTests
     {
         var writer = new FakeNotificationWriter();
         const string sentinel = "SENSITIVE-EXTENSION-REASON-SENTINEL";
-        var (record, review) = CreateCompletedRecordAndReview(ProbationOutcome.Pass);
-        record.Extend(ExpectedEndDate.AddDays(30), sentinel, Guid.NewGuid(), ExpectedEndDate, SeedNow);
-        record.Pass(Guid.NewGuid(), ExpectedEndDate, null, SeedNow);
+
+        // Extend once (Active -> Extended is allowed) then Pass (Extended -> Passed is allowed) —
+        // PROB-05's transition guard rejects Passed->Extended and Passed->Passed, so the record
+        // must reach its terminal Pass state via a single valid transition chain.
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, null, SeedNow);
+        record.Extend(ExpectedEndDate.AddDays(30), sentinel, Guid.NewGuid(), ExpectedEndDate.AddDays(-1), SeedNow);
+        record.Pass(Guid.NewGuid(), ExpectedEndDate.AddDays(30), null, SeedNow);
+
+        var review = ProbationReview.Create(
+            Guid.NewGuid(), record.CompanyId, record.Id, ProbationReviewType.FinalDecision, ExpectedEndDate, SeedNow);
+        review.Complete(Guid.NewGuid(), ProbationOutcome.Pass, null, SeedNow);
 
         await ProbationOutcomeNotifier.NotifyAsync(writer, record, review, NotifyNow, CancellationToken.None);
 
