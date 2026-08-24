@@ -254,7 +254,7 @@ public class ProbationExtensionServiceTests
     {
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
-            new DateOnly(2026, 6, 1), dueDate, null, Now);
+            new DateOnly(2026, 6, 1), dueDate, null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         context.ProbationRecords.Add(record);
 
         var review = ProbationReview.Create(

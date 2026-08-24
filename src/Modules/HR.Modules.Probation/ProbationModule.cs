@@ -15,6 +15,7 @@ using HR.Modules.Probation.Features.GetProbationReviews;
 using HR.Modules.Probation.Features.GetMyProbationStatus;
 using HR.Modules.Probation.Features.GetProbationStatus;
 using HR.Modules.Probation.Features.GetUpcomingProbationReviews;
+using HR.Modules.Probation.Features.MarkProbationNotApplicable;
 using HR.Modules.Probation.Features.UpdateProbationRecord;
 using HR.Modules.Probation.Jobs;
 using HR.Modules.Probation.Persistence;
@@ -57,6 +58,8 @@ public static class ProbationModule
         services.AddScoped<GetProbationReviewHandler>();
         services.AddScoped<UpdateProbationRecordHandler>();
         services.AddScoped<IValidator<UpdateProbationRecordRequest>, UpdateProbationRecordValidator>();
+        services.AddScoped<MarkProbationNotApplicableHandler>();
+        services.AddScoped<IValidator<MarkProbationNotApplicableRequest>, MarkProbationNotApplicableValidator>();
         services.AddScoped<CreateProbationReviewHandler>();
         services.AddScoped<IValidator<CreateProbationReviewRequest>, CreateProbationReviewValidator>();
         services.AddScoped<GetProbationReviewsHandler>();
@@ -103,6 +106,7 @@ public static class ProbationModule
             return;
 
         var now = DateTimeOffset.UtcNow;
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
         var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var betaId = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
@@ -125,7 +129,7 @@ public static class ProbationModule
             var recordId    = new Guid($"40000000-0000-0000-0000-{i + 1:D12}");
 
             var record = ProbationRecord.Create(recordId, companyId, employeeId, managerId,
-                startDate, expectedEnd, null, now);
+                startDate, expectedEnd, null, today, now);
             record.Pass(managerId, expectedEnd, "Probation completed successfully.", now);
             db.ProbationRecords.Add(record);
 
@@ -161,7 +165,7 @@ public static class ProbationModule
 
         var activeRecord = ProbationRecord.Create(
             activeRecordId, acmeId, empCarlosId, empJamesId,
-            new DateOnly(2026, 4, 7), new DateOnly(2026, 7, 7), null, now);
+            new DateOnly(2026, 4, 7), new DateOnly(2026, 7, 7), null, today, now);
         activeRecord.MarkReviewDue(now);
         db.ProbationRecords.Add(activeRecord);
 
@@ -183,7 +187,7 @@ public static class ProbationModule
 
         var activeRecord2 = ProbationRecord.Create(
             activeRecord2Id, acmeId, empSophieId, empSarahId,
-            new DateOnly(2026, 4, 7), new DateOnly(2026, 7, 7), null, now);
+            new DateOnly(2026, 4, 7), new DateOnly(2026, 7, 7), null, today, now);
         activeRecord2.MarkReviewDue(now);
         db.ProbationRecords.Add(activeRecord2);
 

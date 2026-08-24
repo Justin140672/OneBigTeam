@@ -1,5 +1,6 @@
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
+using HR.Modules.Companies.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,12 +11,18 @@ internal sealed class CreateProbationRecordHandler
     private readonly ProbationDbContext _dbContext;
     private readonly IClock _clock;
     private readonly IAuditEventPublisher _auditPublisher;
+    private readonly ICompanyTimeZoneReader _timeZoneReader;
 
-    public CreateProbationRecordHandler(ProbationDbContext dbContext, IClock clock, IAuditEventPublisher auditPublisher)
+    public CreateProbationRecordHandler(
+        ProbationDbContext dbContext,
+        IClock clock,
+        IAuditEventPublisher auditPublisher,
+        ICompanyTimeZoneReader timeZoneReader)
     {
         _dbContext = dbContext;
         _clock = clock;
         _auditPublisher = auditPublisher;
+        _timeZoneReader = timeZoneReader;
     }
 
     public async Task<Result<CreateProbationRecordResponse>> HandleAsync(
@@ -38,6 +45,8 @@ internal sealed class CreateProbationRecordHandler
         }
 
         var now = _clock.UtcNowOffset();
+        var timeZoneId = await _timeZoneReader.GetTimeZoneAsync(request.CompanyId, cancellationToken);
+        var today = _clock.TodayIn(timeZoneId);
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(),
@@ -47,6 +56,7 @@ internal sealed class CreateProbationRecordHandler
             request.StartDate,
             request.ExpectedEndDate,
             string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            today,
             now);
 
         _dbContext.ProbationRecords.Add(record);

@@ -60,6 +60,10 @@ internal sealed class ProbationRecordConfiguration : IEntityTypeConfiguration<Pr
             .HasColumnName("outcome_notes")
             .HasMaxLength(2000);
 
+        builder.Property(r => r.NotApplicableReason)
+            .HasColumnName("not_applicable_reason")
+            .HasMaxLength(1000);
+
         builder.Property(r => r.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

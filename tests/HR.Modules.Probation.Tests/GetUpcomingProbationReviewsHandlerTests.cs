@@ -243,7 +243,7 @@ public class GetUpcomingProbationReviewsHandlerTests
     {
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(),
-            new DateOnly(2026, 4, 1), new DateOnly(2026, 9, 1), null, Now);
+            new DateOnly(2026, 4, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         context.ProbationRecords.Add(record);
         return record;
     }

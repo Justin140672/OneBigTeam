@@ -17,7 +17,7 @@ public class GetProbationReviewsHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, Now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
@@ -39,7 +39,7 @@ public class GetProbationReviewsHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, Now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         context.ProbationRecords.Add(record);
 
         context.ProbationReviews.AddRange(
@@ -83,10 +83,10 @@ public class GetProbationReviewsHandlerTests
 
         var record1 = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, Now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         var record2 = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, Now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         context.ProbationRecords.AddRange(record1, record2);
 
         context.ProbationReviews.AddRange(
@@ -114,7 +114,7 @@ public class GetProbationReviewsHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, Now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         context.ProbationRecords.Add(record);
 
         var review = ProbationReview.Create(

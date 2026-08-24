@@ -264,7 +264,7 @@ public class ProbationReviewRecalculationServiceTests
     {
         var record = ProbationRecord.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            StartDate, expectedEndDate, null, SeedNow);
+            StartDate, expectedEndDate, null, DateOnly.FromDateTime(SeedNow.UtcDateTime), SeedNow);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
         return record;

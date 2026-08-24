@@ -21,7 +21,7 @@ public class UpdateProbationRecordHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
@@ -58,7 +58,7 @@ public class UpdateProbationRecordHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         record.Extend(new DateOnly(2026, 12, 1), "Needs more time.", managerId, new DateOnly(2026, 9, 1), now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
@@ -101,7 +101,7 @@ public class UpdateProbationRecordHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         record.Pass(managerId, new DateOnly(2026, 9, 1), "Great job.", now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
@@ -142,7 +142,7 @@ public class UpdateProbationRecordHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         record.Fail(managerId, new DateOnly(2026, 9, 1), "Did not meet targets.", now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
@@ -169,6 +169,46 @@ public class UpdateProbationRecordHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_Conflict_For_NotApplicable_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
+        record.MarkNotApplicable("Exempt.", now);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateProbationRecordHandler(
+            context,
+            new FakeClock(FixedUtcNow),
+            new ProbationReviewRecalculationService(
+                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
+            new FakeCompanyProbationSettingsReader());
+
+        var result = await handler.HandleAsync(new UpdateProbationRecordRequest
+        {
+            CompanyId = companyId,
+            Id = record.Id,
+            ManagerEmployeeId = Guid.NewGuid(),
+            ExpectedEndDate = new DateOnly(2026, 12, 1),
+            Notes = "Attempted edit."
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+
+        var persisted = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.NotApplicable, persisted.Status);
+        Assert.Equal(managerId, persisted.ManagerEmployeeId);
+    }
+
+    [Fact]
     public async Task HandleAsync_Succeeds_For_ReviewDue_Record()
     {
         await using var context = BuildContext();
@@ -178,7 +218,7 @@ public class UpdateProbationRecordHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         record.MarkReviewDue(now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
@@ -238,7 +278,7 @@ public class UpdateProbationRecordHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
@@ -273,7 +313,7 @@ public class UpdateProbationRecordHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         context.ProbationRecords.Add(record);
 
         var oldFinalDecision = ProbationReview.Create(
@@ -319,7 +359,7 @@ public class UpdateProbationRecordHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         context.ProbationRecords.Add(record);
 
         var existingFinalDecision = ProbationReview.Create(

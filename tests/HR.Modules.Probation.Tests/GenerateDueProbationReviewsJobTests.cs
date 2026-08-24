@@ -491,7 +491,7 @@ public class GenerateDueProbationReviewsJobTests
             Guid.NewGuid(), Guid.NewGuid(),
             employeeId ?? Guid.NewGuid(),
             managerEmployeeId ?? Guid.NewGuid(),
-            StartDate, ExpectedEndDate, null, SeedNow);
+            StartDate, ExpectedEndDate, null, DateOnly.FromDateTime(SeedNow.UtcDateTime), SeedNow);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
         return record;
@@ -515,6 +515,71 @@ public class GenerateDueProbationReviewsJobTests
             hrAdministratorDirectory ?? new FakeHrAdministratorDirectory(),
             notificationWriter ?? new FakeNotificationWriter(),
             NullLogger<GenerateDueProbationReviewsJob>.Instance);
+
+    // -------- PROB-06: NotStarted activation and NotApplicable exclusion --------
+
+    [Fact]
+    public async Task ExecuteAsync_Activates_NotStarted_Record_Whose_StartDate_Has_Been_Reached_And_Schedules_Reviews()
+    {
+        await using var context = BuildContext();
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, null, StartDate.AddDays(-5), SeedNow);
+        Assert.Equal(ProbationStatus.NotStarted, record.Status);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        // "today" (Feb 1) is after StartDate (Jan 1), so the record should activate, and
+        // ManagerCheckIn (due Jan 31) is picked up in the very same job run.
+        await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc)).ExecuteAsync();
+
+        var reloaded = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.ReviewDue, reloaded.Status);
+
+        var reviews = await context.ProbationReviews.ToListAsync();
+        Assert.Single(reviews);
+        Assert.Equal(ProbationReviewType.ManagerCheckIn, reviews[0].ReviewType);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Leaves_NotStarted_Record_Untouched_When_StartDate_Still_In_Future()
+    {
+        await using var context = BuildContext();
+
+        var futureStartDate = new DateOnly(2026, 6, 1);
+        var futureEndDate = new DateOnly(2026, 9, 1);
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            futureStartDate, futureEndDate, null, futureStartDate.AddDays(-10), SeedNow);
+        Assert.Equal(ProbationStatus.NotStarted, record.Status);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc)).ExecuteAsync();
+
+        var reloaded = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.NotStarted, reloaded.Status);
+        Assert.Empty(await context.ProbationReviews.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NotApplicable_Record_Never_Generates_Reviews()
+    {
+        await using var context = BuildContext();
+
+        var record = ProbationRecord.CreateNotApplicable(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, "Exempt role.", SeedNow);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        await BuildJob(context, today: new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Utc)).ExecuteAsync();
+
+        Assert.Empty(await context.ProbationReviews.ToListAsync());
+        var reloaded = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.NotApplicable, reloaded.Status);
+    }
 
     private static ProbationDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<ProbationDbContext>()

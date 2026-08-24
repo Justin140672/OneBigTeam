@@ -11,7 +11,7 @@ public class ProbationRecordTests
     private static ProbationRecord CreateActiveRecord() =>
         ProbationRecord.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            StartDate, ExpectedEndDate, null, Now);
+            StartDate, ExpectedEndDate, null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
 
     // -------- Status transition table --------
 
@@ -333,5 +333,182 @@ public class ProbationRecordTests
 
         Assert.Throws<InvalidOperationException>(() =>
             record.ApplyAdministrativeCorrection(Guid.NewGuid(), ExpectedEndDate.AddDays(1), "Attempted edit.", Now));
+    }
+
+    [Fact]
+    public void ApplyAdministrativeCorrection_On_NotApplicable_Record_Throws()
+    {
+        var record = CreateActiveRecord();
+        record.MarkNotApplicable("Not applicable.", Now);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            record.ApplyAdministrativeCorrection(Guid.NewGuid(), ExpectedEndDate.AddDays(1), "Attempted edit.", Now));
+    }
+
+    // -------- PROB-06: Create() initial status (NotStarted vs Active) --------
+
+    [Fact]
+    public void Create_With_Today_Before_StartDate_Produces_NotStarted()
+    {
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, null, StartDate.AddDays(-1), Now);
+
+        Assert.Equal(ProbationStatus.NotStarted, record.Status);
+    }
+
+    [Fact]
+    public void Create_With_Today_Equal_To_StartDate_Produces_Active()
+    {
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, null, StartDate, Now);
+
+        Assert.Equal(ProbationStatus.Active, record.Status);
+    }
+
+    [Fact]
+    public void Create_With_Today_After_StartDate_Produces_Active()
+    {
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, null, StartDate.AddDays(1), Now);
+
+        Assert.Equal(ProbationStatus.Active, record.Status);
+    }
+
+    // -------- PROB-06: ActivateIfDue --------
+
+    [Fact]
+    public void ActivateIfDue_When_NotStarted_And_Today_Equals_StartDate_Transitions_To_Active()
+    {
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, null, StartDate.AddDays(-1), Now);
+        Assert.Equal(ProbationStatus.NotStarted, record.Status);
+
+        record.ActivateIfDue(StartDate, Now);
+
+        Assert.Equal(ProbationStatus.Active, record.Status);
+    }
+
+    [Fact]
+    public void ActivateIfDue_When_NotStarted_And_Today_After_StartDate_Transitions_To_Active()
+    {
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, null, StartDate.AddDays(-1), Now);
+
+        record.ActivateIfDue(StartDate.AddDays(1), Now);
+
+        Assert.Equal(ProbationStatus.Active, record.Status);
+    }
+
+    [Fact]
+    public void ActivateIfDue_When_NotStarted_And_Today_Before_StartDate_Is_NoOp()
+    {
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, null, StartDate.AddDays(-5), Now);
+
+        record.ActivateIfDue(StartDate.AddDays(-1), Now);
+
+        Assert.Equal(ProbationStatus.NotStarted, record.Status);
+    }
+
+    [Fact]
+    public void ActivateIfDue_When_Already_Active_Is_NoOp()
+    {
+        var record = CreateActiveRecord();
+
+        record.ActivateIfDue(StartDate, Now);
+
+        Assert.Equal(ProbationStatus.Active, record.Status);
+    }
+
+    // -------- PROB-06: MarkNotApplicable --------
+
+    [Fact]
+    public void MarkNotApplicable_From_NotStarted_Succeeds()
+    {
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, null, StartDate.AddDays(-1), Now);
+
+        record.MarkNotApplicable("Exempt role.", Now);
+
+        Assert.Equal(ProbationStatus.NotApplicable, record.Status);
+        Assert.Equal("Exempt role.", record.NotApplicableReason);
+    }
+
+    [Fact]
+    public void MarkNotApplicable_From_Active_Succeeds()
+    {
+        var record = CreateActiveRecord();
+
+        record.MarkNotApplicable("Exempt role.", Now);
+
+        Assert.Equal(ProbationStatus.NotApplicable, record.Status);
+        Assert.Equal("Exempt role.", record.NotApplicableReason);
+    }
+
+    [Fact]
+    public void MarkNotApplicable_From_ReviewDue_Throws()
+    {
+        var record = CreateActiveRecord();
+        record.MarkReviewDue(Now);
+
+        Assert.Throws<InvalidOperationException>(() => record.MarkNotApplicable("Reason.", Now));
+    }
+
+    [Fact]
+    public void MarkNotApplicable_From_Extended_Throws()
+    {
+        var record = CreateActiveRecord();
+        record.Extend(ExpectedEndDate.AddMonths(1), "Needs more time.", Guid.NewGuid(), ExpectedEndDate.AddDays(-1), Now);
+
+        Assert.Throws<InvalidOperationException>(() => record.MarkNotApplicable("Reason.", Now));
+    }
+
+    [Fact]
+    public void MarkNotApplicable_From_Passed_Throws()
+    {
+        var record = CreateActiveRecord();
+        record.Pass(Guid.NewGuid(), ExpectedEndDate, null, Now);
+
+        Assert.Throws<InvalidOperationException>(() => record.MarkNotApplicable("Reason.", Now));
+    }
+
+    [Fact]
+    public void MarkNotApplicable_From_Failed_Throws()
+    {
+        var record = CreateActiveRecord();
+        record.Fail(Guid.NewGuid(), ExpectedEndDate, null, Now);
+
+        Assert.Throws<InvalidOperationException>(() => record.MarkNotApplicable("Reason.", Now));
+    }
+
+    [Fact]
+    public void MarkNotApplicable_From_NotApplicable_Again_Throws()
+    {
+        var record = CreateActiveRecord();
+        record.MarkNotApplicable("First reason.", Now);
+
+        Assert.Throws<InvalidOperationException>(() => record.MarkNotApplicable("Second reason.", Now));
+    }
+
+    // -------- PROB-06: CreateNotApplicable --------
+
+    [Fact]
+    public void CreateNotApplicable_Produces_NotApplicable_Record_With_Reason()
+    {
+        var record = ProbationRecord.CreateNotApplicable(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, "Exempt employment type.", Now);
+
+        Assert.Equal(ProbationStatus.NotApplicable, record.Status);
+        Assert.Equal("Exempt employment type.", record.NotApplicableReason);
+        Assert.Equal(StartDate, record.StartDate);
+        Assert.Equal(ExpectedEndDate, record.ExpectedEndDate);
     }
 }

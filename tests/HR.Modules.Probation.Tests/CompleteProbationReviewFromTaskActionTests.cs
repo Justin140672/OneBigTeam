@@ -616,7 +616,7 @@ public class CompleteProbationReviewFromTaskActionTests
     {
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 4, 1), new DateOnly(2026, 7, 1), null, Now);
+            new DateOnly(2026, 4, 1), new DateOnly(2026, 7, 1), null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         context.ProbationRecords.Add(record);
 
         var review = ProbationReview.Create(

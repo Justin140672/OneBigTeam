@@ -43,7 +43,7 @@ public class GetProbationStatusHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, Now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
 
         switch (statusName)
         {
@@ -75,12 +75,12 @@ public class GetProbationStatusHandlerTests
 
         var older = ProbationRecord.Create(
             Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(),
-            new DateOnly(2024, 1, 1), new DateOnly(2024, 4, 1), null, Now.AddYears(-2));
+            new DateOnly(2024, 1, 1), new DateOnly(2024, 4, 1), null, DateOnly.FromDateTime(Now.AddYears(-2).UtcDateTime), Now.AddYears(-2));
         older.Fail(Guid.NewGuid(), new DateOnly(2024, 4, 1), null, Now.AddYears(-2));
 
         var newer = ProbationRecord.Create(
             Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(),
-            new DateOnly(2026, 4, 7), new DateOnly(2026, 7, 7), null, Now);
+            new DateOnly(2026, 4, 7), new DateOnly(2026, 7, 7), null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         newer.MarkReviewDue(Now);
 
         context.ProbationRecords.AddRange(older, newer);
@@ -104,7 +104,7 @@ public class GetProbationStatusHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), Guid.NewGuid(), employeeId, Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, Now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 

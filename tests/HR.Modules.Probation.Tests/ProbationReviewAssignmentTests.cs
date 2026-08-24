@@ -110,5 +110,5 @@ public class ProbationReviewAssignmentTests
     private static ProbationRecord CreateRecord(Guid managerEmployeeId) =>
         ProbationRecord.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), managerEmployeeId,
-            StartDate, ExpectedEndDate, null, Now);
+            StartDate, ExpectedEndDate, null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
 }

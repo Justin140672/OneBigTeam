@@ -57,7 +57,7 @@ public class ManagerChangedHandlerTests
         var newManagerId = Guid.NewGuid();
 
         var record = ProbationRecord.Create(
-            Guid.NewGuid(), companyId, employeeId, oldManagerId, StartDate, ExpectedEndDate, null, Now);
+            Guid.NewGuid(), companyId, employeeId, oldManagerId, StartDate, ExpectedEndDate, null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
@@ -189,7 +189,7 @@ public class ManagerChangedHandlerTests
         var newManagerId = Guid.NewGuid();
 
         var record = ProbationRecord.Create(
-            Guid.NewGuid(), companyId, employeeId, oldManagerId, StartDate, ExpectedEndDate, null, Now);
+            Guid.NewGuid(), companyId, employeeId, oldManagerId, StartDate, ExpectedEndDate, null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         record.Pass(Guid.NewGuid(), ExpectedEndDate, null, Now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
@@ -209,11 +209,193 @@ public class ManagerChangedHandlerTests
         Assert.Equal(oldManagerId, reloadedRecord.ManagerEmployeeId);
     }
 
+    [Fact]
+    public async Task HandleAsync_No_Record_Exists_With_ProbationDates_Available_Creates_Deferred_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var newManagerId = Guid.NewGuid();
+        var probationStartDate = new DateOnly(2026, 1, 1);
+        var probationEndDate = new DateOnly(2026, 4, 1);
+
+        var probationDatesReader = new FakeEmployeeProbationDatesReader(
+            new EmployeeProbationDates(probationStartDate, probationEndDate));
+
+        var taskCreator = new FakeTaskCreator();
+        var taskCanceller = new FakeTaskCanceller();
+        var handler = BuildHandler(context, taskCreator, taskCanceller, probationDatesReader);
+
+        await handler.HandleAsync(
+            new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, Guid.NewGuid(), newManagerId, Now),
+            CancellationToken.None);
+
+        var created = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(companyId, created.CompanyId);
+        Assert.Equal(employeeId, created.EmployeeId);
+        Assert.Equal(newManagerId, created.ManagerEmployeeId);
+        Assert.Equal(probationStartDate, created.StartDate);
+        Assert.Equal(probationEndDate, created.ExpectedEndDate);
+        // FixedUtcNow (2026-06-25) is after probationStartDate, so the record starts Active.
+        Assert.Equal(ProbationStatus.Active, created.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_No_Record_Exists_With_Future_StartDate_Creates_Deferred_NotStarted_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var newManagerId = Guid.NewGuid();
+        var futureStartDate = DateOnly.FromDateTime(FixedUtcNow).AddDays(10);
+        var futureEndDate = futureStartDate.AddMonths(3);
+
+        var probationDatesReader = new FakeEmployeeProbationDatesReader(
+            new EmployeeProbationDates(futureStartDate, futureEndDate));
+
+        var taskCreator = new FakeTaskCreator();
+        var taskCanceller = new FakeTaskCanceller();
+        var handler = BuildHandler(context, taskCreator, taskCanceller, probationDatesReader);
+
+        await handler.HandleAsync(
+            new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, Guid.NewGuid(), newManagerId, Now),
+            CancellationToken.None);
+
+        var created = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.NotStarted, created.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_No_Record_Exists_And_ProbationDatesReader_Returns_Null_Creates_No_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var newManagerId = Guid.NewGuid();
+
+        var probationDatesReader = new FakeEmployeeProbationDatesReader(dates: null);
+
+        var taskCreator = new FakeTaskCreator();
+        var taskCanceller = new FakeTaskCanceller();
+        var handler = BuildHandler(context, taskCreator, taskCanceller, probationDatesReader);
+
+        await handler.HandleAsync(
+            new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, Guid.NewGuid(), newManagerId, Now),
+            CancellationToken.None);
+
+        Assert.Equal(0, await context.ProbationRecords.CountAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_No_Record_Exists_And_ProbationDatesReader_Returns_Null_ProbationEndDate_Creates_No_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var newManagerId = Guid.NewGuid();
+
+        var probationDatesReader = new FakeEmployeeProbationDatesReader(
+            new EmployeeProbationDates(new DateOnly(2026, 1, 1), null));
+
+        var taskCreator = new FakeTaskCreator();
+        var taskCanceller = new FakeTaskCanceller();
+        var handler = BuildHandler(context, taskCreator, taskCanceller, probationDatesReader);
+
+        await handler.HandleAsync(
+            new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, Guid.NewGuid(), newManagerId, Now),
+            CancellationToken.None);
+
+        Assert.Equal(0, await context.ProbationRecords.CountAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_No_Record_Exists_And_NewManagerId_Null_Creates_No_Deferred_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var probationDatesReader = new FakeEmployeeProbationDatesReader(
+            new EmployeeProbationDates(new DateOnly(2026, 1, 1), new DateOnly(2026, 4, 1)));
+
+        var taskCreator = new FakeTaskCreator();
+        var taskCanceller = new FakeTaskCanceller();
+        var handler = BuildHandler(context, taskCreator, taskCanceller, probationDatesReader);
+
+        await handler.HandleAsync(
+            new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, Guid.NewGuid(), null, Now),
+            CancellationToken.None);
+
+        Assert.Equal(0, await context.ProbationRecords.CountAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Record_Already_Exists_As_NotApplicable_Is_Never_Touched_By_Deferred_Creation()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var oldManagerId = Guid.NewGuid();
+        var newManagerId = Guid.NewGuid();
+
+        var record = ProbationRecord.CreateNotApplicable(
+            Guid.NewGuid(), companyId, employeeId, oldManagerId, StartDate, ExpectedEndDate, "Exempt.", Now);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        var probationDatesReader = new FakeEmployeeProbationDatesReader(
+            new EmployeeProbationDates(StartDate, ExpectedEndDate));
+
+        var taskCreator = new FakeTaskCreator();
+        var taskCanceller = new FakeTaskCanceller();
+        var handler = BuildHandler(context, taskCreator, taskCanceller, probationDatesReader);
+
+        await handler.HandleAsync(
+            new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, oldManagerId, newManagerId, Now),
+            CancellationToken.None);
+
+        Assert.Equal(1, await context.ProbationRecords.CountAsync());
+        var reloaded = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.NotApplicable, reloaded.Status);
+        Assert.Equal(oldManagerId, reloaded.ManagerEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NotStarted_Record_Has_Manager_Updated_Via_In_Flight_Status_Filter()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var oldManagerId = Guid.NewGuid();
+        var newManagerId = Guid.NewGuid();
+        var futureStartDate = DateOnly.FromDateTime(FixedUtcNow).AddDays(10);
+        var futureEndDate = futureStartDate.AddMonths(3);
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, employeeId, oldManagerId, futureStartDate, futureEndDate, null,
+            DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
+        Assert.Equal(ProbationStatus.NotStarted, record.Status);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        var taskCreator = new FakeTaskCreator();
+        var taskCanceller = new FakeTaskCanceller();
+        var handler = BuildHandler(context, taskCreator, taskCanceller);
+
+        await handler.HandleAsync(
+            new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, oldManagerId, newManagerId, Now),
+            CancellationToken.None);
+
+        var updatedRecord = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(newManagerId, updatedRecord.ManagerEmployeeId);
+        Assert.Equal(ProbationStatus.NotStarted, updatedRecord.Status);
+    }
+
     private static async Task<(ProbationRecord Record, ProbationReview Review)> SeedRecordWithPendingCheckIn(
         ProbationDbContext context, Guid companyId, Guid employeeId, Guid managerId)
     {
         var record = ProbationRecord.Create(
-            Guid.NewGuid(), companyId, employeeId, managerId, StartDate, ExpectedEndDate, null, Now);
+            Guid.NewGuid(), companyId, employeeId, managerId, StartDate, ExpectedEndDate, null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         context.ProbationRecords.Add(record);
 
         var review = ProbationReview.Create(
@@ -226,11 +408,16 @@ public class ManagerChangedHandlerTests
     }
 
     private static ManagerChangedHandler BuildHandler(
-        ProbationDbContext context, FakeTaskCreator taskCreator, FakeTaskCanceller taskCanceller) =>
+        ProbationDbContext context,
+        FakeTaskCreator taskCreator,
+        FakeTaskCanceller taskCanceller,
+        IEmployeeProbationDatesReader? probationDatesReader = null) =>
         new(context,
             taskCreator,
             taskCanceller,
             new FakeEmployeeNameReader(),
+            probationDatesReader ?? new FakeEmployeeProbationDatesReader(),
+            new FakeCompanyTimeZoneReader(),
             new FakeClock(FixedUtcNow),
             NullLogger<ManagerChangedHandler>.Instance);
 

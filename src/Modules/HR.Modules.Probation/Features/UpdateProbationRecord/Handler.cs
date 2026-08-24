@@ -41,7 +41,7 @@ internal sealed class UpdateProbationRecordHandler
 
         // PROB-05: a terminal record (Passed/Failed) represents a completed decision — direct
         // "administrative correction" edits are not permitted once that decision has been made.
-        if (record.Status is ProbationStatus.Passed or ProbationStatus.Failed)
+        if (record.Status is ProbationStatus.Passed or ProbationStatus.Failed or ProbationStatus.NotApplicable)
             return Result.Failure<UpdateProbationRecordResponse>(
                 Error.Conflict($"Cannot edit a probation record that has already reached the terminal status '{record.Status}'."));
 

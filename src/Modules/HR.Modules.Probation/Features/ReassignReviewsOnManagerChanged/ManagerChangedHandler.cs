@@ -1,6 +1,7 @@
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Companies.Contracts;
 using HR.Modules.Tasks.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +38,8 @@ internal sealed class ManagerChangedHandler(
     ITaskCreator taskCreator,
     ITaskCanceller taskCanceller,
     IEmployeeNameReader employeeNameReader,
+    IEmployeeProbationDatesReader probationDatesReader,
+    ICompanyTimeZoneReader timeZoneReader,
     IClock clock,
     ILogger<ManagerChangedHandler> logger) : IIntegrationEventHandler<EmployeeManagerChangedIntegrationEvent>
 {
@@ -48,11 +51,28 @@ internal sealed class ManagerChangedHandler(
                      && r.EmployeeId == integrationEvent.EmployeeId
                      && (r.Status == ProbationStatus.Active
                          || r.Status == ProbationStatus.ReviewDue
-                         || r.Status == ProbationStatus.Extended),
+                         || r.Status == ProbationStatus.Extended
+                         || r.Status == ProbationStatus.NotStarted),
                 cancellationToken);
 
         if (record is null)
+        {
+            // PROB-06: no in-flight record. Either none exists at all yet — most likely because
+            // creation was originally deferred for lack of a manager (see EmployeeCreatedHandler)
+            // and one is only being assigned now — or a record exists but has already reached a
+            // decided/terminal status (Passed/Failed/NotApplicable), which must never be
+            // resurrected by a later manager change. Distinguish the two with a second query scoped
+            // to "any status at all" before attempting deferred creation.
+            var anyRecordExists = await dbContext.ProbationRecords
+                .AnyAsync(
+                    r => r.CompanyId == integrationEvent.CompanyId && r.EmployeeId == integrationEvent.EmployeeId,
+                    cancellationToken);
+
+            if (!anyRecordExists && integrationEvent.NewManagerId is not null)
+                await TryCreateDeferredRecordAsync(integrationEvent, cancellationToken);
+
             return;
+        }
 
         if (record.ManagerEmployeeId == integrationEvent.NewManagerId)
             return; // Already applied — duplicate delivery of the same event.
@@ -112,5 +132,48 @@ internal sealed class ManagerChangedHandler(
             assignedUserId: integrationEvent.NewManagerId.Value,
             sourceEntityId: pendingCheckIn.Id,
             cancellationToken);
+    }
+
+    /// <summary>
+    /// PROB-06: completes the "manager assigned later" deferral described in
+    /// EmployeeCreatedHandler. Only reachable when no probation record of any status exists yet for
+    /// this employee, so this is inherently idempotent against redelivery of the same manager-change
+    /// event — a second delivery finds the just-created record and takes the ordinary
+    /// already-applied/reassignment path above instead. Requires a resolvable ProbationEndDate (the
+    /// Employees module always sets one via ProbationDateResolver at employee creation, so a null
+    /// here would indicate a genuinely unusual employee record); without one there is no probation
+    /// period to initialise, so the record is left deferred rather than guessed at.
+    /// </summary>
+    private async Task TryCreateDeferredRecordAsync(
+        EmployeeManagerChangedIntegrationEvent integrationEvent, CancellationToken cancellationToken)
+    {
+        var dates = await probationDatesReader.GetProbationDatesAsync(
+            integrationEvent.CompanyId, integrationEvent.EmployeeId, cancellationToken);
+
+        if (dates?.ProbationEndDate is null)
+            return;
+
+        var now = clock.UtcNowOffset();
+        var timeZoneId = await timeZoneReader.GetTimeZoneAsync(integrationEvent.CompanyId, cancellationToken);
+        var today = clock.TodayIn(timeZoneId);
+
+        var newRecord = ProbationRecord.Create(
+            Guid.NewGuid(),
+            integrationEvent.CompanyId,
+            integrationEvent.EmployeeId,
+            integrationEvent.NewManagerId!.Value,
+            dates.StartDate,
+            dates.ProbationEndDate.Value,
+            notes: null,
+            today,
+            now);
+
+        dbContext.ProbationRecords.Add(newRecord);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Probation record {ProbationRecordId} created for employee {EmployeeId} on manager assignment " +
+            "(creation was previously deferred for lack of a manager).",
+            newRecord.Id, newRecord.EmployeeId);
     }
 }

@@ -25,6 +25,26 @@ internal sealed record ProbationRecordCreatedAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
+internal sealed record ProbationMarkedNotApplicableAuditEvent(
+    Guid CompanyId,
+    Guid ProbationRecordId,
+    Guid EmployeeId,
+    string? Reason,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType        => "probation-record.marked-not-applicable";
+    string IAuditEvent.EntityType       => "ProbationRecord";
+    Guid   IAuditEvent.EntityId         => ProbationRecordId;
+    Guid?  IAuditEvent.EmployeeId       => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId      => null;
+    Guid?  IAuditEvent.ActorEmployeeId  => null;
+    Guid?  IAuditEvent.CorrelationId    => null;
+    string? IAuditEvent.Summary         => "Probation marked not applicable";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => new { Status = "NotApplicable", Reason };
+    object? IAuditEvent.Metadata        => null;
+}
+
 internal sealed record ProbationReviewCreatedAuditEvent(
     Guid CompanyId,
     Guid ProbationReviewId,

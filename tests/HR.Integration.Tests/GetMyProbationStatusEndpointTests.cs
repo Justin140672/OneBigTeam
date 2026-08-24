@@ -77,7 +77,7 @@ public class GetMyProbationStatusEndpointTests
             var db = scope.ServiceProvider.GetRequiredService<ProbationDbContext>();
             db.ProbationRecords.Add(ProbationRecord.Create(
                 Guid.NewGuid(), companyId, SelfUser, Guid.NewGuid(),
-                new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), "Self-service coverage.", Now));
+                new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), "Self-service coverage.", DateOnly.FromDateTime(Now.UtcDateTime), Now));
             await db.SaveChangesAsync();
         }
 
@@ -102,7 +102,7 @@ public class GetMyProbationStatusEndpointTests
             var db = scope.ServiceProvider.GetRequiredService<ProbationDbContext>();
             db.ProbationRecords.Add(ProbationRecord.Create(
                 Guid.NewGuid(), companyId, OtherUser, Guid.NewGuid(),
-                new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, Now));
+                new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(Now.UtcDateTime), Now));
             await db.SaveChangesAsync();
         }
 

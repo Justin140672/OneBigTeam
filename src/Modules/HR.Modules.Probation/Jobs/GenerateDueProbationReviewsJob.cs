@@ -26,6 +26,8 @@ internal sealed class GenerateDueProbationReviewsJob(
     {
         var now = clock.UtcNowOffset();
 
+        await ActivateDueNotStartedRecordsAsync(now);
+
         var activeRecords = await dbContext.ProbationRecords
             .Where(r => r.Status == ProbationStatus.Active || r.Status == ProbationStatus.ReviewDue)
             .ToListAsync();
@@ -189,6 +191,45 @@ internal sealed class GenerateDueProbationReviewsJob(
                 now,
                 cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// PROB-06: NotStarted records become Active as soon as this daily job runs on/after their
+    /// StartDate, so they are picked up by the Active/ReviewDue query immediately below in the
+    /// same pass — a future starter therefore never waits an extra day between "start date
+    /// reached" and "first review scheduling opportunity". See ProbationRecord.ActivateIfDue and
+    /// ProbationStatus.NotStarted for why this transition lives here rather than at read time.
+    /// </summary>
+    private async Task ActivateDueNotStartedRecordsAsync(DateTimeOffset now)
+    {
+        var notStartedRecords = await dbContext.ProbationRecords
+            .Where(r => r.Status == ProbationStatus.NotStarted)
+            .ToListAsync();
+
+        if (notStartedRecords.Count == 0)
+            return;
+
+        var todayByCompany = new Dictionary<Guid, DateOnly>();
+        var activatedAny = false;
+
+        foreach (var record in notStartedRecords)
+        {
+            if (!todayByCompany.TryGetValue(record.CompanyId, out var today))
+            {
+                var timeZoneId = await timeZoneReader.GetTimeZoneAsync(record.CompanyId, CancellationToken.None);
+                today = clock.TodayIn(timeZoneId);
+                todayByCompany[record.CompanyId] = today;
+            }
+
+            if (today < record.StartDate)
+                continue;
+
+            record.ActivateIfDue(today, now);
+            activatedAny = true;
+        }
+
+        if (activatedAny)
+            await dbContext.SaveChangesAsync();
     }
 
     private static string ReviewTypeLabel(ProbationReviewType reviewType) => reviewType switch

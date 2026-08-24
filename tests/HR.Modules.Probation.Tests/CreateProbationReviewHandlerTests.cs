@@ -20,7 +20,7 @@ public class CreateProbationReviewHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
@@ -56,7 +56,7 @@ public class CreateProbationReviewHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
@@ -101,7 +101,7 @@ public class CreateProbationReviewHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
@@ -128,7 +128,7 @@ public class CreateProbationReviewHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
@@ -163,7 +163,7 @@ public class CreateProbationReviewHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
@@ -198,7 +198,7 @@ public class CreateProbationReviewHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         context.ProbationRecords.Add(record);
 
         var existing = ProbationReview.Create(
@@ -231,7 +231,7 @@ public class CreateProbationReviewHandlerTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 

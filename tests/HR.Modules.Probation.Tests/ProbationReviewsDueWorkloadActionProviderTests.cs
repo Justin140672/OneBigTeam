@@ -34,7 +34,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
     {
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(),
-            new DateOnly(2026, 1, 1), new DateOnly(2026, 10, 1), null, DateTimeOffset.UtcNow);
+            new DateOnly(2026, 1, 1), new DateOnly(2026, 10, 1), null, DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime), DateTimeOffset.UtcNow);
         var review = ProbationReview.Create(
             Guid.NewGuid(), companyId, record.Id, ProbationReviewType.ManagerCheckIn, dueDate, DateTimeOffset.UtcNow);
 

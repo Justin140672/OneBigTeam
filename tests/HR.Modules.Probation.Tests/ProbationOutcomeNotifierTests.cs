@@ -62,7 +62,7 @@ public class ProbationOutcomeNotifierTests
         // rejects Passed->Passed, so the record must only transition once.
         var record = ProbationRecord.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            StartDate, ExpectedEndDate, null, SeedNow);
+            StartDate, ExpectedEndDate, null, DateOnly.FromDateTime(SeedNow.UtcDateTime), SeedNow);
         record.Pass(Guid.NewGuid(), ExpectedEndDate, sentinel, SeedNow);
 
         var review = ProbationReview.Create(
@@ -86,7 +86,7 @@ public class ProbationOutcomeNotifierTests
         // must reach its terminal Pass state via a single valid transition chain.
         var record = ProbationRecord.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            StartDate, ExpectedEndDate, null, SeedNow);
+            StartDate, ExpectedEndDate, null, DateOnly.FromDateTime(SeedNow.UtcDateTime), SeedNow);
         record.Extend(ExpectedEndDate.AddDays(30), sentinel, Guid.NewGuid(), ExpectedEndDate.AddDays(-1), SeedNow);
         record.Pass(Guid.NewGuid(), ExpectedEndDate.AddDays(30), null, SeedNow);
 
@@ -117,7 +117,7 @@ public class ProbationOutcomeNotifierTests
     {
         var record = ProbationRecord.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            StartDate, ExpectedEndDate, null, SeedNow);
+            StartDate, ExpectedEndDate, null, DateOnly.FromDateTime(SeedNow.UtcDateTime), SeedNow);
 
         if (outcome == ProbationOutcome.Pass)
             record.Pass(Guid.NewGuid(), ExpectedEndDate, null, SeedNow);

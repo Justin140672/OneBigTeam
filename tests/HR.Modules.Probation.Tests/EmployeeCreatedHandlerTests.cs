@@ -20,10 +20,10 @@ public class EmployeeCreatedHandlerTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var managerId = Guid.NewGuid();
-        var startDate = new DateOnly(2026, 7, 1);
-        var probationEndDate = new DateOnly(2027, 1, 1);
+        var startDate = new DateOnly(2026, 1, 1);
+        var probationEndDate = new DateOnly(2026, 7, 1);
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
 
         await handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(companyId, employeeId, startDate, managerId, probationEndDate),
@@ -47,7 +47,7 @@ public class EmployeeCreatedHandlerTests
         var startDate = new DateOnly(2026, 1, 1);
         var probationEndDate = new DateOnly(2026, 10, 15);
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
 
         await handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid(), startDate, Guid.NewGuid(), probationEndDate),
@@ -62,7 +62,7 @@ public class EmployeeCreatedHandlerTests
     {
         await using var context = BuildContext();
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
 
         await handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), ManagerId: null, new DateOnly(2027, 1, 1)),
@@ -80,7 +80,7 @@ public class EmployeeCreatedHandlerTests
         var startDate = new DateOnly(2026, 7, 1);
         var probationEndDate = new DateOnly(2027, 1, 1);
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
 
         await handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(companyId, Guid.NewGuid(), startDate, managerId, probationEndDate),
@@ -91,6 +91,102 @@ public class EmployeeCreatedHandlerTests
             CancellationToken.None);
 
         Assert.Equal(2, await context.ProbationRecords.CountAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Duplicate_Delivery_When_Record_Already_Exists_In_Any_Status_Is_A_NoOp()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var startDate = new DateOnly(2026, 1, 1);
+        var probationEndDate = new DateOnly(2026, 4, 1);
+        var now = Now;
+
+        var existing = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, employeeId, managerId,
+            startDate, probationEndDate, null, DateOnly.FromDateTime(now.UtcDateTime), now);
+        existing.Pass(managerId, probationEndDate, null, now);
+        context.ProbationRecords.Add(existing);
+        await context.SaveChangesAsync();
+
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+
+        var exception = await Record.ExceptionAsync(() => handler.HandleAsync(
+            new EmployeeCreatedIntegrationEvent(companyId, employeeId, startDate, managerId, probationEndDate),
+            CancellationToken.None));
+
+        Assert.Null(exception);
+        Assert.Equal(1, await context.ProbationRecords.CountAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_Future_StartDate_Creates_NotStarted_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var startDate = DateOnly.FromDateTime(FixedUtcNow).AddDays(10);
+        var probationEndDate = startDate.AddMonths(6);
+
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+
+        await handler.HandleAsync(
+            new EmployeeCreatedIntegrationEvent(companyId, employeeId, startDate, managerId, probationEndDate),
+            CancellationToken.None);
+
+        var record = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.NotStarted, record.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_No_Manager_And_Not_Imported_Creates_No_Record()
+    {
+        await using var context = BuildContext();
+
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+
+        await handler.HandleAsync(
+            new EmployeeCreatedIntegrationEvent(
+                Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), ManagerId: null, new DateOnly(2027, 1, 1),
+                IsImported: false),
+            CancellationToken.None);
+
+        Assert.Equal(0, await context.ProbationRecords.CountAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Imported_Employee_With_Manager_Creates_No_Record()
+    {
+        await using var context = BuildContext();
+
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+
+        await handler.HandleAsync(
+            new EmployeeCreatedIntegrationEvent(
+                Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), Guid.NewGuid(), new DateOnly(2027, 1, 1),
+                IsImported: true),
+            CancellationToken.None);
+
+        Assert.Equal(0, await context.ProbationRecords.CountAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Imported_Employee_Without_Manager_Creates_No_Record()
+    {
+        await using var context = BuildContext();
+
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+
+        await handler.HandleAsync(
+            new EmployeeCreatedIntegrationEvent(
+                Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), ManagerId: null, new DateOnly(2027, 1, 1),
+                IsImported: true),
+            CancellationToken.None);
+
+        Assert.Equal(0, await context.ProbationRecords.CountAsync());
     }
 
     private static ProbationDbContext BuildContext() =>

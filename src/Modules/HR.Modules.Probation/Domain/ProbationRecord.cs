@@ -11,12 +11,27 @@ internal sealed class ProbationRecord
     /// must call <see cref="AssertCanTransitionTo"/> before mutating <see cref="Status"/> so an
     /// invalid transition can never reach persistence, regardless of caller.
     /// </summary>
+    /// <summary>
+    /// PROB-06: added NotStarted and NotApplicable. NotStarted can move to Active (start date
+    /// reached — see <see cref="ActivateIfDue"/>) or straight to NotApplicable (an applicability
+    /// decision made before probation would otherwise have kicked in). Active can also move to
+    /// NotApplicable — an early opt-out decision made shortly after the record starts (e.g. a
+    /// role/employment-type correction discovered right after creation). ReviewDue/Extended
+    /// deliberately cannot move to NotApplicable: by that point real review activity has already
+    /// occurred, so "this never applied" is no longer a truthful decision — use Pass/Fail instead.
+    /// NotApplicable is terminal, same as Passed/Failed.
+    /// </summary>
     private static readonly IReadOnlyDictionary<ProbationStatus, ProbationStatus[]> AllowedTransitions =
         new Dictionary<ProbationStatus, ProbationStatus[]>
         {
+            [ProbationStatus.NotStarted] =
+            [
+                ProbationStatus.Active, ProbationStatus.NotApplicable
+            ],
             [ProbationStatus.Active] =
             [
-                ProbationStatus.ReviewDue, ProbationStatus.Extended, ProbationStatus.Passed, ProbationStatus.Failed
+                ProbationStatus.ReviewDue, ProbationStatus.Extended, ProbationStatus.Passed, ProbationStatus.Failed,
+                ProbationStatus.NotApplicable
             ],
             [ProbationStatus.ReviewDue] =
             [
@@ -27,7 +42,8 @@ internal sealed class ProbationRecord
                 ProbationStatus.ReviewDue, ProbationStatus.Extended, ProbationStatus.Passed, ProbationStatus.Failed
             ],
             [ProbationStatus.Passed] = [],
-            [ProbationStatus.Failed] = []
+            [ProbationStatus.Failed] = [],
+            [ProbationStatus.NotApplicable] = []
         };
 
     private ProbationRecord() { }
@@ -44,9 +60,17 @@ internal sealed class ProbationRecord
     public DateOnly? DecisionDate { get; private set; }
     public Guid? DecisionMakerEmployeeId { get; private set; }
     public string? OutcomeNotes { get; private set; }
+    public string? NotApplicableReason { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    /// <summary>
+    /// PROB-06: <paramref name="today"/> decides the initial status — NotStarted when the
+    /// employee's start date is still in the future, otherwise Active. Callers pass their own
+    /// "today" (rather than this method reading a clock itself) so it can be resolved in the
+    /// caller's own company time zone, consistent with how GenerateDueProbationReviewsJob resolves
+    /// "today" per company elsewhere in this module.
+    /// </summary>
     public static ProbationRecord Create(
         Guid id,
         Guid companyId,
@@ -55,6 +79,7 @@ internal sealed class ProbationRecord
         DateOnly startDate,
         DateOnly expectedEndDate,
         string? notes,
+        DateOnly today,
         DateTimeOffset now)
     {
         return new ProbationRecord
@@ -65,11 +90,78 @@ internal sealed class ProbationRecord
             ManagerEmployeeId = managerEmployeeId,
             StartDate = startDate,
             ExpectedEndDate = expectedEndDate,
-            Status = ProbationStatus.Active,
+            Status = today < startDate ? ProbationStatus.NotStarted : ProbationStatus.Active,
             Notes = notes,
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    /// <summary>
+    /// PROB-06: creates a record that represents an explicit "probation does not apply" decision
+    /// made before any in-flight record existed for this employee (e.g. HR marking the employee
+    /// not applicable while probation creation was still deferred for lack of a manager/period).
+    /// ManagerEmployeeId/ExpectedEndDate are still required non-null fields on this entity, so
+    /// callers supply nominal values (typically the employee's current manager, if any, and the
+    /// start date itself as a placeholder end date) — they carry no workflow meaning for a record
+    /// that will never run reviews.
+    /// </summary>
+    public static ProbationRecord CreateNotApplicable(
+        Guid id,
+        Guid companyId,
+        Guid employeeId,
+        Guid managerEmployeeId,
+        DateOnly startDate,
+        DateOnly expectedEndDate,
+        string? reason,
+        DateTimeOffset now)
+    {
+        return new ProbationRecord
+        {
+            Id = id,
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            ManagerEmployeeId = managerEmployeeId,
+            StartDate = startDate,
+            ExpectedEndDate = expectedEndDate,
+            Status = ProbationStatus.NotApplicable,
+            NotApplicableReason = reason,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
+    /// <summary>
+    /// PROB-06: called from GenerateDueProbationReviewsJob's daily pass. A NotStarted record is
+    /// left untouched until its StartDate is reached, then flips to Active the next time the job
+    /// runs — a lightweight, at-most-24h-lag transition rather than a persisted status computed
+    /// eagerly at every read. Chosen over a purely derived (never-persisted) status because a
+    /// stored column is simpler to query/index/report on (consistent with this session's general
+    /// preference for persisted columns over computed properties) and the daily job already exists
+    /// as the natural place to reconcile date-driven state — no new job/schedule was introduced for
+    /// this. No-op if not currently NotStarted or if the start date has not yet been reached.
+    /// </summary>
+    public void ActivateIfDue(DateOnly today, DateTimeOffset now)
+    {
+        if (Status != ProbationStatus.NotStarted || today < StartDate)
+            return;
+
+        AssertCanTransitionTo(ProbationStatus.Active);
+        Status = ProbationStatus.Active;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// PROB-06: records an explicit "probation does not apply" decision against an existing
+    /// NotStarted or Active record. See <see cref="AllowedTransitions"/> for why ReviewDue/Extended
+    /// records cannot take this path.
+    /// </summary>
+    public void MarkNotApplicable(string? reason, DateTimeOffset now)
+    {
+        AssertCanTransitionTo(ProbationStatus.NotApplicable);
+        Status = ProbationStatus.NotApplicable;
+        NotApplicableReason = reason;
+        UpdatedAt = now;
     }
 
     /// <summary>
@@ -91,7 +183,7 @@ internal sealed class ProbationRecord
         string? notes,
         DateTimeOffset now)
     {
-        if (Status is ProbationStatus.Passed or ProbationStatus.Failed)
+        if (Status is ProbationStatus.Passed or ProbationStatus.Failed or ProbationStatus.NotApplicable)
             throw new InvalidOperationException(
                 $"Cannot edit a probation record that has already reached the terminal status '{Status}'.");
 

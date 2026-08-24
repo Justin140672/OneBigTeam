@@ -34,10 +34,10 @@ public class ProbationSummaryReaderTests
 
         var older = ProbationRecord.Create(
             Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(),
-            new DateOnly(2025, 1, 1), new DateOnly(2025, 4, 1), "older", Now.AddMonths(-6));
+            new DateOnly(2025, 1, 1), new DateOnly(2025, 4, 1), "older", DateOnly.FromDateTime(Now.AddMonths(-6).UtcDateTime), Now.AddMonths(-6));
         var newer = ProbationRecord.Create(
             Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(),
-            new DateOnly(2026, 1, 1), new DateOnly(2026, 4, 1), "newer", Now);
+            new DateOnly(2026, 1, 1), new DateOnly(2026, 4, 1), "newer", DateOnly.FromDateTime(Now.UtcDateTime), Now);
 
         db.ProbationRecords.AddRange(older, newer);
         await db.SaveChangesAsync();
@@ -57,7 +57,7 @@ public class ProbationSummaryReaderTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), Guid.NewGuid(), employeeId, Guid.NewGuid(),
-            new DateOnly(2026, 1, 1), new DateOnly(2026, 4, 1), null, Now);
+            new DateOnly(2026, 1, 1), new DateOnly(2026, 4, 1), null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         db.ProbationRecords.Add(record);
         await db.SaveChangesAsync();
 
@@ -79,7 +79,7 @@ public class ProbationSummaryReaderTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(),
-            startDate, expectedEndDate, "notes", Now);
+            startDate, expectedEndDate, "notes", DateOnly.FromDateTime(Now.UtcDateTime), Now);
         record.Pass(Guid.NewGuid(), decisionDate, "Passed probation", Now);
         db.ProbationRecords.Add(record);
         await db.SaveChangesAsync();
@@ -103,7 +103,7 @@ public class ProbationSummaryReaderTests
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(),
-            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, Now);
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
         db.ProbationRecords.Add(record);
         await db.SaveChangesAsync();
 
