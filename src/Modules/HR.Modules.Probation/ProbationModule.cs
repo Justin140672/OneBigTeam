@@ -70,6 +70,7 @@ public static class ProbationModule
         services.AddScoped<GenerateDueProbationReviewsJob>();
         services.AddScoped<IProbationHistoryReplayer, ProbationHistoryReplayer>();
         services.AddScoped<IProbationReportReader, ProbationReportReader>();
+        services.AddScoped<Services.ProbationResourceAuthorizer>();
     }
 
     public static WebApplication UseProbationRecurringJobs(this WebApplication app)

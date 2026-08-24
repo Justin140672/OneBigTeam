@@ -14,8 +14,15 @@ internal sealed class GetUpcomingProbationReviewsHandler(
 {
     public async Task<Result<GetUpcomingProbationReviewsResponse>> HandleAsync(
         GetUpcomingProbationReviewsRequest request,
+        IReadOnlySet<Guid>? authorizedEmployeeIds,
         CancellationToken cancellationToken)
     {
+        // authorizedEmployeeIds is null for HR Administrators (company-wide, unrestricted). For
+        // managers it is their full reporting hierarchy — resolved server-side by the endpoint
+        // via ProbationResourceAuthorizer, never trusted from the client (PROB-02).
+        if (authorizedEmployeeIds is not null && authorizedEmployeeIds.Count == 0)
+            return Result.Success(new GetUpcomingProbationReviewsResponse([]));
+
         var today   = DateOnly.FromDateTime(clock.UtcNowOffset().DateTime);
         var cutoff  = today.AddDays(30);
 
@@ -26,6 +33,7 @@ internal sealed class GetUpcomingProbationReviewsHandler(
             where review.CompanyId == request.CompanyId
                && review.Status    == ProbationReviewStatus.Pending
                && review.DueDate   <= cutoff
+               && (authorizedEmployeeIds == null || authorizedEmployeeIds.Contains(record.EmployeeId))
             orderby review.DueDate
             select new
             {

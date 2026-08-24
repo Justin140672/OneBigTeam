@@ -20,7 +20,7 @@ public class GetUpcomingProbationReviewsHandlerTests
         var companyId = Guid.NewGuid();
 
         var result = await BuildHandler(context).HandleAsync(
-            new GetUpcomingProbationReviewsRequest(companyId), CancellationToken.None);
+            new GetUpcomingProbationReviewsRequest(companyId), authorizedEmployeeIds: null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Items);
@@ -39,7 +39,7 @@ public class GetUpcomingProbationReviewsHandlerTests
         await context.SaveChangesAsync();
 
         var result = await BuildHandler(context).HandleAsync(
-            new GetUpcomingProbationReviewsRequest(companyId), CancellationToken.None);
+            new GetUpcomingProbationReviewsRequest(companyId), authorizedEmployeeIds: null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Single(result.Value!.Items);
@@ -59,7 +59,7 @@ public class GetUpcomingProbationReviewsHandlerTests
         await context.SaveChangesAsync();
 
         var result = await BuildHandler(context).HandleAsync(
-            new GetUpcomingProbationReviewsRequest(companyId), CancellationToken.None);
+            new GetUpcomingProbationReviewsRequest(companyId), authorizedEmployeeIds: null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Items);
@@ -78,7 +78,7 @@ public class GetUpcomingProbationReviewsHandlerTests
         await context.SaveChangesAsync();
 
         var result = await BuildHandler(context).HandleAsync(
-            new GetUpcomingProbationReviewsRequest(companyId), CancellationToken.None);
+            new GetUpcomingProbationReviewsRequest(companyId), authorizedEmployeeIds: null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Single(result.Value!.Items);
@@ -99,7 +99,7 @@ public class GetUpcomingProbationReviewsHandlerTests
         await context.SaveChangesAsync();
 
         var result = await BuildHandler(context).HandleAsync(
-            new GetUpcomingProbationReviewsRequest(companyId), CancellationToken.None);
+            new GetUpcomingProbationReviewsRequest(companyId), authorizedEmployeeIds: null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Items);
@@ -118,7 +118,7 @@ public class GetUpcomingProbationReviewsHandlerTests
         await context.SaveChangesAsync();
 
         var result = await BuildHandler(context).HandleAsync(
-            new GetUpcomingProbationReviewsRequest(companyId), CancellationToken.None);
+            new GetUpcomingProbationReviewsRequest(companyId), authorizedEmployeeIds: null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -140,7 +140,7 @@ public class GetUpcomingProbationReviewsHandlerTests
         await context.SaveChangesAsync();
 
         var result = await BuildHandler(context).HandleAsync(
-            new GetUpcomingProbationReviewsRequest(companyId), CancellationToken.None);
+            new GetUpcomingProbationReviewsRequest(companyId), authorizedEmployeeIds: null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var items = result.Value!.Items;
@@ -165,11 +165,78 @@ public class GetUpcomingProbationReviewsHandlerTests
         await context.SaveChangesAsync();
 
         var result = await BuildHandler(context).HandleAsync(
-            new GetUpcomingProbationReviewsRequest(company1Id), CancellationToken.None);
+            new GetUpcomingProbationReviewsRequest(company1Id), authorizedEmployeeIds: null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Single(result.Value!.Items);
         Assert.All(result.Value.Items, item => Assert.Equal(company1Id, item.ReviewId != Guid.Empty ? company1Id : Guid.Empty));
+    }
+
+    // ── PROB-02: authorizedEmployeeIds filtering ────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Null_AuthorizedEmployeeIds_Returns_All_Matching_Reviews()
+    {
+        // null == HR Administrator (unrestricted/company-wide).
+        await using var context = BuildContext();
+        var (companyId, employeeId) = (Guid.NewGuid(), Guid.NewGuid());
+        var record = SeedRecord(context, companyId, employeeId);
+        context.ProbationReviews.Add(ProbationReview.Create(
+            Guid.NewGuid(), companyId, record.Id,
+            ProbationReviewType.ManagerCheckIn, Today.AddDays(5), Now));
+        await context.SaveChangesAsync();
+
+        var result = await BuildHandler(context).HandleAsync(
+            new GetUpcomingProbationReviewsRequest(companyId), authorizedEmployeeIds: null, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value!.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Restricted_Set_Only_Returns_Reviews_For_Employees_In_Set()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var inScopeEmployeeId = Guid.NewGuid();
+        var outOfScopeEmployeeId = Guid.NewGuid();
+        var inScopeRecord = SeedRecord(context, companyId, inScopeEmployeeId);
+        var outOfScopeRecord = SeedRecord(context, companyId, outOfScopeEmployeeId);
+
+        context.ProbationReviews.AddRange(
+            ProbationReview.Create(Guid.NewGuid(), companyId, inScopeRecord.Id, ProbationReviewType.ManagerCheckIn, Today.AddDays(5), Now),
+            ProbationReview.Create(Guid.NewGuid(), companyId, outOfScopeRecord.Id, ProbationReviewType.ManagerCheckIn, Today.AddDays(5), Now));
+        await context.SaveChangesAsync();
+
+        var authorizedEmployeeIds = new HashSet<Guid> { inScopeEmployeeId };
+        var result = await BuildHandler(context).HandleAsync(
+            new GetUpcomingProbationReviewsRequest(companyId), authorizedEmployeeIds, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal(inScopeEmployeeId, item.EmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Empty_AuthorizedEmployeeIds_Returns_Empty_Without_Querying()
+    {
+        // A manager with zero reports must get an empty response, not an unrestricted one —
+        // an empty (non-null) set must never be treated the same as "no restriction".
+        await using var context = BuildContext();
+        var (companyId, employeeId) = (Guid.NewGuid(), Guid.NewGuid());
+        var record = SeedRecord(context, companyId, employeeId);
+        context.ProbationReviews.Add(ProbationReview.Create(
+            Guid.NewGuid(), companyId, record.Id,
+            ProbationReviewType.ManagerCheckIn, Today.AddDays(5), Now));
+        await context.SaveChangesAsync();
+
+        var result = await BuildHandler(context).HandleAsync(
+            new GetUpcomingProbationReviewsRequest(companyId),
+            authorizedEmployeeIds: new HashSet<Guid>(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Items);
     }
 
     private static ProbationRecord SeedRecord(ProbationDbContext context, Guid companyId, Guid employeeId)
