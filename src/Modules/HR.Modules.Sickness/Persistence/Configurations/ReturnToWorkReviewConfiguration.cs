@@ -40,6 +40,22 @@ internal sealed class ReturnToWorkReviewConfiguration : IEntityTypeConfiguration
             .HasColumnName("notes")
             .HasMaxLength(2000);
 
+        // SICK-03: structured fit-to-return outcome. Nullable — unset until the review is
+        // completed; completion is blocked without a value at the validator level.
+        builder.Property(r => r.Outcome)
+            .HasColumnName("fit_to_return_outcome")
+            .HasMaxLength(30)
+            .HasConversion<string>();
+
+        builder.Property(r => r.AdjustmentsRequired)
+            .HasColumnName("adjustments_required")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(r => r.AdjustmentDetails)
+            .HasColumnName("adjustment_details")
+            .HasMaxLength(2000);
+
         builder.Property(r => r.Status)
             .HasColumnName("status")
             .HasMaxLength(20)

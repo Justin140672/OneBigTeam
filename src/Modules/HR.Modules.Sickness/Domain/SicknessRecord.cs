@@ -73,6 +73,30 @@ internal sealed class SicknessRecord
         UpdatedAt = now;
     }
 
+    /// <summary>
+    /// SICK-03 design decision: a return-to-work review completed with
+    /// <see cref="FitToReturnOutcome.NotFit"/> means the employee remains unfit for work, so the
+    /// sickness record must not stay Closed. Rather than requiring HR to raise a brand-new
+    /// record for what is clinically the same ongoing absence episode (which would fragment
+    /// fit-note-threshold and reporting calculations across multiple records), this reopens the
+    /// existing record as Active. EndDate/EndDayPart/ReturnToWorkDate/TotalDays are cleared
+    /// because the actual return date is now unknown; a future close (once the employee is
+    /// actually fit) will set them again via the normal CloseSicknessRecord flow, which may in
+    /// turn raise another return-to-work review.
+    /// </summary>
+    public void ReopenFollowingUnfitReview(DateTimeOffset now)
+    {
+        if (Status == SicknessStatus.Active)
+            return; // already open — defensive no-op, keeps this safe to call idempotently.
+
+        Status = SicknessStatus.Active;
+        EndDate = null;
+        EndDayPart = null;
+        ReturnToWorkDate = null;
+        TotalDays = null;
+        UpdatedAt = now;
+    }
+
     public void ReceiveEvidence(DateTimeOffset now)
     {
         EvidenceStatus = SicknessEvidenceStatus.Received;

@@ -51,7 +51,7 @@ public class ReturnToWorkReminderJobTests
         }
         else if (status == ReturnToWorkReviewStatus.Completed)
         {
-            review.Complete(Guid.NewGuid(), null, Now);
+            review.Complete(Guid.NewGuid(), FitToReturnOutcome.Fit, false, null, null, Now);
         }
         else if (status == ReturnToWorkReviewStatus.Cancelled)
         {

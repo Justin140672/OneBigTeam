@@ -117,6 +117,9 @@ internal sealed record ReturnToWorkReviewCompletedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
     Guid ReviewedBy,
+    string Outcome,
+    bool AdjustmentsRequired,
+    string? AdjustmentDetails,
     string? Notes,
     DateTimeOffset CompletedAt,
     DateTimeOffset OccurredAt) : IAuditEvent
@@ -130,7 +133,33 @@ internal sealed record ReturnToWorkReviewCompletedAuditEvent(
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Return-to-work review completed";
     object? IAuditEvent.Before => null;
-    object? IAuditEvent.After => new { SicknessRecordId, CompletedAt, Notes };
+    object? IAuditEvent.After => new { SicknessRecordId, CompletedAt, Outcome, AdjustmentsRequired, AdjustmentDetails, Notes };
+    object? IAuditEvent.Metadata => null;
+}
+
+/// <summary>
+/// SICK-03: raised when a "Not Fit" return-to-work review outcome reopens a previously closed
+/// sickness record (see SicknessRecord.ReopenFollowingUnfitReview). Kept distinct from
+/// ReturnToWorkReviewCompletedAuditEvent so audit consumers can filter on the record-level state
+/// change independently of the review-level completion.
+/// </summary>
+internal sealed record SicknessRecordReopenedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid SicknessRecordId,
+    Guid ReviewId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "sickness.record_reopened";
+    string IAuditEvent.EntityType => "SicknessRecord";
+    Guid IAuditEvent.EntityId => SicknessRecordId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Sickness record reopened following a not-fit return-to-work review";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { ReviewId };
     object? IAuditEvent.Metadata => null;
 }
 

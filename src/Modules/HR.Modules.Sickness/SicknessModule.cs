@@ -2,6 +2,7 @@ using HR.Modules.Tasks.Contracts;
 using Hangfire;
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Features.CloseSicknessRecord;
+using HR.Modules.Sickness.Features.CompleteReturnToWorkReview;
 using HR.Modules.Sickness.Features.CompleteReturnToWorkReviewFromTask;
 using HR.Modules.Sickness.Features.FulfilEvidenceRequest;
 using HR.Modules.Sickness.Features.CreateSicknessCategory;
@@ -63,6 +64,7 @@ public static class SicknessModule
         services.AddScoped<GetOverdueReturnToWorkReviewsHandler>();
         services.AddScoped<GetMissingFitNotesHandler>();
         services.AddScoped<GetReturnToWorkReviewHandler>();
+        services.AddScoped<CompleteReturnToWorkReviewHandler>();
         services.AddScoped<GetMySicknessRecordsHandler>();
         services.AddScoped<Services.FitNoteEvidenceRequestService>();
         services.AddScoped<FitNoteRequestJob>();

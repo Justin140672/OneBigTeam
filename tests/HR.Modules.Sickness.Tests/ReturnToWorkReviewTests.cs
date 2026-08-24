@@ -47,13 +47,22 @@ public class ReturnToWorkReviewTests
         var review = CreateDefault();
         var completedAt = Now.AddDays(1);
 
-        review.Complete(ReviewedBy, "Employee confirmed fit to return.", completedAt);
+        review.Complete(
+            ReviewedBy,
+            FitToReturnOutcome.Fit,
+            adjustmentsRequired: false,
+            adjustmentDetails: null,
+            notes: "Employee confirmed fit to return.",
+            now: completedAt);
 
         Assert.Equal(ReturnToWorkReviewStatus.Completed, review.Status);
         Assert.Equal(ReviewedBy, review.ReviewedBy);
         Assert.Equal("Employee confirmed fit to return.", review.Notes);
         Assert.Equal(completedAt, review.CompletedAt);
         Assert.Equal(completedAt, review.UpdatedAt);
+        Assert.Equal(FitToReturnOutcome.Fit, review.Outcome);
+        Assert.False(review.AdjustmentsRequired);
+        Assert.Null(review.AdjustmentDetails);
     }
 
     [Fact]
@@ -61,9 +70,68 @@ public class ReturnToWorkReviewTests
     {
         var review = CreateDefault();
 
-        review.Complete(ReviewedBy, null, Now.AddDays(1));
+        review.Complete(
+            ReviewedBy,
+            FitToReturnOutcome.Fit,
+            adjustmentsRequired: false,
+            adjustmentDetails: null,
+            notes: null,
+            now: Now.AddDays(1));
 
         Assert.Null(review.Notes);
+    }
+
+    [Fact]
+    public void Complete_WithAdjustmentsRequired_SetsOutcomeAdjustmentsAndDetails()
+    {
+        var review = CreateDefault();
+        var completedAt = Now.AddDays(1);
+
+        review.Complete(
+            ReviewedBy,
+            FitToReturnOutcome.FitWithAdjustments,
+            adjustmentsRequired: true,
+            adjustmentDetails: "Phased return, reduced hours for two weeks.",
+            notes: null,
+            now: completedAt);
+
+        Assert.Equal(FitToReturnOutcome.FitWithAdjustments, review.Outcome);
+        Assert.True(review.AdjustmentsRequired);
+        Assert.Equal("Phased return, reduced hours for two weeks.", review.AdjustmentDetails);
+    }
+
+    [Fact]
+    public void Complete_WhenAlreadyCompleted_IsIdempotent_LeavesAllFieldsUnchanged()
+    {
+        var review = CreateDefault();
+        var firstCompletedAt = Now.AddDays(1);
+
+        review.Complete(
+            ReviewedBy,
+            FitToReturnOutcome.Fit,
+            adjustmentsRequired: false,
+            adjustmentDetails: null,
+            notes: "Original notes",
+            now: firstCompletedAt);
+
+        var differentReviewer = Guid.NewGuid();
+        review.Complete(
+            differentReviewer,
+            FitToReturnOutcome.NotFit,
+            adjustmentsRequired: true,
+            adjustmentDetails: "Should not be applied",
+            notes: "Should not be applied",
+            now: firstCompletedAt.AddDays(5));
+
+        Assert.Equal(ReturnToWorkReviewStatus.Completed, review.Status);
+        Assert.Equal(ReviewedBy, review.ReviewedBy);
+        Assert.NotEqual(differentReviewer, review.ReviewedBy);
+        Assert.Equal(FitToReturnOutcome.Fit, review.Outcome);
+        Assert.False(review.AdjustmentsRequired);
+        Assert.Null(review.AdjustmentDetails);
+        Assert.Equal("Original notes", review.Notes);
+        Assert.Equal(firstCompletedAt, review.CompletedAt);
+        Assert.Equal(firstCompletedAt, review.UpdatedAt);
     }
 
     [Fact]

@@ -126,7 +126,7 @@ public class GetOverdueReturnToWorkReviewsHandlerTests
         var companyId = Guid.NewGuid();
 
         var review = ReturnToWorkReview.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), DueDate, Now);
-        review.Complete(Guid.NewGuid(), null, Now);
+        review.Complete(Guid.NewGuid(), FitToReturnOutcome.Fit, false, null, null, Now);
         db.ReturnToWorkReviews.Add(review);
         await db.SaveChangesAsync();
 

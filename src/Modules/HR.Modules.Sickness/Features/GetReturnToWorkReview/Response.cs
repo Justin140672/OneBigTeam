@@ -8,4 +8,7 @@ internal sealed record GetReturnToWorkReviewResponse(
     DateOnly DueDate,
     string Status,
     DateTimeOffset? CompletedAt,
-    string? Notes);
+    string? Notes,
+    string? Outcome,
+    bool AdjustmentsRequired,
+    string? AdjustmentDetails);

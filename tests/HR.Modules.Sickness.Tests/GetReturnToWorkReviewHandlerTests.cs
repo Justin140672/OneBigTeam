@@ -82,7 +82,7 @@ public class GetReturnToWorkReviewHandlerTests
         var recordId = Guid.NewGuid();
 
         var review = ReturnToWorkReview.Create(Guid.NewGuid(), companyId, recordId, employeeId, DueDate, Now);
-        review.Complete(Guid.NewGuid(), "Sensitive medical detail", Now);
+        review.Complete(Guid.NewGuid(), FitToReturnOutcome.Fit, false, null, "Sensitive medical detail", Now);
         db.ReturnToWorkReviews.Add(review);
         await db.SaveChangesAsync();
 
@@ -105,7 +105,7 @@ public class GetReturnToWorkReviewHandlerTests
         var recordId = Guid.NewGuid();
 
         var review = ReturnToWorkReview.Create(Guid.NewGuid(), companyId, recordId, employeeId, DueDate, Now);
-        review.Complete(Guid.NewGuid(), "Sensitive medical detail", Now);
+        review.Complete(Guid.NewGuid(), FitToReturnOutcome.Fit, false, null, "Sensitive medical detail", Now);
         db.ReturnToWorkReviews.Add(review);
         await db.SaveChangesAsync();
 

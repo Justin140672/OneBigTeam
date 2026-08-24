@@ -2,14 +2,17 @@ using HR.Modules.Tasks.Contracts;
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Features.CompleteReturnToWorkReviewFromTask;
 using HR.Modules.Sickness.Persistence;
-using HR.Modules.Sickness.Tests.Infrastructure;
-using HR.SharedKernel;
-using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
-using HR.Modules.Sickness;
 
 namespace HR.Modules.Sickness.Tests;
 
+/// <summary>
+/// SICK-03: CompleteReturnToWorkReviewFromTaskAction no longer completes reviews at all — the
+/// generic Tasks-module task-completion callback has no structured fit-to-return outcome to
+/// supply, and completing a review without an outcome is disallowed. This action is now a
+/// defensive no-op on every path; the review is only ever completed via the dedicated
+/// Features/CompleteReturnToWorkReview endpoint.
+/// </summary>
 public class CompleteReturnToWorkReviewFromTaskActionTests
 {
     private static readonly DateTime NowUtc = new(2026, 7, 2, 9, 0, 0, DateTimeKind.Utc);
@@ -31,7 +34,7 @@ public class CompleteReturnToWorkReviewFromTaskActionTests
             new DateOnly(2026, 7, 9), Now);
 
         if (completed)
-            review.Complete(Guid.NewGuid(), "Already reviewed", Now);
+            review.Complete(Guid.NewGuid(), FitToReturnOutcome.Fit, false, null, "Already reviewed", Now);
 
         db.ReturnToWorkReviews.Add(review);
         await db.SaveChangesAsync();
@@ -39,11 +42,7 @@ public class CompleteReturnToWorkReviewFromTaskActionTests
         return review;
     }
 
-    private static CompleteReturnToWorkReviewFromTaskAction BuildAction(
-        SicknessDbContext db,
-        DateTime? nowUtc = null,
-        FakeAuditEventPublisher? auditPublisher = null) =>
-        new(db, new FakeClock(nowUtc ?? NowUtc), auditPublisher ?? new FakeAuditEventPublisher());
+    private static CompleteReturnToWorkReviewFromTaskAction BuildAction(SicknessDbContext db) => new(db);
 
     private static TaskCompletionContext BuildCompletionContext(
         Guid companyId, Guid? sourceEntityId, Guid completedBy, string? notes = null) =>
@@ -52,7 +51,7 @@ public class CompleteReturnToWorkReviewFromTaskActionTests
             EmployeeId, completedBy, Now, sourceEntityId, null, notes);
 
     [Fact]
-    public async Task ExecuteAsync_CompletesPendingReview_SetsNotesReviewedByAndCompletedAt()
+    public async Task ExecuteAsync_PendingReview_IsNoOp_ReviewStaysPending()
     {
         var db = BuildDbContext();
         var review = await SeedReview(db);
@@ -64,20 +63,21 @@ public class CompleteReturnToWorkReviewFromTaskActionTests
             CancellationToken.None);
 
         var updated = await db.ReturnToWorkReviews.FindAsync(review.Id);
-        Assert.Equal(ReturnToWorkReviewStatus.Completed, updated!.Status);
-        Assert.Equal(completedBy, updated.ReviewedBy);
-        Assert.Equal("Fit to return", updated.Notes);
-        Assert.Equal(Now, updated.CompletedAt);
+        Assert.Equal(ReturnToWorkReviewStatus.Pending, updated!.Status);
+        Assert.Null(updated.ReviewedBy);
+        Assert.Null(updated.Notes);
+        Assert.Null(updated.CompletedAt);
+        Assert.Null(updated.Outcome);
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenAlreadyCompleted_DoesNotChangeReview()
+    public async Task ExecuteAsync_WhenAlreadyCompleted_IsNoOp_DoesNotChangeReview()
     {
         var db = BuildDbContext();
         var review = await SeedReview(db, completed: true);
         var originalReviewedBy = review.ReviewedBy;
         var originalNotes = review.Notes;
-        var action = BuildAction(db, NowUtc.AddHours(1));
+        var action = BuildAction(db);
 
         await action.ExecuteAsync(
             BuildCompletionContext(CompanyId, review.Id, Guid.NewGuid(), "New notes"),
@@ -126,57 +126,4 @@ public class CompleteReturnToWorkReviewFromTaskActionTests
     [Fact]
     public void ActionType_ReturnsReview() =>
         Assert.Equal(TaskActionType.Review, BuildAction(BuildDbContext()).ActionType);
-
-    [Fact]
-    public async Task ExecuteAsync_PublishesAuditEvent_OnSuccessfulCompletion()
-    {
-        var db = BuildDbContext();
-        var review = await SeedReview(db);
-        var auditPublisher = new FakeAuditEventPublisher();
-        var action = BuildAction(db, auditPublisher: auditPublisher);
-        var completedBy = Guid.NewGuid();
-
-        await action.ExecuteAsync(
-            BuildCompletionContext(CompanyId, review.Id, completedBy, "Fit to return"),
-            CancellationToken.None);
-
-        var auditEvents = auditPublisher.PublishedEvents.OfType<ReturnToWorkReviewCompletedAuditEvent>().ToList();
-        Assert.Single(auditEvents);
-        var evt = auditEvents[0];
-        Assert.Equal(review.Id, evt.ReviewId);
-        Assert.Equal(review.SicknessRecordId, evt.SicknessRecordId);
-        Assert.Equal(CompanyId, evt.CompanyId);
-        Assert.Equal(EmployeeId, evt.EmployeeId);
-        Assert.Equal(completedBy, evt.ReviewedBy);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_DoesNotPublishAuditEvent_WhenAlreadyCompleted()
-    {
-        var db = BuildDbContext();
-        var review = await SeedReview(db, completed: true);
-        var auditPublisher = new FakeAuditEventPublisher();
-        var action = BuildAction(db, auditPublisher: auditPublisher);
-
-        await action.ExecuteAsync(
-            BuildCompletionContext(CompanyId, review.Id, Guid.NewGuid()),
-            CancellationToken.None);
-
-        Assert.Empty(auditPublisher.PublishedEvents.OfType<ReturnToWorkReviewCompletedAuditEvent>());
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_DoesNotPublishAuditEvent_WhenSourceEntityIdIsNull()
-    {
-        var db = BuildDbContext();
-        await SeedReview(db);
-        var auditPublisher = new FakeAuditEventPublisher();
-        var action = BuildAction(db, auditPublisher: auditPublisher);
-
-        await action.ExecuteAsync(
-            BuildCompletionContext(CompanyId, sourceEntityId: null, Guid.NewGuid()),
-            CancellationToken.None);
-
-        Assert.Empty(auditPublisher.PublishedEvents.OfType<ReturnToWorkReviewCompletedAuditEvent>());
-    }
 }

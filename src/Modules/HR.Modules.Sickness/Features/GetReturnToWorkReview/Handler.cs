@@ -41,6 +41,12 @@ internal sealed class GetReturnToWorkReviewHandler(
         // see the full record; managers get a trimmed view that omits Notes, per SICK-02 ("avoid
         // returning category, notes or evidence information where a limited manager view does
         // not require it").
+        //
+        // SICK-03: AdjustmentsRequired/AdjustmentDetails are NOT trimmed for managers — unlike
+        // free-text Notes, adjustment details describe what the manager themselves needs to put
+        // in place for the employee's return (e.g. phased hours, altered duties), so a manager
+        // acting on the review needs to see them regardless of HR Administrator status. Outcome
+        // is likewise visible to both — it's the headline decision the review exists to record.
         return Result.Success(new GetReturnToWorkReviewResponse(
             review.Id,
             review.CompanyId,
@@ -49,6 +55,9 @@ internal sealed class GetReturnToWorkReviewHandler(
             review.DueDate,
             review.Status.ToString(),
             review.CompletedAt,
-            isHrAdministrator ? review.Notes : null));
+            isHrAdministrator ? review.Notes : null,
+            review.Outcome?.ToString(),
+            review.AdjustmentsRequired,
+            review.AdjustmentDetails));
     }
 }
