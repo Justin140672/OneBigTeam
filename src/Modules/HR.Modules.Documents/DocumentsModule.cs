@@ -278,6 +278,7 @@ public static class DocumentsModule
 
         services.AddScoped<SharedCompanyDocumentAcknowledgementReminderJob>();
         services.AddScoped<DetectDocumentsDueForReviewJob>();
+        services.AddScoped<DocumentExpiryReminderJob>();
         services.AddHttpClient();
         services.AddScoped<ScanUploadedFileJob>();
 
@@ -302,6 +303,13 @@ public static class DocumentsModule
             "detect-documents-due-for-review",
             job => job.ExecuteAsync(),
             Cron.Daily(10));
+        // DOC-03: automatic daily processing of the 90/30/7-day-before-expiry reminder schedule
+        // and the overdue/expired notification for every company, replacing reliance on an HR
+        // user or external caller manually invoking the /expiry-notifications endpoint.
+        jobManager.AddOrUpdate<DocumentExpiryReminderJob>(
+            "document-expiry-reminders",
+            job => job.ExecuteAsync(),
+            Cron.Daily(11));
         return app;
     }
 

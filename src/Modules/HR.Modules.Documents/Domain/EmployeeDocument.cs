@@ -14,6 +14,14 @@ internal sealed class EmployeeDocument
     public DateTimeOffset? AcknowledgedAt { get; private set; }
     public DateTimeOffset? ExpiringSoonNotifiedAt { get; private set; }
     public DateTimeOffset? ExpiredNotifiedAt { get; private set; }
+
+    // DOC-03: three independent, one-shot reminder stages fired as the expiry date approaches.
+    // Each is set once (when the corresponding day-threshold is first crossed by the daily job)
+    // and never re-set unless UpdateExpiryDate restarts the schedule against a new expiry date.
+    public DateTimeOffset? ExpiryReminder90SentAt { get; private set; }
+    public DateTimeOffset? ExpiryReminder30SentAt { get; private set; }
+    public DateTimeOffset? ExpiryReminder7SentAt { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -63,4 +71,57 @@ internal sealed class EmployeeDocument
         ExpiredNotifiedAt = now;
         UpdatedAt         = now;
     }
+
+    /// <summary>
+    /// DOC-03: marks the given upcoming-expiry reminder stage as sent. Each stage is independent
+    /// and idempotent — calling this again for a stage that has already fired is a safe no-op at
+    /// the call site (callers should check the corresponding *SentAt property first), and the
+    /// value is never overwritten once set except via <see cref="UpdateExpiryDate"/>.
+    /// </summary>
+    public void MarkExpiryReminderSent(ExpiryReminderStage stage, DateTimeOffset now)
+    {
+        switch (stage)
+        {
+            case ExpiryReminderStage.NinetyDays:
+                ExpiryReminder90SentAt = now;
+                break;
+            case ExpiryReminderStage.ThirtyDays:
+                ExpiryReminder30SentAt = now;
+                break;
+            case ExpiryReminderStage.SevenDays:
+                ExpiryReminder7SentAt = now;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(stage), stage, null);
+        }
+
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// DOC-03: updates the tracked expiry date and resets all reminder state (the three upcoming
+    /// -expiry stages plus the legacy expiring-soon/expired flags) so the notification schedule
+    /// restarts cleanly against the new date. Callers must always go through this method rather
+    /// than setting ExpiryDate directly, so the reset can never be forgotten at a future call
+    /// site (e.g. a document re-issue/edit handler).
+    /// </summary>
+    public void UpdateExpiryDate(DateOnly? newExpiryDate, DateTimeOffset now)
+    {
+        ExpiryDate = newExpiryDate;
+
+        ExpiryReminder90SentAt = null;
+        ExpiryReminder30SentAt = null;
+        ExpiryReminder7SentAt  = null;
+        ExpiringSoonNotifiedAt = null;
+        ExpiredNotifiedAt      = null;
+
+        UpdatedAt = now;
+    }
+}
+
+internal enum ExpiryReminderStage
+{
+    NinetyDays,
+    ThirtyDays,
+    SevenDays,
 }

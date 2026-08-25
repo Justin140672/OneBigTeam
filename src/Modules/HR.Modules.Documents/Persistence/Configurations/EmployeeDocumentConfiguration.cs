@@ -47,6 +47,15 @@ internal sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<E
         builder.Property(ed => ed.ExpiredNotifiedAt)
             .HasColumnName("expired_notified_at");
 
+        builder.Property(ed => ed.ExpiryReminder90SentAt)
+            .HasColumnName("expiry_reminder_90_sent_at");
+
+        builder.Property(ed => ed.ExpiryReminder30SentAt)
+            .HasColumnName("expiry_reminder_30_sent_at");
+
+        builder.Property(ed => ed.ExpiryReminder7SentAt)
+            .HasColumnName("expiry_reminder_7_sent_at");
+
         builder.Property(ed => ed.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

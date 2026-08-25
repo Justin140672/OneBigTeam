@@ -41,17 +41,38 @@ public class DocumentExpiryTasksEndToEndTests
             $"/api/companies/{companyId}/documents/expiry-notifications", new { });
         notifResp.EnsureSuccessStatusCode();
         var notifPayload = await notifResp.Content.ReadFromJsonAsync<NotifPayload>();
-        Assert.Equal(1, notifPayload!.ExpiringSoonCount);
+
+        // DOC-03: a document that is 10 days from expiry has already crossed both the 90-day and
+        // the 30-day reminder thresholds by the time it is first evaluated (it was never inside
+        // the 90-day window on an earlier run), so both stages fire together on this first pass —
+        // see ProcessDocumentExpiryNotificationsHandler's catch-up semantics.
+        Assert.Equal(2, notifPayload!.ExpiringSoonCount);
+        Assert.Equal(1, notifPayload.Reminder90Count);
+        Assert.Equal(1, notifPayload.Reminder30Count);
+        Assert.Equal(0, notifPayload.Reminder7Count);
 
         var tasksResp = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/tasks");
         Assert.Equal(HttpStatusCode.OK, tasksResp.StatusCode);
 
         var tasks = await tasksResp.Content.ReadFromJsonAsync<TaskListPayload>();
-        var task  = Assert.Single(tasks!.Items.Where(t => t.Source == "Document"));
-        Assert.Equal("High",     task.Priority);
-        Assert.Equal(employeeId, task.AssignedEmployeeId);
-        Assert.Contains("expiring soon", task.Title, StringComparison.OrdinalIgnoreCase);
+        var documentTasks = tasks!.Items.Where(t => t.Source == "Document").ToList();
+        Assert.Equal(2, documentTasks.Count);
+        Assert.All(documentTasks, task =>
+        {
+            Assert.Equal("High",     task.Priority);
+            Assert.Equal(employeeId, task.AssignedEmployeeId);
+            Assert.Contains("expiring soon", task.Title, StringComparison.OrdinalIgnoreCase);
+        });
+
+        // Re-running the job for the same company must be a no-op for this document — both
+        // stages were already marked sent above, so idempotency is verified by re-posting and
+        // confirming no further reminder is fired.
+        var rerunResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/documents/expiry-notifications", new { });
+        rerunResp.EnsureSuccessStatusCode();
+        var rerunPayload = await rerunResp.Content.ReadFromJsonAsync<NotifPayload>();
+        Assert.Equal(0, rerunPayload!.ExpiringSoonCount);
     }
 
     [Fact]
@@ -152,7 +173,12 @@ public class DocumentExpiryTasksEndToEndTests
         resp.EnsureSuccessStatusCode();
     }
 
-    private sealed record NotifPayload(int ExpiringSoonCount, int ExpiredCount);
+    private sealed record NotifPayload(
+        int ExpiringSoonCount,
+        int ExpiredCount,
+        int Reminder90Count,
+        int Reminder30Count,
+        int Reminder7Count);
     private sealed record DocTypePayload(Guid Id);
     private sealed record TaskListPayload(IReadOnlyList<TaskItem> Items);
     private sealed record TaskItem(Guid Id, string Title, string Source, string Priority, Guid? AssignedEmployeeId);
