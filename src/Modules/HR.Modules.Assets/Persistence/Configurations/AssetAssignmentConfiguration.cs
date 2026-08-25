@@ -42,6 +42,11 @@ internal sealed class AssetAssignmentConfiguration : IEntityTypeConfiguration<As
         builder.Property(a => a.ReturnedAt)
             .HasColumnName("returned_at");
 
+        builder.Property(a => a.ReturnOutcome)
+            .HasColumnName("return_outcome")
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
         builder.Property(a => a.Notes)
             .HasColumnName("notes")
             .HasMaxLength(2000);

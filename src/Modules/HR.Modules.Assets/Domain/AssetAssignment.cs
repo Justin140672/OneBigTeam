@@ -12,6 +12,7 @@ internal sealed class AssetAssignment
     public DateTimeOffset AssignedAt { get; private set; }
     public DateTimeOffset? AcknowledgedAt { get; private set; }
     public DateTimeOffset? ReturnedAt { get; private set; }
+    public AssetAssignmentReturnOutcome? ReturnOutcome { get; private set; }
     public string? Notes { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -50,12 +51,13 @@ internal sealed class AssetAssignment
         UpdatedAt = now;
     }
 
-    public void Return(DateTimeOffset now)
+    public void Return(DateTimeOffset now, AssetAssignmentReturnOutcome outcome = AssetAssignmentReturnOutcome.Returned)
     {
         if (ReturnedAt is not null)
             throw new InvalidOperationException("Asset has already been returned.");
 
         ReturnedAt = now;
+        ReturnOutcome = outcome;
         UpdatedAt = now;
     }
 }

@@ -17,6 +17,15 @@ internal sealed class OffboardingTask
     // TaskItem without needing to re-resolve the manager hierarchy or asset ownership again.
     public Guid? AssignedEmployeeId { get; private set; }
 
+    // OFF-04: links this task to the specific Assets-module AssetAssignment it represents, rather
+    // than only carrying a free-text label (e.g. "Return asset: MacBook Pro"). Null for every
+    // non-asset-return checklist item (document review, manager exit checklist, etc). Completing a
+    // task with this set routes through IAssetReturnService instead of the generic
+    // "mark complete" path — see CompleteOffboardingTaskFromTaskAction.
+    public Guid? AssetAssignmentId { get; private set; }
+
+    public bool IsAssetReturnTask => AssetAssignmentId is not null;
+
     public DateOnly? DueDate { get; private set; }
     public OffboardingTaskStatus Status { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
@@ -41,7 +50,8 @@ internal sealed class OffboardingTask
         OffboardingTaskAssignTo assignTo,
         DateOnly? dueDate,
         DateTimeOffset now,
-        Guid? assignedEmployeeId = null)
+        Guid? assignedEmployeeId = null,
+        Guid? assetAssignmentId = null)
     {
         return new OffboardingTask
         {
@@ -52,6 +62,7 @@ internal sealed class OffboardingTask
             Description = description,
             AssignTo = assignTo,
             AssignedEmployeeId = assignedEmployeeId,
+            AssetAssignmentId = assetAssignmentId,
             DueDate = dueDate,
             Status = OffboardingTaskStatus.Pending,
             CreatedAt = now,

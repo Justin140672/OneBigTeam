@@ -118,7 +118,8 @@ internal sealed class StartOffboardingHandler(
                 Guid.NewGuid(), request.CompanyId, plan.Id,
                 title, description: null,
                 OffboardingTaskAssignTo.Employee,
-                dueDate: request.LastWorkingDay, now: now, assignedEmployeeId: request.EmployeeId);
+                dueDate: request.LastWorkingDay, now: now, assignedEmployeeId: request.EmployeeId,
+                assetAssignmentId: asset.AssetAssignmentId);
             dbContext.OffboardingTasks.Add(task);
             generatedTaskIds.Add(task.Id);
         }

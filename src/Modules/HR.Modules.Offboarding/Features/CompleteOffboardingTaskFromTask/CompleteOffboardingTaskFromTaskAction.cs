@@ -5,6 +5,7 @@ using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using HR.Modules.Offboarding;
 
 namespace HR.Modules.Offboarding.Features.CompleteOffboardingTaskFromTask;
@@ -15,8 +16,10 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
     IEmployeeNameReader employeeNameReader,
     INotificationWriter notificationWriter,
     ITaskCreator taskCreator,
+    IAssetReturnService assetReturnService,
     IAuditEventPublisher auditPublisher,
-    IIntegrationEventPublisher integrationEventPublisher) : ITaskCompletionAction
+    IIntegrationEventPublisher integrationEventPublisher,
+    ILogger<CompleteOffboardingTaskFromTaskAction> logger) : ITaskCompletionAction
 {
     private static readonly Guid SystemUserId = Guid.Empty;
 
@@ -39,16 +42,64 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
         if (offboardingTask.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped)
             return;
 
-        offboardingTask.Complete(clock.UtcNowOffset());
-
         var plan = await dbContext.OffboardingPlans
             .FirstOrDefaultAsync(p => p.Id == offboardingTask.OffboardingPlanId, cancellationToken);
 
         if (plan is null)
         {
+            // No owning plan — nothing to reconcile the asset against, and nothing to gate for
+            // completion. Fall back to the plain completion below (matches prior behaviour).
+            offboardingTask.Complete(clock.UtcNowOffset());
             await dbContext.SaveChangesAsync(cancellationToken);
             return;
         }
+
+        // OFF-04: an asset-return checklist item must actually return (or explicitly write off) the
+        // real Assets-module assignment before the offboarding side is allowed to consider it done.
+        // This call is verified against the offboarding plan's own employee — it can never be used
+        // to close out an assignment belonging to someone else, even if the underlying Tasks-module
+        // TaskItem/sourceEntityId were somehow mismatched. The Tasks-module TaskItem itself has
+        // already been marked Completed by the caller (see CompleteTaskHandler) before this
+        // best-effort dispatch runs — that is an existing, unrelated architectural property of every
+        // ITaskCompletionAction, not something introduced here. What this guards is the source of
+        // truth that actually matters for offboarding: the OffboardingTask stays NOT Completed (and
+        // therefore continues to block plan completion, see the "isCompleting" check below) whenever
+        // the real asset return could not be verified/performed.
+        if (offboardingTask.IsAssetReturnTask)
+        {
+            var outcome = context.OutcomeDecision switch
+            {
+                "Lost" => AssetReturnOutcome.Lost,
+                "Damaged" => AssetReturnOutcome.Damaged,
+                _ => AssetReturnOutcome.Returned
+            };
+
+            var returnResult = await assetReturnService.ReturnAsync(
+                context.CompanyId,
+                offboardingTask.AssetAssignmentId!.Value,
+                expectedEmployeeId: plan.EmployeeId,
+                outcome,
+                returnedBy: context.CompletedBy,
+                notes: context.OutcomeReason,
+                cancellationToken);
+
+            if (returnResult is AssetReturnResult.EmployeeMismatch or AssetReturnResult.NotFound)
+            {
+                logger.LogError(
+                    "Offboarding asset-return task {OffboardingTaskId} (plan {OffboardingPlanId}, " +
+                    "employee {EmployeeId}) could not be completed: asset assignment " +
+                    "{AssetAssignmentId} returned {Result}. Leaving the offboarding task outstanding.",
+                    offboardingTask.Id, plan.Id, plan.EmployeeId, offboardingTask.AssetAssignmentId, returnResult);
+                return;
+            }
+
+            // Success or AlreadyReturned (the assignment was already closed by another path, e.g.
+            // Assets' own "Request Return" flow, or a retried/duplicated completion) both mean the
+            // real-world asset state is exactly what this offboarding task expects — safe to
+            // complete the checklist item.
+        }
+
+        offboardingTask.Complete(clock.UtcNowOffset());
 
         var now = clock.UtcNowOffset();
 

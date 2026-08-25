@@ -42,6 +42,9 @@ internal sealed class OffboardingTaskConfiguration : IEntityTypeConfiguration<Of
         builder.Property(t => t.AssignedEmployeeId)
             .HasColumnName("assigned_employee_id");
 
+        builder.Property(t => t.AssetAssignmentId)
+            .HasColumnName("asset_assignment_id");
+
         builder.Property(t => t.DueDate)
             .HasColumnName("due_date");
 
@@ -77,5 +80,10 @@ internal sealed class OffboardingTaskConfiguration : IEntityTypeConfiguration<Of
         // scan, across every plan/company.
         builder.HasIndex(t => t.TaskItemCreatedAt)
             .HasDatabaseName("ix_offboarding_tasks_task_item_created_at");
+
+        // OFF-04: lets the reconciliation job cheaply check which of a plan's currently-assigned
+        // assets already have an OffboardingTask, without a full table scan.
+        builder.HasIndex(t => t.AssetAssignmentId)
+            .HasDatabaseName("ix_offboarding_tasks_asset_assignment_id");
     }
 }

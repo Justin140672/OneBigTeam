@@ -6,6 +6,7 @@ using HR.Modules.Offboarding.Persistence;
 using HR.Modules.Offboarding.Tests.Infrastructure;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Offboarding.Tests;
 
@@ -43,11 +44,13 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Guid planId,
         DateTimeOffset createdAt,
         OffboardingTaskStatus status = OffboardingTaskStatus.Pending,
-        string title = "Some task")
+        string title = "Some task",
+        Guid? assetAssignmentId = null)
     {
         var task = OffboardingTask.Create(
             Guid.NewGuid(), companyId, planId, title, null,
-            OffboardingTaskAssignTo.Employee, null, createdAt);
+            OffboardingTaskAssignTo.Employee, null, createdAt,
+            assetAssignmentId: assetAssignmentId);
 
         if (status == OffboardingTaskStatus.Completed)
             task.Complete(createdAt);
@@ -60,7 +63,9 @@ public class CompleteOffboardingTaskFromTaskActionTests
 
     private static TaskCompletionContext BuildTaskContext(
         Guid companyId,
-        Guid? sourceEntityId) =>
+        Guid? sourceEntityId,
+        string? outcomeDecision = null,
+        string? outcomeReason = null) =>
         new(
             companyId,
             Guid.NewGuid(),
@@ -71,23 +76,31 @@ public class CompleteOffboardingTaskFromTaskActionTests
             null,
             Guid.NewGuid(),
             Now,
-            sourceEntityId);
+            sourceEntityId,
+            outcomeDecision,
+            outcomeReason);
 
-    private static (CompleteOffboardingTaskFromTaskAction Action, FakeNotificationWriter Notifications, FakeTaskCreator TaskCreator, FakeAuditPublisher AuditPublisher)
-        BuildAction(OffboardingDbContext dbContext, Dictionary<Guid, string>? names = null)
+    private static (CompleteOffboardingTaskFromTaskAction Action, FakeNotificationWriter Notifications, FakeTaskCreator TaskCreator, FakeAuditPublisher AuditPublisher, FakeAssetReturnService AssetReturnService)
+        BuildAction(
+            OffboardingDbContext dbContext,
+            Dictionary<Guid, string>? names = null,
+            FakeAssetReturnService? assetReturnService = null)
     {
         var notifications = new FakeNotificationWriter();
         var taskCreator = new FakeTaskCreator();
         var auditPublisher = new FakeAuditPublisher();
+        assetReturnService ??= new FakeAssetReturnService();
         var action = new CompleteOffboardingTaskFromTaskAction(
             dbContext,
             new FakeClock(FixedUtcNow),
             new FakeEmployeeNameReader(names),
             notifications,
             taskCreator,
+            assetReturnService,
             auditPublisher,
-            new HR.Modules.Offboarding.Tests.Infrastructure.FakeIntegrationEventPublisher());
-        return (action, notifications, taskCreator, auditPublisher);
+            new HR.Modules.Offboarding.Tests.Infrastructure.FakeIntegrationEventPublisher(),
+            NullLogger<CompleteOffboardingTaskFromTaskAction>.Instance);
+        return (action, notifications, taskCreator, auditPublisher, assetReturnService);
     }
 
     [Fact]
@@ -101,7 +114,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
         await dbContext.SaveChangesAsync();
 
-        var (action, _, _, _) = BuildAction(dbContext);
+        var (action, _, _, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, task.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -124,7 +137,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
         await dbContext.SaveChangesAsync();
 
-        var (action, _, taskCreator, _) = BuildAction(dbContext);
+        var (action, _, taskCreator, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -147,7 +160,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Completed, "Task B");
         await dbContext.SaveChangesAsync();
 
-        var (action, _, _, _) = BuildAction(dbContext);
+        var (action, _, _, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -170,7 +183,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Skipped, "Task C");
         await dbContext.SaveChangesAsync();
 
-        var (action, _, _, auditPublisher) = BuildAction(dbContext);
+        var (action, _, _, auditPublisher, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -194,7 +207,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
         await dbContext.SaveChangesAsync();
 
-        var (action, _, _, auditPublisher) = BuildAction(dbContext);
+        var (action, _, _, auditPublisher, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -219,7 +232,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         await dbContext.SaveChangesAsync();
 
         var names = new Dictionary<Guid, string> { [employeeId] = employeeName };
-        var (action, notifications, taskCreator, _) = BuildAction(dbContext, names);
+        var (action, notifications, taskCreator, _, _) = BuildAction(dbContext, names);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -249,7 +262,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Skipped, "Task C");
         await dbContext.SaveChangesAsync();
 
-        var (action, _, taskCreator, _) = BuildAction(dbContext);
+        var (action, _, taskCreator, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -270,7 +283,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
         await dbContext.SaveChangesAsync();
 
-        var (action, notifications, taskCreator, _) = BuildAction(dbContext);
+        var (action, notifications, taskCreator, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, sourceEntityId: null);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -297,7 +310,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
         await dbContext.SaveChangesAsync();
 
-        var (action, _, taskCreator, _) = BuildAction(dbContext);
+        var (action, _, taskCreator, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, sourceEntityId: Guid.NewGuid());
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -324,7 +337,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Completed, "Task B");
         await dbContext.SaveChangesAsync();
 
-        var (action, _, taskCreator, _) = BuildAction(dbContext);
+        var (action, _, taskCreator, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, alreadyCompletedTask.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -352,7 +365,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var alreadySkippedTask = SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Skipped, "Task A");
         await dbContext.SaveChangesAsync();
 
-        var (action, _, taskCreator, _) = BuildAction(dbContext);
+        var (action, _, taskCreator, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, alreadySkippedTask.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -374,7 +387,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var task = SeedTask(dbContext, otherCompanyId, plan.Id, seedAt);
         await dbContext.SaveChangesAsync();
 
-        var (action, _, taskCreator, _) = BuildAction(dbContext);
+        var (action, _, taskCreator, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, task.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -387,5 +400,162 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.Equal(OffboardingStatus.NotStarted, savedPlan.Status);
         Assert.Equal(seedAt, savedPlan.UpdatedAt);
         Assert.Empty(taskCreator.Created);
+    }
+
+    // ---- OFF-04: asset-return task completion ----
+
+    [Fact]
+    public async Task ExecuteAsync_AssetReturnTask_Calls_VerifiedReturn_With_Plan_EmployeeId_And_Completes_On_Success()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), companyId, employeeId, DateOnly.FromDateTime(seedAt.Date), null, seedAt);
+        plan.Start(seedAt);
+        dbContext.OffboardingPlans.Add(plan);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Return asset: Laptop", assetAssignmentId: assignmentId);
+        await dbContext.SaveChangesAsync();
+
+        var assetReturnService = new FakeAssetReturnService { NextResult = AssetReturnResult.Success };
+        var (action, _, _, _, _) = BuildAction(dbContext, assetReturnService: assetReturnService);
+        var context = BuildTaskContext(companyId, task.Id, outcomeReason: "Handed in to IT");
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var call = Assert.Single(assetReturnService.VerifiedCalls);
+        Assert.Equal(companyId, call.CompanyId);
+        Assert.Equal(assignmentId, call.AssignmentId);
+        Assert.Equal(employeeId, call.ExpectedEmployeeId);
+        Assert.Equal(AssetReturnOutcome.Returned, call.Outcome);
+        Assert.Equal(context.CompletedBy, call.ReturnedBy);
+        Assert.Equal("Handed in to IT", call.Notes);
+
+        var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(OffboardingTaskStatus.Completed, savedTask.Status);
+    }
+
+    [Theory]
+    [InlineData(AssetReturnResult.EmployeeMismatch)]
+    [InlineData(AssetReturnResult.NotFound)]
+    public async Task ExecuteAsync_AssetReturnTask_Not_Completed_And_Plan_Not_Completed_When_Return_Fails(
+        AssetReturnResult failureResult)
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), companyId, employeeId, DateOnly.FromDateTime(seedAt.Date), null, seedAt);
+        plan.Start(seedAt);
+        dbContext.OffboardingPlans.Add(plan);
+        // This is the last outstanding task — if it were completed, the plan would complete too.
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Return asset: Laptop", assetAssignmentId: assignmentId);
+        await dbContext.SaveChangesAsync();
+
+        var assetReturnService = new FakeAssetReturnService { NextResult = failureResult };
+        var (action, _, taskCreator, auditPublisher, _) = BuildAction(dbContext, assetReturnService: assetReturnService);
+        var context = BuildTaskContext(companyId, task.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(OffboardingTaskStatus.Pending, savedTask.Status);
+        Assert.Null(savedTask.CompletedAt);
+
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OffboardingStatus.InProgress, savedPlan.Status);
+
+        Assert.Empty(taskCreator.Created);
+        Assert.Empty(auditPublisher.Published);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AssetReturnTask_Completes_When_Already_Returned()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), companyId, employeeId, DateOnly.FromDateTime(seedAt.Date), null, seedAt);
+        plan.Start(seedAt);
+        dbContext.OffboardingPlans.Add(plan);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Return asset: Laptop", assetAssignmentId: assignmentId);
+        await dbContext.SaveChangesAsync();
+
+        var assetReturnService = new FakeAssetReturnService { NextResult = AssetReturnResult.AlreadyReturned };
+        var (action, _, _, _, _) = BuildAction(dbContext, assetReturnService: assetReturnService);
+        var context = BuildTaskContext(companyId, task.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(OffboardingTaskStatus.Completed, savedTask.Status);
+
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OffboardingStatus.Completed, savedPlan.Status);
+    }
+
+    [Theory]
+    [InlineData("Lost", AssetReturnOutcome.Lost)]
+    [InlineData("Damaged", AssetReturnOutcome.Damaged)]
+    [InlineData(null, AssetReturnOutcome.Returned)]
+    [InlineData("SomethingElse", AssetReturnOutcome.Returned)]
+    public async Task ExecuteAsync_AssetReturnTask_Maps_OutcomeDecision_To_AssetReturnOutcome(
+        string? outcomeDecision, AssetReturnOutcome expectedOutcome)
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), companyId, employeeId, DateOnly.FromDateTime(seedAt.Date), null, seedAt);
+        plan.Start(seedAt);
+        dbContext.OffboardingPlans.Add(plan);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Return asset: Laptop", assetAssignmentId: assignmentId);
+        await dbContext.SaveChangesAsync();
+
+        var assetReturnService = new FakeAssetReturnService { NextResult = AssetReturnResult.Success };
+        var (action, _, _, _, _) = BuildAction(dbContext, assetReturnService: assetReturnService);
+        var context = BuildTaskContext(companyId, task.Id, outcomeDecision: outcomeDecision);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var call = Assert.Single(assetReturnService.VerifiedCalls);
+        Assert.Equal(expectedOutcome, call.Outcome);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NonAssetReturnTask_Never_Calls_AssetReturnService()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Return badge"); // no AssetAssignmentId
+        await dbContext.SaveChangesAsync();
+
+        var assetReturnService = new FakeAssetReturnService();
+        var (action, _, _, _, _) = BuildAction(dbContext, assetReturnService: assetReturnService);
+        var context = BuildTaskContext(companyId, task.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.Empty(assetReturnService.VerifiedCalls);
+        Assert.Empty(assetReturnService.Calls);
+
+        var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(OffboardingTaskStatus.Completed, savedTask.Status);
     }
 }

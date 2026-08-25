@@ -5,6 +5,8 @@ using HR.Modules.Assets.Features.CreateAssetCategory;
 using HR.Modules.Assets.Features.ReturnAssetAssignment;
 using HR.Modules.Assets.Persistence;
 using HR.Modules.Assets.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
+using HR.Modules.Assets;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Tests;
@@ -142,5 +144,139 @@ public class AssetReturnServiceTests
         Assert.Empty(auditPublisher.Published);
         var assignment = await db.AssetAssignments.FindAsync(assignmentId);
         Assert.True(assignment!.IsActive);
+    }
+
+    // ---- Verified overload (OFF-04) ----
+
+    [Fact]
+    public async Task VerifiedReturnAsync_Returns_NotFound_When_Assignment_Does_Not_Exist()
+    {
+        await using var db = BuildContext();
+        var clock = new FakeClock(FixedUtcNow);
+        var auditPublisher = new FakeAuditPublisher();
+        var service = new AssetReturnService(db, clock, auditPublisher);
+
+        var result = await service.ReturnAsync(
+            Guid.NewGuid(), Guid.NewGuid(), expectedEmployeeId: null,
+            AssetReturnOutcome.Returned, Guid.NewGuid(), notes: null, CancellationToken.None);
+
+        Assert.Equal(AssetReturnResult.NotFound, result);
+        Assert.Empty(auditPublisher.Published);
+    }
+
+    [Fact]
+    public async Task VerifiedReturnAsync_Returns_EmployeeMismatch_And_Leaves_Assignment_Untouched()
+    {
+        await using var db = BuildContext();
+        var (assignmentId, assetId, _, companyId) = await SeedActiveAssignmentAsync(db);
+        var clock = new FakeClock(FixedUtcNow);
+        var auditPublisher = new FakeAuditPublisher();
+        var service = new AssetReturnService(db, clock, auditPublisher);
+
+        var result = await service.ReturnAsync(
+            companyId, assignmentId, expectedEmployeeId: Guid.NewGuid(),
+            AssetReturnOutcome.Returned, Guid.NewGuid(), notes: null, CancellationToken.None);
+
+        Assert.Equal(AssetReturnResult.EmployeeMismatch, result);
+        Assert.Empty(auditPublisher.Published);
+
+        var assignment = await db.AssetAssignments.FindAsync(assignmentId);
+        Assert.True(assignment!.IsActive);
+        Assert.Null(assignment.ReturnedAt);
+
+        var asset = await db.Assets.FindAsync(assetId);
+        Assert.Equal(AssetStatus.Assigned, asset!.Status);
+    }
+
+    [Fact]
+    public async Task VerifiedReturnAsync_Returns_AlreadyReturned_When_Assignment_Inactive()
+    {
+        await using var db = BuildContext();
+        var (assignmentId, _, employeeId, companyId) = await SeedActiveAssignmentAsync(db);
+        var clock = new FakeClock(FixedUtcNow);
+        var auditPublisher = new FakeAuditPublisher();
+        var service = new AssetReturnService(db, clock, auditPublisher);
+
+        var first = await service.ReturnAsync(
+            companyId, assignmentId, expectedEmployeeId: employeeId,
+            AssetReturnOutcome.Returned, Guid.NewGuid(), notes: null, CancellationToken.None);
+        Assert.Equal(AssetReturnResult.Success, first);
+
+        var second = await service.ReturnAsync(
+            companyId, assignmentId, expectedEmployeeId: employeeId,
+            AssetReturnOutcome.Returned, Guid.NewGuid(), notes: null, CancellationToken.None);
+
+        Assert.Equal(AssetReturnResult.AlreadyReturned, second);
+        Assert.Single(auditPublisher.Published);
+    }
+
+    [Fact]
+    public async Task VerifiedReturnAsync_Success_With_Returned_Outcome_Marks_Asset_Available()
+    {
+        await using var db = BuildContext();
+        var (assignmentId, assetId, employeeId, companyId) = await SeedActiveAssignmentAsync(db);
+        var clock = new FakeClock(FixedUtcNow);
+        var auditPublisher = new FakeAuditPublisher();
+        var service = new AssetReturnService(db, clock, auditPublisher);
+
+        var result = await service.ReturnAsync(
+            companyId, assignmentId, expectedEmployeeId: employeeId,
+            AssetReturnOutcome.Returned, Guid.NewGuid(), notes: "Handed back to IT", CancellationToken.None);
+
+        Assert.Equal(AssetReturnResult.Success, result);
+
+        var asset = await db.Assets.FindAsync(assetId);
+        Assert.Equal(AssetStatus.Available, asset!.Status);
+
+        var assignment = await db.AssetAssignments.FindAsync(assignmentId);
+        Assert.False(assignment!.IsActive);
+
+        var evt = Assert.IsType<AssetAssignmentReturnedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal("Returned", evt.Outcome);
+        Assert.Equal("Handed back to IT", evt.Notes);
+    }
+
+    [Theory]
+    [InlineData(AssetReturnOutcome.Lost)]
+    [InlineData(AssetReturnOutcome.Damaged)]
+    public async Task VerifiedReturnAsync_Success_With_Lost_Or_Damaged_Outcome_Marks_Asset_UnderRepair_Not_Available(
+        AssetReturnOutcome outcome)
+    {
+        await using var db = BuildContext();
+        var (assignmentId, assetId, employeeId, companyId) = await SeedActiveAssignmentAsync(db);
+        var clock = new FakeClock(FixedUtcNow);
+        var auditPublisher = new FakeAuditPublisher();
+        var service = new AssetReturnService(db, clock, auditPublisher);
+
+        var result = await service.ReturnAsync(
+            companyId, assignmentId, expectedEmployeeId: employeeId,
+            outcome, Guid.NewGuid(), notes: "Damaged screen", CancellationToken.None);
+
+        Assert.Equal(AssetReturnResult.Success, result);
+
+        var asset = await db.Assets.FindAsync(assetId);
+        Assert.Equal(AssetStatus.UnderRepair, asset!.Status);
+        Assert.NotEqual(AssetStatus.Available, asset.Status);
+
+        var assignment = await db.AssetAssignments.FindAsync(assignmentId);
+        Assert.False(assignment!.IsActive);
+    }
+
+    [Fact]
+    public async Task VerifiedReturnAsync_Skips_Employee_Check_When_ExpectedEmployeeId_Is_Null()
+    {
+        await using var db = BuildContext();
+        var (assignmentId, assetId, _, companyId) = await SeedActiveAssignmentAsync(db);
+        var clock = new FakeClock(FixedUtcNow);
+        var auditPublisher = new FakeAuditPublisher();
+        var service = new AssetReturnService(db, clock, auditPublisher);
+
+        var result = await service.ReturnAsync(
+            companyId, assignmentId, expectedEmployeeId: null,
+            AssetReturnOutcome.Returned, Guid.NewGuid(), notes: null, CancellationToken.None);
+
+        Assert.Equal(AssetReturnResult.Success, result);
+        var asset = await db.Assets.FindAsync(assetId);
+        Assert.Equal(AssetStatus.Available, asset!.Status);
     }
 }

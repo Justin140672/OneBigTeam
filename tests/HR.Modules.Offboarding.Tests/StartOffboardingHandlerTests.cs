@@ -400,6 +400,46 @@ public class StartOffboardingHandlerTests
         Assert.Equal(6, dbContext.OffboardingTasks.Count());
     }
 
+    // OFF-04
+    [Fact]
+    public async Task HandleAsync_AssetReturnTask_Carries_The_AssetAssignmentId_From_AssignedAssetReader()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var assignmentId = Guid.NewGuid();
+        var assets = new List<AssignedAssetItem> { new(assignmentId, Guid.NewGuid(), "MacBook Pro") };
+        var harness = BuildHandler(dbContext, names, assignedAssets: assets);
+
+        var result = await harness.Handler.HandleAsync(BuildRequest(companyId, employeeId), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var assetTask = await dbContext.OffboardingTasks.SingleAsync(t => t.AssetAssignmentId == assignmentId);
+        Assert.True(assetTask.IsAssetReturnTask);
+        Assert.Contains("MacBook Pro", assetTask.Title);
+    }
+
+    // OFF-04
+    [Fact]
+    public async Task HandleAsync_NonAssetTask_Has_Null_AssetAssignmentId()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var harness = BuildHandler(dbContext, names, assignedAssets: []);
+
+        var result = await harness.Handler.HandleAsync(BuildRequest(companyId, employeeId), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.All(dbContext.OffboardingTasks, t =>
+        {
+            Assert.Null(t.AssetAssignmentId);
+            Assert.False(t.IsAssetReturnTask);
+        });
+    }
+
     // OFF-03: DbUpdateException-on-race coverage for the unique partial index
     // (ix_offboarding_plans_company_id_employee_id_active) is deliberately NOT attempted at the unit
     // level here — EF Core's InMemory provider does not enforce unique indexes/constraints, so there

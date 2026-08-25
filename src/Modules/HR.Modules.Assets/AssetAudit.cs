@@ -89,7 +89,9 @@ internal sealed record AssetAssignmentReturnedAuditEvent(
     Guid AssetId,
     Guid EmployeeId,
     Guid ReturnedBy,
-    DateTimeOffset OccurredAt) : IAuditEvent
+    DateTimeOffset OccurredAt,
+    string Outcome = "Returned",
+    string? Notes = null) : IAuditEvent
 {
     string IAuditEvent.EventType => "asset.assignment.returned";
     string IAuditEvent.EntityType => "AssetAssignment";
@@ -98,8 +100,8 @@ internal sealed record AssetAssignmentReturnedAuditEvent(
     Guid? IAuditEvent.ActorUserId => ReturnedBy;
     Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
-    string? IAuditEvent.Summary => "Asset returned by employee";
+    string? IAuditEvent.Summary => Outcome == "Returned" ? "Asset returned by employee" : $"Asset return recorded as {Outcome}";
     object? IAuditEvent.Before => null;
-    object? IAuditEvent.After => new { ReturnedBy, OccurredAt };
-    object? IAuditEvent.Metadata => null;
+    object? IAuditEvent.After => new { ReturnedBy, OccurredAt, Outcome };
+    object? IAuditEvent.Metadata => Notes is null ? null : new { Notes };
 }

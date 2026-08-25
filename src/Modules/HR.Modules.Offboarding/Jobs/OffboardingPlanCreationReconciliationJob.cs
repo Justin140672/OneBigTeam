@@ -3,6 +3,7 @@ using HR.Modules.Offboarding.Domain;
 using HR.Modules.Offboarding.Features.StartOffboarding;
 using HR.Modules.Offboarding.Persistence;
 using HR.Modules.Offboarding.Services;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -37,14 +38,100 @@ namespace HR.Modules.Offboarding.Jobs;
 internal sealed class OffboardingPlanCreationReconciliationJob(
     OffboardingDbContext dbContext,
     IActiveLeavingProcessReader activeLeavingProcessReader,
+    IAssignedAssetReader assignedAssetReader,
     StartOffboardingHandler startOffboardingHandler,
     OffboardingTaskSynchronizer taskSynchronizer,
+    IClock clock,
     ILogger<OffboardingPlanCreationReconciliationJob> logger)
 {
     public async Task ExecuteAsync()
     {
         await CreateMissingPlansAsync();
+        await AddMissingAssetReturnTasksAsync();
         await SyncPartiallySyncedPlansAsync();
+    }
+
+    // OFF-04: an asset assigned to an employee AFTER their offboarding plan/checklist was generated
+    // (StartOffboardingHandler only builds the checklist once, at plan creation) would otherwise
+    // never get a return task and could walk out the door with it. No "asset assigned" integration
+    // event currently exists in Assets to drive this reactively, so — per this session's guidance to
+    // prefer the lighter-weight option when no suitable event already exists — this diffs each
+    // active plan's currently-assigned assets (IAssignedAssetReader, the same read contract
+    // StartOffboardingHandler itself uses) against the OffboardingTasks it already has (matched by
+    // AssetAssignmentId, not by label) and creates any that are missing. Idempotent: an assignment
+    // that already has a task (of any status — including a completed/skipped one, e.g. it was
+    // returned and the asset was later reassigned then reassigned again is out of scope here since
+    // IAssignedAssetReader only returns currently-active assignments) is never duplicated.
+    private async Task AddMissingAssetReturnTasksAsync()
+    {
+        var activePlans = await dbContext.OffboardingPlans
+            .AsNoTracking()
+            .Where(p => p.Status != OffboardingStatus.Completed && p.Status != OffboardingStatus.Cancelled)
+            .ToListAsync();
+
+        if (activePlans.Count == 0)
+            return;
+
+        foreach (var plan in activePlans)
+        {
+            try
+            {
+                var assignedAssets = await assignedAssetReader.GetAssignedAssetsAsync(
+                    plan.CompanyId, plan.EmployeeId, CancellationToken.None);
+
+                if (assignedAssets.Count == 0)
+                    continue;
+
+                var existingAssignmentIds = await dbContext.OffboardingTasks
+                    .Where(t => t.OffboardingPlanId == plan.Id && t.AssetAssignmentId != null)
+                    .Select(t => t.AssetAssignmentId!.Value)
+                    .ToListAsync();
+
+                var existingAssignmentIdSet = existingAssignmentIds.ToHashSet();
+                var missingAssets = assignedAssets
+                    .Where(a => !existingAssignmentIdSet.Contains(a.AssetAssignmentId))
+                    .ToList();
+
+                if (missingAssets.Count == 0)
+                    continue;
+
+                var now = clock.UtcNowOffset();
+
+                foreach (var asset in missingAssets)
+                {
+                    var task = OffboardingTask.Create(
+                        Guid.NewGuid(), plan.CompanyId, plan.Id,
+                        title: $"Return asset: {asset.AssetLabel}", description: null,
+                        OffboardingTaskAssignTo.Employee,
+                        dueDate: plan.LastWorkingDay, now: now,
+                        assignedEmployeeId: plan.EmployeeId,
+                        assetAssignmentId: asset.AssetAssignmentId);
+                    dbContext.OffboardingTasks.Add(task);
+                }
+
+                await dbContext.SaveChangesAsync(CancellationToken.None);
+
+                logger.LogInformation(
+                    "Reconciliation added {Count} asset-return task(s) for offboarding plan " +
+                    "{OffboardingPlanId} (employee {EmployeeId}, company {CompanyId}) for assets " +
+                    "assigned after the plan was created.",
+                    missingAssets.Count, plan.Id, plan.EmployeeId, plan.CompanyId);
+
+                // Sync only this plan's newly-added tasks now, rather than waiting for the general
+                // SyncPartiallySyncedPlansAsync pass below — cheap since it only queries tasks with
+                // TaskItemCreatedAt == null, and keeps the Tasks-module checklist current within the
+                // same run.
+                await taskSynchronizer.SyncPlanAsync(plan.CompanyId, plan.Id, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(
+                    ex,
+                    "Reconciling missing asset-return tasks threw for offboarding plan " +
+                    "{OffboardingPlanId} (employee {EmployeeId}, company {CompanyId}).",
+                    plan.Id, plan.EmployeeId, plan.CompanyId);
+            }
+        }
     }
 
     private async Task CreateMissingPlansAsync()

@@ -1,6 +1,6 @@
 using HR.Infrastructure.Abstractions;
 
-namespace HR.Modules.Tasks.Tests.Infrastructure;
+namespace HR.Modules.Offboarding.Tests.Infrastructure;
 
 internal sealed class FakeAssetReturnService : IAssetReturnService
 {
@@ -16,6 +16,8 @@ internal sealed class FakeAssetReturnService : IAssetReturnService
 
     public List<Call> Calls { get; } = [];
     public List<VerifiedCall> VerifiedCalls { get; } = [];
+
+    /// <summary>Result returned by the verified overload for every call. Defaults to Success.</summary>
     public AssetReturnResult NextResult { get; set; } = AssetReturnResult.Success;
 
     public Task ReturnAsync(Guid companyId, Guid assignmentId, Guid returnedBy, CancellationToken cancellationToken)
