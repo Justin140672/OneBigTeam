@@ -97,7 +97,8 @@ internal sealed class AmendLeavingProcessHandler(
         // chain of amendments converges rather than compounding reductions.
         await integrationEventPublisher.PublishAsync(
             new EmployeeLeavingDateSetIntegrationEvent(
-                leavingProcess.CompanyId, leavingProcess.EmployeeId, leavingProcess.LeavingDate, now),
+                leavingProcess.CompanyId, leavingProcess.EmployeeId,
+                leavingProcess.LeavingDate, leavingProcess.LastWorkingDay, now),
             cancellationToken);
 
         // request.ConfirmBackdatedLeavingDate is guaranteed true here — the unconfirmed case

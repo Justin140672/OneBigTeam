@@ -52,4 +52,18 @@ internal sealed class OffboardingPlan
         Notes = notes;
         UpdatedAt = now;
     }
+
+    // OFF-02: shifts the plan's LastWorkingDay when HR amends the employee's leaving/last working
+    // date. Returns false (and leaves everything untouched) when newLastWorkingDay already matches
+    // — this is what makes IOffboardingPlanCoordinator.RescheduleOutstandingTasksAsync idempotent
+    // for the plan itself: replaying the same amendment is a safe no-op.
+    public bool Reschedule(DateOnly newLastWorkingDay, DateTimeOffset now)
+    {
+        if (LastWorkingDay == newLastWorkingDay)
+            return false;
+
+        LastWorkingDay = newLastWorkingDay;
+        UpdatedAt = now;
+        return true;
+    }
 }

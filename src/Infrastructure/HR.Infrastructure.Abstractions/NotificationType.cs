@@ -42,4 +42,9 @@ public enum NotificationType
     ProbationExtended                             = 38,
     ProbationReviewDue                            = 39,
     ProbationOutcomeRecorded                      = 40,
+    // OFF-02: raised when an outstanding task's due date is shifted as a side effect of an
+    // amendment to the underlying business date it was derived from (e.g. an employee's last
+    // working day) — distinct from TaskAssigned/TaskDueSoon/TaskOverdue, none of which fit a
+    // date-only change to a task the assignee already knows about.
+    TaskDateChanged                               = 41,
 }

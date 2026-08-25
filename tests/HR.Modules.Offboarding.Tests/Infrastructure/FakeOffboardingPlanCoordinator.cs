@@ -6,9 +6,11 @@ internal sealed class FakeOffboardingPlanCoordinator : IOffboardingPlanCoordinat
 {
     public record StartCall(Guid CompanyId, Guid EmployeeId, DateOnly LastWorkingDay, string? Notes);
     public record CancelOutstandingTasksCall(Guid CompanyId, Guid EmployeeId);
+    public record RescheduleOutstandingTasksCall(Guid CompanyId, Guid EmployeeId, DateOnly NewLastWorkingDay);
 
     public List<StartCall> StartCalls { get; } = [];
     public List<CancelOutstandingTasksCall> CancelOutstandingTasksCalls { get; } = [];
+    public List<RescheduleOutstandingTasksCall> RescheduleOutstandingTasksCalls { get; } = [];
 
     /// <summary>Set to make CancelOutstandingTasksAsync throw for a specific employee — used to
     /// prove one employee's failure doesn't stop a batch (e.g. the reconciliation job) from
@@ -36,6 +38,16 @@ internal sealed class FakeOffboardingPlanCoordinator : IOffboardingPlanCoordinat
         if (EmployeeIdsThatThrow.Contains(employeeId))
             throw new InvalidOperationException($"Simulated failure for employee {employeeId}.");
 
+        return Task.CompletedTask;
+    }
+
+    public Task RescheduleOutstandingTasksAsync(
+        Guid companyId,
+        Guid employeeId,
+        DateOnly newLastWorkingDay,
+        CancellationToken cancellationToken)
+    {
+        RescheduleOutstandingTasksCalls.Add(new RescheduleOutstandingTasksCall(companyId, employeeId, newLastWorkingDay));
         return Task.CompletedTask;
     }
 }

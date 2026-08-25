@@ -87,4 +87,35 @@ public class OffboardingPlanTests
         Assert.Equal(OffboardingStatus.Cancelled, plan.Status);
         Assert.Null(plan.Notes);
     }
+
+    // OFF-02
+    [Fact]
+    public void Reschedule_Updates_LastWorkingDay_And_UpdatedAt_When_Date_Changes()
+    {
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), null, FixedNow);
+        var later = FixedNow.AddDays(1);
+        var newLastWorkingDay = new DateOnly(2026, 7, 15);
+
+        var changed = plan.Reschedule(newLastWorkingDay, later);
+
+        Assert.True(changed);
+        Assert.Equal(newLastWorkingDay, plan.LastWorkingDay);
+        Assert.Equal(later, plan.UpdatedAt);
+    }
+
+    [Fact]
+    public void Reschedule_Is_NoOp_When_New_Date_Equals_Current_LastWorkingDay()
+    {
+        var lastWorkingDay = new DateOnly(2026, 7, 1);
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), lastWorkingDay, null, FixedNow);
+        var later = FixedNow.AddDays(1);
+
+        var changed = plan.Reschedule(lastWorkingDay, later);
+
+        Assert.False(changed);
+        Assert.Equal(lastWorkingDay, plan.LastWorkingDay);
+        Assert.Equal(FixedNow, plan.UpdatedAt);
+    }
 }

@@ -111,4 +111,20 @@ internal sealed class TaskItem
         DueDate = dueDate;
         UpdatedAt = now;
     }
+
+    // OFF-02: shifts the due date only, for bulk source-driven rescheduling (e.g. every open
+    // OffboardingTask's TaskItem when the employee's last working day is amended). Returns false
+    // (and leaves everything untouched) when newDueDate already matches the current DueDate, so
+    // callers can cheaply detect a no-op and skip downstream side effects (notifications, audit)
+    // — the same check-current-value-before-update shape ITaskCanceller's terminal-state guard
+    // uses for idempotency.
+    public bool Reschedule(DateOnly newDueDate, DateTimeOffset now)
+    {
+        if (DueDate == newDueDate)
+            return false;
+
+        DueDate = newDueDate;
+        UpdatedAt = now;
+        return true;
+    }
 }

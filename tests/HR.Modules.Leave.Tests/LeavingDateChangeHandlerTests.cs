@@ -34,7 +34,7 @@ public class LeavingDateChangeHandlerTests
         var handler = BuildHandler(context, new DateOnly(2020, 1, 1));
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, leavingDate, now),
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
@@ -63,12 +63,12 @@ public class LeavingDateChangeHandlerTests
         var handler = BuildHandler(context, new DateOnly(2020, 1, 1));
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, firstLeavingDate, now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, firstLeavingDate, firstLeavingDate, now),
             CancellationToken.None);
 
         var amendedLeavingDate = new DateOnly(2026, 9, 30);
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, amendedLeavingDate, now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, amendedLeavingDate, amendedLeavingDate, now),
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
@@ -97,7 +97,7 @@ public class LeavingDateChangeHandlerTests
         var handler = BuildHandler(context, new DateOnly(2020, 1, 1));
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, leavingDate, now),
             CancellationToken.None);
 
         var reduced = await context.LeaveBalances.SingleAsync();
@@ -137,7 +137,7 @@ public class LeavingDateChangeHandlerTests
         var handler = BuildHandler(context, new DateOnly(2020, 1, 1));
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, leavingDate, now),
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
@@ -169,7 +169,7 @@ public class LeavingDateChangeHandlerTests
         var handler = BuildHandler(context, new DateOnly(2020, 1, 1));
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, leavingDate, now),
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
@@ -200,7 +200,7 @@ public class LeavingDateChangeHandlerTests
         var handler = BuildHandler(context, new DateOnly(2020, 1, 1));
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, leavingDate, now),
             CancellationToken.None);
 
         var unchanged = await context.LeaveBalances.SingleAsync();
@@ -229,7 +229,7 @@ public class LeavingDateChangeHandlerTests
         var handler = BuildHandler(context, startDate: null);
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, leavingDate, now),
             CancellationToken.None);
 
         var unchanged = await context.LeaveBalances.SingleAsync();
@@ -253,7 +253,7 @@ public class LeavingDateChangeHandlerTests
         var handler = BuildHandler(context, new DateOnly(2020, 1, 1));
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, leavingDate, now),
             CancellationToken.None);
 
         Assert.Empty(context.LeaveBalances);
@@ -284,7 +284,7 @@ public class LeavingDateChangeHandlerTests
         var handler = BuildHandler(context, new DateOnly(2020, 1, 1));
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, futureLeavingDate, now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, futureLeavingDate, futureLeavingDate, now),
             CancellationToken.None);
 
         var untouchedCurrentYear = await context.LeaveBalances.SingleAsync(b => b.PolicyYear == currentPolicyYear);
@@ -314,7 +314,7 @@ public class LeavingDateChangeHandlerTests
         await context.SaveChangesAsync();
 
         var handler = BuildHandler(context, new DateOnly(2020, 1, 1));
-        var integrationEvent = new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, now);
+        var integrationEvent = new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, leavingDate, now);
 
         await handler.HandleAsync(integrationEvent, CancellationToken.None);
         var afterFirst = await context.LeaveBalances.SingleAsync();
@@ -359,7 +359,7 @@ public class LeavingDateChangeHandlerTests
             new FakeEmployeeStartDateReader(new DateOnly(2020, 1, 1)));
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, leavingDate, now),
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();

@@ -53,3 +53,30 @@ internal sealed record OffboardingPlanCancelledAuditEvent(
     object? IAuditEvent.After           => new { Status = "Cancelled", OutstandingTasksCancelled };
     object? IAuditEvent.Metadata        => null;
 }
+
+// OFF-02: published when the active offboarding plan's LastWorkingDay (and its outstanding task
+// due dates) is reconciled after HR amends the employee's leaving date/last working day
+// (EmployeeLeavingDateSetIntegrationEvent). Only published when the plan's LastWorkingDay actually
+// changes — a replayed amendment carrying the same date is a no-op and produces no audit entry
+// (see IOffboardingPlanCoordinator.RescheduleOutstandingTasksAsync).
+internal sealed record OffboardingPlanRescheduledAuditEvent(
+    Guid CompanyId,
+    Guid OffboardingPlanId,
+    Guid EmployeeId,
+    DateOnly BeforeLastWorkingDay,
+    DateOnly AfterLastWorkingDay,
+    int OutstandingTasksRescheduled,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType        => "offboarding-plan.rescheduled";
+    string IAuditEvent.EntityType       => "OffboardingPlan";
+    Guid   IAuditEvent.EntityId         => OffboardingPlanId;
+    Guid?  IAuditEvent.EmployeeId       => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId      => null;
+    Guid?  IAuditEvent.ActorEmployeeId  => null;
+    Guid?  IAuditEvent.CorrelationId    => null;
+    string? IAuditEvent.Summary         => $"Offboarding last working day changed from {BeforeLastWorkingDay:d} to {AfterLastWorkingDay:d} ({OutstandingTasksRescheduled} outstanding task(s) rescheduled)";
+    object? IAuditEvent.Before          => new { LastWorkingDay = BeforeLastWorkingDay };
+    object? IAuditEvent.After           => new { LastWorkingDay = AfterLastWorkingDay, OutstandingTasksRescheduled };
+    object? IAuditEvent.Metadata        => null;
+}

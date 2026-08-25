@@ -6,6 +6,7 @@ using HR.Modules.Offboarding.Features.CancelOffboardingOnLeavingProcessCancelled
 using HR.Modules.Offboarding.Features.CompleteOffboardingTaskFromTask;
 using HR.Modules.Offboarding.Features.GetOffboardingOverview;
 using HR.Modules.Offboarding.Features.GetOffboardingStatus;
+using HR.Modules.Offboarding.Features.RescheduleOffboardingOnLeavingDateChanged;
 using HR.Modules.Offboarding.Features.StartOffboarding;
 using HR.Modules.Offboarding.Jobs;
 using HR.Modules.Offboarding.Persistence;
@@ -45,6 +46,11 @@ public static class OffboardingModule
         // the Tasks module.
         services.AddScoped<IIntegrationEventHandler<EmployeeLeavingProcessCancelledIntegrationEvent>, CancelOffboardingOnLeavingProcessCancelledHandler>();
         services.AddScoped<OffboardingCancellationReconciliationJob>();
+
+        // OFF-02: consumer of EmployeeLeavingDateSetIntegrationEvent (published on both leaving
+        // process start and amendment) — keeps the active plan's LastWorkingDay and outstanding
+        // task due dates aligned whenever HR changes the employee's leaving date/last working day.
+        services.AddScoped<IIntegrationEventHandler<EmployeeLeavingDateSetIntegrationEvent>, RescheduleOffboardingOnLeavingDateChangedHandler>();
 
         return services;
     }

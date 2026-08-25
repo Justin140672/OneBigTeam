@@ -6,9 +6,11 @@ internal sealed class FakeOffboardingPlanCoordinator : IOffboardingPlanCoordinat
 {
     public record StartCall(Guid CompanyId, Guid EmployeeId, DateOnly LastWorkingDay, string? Notes);
     public record CancelOutstandingTasksCall(Guid CompanyId, Guid EmployeeId);
+    public record RescheduleOutstandingTasksCall(Guid CompanyId, Guid EmployeeId, DateOnly NewLastWorkingDay);
 
     public List<StartCall> StartCalls { get; } = [];
     public List<CancelOutstandingTasksCall> CancelOutstandingTasksCalls { get; } = [];
+    public List<RescheduleOutstandingTasksCall> RescheduleOutstandingTasksCalls { get; } = [];
 
     public Task StartAsync(
         Guid companyId,
@@ -27,6 +29,16 @@ internal sealed class FakeOffboardingPlanCoordinator : IOffboardingPlanCoordinat
         CancellationToken cancellationToken)
     {
         CancelOutstandingTasksCalls.Add(new CancelOutstandingTasksCall(companyId, employeeId));
+        return Task.CompletedTask;
+    }
+
+    public Task RescheduleOutstandingTasksAsync(
+        Guid companyId,
+        Guid employeeId,
+        DateOnly newLastWorkingDay,
+        CancellationToken cancellationToken)
+    {
+        RescheduleOutstandingTasksCalls.Add(new RescheduleOutstandingTasksCall(companyId, employeeId, newLastWorkingDay));
         return Task.CompletedTask;
     }
 }

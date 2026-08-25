@@ -39,7 +39,7 @@ public class LeavingDateChangeHandlerTests
         // Leaving mid-year (June 30) — roughly half a year's entitlement remains.
         var leavingDate = new DateOnly(2026, 6, 30);
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, leavingDate, now),
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
@@ -74,12 +74,12 @@ public class LeavingDateChangeHandlerTests
         // Set an initial leaving date, then amend it earlier — applying repeated events must
         // converge on the figure implied by the *current* leaving date, never stack reductions.
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 9, 30), now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 9, 30), new DateOnly(2026, 9, 30), now),
             CancellationToken.None);
         var afterFirst = (await context.LeaveBalances.SingleAsync()).EntitlementDays;
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 3, 31), now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 3, 31), new DateOnly(2026, 3, 31), now),
             CancellationToken.None);
         var afterAmend = (await context.LeaveBalances.SingleAsync()).EntitlementDays;
 
@@ -87,7 +87,7 @@ public class LeavingDateChangeHandlerTests
 
         // Re-delivering the same (amended) event again must be a no-op relative to the current value.
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 3, 31), now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 3, 31), new DateOnly(2026, 3, 31), now),
             CancellationToken.None);
         var afterRedelivery = (await context.LeaveBalances.SingleAsync()).EntitlementDays;
 
@@ -119,7 +119,7 @@ public class LeavingDateChangeHandlerTests
             new FakeEmployeeStartDateReader(new DateOnly(2020, 1, 1)));
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 3, 31), now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 3, 31), new DateOnly(2026, 3, 31), now),
             CancellationToken.None);
         var reduced = (await context.LeaveBalances.SingleAsync()).EntitlementDays;
         Assert.True(reduced < 25m);
@@ -161,7 +161,7 @@ public class LeavingDateChangeHandlerTests
         // Leaving very early in the year drives entitlement below the already-recorded usage,
         // producing a legitimate negative remaining balance that must not be clamped.
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 1, 31), now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 1, 31), new DateOnly(2026, 1, 31), now),
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
@@ -197,7 +197,7 @@ public class LeavingDateChangeHandlerTests
             new FakeEmployeeStartDateReader(new DateOnly(2020, 1, 1)));
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 3, 31), now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 3, 31), new DateOnly(2026, 3, 31), now),
             CancellationToken.None);
 
         var unchanged = await context.LeaveBalances.SingleAsync();
@@ -230,7 +230,7 @@ public class LeavingDateChangeHandlerTests
             new FakeEmployeeStartDateReader(null));
 
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 3, 31), now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 3, 31), new DateOnly(2026, 3, 31), now),
             CancellationToken.None);
 
         var unchanged = await context.LeaveBalances.SingleAsync();
@@ -264,7 +264,7 @@ public class LeavingDateChangeHandlerTests
         // Leaving date backdated to a date already in the past relative to "now" — half the year
         // (Jan 1 - Jun 30 inclusive, 181 of 365 days).
         await handler.HandleAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 30), now),
+            new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 30), new DateOnly(2026, 6, 30), now),
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();

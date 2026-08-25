@@ -199,4 +199,47 @@ public class TaskItemTests
         Assert.Equal(new DateOnly(2026, 12, 31), task.DueDate);
         Assert.Equal(later, task.UpdatedAt);
     }
+
+    // OFF-02
+    [Fact]
+    public void Reschedule_Updates_DueDate_And_UpdatedAt_When_Date_Changes()
+    {
+        var task = CreateOpen(dueDate: new DateOnly(2026, 8, 1));
+        var later = Now.AddMinutes(5);
+        var newDueDate = new DateOnly(2026, 8, 15);
+
+        var changed = task.Reschedule(newDueDate, later);
+
+        Assert.True(changed);
+        Assert.Equal(newDueDate, task.DueDate);
+        Assert.Equal(later, task.UpdatedAt);
+    }
+
+    [Fact]
+    public void Reschedule_Is_NoOp_When_New_Date_Equals_Current_DueDate()
+    {
+        var dueDate = new DateOnly(2026, 8, 1);
+        var task = CreateOpen(dueDate: dueDate);
+        var later = Now.AddMinutes(5);
+
+        var changed = task.Reschedule(dueDate, later);
+
+        Assert.False(changed);
+        Assert.Equal(dueDate, task.DueDate);
+        Assert.Equal(Now, task.UpdatedAt);
+    }
+
+    [Fact]
+    public void Reschedule_Works_When_Current_DueDate_Is_Null()
+    {
+        var task = CreateOpen(dueDate: null);
+        var later = Now.AddMinutes(5);
+        var newDueDate = new DateOnly(2026, 8, 15);
+
+        var changed = task.Reschedule(newDueDate, later);
+
+        Assert.True(changed);
+        Assert.Equal(newDueDate, task.DueDate);
+        Assert.Equal(later, task.UpdatedAt);
+    }
 }

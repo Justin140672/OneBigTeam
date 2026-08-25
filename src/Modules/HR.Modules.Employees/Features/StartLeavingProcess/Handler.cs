@@ -120,7 +120,8 @@ internal sealed class StartLeavingProcessHandler(
         // employee's current policy year entitlement pro-rated through the new LeavingDate.
         await integrationEventPublisher.PublishAsync(
             new EmployeeLeavingDateSetIntegrationEvent(
-                leavingProcess.CompanyId, leavingProcess.EmployeeId, leavingProcess.LeavingDate, now),
+                leavingProcess.CompanyId, leavingProcess.EmployeeId,
+                leavingProcess.LeavingDate, leavingProcess.LastWorkingDay, now),
             cancellationToken);
 
         // request.ConfirmBackdatedLeavingDate is guaranteed true here — the unconfirmed case

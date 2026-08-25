@@ -71,4 +71,53 @@ public class OffboardingTaskTests
         Assert.Null(task.CompletedAt);
         Assert.Equal(later, task.UpdatedAt);
     }
+
+    // OFF-02
+    [Fact]
+    public void Reschedule_Updates_DueDate_And_UpdatedAt_When_Date_Changes()
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, new DateOnly(2026, 7, 1), FixedNow);
+        var later = FixedNow.AddDays(1);
+        var newDueDate = new DateOnly(2026, 7, 15);
+
+        var changed = task.Reschedule(newDueDate, later);
+
+        Assert.True(changed);
+        Assert.Equal(newDueDate, task.DueDate);
+        Assert.Equal(later, task.UpdatedAt);
+    }
+
+    [Fact]
+    public void Reschedule_Is_NoOp_When_New_Date_Equals_Current_DueDate()
+    {
+        var dueDate = new DateOnly(2026, 7, 1);
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, dueDate, FixedNow);
+        var later = FixedNow.AddDays(1);
+
+        var changed = task.Reschedule(dueDate, later);
+
+        Assert.False(changed);
+        Assert.Equal(dueDate, task.DueDate);
+        Assert.Equal(FixedNow, task.UpdatedAt);
+    }
+
+    [Fact]
+    public void Reschedule_Works_When_Current_DueDate_Is_Null()
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Conduct exit interview", null,
+            OffboardingTaskAssignTo.Manager, null, FixedNow);
+        var later = FixedNow.AddDays(1);
+        var newDueDate = new DateOnly(2026, 7, 15);
+
+        var changed = task.Reschedule(newDueDate, later);
+
+        Assert.True(changed);
+        Assert.Equal(newDueDate, task.DueDate);
+        Assert.Equal(later, task.UpdatedAt);
+    }
 }

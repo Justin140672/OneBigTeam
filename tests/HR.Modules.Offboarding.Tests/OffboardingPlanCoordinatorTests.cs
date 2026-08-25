@@ -37,11 +37,15 @@ public class OffboardingPlanCoordinatorTests
             new NoOpIntegrationEventPublisher());
 
     private static OffboardingPlanCoordinator BuildCoordinator(
-        OffboardingDbContext dbContext, FakeAuditPublisher? auditPublisher = null, FakeTaskCanceller? taskCanceller = null) =>
+        OffboardingDbContext dbContext,
+        FakeAuditPublisher? auditPublisher = null,
+        FakeTaskCanceller? taskCanceller = null,
+        FakeTaskRescheduler? taskRescheduler = null) =>
         new(
             BuildUnusedStartOffboardingHandler(dbContext),
             dbContext,
             taskCanceller ?? new FakeTaskCanceller(),
+            taskRescheduler ?? new FakeTaskRescheduler(),
             new FakeClock(FixedUtcNow),
             auditPublisher ?? new FakeAuditPublisher(),
             NullLogger<OffboardingPlanCoordinator>.Instance);
@@ -283,5 +287,246 @@ public class OffboardingPlanCoordinatorTests
 
         Assert.Empty(auditPublisher.Published);
         Assert.Empty(taskCanceller.CancelManyCalls);
+    }
+
+    // OFF-02: RescheduleOutstandingTasksAsync tests below.
+
+    [Fact]
+    public async Task RescheduleOutstandingTasksAsync_Is_NoOp_When_No_Plan_Exists()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var taskRescheduler = new FakeTaskRescheduler();
+        var coordinator = BuildCoordinator(dbContext, auditPublisher, taskRescheduler: taskRescheduler);
+
+        await coordinator.RescheduleOutstandingTasksAsync(
+            companyId, employeeId, new DateOnly(2026, 8, 15), CancellationToken.None);
+
+        Assert.Empty(auditPublisher.Published);
+        Assert.Empty(taskRescheduler.RescheduleManyCalls);
+    }
+
+    [Fact]
+    public async Task RescheduleOutstandingTasksAsync_Is_NoOp_When_Plan_Already_Completed()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var completedPlan = CreateActivePlan(companyId, employeeId, Now.AddDays(-30));
+        completedPlan.Complete(Now.AddDays(-10));
+        dbContext.OffboardingPlans.Add(completedPlan);
+        await dbContext.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var taskRescheduler = new FakeTaskRescheduler();
+        var coordinator = BuildCoordinator(dbContext, auditPublisher, taskRescheduler: taskRescheduler);
+
+        await coordinator.RescheduleOutstandingTasksAsync(
+            companyId, employeeId, new DateOnly(2026, 8, 15), CancellationToken.None);
+
+        Assert.Empty(auditPublisher.Published);
+        Assert.Empty(taskRescheduler.RescheduleManyCalls);
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == completedPlan.Id);
+        Assert.Equal(new DateOnly(2026, 8, 1), savedPlan.LastWorkingDay);
+    }
+
+    [Fact]
+    public async Task RescheduleOutstandingTasksAsync_Is_NoOp_When_Plan_Already_Cancelled()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var cancelledPlan = CreateActivePlan(companyId, employeeId, Now.AddDays(-30));
+        cancelledPlan.Cancel("Withdrawn.", Now.AddDays(-10));
+        dbContext.OffboardingPlans.Add(cancelledPlan);
+        await dbContext.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var taskRescheduler = new FakeTaskRescheduler();
+        var coordinator = BuildCoordinator(dbContext, auditPublisher, taskRescheduler: taskRescheduler);
+
+        await coordinator.RescheduleOutstandingTasksAsync(
+            companyId, employeeId, new DateOnly(2026, 8, 15), CancellationToken.None);
+
+        Assert.Empty(auditPublisher.Published);
+        Assert.Empty(taskRescheduler.RescheduleManyCalls);
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == cancelledPlan.Id);
+        Assert.Equal(new DateOnly(2026, 8, 1), savedPlan.LastWorkingDay);
+    }
+
+    [Fact]
+    public async Task RescheduleOutstandingTasksAsync_Moves_LastWorkingDay_And_Outstanding_Tasks_Later()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = CreateActivePlan(companyId, employeeId, Now.AddDays(-5));
+        dbContext.OffboardingPlans.Add(plan);
+
+        var pendingTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, new DateOnly(2026, 8, 1), Now.AddDays(-5));
+        var completedTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Conduct exit interview", null,
+            OffboardingTaskAssignTo.Manager, new DateOnly(2026, 8, 1), Now.AddDays(-5));
+        completedTask.Complete(Now.AddDays(-3));
+        var skippedTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Revoke system access", null,
+            OffboardingTaskAssignTo.Manager, new DateOnly(2026, 8, 1), Now.AddDays(-5));
+        skippedTask.Skip(Now.AddDays(-2));
+        dbContext.OffboardingTasks.AddRange(pendingTask, completedTask, skippedTask);
+        await dbContext.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var taskRescheduler = new FakeTaskRescheduler();
+        var coordinator = BuildCoordinator(dbContext, auditPublisher, taskRescheduler: taskRescheduler);
+
+        var newLastWorkingDay = new DateOnly(2026, 8, 20);
+
+        await coordinator.RescheduleOutstandingTasksAsync(
+            companyId, employeeId, newLastWorkingDay, CancellationToken.None);
+
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(newLastWorkingDay, savedPlan.LastWorkingDay);
+
+        var savedPendingTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == pendingTask.Id);
+        Assert.Equal(newLastWorkingDay, savedPendingTask.DueDate);
+
+        var savedCompletedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == completedTask.Id);
+        Assert.Equal(new DateOnly(2026, 8, 1), savedCompletedTask.DueDate);
+
+        var savedSkippedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == skippedTask.Id);
+        Assert.Equal(new DateOnly(2026, 8, 1), savedSkippedTask.DueDate);
+
+        var auditEvent = Assert.IsType<OffboardingPlanRescheduledAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal(companyId, auditEvent.CompanyId);
+        Assert.Equal(employeeId, auditEvent.EmployeeId);
+        Assert.Equal(plan.Id, auditEvent.OffboardingPlanId);
+        Assert.Equal(new DateOnly(2026, 8, 1), auditEvent.BeforeLastWorkingDay);
+        Assert.Equal(newLastWorkingDay, auditEvent.AfterLastWorkingDay);
+        Assert.Equal(1, auditEvent.OutstandingTasksRescheduled);
+
+        var call = Assert.Single(taskRescheduler.RescheduleManyCalls);
+        Assert.Equal(companyId, call.CompanyId);
+        Assert.Equal(TaskSource.Offboarding, call.Source);
+        Assert.Equal(TaskActionType.Complete, call.ActionType);
+        Assert.Equal(newLastWorkingDay, call.NewDueDate);
+        Assert.Equal(pendingTask.Id, Assert.Single(call.SourceEntityIds));
+    }
+
+    [Fact]
+    public async Task RescheduleOutstandingTasksAsync_Moves_LastWorkingDay_And_Outstanding_Tasks_Earlier()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = CreateActivePlan(companyId, employeeId, Now.AddDays(-5));
+        dbContext.OffboardingPlans.Add(plan);
+
+        var pendingTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, new DateOnly(2026, 8, 1), Now.AddDays(-5));
+        dbContext.OffboardingTasks.Add(pendingTask);
+        await dbContext.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var taskRescheduler = new FakeTaskRescheduler();
+        var coordinator = BuildCoordinator(dbContext, auditPublisher, taskRescheduler: taskRescheduler);
+
+        var newLastWorkingDay = new DateOnly(2026, 7, 10);
+
+        await coordinator.RescheduleOutstandingTasksAsync(
+            companyId, employeeId, newLastWorkingDay, CancellationToken.None);
+
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(newLastWorkingDay, savedPlan.LastWorkingDay);
+
+        var savedPendingTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == pendingTask.Id);
+        Assert.Equal(newLastWorkingDay, savedPendingTask.DueDate);
+
+        var auditEvent = Assert.IsType<OffboardingPlanRescheduledAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal(new DateOnly(2026, 8, 1), auditEvent.BeforeLastWorkingDay);
+        Assert.Equal(newLastWorkingDay, auditEvent.AfterLastWorkingDay);
+
+        var call = Assert.Single(taskRescheduler.RescheduleManyCalls);
+        Assert.Equal(newLastWorkingDay, call.NewDueDate);
+    }
+
+    // OFF-02: there is no confirmation step in Offboarding — Employees' AmendLeavingProcess handler
+    // already gates a backdated leaving date on ConfirmBackdatedLeavingDate before this event is even
+    // published, so the coordinator must just process whatever (possibly past) date arrives.
+    [Fact]
+    public async Task RescheduleOutstandingTasksAsync_Processes_Backdated_LastWorkingDay_Without_SpecialCasing()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = CreateActivePlan(companyId, employeeId, Now.AddDays(-30));
+        dbContext.OffboardingPlans.Add(plan);
+        var pendingTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, new DateOnly(2026, 8, 1), Now.AddDays(-30));
+        dbContext.OffboardingTasks.Add(pendingTask);
+        await dbContext.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var coordinator = BuildCoordinator(dbContext, auditPublisher);
+
+        // FixedUtcNow is 2026-07-24, so this date is in the past relative to "now".
+        var backdatedLastWorkingDay = new DateOnly(2026, 7, 1);
+
+        await coordinator.RescheduleOutstandingTasksAsync(
+            companyId, employeeId, backdatedLastWorkingDay, CancellationToken.None);
+
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(backdatedLastWorkingDay, savedPlan.LastWorkingDay);
+
+        var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == pendingTask.Id);
+        Assert.Equal(backdatedLastWorkingDay, savedTask.DueDate);
+
+        Assert.Single(auditPublisher.Published);
+    }
+
+    [Fact]
+    public async Task RescheduleOutstandingTasksAsync_Repeated_Call_With_Same_Date_Publishes_No_Additional_Audit_Event_But_Still_ReInvokes_TaskRescheduler()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = CreateActivePlan(companyId, employeeId, Now.AddDays(-5));
+        dbContext.OffboardingPlans.Add(plan);
+        var pendingTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, new DateOnly(2026, 8, 1), Now.AddDays(-5));
+        dbContext.OffboardingTasks.Add(pendingTask);
+        await dbContext.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var taskRescheduler = new FakeTaskRescheduler();
+        var coordinator = BuildCoordinator(dbContext, auditPublisher, taskRescheduler: taskRescheduler);
+
+        var newLastWorkingDay = new DateOnly(2026, 8, 20);
+
+        await coordinator.RescheduleOutstandingTasksAsync(
+            companyId, employeeId, newLastWorkingDay, CancellationToken.None);
+        await coordinator.RescheduleOutstandingTasksAsync(
+            companyId, employeeId, newLastWorkingDay, CancellationToken.None);
+
+        Assert.Single(auditPublisher.Published);
+        Assert.Equal(2, taskRescheduler.RescheduleManyCalls.Count);
+
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(newLastWorkingDay, savedPlan.LastWorkingDay);
+        var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == pendingTask.Id);
+        Assert.Equal(newLastWorkingDay, savedTask.DueDate);
     }
 }

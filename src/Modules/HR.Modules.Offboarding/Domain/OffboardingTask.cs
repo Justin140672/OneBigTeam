@@ -53,4 +53,20 @@ internal sealed class OffboardingTask
         Status = OffboardingTaskStatus.Skipped;
         UpdatedAt = now;
     }
+
+    // OFF-02: shifts this task's due date to track a plan-level LastWorkingDay amendment. Every
+    // OffboardingTask is created with DueDate == the plan's LastWorkingDay at generation time (see
+    // StartOffboardingHandler), so rescheduling the plan reschedules every outstanding task to the
+    // same new date. Returns false when DueDate already matches, so callers can detect a no-op —
+    // completed/skipped tasks are filtered out by the caller before this is ever invoked, which is
+    // what guarantees their DueDate is never rewritten.
+    public bool Reschedule(DateOnly newDueDate, DateTimeOffset now)
+    {
+        if (DueDate == newDueDate)
+            return false;
+
+        DueDate = newDueDate;
+        UpdatedAt = now;
+        return true;
+    }
 }

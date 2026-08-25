@@ -18,6 +18,7 @@ internal sealed class OffboardingPlanCoordinator(
     StartOffboardingHandler startOffboardingHandler,
     OffboardingDbContext dbContext,
     ITaskCanceller taskCanceller,
+    ITaskRescheduler taskRescheduler,
     IClock clock,
     IAuditEventPublisher auditEventPublisher,
     ILogger<OffboardingPlanCoordinator> logger) : IOffboardingPlanCoordinator
@@ -153,6 +154,100 @@ internal sealed class OffboardingPlanCoordinator(
                 "Cancelled {Count} outstanding Tasks-module task(s) for offboarding plan {OffboardingPlanId} " +
                 "(employee {EmployeeId}, company {CompanyId}).",
                 tasksModuleCancelledCount, plan.Id, employeeId, companyId);
+        }
+    }
+
+    // OFF-02: called by Offboarding's consumer of EmployeeLeavingDateSetIntegrationEvent whenever
+    // Employees' StartLeavingProcess or AmendLeavingProcess handler sets/amends the leaving
+    // date/last working day. Reconciles the active plan's LastWorkingDay and every outstanding
+    // OffboardingTask's due date to the given newLastWorkingDay, then propagates the same date to
+    // the corresponding Tasks-module TaskItems.
+    //
+    // Idempotent, mirroring CancelOutstandingTasksAsync's shape:
+    //  - No plan at all, or the most recent plan already Completed/Cancelled: no-op — a leaving
+    //    date can be amended before offboarding has started (nothing to reschedule yet; the plan
+    //    will be created with the correct LastWorkingDay when it does start) or after it has
+    //    finished/been withdrawn (a terminal plan must never be touched by this).
+    //  - Plan's LastWorkingDay already equals newLastWorkingDay, and every outstanding task's
+    //    DueDate already matches too: no local changes, no audit event — but the Tasks-module sync
+    //    below still always runs (self-healing after a partial prior failure), same as cancellation.
+    // Best-effort by design: this must never throw in a way that aborts the caller's own request.
+    public async Task RescheduleOutstandingTasksAsync(
+        Guid companyId,
+        Guid employeeId,
+        DateOnly newLastWorkingDay,
+        CancellationToken cancellationToken)
+    {
+        var plan = await dbContext.OffboardingPlans
+            .Where(p => p.CompanyId == companyId && p.EmployeeId == employeeId)
+            .OrderByDescending(p => p.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (plan is null)
+        {
+            logger.LogInformation(
+                "No offboarding plan found to reschedule for employee {EmployeeId} in company {CompanyId}.",
+                employeeId, companyId);
+            return;
+        }
+
+        if (plan.Status is OffboardingStatus.Completed or OffboardingStatus.Cancelled)
+        {
+            logger.LogInformation(
+                "Offboarding plan {OffboardingPlanId} for employee {EmployeeId} is already {Status} — " +
+                "a leaving date amendment has no effect on it.",
+                plan.Id, employeeId, plan.Status);
+            return;
+        }
+
+        var now = clock.UtcNowOffset();
+        var beforeLastWorkingDay = plan.LastWorkingDay;
+        var planChanged = plan.Reschedule(newLastWorkingDay, now);
+
+        var outstandingTasks = await dbContext.OffboardingTasks
+            .Where(t => t.OffboardingPlanId == plan.Id
+                && t.Status != OffboardingTaskStatus.Completed
+                && t.Status != OffboardingTaskStatus.Skipped)
+            .ToListAsync(cancellationToken);
+
+        var rescheduledTaskCount = outstandingTasks.Count(t => t.Reschedule(newLastWorkingDay, now));
+
+        if (planChanged || rescheduledTaskCount > 0)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditEventPublisher.PublishAsync(
+                new OffboardingPlanRescheduledAuditEvent(
+                    plan.CompanyId,
+                    plan.Id,
+                    plan.EmployeeId,
+                    beforeLastWorkingDay,
+                    newLastWorkingDay,
+                    rescheduledTaskCount,
+                    now),
+                cancellationToken);
+        }
+
+        // Always re-run the cross-module sync, mirroring CancelOutstandingTasksAsync — this is
+        // what makes the method self-healing if a previous call's local save succeeded but the
+        // Tasks-module call below failed or the process crashed before reaching it. Passing every
+        // outstanding OffboardingTask id every time is cheap: ITaskRescheduler only rewrites (and
+        // notifies for) tasks whose TaskItem.DueDate doesn't already match newLastWorkingDay.
+        if (outstandingTasks.Count == 0)
+            return;
+
+        var outstandingTaskIds = outstandingTasks.Select(t => t.Id).ToList();
+
+        var tasksModuleRescheduledCount = await taskRescheduler.RescheduleManyBySourceEntitiesAsync(
+            companyId, outstandingTaskIds, TaskSource.Offboarding, TaskActionType.Complete, newLastWorkingDay,
+            cancellationToken);
+
+        if (tasksModuleRescheduledCount > 0)
+        {
+            logger.LogInformation(
+                "Rescheduled {Count} outstanding Tasks-module task(s) to {NewLastWorkingDay} for offboarding " +
+                "plan {OffboardingPlanId} (employee {EmployeeId}, company {CompanyId}).",
+                tasksModuleRescheduledCount, newLastWorkingDay, plan.Id, employeeId, companyId);
         }
     }
 }

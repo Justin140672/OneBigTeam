@@ -14,8 +14,15 @@ namespace HR.Modules.Employees.Contracts;
 // leaving process is finalised (the leaving date has actually been reached/confirmed) — this event
 // fires immediately when the leaving date is set or amended, while the process is still in
 // progress and may yet be cancelled.
+//
+// OFF-02: LastWorkingDay was added alongside LeavingDate so Offboarding can become a second
+// consumer, reconciling the active offboarding plan's LastWorkingDay and its outstanding task due
+// dates whenever HR amends either date — mirroring how Leave already recalculates entitlement from
+// LeavingDate. As with LeavingDate, consumers must always treat LastWorkingDay as the current
+// absolute value (never an incremental delta), so a chain of amendments converges.
 public sealed record EmployeeLeavingDateSetIntegrationEvent(
     Guid CompanyId,
     Guid EmployeeId,
     DateOnly LeavingDate,
+    DateOnly LastWorkingDay,
     DateTimeOffset OccurredAt) : IIntegrationEvent;
