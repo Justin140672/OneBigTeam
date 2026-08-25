@@ -5,6 +5,7 @@ using HR.Modules.Offboarding.Features.StartOffboarding;
 using HR.Modules.Offboarding.Persistence;
 using HR.Modules.Offboarding.Services;
 using HR.Modules.Offboarding.Tests.Infrastructure;
+using HR.Modules.Tasks.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -36,10 +37,11 @@ public class OffboardingPlanCoordinatorTests
             new NoOpIntegrationEventPublisher());
 
     private static OffboardingPlanCoordinator BuildCoordinator(
-        OffboardingDbContext dbContext, FakeAuditPublisher? auditPublisher = null) =>
+        OffboardingDbContext dbContext, FakeAuditPublisher? auditPublisher = null, FakeTaskCanceller? taskCanceller = null) =>
         new(
             BuildUnusedStartOffboardingHandler(dbContext),
             dbContext,
+            taskCanceller ?? new FakeTaskCanceller(),
             new FakeClock(FixedUtcNow),
             auditPublisher ?? new FakeAuditPublisher(),
             NullLogger<OffboardingPlanCoordinator>.Instance);
@@ -192,5 +194,94 @@ public class OffboardingPlanCoordinatorTests
         Assert.Empty(auditPublisher.Published);
         var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == completedPlan.Id);
         Assert.Equal(OffboardingStatus.Completed, savedPlan.Status);
+    }
+
+    // OFF-01: the cross-module Tasks-module sync is the entire point of this method — previously
+    // only the local OffboardingTask rows were marked Skipped, leaving the real Tasks-module
+    // TaskItems dangling Open. This pins that CancelManyBySourceEntitiesAsync is actually invoked
+    // with the plan's own OffboardingTask ids and the correct source/action-type filter.
+    [Fact]
+    public async Task CancelOutstandingTasksAsync_Invokes_TaskCanceller_With_Plans_OffboardingTask_Ids()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = CreateActivePlan(companyId, employeeId, Now.AddDays(-5));
+        dbContext.OffboardingPlans.Add(plan);
+
+        var pendingTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Return laptop", null, OffboardingTaskAssignTo.Employee, null, Now.AddDays(-5));
+        var completedTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Conduct exit interview", null, OffboardingTaskAssignTo.Manager, null, Now.AddDays(-5));
+        completedTask.Complete(Now.AddDays(-3));
+        dbContext.OffboardingTasks.AddRange(pendingTask, completedTask);
+        await dbContext.SaveChangesAsync();
+
+        var taskCanceller = new FakeTaskCanceller();
+        var coordinator = BuildCoordinator(dbContext, taskCanceller: taskCanceller);
+
+        await coordinator.CancelOutstandingTasksAsync(companyId, employeeId, CancellationToken.None);
+
+        var call = Assert.Single(taskCanceller.CancelManyCalls);
+        Assert.Equal(companyId, call.CompanyId);
+        Assert.Equal(TaskSource.Offboarding, call.Source);
+        Assert.Equal(TaskActionType.Complete, call.ActionType);
+        Assert.Equal(
+            new[] { pendingTask.Id, completedTask.Id }.OrderBy(id => id),
+            call.SourceEntityIds.OrderBy(id => id));
+    }
+
+    // OFF-01: calling a second time on an already-Cancelled plan must still re-run the
+    // Tasks-module sync (this is what makes the method safe as a reconciliation retry after a
+    // partial failure) but must NOT publish a second audit event for the same cancellation.
+    [Fact]
+    public async Task CancelOutstandingTasksAsync_Called_Twice_ReInvokes_TaskCanceller_But_Does_Not_Duplicate_Audit_Event()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = CreateActivePlan(companyId, employeeId, Now.AddDays(-5));
+        dbContext.OffboardingPlans.Add(plan);
+        var pendingTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Return laptop", null, OffboardingTaskAssignTo.Employee, null, Now.AddDays(-5));
+        dbContext.OffboardingTasks.Add(pendingTask);
+        await dbContext.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var taskCanceller = new FakeTaskCanceller();
+        var coordinator = BuildCoordinator(dbContext, auditPublisher, taskCanceller);
+
+        await coordinator.CancelOutstandingTasksAsync(companyId, employeeId, CancellationToken.None);
+        await coordinator.CancelOutstandingTasksAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.Single(auditPublisher.Published);
+        Assert.Equal(2, taskCanceller.CancelManyCalls.Count);
+    }
+
+    // OFF-01: a Completed plan is a terminal state that must never be touched — including never
+    // even attempting the Tasks-module sync, since a completed offboarding plan's tasks are all
+    // already resolved and must not be reopened/cancelled retroactively.
+    [Fact]
+    public async Task CancelOutstandingTasksAsync_Does_Not_Invoke_TaskCanceller_When_Plan_Already_Completed()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var completedPlan = CreateActivePlan(companyId, employeeId, Now.AddDays(-30));
+        completedPlan.Complete(Now.AddDays(-10));
+        dbContext.OffboardingPlans.Add(completedPlan);
+        await dbContext.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var taskCanceller = new FakeTaskCanceller();
+        var coordinator = BuildCoordinator(dbContext, auditPublisher, taskCanceller);
+
+        await coordinator.CancelOutstandingTasksAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.Empty(auditPublisher.Published);
+        Assert.Empty(taskCanceller.CancelManyCalls);
     }
 }

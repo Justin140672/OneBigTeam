@@ -40,6 +40,21 @@ internal sealed class FakeTaskCanceller : ITaskCanceller
         return Task.FromResult(CancelAllReturnCount);
     }
 
+    /// <summary>Number of tasks CancelManyBySourceEntitiesAsync should report as cancelled — configure per test.</summary>
+    public int CancelManyReturnCount { get; set; }
+
+    public Task<int> CancelManyBySourceEntitiesAsync(
+        Guid companyId,
+        IReadOnlyCollection<Guid> sourceEntityIds,
+        TaskSource source,
+        TaskActionType actionType,
+        CancellationToken cancellationToken)
+    {
+        foreach (var sourceEntityId in sourceEntityIds)
+            _cancelAllCalls.Add(new CancelAllCall(companyId, sourceEntityId, source, actionType));
+        return Task.FromResult(CancelManyReturnCount);
+    }
+
     internal sealed record CancelledCall(
         Guid CompanyId,
         Guid SourceEntityId,

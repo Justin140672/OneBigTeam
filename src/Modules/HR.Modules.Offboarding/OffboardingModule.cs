@@ -1,6 +1,8 @@
 using HR.Modules.Tasks.Contracts;
 using FluentValidation;
 using Hangfire;
+using HR.Modules.Employees.Contracts;
+using HR.Modules.Offboarding.Features.CancelOffboardingOnLeavingProcessCancelled;
 using HR.Modules.Offboarding.Features.CompleteOffboardingTaskFromTask;
 using HR.Modules.Offboarding.Features.GetOffboardingOverview;
 using HR.Modules.Offboarding.Features.GetOffboardingStatus;
@@ -9,6 +11,7 @@ using HR.Modules.Offboarding.Jobs;
 using HR.Modules.Offboarding.Persistence;
 using HR.Modules.Offboarding.Services;
 using HR.Infrastructure.Abstractions;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,6 +39,13 @@ public static class OffboardingModule
         services.AddScoped<OffboardingReminderJob>();
         services.AddScoped<IWorkloadActionProvider, OutstandingOffboardingTasksWorkloadActionProvider>();
 
+        // OFF-01: second consumer of EmployeeLeavingProcessCancelledIntegrationEvent (alongside
+        // the Leave module's), plus the daily reconciliation job that catches up on anything this
+        // consumer (or Employees' own direct, synchronous call) failed to fully synchronise with
+        // the Tasks module.
+        services.AddScoped<IIntegrationEventHandler<EmployeeLeavingProcessCancelledIntegrationEvent>, CancelOffboardingOnLeavingProcessCancelledHandler>();
+        services.AddScoped<OffboardingCancellationReconciliationJob>();
+
         return services;
     }
 
@@ -46,6 +56,10 @@ public static class OffboardingModule
             "offboarding-reminders",
             job => job.ExecuteAsync(),
             Cron.Daily(8));
+        jobManager.AddOrUpdate<OffboardingCancellationReconciliationJob>(
+            "offboarding-cancellation-reconciliation",
+            job => job.ExecuteAsync(),
+            Cron.Daily(9));
         return app;
     }
 
