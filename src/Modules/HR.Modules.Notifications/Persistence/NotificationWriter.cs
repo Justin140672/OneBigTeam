@@ -9,7 +9,8 @@ namespace HR.Modules.Notifications.Persistence;
 
 internal sealed class NotificationWriter(
     NotificationsDbContext dbContext,
-    IBackgroundJobClient backgroundJobClient) : INotificationWriter
+    IBackgroundJobClient backgroundJobClient,
+    IAuditEventPublisher auditPublisher) : INotificationWriter
 {
     /// <summary>
     /// NOT-03: template-based write path for the six NotificationType values registered in
@@ -58,6 +59,11 @@ internal sealed class NotificationWriter(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        // NOT-05: creation audit — actor is the system, since this is shared infrastructure with
+        // no reliable human actor at this call site (see NotificationsSystemActor doc comment).
+        await auditPublisher.PublishAsync(new NotificationCreatedAuditEvent(
+            companyId, id, employeeId, type, channel, createdAt), cancellationToken);
+
         if (emailDelivery is not null)
         {
             backgroundJobClient.Enqueue<EmailDeliveryJob>(job => job.SendAsync(id, null));
@@ -97,6 +103,11 @@ internal sealed class NotificationWriter(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // NOT-05: creation audit — actor is the system, since this is shared infrastructure with
+        // no reliable human actor at this call site (see NotificationsSystemActor doc comment).
+        await auditPublisher.PublishAsync(new NotificationCreatedAuditEvent(
+            companyId, id, employeeId, type, channel, createdAt), cancellationToken);
 
         if (emailDelivery is not null)
         {

@@ -1,6 +1,8 @@
+using HR.Modules.Notifications;
 using HR.Modules.Notifications.Domain;
 using HR.Modules.Notifications.Features.MarkAllNotificationsRead;
 using HR.Modules.Notifications.Persistence;
+using HR.Modules.Notifications.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Notifications.Tests;
@@ -25,13 +27,14 @@ public class MarkAllNotificationsReadHandlerTests
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        ctx.Notifications.AddRange(
-            MakeNotification(companyId, employeeId, isRead: false),
-            MakeNotification(companyId, employeeId, isRead: false),
-            MakeNotification(companyId, employeeId, isRead: true));
+        var unread1 = MakeNotification(companyId, employeeId, isRead: false);
+        var unread2 = MakeNotification(companyId, employeeId, isRead: false);
+        var alreadyRead = MakeNotification(companyId, employeeId, isRead: true);
+        ctx.Notifications.AddRange(unread1, unread2, alreadyRead);
         await ctx.SaveChangesAsync();
+        var auditPublisher = new FakeAuditPublisher();
 
-        await new MarkAllNotificationsReadHandler(ctx).HandleAsync(
+        await new MarkAllNotificationsReadHandler(ctx, auditPublisher, new FakeClock(Now.UtcDateTime)).HandleAsync(
             new MarkAllNotificationsReadRequest { CompanyId = companyId, EmployeeId = employeeId },
             CancellationToken.None);
 
@@ -39,6 +42,20 @@ public class MarkAllNotificationsReadHandlerTests
             .Where(n => n.CompanyId == companyId && n.EmployeeId == employeeId)
             .ToListAsync();
         Assert.All(all, n => Assert.True(n.IsRead));
+
+        // NOT-05: one NotificationReadAuditEvent per notification actually transitioned from
+        // unread to read — the already-read notification does not produce a duplicate event.
+        Assert.Equal(2, auditPublisher.Published.Count);
+        var readEvents = auditPublisher.Published.Cast<NotificationReadAuditEvent>().ToList();
+        var publishedIds = readEvents.Select(e => e.NotificationId).OrderBy(id => id).ToList();
+        var expectedIds = new[] { unread1.Id, unread2.Id }.OrderBy(id => id).ToList();
+        Assert.Equal(expectedIds, publishedIds);
+        Assert.All(readEvents, e =>
+        {
+            Assert.Equal(companyId,  e.CompanyId);
+            Assert.Equal(employeeId, e.RecipientEmployeeId);
+            Assert.Equal(employeeId, ((HR.SharedKernel.IAuditEvent)e).ActorEmployeeId);
+        });
     }
 
     [Fact]
@@ -54,7 +71,7 @@ public class MarkAllNotificationsReadHandlerTests
             MakeNotification(companyId, employeeB));
         await ctx.SaveChangesAsync();
 
-        await new MarkAllNotificationsReadHandler(ctx).HandleAsync(
+        await new MarkAllNotificationsReadHandler(ctx, new FakeAuditPublisher(), new FakeClock(Now.UtcDateTime)).HandleAsync(
             new MarkAllNotificationsReadRequest { CompanyId = companyId, EmployeeId = employeeA },
             CancellationToken.None);
 
@@ -75,7 +92,7 @@ public class MarkAllNotificationsReadHandlerTests
             MakeNotification(companyB, employeeId));
         await ctx.SaveChangesAsync();
 
-        await new MarkAllNotificationsReadHandler(ctx).HandleAsync(
+        await new MarkAllNotificationsReadHandler(ctx, new FakeAuditPublisher(), new FakeClock(Now.UtcDateTime)).HandleAsync(
             new MarkAllNotificationsReadRequest { CompanyId = companyA, EmployeeId = employeeId },
             CancellationToken.None);
 
@@ -87,13 +104,16 @@ public class MarkAllNotificationsReadHandlerTests
     public async Task Is_Safe_When_No_Notifications_Exist()
     {
         await using var ctx = BuildContext();
+        var auditPublisher = new FakeAuditPublisher();
 
         var ex = await Record.ExceptionAsync(() =>
-            new MarkAllNotificationsReadHandler(ctx).HandleAsync(
+            new MarkAllNotificationsReadHandler(ctx, auditPublisher, new FakeClock(Now.UtcDateTime)).HandleAsync(
                 new MarkAllNotificationsReadRequest { CompanyId = Guid.NewGuid(), EmployeeId = Guid.NewGuid() },
                 CancellationToken.None));
 
         Assert.Null(ex);
+        // NOT-05: nothing unread => nothing published.
+        Assert.Empty(auditPublisher.Published);
     }
 
     private static NotificationsDbContext BuildContext()

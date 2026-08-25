@@ -1,8 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using HR.Infrastructure.Persistence;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using HR.SharedKernel;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -145,6 +148,93 @@ public class NotificationsEndpointTests
         var afterPayload = await afterResp.Content.ReadFromJsonAsync<NotifListPayload>();
         Assert.Equal(0, afterPayload!.UnreadCount);
         Assert.True(afterPayload.Items[0].IsRead);
+    }
+
+    // ── NOT-05: notification audit history ─────────────────────────────────────────
+
+    [Fact]
+    public async Task MarkNotificationRead_Persists_NotificationReadAuditEvent()
+    {
+        var userId       = Guid.NewGuid();
+        using var client = await AuthenticatedClient(userId);
+
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "NOT-05 audit test", assignedEmployeeId: userId);
+
+        var listResp    = await client.GetAsync($"/api/companies/{SeededCompanyId}/notifications/my");
+        var listPayload = await listResp.Content.ReadFromJsonAsync<NotifListPayload>();
+        var notifId     = listPayload!.Items[0].Id;
+
+        var markResp = await client.PutAsJsonAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/{notifId}/read",
+            new { companyId = SeededCompanyId, notificationId = notifId });
+        Assert.Equal(HttpStatusCode.NoContent, markResp.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == SeededCompanyId && e.EventType == "notifications.read" && e.EntityId == notifId)
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("Notification", auditRecord!.EntityType);
+        Assert.Equal(userId, auditRecord.EmployeeId);
+        // The recipient marks their own notification read — actor and recipient are the same employee.
+        Assert.Equal(userId, auditRecord.ActorEmployeeId);
+    }
+
+    [Fact]
+    public async Task MarkNotificationRead_Does_Not_Publish_A_Second_Audit_Event_When_Already_Read()
+    {
+        var userId       = Guid.NewGuid();
+        using var client = await AuthenticatedClient(userId);
+
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "NOT-05 idempotent audit test", assignedEmployeeId: userId);
+
+        var listResp    = await client.GetAsync($"/api/companies/{SeededCompanyId}/notifications/my");
+        var listPayload = await listResp.Content.ReadFromJsonAsync<NotifListPayload>();
+        var notifId     = listPayload!.Items[0].Id;
+
+        var body = new { companyId = SeededCompanyId, notificationId = notifId };
+        var firstResp  = await client.PutAsJsonAsync($"/api/companies/{SeededCompanyId}/notifications/{notifId}/read", body);
+        Assert.Equal(HttpStatusCode.NoContent, firstResp.StatusCode);
+        var secondResp = await client.PutAsJsonAsync($"/api/companies/{SeededCompanyId}/notifications/{notifId}/read", body);
+        Assert.Equal(HttpStatusCode.NoContent, secondResp.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecords = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == SeededCompanyId && e.EventType == "notifications.read" && e.EntityId == notifId)
+            .ToListAsync();
+
+        Assert.Single(auditRecords);
+    }
+
+    [Fact]
+    public async Task MarkAllNotificationsRead_Persists_One_NotificationReadAuditEvent_Per_Unread_Notification()
+    {
+        var userId       = Guid.NewGuid();
+        using var client = await AuthenticatedClient(userId);
+
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "NOT-05 bulk audit A", assignedEmployeeId: userId);
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "NOT-05 bulk audit B", assignedEmployeeId: userId);
+
+        var markAllResp = await client.PutAsJsonAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{userId}/notifications/read-all",
+            new { companyId = SeededCompanyId, employeeId = userId });
+        Assert.Equal(HttpStatusCode.NoContent, markAllResp.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecords = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == SeededCompanyId && e.EventType == "notifications.read" && e.EmployeeId == userId)
+            .ToListAsync();
+
+        Assert.Equal(2, auditRecords.Count);
+        Assert.All(auditRecords, r => Assert.Equal(userId, r.ActorEmployeeId));
     }
 
     // ── NOT-01: notification ownership enforcement ─────────────────────────────────

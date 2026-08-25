@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Notifications;
 using HR.Modules.Notifications.Domain;
 using HR.Modules.Notifications.Jobs;
 using HR.Modules.Notifications.Persistence;
@@ -15,7 +16,10 @@ namespace HR.Modules.Notifications.Tests;
 // here — see SendAsync_Transient_Failure_With_Null_Context_Rethrows_Without_Marking_Failed below.
 // The final-attempt-marks-Failed branch itself is not independently unit-tested for that reason;
 // SanitizeFailureReason's exception-to-category mapping and the "save + rethrow" shape either side
-// of that branch are otherwise fully exercised.
+// of that branch are otherwise fully exercised. NOT-05: consequently the isFinalAttempt branch's
+// EmailDeliveryFailedAuditEvent publish is also not directly exercised here — the "no recipient
+// email" immediate-fail path (SendAsync_No_Recipient_Email_...) exercises the exact same publish
+// call/shape via the sibling immediate-fail branch instead.
 public class EmailDeliveryJobTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 8, 6, 10, 0, 0, DateTimeKind.Utc);
@@ -28,12 +32,14 @@ public class EmailDeliveryJobTests
     private static EmailDeliveryJob BuildJob(
         NotificationsDbContext db,
         FakeEmailSender emailSender,
-        FakeUserEmailReader? userEmailReader = null) =>
+        FakeUserEmailReader? userEmailReader = null,
+        FakeAuditPublisher? auditPublisher = null) =>
         new(
             db,
             emailSender,
             userEmailReader ?? new FakeUserEmailReader(),
             new FakeClock(FixedUtcNow),
+            auditPublisher ?? new FakeAuditPublisher(),
             new FakeLogger<EmailDeliveryJob>());
 
     private static async Task<(Notification Notification, EmailDelivery Delivery)> SeedPendingDelivery(
@@ -75,6 +81,31 @@ public class EmailDeliveryJobTests
         Assert.NotNull(stored.LastAttemptAt);
     }
 
+    // NOT-05: audit -------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task SendAsync_Success_Publishes_EmailDeliverySucceededAuditEvent()
+    {
+        await using var db  = BuildContext();
+        var companyId        = Guid.NewGuid();
+        var notificationId   = Guid.NewGuid();
+        var (notification, _) = await SeedPendingDelivery(db, companyId, notificationId);
+        var emailSender       = new FakeEmailSender();
+        var auditPublisher    = new FakeAuditPublisher();
+        var job                = BuildJob(db, emailSender, auditPublisher: auditPublisher);
+
+        await job.SendAsync(notificationId);
+
+        var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
+        var evt = Assert.Single(auditPublisher.Published);
+        var succeeded = Assert.IsType<EmailDeliverySucceededAuditEvent>(evt);
+        Assert.Equal(companyId,                    succeeded.CompanyId);
+        Assert.Equal(notificationId,                succeeded.NotificationId);
+        Assert.Equal(notification.EmployeeId,       succeeded.RecipientEmployeeId);
+        Assert.Equal(stored.SentAt,                 succeeded.SentAt);
+        Assert.Equal(NotificationsSystemActor.Id,   ((HR.SharedKernel.IAuditEvent)succeeded).ActorEmployeeId);
+    }
+
     [Fact]
     public async Task SendAsync_Transient_Failure_With_Null_Context_Rethrows_Without_Marking_Failed()
     {
@@ -86,7 +117,8 @@ public class EmailDeliveryJobTests
         var notificationId   = Guid.NewGuid();
         await SeedPendingDelivery(db, companyId, notificationId);
         var emailSender       = new FakeEmailSender(failuresBeforeSuccess: int.MaxValue);
-        var job                = BuildJob(db, emailSender);
+        var auditPublisher    = new FakeAuditPublisher();
+        var job                = BuildJob(db, emailSender, auditPublisher: auditPublisher);
 
         await Assert.ThrowsAsync<HttpRequestException>(() => job.SendAsync(notificationId));
 
@@ -96,6 +128,10 @@ public class EmailDeliveryJobTests
         Assert.Null(stored.SentAt);
         Assert.Null(stored.FailureReason);
         Assert.Empty(emailSender.Calls);
+        // NOT-05: a non-final retry attempt must not publish a failure event — only the exhausted
+        // final attempt does, so a delivery that eventually succeeds after retries never shows a
+        // misleading failure event in its audit history.
+        Assert.Empty(auditPublisher.Published);
     }
 
     [Fact]
@@ -106,7 +142,8 @@ public class EmailDeliveryJobTests
         var notificationId   = Guid.NewGuid();
         await SeedPendingDelivery(db, companyId, notificationId);
         var emailSender       = new FakeEmailSender();
-        var job                = BuildJob(db, emailSender, new FakeUserEmailReader(email: null));
+        var auditPublisher    = new FakeAuditPublisher();
+        var job                = BuildJob(db, emailSender, new FakeUserEmailReader(email: null), auditPublisher);
 
         await job.SendAsync(notificationId); // must not throw
 
@@ -115,6 +152,13 @@ public class EmailDeliveryJobTests
         Assert.Equal("Invalid recipient address.",      stored.FailureReason);
         Assert.Equal(1,                                 stored.AttemptCount);
         Assert.Empty(emailSender.Calls);
+
+        var evt = Assert.Single(auditPublisher.Published);
+        var failed = Assert.IsType<EmailDeliveryFailedAuditEvent>(evt);
+        Assert.Equal(companyId,                     failed.CompanyId);
+        Assert.Equal(notificationId,                 failed.NotificationId);
+        Assert.Equal("Invalid recipient address.",   failed.SanitizedFailureReason);
+        Assert.DoesNotContain(nameof(HttpRequestException), failed.SanitizedFailureReason);
     }
 
     [Theory]
@@ -149,7 +193,8 @@ public class EmailDeliveryJobTests
         await db.SaveChangesAsync();
 
         var emailSender = new FakeEmailSender();
-        var job          = BuildJob(db, emailSender);
+        var auditPublisher = new FakeAuditPublisher();
+        var job          = BuildJob(db, emailSender, auditPublisher: auditPublisher);
 
         await job.SendAsync(notificationId);
 
@@ -157,6 +202,9 @@ public class EmailDeliveryJobTests
         var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
         Assert.Equal(1,               stored.AttemptCount); // unchanged — no additional RecordAttempt call
         Assert.Equal(EmailDeliveryStatus.Sent, stored.Status);
+        // NOT-05: replayed/re-enqueued jobs for an already-delivered notification must not publish a
+        // second, misleading success event.
+        Assert.Empty(auditPublisher.Published);
     }
 
     [Fact]

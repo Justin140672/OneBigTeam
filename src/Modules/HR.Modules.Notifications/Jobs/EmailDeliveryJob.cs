@@ -1,6 +1,7 @@
 using Hangfire;
 using Hangfire.Server;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Notifications;
 using HR.Modules.Notifications.Domain;
 using HR.Modules.Notifications.Persistence;
 using HR.SharedKernel;
@@ -36,6 +37,7 @@ internal sealed class EmailDeliveryJob(
     IEmailSender emailSender,
     IUserEmailReader userEmailReader,
     IClock clock,
+    IAuditEventPublisher auditPublisher,
     ILogger<EmailDeliveryJob> logger)
 {
     public const int MaxAttempts = 4;
@@ -79,6 +81,15 @@ internal sealed class EmailDeliveryJob(
             delivery.RecordAttempt(clock.UtcNowOffset());
             delivery.MarkFailed("Invalid recipient address.");
             await db.SaveChangesAsync();
+
+            // NOT-05: not worth retrying (see comment above) — this is itself a final, permanent
+            // failure, so it is audited immediately rather than waiting for [AutomaticRetry] to be
+            // exhausted. FailureReason is already sanitised (never the raw recipient/exception
+            // detail) — see EmailDelivery.MarkFailed's doc comment.
+            await auditPublisher.PublishAsync(new EmailDeliveryFailedAuditEvent(
+                delivery.CompanyId, notificationId, notification.EmployeeId,
+                delivery.FailureReason!, clock.UtcNowOffset()), CancellationToken.None);
+
             logger.LogWarning(
                 "EmailDeliveryJob: no email on file for employee {EmployeeId} (notification {NotificationId}) — delivery marked permanently failed.",
                 notification.EmployeeId, notificationId);
@@ -99,8 +110,16 @@ internal sealed class EmailDeliveryJob(
             var htmlBody = delivery.EmailBody ?? BuildHtmlBody(notification.Title, notification.Body);
             await emailSender.SendAsync(recipientEmail, subject, htmlBody, CancellationToken.None);
 
-            delivery.MarkSent(clock.UtcNowOffset());
+            var sentAt = clock.UtcNowOffset();
+            delivery.MarkSent(sentAt);
             await db.SaveChangesAsync();
+
+            // NOT-05: only reached on an actual first-time transition to Sent — the idempotency
+            // guard above (Status == Sent → return) short-circuits before this point on a replayed
+            // job for an already-delivered notification, so a retry that eventually succeeds
+            // produces exactly one success event, never a duplicate.
+            await auditPublisher.PublishAsync(new EmailDeliverySucceededAuditEvent(
+                delivery.CompanyId, notificationId, notification.EmployeeId, sentAt), CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -109,8 +128,17 @@ internal sealed class EmailDeliveryJob(
 
             if (isFinalAttempt)
             {
-                delivery.MarkFailed(SanitizeFailureReason(ex));
+                var reason = SanitizeFailureReason(ex);
+                delivery.MarkFailed(reason);
                 await db.SaveChangesAsync();
+
+                // NOT-05: final delivery failure only — never on an intermediate retry attempt
+                // (the else branch below, for retries not yet exhausted, deliberately publishes
+                // nothing). Reason is the same sanitised category persisted to FailureReason —
+                // never the raw exception message/stack trace.
+                await auditPublisher.PublishAsync(new EmailDeliveryFailedAuditEvent(
+                    delivery.CompanyId, notificationId, notification.EmployeeId,
+                    reason, clock.UtcNowOffset()), CancellationToken.None);
 
                 logger.LogError(ex,
                     "EmailDeliveryJob: email delivery permanently failed after {Attempts} attempts for notification {NotificationId}.",

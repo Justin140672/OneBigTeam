@@ -1,3 +1,4 @@
+using HR.Modules.Notifications;
 using HR.Modules.Notifications.Domain;
 using HR.Modules.Notifications.Jobs;
 using HR.Modules.Notifications.Persistence;
@@ -19,7 +20,7 @@ public class NotificationWriterTemplatedTests
     {
         await using var ctx = BuildContext();
         var backgroundJobClient = new RecordingBackgroundJobClient();
-        var writer = new NotificationWriter(ctx, backgroundJobClient);
+        var writer = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher());
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var sourceEntityId = Guid.NewGuid();
@@ -52,12 +53,45 @@ public class NotificationWriterTemplatedTests
         Assert.Equal(id, job.Args[0]);
     }
 
+    // NOT-05: audit -------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task WriteTemplatedAsync_Publishes_NotificationCreatedAuditEvent_On_Success()
+    {
+        await using var ctx = BuildContext();
+        var auditPublisher = new FakeAuditPublisher();
+        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), auditPublisher);
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var sourceEntityId = Guid.NewGuid();
+        var id = Guid.NewGuid();
+        var tokens = new Dictionary<string, string>
+        {
+            ["StartDate"] = "3 Aug 2026",
+            ["EndDate"] = "7 Aug 2026",
+        };
+
+        var result = await writer.WriteTemplatedAsync(
+            id, companyId, employeeId, NotificationType.LeaveApproved, tokens,
+            sourceEntityId, NotificationPriority.Normal, Now);
+
+        Assert.True(result.IsSuccess);
+
+        var evt = Assert.Single(auditPublisher.Published);
+        var created = Assert.IsType<NotificationCreatedAuditEvent>(evt);
+        Assert.Equal(companyId,                     created.CompanyId);
+        Assert.Equal(id,                             created.NotificationId);
+        Assert.Equal(employeeId,                     created.RecipientEmployeeId);
+        Assert.Equal(NotificationType.LeaveApproved, created.NotificationType);
+        Assert.Equal(NotificationsSystemActor.Id,    ((HR.SharedKernel.IAuditEvent)created).ActorEmployeeId);
+    }
+
     [Fact]
     public async Task WriteTemplatedAsync_TaskAssigned_Persists_Notification_But_Not_EmailDelivery_Or_Job()
     {
         await using var ctx = BuildContext();
         var backgroundJobClient = new RecordingBackgroundJobClient();
-        var writer = new NotificationWriter(ctx, backgroundJobClient);
+        var writer = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher());
         var tokens = new Dictionary<string, string>
         {
             ["TaskTitle"] = "Review leave request",
@@ -83,7 +117,8 @@ public class NotificationWriterTemplatedTests
     {
         await using var ctx = BuildContext();
         var backgroundJobClient = new RecordingBackgroundJobClient();
-        var writer = new NotificationWriter(ctx, backgroundJobClient);
+        var auditPublisher = new FakeAuditPublisher();
+        var writer = new NotificationWriter(ctx, backgroundJobClient, auditPublisher);
         var tokens = new Dictionary<string, string> { ["StartDate"] = "3 Aug 2026" }; // EndDate missing
 
         var result = await writer.WriteTemplatedAsync(
@@ -95,13 +130,14 @@ public class NotificationWriterTemplatedTests
         Assert.Empty(ctx.Notifications);
         Assert.Empty(ctx.EmailDeliveries);
         Assert.Empty(backgroundJobClient.CreatedJobs);
+        Assert.Empty(auditPublisher.Published);
     }
 
     [Fact]
     public async Task WriteTemplatedAsync_With_Unregistered_NotificationType_Throws_InvalidOperationException()
     {
         await using var ctx = BuildContext();
-        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient());
+        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WriteTemplatedAsync(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), NotificationType.TaskOverdue,
@@ -114,7 +150,7 @@ public class NotificationWriterTemplatedTests
     public async Task WriteTemplatedAsync_LeaveApproved_Persists_ActionUrl_Matching_NotificationActionRouteBuilder()
     {
         await using var ctx = BuildContext();
-        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient());
+        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var sourceEntityId = Guid.NewGuid();
@@ -142,7 +178,7 @@ public class NotificationWriterTemplatedTests
     public async Task WriteTemplatedAsync_TaskAssigned_Persists_ActionUrl_Matching_NotificationActionRouteBuilder()
     {
         await using var ctx = BuildContext();
-        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient());
+        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var sourceEntityId = Guid.NewGuid();
