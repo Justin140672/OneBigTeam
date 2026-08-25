@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="HR.Integration.Tests" />
+    <InternalsVisibleTo Include="HR.Modules.Reporting.Tests" />
   </ItemGroup>
 
   <ItemGroup>

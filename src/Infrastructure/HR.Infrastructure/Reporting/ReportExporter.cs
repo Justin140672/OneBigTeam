@@ -29,10 +29,10 @@ internal sealed class ReportExporter : IReportExporter
     private static ReportExportFile ExportCsv(ReportExportData data)
     {
         var builder = new StringBuilder();
-        builder.AppendLine(string.Join(',', data.ColumnHeaders.Select(EscapeCsvField)));
+        builder.AppendLine(string.Join(',', data.ColumnHeaders.Select(h => EscapeCsvField(NeutralizeFormulaInjection(h)))));
 
         foreach (var row in data.Rows)
-            builder.AppendLine(string.Join(',', row.Select(EscapeCsvField)));
+            builder.AppendLine(string.Join(',', row.Select(v => EscapeCsvField(NeutralizeFormulaInjection(v)))));
 
         var bytes = Encoding.UTF8.GetBytes(builder.ToString());
         return new ReportExportFile(bytes, "text/csv", $"{SafeFileName(data.ReportTitle)}.csv");
@@ -46,13 +46,44 @@ internal sealed class ReportExporter : IReportExporter
             : value;
     }
 
+    /// <summary>
+    /// Neutralises spreadsheet-formula injection (CSV/Excel formula injection, aka CSV injection).
+    /// Any value that a spreadsheet application would interpret as the start of a formula
+    /// (=, +, -, @) is prefixed so it is opened as plain text rather than executed. Leading
+    /// whitespace and control characters are stripped before detection so they cannot be used
+    /// to bypass the check. Genuine numeric values (including negative numbers) are left
+    /// untouched so they remain usable as numbers.
+    /// </summary>
+    private static string NeutralizeFormulaInjection(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return value ?? string.Empty;
+
+        var index = 0;
+        while (index < value.Length && (char.IsWhiteSpace(value[index]) || char.IsControl(value[index])))
+            index++;
+
+        if (index >= value.Length)
+            return value;
+
+        var firstSignificantChar = value[index];
+        if (firstSignificantChar is not ('=' or '+' or '-' or '@'))
+            return value;
+
+        // Genuine numeric values (e.g. "-42", " 3.14") are safe and must remain usable as numbers.
+        if (double.TryParse(value, NumberStyles.Float | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out _))
+            return value;
+
+        return "'" + value;
+    }
+
     private static ReportExportFile ExportExcel(ReportExportData data)
     {
         using var workbook = new XLWorkbook();
         var worksheet = workbook.Worksheets.Add("Report");
 
         for (var column = 0; column < data.ColumnHeaders.Count; column++)
-            worksheet.Cell(1, column + 1).Value = data.ColumnHeaders[column];
+            SetTextCell(worksheet.Cell(1, column + 1), data.ColumnHeaders[column]);
 
         worksheet.Row(1).Style.Font.Bold = true;
 
@@ -60,7 +91,7 @@ internal sealed class ReportExporter : IReportExporter
         {
             var row = data.Rows[rowIndex];
             for (var column = 0; column < row.Count; column++)
-                worksheet.Cell(rowIndex + 2, column + 1).Value = row[column] ?? string.Empty;
+                SetTextCell(worksheet.Cell(rowIndex + 2, column + 1), row[column]);
         }
 
         worksheet.Columns().AdjustToContents();
@@ -120,6 +151,19 @@ internal sealed class ReportExporter : IReportExporter
         var bytes = document.GeneratePdf();
 
         return new ReportExportFile(bytes, "application/pdf", $"{SafeFileName(data.ReportTitle)}.pdf");
+    }
+
+    /// <summary>
+    /// Writes an untrusted string value into an Excel cell, explicitly as text, after
+    /// neutralising any spreadsheet-formula injection prefix. This prevents both formula
+    /// execution and ClosedXML/Excel auto-detection turning the value into a number, date
+    /// or formula.
+    /// </summary>
+    private static void SetTextCell(IXLCell cell, string? value)
+    {
+        var neutralized = NeutralizeFormulaInjection(value ?? string.Empty);
+        cell.Style.NumberFormat.Format = "@";
+        cell.SetValue(neutralized);
     }
 
     private static string SafeFileName(string title)
