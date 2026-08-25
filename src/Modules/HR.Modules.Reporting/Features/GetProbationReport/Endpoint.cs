@@ -13,7 +13,7 @@ internal sealed class Endpoint(
     {
         Get("/api/companies/{companyId:guid}/reporting/probation");
         // Manager OR HrAdministrator baseline access — the handler enforces row-level scoping down
-        // to direct reports for non-HR callers (see Handler.cs), mirroring
+        // to the caller's complete reporting hierarchy for non-HR callers (see Handler.cs), mirroring
         // GetLeaveSummaryReport/Endpoint.cs exactly.
         Policies("reporting:view-probation");
     }

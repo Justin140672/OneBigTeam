@@ -13,8 +13,8 @@ internal sealed class Endpoint(
     {
         Get("/api/companies/{companyId:guid}/reporting/leave-summary");
         // Manager OR HrAdministrator baseline access — the handler enforces row-level scoping down
-        // to direct reports for non-HR callers (see Handler.cs), so the policy alone is not the
-        // only gate protecting company-wide data.
+        // to the caller's complete reporting hierarchy for non-HR callers (see Handler.cs), so the
+        // policy alone is not the only gate protecting company-wide data.
         Policies("reporting:view-leave-summary");
     }
 

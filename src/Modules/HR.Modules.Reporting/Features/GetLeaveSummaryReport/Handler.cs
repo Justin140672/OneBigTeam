@@ -18,12 +18,15 @@ internal sealed class GetLeaveSummaryReportHandler(
         var policyYear = request.PolicyYear ?? DateTime.UtcNow.Year;
 
         // Row-level manager scoping: a non-HR caller (Manager only, per reporting:view-leave-summary
-        // policy) is restricted to their own direct reports — never company-wide data — regardless
-        // of any filter supplied. This mirrors the same hard-gate approach GetTeamSicknessToday uses.
+        // policy) is restricted to their complete reporting hierarchy — every employee beneath them
+        // at any depth, not just direct reports — and never to company-wide data, regardless of any
+        // filter supplied. GetAllDescendantIdsAsync walks the manager tree (BFS) so cycles/malformed
+        // manager relationships cannot cause infinite loops or unbounded results (see
+        // DirectReportsReader.GetAllDescendantIdsAsync).
         IReadOnlyCollection<Guid>? employeeIds = null;
         if (!callerIsHr)
         {
-            var directReportIds = await directReportsReader.GetDirectReportIdsAsync(
+            var directReportIds = await directReportsReader.GetAllDescendantIdsAsync(
                 request.CompanyId, callerEmployeeId, cancellationToken);
             employeeIds = directReportIds.ToList();
 

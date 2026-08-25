@@ -36,11 +36,11 @@ internal sealed class GetReportCatalogHandler
         ("vacancy-performance-report", "Vacancy Performance Report", ReportCategory.Recruitment,
             "Per-vacancy days open, applicant count, interview count, offer count and hire date.", false, false, false, false, false),
         ("probation-report", "Probation Report", ReportCategory.Hr,
-            "Current probation, due and overdue reviews, passed and extended, visible to HR company-wide and to Managers for their own direct reports.", false, false, true, false, false),
+            "Current probation, due and overdue reviews, passed and extended, visible to HR company-wide and to Managers for their complete reporting hierarchy.", false, false, true, false, false),
 
         // Reporting Dashboard epic, phase 4 (OBT-712..715).
         ("onboarding-progress", "Onboarding Progress Report", ReportCategory.Hr,
-            "Onboarding plan status and outstanding tasks per employee, visible to HR company-wide and to Managers for their own direct reports.", false, false, false, true, false),
+            "Onboarding plan status and outstanding tasks per employee, visible to HR company-wide and to Managers for their complete reporting hierarchy.", false, false, false, true, false),
         ("offboarding-progress", "Offboarding Progress Report", ReportCategory.Hr,
             "Offboarding plan status, outstanding tasks, access and asset return status per employee.", false, false, false, false, false),
         ("document-compliance", "Document Compliance Report", ReportCategory.Hr,

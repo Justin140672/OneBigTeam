@@ -13,7 +13,8 @@ internal sealed class Endpoint(
     {
         Get("/api/companies/{companyId:guid}/reporting/onboarding-progress");
         // Manager OR HrAdministrator baseline access — the handler enforces row-level scoping down
-        // to direct reports for non-HR callers (see Handler.cs), mirroring GetProbationReport.
+        // to the caller's complete reporting hierarchy for non-HR callers (see Handler.cs), mirroring
+        // GetProbationReport.
         Policies("reporting:view-onboarding");
     }
 

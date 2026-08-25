@@ -16,12 +16,13 @@ internal sealed class GetProbationReportHandler(
         CancellationToken cancellationToken)
     {
         // Row-level manager scoping: a non-HR caller (Manager only, per reporting:view-probation
-        // policy) is restricted to their own direct reports — never company-wide data — regardless
-        // of any filter supplied. Mirrors GetLeaveSummaryReport/Handler.cs exactly.
+        // policy) is restricted to their complete reporting hierarchy — every employee beneath them
+        // at any depth, not just direct reports — and never to company-wide data, regardless of any
+        // filter supplied. Mirrors GetLeaveSummaryReport/Handler.cs exactly.
         IReadOnlyCollection<Guid>? employeeIds = null;
         if (!callerIsHr)
         {
-            var directReportIds = await directReportsReader.GetDirectReportIdsAsync(
+            var directReportIds = await directReportsReader.GetAllDescendantIdsAsync(
                 request.CompanyId, callerEmployeeId, cancellationToken);
             employeeIds = directReportIds.ToList();
 
