@@ -8,6 +8,7 @@ public sealed record NotificationDto(
     Guid SourceEntityId,
     string Type,
     string Priority,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? ActionUrl);
 
 public sealed record NotificationsResponse(int UnreadCount, List<NotificationDto> Items);

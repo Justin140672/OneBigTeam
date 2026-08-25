@@ -245,6 +245,48 @@ public class NotificationWriterTests
         Assert.Empty(backgroundJobClient.CreatedJobs);
     }
 
+    // NOT-04: ActionUrl computed at write time -------------------------------------------------
+
+    [Fact]
+    public async Task WriteAsync_Persists_ActionUrl_Matching_NotificationActionRouteBuilder_For_Mapped_Type()
+    {
+        await using var ctx  = BuildContext();
+        var writer           = new NotificationWriter(ctx, new NoOpBackgroundJobClient());
+        var companyId        = Guid.NewGuid();
+        var employeeId       = Guid.NewGuid();
+        var sourceEntityId   = Guid.NewGuid();
+        var id               = Guid.NewGuid();
+
+        await writer.WriteAsync(
+            id, companyId, employeeId,
+            "Task assigned", null,
+            sourceEntityId, NotificationType.TaskAssigned, NotificationPriority.Normal,
+            Now);
+
+        var expected = HR.Modules.Notifications.Domain.NotificationActionRouteBuilder.BuildActionUrl(
+            NotificationType.TaskAssigned, companyId, employeeId, sourceEntityId);
+
+        var saved = await ctx.Notifications.SingleAsync();
+        Assert.NotNull(expected);
+        Assert.Equal(expected, saved.ActionUrl);
+    }
+
+    [Fact]
+    public async Task WriteAsync_Persists_Null_ActionUrl_For_Type_With_No_Destination()
+    {
+        await using var ctx  = BuildContext();
+        var writer           = new NotificationWriter(ctx, new NoOpBackgroundJobClient());
+
+        await writer.WriteAsync(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "Interview scheduled", null,
+            Guid.NewGuid(), NotificationType.InterviewScheduled, NotificationPriority.Normal,
+            Now);
+
+        var saved = await ctx.Notifications.SingleAsync();
+        Assert.Null(saved.ActionUrl);
+    }
+
     private static NotificationsDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<NotificationsDbContext>()

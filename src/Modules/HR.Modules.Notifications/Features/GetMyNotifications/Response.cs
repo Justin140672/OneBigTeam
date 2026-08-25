@@ -8,7 +8,8 @@ internal sealed record MyNotificationItem(
     Guid SourceEntityId,
     string Type,
     string Priority,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? ActionUrl);
 
 internal sealed record GetMyNotificationsResponse(
     int UnreadCount,

@@ -1062,6 +1062,12 @@
             {
                 "probation" => _showProbationTab ? 4 : 0,
                 "leave" => LeaveTabIndex,
+                // NOT-04: deep-link targets for notification action URLs that land on this page's
+                // Sickness/Documents tabs (see NotificationActionRouteBuilder) — same index math as
+                // the always-rendered tabs above, shifted by ProbationOffset like every other tab
+                // after Probation's conditional slot.
+                "sickness" => 7 + ProbationOffset,
+                "documents" => 9 + ProbationOffset,
                 "onboarding" => _showOnboardingTab ? OnboardingTabIndex : 0,
                 "offboarding" => OffboardingTabIndex,
                 "leaving" => _showLeavingTab ? LeavingTabIndex : 0,

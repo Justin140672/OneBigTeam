@@ -108,6 +108,64 @@ public class NotificationWriterTemplatedTests
             new Dictionary<string, string>(), Guid.NewGuid(), NotificationPriority.Normal, Now));
     }
 
+    // NOT-04: ActionUrl computed at write time -------------------------------------------------
+
+    [Fact]
+    public async Task WriteTemplatedAsync_LeaveApproved_Persists_ActionUrl_Matching_NotificationActionRouteBuilder()
+    {
+        await using var ctx = BuildContext();
+        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient());
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var sourceEntityId = Guid.NewGuid();
+        var tokens = new Dictionary<string, string>
+        {
+            ["StartDate"] = "3 Aug 2026",
+            ["EndDate"] = "7 Aug 2026",
+        };
+
+        var result = await writer.WriteTemplatedAsync(
+            Guid.NewGuid(), companyId, employeeId, NotificationType.LeaveApproved, tokens,
+            sourceEntityId, NotificationPriority.Normal, Now);
+
+        Assert.True(result.IsSuccess);
+
+        var expected = NotificationActionRouteBuilder.BuildActionUrl(
+            NotificationType.LeaveApproved, companyId, employeeId, sourceEntityId);
+
+        var notification = await ctx.Notifications.SingleAsync();
+        Assert.NotNull(expected);
+        Assert.Equal(expected, notification.ActionUrl);
+    }
+
+    [Fact]
+    public async Task WriteTemplatedAsync_TaskAssigned_Persists_ActionUrl_Matching_NotificationActionRouteBuilder()
+    {
+        await using var ctx = BuildContext();
+        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient());
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var sourceEntityId = Guid.NewGuid();
+        var tokens = new Dictionary<string, string>
+        {
+            ["TaskTitle"] = "Review leave request",
+            ["TaskDescription"] = "Some detail",
+        };
+
+        var result = await writer.WriteTemplatedAsync(
+            Guid.NewGuid(), companyId, employeeId, NotificationType.TaskAssigned, tokens,
+            sourceEntityId, NotificationPriority.Normal, Now);
+
+        Assert.True(result.IsSuccess);
+
+        var expected = NotificationActionRouteBuilder.BuildActionUrl(
+            NotificationType.TaskAssigned, companyId, employeeId, sourceEntityId);
+
+        var notification = await ctx.Notifications.SingleAsync();
+        Assert.NotNull(expected);
+        Assert.Equal(expected, notification.ActionUrl);
+    }
+
     private static NotificationsDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<NotificationsDbContext>()

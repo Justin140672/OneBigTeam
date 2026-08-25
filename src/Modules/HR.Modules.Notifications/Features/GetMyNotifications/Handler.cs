@@ -16,7 +16,7 @@ internal sealed class GetMyNotificationsHandler(NotificationsDbContext dbContext
             .Take(50)
             .Select(n => new MyNotificationItem(
                 n.Id, n.Title, n.Body, n.IsRead,
-                n.SourceEntityId, n.Type.ToString(), n.Priority.ToString(), n.CreatedAt))
+                n.SourceEntityId, n.Type.ToString(), n.Priority.ToString(), n.CreatedAt, n.ActionUrl))
             .ToListAsync(cancellationToken);
 
         var unreadCount = items.Count(n => !n.IsRead);

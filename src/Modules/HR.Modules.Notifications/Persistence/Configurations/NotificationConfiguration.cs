@@ -57,6 +57,10 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
             .HasColumnName("created_at")
             .IsRequired();
 
+        builder.Property(n => n.ActionUrl)
+            .HasColumnName("action_url")
+            .HasMaxLength(500);
+
         builder.HasIndex(n => new { n.CompanyId, n.EmployeeId, n.IsRead });
 
         builder.HasIndex(n => new { n.EmployeeId, n.SourceEntityId, n.Type }).IsUnique();

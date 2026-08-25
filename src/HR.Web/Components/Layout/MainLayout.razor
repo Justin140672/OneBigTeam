@@ -1,6 +1,5 @@
 @inherits LayoutComponentBase
 @implements IDisposable
-@using HR.Web.Components.Pages.Tasks
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject AppSession Session
@@ -207,10 +206,12 @@ else
                                             {
                                                 var notif = n;
                                                 var (typeIcon, typeLabel, typeCss) = NotifTypeInfo(notif.Type);
+                                                var hasAction = !string.IsNullOrEmpty(notif.ActionUrl);
                                                 <div class="notif-item @(notif.IsRead ? "" : "notif-unread") notif-type--@notif.Type.ToLowerInvariant()"
                                                      role="button"
                                                      tabindex="0"
-                                                     aria-label="@($"{NotifTypeInfo(notif.Type).Label}: {notif.Title}")"
+                                                     aria-label="@($"{NotifTypeInfo(notif.Type).Label}: {notif.Title}{(hasAction ? "" : " (no further detail available)")}")"
+                                                     title="@(hasAction ? null : "No further detail available")"
                                                      @onclick="() => OnNotificationClick(notif)"
                                                      @onkeydown="e => OnNotificationKeyDown(e, notif)">
                                                     <div class="notif-item-header">
@@ -292,11 +293,6 @@ else
 
     </div>
 
-    <TaskViewDialog CompanyId="Session.CompanyId"
-                    TaskId="_notifiedTaskId"
-                    IsOpen="_taskDialogOpen"
-                    OnClosed="OnTaskDialogClosedAsync" />
-
 }
 
 @code {
@@ -329,9 +325,6 @@ else
     private List<NotificationDto> _notifications = [];
     private bool _notifOpen;
     private bool _helpOpen;
-
-    private Guid? _notifiedTaskId;
-    private bool _taskDialogOpen;
 
     private IReadOnlyList<DevPersonaDto> _personas = [];
     private List<PersonaOption> _personaOptions = [];
@@ -479,6 +472,14 @@ else
             await OnNotificationClick(notification);
     }
 
+    // NOT-04: navigates using the ActionUrl computed server-side by
+    // NotificationActionRouteBuilder at write time, instead of always opening the task dialog
+    // regardless of the notification's actual type. A null ActionUrl (informational notifications,
+    // or a type with no destination screen — see NotificationActionRouteBuilder) marks the
+    // notification read and closes the dropdown but performs no navigation; the "No further detail
+    // available" title/aria-label on the item (see markup above) is the only feedback in that case,
+    // per NOT-04's "friendly message rather than opening an unrelated dialog" acceptance criterion.
+    // Reachable identically via mouse click and Enter/Space keyboard activation (OnNotificationKeyDown).
     private async Task OnNotificationClick(NotificationDto notification)
     {
         _notifOpen = false;
@@ -490,18 +491,11 @@ else
             if (idx >= 0)
                 _notifications[idx] = notification with { IsRead = true };
         }
-        _notifiedTaskId = notification.SourceEntityId;
-        _taskDialogOpen = true;
-    }
 
-    // Mirrors HrInboxWidget's CloseTaskDialogAsync convention: refresh unconditionally on close
-    // (rather than trying to detect "was completed") so a task completed via the notification's
-    // TaskViewDialog is removed from — or updated in — the notification list immediately, instead
-    // of lingering until the next unrelated reload.
-    private async Task OnTaskDialogClosedAsync()
-    {
-        _taskDialogOpen = false;
-        await LoadNotificationsAsync();
+        if (!string.IsNullOrEmpty(notification.ActionUrl))
+        {
+            NavigationManager.NavigateTo(notification.ActionUrl);
+        }
     }
 
     private async Task MarkAllRead()

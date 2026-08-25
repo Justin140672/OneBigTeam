@@ -42,8 +42,9 @@ internal sealed class NotificationWriter(
 
         var rendered = renderResult.Value!;
 
+        var actionUrl = NotificationActionRouteBuilder.BuildActionUrl(type, companyId, employeeId, sourceEntityId);
         var notification = Notification.Create(
-            id, companyId, employeeId, rendered.InAppTitle, rendered.InAppBody, sourceEntityId, createdAt, type, priority);
+            id, companyId, employeeId, rendered.InAppTitle, rendered.InAppBody, sourceEntityId, createdAt, type, priority, actionUrl);
         dbContext.Notifications.Add(notification);
 
         var channel = NotificationChannelDefaults.GetChannel(type);
@@ -77,7 +78,8 @@ internal sealed class NotificationWriter(
         DateTimeOffset createdAt,
         CancellationToken cancellationToken = default)
     {
-        var notification = Notification.Create(id, companyId, employeeId, title, body, sourceEntityId, createdAt, type, priority);
+        var actionUrl = NotificationActionRouteBuilder.BuildActionUrl(type, companyId, employeeId, sourceEntityId);
+        var notification = Notification.Create(id, companyId, employeeId, title, body, sourceEntityId, createdAt, type, priority, actionUrl);
         dbContext.Notifications.Add(notification);
 
         // NOT-02: channel-aware delivery. In-app is always written above (existing baseline
