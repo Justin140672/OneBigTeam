@@ -62,6 +62,17 @@ public class GetHrSettingsEndpointTests
         Assert.Equal(createdCompanyId, payload!.CompanyId);
         Assert.Equal("Automatic", payload.EmployeeNumberMode);
         Assert.Equal(1, payload.NextEmployeeNumber);
+
+        // SET-04: newly-provisioned companies retain the CompanySettings.CreateDefault checkpoint
+        // and threshold defaults until explicitly changed.
+        Assert.Equal(30, payload.ProbationCheckpointDay1);
+        Assert.Equal(60, payload.ProbationCheckpointDay2);
+        Assert.Equal(90, payload.ProbationCheckpointDay3);
+        Assert.Equal(4, payload.FrequentAbsenceCountThreshold);
+        Assert.Equal(365, payload.FrequentAbsenceWindowDays);
+        Assert.Equal(28, payload.LongAbsenceDayThreshold);
+        Assert.Equal(3, payload.WeekdayPatternOccurrenceThreshold);
+        Assert.Equal(365, payload.WeekdayPatternWindowDays);
     }
 
     [Fact]
@@ -99,5 +110,13 @@ public class GetHrSettingsEndpointTests
         string? EmployeeNumberPrefix,
         int NextEmployeeNumber,
         int EmployeeNumberMinimumLength,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        int? ProbationCheckpointDay1,
+        int? ProbationCheckpointDay2,
+        int? ProbationCheckpointDay3,
+        int FrequentAbsenceCountThreshold,
+        int FrequentAbsenceWindowDays,
+        int LongAbsenceDayThreshold,
+        int WeekdayPatternOccurrenceThreshold,
+        int WeekdayPatternWindowDays);
 }

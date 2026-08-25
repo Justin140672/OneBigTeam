@@ -253,6 +253,27 @@ internal sealed class CompanySettings
         Version++;
     }
 
+    /// <summary>
+    /// SET-04: updates the SICK-04 attendance-pattern alert thresholds. Kept separate from
+    /// <see cref="UpdateHrPolicy"/> as its own concern, matching <see cref="UpdateProbationCheckpoints"/>.
+    /// </summary>
+    public void UpdateAttendanceAlertThresholds(
+        int frequentAbsenceCountThreshold,
+        int frequentAbsenceWindowDays,
+        int longAbsenceDayThreshold,
+        int weekdayPatternOccurrenceThreshold,
+        int weekdayPatternWindowDays,
+        DateTimeOffset now)
+    {
+        FrequentAbsenceCountThreshold = frequentAbsenceCountThreshold;
+        FrequentAbsenceWindowDays = frequentAbsenceWindowDays;
+        LongAbsenceDayThreshold = longAbsenceDayThreshold;
+        WeekdayPatternOccurrenceThreshold = weekdayPatternOccurrenceThreshold;
+        WeekdayPatternWindowDays = weekdayPatternWindowDays;
+        UpdatedAt = now;
+        Version++;
+    }
+
     public void UpdateAssetNumberSettings(
         AssetNumberMode assetNumberMode,
         string? assetNumberPrefix,

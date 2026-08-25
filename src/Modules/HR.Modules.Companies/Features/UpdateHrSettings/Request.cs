@@ -34,4 +34,19 @@ internal sealed record UpdateHrSettingsRequest
 
 	/// <summary>See UpdateCompanySettingsRequest.Version (SET-03) — same concurrency scheme.</summary>
 	public int Version { get; init; }
+
+	// SET-04: probation checkpoints (offsets in days from the probation start date). A null
+	// checkpoint explicitly disables it. Checkpoints must be positive, strictly increasing, and
+	// (when set) before ProbationMonths * 30 (the approximate probation end point) — see Validator.
+	public int? ProbationCheckpointDay1 { get; init; }
+	public int? ProbationCheckpointDay2 { get; init; }
+	public int? ProbationCheckpointDay3 { get; init; }
+
+	// SET-04: SICK-04 attendance-alert thresholds, now editable rather than fixed at their
+	// CreateDefault values.
+	public int FrequentAbsenceCountThreshold { get; init; } = 4;
+	public int FrequentAbsenceWindowDays { get; init; } = 365;
+	public int LongAbsenceDayThreshold { get; init; } = 28;
+	public int WeekdayPatternOccurrenceThreshold { get; init; } = 3;
+	public int WeekdayPatternWindowDays { get; init; } = 365;
 }

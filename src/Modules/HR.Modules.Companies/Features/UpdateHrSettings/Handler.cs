@@ -70,7 +70,15 @@ internal sealed class UpdateHrSettingsHandler
 				company.Settings.AssetNumberMode,
 				company.Settings.AssetNumberPrefix,
 				company.Settings.NextAssetNumber,
-				company.Settings.AssetNumberMinimumLength);
+				company.Settings.AssetNumberMinimumLength,
+				company.Settings.ProbationCheckpointDay1,
+				company.Settings.ProbationCheckpointDay2,
+				company.Settings.ProbationCheckpointDay3,
+				company.Settings.FrequentAbsenceCountThreshold,
+				company.Settings.FrequentAbsenceWindowDays,
+				company.Settings.LongAbsenceDayThreshold,
+				company.Settings.WeekdayPatternOccurrenceThreshold,
+				company.Settings.WeekdayPatternWindowDays);
 
 		var previousEmployeeNumberMode = company.Settings?.EmployeeNumberMode;
 		var previousEmployeeNumberPrefix = company.Settings?.EmployeeNumberPrefix;
@@ -104,6 +112,20 @@ internal sealed class UpdateHrSettingsHandler
 			request.AssetNumberPrefix,
 			request.NextAssetNumber,
 			request.AssetNumberMinimumLength,
+			now);
+
+		settings.UpdateProbationCheckpoints(
+			request.ProbationCheckpointDay1,
+			request.ProbationCheckpointDay2,
+			request.ProbationCheckpointDay3,
+			now);
+
+		settings.UpdateAttendanceAlertThresholds(
+			request.FrequentAbsenceCountThreshold,
+			request.FrequentAbsenceWindowDays,
+			request.LongAbsenceDayThreshold,
+			request.WeekdayPatternOccurrenceThreshold,
+			request.WeekdayPatternWindowDays,
 			now);
 
 		company.SetSettings(settings, now);
@@ -168,7 +190,15 @@ internal sealed class UpdateHrSettingsHandler
 					settings.AssetNumberMode,
 					settings.AssetNumberPrefix,
 					settings.NextAssetNumber,
-					settings.AssetNumberMinimumLength)),
+					settings.AssetNumberMinimumLength,
+					settings.ProbationCheckpointDay1,
+					settings.ProbationCheckpointDay2,
+					settings.ProbationCheckpointDay3,
+					settings.FrequentAbsenceCountThreshold,
+					settings.FrequentAbsenceWindowDays,
+					settings.LongAbsenceDayThreshold,
+					settings.WeekdayPatternOccurrenceThreshold,
+					settings.WeekdayPatternWindowDays)),
 			cancellationToken);
 
 		return Result.Success(new UpdateHrSettingsResponse(
@@ -197,6 +227,14 @@ internal sealed class UpdateHrSettingsHandler
 			settings.NextAssetNumber,
 			settings.AssetNumberMinimumLength,
 			settings.UpdatedAt,
-			settings.Version));
+			settings.Version,
+			settings.ProbationCheckpointDay1,
+			settings.ProbationCheckpointDay2,
+			settings.ProbationCheckpointDay3,
+			settings.FrequentAbsenceCountThreshold,
+			settings.FrequentAbsenceWindowDays,
+			settings.LongAbsenceDayThreshold,
+			settings.WeekdayPatternOccurrenceThreshold,
+			settings.WeekdayPatternWindowDays));
 	}
 }

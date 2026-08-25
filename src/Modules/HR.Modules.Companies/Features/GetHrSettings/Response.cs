@@ -31,4 +31,12 @@ internal sealed record GetHrSettingsResponse(
     int NextAssetNumber,
     int AssetNumberMinimumLength,
     DateTimeOffset UpdatedAt,
-    int Version);
+    int Version,
+    int? ProbationCheckpointDay1,
+    int? ProbationCheckpointDay2,
+    int? ProbationCheckpointDay3,
+    int FrequentAbsenceCountThreshold,
+    int FrequentAbsenceWindowDays,
+    int LongAbsenceDayThreshold,
+    int WeekdayPatternOccurrenceThreshold,
+    int WeekdayPatternWindowDays);

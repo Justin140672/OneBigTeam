@@ -204,7 +204,7 @@ public class UpdateHrSettingsEndpointTests
         // UpdateHrSettingsHandler calls both UpdateHrPolicy and UpdateAssetNumberSettings, each of
         // which increments Version once — a single successful HR-settings update therefore bumps
         // Version by 2 (1 -> 3), not 1.
-        Assert.Equal(3, firstPayload!.Version);
+        Assert.Equal(5, firstPayload!.Version);
 
         var secondResponse = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
         {
@@ -238,7 +238,120 @@ public class UpdateHrSettingsEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<UpdateHrSettingsPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(3, payload!.Version);
+        Assert.Equal(5, payload!.Version);
+    }
+
+    [Fact]
+    public async Task Put_Hr_Settings_Persists_ProbationCheckpoints_And_AttendanceAlertThresholds_And_RoundTrips_Via_Get()
+    {
+        var tenantId = Guid.NewGuid();
+        var companyId = await CreateCompanyAsync(tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
+
+        var putResponse = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
+        {
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 25,
+            probationMonths = 6,
+            probationCheckpointDay1 = 14,
+            probationCheckpointDay2 = 45,
+            probationCheckpointDay3 = 100,
+            frequentAbsenceCountThreshold = 6,
+            frequentAbsenceWindowDays = 180,
+            longAbsenceDayThreshold = 21,
+            weekdayPatternOccurrenceThreshold = 2,
+            weekdayPatternWindowDays = 200,
+        });
+
+        Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
+        var putPayload = await putResponse.Content.ReadFromJsonAsync<UpdateHrSettingsPayload>();
+        Assert.NotNull(putPayload);
+        Assert.Equal(14, putPayload!.ProbationCheckpointDay1);
+        Assert.Equal(45, putPayload.ProbationCheckpointDay2);
+        Assert.Equal(100, putPayload.ProbationCheckpointDay3);
+        Assert.Equal(6, putPayload.FrequentAbsenceCountThreshold);
+        Assert.Equal(180, putPayload.FrequentAbsenceWindowDays);
+        Assert.Equal(21, putPayload.LongAbsenceDayThreshold);
+        Assert.Equal(2, putPayload.WeekdayPatternOccurrenceThreshold);
+        Assert.Equal(200, putPayload.WeekdayPatternWindowDays);
+
+        var getResponse = await client.GetAsync($"/api/companies/{companyId}/hr-settings");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var getPayload = await getResponse.Content.ReadFromJsonAsync<GetHrSettingsRoundTripPayload>();
+        Assert.NotNull(getPayload);
+        Assert.Equal(14, getPayload!.ProbationCheckpointDay1);
+        Assert.Equal(45, getPayload.ProbationCheckpointDay2);
+        Assert.Equal(100, getPayload.ProbationCheckpointDay3);
+        Assert.Equal(6, getPayload.FrequentAbsenceCountThreshold);
+        Assert.Equal(180, getPayload.FrequentAbsenceWindowDays);
+        Assert.Equal(21, getPayload.LongAbsenceDayThreshold);
+        Assert.Equal(2, getPayload.WeekdayPatternOccurrenceThreshold);
+        Assert.Equal(200, getPayload.WeekdayPatternWindowDays);
+    }
+
+    [Fact]
+    public async Task Put_Hr_Settings_Returns_UnprocessableEntity_When_ProbationCheckpoints_Are_Out_Of_Order()
+    {
+        var tenantId = Guid.NewGuid();
+        var companyId = await CreateCompanyAsync(tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
+        {
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 25,
+            probationMonths = 6,
+            probationCheckpointDay1 = 60,
+            probationCheckpointDay2 = 30,
+        });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_Hr_Settings_Returns_UnprocessableEntity_When_FrequentAbsenceCountThreshold_Is_Out_Of_Range()
+    {
+        var tenantId = Guid.NewGuid();
+        var companyId = await CreateCompanyAsync(tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
+        {
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 25,
+            probationMonths = 6,
+            frequentAbsenceCountThreshold = 51,
+        });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_Hr_Settings_Retains_Default_Checkpoints_And_Thresholds_When_Not_Explicitly_Sent()
+    {
+        // SET-04 backward compatibility: a request that omits the new fields relies on the
+        // request DTO's own defaults (matching CompanySettings.CreateDefault), so existing
+        // companies retain their current values rather than being reset to null/zero.
+        var tenantId = Guid.NewGuid();
+        var companyId = await CreateCompanyAsync(tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", HrSettingsBody());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UpdateHrSettingsPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(4, payload!.FrequentAbsenceCountThreshold);
+        Assert.Equal(365, payload.FrequentAbsenceWindowDays);
+        Assert.Equal(28, payload.LongAbsenceDayThreshold);
+        Assert.Equal(3, payload.WeekdayPatternOccurrenceThreshold);
+        Assert.Equal(365, payload.WeekdayPatternWindowDays);
     }
 
     [Fact]
@@ -314,7 +427,15 @@ public class UpdateHrSettingsEndpointTests
         Guid CompanyId,
         int LeaveYearStartMonth,
         decimal DefaultHolidayAllowance,
-        int Version);
+        int Version,
+        int? ProbationCheckpointDay1,
+        int? ProbationCheckpointDay2,
+        int? ProbationCheckpointDay3,
+        int FrequentAbsenceCountThreshold,
+        int FrequentAbsenceWindowDays,
+        int LongAbsenceDayThreshold,
+        int WeekdayPatternOccurrenceThreshold,
+        int WeekdayPatternWindowDays);
 
     private sealed record GetCompanySettingsPayload(
         Guid CompanyId,
@@ -325,4 +446,15 @@ public class UpdateHrSettingsEndpointTests
         Guid CompanyId,
         int LeaveYearStartMonth,
         decimal DefaultHolidayAllowance);
+
+    private sealed record GetHrSettingsRoundTripPayload(
+        Guid CompanyId,
+        int? ProbationCheckpointDay1,
+        int? ProbationCheckpointDay2,
+        int? ProbationCheckpointDay3,
+        int FrequentAbsenceCountThreshold,
+        int FrequentAbsenceWindowDays,
+        int LongAbsenceDayThreshold,
+        int WeekdayPatternOccurrenceThreshold,
+        int WeekdayPatternWindowDays);
 }

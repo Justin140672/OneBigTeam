@@ -28,7 +28,15 @@ internal sealed record HrSettingsAuditSnapshot(
     AssetNumberMode AssetNumberMode,
     string? AssetNumberPrefix,
     int NextAssetNumber,
-    int AssetNumberMinimumLength);
+    int AssetNumberMinimumLength,
+    int? ProbationCheckpointDay1 = null,
+    int? ProbationCheckpointDay2 = null,
+    int? ProbationCheckpointDay3 = null,
+    int FrequentAbsenceCountThreshold = 0,
+    int FrequentAbsenceWindowDays = 0,
+    int LongAbsenceDayThreshold = 0,
+    int WeekdayPatternOccurrenceThreshold = 0,
+    int WeekdayPatternWindowDays = 0);
 
 internal sealed record HrSettingsUpdatedAuditEvent(
     Guid CompanyId,

@@ -72,6 +72,16 @@ public class CompanySettingsVersionTests
     }
 
     [Fact]
+    public void UpdateAttendanceAlertThresholds_Increments_Version_By_One()
+    {
+        var settings = CompanySettings.CreateDefault(Guid.NewGuid(), Now);
+
+        settings.UpdateAttendanceAlertThresholds(6, 180, 21, 2, 200, Now);
+
+        Assert.Equal(2, settings.Version);
+    }
+
+    [Fact]
     public void UpdateAssetNumberSettings_Increments_Version_By_One()
     {
         var settings = CompanySettings.CreateDefault(Guid.NewGuid(), Now);

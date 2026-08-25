@@ -53,7 +53,15 @@ internal sealed class GetHrSettingsHandler(CompaniesDbContext dbContext)
                 defaults.NextAssetNumber,
                 defaults.AssetNumberMinimumLength,
                 defaults.UpdatedAt,
-                defaults.Version));
+                defaults.Version,
+                defaults.ProbationCheckpointDay1,
+                defaults.ProbationCheckpointDay2,
+                defaults.ProbationCheckpointDay3,
+                defaults.FrequentAbsenceCountThreshold,
+                defaults.FrequentAbsenceWindowDays,
+                defaults.LongAbsenceDayThreshold,
+                defaults.WeekdayPatternOccurrenceThreshold,
+                defaults.WeekdayPatternWindowDays));
         }
 
         return Result.Success(new GetHrSettingsResponse(
@@ -82,6 +90,14 @@ internal sealed class GetHrSettingsHandler(CompaniesDbContext dbContext)
             settings.NextAssetNumber,
             settings.AssetNumberMinimumLength,
             settings.UpdatedAt,
-            settings.Version));
+            settings.Version,
+            settings.ProbationCheckpointDay1,
+            settings.ProbationCheckpointDay2,
+            settings.ProbationCheckpointDay3,
+            settings.FrequentAbsenceCountThreshold,
+            settings.FrequentAbsenceWindowDays,
+            settings.LongAbsenceDayThreshold,
+            settings.WeekdayPatternOccurrenceThreshold,
+            settings.WeekdayPatternWindowDays));
     }
 }

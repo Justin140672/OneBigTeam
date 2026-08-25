@@ -438,7 +438,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var firstResult = await firstHandler.HandleAsync(ValidRequest(company.Id) with { Version = 1 }, CancellationToken.None);
 		Assert.True(firstResult.IsSuccess);
-		Assert.Equal(3, firstResult.Value!.Version);
+		Assert.Equal(5, firstResult.Value!.Version);
 
 		// Second attempt is submitted against the stale Version = 1 read before the first update.
 		var auditPublisher = new CapturingAuditEventPublisher();
@@ -454,6 +454,110 @@ public class UpdateHrSettingsHandlerTests
 		Assert.True(secondResult.IsFailure);
 		Assert.Equal("conflict", secondResult.Error.Code);
 		Assert.Empty(auditPublisher.Published);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Persists_ProbationCheckpoints_And_AttendanceAlertThresholds()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 8, 25, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var handler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 8, 25, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+
+		var result = await handler.HandleAsync(
+			ValidRequest(company.Id) with
+			{
+				ProbationCheckpointDay1 = 14,
+				ProbationCheckpointDay2 = 45,
+				ProbationCheckpointDay3 = null,
+				FrequentAbsenceCountThreshold = 6,
+				FrequentAbsenceWindowDays = 180,
+				LongAbsenceDayThreshold = 21,
+				WeekdayPatternOccurrenceThreshold = 2,
+				WeekdayPatternWindowDays = 200,
+			},
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+		Assert.Equal(14, result.Value!.ProbationCheckpointDay1);
+		Assert.Equal(45, result.Value.ProbationCheckpointDay2);
+		Assert.Null(result.Value.ProbationCheckpointDay3);
+		Assert.Equal(6, result.Value.FrequentAbsenceCountThreshold);
+		Assert.Equal(180, result.Value.FrequentAbsenceWindowDays);
+		Assert.Equal(21, result.Value.LongAbsenceDayThreshold);
+		Assert.Equal(2, result.Value.WeekdayPatternOccurrenceThreshold);
+		Assert.Equal(200, result.Value.WeekdayPatternWindowDays);
+
+		var savedSettings = await context.CompanySettings.SingleAsync();
+		Assert.Equal(14, savedSettings.ProbationCheckpointDay1);
+		Assert.Equal(45, savedSettings.ProbationCheckpointDay2);
+		Assert.Null(savedSettings.ProbationCheckpointDay3);
+		Assert.Equal(6, savedSettings.FrequentAbsenceCountThreshold);
+		Assert.Equal(180, savedSettings.FrequentAbsenceWindowDays);
+		Assert.Equal(21, savedSettings.LongAbsenceDayThreshold);
+		Assert.Equal(2, savedSettings.WeekdayPatternOccurrenceThreshold);
+		Assert.Equal(200, savedSettings.WeekdayPatternWindowDays);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Includes_ProbationCheckpoints_And_AttendanceAlertThresholds_In_AuditEvent_BeforeAndAfter_Snapshots()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 8, 25, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var auditPublisher = new CapturingAuditEventPublisher();
+		var updateTime = new DateTime(2026, 8, 25, 11, 0, 0, DateTimeKind.Utc);
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+
+		await handler.HandleAsync(
+			ValidRequest(company.Id) with
+			{
+				ProbationCheckpointDay1 = 14,
+				ProbationCheckpointDay2 = 45,
+				ProbationCheckpointDay3 = null,
+				FrequentAbsenceCountThreshold = 6,
+				FrequentAbsenceWindowDays = 180,
+				LongAbsenceDayThreshold = 21,
+				WeekdayPatternOccurrenceThreshold = 2,
+				WeekdayPatternWindowDays = 200,
+			},
+			CancellationToken.None);
+
+		var auditEvt = Assert.Single(auditPublisher.Published);
+		var auditEvent = Assert.IsType<HrSettingsUpdatedAuditEvent>(auditEvt);
+
+		Assert.NotNull(auditEvent.PreviousSettings);
+		// Defaults established by CompanySettings.CreateDefault.
+		Assert.Equal(30, auditEvent.PreviousSettings!.ProbationCheckpointDay1);
+		Assert.Equal(60, auditEvent.PreviousSettings.ProbationCheckpointDay2);
+		Assert.Equal(90, auditEvent.PreviousSettings.ProbationCheckpointDay3);
+		Assert.Equal(4, auditEvent.PreviousSettings.FrequentAbsenceCountThreshold);
+		Assert.Equal(365, auditEvent.PreviousSettings.FrequentAbsenceWindowDays);
+		Assert.Equal(28, auditEvent.PreviousSettings.LongAbsenceDayThreshold);
+		Assert.Equal(3, auditEvent.PreviousSettings.WeekdayPatternOccurrenceThreshold);
+		Assert.Equal(365, auditEvent.PreviousSettings.WeekdayPatternWindowDays);
+
+		Assert.Equal(14, auditEvent.CurrentSettings.ProbationCheckpointDay1);
+		Assert.Equal(45, auditEvent.CurrentSettings.ProbationCheckpointDay2);
+		Assert.Null(auditEvent.CurrentSettings.ProbationCheckpointDay3);
+		Assert.Equal(6, auditEvent.CurrentSettings.FrequentAbsenceCountThreshold);
+		Assert.Equal(180, auditEvent.CurrentSettings.FrequentAbsenceWindowDays);
+		Assert.Equal(21, auditEvent.CurrentSettings.LongAbsenceDayThreshold);
+		Assert.Equal(2, auditEvent.CurrentSettings.WeekdayPatternOccurrenceThreshold);
+		Assert.Equal(200, auditEvent.CurrentSettings.WeekdayPatternWindowDays);
 	}
 
 	private static CompaniesDbContext BuildContext()

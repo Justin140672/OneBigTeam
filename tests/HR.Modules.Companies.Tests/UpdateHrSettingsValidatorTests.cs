@@ -301,4 +301,283 @@ public class UpdateHrSettingsValidatorTests
 		Assert.False(result.IsValid);
 		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.EmployeeNumberPrefix));
 	}
+
+	// SET-04: probation checkpoints.
+
+	[Fact]
+	public void Validate_Passes_When_ProbationCheckpoints_Are_Valid_And_Strictly_Increasing()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with
+		{
+			ProbationMonths = 6,
+			ProbationCheckpointDay1 = 30,
+			ProbationCheckpointDay2 = 60,
+			ProbationCheckpointDay3 = 90,
+		});
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Passes_When_All_ProbationCheckpoints_Are_Null()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with
+		{
+			ProbationCheckpointDay1 = null,
+			ProbationCheckpointDay2 = null,
+			ProbationCheckpointDay3 = null,
+		});
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Passes_When_Only_A_Later_ProbationCheckpoint_Is_Configured()
+	{
+		// Day1 = null, Day2 = 10, Day3 = 20 — nulls are simply skipped, not required to be trailing.
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with
+		{
+			ProbationMonths = 6,
+			ProbationCheckpointDay1 = null,
+			ProbationCheckpointDay2 = 10,
+			ProbationCheckpointDay3 = 20,
+		});
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_ProbationCheckpointDay1_Is_Zero()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { ProbationCheckpointDay1 = 0 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.ProbationCheckpointDay1));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_ProbationCheckpointDay1_Is_Negative()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { ProbationCheckpointDay1 = -5 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.ProbationCheckpointDay1));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_ProbationCheckpoints_Contain_A_Duplicate_Value()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with
+		{
+			ProbationMonths = 6,
+			ProbationCheckpointDay1 = 30,
+			ProbationCheckpointDay2 = 30,
+			ProbationCheckpointDay3 = null,
+		});
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == "ProbationCheckpoints");
+	}
+
+	[Fact]
+	public void Validate_Fails_When_ProbationCheckpoints_Are_Out_Of_Order()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with
+		{
+			ProbationMonths = 6,
+			ProbationCheckpointDay1 = 60,
+			ProbationCheckpointDay2 = 30,
+			ProbationCheckpointDay3 = null,
+		});
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == "ProbationCheckpoints");
+	}
+
+	[Fact]
+	public void Validate_Fails_When_A_ProbationCheckpoint_Equals_The_Probation_End_Day()
+	{
+		// ProbationMonths = 6 -> end day = 180. Exactly 180 must fail (strictly less-than required).
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with
+		{
+			ProbationMonths = 6,
+			ProbationCheckpointDay1 = 30,
+			ProbationCheckpointDay2 = 60,
+			ProbationCheckpointDay3 = 180,
+		});
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == "ProbationCheckpoints");
+	}
+
+	[Fact]
+	public void Validate_Passes_When_A_ProbationCheckpoint_Is_One_Day_Before_The_Probation_End_Day()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with
+		{
+			ProbationMonths = 6,
+			ProbationCheckpointDay1 = 30,
+			ProbationCheckpointDay2 = 60,
+			ProbationCheckpointDay3 = 179,
+		});
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_A_ProbationCheckpoint_Exceeds_The_Probation_End_Day()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with
+		{
+			ProbationMonths = 6,
+			ProbationCheckpointDay1 = 30,
+			ProbationCheckpointDay2 = 200,
+			ProbationCheckpointDay3 = null,
+		});
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == "ProbationCheckpoints");
+	}
+
+	// SET-04: attendance-alert thresholds.
+
+	[Theory]
+	[InlineData(1)]
+	[InlineData(50)]
+	public void Validate_Passes_For_FrequentAbsenceCountThreshold_At_Boundaries(int threshold)
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { FrequentAbsenceCountThreshold = threshold });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_FrequentAbsenceCountThreshold_Is_Zero()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { FrequentAbsenceCountThreshold = 0 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.FrequentAbsenceCountThreshold));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_FrequentAbsenceCountThreshold_Exceeds_Fifty()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { FrequentAbsenceCountThreshold = 51 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.FrequentAbsenceCountThreshold));
+	}
+
+	[Theory]
+	[InlineData(30)]
+	[InlineData(730)]
+	public void Validate_Passes_For_FrequentAbsenceWindowDays_At_Boundaries(int windowDays)
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { FrequentAbsenceWindowDays = windowDays });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_FrequentAbsenceWindowDays_Is_Below_Thirty()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { FrequentAbsenceWindowDays = 29 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.FrequentAbsenceWindowDays));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_FrequentAbsenceWindowDays_Exceeds_SevenHundredThirty()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { FrequentAbsenceWindowDays = 731 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.FrequentAbsenceWindowDays));
+	}
+
+	[Theory]
+	[InlineData(1)]
+	[InlineData(365)]
+	public void Validate_Passes_For_LongAbsenceDayThreshold_At_Boundaries(int threshold)
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { LongAbsenceDayThreshold = threshold });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_LongAbsenceDayThreshold_Is_Zero()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { LongAbsenceDayThreshold = 0 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.LongAbsenceDayThreshold));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_LongAbsenceDayThreshold_Exceeds_ThreeHundredSixtyFive()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { LongAbsenceDayThreshold = 366 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.LongAbsenceDayThreshold));
+	}
+
+	[Theory]
+	[InlineData(1)]
+	[InlineData(50)]
+	public void Validate_Passes_For_WeekdayPatternOccurrenceThreshold_At_Boundaries(int threshold)
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { WeekdayPatternOccurrenceThreshold = threshold });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_WeekdayPatternOccurrenceThreshold_Is_Zero()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { WeekdayPatternOccurrenceThreshold = 0 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.WeekdayPatternOccurrenceThreshold));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_WeekdayPatternOccurrenceThreshold_Exceeds_Fifty()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { WeekdayPatternOccurrenceThreshold = 51 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.WeekdayPatternOccurrenceThreshold));
+	}
+
+	[Theory]
+	[InlineData(30)]
+	[InlineData(730)]
+	public void Validate_Passes_For_WeekdayPatternWindowDays_At_Boundaries(int windowDays)
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { WeekdayPatternWindowDays = windowDays });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_WeekdayPatternWindowDays_Is_Below_Thirty()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { WeekdayPatternWindowDays = 29 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.WeekdayPatternWindowDays));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_WeekdayPatternWindowDays_Exceeds_SevenHundredThirty()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { WeekdayPatternWindowDays = 731 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.WeekdayPatternWindowDays));
+	}
 }
