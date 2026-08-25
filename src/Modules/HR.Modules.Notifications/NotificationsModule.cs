@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Notifications.Domain;
 using HR.Infrastructure.Abstractions;
@@ -6,6 +7,9 @@ using HR.Modules.Notifications.Features.GetMyNotifications;
 using HR.Modules.Notifications.Features.GetUnreadNotificationCount;
 using HR.Modules.Notifications.Features.MarkAllNotificationsRead;
 using HR.Modules.Notifications.Features.MarkNotificationRead;
+using HR.Modules.Notifications.Features.NotifyOnCandidateHired;
+using HR.Modules.Notifications.Features.NotifyOnEmployeeCreated;
+using HR.Modules.Notifications.Features.NotifyOnLeaveRequested;
 using HR.Modules.Notifications.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +31,16 @@ public static class NotificationsModule
         services.AddScoped<GetUnreadNotificationCountHandler>();
         services.AddScoped<MarkNotificationReadHandler>();
         services.AddScoped<MarkAllNotificationsReadHandler>();
+
+        // NOT-07: event-driven notification consumers. Notifications is a pure consumer of
+        // integration events published by their owning modules (Leave, Employees, Recruitment) —
+        // it never references those modules' implementation projects, only their sanctioned
+        // *.Contracts surfaces (IManagerReader, IEmployeeNameReader, IPositionProfileReader) plus
+        // the shared IHrAdministratorDirectory already used elsewhere (Probation, Offboarding,
+        // Support) for HR-queue resolution.
+        services.AddScoped<IIntegrationEventHandler<LeaveRequestedIntegrationEvent>, NotifyOnLeaveRequestedHandler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, NotifyOnEmployeeCreatedHandler>();
+        services.AddScoped<IIntegrationEventHandler<CandidateHiredIntegrationEvent>, NotifyOnCandidateHiredHandler>();
 
         return services;
     }

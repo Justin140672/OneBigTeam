@@ -21,8 +21,15 @@ public class NotificationsEndpointTests
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            // Every real user carries the Employee role as a floor (see IdentityModule.AddRolePolicies /
+            // "role:employee"), so a persona that also happens to be an HR Administrator must be seeded
+            // with both roles here — otherwise the "role:employee" policy on endpoints like
+            // MarkNotificationRead rejects the request with 403 before the handler's own ownership check
+            // (which is what NOT-01's anti-enumeration NotFound behaviour actually exercises) is reached.
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.Employee);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator);
+        }).GetAwaiter().GetResult();
     }
 
     // ── GetMyNotifications ────────────────────────────────────────────────────────
