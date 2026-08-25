@@ -31,8 +31,12 @@ internal sealed class OffboardingPlanCoordinator(
         Guid? replacementManagerEmployeeId,
         CancellationToken cancellationToken)
     {
+        // OFF-08: this coordinator path is always the system-driven auto-start triggered by
+        // Employees' StartLeavingProcess handler, never a direct human "Start Offboarding" action
+        // (that goes through StartOffboarding's Endpoint, which resolves the real actor).
         var request = new StartOffboardingRequest(
-            companyId, employeeId, lastWorkingDay, notes, replacementManagerEmployeeId);
+            companyId, employeeId, lastWorkingDay, notes, replacementManagerEmployeeId,
+            ActorEmployeeId: OffboardingSystemActor.Id);
         var result = await startOffboardingHandler.HandleAsync(request, cancellationToken);
 
         if (result.IsFailure)

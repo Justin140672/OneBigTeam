@@ -23,7 +23,8 @@ internal sealed class StartOffboardingHandler(
     ICompanyLeavingSettingsReader leavingSettingsReader,
     IHrAdministratorDirectory hrAdministratorDirectory,
     IDirectReportsReader directReportsReader,
-    ITaskReassigner taskReassigner)
+    ITaskReassigner taskReassigner,
+    IAuditEventPublisher auditEventPublisher)
 {
     public async Task<Result<StartOffboardingResponse>> HandleAsync(
         StartOffboardingRequest request,
@@ -168,6 +169,23 @@ internal sealed class StartOffboardingHandler(
 
         await NotifyOffboardingStartedAsync(
             plan, employeeName, managerId, isBackdated, accessAlreadyDisabled, now, cancellationToken);
+
+        // OFF-08: exactly one plan is ever created per employee for this handler invocation — the
+        // unique active-plan index (surfaced above as the DbUpdateException Conflict) guarantees
+        // this SaveChangesAsync only ever reaches here once per plan, so no duplicate-publish guard
+        // is needed.
+        await auditEventPublisher.PublishAsync(
+            new OffboardingPlanStartedAuditEvent(
+                plan.CompanyId,
+                plan.Id,
+                plan.EmployeeId,
+                request.ActorEmployeeId ?? OffboardingSystemActor.Id,
+                plan.LastWorkingDay,
+                generatedTaskIds.Count,
+                dbContext.OffboardingTasks.Local.Count(t => t.OffboardingPlanId == plan.Id && t.IsMandatory),
+                isBackdated,
+                now),
+            cancellationToken);
 
         await integrationEventPublisher.PublishAsync(
             new OffboardingStartedIntegrationEvent(plan.CompanyId, plan.EmployeeId, now),

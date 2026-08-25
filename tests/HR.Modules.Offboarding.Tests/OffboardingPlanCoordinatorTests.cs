@@ -40,7 +40,8 @@ public class OffboardingPlanCoordinatorTests
             new FakeCompanyLeavingSettingsReader(),
             new FakeHrAdministratorDirectory(),
             new FakeDirectReportsReader(),
-            new FakeTaskReassigner());
+            new FakeTaskReassigner(),
+            new FakeAuditPublisher());
 
     private static OffboardingPlanCoordinator BuildCoordinator(
         OffboardingDbContext dbContext,

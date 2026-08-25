@@ -23,15 +23,18 @@ public class StartOffboardingHandlerTests
 
     private static StartOffboardingRequest BuildRequest(
         Guid companyId, Guid employeeId, DateOnly? lastWorkingDay = null, string? notes = null,
-        Guid? replacementManagerEmployeeId = null) =>
-        new(companyId, employeeId, lastWorkingDay ?? new DateOnly(2026, 7, 15), notes, replacementManagerEmployeeId);
+        Guid? replacementManagerEmployeeId = null, Guid? actorEmployeeId = null) =>
+        new(
+            companyId, employeeId, lastWorkingDay ?? new DateOnly(2026, 7, 15), notes,
+            replacementManagerEmployeeId, actorEmployeeId);
 
     private sealed record Harness(
         StartOffboardingHandler Handler,
         FakeNotificationWriter Notifications,
         FakeTaskCreator TaskCreator,
         CapturingIntegrationEventPublisher IntegrationPublisher,
-        FakeTaskReassigner TaskReassigner);
+        FakeTaskReassigner TaskReassigner,
+        FakeAuditPublisher AuditPublisher);
 
     private static Harness BuildHandler(
         OffboardingDbContext dbContext,
@@ -47,6 +50,7 @@ public class StartOffboardingHandlerTests
         var taskCreator = new FakeTaskCreator();
         var integrationPublisher = new CapturingIntegrationEventPublisher();
         var taskReassigner = new FakeTaskReassigner();
+        var auditPublisher = new FakeAuditPublisher();
         var taskSynchronizer = new OffboardingTaskSynchronizer(
             dbContext,
             taskCreator,
@@ -65,8 +69,9 @@ public class StartOffboardingHandlerTests
             new FakeCompanyLeavingSettingsReader(autoDisableAccessOnLeavingDate),
             new FakeHrAdministratorDirectory(hrAdministratorEmployeeIds),
             new FakeDirectReportsReader((directReportIds ?? []).ToArray()),
-            taskReassigner);
-        return new Harness(handler, notifications, taskCreator, integrationPublisher, taskReassigner);
+            taskReassigner,
+            auditPublisher);
+        return new Harness(handler, notifications, taskCreator, integrationPublisher, taskReassigner, auditPublisher);
     }
 
     [Fact]
@@ -784,5 +789,49 @@ public class StartOffboardingHandlerTests
         Assert.Contains(exceptionTasks, t => t.Title.Contains("Robin Report"));
         Assert.Contains(exceptionTasks, t => t.Title.Contains("Casey Colleague"));
         Assert.All(exceptionTasks, t => Assert.True(t.RequiresHrConfirmation));
+    }
+
+    // OFF-08: the human HR actor who started the plan (e.g. via the manual "Start Offboarding"
+    // endpoint) must be attributed on OffboardingPlanStartedAuditEvent, never null/unattributed.
+    [Fact]
+    public async Task HandleAsync_Publishes_OffboardingPlanStartedAuditEvent_With_Human_Actor()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var actorEmployeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var harness = BuildHandler(dbContext, names);
+
+        var request = BuildRequest(companyId, employeeId, actorEmployeeId: actorEmployeeId);
+        var result = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var startedEvent = Assert.Single(
+            harness.AuditPublisher.Published.OfType<HR.Modules.Offboarding.OffboardingPlanStartedAuditEvent>());
+        Assert.Equal(result.Value!.Id, startedEvent.OffboardingPlanId);
+        Assert.Equal(employeeId, startedEvent.EmployeeId);
+        Assert.Equal(actorEmployeeId, startedEvent.ActorEmployeeId);
+    }
+
+    // OFF-08: when no actor is supplied (e.g. the reconciliation job's system-driven path), the
+    // event falls back to OffboardingSystemActor.Id rather than publishing an unattributed audit
+    // entry.
+    [Fact]
+    public async Task HandleAsync_Falls_Back_To_SystemActor_When_No_ActorEmployeeId_Supplied()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var harness = BuildHandler(dbContext, names);
+
+        var request = BuildRequest(companyId, employeeId);
+        var result = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var startedEvent = Assert.Single(
+            harness.AuditPublisher.Published.OfType<HR.Modules.Offboarding.OffboardingPlanStartedAuditEvent>());
+        Assert.Equal(HR.Modules.Offboarding.OffboardingSystemActor.Id, startedEvent.ActorEmployeeId);
     }
 }

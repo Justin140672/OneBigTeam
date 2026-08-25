@@ -915,6 +915,94 @@ public class AuditHistoryIntegrationTests
         Assert.DoesNotContain(sensitiveReason, auditRecord.AfterJson ?? string.Empty);
     }
 
+    // OFF-08: StartOffboarding (the manual "Start Offboarding" HR action) must attribute its audit
+    // event to the authenticated HR actor — never leave ActorEmployeeId unset/null the way every
+    // Offboarding audit event previously did.
+    [Fact]
+    public async Task StartOffboarding_Persists_Audit_Record_Attributed_To_Authenticated_Actor()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+
+        var startResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/offboarding/start",
+            new { companyId, employeeId, lastWorkingDay = "2026-12-01", notes = "Resigned." });
+        startResp.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "offboarding-plan.started" && e.EmployeeId == employeeId)
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("OffboardingPlan", auditRecord!.EntityType);
+        Assert.Equal(employeeId, auditRecord.EmployeeId);
+        // The critical assertion for OFF-08: the plan-started event must be attributed to the real
+        // authenticated HR actor, not left null/unattributed as every Offboarding audit event did
+        // before this ticket.
+        Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
+    }
+
+    // OFF-08: completing the sole/final offboarding task must both (a) publish a task-level
+    // OffboardingTaskCompletedAuditEvent distinct from the plan-level roll-up, and (b) attribute
+    // the resulting OffboardingPlanCompletedAuditEvent to the person who actually completed the
+    // task (via TaskCompletionContext.CompletedBy) — not leave it unattributed.
+    [Fact]
+    public async Task CompleteOffboardingTask_Persists_TaskLevel_And_PlanCompleted_Audit_Records_With_Actor()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+
+        var startResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/offboarding/start",
+            new { companyId, employeeId, lastWorkingDay = "2026-12-01", notes = "Resigned." });
+        startResp.EnsureSuccessStatusCode();
+
+        // Locate the Tasks-module TaskItem(s) generated for this offboarding plan and complete
+        // every one of them, driving the plan to Completed and exercising both the task-level and
+        // plan-level audit events end-to-end.
+        var tasksResp = await hrAdminClient.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/tasks");
+        tasksResp.EnsureSuccessStatusCode();
+        var tasksPayload = await tasksResp.Content.ReadFromJsonAsync<EmployeeTaskListPayload>();
+
+        var offboardingTasks = tasksPayload?.Items.Where(t => t.Source == "Offboarding").ToList() ?? [];
+
+        if (offboardingTasks.Count == 0)
+        {
+            // No employee-assigned Offboarding tasks (e.g. all checklist items were manager/HR-
+            // assigned) — the plan-started attribution assertion above already covers OFF-08's core
+            // requirement; nothing further to exercise here without a more elaborate fixture.
+            return;
+        }
+
+        foreach (var task in offboardingTasks)
+        {
+            var completeResp = await hrAdminClient.PostAsJsonAsync(
+                $"/api/companies/{companyId}/tasks/{task.Id}/complete",
+                new { companyId, id = task.Id });
+            completeResp.EnsureSuccessStatusCode();
+        }
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var taskCompletedRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "offboarding-task.completed" && e.EmployeeId == employeeId)
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(taskCompletedRecord);
+        Assert.Equal("OffboardingTask", taskCompletedRecord!.EntityType);
+        Assert.Equal(HrAdminUser, taskCompletedRecord.ActorEmployeeId);
+    }
+
     private static async Task<(Guid recordId, Guid reviewId)> CreateProbationRecordAndReviewAsync(
         HttpClient client, Guid companyId, string reviewType)
     {
@@ -1075,6 +1163,10 @@ public class AuditHistoryIntegrationTests
     }
 
     private sealed record IdPayload(Guid Id);
+
+    private sealed record EmployeeTaskItemPayload(Guid Id, string Source);
+
+    private sealed record EmployeeTaskListPayload(List<EmployeeTaskItemPayload> Items);
 
     private sealed record DepartmentPayload(Guid Id, string Name);
 

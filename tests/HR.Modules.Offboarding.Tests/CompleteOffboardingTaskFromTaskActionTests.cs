@@ -206,15 +206,29 @@ public class CompleteOffboardingTaskFromTaskActionTests
 
         await action.ExecuteAsync(context, CancellationToken.None);
 
-        var published = Assert.Single(auditPublisher.Published);
-        Assert.Equal("offboarding-plan.completed", published.EventType);
-        Assert.Equal("OffboardingPlan", published.EntityType);
-        Assert.Equal(plan.Id, published.EntityId);
-        Assert.Equal(plan.EmployeeId, published.EmployeeId);
+        // OFF-08: completing the final task now publishes two audit entries — the task-level
+        // OffboardingTaskCompletedAuditEvent (every completion) and the plan-level
+        // OffboardingPlanCompletedAuditEvent (only when this was the resolving task).
+        Assert.Equal(2, auditPublisher.Published.Count);
+
+        var taskEvent = Assert.Single(auditPublisher.Published, e => e.EventType == "offboarding-task.completed");
+        Assert.Equal("OffboardingTask", taskEvent.EntityType);
+        Assert.Equal(taskToComplete.Id, taskEvent.EntityId);
+        Assert.Equal(plan.EmployeeId, taskEvent.EmployeeId);
+        Assert.Equal(context.CompletedBy, taskEvent.ActorEmployeeId);
+        Assert.Equal(plan.Id, taskEvent.CorrelationId);
+
+        var planEvent = Assert.Single(auditPublisher.Published, e => e.EventType == "offboarding-plan.completed");
+        Assert.Equal("OffboardingPlan", planEvent.EntityType);
+        Assert.Equal(plan.Id, planEvent.EntityId);
+        Assert.Equal(plan.EmployeeId, planEvent.EmployeeId);
+        // The person whose action resolved the plan's last task is attributed as the plan-completed
+        // actor too — never assumed to be the leaving employee themself.
+        Assert.Equal(context.CompletedBy, planEvent.ActorEmployeeId);
     }
 
     [Fact]
-    public async Task ExecuteAsync_Completing_A_NonFinal_Task_Does_Not_Publish_PlanCompletedAuditEvent()
+    public async Task ExecuteAsync_Completing_A_NonFinal_Task_Publishes_Only_The_TaskLevel_Audit_Event()
     {
         await using var dbContext = BuildContext();
         var companyId = Guid.NewGuid();
@@ -230,7 +244,11 @@ public class CompleteOffboardingTaskFromTaskActionTests
 
         await action.ExecuteAsync(context, CancellationToken.None);
 
-        Assert.Empty(auditPublisher.Published);
+        // OFF-08: a per-task audit entry is always published on completion, even when it doesn't
+        // resolve the whole plan — only the plan-level event is conditional on that.
+        var published = Assert.Single(auditPublisher.Published);
+        Assert.Equal("offboarding-task.completed", published.EventType);
+        Assert.Equal(taskToComplete.Id, published.EntityId);
     }
 
     [Fact]
@@ -650,7 +668,8 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.False(afterFirst.RequiresHrReconciliation);
         Assert.Equal(OffboardingStatus.Completed, afterFirst.Status);
         Assert.Single(taskCreator.Created);
-        Assert.Single(auditPublisher.Published);
+        // OFF-08: task-level + plan-level audit entries for this single resolving completion.
+        Assert.Equal(2, auditPublisher.Published.Count);
 
         // Replaying the same completion (e.g. a retried Tasks-module callback) hits the
         // Status is Completed/Skipped early-return and must not throw, re-clear an already-clear
@@ -661,7 +680,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.False(afterSecond.RequiresHrReconciliation);
         Assert.Equal(OffboardingStatus.Completed, afterSecond.Status);
         Assert.Single(taskCreator.Created);
-        Assert.Single(auditPublisher.Published);
+        Assert.Equal(2, auditPublisher.Published.Count);
     }
 
     // ---- OFF-07: "Skip" outcome decision ----
@@ -897,5 +916,108 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var created = Assert.Single(taskCreator.Created);
         Assert.Null(created.AssignedEmployeeId);
         Assert.Empty(notifications.Written);
+    }
+
+    // OFF-08: task-level completion audit — actor must be the person who completed the
+    // Tasks-module TaskItem (TaskCompletionContext.CompletedBy), never assumed to be the plan's
+    // employee, and the event must carry the OffboardingTaskId/OffboardingPlanId/AssetAssignmentId
+    // cross-module correlation fields.
+    [Fact]
+    public async Task ExecuteAsync_Publishes_OffboardingTaskCompletedAuditEvent_With_Correct_Actor_And_Ids()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var assetAssignmentId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), companyId, employeeId, new DateOnly(2026, 7, 1), null, seedAt);
+        plan.Start(seedAt);
+        dbContext.OffboardingPlans.Add(plan);
+        var task = SeedTask(
+            dbContext, companyId, plan.Id, seedAt, title: "Return laptop", assetAssignmentId: assetAssignmentId);
+        // A second outstanding mandatory task so completing the first does not also complete the plan
+        // — keeps this test focused on the task-level event only.
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Other task");
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, _, auditPublisher, assetReturnService) = BuildAction(dbContext);
+        var actorId = Guid.NewGuid();
+        var context = BuildTaskContext(companyId, task.Id) with { CompletedBy = actorId };
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var completedEvent = Assert.Single(
+            auditPublisher.Published.OfType<HR.Modules.Offboarding.OffboardingTaskCompletedAuditEvent>());
+        Assert.Equal(task.Id, completedEvent.OffboardingTaskId);
+        Assert.Equal(plan.Id, completedEvent.OffboardingPlanId);
+        Assert.Equal(employeeId, completedEvent.EmployeeId);
+        Assert.Equal(actorId, completedEvent.ActorEmployeeId);
+        Assert.Equal(assetAssignmentId, completedEvent.AssetAssignmentId);
+    }
+
+    // OFF-08: task-level skip audit — actor and reason must be carried through, and the plan's
+    // aggregate OffboardingPlanCompletedAuditEvent must not fire since a skipped mandatory task
+    // still blocks plan completion.
+    [Fact]
+    public async Task ExecuteAsync_Skip_Publishes_OffboardingTaskSkippedAuditEvent_With_Reason_And_Actor()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), companyId, employeeId, new DateOnly(2026, 7, 1), null, seedAt);
+        plan.Start(seedAt);
+        dbContext.OffboardingPlans.Add(plan);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Conduct exit interview");
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, _, auditPublisher, _) = BuildAction(dbContext);
+        var actorId = Guid.NewGuid();
+        var context = BuildTaskContext(companyId, task.Id, outcomeDecision: "Skip", outcomeReason: "Not required.")
+            with
+        { CompletedBy = actorId };
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var skippedEvent = Assert.Single(
+            auditPublisher.Published.OfType<HR.Modules.Offboarding.OffboardingTaskSkippedAuditEvent>());
+        Assert.Equal(task.Id, skippedEvent.OffboardingTaskId);
+        Assert.Equal(plan.Id, skippedEvent.OffboardingPlanId);
+        Assert.Equal(employeeId, skippedEvent.EmployeeId);
+        Assert.Equal(actorId, skippedEvent.ActorEmployeeId);
+        Assert.Equal("Not required.", skippedEvent.SkipReason);
+    }
+
+    // OFF-08: plan-completed event's actor must be whoever completed the final task, not the
+    // affected (departing) employee.
+    [Fact]
+    public async Task ExecuteAsync_Completing_Final_Task_Publishes_PlanCompleted_With_Completer_As_Actor()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), companyId, employeeId, new DateOnly(2026, 7, 1), null, seedAt);
+        plan.Start(seedAt);
+        dbContext.OffboardingPlans.Add(plan);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Only task");
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, _, auditPublisher, _) = BuildAction(dbContext);
+        var actorId = Guid.NewGuid();
+        var context = BuildTaskContext(companyId, task.Id) with { CompletedBy = actorId };
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var planCompleted = Assert.Single(
+            auditPublisher.Published.OfType<HR.Modules.Offboarding.OffboardingPlanCompletedAuditEvent>());
+        Assert.Equal(actorId, planCompleted.ActorEmployeeId);
+        Assert.NotEqual(employeeId, planCompleted.ActorEmployeeId);
     }
 }

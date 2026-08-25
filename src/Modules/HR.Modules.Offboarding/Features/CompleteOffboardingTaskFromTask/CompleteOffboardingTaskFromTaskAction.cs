@@ -49,6 +49,9 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
         if (offboardingTask.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped)
             return;
 
+        var plan = await dbContext.OffboardingPlans
+            .FirstOrDefaultAsync(p => p.Id == offboardingTask.OffboardingPlanId, cancellationToken);
+
         // OFF-07: an explicit "Skip" outcome, mirroring the existing "Lost"/"Damaged" asset-return
         // outcome extension pattern below — the generic Tasks-module completion payload
         // (OutcomeDecision/OutcomeReason) already carries exactly what's needed. A reason is
@@ -67,12 +70,32 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
             }
 
             offboardingTask.Skip(clock.UtcNowOffset(), context.OutcomeReason, context.CompletedBy);
-            await TryCompletePlanAsync(offboardingTask, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            // OFF-08: task-level audit entry — published once per task, guarded by the
+            // Status-already-terminal early-return at the top of this method, which prevents a
+            // redelivered/retried completion action from ever reaching here twice for the same
+            // OffboardingTask. EmployeeId is the leaving employee the plan belongs to (falls back to
+            // the task's own AssignedEmployeeId in the unexpected case the owning plan cannot be
+            // found — mirrors the plain-completion fallback below).
+            await auditPublisher.PublishAsync(
+                new OffboardingTaskSkippedAuditEvent(
+                    offboardingTask.CompanyId,
+                    offboardingTask.OffboardingPlanId,
+                    offboardingTask.Id,
+                    context.TaskId,
+                    plan?.EmployeeId ?? offboardingTask.AssignedEmployeeId ?? context.CompletedBy,
+                    context.CompletedBy,
+                    offboardingTask.Title,
+                    offboardingTask.SkipReason!,
+                    offboardingTask.AssetAssignmentId,
+                    offboardingTask.SkippedAt!.Value),
+                cancellationToken);
+
+            if (plan is not null)
+                await TryCompletePlanAsync(offboardingTask, cancellationToken, plan, context.CompletedBy);
             return;
         }
-
-        var plan = await dbContext.OffboardingPlans
-            .FirstOrDefaultAsync(p => p.Id == offboardingTask.OffboardingPlanId, cancellationToken);
 
         if (plan is null)
         {
@@ -129,8 +152,24 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
         }
 
         offboardingTask.Complete(clock.UtcNowOffset());
+        await dbContext.SaveChangesAsync(cancellationToken);
 
-        await TryCompletePlanAsync(offboardingTask, cancellationToken, plan);
+        // OFF-08: task-level audit entry — see the Skip branch above for the idempotency reasoning
+        // (guarded by the Status-already-terminal early-return at the top of this method).
+        await auditPublisher.PublishAsync(
+            new OffboardingTaskCompletedAuditEvent(
+                offboardingTask.CompanyId,
+                offboardingTask.OffboardingPlanId,
+                offboardingTask.Id,
+                context.TaskId,
+                plan.EmployeeId,
+                context.CompletedBy,
+                offboardingTask.Title,
+                offboardingTask.AssetAssignmentId,
+                offboardingTask.CompletedAt!.Value),
+            cancellationToken);
+
+        await TryCompletePlanAsync(offboardingTask, cancellationToken, plan, context.CompletedBy);
     }
 
     // OFF-07: shared tail for both the ordinary Complete path and the new Skip path — either
@@ -144,7 +183,10 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
     // than racing the first request to independently conclude "I'm the one who completes this plan"
     // and duplicating the plan-completed event and the HR review task.
     private async Task TryCompletePlanAsync(
-        OffboardingTask offboardingTask, CancellationToken cancellationToken, OffboardingPlan? plan = null)
+        OffboardingTask offboardingTask,
+        CancellationToken cancellationToken,
+        OffboardingPlan? plan = null,
+        Guid actorEmployeeId = default)
     {
         // OFF-07: transactions and "SELECT ... FOR UPDATE" row locking are only meaningful (and only
         // supported) against a real relational provider — the module's unit test suite runs against
@@ -209,6 +251,12 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
             plan.CompanyId,
             plan.Id,
             plan.EmployeeId,
+            // OFF-08: whoever completed/skipped the specific task that resolved the plan — matches
+            // this plan-completed event to the person who actually caused it, never assumed to be
+            // the affected employee. Falls back to OffboardingSystemActor.Id (Guid.Empty) only if
+            // this method is ever reached without an actor (defensive; every call site above
+            // always supplies context.CompletedBy).
+            actorEmployeeId == default ? OffboardingSystemActor.Id : actorEmployeeId,
             plan.LastWorkingDay,
             outcome.TotalTasks,
             outcome.CompletedTasks,
