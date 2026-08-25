@@ -102,5 +102,12 @@ internal sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
         builder.HasIndex(d => d.EmployeeId);
         builder.HasIndex(d => d.DocumentTypeId);
         builder.HasIndex(d => new { d.CompanyId, d.EmployeeId, d.Status });
+
+        // DOC-06: SearchEmployeeDocuments filters by document type within a company. A simple
+        // btree index does not accelerate the ILIKE/Contains-style title/file_name search text
+        // match used by that feature (a GIN/pg_trgm trigram index would be needed for that, and
+        // this codebase has no existing precedent for one elsewhere) — that limitation is accepted
+        // rather than adding a trigram index speculatively.
+        builder.HasIndex(d => new { d.CompanyId, d.DocumentTypeId });
     }
 }

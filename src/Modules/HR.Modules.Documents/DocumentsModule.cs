@@ -48,6 +48,7 @@ using HR.Modules.Documents.Features.ListDocumentRequests;
 using HR.Modules.Documents.Features.CancelDocumentRequest;
 using HR.Modules.Documents.Features.RequestAdditionalEmployeeDocument;
 using HR.Modules.Documents.Features.ListEmployeeDocuments;
+using HR.Modules.Documents.Features.SearchEmployeeDocuments;
 using HR.Modules.Documents.Features.UploadEmployeeDocument;
 using HR.Modules.Documents.Features.UploadEmployeeDocumentVersion;
 using HR.Modules.Documents.Features.GetEmployeeDocumentVersionHistory;
@@ -252,6 +253,10 @@ public static class DocumentsModule
 
         services.AddScoped<ListEmployeeDocumentsHandler>();
         services.AddScoped<IValidator<ListEmployeeDocumentsRequest>, ListEmployeeDocumentsValidator>();
+
+        // DOC-06: company-wide document search/filter, distinct from ListEmployeeDocuments.
+        services.AddScoped<SearchEmployeeDocumentsHandler>();
+        services.AddScoped<IValidator<SearchEmployeeDocumentsRequest>, SearchEmployeeDocumentsValidator>();
 
         services.AddScoped<ListDocumentRequestsHandler>();
         services.AddScoped<GetDocumentRequestHandler>();

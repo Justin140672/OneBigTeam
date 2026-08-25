@@ -119,5 +119,12 @@ internal sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<E
         builder.HasIndex(ed => new { ed.CompanyId, ed.IsArchived });
         builder.HasIndex(ed => new { ed.CompanyId, ed.EmployeeId, ed.IsLatestVersion });
         builder.HasIndex(ed => ed.PreviousVersionId).IsUnique();
+
+        // DOC-06: search/filter support. CreatedAt (upload-date range + default result ordering)
+        // and ExpiryDate (expiry-date range) are both filtered on directly in
+        // SearchEmployeeDocuments, always scoped by company_id first per the standing
+        // "company_id + <filter column>" composite-index convention.
+        builder.HasIndex(ed => new { ed.CompanyId, ed.CreatedAt });
+        builder.HasIndex(ed => new { ed.CompanyId, ed.ExpiryDate });
     }
 }
