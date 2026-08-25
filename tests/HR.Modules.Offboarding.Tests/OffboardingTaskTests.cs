@@ -31,6 +31,45 @@ public class OffboardingTaskTests
         Assert.Equal(FixedNow, task.UpdatedAt);
     }
 
+    // OFF-03
+    [Fact]
+    public void Create_Defaults_AssignedEmployeeId_To_Null_When_Not_Supplied()
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+
+        Assert.Null(task.AssignedEmployeeId);
+    }
+
+    // OFF-03
+    [Fact]
+    public void Create_Sets_AssignedEmployeeId_When_Supplied()
+    {
+        var assignedEmployeeId = Guid.NewGuid();
+
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow, assignedEmployeeId);
+
+        Assert.Equal(assignedEmployeeId, task.AssignedEmployeeId);
+    }
+
+    // OFF-03
+    [Fact]
+    public void MarkTaskItemCreated_Sets_TaskItemCreatedAt_And_UpdatedAt()
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+        var later = FixedNow.AddDays(1);
+
+        task.MarkTaskItemCreated(later);
+
+        Assert.Equal(later, task.TaskItemCreatedAt);
+        Assert.Equal(later, task.UpdatedAt);
+    }
+
     [Fact]
     public void Create_Allows_Null_Description_And_Null_DueDate()
     {

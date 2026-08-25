@@ -3,6 +3,7 @@ using System;
 using HR.Modules.Offboarding.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HR.Modules.Offboarding.Migrations
 {
     [DbContext(typeof(OffboardingDbContext))]
-    partial class OffboardingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260825080711_AddOffboardingReliability")]
+    partial class AddOffboardingReliability
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

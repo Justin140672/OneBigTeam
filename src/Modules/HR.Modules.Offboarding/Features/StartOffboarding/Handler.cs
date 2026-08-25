@@ -1,6 +1,7 @@
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Offboarding.Domain;
 using HR.Modules.Offboarding.Persistence;
+using HR.Modules.Offboarding.Services;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
@@ -15,7 +16,7 @@ internal sealed class StartOffboardingHandler(
     IManagerReader managerReader,
     IAssignedAssetReader assignedAssetReader,
     IOutstandingDocumentRequestReader documentReader,
-    ITaskCreator taskCreator,
+    OffboardingTaskSynchronizer taskSynchronizer,
     INotificationWriter notificationWriter,
     IIntegrationEventPublisher integrationEventPublisher)
 {
@@ -29,6 +30,9 @@ internal sealed class StartOffboardingHandler(
 
         var employeeName = string.IsNullOrEmpty(employeeNameValue) ? "the employee" : employeeNameValue;
 
+        // Fast-path pre-check — avoids the round trip to build tasks and hit the database when a
+        // conflict is already obviously true. Not the source of correctness under concurrency: see
+        // the unique index / DbUpdateException handling below, which is the real guarantee.
         var hasActivePlan = await dbContext.OffboardingPlans
             .AnyAsync(
                 p => p.CompanyId == request.CompanyId
@@ -52,11 +56,32 @@ internal sealed class StartOffboardingHandler(
 
         var generatedTaskIds = new List<Guid>();
 
-        await CreateAssetReturnTasksAsync(request, plan, employeeName, now, generatedTaskIds, cancellationToken);
+        await CreateAssetReturnTasksAsync(request, plan, now, generatedTaskIds, cancellationToken);
         await CreateDocumentReviewTaskAsync(request, plan, now, generatedTaskIds, cancellationToken);
         await CreateManagerExitChecklistAsync(request, plan, employeeName, managerId, now, generatedTaskIds, cancellationToken);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        // OFF-03: the OffboardingPlan and every OffboardingTask are made durable in one transaction
+        // BEFORE any cross-module call to the Tasks module — a general (Tasks-module) task must
+        // never be created before its OffboardingTask source row exists. If two requests race to
+        // start offboarding for the same employee concurrently, the unique partial index on
+        // (company_id, employee_id) rejects the second insert here and we surface that as the same
+        // Conflict the pre-check above would have returned, rather than propagating a raw DB
+        // exception or creating two plans.
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Result.Failure<StartOffboardingResponse>(
+                Error.Conflict("An offboarding plan already exists for this employee."));
+        }
+
+        // Now that the plan/tasks are durable, synchronise the corresponding Tasks-module TaskItems.
+        // A failure here is isolated per task (see OffboardingTaskSynchronizer) and is not a
+        // log-only dead end: any task left unsynced is retried by
+        // OffboardingPlanCreationReconciliationJob until it succeeds.
+        await taskSynchronizer.SyncPlanAsync(plan.CompanyId, plan.Id, cancellationToken);
 
         await NotifyOffboardingStartedAsync(plan, employeeName, managerId, now, cancellationToken);
 
@@ -78,7 +103,6 @@ internal sealed class StartOffboardingHandler(
     private async Task CreateAssetReturnTasksAsync(
         StartOffboardingRequest request,
         OffboardingPlan plan,
-        string employeeName,
         DateTimeOffset now,
         List<Guid> generatedTaskIds,
         CancellationToken cancellationToken)
@@ -93,23 +117,10 @@ internal sealed class StartOffboardingHandler(
             var task = OffboardingTask.Create(
                 Guid.NewGuid(), request.CompanyId, plan.Id,
                 title, description: null,
-                OffboardingTaskAssignTo.Employee, request.LastWorkingDay, now);
+                OffboardingTaskAssignTo.Employee,
+                dueDate: request.LastWorkingDay, now: now, assignedEmployeeId: request.EmployeeId);
             dbContext.OffboardingTasks.Add(task);
             generatedTaskIds.Add(task.Id);
-
-            await taskCreator.CreateAsync(
-                request.CompanyId,
-                createdBy:          request.EmployeeId,
-                title:              title,
-                description:        null,
-                priority:           TaskPriority.Medium,
-                source:             TaskSource.Offboarding,
-                actionType:         TaskActionType.Complete,
-                dueDate:            request.LastWorkingDay,
-                assignedEmployeeId: request.EmployeeId,
-                assignedUserId:     request.EmployeeId,
-                sourceEntityId:     task.Id,
-                cancellationToken);
         }
     }
 
@@ -132,26 +143,13 @@ internal sealed class StartOffboardingHandler(
         var task = OffboardingTask.Create(
             Guid.NewGuid(), request.CompanyId, plan.Id,
             title, description,
-            OffboardingTaskAssignTo.HR, request.LastWorkingDay, now);
+            OffboardingTaskAssignTo.HR,
+            dueDate: request.LastWorkingDay, now: now, assignedEmployeeId: null);
         dbContext.OffboardingTasks.Add(task);
         generatedTaskIds.Add(task.Id);
-
-        await taskCreator.CreateAsync(
-            request.CompanyId,
-            createdBy:          request.EmployeeId,
-            title:              title,
-            description:        description,
-            priority:           TaskPriority.Medium,
-            source:             TaskSource.Offboarding,
-            actionType:         TaskActionType.Complete,
-            dueDate:            request.LastWorkingDay,
-            assignedEmployeeId: null,
-            assignedUserId:     null,
-            sourceEntityId:     task.Id,
-            cancellationToken);
     }
 
-    private async Task CreateManagerExitChecklistAsync(
+    private Task CreateManagerExitChecklistAsync(
         StartOffboardingRequest request,
         OffboardingPlan plan,
         string employeeName,
@@ -173,24 +171,13 @@ internal sealed class StartOffboardingHandler(
             var task = OffboardingTask.Create(
                 Guid.NewGuid(), request.CompanyId, plan.Id,
                 title, description: null,
-                OffboardingTaskAssignTo.Manager, request.LastWorkingDay, now);
+                OffboardingTaskAssignTo.Manager,
+                dueDate: request.LastWorkingDay, now: now, assignedEmployeeId: managerId);
             dbContext.OffboardingTasks.Add(task);
             generatedTaskIds.Add(task.Id);
-
-            await taskCreator.CreateAsync(
-                request.CompanyId,
-                createdBy:          request.EmployeeId,
-                title:              title,
-                description:        null,
-                priority:           TaskPriority.Medium,
-                source:             TaskSource.Offboarding,
-                actionType:         TaskActionType.Complete,
-                dueDate:            request.LastWorkingDay,
-                assignedEmployeeId: managerId,
-                assignedUserId:     managerId,
-                sourceEntityId:     task.Id,
-                cancellationToken);
         }
+
+        return Task.CompletedTask;
     }
 
     private async Task NotifyOffboardingStartedAsync(

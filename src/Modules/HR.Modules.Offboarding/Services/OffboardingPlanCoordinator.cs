@@ -35,15 +35,20 @@ internal sealed class OffboardingPlanCoordinator(
 
         if (result.IsFailure)
         {
-            // Best-effort side effect: by the time a Leaving Process is started, an offboarding
-            // plan should never already exist for the same employee — the product flow doesn't
-            // allow offboarding to be started manually ahead of a leaving process. If the
-            // conflict (or any other failure, e.g. employee lookup) happens anyway, we log and
-            // swallow rather than fail "Start Leaving Process": the LeavingProcess entity and the
-            // employee's status change have already been committed by the caller and remain the
-            // source of truth, and HR can still start offboarding manually from the Offboarding
-            // tab if this automatic trigger didn't run.
-            logger.LogWarning(
+            // Best-effort side effect: the LeavingProcess entity and the employee's status change
+            // have already been committed by the caller and remain the source of truth, so a
+            // failure here must not fail "Start Leaving Process" itself. This is deliberately NOT
+            // treated as a log-only, unrecoverable condition (OFF-03): a Conflict means a plan
+            // already exists (nothing to do), but any other failure leaves this employee's
+            // in-progress leaving process without an active offboarding plan — a state
+            // OffboardingPlanCreationReconciliationJob actively detects (via
+            // IActiveLeavingProcessReader) and repairs automatically on its next daily run, and HR
+            // can also start offboarding manually from the Offboarding tab in the meantime.
+            // Logged at Error (not Warning) for anything other than the expected Conflict case,
+            // since it is a real gap until reconciliation closes it.
+            var logLevel = result.Error.Code == "conflict" ? LogLevel.Information : LogLevel.Error;
+            logger.Log(
+                logLevel,
                 "Could not auto-start offboarding plan for employee {EmployeeId} in company {CompanyId}: {Error}",
                 employeeId, companyId, result.Error.Message);
         }

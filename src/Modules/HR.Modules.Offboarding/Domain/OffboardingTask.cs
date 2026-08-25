@@ -10,11 +10,27 @@ internal sealed class OffboardingTask
     public string Title { get; private set; } = null!;
     public string? Description { get; private set; }
     public OffboardingTaskAssignTo AssignTo { get; private set; }
+
+    // OFF-03: snapshot of the employee/manager this task's corresponding Tasks-module TaskItem
+    // should be assigned to, captured at generation time. Persisted (rather than recomputed) so the
+    // durable-write-then-sync flow — and any later reconciliation retry — can create/recreate the
+    // TaskItem without needing to re-resolve the manager hierarchy or asset ownership again.
+    public Guid? AssignedEmployeeId { get; private set; }
+
     public DateOnly? DueDate { get; private set; }
     public OffboardingTaskStatus Status { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // OFF-03: null until the corresponding Tasks-module TaskItem has actually been created for this
+    // OffboardingTask. This is what makes "every general task references an existing offboarding
+    // task" true in practice — the OffboardingTask row is always durable (committed) before its
+    // TaskItem is attempted — and it is the marker OffboardingTaskSynchronizer and
+    // OffboardingPlanCreationReconciliationJob use to find and complete/retry any task whose
+    // Tasks-module counterpart was not created (partial failure, crash, or the process never having
+    // reached the sync step yet).
+    public DateTimeOffset? TaskItemCreatedAt { get; private set; }
 
     public static OffboardingTask Create(
         Guid id,
@@ -24,7 +40,8 @@ internal sealed class OffboardingTask
         string? description,
         OffboardingTaskAssignTo assignTo,
         DateOnly? dueDate,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? assignedEmployeeId = null)
     {
         return new OffboardingTask
         {
@@ -34,11 +51,21 @@ internal sealed class OffboardingTask
             Title = title,
             Description = description,
             AssignTo = assignTo,
+            AssignedEmployeeId = assignedEmployeeId,
             DueDate = dueDate,
             Status = OffboardingTaskStatus.Pending,
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    // OFF-03: stamped by OffboardingTaskSynchronizer immediately after the corresponding
+    // Tasks-module TaskItem is successfully created. Idempotent from the caller's point of view —
+    // once set, this task is excluded from future sync/reconciliation passes.
+    public void MarkTaskItemCreated(DateTimeOffset now)
+    {
+        TaskItemCreatedAt = now;
+        UpdatedAt = now;
     }
 
     public void Complete(DateTimeOffset now)

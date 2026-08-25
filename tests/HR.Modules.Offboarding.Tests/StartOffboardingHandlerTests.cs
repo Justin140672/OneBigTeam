@@ -3,9 +3,11 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Offboarding.Domain;
 using HR.Modules.Offboarding.Features.StartOffboarding;
 using HR.Modules.Offboarding.Persistence;
+using HR.Modules.Offboarding.Services;
 using HR.Modules.Offboarding.Tests.Infrastructure;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Offboarding.Tests;
 
@@ -39,6 +41,11 @@ public class StartOffboardingHandlerTests
         var notifications = new FakeNotificationWriter();
         var taskCreator = new FakeTaskCreator();
         var integrationPublisher = new CapturingIntegrationEventPublisher();
+        var taskSynchronizer = new OffboardingTaskSynchronizer(
+            dbContext,
+            taskCreator,
+            new FakeClock(FixedUtcNow),
+            NullLogger<OffboardingTaskSynchronizer>.Instance);
         var handler = new StartOffboardingHandler(
             dbContext,
             new FakeClock(FixedUtcNow),
@@ -46,7 +53,7 @@ public class StartOffboardingHandlerTests
             new FakeManagerReader(managerId),
             new FakeAssignedAssetReader(assignedAssets),
             new FakeOutstandingDocumentRequestReader(outstandingDocuments),
-            taskCreator,
+            taskSynchronizer,
             notifications,
             integrationPublisher);
         return new Harness(handler, notifications, taskCreator, integrationPublisher);
@@ -391,5 +398,107 @@ public class StartOffboardingHandlerTests
         // 1 asset task + 1 HR document-review task + 4 manager checklist tasks = 6
         Assert.Equal(6, result.Value!.GeneratedTaskIds.Count);
         Assert.Equal(6, dbContext.OffboardingTasks.Count());
+    }
+
+    // OFF-03: DbUpdateException-on-race coverage for the unique partial index
+    // (ix_offboarding_plans_company_id_employee_id_active) is deliberately NOT attempted at the unit
+    // level here — EF Core's InMemory provider does not enforce unique indexes/constraints, so there
+    // is no way to make SaveChangesAsync throw a DbUpdateException for a duplicate active plan under
+    // this provider. That guarantee is instead exercised for real against Postgres in
+    // HR.Integration.Tests (StartOffboardingEndpointTests — concurrent-request test), which is the
+    // only place that can actually trigger the index and prove the catch path returns Conflict.
+
+    // OFF-03
+    [Fact]
+    public async Task HandleAsync_Commits_Plan_And_Tasks_Before_Calling_TaskCreator()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var harness = BuildHandler(dbContext, names);
+
+        var pendingAddedEntriesObservedDuringSync = new List<int>();
+        harness.TaskCreator.OnCreateAsyncInvoked = () =>
+        {
+            var pendingAdded = dbContext.ChangeTracker.Entries()
+                .Count(e => e.State == EntityState.Added);
+            pendingAddedEntriesObservedDuringSync.Add(pendingAdded);
+        };
+
+        var result = await harness.Handler.HandleAsync(BuildRequest(companyId, employeeId), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEmpty(pendingAddedEntriesObservedDuringSync);
+        // By the time any TaskCreator.CreateAsync call happens, the plan/tasks SaveChangesAsync has
+        // already run — nothing should still be pending "Added" in the change tracker.
+        Assert.All(pendingAddedEntriesObservedDuringSync, count => Assert.Equal(0, count));
+
+        var plan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == result.Value!.Id);
+        Assert.NotEqual(default, plan.Id);
+    }
+
+    // OFF-03
+    [Fact]
+    public async Task HandleAsync_Returns_Success_Even_When_TaskSynchronizer_Fails_For_One_Generated_Task()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var harness = BuildHandler(dbContext, names);
+        harness.TaskCreator.TitlesToFail.Add("Review outstanding documents for employee exit");
+
+        var result = await harness.Handler.HandleAsync(BuildRequest(companyId, employeeId), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var failedTask = await dbContext.OffboardingTasks.SingleAsync(
+            t => t.Title == "Review outstanding documents for employee exit");
+        Assert.Null(failedTask.TaskItemCreatedAt);
+
+        Assert.All(
+            dbContext.OffboardingTasks.Where(t => t.Title != "Review outstanding documents for employee exit"),
+            t => Assert.NotNull(t.TaskItemCreatedAt));
+    }
+
+    // OFF-03
+    [Fact]
+    public async Task HandleAsync_Sets_AssignedEmployeeId_On_Generated_Tasks()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var assets = new List<AssignedAssetItem> { new(Guid.NewGuid(), Guid.NewGuid(), "Monitor") };
+        var harness = BuildHandler(dbContext, names, managerId: managerId, assignedAssets: assets);
+
+        await harness.Handler.HandleAsync(BuildRequest(companyId, employeeId), CancellationToken.None);
+
+        var assetTask = await dbContext.OffboardingTasks.SingleAsync(t => t.AssignTo == OffboardingTaskAssignTo.Employee);
+        Assert.Equal(employeeId, assetTask.AssignedEmployeeId);
+
+        var hrTask = await dbContext.OffboardingTasks.SingleAsync(t => t.AssignTo == OffboardingTaskAssignTo.HR);
+        Assert.Null(hrTask.AssignedEmployeeId);
+
+        var managerTasks = dbContext.OffboardingTasks.Where(t => t.AssignTo == OffboardingTaskAssignTo.Manager);
+        Assert.All(managerTasks, t => Assert.Equal(managerId, t.AssignedEmployeeId));
+    }
+
+    // OFF-03
+    [Fact]
+    public async Task HandleAsync_Manager_Tasks_Have_Null_AssignedEmployeeId_When_No_Manager()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var harness = BuildHandler(dbContext, names, managerId: null);
+
+        await harness.Handler.HandleAsync(BuildRequest(companyId, employeeId), CancellationToken.None);
+
+        var managerTasks = dbContext.OffboardingTasks.Where(t => t.AssignTo == OffboardingTaskAssignTo.Manager);
+        Assert.All(managerTasks, t => Assert.Null(t.AssignedEmployeeId));
     }
 }

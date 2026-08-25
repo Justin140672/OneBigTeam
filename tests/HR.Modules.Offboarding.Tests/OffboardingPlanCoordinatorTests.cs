@@ -32,7 +32,9 @@ public class OffboardingPlanCoordinatorTests
             new FakeManagerReader(null),
             new FakeAssignedAssetReader(),
             new FakeOutstandingDocumentRequestReader(),
-            new FakeTaskCreator(),
+            new OffboardingTaskSynchronizer(
+                dbContext, new FakeTaskCreator(), new FakeClock(FixedUtcNow),
+                NullLogger<OffboardingTaskSynchronizer>.Instance),
             new FakeNotificationWriter(),
             new NoOpIntegrationEventPublisher());
 

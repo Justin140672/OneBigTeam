@@ -134,6 +134,66 @@ public class StartOffboardingEndpointTests
     }
 
     [Fact]
+    public async Task Post_StartOffboarding_Creates_Matching_TaskItems_In_Tasks_Module()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AdminClient(companyId);
+        var employeeId = await CreateEmployeeAsync(client, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/offboarding/start",
+            new { companyId, employeeId, lastWorkingDay = "2026-08-01", notes = "Resigned." });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<OffboardingPlanPayload>();
+        Assert.NotNull(payload);
+
+        // OFF-03: every OffboardingTask generated for the plan must have a corresponding
+        // Tasks-module TaskItem created via the durable-write-then-sync flow — assert this against
+        // the real Tasks-module endpoint rather than mocking the cross-module boundary.
+        var unassignedResponse = await client.GetAsync($"/api/companies/{companyId}/tasks/unassigned");
+        unassignedResponse.EnsureSuccessStatusCode();
+        var unassigned = await unassignedResponse.Content.ReadFromJsonAsync<UnassignedTasksPayload>();
+        Assert.NotNull(unassigned);
+
+        foreach (var generatedTaskId in payload!.GeneratedTaskIds)
+        {
+            Assert.Contains(unassigned!.Items, t => t.SourceEntityId == generatedTaskId && t.Source == "Offboarding");
+        }
+    }
+
+    [Fact]
+    public async Task Post_StartOffboarding_Concurrent_Requests_Result_In_Exactly_One_Active_Plan()
+    {
+        // Genuine concurrency against the real Postgres-backed unique partial index
+        // (ix_offboarding_plans_company_id_employee_id_active) — this is the actual guarantee that
+        // "repeated or concurrent requests do not duplicate plans" relies on; the handler's
+        // AnyAsync pre-check alone has a TOCTOU race and cannot be relied on to prove this.
+        var companyId = Guid.NewGuid();
+        using var client = await AdminClient(companyId);
+        var employeeId = await CreateEmployeeAsync(client, companyId);
+
+        var request1 = client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/offboarding/start",
+            new { companyId, employeeId, lastWorkingDay = "2026-08-01" });
+        var request2 = client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/offboarding/start",
+            new { companyId, employeeId, lastWorkingDay = "2026-08-15" });
+
+        var responses = await Task.WhenAll(request1, request2);
+
+        Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.Created);
+        Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.Conflict);
+
+        var statusResponse = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/offboarding-status");
+        statusResponse.EnsureSuccessStatusCode();
+        var status = await statusResponse.Content.ReadFromJsonAsync<OffboardingStatusPayload>();
+        Assert.NotNull(status);
+        Assert.True(status!.HasPlan);
+        Assert.Equal("InProgress", status.Status);
+    }
+
+    [Fact]
     public async Task Post_StartOffboarding_Returns_NotFound_When_Employee_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
@@ -190,5 +250,23 @@ public class StartOffboardingEndpointTests
         string Status,
         string? Notes,
         IReadOnlyList<Guid> GeneratedTaskIds,
+        DateTimeOffset CreatedAt);
+
+    private sealed record OffboardingStatusPayload(bool HasPlan, string? Status);
+
+    private sealed record UnassignedTasksPayload(IReadOnlyList<UnassignedTaskItemPayload> Items);
+
+    private sealed record UnassignedTaskItemPayload(
+        Guid Id,
+        Guid CompanyId,
+        string Title,
+        string? Description,
+        string Status,
+        string Priority,
+        string Source,
+        string ActionType,
+        DateOnly? DueDate,
+        Guid? SourceEntityId,
+        Guid CreatedBy,
         DateTimeOffset CreatedAt);
 }

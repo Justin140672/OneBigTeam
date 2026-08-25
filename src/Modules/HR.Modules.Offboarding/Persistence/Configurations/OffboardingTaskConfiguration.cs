@@ -39,8 +39,14 @@ internal sealed class OffboardingTaskConfiguration : IEntityTypeConfiguration<Of
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(t => t.AssignedEmployeeId)
+            .HasColumnName("assigned_employee_id");
+
         builder.Property(t => t.DueDate)
             .HasColumnName("due_date");
+
+        builder.Property(t => t.TaskItemCreatedAt)
+            .HasColumnName("task_item_created_at");
 
         builder.Property(t => t.Status)
             .HasColumnName("status")
@@ -65,5 +71,11 @@ internal sealed class OffboardingTaskConfiguration : IEntityTypeConfiguration<Of
 
         builder.HasIndex(t => t.OffboardingPlanId);
         builder.HasIndex(t => new { t.CompanyId, t.OffboardingPlanId });
+
+        // OFF-03: lets OffboardingTaskSynchronizer / OffboardingPlanCreationReconciliationJob
+        // cheaply find every task still awaiting its Tasks-module TaskItem, without a full table
+        // scan, across every plan/company.
+        builder.HasIndex(t => t.TaskItemCreatedAt)
+            .HasDatabaseName("ix_offboarding_tasks_task_item_created_at");
     }
 }

@@ -49,5 +49,17 @@ internal sealed class OffboardingPlanConfiguration : IEntityTypeConfiguration<Of
         builder.HasIndex(p => p.CompanyId);
         builder.HasIndex(p => new { p.CompanyId, p.EmployeeId });
         builder.HasIndex(p => new { p.CompanyId, p.Status });
+
+        // OFF-03: database-level backstop against duplicate active plans for the same employee.
+        // "Active" here means anything not yet in a terminal state (Completed/Cancelled) — an
+        // employee may accumulate any number of Completed/Cancelled historical plans, but never
+        // more than one NotStarted/InProgress plan at a time. This is what makes concurrent/repeated
+        // "start offboarding" attempts (manual or automatic) safe: the in-memory pre-check in
+        // StartOffboardingHandler is only a fast-path optimisation, this index is the real guarantee
+        // under concurrency, and a violation is caught there and turned into a Conflict result.
+        builder.HasIndex(p => new { p.CompanyId, p.EmployeeId })
+            .IsUnique()
+            .HasFilter("status NOT IN ('Completed', 'Cancelled')")
+            .HasDatabaseName("ix_offboarding_plans_company_id_employee_id_active");
     }
 }
