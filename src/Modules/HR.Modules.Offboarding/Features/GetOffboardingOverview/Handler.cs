@@ -23,6 +23,8 @@ internal sealed class GetOffboardingOverviewHandler(OffboardingDbContext dbConte
                 null,
                 null,
                 null,
+                false,
+                false,
                 []);
         }
 
@@ -41,7 +43,8 @@ internal sealed class GetOffboardingOverviewHandler(OffboardingDbContext dbConte
                 t.DueDate,
                 t.CompletedAt,
                 t.CreatedAt,
-                t.UpdatedAt))
+                t.UpdatedAt,
+                t.RequiresHrConfirmation))
             .ToList();
 
         return new GetOffboardingOverviewResponse(
@@ -50,6 +53,8 @@ internal sealed class GetOffboardingOverviewHandler(OffboardingDbContext dbConte
             plan.Status.ToString(),
             plan.LastWorkingDay,
             plan.Notes,
+            plan.IsBackdated,
+            plan.RequiresHrReconciliation,
             taskItems);
     }
 }

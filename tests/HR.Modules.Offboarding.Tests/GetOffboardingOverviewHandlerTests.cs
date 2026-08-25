@@ -260,4 +260,52 @@ public class GetOffboardingOverviewHandlerTests
         Assert.Equal("InProgress", result.PlanStatus);
         Assert.NotEqual(older.LastWorkingDay, result.LastWorkingDay);
     }
+
+    // ---- OFF-05 ----
+
+    [Fact]
+    public async Task HandleAsync_Returns_IsBackdated_And_RequiresHrReconciliation_False_When_No_Plan_Found()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var handler = BuildHandler(db);
+        var result = await handler.HandleAsync(
+            new GetOffboardingOverviewRequest(companyId, employeeId),
+            CancellationToken.None);
+
+        Assert.False(result.IsBackdated);
+        Assert.False(result.RequiresHrReconciliation);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Surfaces_IsBackdated_RequiresHrReconciliation_And_Task_RequiresHrConfirmation()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), companyId, employeeId, DateOnly.FromDateTime(Now.Date), null, Now, isBackdated: true);
+        plan.Start(Now);
+        plan.MarkHrReconciliationRequired(Now);
+        db.OffboardingPlans.Add(plan);
+
+        var reconciliationTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Confirm return of asset", null,
+            OffboardingTaskAssignTo.HR, null, Now, requiresHrConfirmation: true);
+        db.OffboardingTasks.Add(reconciliationTask);
+        await db.SaveChangesAsync();
+
+        var handler = BuildHandler(db);
+        var result = await handler.HandleAsync(
+            new GetOffboardingOverviewRequest(companyId, employeeId),
+            CancellationToken.None);
+
+        Assert.True(result.IsBackdated);
+        Assert.True(result.RequiresHrReconciliation);
+        var taskItem = Assert.Single(result.Tasks);
+        Assert.True(taskItem.RequiresHrConfirmation);
+    }
 }

@@ -26,6 +26,14 @@ internal sealed class OffboardingTask
 
     public bool IsAssetReturnTask => AssetAssignmentId is not null;
 
+    // OFF-05: true for tasks generated as part of backdated-departure reconciliation — outstanding
+    // assets, documents or access that HR must explicitly confirm/action because the employee who
+    // would normally have handled them has already left (and may already have lost system access).
+    // Distinct from AssignTo == HR on its own: several ordinary checklist items (e.g. the document
+    // review task) are already HR-assigned regardless of backdating, but only reconciliation tasks
+    // drive OffboardingPlan.RequiresHrReconciliation.
+    public bool RequiresHrConfirmation { get; private set; }
+
     public DateOnly? DueDate { get; private set; }
     public OffboardingTaskStatus Status { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
@@ -51,7 +59,8 @@ internal sealed class OffboardingTask
         DateOnly? dueDate,
         DateTimeOffset now,
         Guid? assignedEmployeeId = null,
-        Guid? assetAssignmentId = null)
+        Guid? assetAssignmentId = null,
+        bool requiresHrConfirmation = false)
     {
         return new OffboardingTask
         {
@@ -63,11 +72,33 @@ internal sealed class OffboardingTask
             AssignTo = assignTo,
             AssignedEmployeeId = assignedEmployeeId,
             AssetAssignmentId = assetAssignmentId,
+            RequiresHrConfirmation = requiresHrConfirmation,
             DueDate = dueDate,
             Status = OffboardingTaskStatus.Pending,
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    // OFF-05: used to auto-complete/waive a checklist item that becomes irrelevant specifically
+    // because the departure is backdated (e.g. "revoke system access" when access has already been
+    // disabled synchronously by EmployeeDepartureFinalizer). Distinct from the plain Skip() below —
+    // this variant is only ever invoked immediately at generation time, before the task has a
+    // Tasks-module TaskItem, so OffboardingTaskSynchronizer's "Status != Skipped" filter simply never
+    // picks it up and no TaskItem/notification is ever created for it in the first place.
+    public static OffboardingTask CreateWaived(
+        Guid id,
+        Guid companyId,
+        Guid offboardingPlanId,
+        string title,
+        string description,
+        OffboardingTaskAssignTo assignTo,
+        DateOnly? dueDate,
+        DateTimeOffset now)
+    {
+        var task = Create(id, companyId, offboardingPlanId, title, description, assignTo, dueDate, now);
+        task.Skip(now);
+        return task;
     }
 
     // OFF-03: stamped by OffboardingTaskSynchronizer immediately after the corresponding

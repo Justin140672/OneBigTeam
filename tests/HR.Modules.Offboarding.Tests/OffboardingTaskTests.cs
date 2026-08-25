@@ -159,4 +159,49 @@ public class OffboardingTaskTests
         Assert.Equal(newDueDate, task.DueDate);
         Assert.Equal(later, task.UpdatedAt);
     }
+
+    // ---- OFF-05 ----
+
+    [Fact]
+    public void Create_Defaults_RequiresHrConfirmation_False_When_Not_Supplied()
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+
+        Assert.False(task.RequiresHrConfirmation);
+    }
+
+    [Fact]
+    public void Create_Sets_RequiresHrConfirmation_When_Supplied()
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.HR, null, FixedNow, requiresHrConfirmation: true);
+
+        Assert.True(task.RequiresHrConfirmation);
+    }
+
+    [Fact]
+    public void CreateWaived_Produces_A_Skipped_Task_With_Null_CompletedAt_And_Given_Description()
+    {
+        var id = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var planId = Guid.NewGuid();
+        var dueDate = new DateOnly(2026, 7, 1);
+        const string description = "Waived automatically — access already disabled.";
+
+        var task = OffboardingTask.CreateWaived(
+            id, companyId, planId, "Revoke system access and accounts — Jamie Smith", description,
+            OffboardingTaskAssignTo.Manager, dueDate, FixedNow);
+
+        Assert.Equal(id, task.Id);
+        Assert.Equal(companyId, task.CompanyId);
+        Assert.Equal(planId, task.OffboardingPlanId);
+        Assert.Equal(OffboardingTaskStatus.Skipped, task.Status);
+        // Skip() does not set CompletedAt (see Skip_Sets_Status_And_UpdatedAt_But_Leaves_CompletedAt_Null above).
+        Assert.Null(task.CompletedAt);
+        Assert.Equal(description, task.Description);
+        Assert.Equal(FixedNow, task.UpdatedAt);
+    }
 }

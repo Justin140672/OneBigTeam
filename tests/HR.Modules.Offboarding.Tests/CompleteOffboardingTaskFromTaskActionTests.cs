@@ -45,12 +45,14 @@ public class CompleteOffboardingTaskFromTaskActionTests
         DateTimeOffset createdAt,
         OffboardingTaskStatus status = OffboardingTaskStatus.Pending,
         string title = "Some task",
-        Guid? assetAssignmentId = null)
+        Guid? assetAssignmentId = null,
+        bool requiresHrConfirmation = false)
     {
         var task = OffboardingTask.Create(
             Guid.NewGuid(), companyId, planId, title, null,
             OffboardingTaskAssignTo.Employee, null, createdAt,
-            assetAssignmentId: assetAssignmentId);
+            assetAssignmentId: assetAssignmentId,
+            requiresHrConfirmation: requiresHrConfirmation);
 
         if (status == OffboardingTaskStatus.Completed)
             task.Complete(createdAt);
@@ -557,5 +559,91 @@ public class CompleteOffboardingTaskFromTaskActionTests
 
         var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == task.Id);
         Assert.Equal(OffboardingTaskStatus.Completed, savedTask.Status);
+    }
+
+    // ---- OFF-05: HR reconciliation flag clearing ----
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_The_Sole_Outstanding_ReconciliationTask_Clears_RequiresHrReconciliation()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
+        plan.MarkHrReconciliationRequired(seedAt);
+        var reconciliationTask = SeedTask(
+            dbContext, companyId, plan.Id, seedAt, title: "Confirm return of asset (reconciliation)",
+            requiresHrConfirmation: true);
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, _, _, _) = BuildAction(dbContext);
+        var context = BuildTaskContext(companyId, reconciliationTask.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.False(savedPlan.RequiresHrReconciliation);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_One_Of_Several_ReconciliationTasks_Leaves_RequiresHrReconciliation_True()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
+        plan.MarkHrReconciliationRequired(seedAt);
+        var firstReconciliationTask = SeedTask(
+            dbContext, companyId, plan.Id, seedAt, title: "Reconciliation task A", requiresHrConfirmation: true);
+        SeedTask(
+            dbContext, companyId, plan.Id, seedAt, title: "Reconciliation task B", requiresHrConfirmation: true);
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, _, _, _) = BuildAction(dbContext);
+        var context = BuildTaskContext(companyId, firstReconciliationTask.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.True(savedPlan.RequiresHrReconciliation);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Replaying_Completion_Of_An_Already_Completed_ReconciliationTask_Is_Idempotent()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
+        plan.MarkHrReconciliationRequired(seedAt);
+        var reconciliationTask = SeedTask(
+            dbContext, companyId, plan.Id, seedAt, title: "Reconciliation task", requiresHrConfirmation: true);
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, taskCreator, auditPublisher, _) = BuildAction(dbContext);
+        var context = BuildTaskContext(companyId, reconciliationTask.Id);
+
+        // First completion clears the flag and (since this is the plan's only task) completes the plan.
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var afterFirst = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.False(afterFirst.RequiresHrReconciliation);
+        Assert.Equal(OffboardingStatus.Completed, afterFirst.Status);
+        Assert.Single(taskCreator.Created);
+        Assert.Single(auditPublisher.Published);
+
+        // Replaying the same completion (e.g. a retried Tasks-module callback) hits the
+        // Status is Completed/Skipped early-return and must not throw, re-clear an already-clear
+        // flag, or fire duplicate audit/HR-completion-review events.
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var afterSecond = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.False(afterSecond.RequiresHrReconciliation);
+        Assert.Equal(OffboardingStatus.Completed, afterSecond.Status);
+        Assert.Single(taskCreator.Created);
+        Assert.Single(auditPublisher.Published);
     }
 }

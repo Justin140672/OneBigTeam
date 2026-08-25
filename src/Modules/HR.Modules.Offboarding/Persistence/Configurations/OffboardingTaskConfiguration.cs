@@ -45,6 +45,10 @@ internal sealed class OffboardingTaskConfiguration : IEntityTypeConfiguration<Of
         builder.Property(t => t.AssetAssignmentId)
             .HasColumnName("asset_assignment_id");
 
+        builder.Property(t => t.RequiresHrConfirmation)
+            .HasColumnName("requires_hr_confirmation")
+            .IsRequired();
+
         builder.Property(t => t.DueDate)
             .HasColumnName("due_date");
 

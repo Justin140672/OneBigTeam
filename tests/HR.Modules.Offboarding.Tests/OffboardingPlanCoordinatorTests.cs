@@ -36,7 +36,9 @@ public class OffboardingPlanCoordinatorTests
                 dbContext, new FakeTaskCreator(), new FakeClock(FixedUtcNow),
                 NullLogger<OffboardingTaskSynchronizer>.Instance),
             new FakeNotificationWriter(),
-            new NoOpIntegrationEventPublisher());
+            new NoOpIntegrationEventPublisher(),
+            new FakeCompanyLeavingSettingsReader(),
+            new FakeHrAdministratorDirectory());
 
     private static OffboardingPlanCoordinator BuildCoordinator(
         OffboardingDbContext dbContext,

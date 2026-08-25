@@ -38,6 +38,14 @@ internal sealed class OffboardingPlanConfiguration : IEntityTypeConfiguration<Of
             .HasColumnName("notes")
             .HasMaxLength(2000);
 
+        builder.Property(p => p.IsBackdated)
+            .HasColumnName("is_backdated")
+            .IsRequired();
+
+        builder.Property(p => p.RequiresHrReconciliation)
+            .HasColumnName("requires_hr_reconciliation")
+            .IsRequired();
+
         builder.Property(p => p.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
@@ -49,6 +57,10 @@ internal sealed class OffboardingPlanConfiguration : IEntityTypeConfiguration<Of
         builder.HasIndex(p => p.CompanyId);
         builder.HasIndex(p => new { p.CompanyId, p.EmployeeId });
         builder.HasIndex(p => new { p.CompanyId, p.Status });
+
+        // OFF-05: lets HR list/query "needs reconciliation" plans cheaply, company-wide.
+        builder.HasIndex(p => new { p.CompanyId, p.RequiresHrReconciliation })
+            .HasDatabaseName("ix_offboarding_plans_company_id_requires_hr_reconciliation");
 
         // OFF-03: database-level backstop against duplicate active plans for the same employee.
         // "Active" here means anything not yet in a terminal state (Completed/Cancelled) — an

@@ -36,7 +36,9 @@ public class StartOffboardingHandlerTests
         Dictionary<Guid, string>? employeeNames = null,
         Guid? managerId = null,
         IReadOnlyList<AssignedAssetItem>? assignedAssets = null,
-        IReadOnlyList<OutstandingDocumentRequestItem>? outstandingDocuments = null)
+        IReadOnlyList<OutstandingDocumentRequestItem>? outstandingDocuments = null,
+        bool autoDisableAccessOnLeavingDate = false,
+        IReadOnlyList<Guid>? hrAdministratorEmployeeIds = null)
     {
         var notifications = new FakeNotificationWriter();
         var taskCreator = new FakeTaskCreator();
@@ -55,7 +57,9 @@ public class StartOffboardingHandlerTests
             new FakeOutstandingDocumentRequestReader(outstandingDocuments),
             taskSynchronizer,
             notifications,
-            integrationPublisher);
+            integrationPublisher,
+            new FakeCompanyLeavingSettingsReader(autoDisableAccessOnLeavingDate),
+            new FakeHrAdministratorDirectory(hrAdministratorEmployeeIds));
         return new Harness(handler, notifications, taskCreator, integrationPublisher);
     }
 
@@ -540,5 +544,131 @@ public class StartOffboardingHandlerTests
 
         var managerTasks = dbContext.OffboardingTasks.Where(t => t.AssignTo == OffboardingTaskAssignTo.Manager);
         Assert.All(managerTasks, t => Assert.Null(t.AssignedEmployeeId));
+    }
+
+    // ---- OFF-05: backdated departure reconciliation ----
+
+    private static DateOnly BackdatedLastWorkingDay => DateOnly.FromDateTime(FixedUtcNow); // today == backdated
+    private static DateOnly FutureLastWorkingDay => new(2026, 8, 1);
+
+    [Fact]
+    public async Task HandleAsync_Backdated_With_AutoDisableAccess_Routes_Asset_Tasks_To_HR_With_ReconciliationFlag()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var hrAdminId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var assets = new List<AssignedAssetItem> { new(Guid.NewGuid(), Guid.NewGuid(), "MacBook Pro") };
+        var outstanding = new List<OutstandingDocumentRequestItem> { new(Guid.NewGuid(), "Passport", null, true) };
+        var harness = BuildHandler(
+            dbContext, names, managerId: managerId, assignedAssets: assets, outstandingDocuments: outstanding,
+            autoDisableAccessOnLeavingDate: true, hrAdministratorEmployeeIds: [hrAdminId]);
+
+        var request = BuildRequest(companyId, employeeId, BackdatedLastWorkingDay);
+        var result = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var assetTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Title.Contains("MacBook Pro"));
+        Assert.Equal(OffboardingTaskAssignTo.HR, assetTask.AssignTo);
+        Assert.True(assetTask.RequiresHrConfirmation);
+        Assert.Empty(dbContext.OffboardingTasks.Where(t => t.AssignTo == OffboardingTaskAssignTo.Employee));
+
+        var revokeAccessTask = await dbContext.OffboardingTasks.SingleAsync(
+            t => t.Title.Contains("Revoke system access"));
+        Assert.Equal(OffboardingTaskStatus.Skipped, revokeAccessTask.Status);
+
+        var documentTask = await dbContext.OffboardingTasks.SingleAsync(
+            t => t.Title == "Review outstanding documents for employee exit");
+        Assert.True(documentTask.RequiresHrConfirmation);
+
+        var plan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == result.Value!.Id);
+        Assert.True(plan.IsBackdated);
+        Assert.True(plan.RequiresHrReconciliation);
+
+        Assert.DoesNotContain(harness.Notifications.Written,
+            n => n.EmployeeId == employeeId && n.Type == NotificationType.OffboardingStarted);
+        Assert.Contains(harness.Notifications.Written,
+            n => n.EmployeeId == managerId && n.Type == NotificationType.OffboardingStarted);
+        Assert.Contains(harness.Notifications.Written,
+            n => n.EmployeeId == hrAdminId && n.Type == NotificationType.OffboardingRequiresHrReconciliation);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Backdated_Without_AutoDisableAccess_Keeps_Revoke_Access_Task_Pending_And_Notifies_Employee()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var harness = BuildHandler(dbContext, names, autoDisableAccessOnLeavingDate: false);
+
+        var request = BuildRequest(companyId, employeeId, BackdatedLastWorkingDay);
+        var result = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var revokeAccessTask = await dbContext.OffboardingTasks.SingleAsync(
+            t => t.Title.Contains("Revoke system access"));
+        Assert.Equal(OffboardingTaskStatus.Pending, revokeAccessTask.Status);
+
+        Assert.Contains(harness.Notifications.Written,
+            n => n.EmployeeId == employeeId && n.Type == NotificationType.OffboardingStarted);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Not_Backdated_Keeps_Existing_Employee_Assigned_Asset_Task_Behaviour()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var assets = new List<AssignedAssetItem> { new(Guid.NewGuid(), Guid.NewGuid(), "Monitor") };
+        var harness = BuildHandler(
+            dbContext, names, assignedAssets: assets, autoDisableAccessOnLeavingDate: true,
+            hrAdministratorEmployeeIds: [Guid.NewGuid()]);
+
+        var request = BuildRequest(companyId, employeeId, FutureLastWorkingDay);
+        var result = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var assetTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Title.Contains("Monitor"));
+        Assert.Equal(OffboardingTaskAssignTo.Employee, assetTask.AssignTo);
+        Assert.False(assetTask.RequiresHrConfirmation);
+
+        var plan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == result.Value!.Id);
+        Assert.False(plan.IsBackdated);
+        Assert.False(plan.RequiresHrReconciliation);
+
+        Assert.DoesNotContain(harness.Notifications.Written,
+            n => n.Type == NotificationType.OffboardingRequiresHrReconciliation);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Backdated_With_No_HrAdministrators_Creates_Unassigned_Reconciliation_Tasks_Without_Throwing()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var assets = new List<AssignedAssetItem> { new(Guid.NewGuid(), Guid.NewGuid(), "MacBook Pro") };
+        var harness = BuildHandler(
+            dbContext, names, assignedAssets: assets, autoDisableAccessOnLeavingDate: true,
+            hrAdministratorEmployeeIds: []);
+
+        var request = BuildRequest(companyId, employeeId, BackdatedLastWorkingDay);
+        var result = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var assetTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Title.Contains("MacBook Pro"));
+        Assert.Null(assetTask.AssignedEmployeeId);
+        Assert.True(assetTask.RequiresHrConfirmation);
+
+        Assert.DoesNotContain(harness.Notifications.Written,
+            n => n.Type == NotificationType.OffboardingRequiresHrReconciliation);
     }
 }

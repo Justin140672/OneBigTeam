@@ -118,4 +118,69 @@ public class OffboardingPlanTests
         Assert.Equal(lastWorkingDay, plan.LastWorkingDay);
         Assert.Equal(FixedNow, plan.UpdatedAt);
     }
+
+    // ---- OFF-05 ----
+
+    [Fact]
+    public void Create_Defaults_IsBackdated_False_And_RequiresHrReconciliation_False_When_Not_Specified()
+    {
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), null, FixedNow);
+
+        Assert.False(plan.IsBackdated);
+        Assert.False(plan.RequiresHrReconciliation);
+    }
+
+    [Fact]
+    public void Create_Sets_IsBackdated_True_When_Specified()
+    {
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), null, FixedNow,
+            isBackdated: true);
+
+        Assert.True(plan.IsBackdated);
+    }
+
+    [Fact]
+    public void MarkHrReconciliationRequired_Sets_Flag_And_Bumps_UpdatedAt()
+    {
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), null, FixedNow,
+            isBackdated: true);
+        var later = FixedNow.AddMinutes(5);
+
+        plan.MarkHrReconciliationRequired(later);
+
+        Assert.True(plan.RequiresHrReconciliation);
+        Assert.Equal(later, plan.UpdatedAt);
+    }
+
+    [Fact]
+    public void ResolveHrReconciliation_Clears_Flag_And_Bumps_UpdatedAt_When_Currently_True()
+    {
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), null, FixedNow,
+            isBackdated: true);
+        plan.MarkHrReconciliationRequired(FixedNow.AddMinutes(5));
+        var later = FixedNow.AddDays(1);
+
+        plan.ResolveHrReconciliation(later);
+
+        Assert.False(plan.RequiresHrReconciliation);
+        Assert.Equal(later, plan.UpdatedAt);
+    }
+
+    [Fact]
+    public void ResolveHrReconciliation_Is_NoOp_When_Flag_Already_False()
+    {
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), null, FixedNow);
+        var later = FixedNow.AddDays(1);
+
+        plan.ResolveHrReconciliation(later);
+
+        Assert.False(plan.RequiresHrReconciliation);
+        // Guard returns early without touching UpdatedAt when the flag was already false.
+        Assert.Equal(FixedNow, plan.UpdatedAt);
+    }
 }

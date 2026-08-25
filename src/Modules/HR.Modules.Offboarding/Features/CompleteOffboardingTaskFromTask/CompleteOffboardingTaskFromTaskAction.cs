@@ -114,6 +114,18 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
         if (isCompleting)
             plan.Complete(now);
 
+        // OFF-05: once every task requiring explicit HR confirmation (backdated-departure asset/
+        // document/access reconciliation) has reached a terminal state, the plan-level
+        // RequiresHrReconciliation alert is no longer accurate and should clear. Checked against the
+        // freshly-loaded planTasks (which already includes this task's just-applied Complete()), so
+        // this reflects the state immediately after the current completion, not a stale snapshot.
+        if (plan.RequiresHrReconciliation
+            && planTasks.Where(t => t.RequiresHrConfirmation)
+                .All(t => t.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped))
+        {
+            plan.ResolveHrReconciliation(now);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (isCompleting)

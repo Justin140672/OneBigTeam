@@ -6,6 +6,8 @@ internal sealed record GetOffboardingOverviewResponse(
     string? PlanStatus,
     DateOnly? LastWorkingDay,
     string? Notes,
+    bool IsBackdated,
+    bool RequiresHrReconciliation,
     IReadOnlyList<OffboardingTaskOverviewItem> Tasks);
 
 internal sealed record OffboardingTaskOverviewItem(
@@ -17,4 +19,5 @@ internal sealed record OffboardingTaskOverviewItem(
     DateOnly? DueDate,
     DateTimeOffset? CompletedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool RequiresHrConfirmation);

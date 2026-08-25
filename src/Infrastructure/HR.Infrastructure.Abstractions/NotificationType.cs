@@ -47,4 +47,11 @@ public enum NotificationType
     // working day) — distinct from TaskAssigned/TaskDueSoon/TaskOverdue, none of which fit a
     // date-only change to a task the assignee already knows about.
     TaskDateChanged                               = 41,
+    // OFF-05: raised at offboarding-plan creation time for a backdated departure that generated at
+    // least one HR reconciliation task (outstanding assets/documents/access the departed employee
+    // can no longer action themselves). Sent to HR administrators, distinct from
+    // IncompleteOffboardingAtDeparture (which fires later, to the manager, at departure
+    // finalisation if offboarding is still incomplete) and from OffboardingStarted (the routine
+    // "plan created" notice).
+    OffboardingRequiresHrReconciliation           = 42,
 }
