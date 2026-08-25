@@ -32,6 +32,7 @@ internal sealed class DownloadImportTemplateHandler
         ("Date Of Birth", true, "yyyy-MM-dd or dd/MM/yyyy; must be in the past"),
         ("Continuous Service Date", false, "yyyy-MM-dd or dd/MM/yyyy"),
         ("Probation End Date", false, "yyyy-MM-dd or dd/MM/yyyy"),
+        ("Address", false, "Free text"),
         ("Employee Number", false, "Required if the company's Employee Number Mode is Manual; must be left blank if Automatic. Must be unique within the file and within the company"),
         ("Manager Reference", false, "Must match another row's Employee Number/Work Email in the file, or an existing employee's Employee Number/Work Email in the company"),
         ("Department", true, "Name; auto-created with a warning if it doesn't already exist for the company"),

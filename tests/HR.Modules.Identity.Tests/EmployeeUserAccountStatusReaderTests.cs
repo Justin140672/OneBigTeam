@@ -67,9 +67,13 @@ public class EmployeeUserAccountStatusReaderTests(IdentityDatabaseFixture fixtur
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
+        // UserInvite.IsExpired compares against the real wall clock (DateTimeOffset.UtcNow), not
+        // the fixed `Now` used elsewhere in this file, so the invite must be created "now" (not a
+        // hardcoded past date) to stay within its 7-day expiry window and exercise the
+        // PendingInvitation (not InvitationExpired) branch.
         await using (var db = fixture.BuildContext())
         {
-            db.UserInvites.Add(UserInvite.Create(employeeId, companyId, "employee@example.com", Now));
+            db.UserInvites.Add(UserInvite.Create(employeeId, companyId, "employee@example.com", DateTimeOffset.UtcNow));
             await db.SaveChangesAsync();
         }
 

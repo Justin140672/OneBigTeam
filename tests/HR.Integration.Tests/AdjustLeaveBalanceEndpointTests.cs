@@ -285,9 +285,12 @@ public class AdjustLeaveBalanceEndpointTests
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
         var leaveTypeId = Guid.NewGuid();
+        // AccrualMethod.None: these tests exercise adjustment/balance math, not LEAVE-04's on-read
+        // accrual pacing — Monthly would gate RemainingDays by real elapsed-time-since-accrualStartDate
+        // (see LeaveAccrualCalculator), making assertions here spuriously fail as real time passes.
         db.LeaveTypes.Add(LeaveType.Create(
             leaveTypeId, companyId, "Annual Leave", "ANNUAL", defaultEntitlementDays,
-            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, DateTimeOffset.UtcNow));
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();
         return leaveTypeId;
     }

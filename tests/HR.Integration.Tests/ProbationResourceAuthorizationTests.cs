@@ -381,6 +381,13 @@ public class ProbationResourceAuthorizationTests
     /// <summary>
     /// Creates a probation record and a Pending review due within the next 30 days, so it
     /// surfaces from both GetUpcomingProbationReviews and a direct GetProbationReview lookup.
+    ///
+    /// PROB-06's EmployeeCreatedHandler / ManagerChangedHandler auto-create a deferred probation
+    /// record as soon as the employee has both a manager and a resolvable probation end date — by
+    /// the time this runs (after CreateEmployeeAsync + AssignManagerAsync), that auto-created
+    /// record usually already exists, so an explicit create here would conflict. Reuse the
+    /// existing record via GetProbationRecordByEmployee in that case rather than assuming this is
+    /// always the first record for the employee.
     /// </summary>
     private async Task<Guid> CreateUpcomingReviewAsync(HttpClient hrClient, Guid companyId, Guid employeeId)
     {
@@ -392,8 +399,20 @@ public class ProbationResourceAuthorizationTests
             startDate = "2026-06-01",
             expectedEndDate = "2026-09-01"
         });
-        recordResponse.EnsureSuccessStatusCode();
-        var record = await recordResponse.Content.ReadFromJsonAsync<RecordPayload>();
+
+        RecordPayload? record;
+        if (recordResponse.StatusCode == HttpStatusCode.Conflict)
+        {
+            var existingResponse = await hrClient.GetAsync(
+                $"/api/companies/{companyId}/employees/{employeeId}/probation-record");
+            existingResponse.EnsureSuccessStatusCode();
+            record = await existingResponse.Content.ReadFromJsonAsync<RecordPayload>();
+        }
+        else
+        {
+            recordResponse.EnsureSuccessStatusCode();
+            record = await recordResponse.Content.ReadFromJsonAsync<RecordPayload>();
+        }
 
         var dueDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10).ToString("yyyy-MM-dd");
         var reviewResponse = await hrClient.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new

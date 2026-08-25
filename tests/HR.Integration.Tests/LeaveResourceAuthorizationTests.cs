@@ -910,7 +910,8 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employeeId}/leave-requests",
             SubmitBody(AnnualLeaveTypeId, startDate, endDate));
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+            throw new Exception($"Submit failed {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
         var payload = await response.Content.ReadFromJsonAsync<LeaveRequestPayload>();
         return payload!.Id;
     }

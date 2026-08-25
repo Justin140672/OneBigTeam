@@ -28,7 +28,12 @@ public class GetLeaveBalanceHistoryEndpointTests
 
         Task.Run(async () =>
         {
+            // GetLeaveBalanceHistory's endpoint-level policy is "role:employee" (LEAVE-01/LEAVE-08 —
+            // resource scope is enforced separately by LeaveResourceAuthorizer), so the HR admin
+            // caller also needs the Employee role claim, not just HrAdministrator, to pass the
+            // endpoint policy gate — mirrors LeavingDateChangeRecalculatesLeaveBalanceEndpointTests.
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.Manager);
         }).GetAwaiter().GetResult();
     }

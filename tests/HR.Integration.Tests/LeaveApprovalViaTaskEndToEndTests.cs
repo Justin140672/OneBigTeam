@@ -56,9 +56,12 @@ public class LeaveApprovalViaTaskEndToEndTests
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
+            // AccrualMethod.None: this test exercises submit/approve balance math, not LEAVE-04's
+            // on-read accrual pacing (see LeaveAccrualCalculator), which would gate RemainingDays by
+            // real elapsed time since accrualStartDate.
             db.LeaveTypes.Add(LeaveType.Create(
                 leaveTypeId, companyId, "Annual Leave", "ANNUAL", 25,
-                AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, DateTimeOffset.UtcNow));
+                AccrualMethod.None, LeaveTypeBehaviour.Standard, DateTimeOffset.UtcNow));
             await db.SaveChangesAsync();
         }
 
@@ -158,9 +161,10 @@ public class LeaveApprovalViaTaskEndToEndTests
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
+            // AccrualMethod.None: see note in the Approval test above.
             db.LeaveTypes.Add(LeaveType.Create(
                 leaveTypeId, companyId, "Annual Leave", "ANNUAL", 25,
-                AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, DateTimeOffset.UtcNow));
+                AccrualMethod.None, LeaveTypeBehaviour.Standard, DateTimeOffset.UtcNow));
             await db.SaveChangesAsync();
         }
 

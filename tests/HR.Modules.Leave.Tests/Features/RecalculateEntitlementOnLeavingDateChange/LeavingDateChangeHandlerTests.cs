@@ -268,7 +268,10 @@ public class LeavingDateChangeHandlerTests
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(24m * 181 / 365, updated.EntitlementDays);
+        // LeaveEntitlementCalculator.CalculateEntitlement rounds pro-rated entitlement to 2 decimal
+        // places (AwayFromZero) — see its final Math.Round call — so the expectation here must match
+        // that rounding, not the unrounded fraction.
+        Assert.Equal(Math.Round(24m * 181 / 365, 2, MidpointRounding.AwayFromZero), updated.EntitlementDays);
     }
 
     private static LeaveDbContext BuildContext()
