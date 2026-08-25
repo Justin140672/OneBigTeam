@@ -17,9 +17,8 @@ public class GetEmployeeDocumentHandlerTests
             .Options);
 
     private static GetEmployeeDocumentHandler BuildHandler(
-        DocumentsDbContext db,
-        FakeDocumentStorageService? storage = null) =>
-        new(db, storage ?? new FakeDocumentStorageService());
+        DocumentsDbContext db) =>
+        new(db);
 
     private static async Task<(DocumentType docType, Document doc, EmployeeDocument empDoc)> SeedAll(
         DocumentsDbContext db,
@@ -50,15 +49,14 @@ public class GetEmployeeDocumentHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_EmployeeDocument_With_DownloadUrl()
+    public async Task HandleAsync_Returns_EmployeeDocument_Metadata_Only()
     {
         await using var db = BuildContext();
-        var storage        = new FakeDocumentStorageService();
         var companyId      = Guid.NewGuid();
         var employeeId     = Guid.NewGuid();
         var uploadedBy     = Guid.NewGuid();
         var (docType, doc, empDoc) = await SeedAll(db, companyId, employeeId, uploadedBy);
-        var handler = BuildHandler(db, storage);
+        var handler = BuildHandler(db);
 
         var result = await handler.HandleAsync(
             new GetEmployeeDocumentRequest
@@ -89,7 +87,14 @@ public class GetEmployeeDocumentHandlerTests
         Assert.Null(r.IssueDate);
         Assert.Null(r.ExpiryDate);
         Assert.Null(r.AcknowledgedAt);
-        Assert.NotNull(r.DownloadUrl);
+
+        // DOC-02: detail response is metadata-only; there must be no download-URL
+        // property on the response record (compile-time proof via reflection).
+        var responseType = typeof(GetEmployeeDocumentResponse);
+        Assert.DoesNotContain(
+            responseType.GetProperties(),
+            p => p.Name.Contains("DownloadUrl", StringComparison.OrdinalIgnoreCase)
+              || p.Name.Contains("Uri", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -178,25 +183,17 @@ public class GetEmployeeDocumentHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_DownloadUrl_Is_Derived_From_StorageKey()
+    public async Task HandleAsync_Does_Not_Require_A_DocumentStorageService_Dependency()
     {
-        await using var db = BuildContext();
-        var storage        = new FakeDocumentStorageService();
-        var companyId      = Guid.NewGuid();
-        var employeeId     = Guid.NewGuid();
-        var (_, doc, empDoc) = await SeedAll(db, companyId, employeeId, Guid.NewGuid());
-        var handler = BuildHandler(db, storage);
+        // DOC-02: the handler must no longer depend on IDocumentStorageService to
+        // resolve a download URL - the constructor only accepts the DbContext.
+        var ctor = typeof(GetEmployeeDocumentHandler)
+            .GetConstructors(System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic)
+            .Single();
 
-        var result = await handler.HandleAsync(
-            new GetEmployeeDocumentRequest
-            {
-                CompanyId          = companyId,
-                EmployeeId         = employeeId,
-                EmployeeDocumentId = empDoc.Id,
-            },
-            CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Contains(doc.StorageKey, result.Value!.DownloadUrl.ToString());
+        Assert.Single(ctor.GetParameters());
+        Assert.Equal(typeof(DocumentsDbContext), ctor.GetParameters()[0].ParameterType);
     }
 }

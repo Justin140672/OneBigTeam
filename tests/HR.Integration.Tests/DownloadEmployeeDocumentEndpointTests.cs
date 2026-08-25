@@ -1,8 +1,11 @@
 using System.Net;
+using HR.Infrastructure.Persistence;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -47,6 +50,44 @@ public class DownloadEmployeeDocumentEndpointTests(ApiWebApplicationFactory fact
         using var client = await AdminClient(AcmeCompanyId);
         var response     = await client.GetAsync(DownloadUrl(AcmeCompanyId, Guid.NewGuid(), SarahContractDocId));
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Successful_Download_Publishes_DocumentDownloadedAuditEvent()
+    {
+        // DOC-02 acceptance criteria: a successful (clean-scan) download must record an audit
+        // trail. See DocumentDownloadedAuditEvent ("document.downloaded") in DocumentsAudit.cs,
+        // published from DownloadEmployeeDocument's handler.
+        var userId = Guid.NewGuid();
+        using var client = await NoRedirectAdminClientWithUser(AcmeCompanyId, userId);
+
+        var response = await client.GetAsync(DownloadUrl(AcmeCompanyId, SarahEmployeeId, SarahContractDocId));
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == AcmeCompanyId
+                     && e.EventType == "document.downloaded"
+                     && e.EntityId == SarahContractDocId)
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("EmployeeDocument", auditRecord!.EntityType);
+        Assert.Equal(SarahEmployeeId,    auditRecord.EmployeeId);
+        Assert.Equal(userId,             auditRecord.ActorUserId);
+    }
+
+    private async Task<HttpClient> NoRedirectAdminClientWithUser(Guid companyId, Guid userId)
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee, companyId);
+        await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.HrAdministrator, companyId);
+        return client;
     }
 
     private static string DownloadUrl(Guid companyId, Guid employeeId, Guid docId) =>

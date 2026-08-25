@@ -1,13 +1,11 @@
 using HR.Modules.Documents.Persistence;
-using HR.Modules.Documents.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.GetEmployeeDocument;
 
 internal sealed class GetEmployeeDocumentHandler(
-    DocumentsDbContext db,
-    IDocumentStorageService storage)
+    DocumentsDbContext db)
 {
     public async Task<Result<GetEmployeeDocumentResponse>> HandleAsync(
         GetEmployeeDocumentRequest request,
@@ -26,8 +24,6 @@ internal sealed class GetEmployeeDocumentHandler(
         if (row is null)
             return Result.Failure<GetEmployeeDocumentResponse>(
                 Error.NotFound("Employee document was not found."));
-
-        var downloadUrl = await storage.GetDownloadUrlAsync(row.d.StorageKey, cancellationToken);
 
         return Result.Success(new GetEmployeeDocumentResponse(
             EmployeeDocumentId: row.ed.Id,
@@ -48,7 +44,6 @@ internal sealed class GetEmployeeDocumentHandler(
             IssueDate:          row.ed.IssueDate,
             ExpiryDate:         row.ed.ExpiryDate,
             AcknowledgedAt:     row.ed.AcknowledgedAt,
-            CreatedAt:          row.ed.CreatedAt,
-            DownloadUrl:        downloadUrl));
+            CreatedAt:          row.ed.CreatedAt));
     }
 }

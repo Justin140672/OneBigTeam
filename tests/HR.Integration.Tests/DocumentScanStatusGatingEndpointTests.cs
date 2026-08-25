@@ -67,6 +67,19 @@ public class DocumentScanStatusGatingEndpointTests
     }
 
     [Fact]
+    public async Task DownloadEmployeeDocument_Returns_NotFound_While_Document_Scan_Failed()
+    {
+        var employeeId = Guid.NewGuid();
+        var (documentId, employeeDocumentId) = await SeedEmployeeDocumentAsync(employeeId, FileScanStatus.Failed);
+
+        using var noRedirect = NoRedirectManagerClient();
+        var response = await noRedirect.GetAsync(
+            $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents/{employeeDocumentId}/download");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task DownloadEmployeeDocument_Redirects_Once_Document_Is_Marked_Clean()
     {
         var employeeId = Guid.NewGuid();

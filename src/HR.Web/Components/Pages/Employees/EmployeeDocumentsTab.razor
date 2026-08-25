@@ -1,5 +1,4 @@
 @inject DocumentService DocumentService
-@inject IJSRuntime JS
 
 @if (!_requestsLoading && _requests.Count > 0)
 {
@@ -170,10 +169,11 @@ else
                             }
                             else
                             {
-                                <SfButton CssClass="e-outline e-small me-1"
-                                          OnClick="() => DownloadAsync(r.EmployeeDocumentId)">
+                                <a class="e-btn e-outline e-small me-1"
+                                   href="@DocumentService.GetEmployeeDocumentDownloadUrl(CompanyId, EmployeeId, r.EmployeeDocumentId)"
+                                   target="_blank">
                                     Download
-                                </SfButton>
+                                </a>
                                 @if (!EmployeeSelfUpload)
                                 {
                                     <SfButton CssClass="e-danger e-outline e-small"
@@ -251,13 +251,6 @@ else
     {
         _requestOpen = false;
         await LoadAsync();
-    }
-
-    private async Task DownloadAsync(Guid employeeDocumentId)
-    {
-        var url = await DocumentService.GetDownloadUrlAsync(CompanyId, EmployeeId, employeeDocumentId);
-        if (url is not null)
-            await JS.InvokeVoidAsync("window.open", url, "_blank");
     }
 
     private void StartDelete(Guid id)   => _deleteTargetId = id;

@@ -21,5 +21,4 @@ internal sealed record GetEmployeeDocumentResponse(
     DateOnly? IssueDate,
     DateOnly? ExpiryDate,
     DateTimeOffset? AcknowledgedAt,
-    DateTimeOffset CreatedAt,
-    Uri DownloadUrl);
+    DateTimeOffset CreatedAt);

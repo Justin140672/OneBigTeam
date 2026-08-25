@@ -785,16 +785,9 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         catch { return false; }
     }
 
-    public async Task<string?> GetDownloadUrlAsync(
-        Guid companyId, Guid employeeId, Guid employeeDocumentId,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var doc = await Http.GetFromJsonAsync<EmployeeDocumentDetailResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/documents/{employeeDocumentId}", HrApiJsonOptions.Default, cancellationToken);
-            return doc?.DownloadUrl;
-        }
-        catch { return null; }
-    }
+    // Relative URL for the download redirect endpoint — bind directly to an <a href> so the
+    // browser follows the server-side redirect (and its scan-status gate and download audit
+    // event) itself. Do NOT resolve a signed URL via the detail endpoint — detail is metadata only.
+    public string GetEmployeeDocumentDownloadUrl(Guid companyId, Guid employeeId, Guid employeeDocumentId) =>
+        $"api/companies/{companyId}/employees/{employeeId}/documents/{employeeDocumentId}/download";
 }

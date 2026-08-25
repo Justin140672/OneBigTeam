@@ -1,8 +1,12 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Documents.Domain;
+using HR.Modules.Documents.Persistence;
 using HR.Modules.Identity.Domain;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -100,7 +104,82 @@ public class GetEmployeeDocumentEndpointTests
         Assert.Equal(employeeId,                  payload.EmployeeId);
         Assert.Equal("Get Test Doc",              payload.Title);
         Assert.Equal(new DateOnly(2028, 1, 1),    payload.ExpiryDate);
-        Assert.NotNull(                           payload.DownloadUrl);
+    }
+
+    [Fact]
+    public async Task Response_Body_Does_Not_Contain_A_DownloadUrl_Property()
+    {
+        // DOC-02: the detail endpoint used to leak a signed download URL, bypassing virus-scan
+        // gating and download auditing. Assert the raw JSON body has no such property at all,
+        // rather than just relying on the strongly-typed DTO no longer declaring the field.
+        using var client = await AdminClient();
+        var response     = await client.GetAsync(
+            $"/api/companies/{AcmeCompanyId}/employees/{SarahEmployeeId}/documents/{SarahContractDocId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.False(doc.RootElement.TryGetProperty("downloadUrl", out _));
+        Assert.False(doc.RootElement.TryGetProperty("uri", out _));
+        Assert.False(doc.RootElement.TryGetProperty("url", out _));
+    }
+
+    [Theory]
+    [InlineData("Pending")]
+    [InlineData("Infected")]
+    [InlineData("Failed")]
+    public async Task Returns_OK_With_Metadata_Regardless_Of_Scan_Status(string scanStatusName)
+    {
+        // DOC-02: the detail endpoint is metadata-only and must never gate on scan status - only
+        // the download endpoint does that (see DocumentScanStatusGatingEndpointTests).
+        // FileScanStatus is internal, so [InlineData] uses a string and we parse it here rather
+        // than exposing the enum on a public test method signature (CS0051).
+        var scanStatus = Enum.Parse<FileScanStatus>(scanStatusName);
+        var employeeId = Guid.NewGuid();
+        var employeeDocumentId = await SeedDocumentWithScanStatusAsync(employeeId, scanStatus);
+
+        using var client = await AdminClient();
+        var response = await client.GetAsync(
+            $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents/{employeeDocumentId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<DocPayload>();
+        Assert.Equal(employeeDocumentId, payload!.EmployeeDocumentId);
+    }
+
+    private async Task<Guid> SeedDocumentWithScanStatusAsync(Guid employeeId, FileScanStatus scanStatus)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db  = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
+        var now = DateTimeOffset.UtcNow;
+
+        var docType = DocumentType.Create(Guid.NewGuid(), AcmeCompanyId, $"Detail Scan Type {Guid.NewGuid()}", null, now);
+        db.DocumentTypes.Add(docType);
+
+        var document = Document.Create(
+            Guid.NewGuid(), AcmeCompanyId, employeeId, "Detail Scan Test", null,
+            docType.Id, "detail-scan.pdf", 1024, "application/pdf",
+            $"{AcmeCompanyId}/{employeeId}/detail-scan.pdf", null, AdminUser, now);
+
+        switch (scanStatus)
+        {
+            case FileScanStatus.Pending:
+                break;
+            case FileScanStatus.Infected:
+                document.MarkScanInfected("EICAR.Test.File", now);
+                break;
+            case FileScanStatus.Failed:
+                document.MarkScanFailed("scanner unreachable", now);
+                break;
+        }
+        db.Documents.Add(document);
+
+        var employeeDocument = EmployeeDocument.Create(
+            Guid.NewGuid(), AcmeCompanyId, employeeId, document.Id, AdminUser, now);
+        db.EmployeeDocuments.Add(employeeDocument);
+
+        await db.SaveChangesAsync();
+        return employeeDocument.Id;
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -142,6 +221,5 @@ public class GetEmployeeDocumentEndpointTests
         string   Title,
         string   FileName,
         string   ContentType,
-        DateOnly? ExpiryDate,
-        string   DownloadUrl);
+        DateOnly? ExpiryDate);
 }
