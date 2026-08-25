@@ -49,6 +49,22 @@ public class GetReportCatalogEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    // REP-04: a Company Administrator has no Manager/Recruiter/HrAdministrator role, so — like the
+    // plain Employee case above — they never even reach the per-category workload-actions gate;
+    // they're rejected at the baseline "reporting:view" policy before the catalogue is built at all.
+    [Fact]
+    public async Task Get_Catalog_Returns_Forbidden_For_CompanyAdministrator_Without_Operational_HR_Role()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.CompanyAdministrator);
+        using var client = await ClientFor(userId, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/catalog");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     [Fact]
     public async Task Get_Catalog_Returns_Only_LeaveSummary_For_Manager_With_No_Other_Category_Access()
     {

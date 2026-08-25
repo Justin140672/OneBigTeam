@@ -11,8 +11,8 @@ namespace HR.Modules.Reporting.Features.GetWorkloadActions;
 /// authorization/permission filtering — each provider has already scoped its own results to what
 /// <paramref name="caller"/> is allowed to see (HR-only, manager-scoped to direct reports,
 /// recruitment-scoped, or self-scoped) before returning here. This handler only merges, computes
-/// urgency, applies the caller-supplied display filters, groups and summarises — defense-in-depth
-/// pattern identical to GetReportCatalog: the endpoint's baseline reporting:view policy is a menu
+/// urgency, applies the caller-supplied display filters, groups and summarises — defense-in-depth:
+/// the endpoint's reporting:view-workload-actions policy (Manager/HrAdministrator only) is a menu
 /// gate, real filtering happens per-provider.
 /// </summary>
 internal sealed class GetWorkloadActionsHandler(

@@ -22,9 +22,11 @@ namespace HR.Integration.Tests;
 
 /// <summary>
 /// OBT-721 Workload &amp; HR Actions Report integration coverage. Every <see cref="HR.Infrastructure.Abstractions.IWorkloadActionProvider"/>
-/// self-scopes by caller (see xmldoc on that interface), so the key security assertion here is that
-/// no persona ever receives another manager's or another category's company-wide data — the
-/// aggregation endpoint's baseline "reporting:view" policy is only a menu gate.
+/// self-scopes by caller (see xmldoc on that interface), so one key security assertion here is that
+/// no persona ever receives another manager's or another category's company-wide data. REP-04
+/// additionally locks the endpoint itself to the dedicated "reporting:view-workload-actions" policy
+/// (Manager, HrAdministrator only) rather than the broader baseline "reporting:view" policy (Manager,
+/// Recruiter, HrAdministrator) — see the Forbidden/Ok tests below for that gate.
 /// </summary>
 [Collection("Integration")]
 public class GetWorkloadActionsEndpointTests
@@ -68,6 +70,64 @@ public class GetWorkloadActionsEndpointTests
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    // REP-04: this endpoint moved from the broader "reporting:view" policy (Manager, Recruiter,
+    // HrAdministrator) to the dedicated "reporting:view-workload-actions" policy (Manager,
+    // HrAdministrator only) — matching the same gate the report catalogue already uses for the
+    // "workload-actions" entry. A Recruiter-only caller previously passed the baseline gate here
+    // (even though row-level scoping meant they'd only ever see the Recruitment category); now they
+    // must be rejected with 403 before the handler ever runs.
+    [Fact]
+    public async Task Get_WorkloadActions_Returns_Forbidden_For_Recruiter_Only_Caller()
+    {
+        var companyId = Guid.NewGuid();
+        var recruiterId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, recruiterId, SystemRoles.Recruiter);
+        using var client = await ClientFor(companyId, recruiterId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_WorkloadActions_Returns_Forbidden_For_CompanyAdministrator_Without_Operational_HR_Role()
+    {
+        var companyId = Guid.NewGuid();
+        var companyAdminId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, companyAdminId, SystemRoles.CompanyAdministrator);
+        using var client = await ClientFor(companyId, companyAdminId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_WorkloadActions_Returns_Ok_For_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+        using var client = await ClientFor(companyId, managerId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_WorkloadActions_Returns_Ok_For_HrAdministrator()
+    {
+        var companyId = Guid.NewGuid();
+        var hrAdminId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.HrAdministrator);
+        using var client = await ClientFor(companyId, hrAdminId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
@@ -156,30 +216,26 @@ public class GetWorkloadActionsEndpointTests
         Assert.DoesNotContain(payload.Items, i => i.ActionCategory == "Vacancies Awaiting Action");
     }
 
+    // REP-04: previously a Recruiter-only caller passed the endpoint's then-baseline "reporting:view"
+    // policy and only ever saw the Recruitment category via row-level provider scoping. The endpoint
+    // now requires "reporting:view-workload-actions" (Manager/HrAdministrator only), so a Recruiter
+    // without either role is rejected at the policy gate before the handler/providers ever run — see
+    // Get_WorkloadActions_Returns_Forbidden_For_Recruiter_Only_Caller above for the dedicated
+    // authorization assertion.
     [Fact]
-    public async Task Get_WorkloadActions_Recruiter_Only_Sees_Recruitment_Category_Items()
+    public async Task Get_WorkloadActions_Recruiter_Only_Is_Forbidden_And_Never_Reaches_Providers()
     {
         var companyId = Guid.NewGuid();
         var recruiterId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, recruiterId, SystemRoles.Recruiter);
 
         var hiringManagerId = await SeedEmployeeAsync(companyId, "Harriet", "Manager");
-        var otherEmployeeId = await SeedEmployeeAsync(companyId, "Owen", "Employee");
-
         await SeedOpenVacancyAsync(companyId, hiringManagerId, assignedRecruiterId: null);
-        // Leave/tasks belonging to someone else — a Recruiter must never see these HR/Manager
-        // scoped categories, even though the endpoint's baseline policy lets them through the gate.
-        await SeedLeaveRequestAsync(companyId, otherEmployeeId, Today.AddDays(5));
-        await SeedOverdueTaskAsync(companyId, otherEmployeeId, Today.AddDays(-1));
 
         using var client = await ClientFor(companyId, recruiterId);
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<WorkloadActionsPayload>();
-        Assert.NotNull(payload);
-        Assert.NotEmpty(payload!.Items);
-        Assert.All(payload.Items, item => Assert.Equal("Vacancies Awaiting Action", item.ActionCategory));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

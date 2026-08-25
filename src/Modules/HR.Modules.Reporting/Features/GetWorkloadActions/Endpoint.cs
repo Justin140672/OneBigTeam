@@ -9,13 +9,13 @@ internal sealed class Endpoint(GetWorkloadActionsHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/reporting/workload-actions");
-        // Baseline reporting:view gate only (Manager, Recruiter, HrAdministrator) — same
-        // defense-in-depth pattern as GetReportCatalog. The real, per-category permission scoping
-        // happens inside each IWorkloadActionProvider (see Handler.cs xmldoc): a Manager only ever
-        // gets their own direct reports' items, a Recruiter only gets recruitment categories, and a
-        // caller with none of the baseline roles is rejected outright by this policy before the
-        // handler ever runs.
-        Policies("reporting:view");
+        // Uses the dedicated reporting:view-workload-actions policy (Manager, HrAdministrator only)
+        // — the same access gate the catalogue resolves via ReportAccessGate.WorkloadActions /
+        // ReportAccessGateEvaluator, so a Recruiter-only or Company Administrator (without an
+        // operational HR role) caller is rejected with 403 before the handler ever runs. Per-category
+        // row-level scoping still happens inside each IWorkloadActionProvider (see Handler.cs xmldoc)
+        // as defence in depth on top of this endpoint-level check.
+        Policies("reporting:view-workload-actions");
     }
 
     public override async Task HandleAsync(

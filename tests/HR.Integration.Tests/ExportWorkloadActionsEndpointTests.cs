@@ -44,6 +44,70 @@ public class ExportWorkloadActionsEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    // REP-04: this endpoint moved from the broader "reporting:view" policy (Manager, Recruiter,
+    // HrAdministrator) to the dedicated "reporting:view-workload-actions" policy (Manager,
+    // HrAdministrator only) — same gate as GetWorkloadActions and the report catalogue's
+    // "workload-actions" entry.
+    [Fact]
+    public async Task Export_WorkloadActions_Returns_Forbidden_For_Recruiter_Only_Caller()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Recruiter);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions/export?format=Csv");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Export_WorkloadActions_Returns_Forbidden_For_CompanyAdministrator_Without_Operational_HR_Role()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.CompanyAdministrator);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions/export?format=Csv");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Export_WorkloadActions_Returns_Ok_For_Manager()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions/export?format=Csv");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Export_WorkloadActions_Returns_Ok_For_HrAdministrator()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions/export?format=Csv");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     [Fact]
     public async Task Export_WorkloadActions_Returns_Csv_For_HrAdministrator()
     {
