@@ -31,7 +31,8 @@ public class UpdateProbationRecordHandlerTests
             new ProbationReviewRecalculationService(
                 context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
                 new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
-            new FakeCompanyProbationSettingsReader());
+            new FakeCompanyProbationSettingsReader(),
+            new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
         {
@@ -46,6 +47,95 @@ public class UpdateProbationRecordHandlerTests
         Assert.Equal(newManagerId, result.Value!.ManagerEmployeeId);
         Assert.Equal("Active", result.Value.Status);
         Assert.Equal("Updated notes.", result.Value.Notes);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_Before_After_And_Actor()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var oldManagerId = Guid.NewGuid();
+        var newManagerId = Guid.NewGuid();
+        var actorEmployeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var oldExpectedEndDate = new DateOnly(2026, 9, 1);
+        var newExpectedEndDate = new DateOnly(2026, 10, 1);
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), oldManagerId,
+            new DateOnly(2026, 6, 1), oldExpectedEndDate, null, DateOnly.FromDateTime(now.UtcDateTime), now);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        var publisher = new FakeAuditPublisher();
+        var handler = new UpdateProbationRecordHandler(
+            context,
+            new FakeClock(FixedUtcNow),
+            new ProbationReviewRecalculationService(
+                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
+            new FakeCompanyProbationSettingsReader(),
+            publisher);
+
+        var result = await handler.HandleAsync(new UpdateProbationRecordRequest
+        {
+            CompanyId = companyId,
+            Id = record.Id,
+            ManagerEmployeeId = newManagerId,
+            ExpectedEndDate = newExpectedEndDate,
+            Notes = "Corrected manager and date.",
+            ActorEmployeeId = actorEmployeeId
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<ProbationRecordUpdatedAuditEvent>(Assert.Single(publisher.Published));
+        Assert.Equal(actorEmployeeId, evt.ActorEmployeeIdValue);
+        Assert.Equal(oldManagerId, evt.BeforeManagerEmployeeId);
+        Assert.Equal(oldExpectedEndDate, evt.BeforeExpectedEndDate);
+        Assert.Equal(newManagerId, evt.ManagerEmployeeId);
+        Assert.Equal(newExpectedEndDate, evt.ExpectedEndDate);
+        Assert.True(evt.HasNotes);
+
+        var serialized = System.Text.Json.JsonSerializer.Serialize(evt);
+        Assert.DoesNotContain("Corrected manager and date.", serialized);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_HasNotes_False_When_Notes_Cleared()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), "Original notes.", DateOnly.FromDateTime(now.UtcDateTime), now);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        var publisher = new FakeAuditPublisher();
+        var handler = new UpdateProbationRecordHandler(
+            context,
+            new FakeClock(FixedUtcNow),
+            new ProbationReviewRecalculationService(
+                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
+            new FakeCompanyProbationSettingsReader(),
+            publisher);
+
+        var result = await handler.HandleAsync(new UpdateProbationRecordRequest
+        {
+            CompanyId = companyId,
+            Id = record.Id,
+            ManagerEmployeeId = managerId,
+            ExpectedEndDate = new DateOnly(2026, 9, 1),
+            Notes = null
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<ProbationRecordUpdatedAuditEvent>(Assert.Single(publisher.Published));
+        Assert.False(evt.HasNotes);
     }
 
     [Fact]
@@ -69,7 +159,8 @@ public class UpdateProbationRecordHandlerTests
             new ProbationReviewRecalculationService(
                 context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
                 new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
-            new FakeCompanyProbationSettingsReader());
+            new FakeCompanyProbationSettingsReader(),
+            new FakeAuditPublisher());
 
         var newManagerId = Guid.NewGuid();
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
@@ -112,7 +203,8 @@ public class UpdateProbationRecordHandlerTests
             new ProbationReviewRecalculationService(
                 context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
                 new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
-            new FakeCompanyProbationSettingsReader());
+            new FakeCompanyProbationSettingsReader(),
+            new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
         {
@@ -153,7 +245,8 @@ public class UpdateProbationRecordHandlerTests
             new ProbationReviewRecalculationService(
                 context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
                 new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
-            new FakeCompanyProbationSettingsReader());
+            new FakeCompanyProbationSettingsReader(),
+            new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
         {
@@ -189,7 +282,8 @@ public class UpdateProbationRecordHandlerTests
             new ProbationReviewRecalculationService(
                 context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
                 new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
-            new FakeCompanyProbationSettingsReader());
+            new FakeCompanyProbationSettingsReader(),
+            new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
         {
@@ -229,7 +323,8 @@ public class UpdateProbationRecordHandlerTests
             new ProbationReviewRecalculationService(
                 context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
                 new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
-            new FakeCompanyProbationSettingsReader());
+            new FakeCompanyProbationSettingsReader(),
+            new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
         {
@@ -254,7 +349,8 @@ public class UpdateProbationRecordHandlerTests
             new ProbationReviewRecalculationService(
                 context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
                 new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
-            new FakeCompanyProbationSettingsReader());
+            new FakeCompanyProbationSettingsReader(),
+            new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
         {
@@ -288,7 +384,8 @@ public class UpdateProbationRecordHandlerTests
             new ProbationReviewRecalculationService(
                 context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
                 new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
-            new FakeCompanyProbationSettingsReader());
+            new FakeCompanyProbationSettingsReader(),
+            new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
         {
@@ -328,7 +425,8 @@ public class UpdateProbationRecordHandlerTests
             new ProbationReviewRecalculationService(
                 context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
                 new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
-            new FakeCompanyProbationSettingsReader());
+            new FakeCompanyProbationSettingsReader(),
+            new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
         {
@@ -375,7 +473,8 @@ public class UpdateProbationRecordHandlerTests
             new ProbationReviewRecalculationService(
                 context, taskCreator, new FakeTaskCanceller(), new FakeEmployeeNameReader(),
                 new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
-            new FakeCompanyProbationSettingsReader());
+            new FakeCompanyProbationSettingsReader(),
+            new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new UpdateProbationRecordRequest
         {

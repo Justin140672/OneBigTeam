@@ -11,6 +11,8 @@ internal enum EmployeeTimelineEventType
     CompensationChanged,
     OnboardingCompleted,
     ProbationPassed,
+    ProbationFailed,
+    ProbationExtended,
     CompanyDocumentAcknowledged,
     EmployeeDocumentAdded,
     HrNoteAdded,

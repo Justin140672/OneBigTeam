@@ -67,9 +67,10 @@ internal sealed class CreateProbationRecordHandler
             record.Id,
             record.EmployeeId,
             record.ManagerEmployeeId,
+            request.ActorEmployeeId,
             record.StartDate,
             record.ExpectedEndDate,
-            record.Notes,
+            HasNotes: !string.IsNullOrWhiteSpace(record.Notes),
             now), cancellationToken);
 
         return Result.Success(new CreateProbationRecordResponse(

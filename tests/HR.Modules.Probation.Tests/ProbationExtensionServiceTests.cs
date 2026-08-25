@@ -61,7 +61,70 @@ public class ProbationExtensionServiceTests
         Assert.Contains(notificationWriter.Written, n => n.EmployeeId == record.EmployeeId && n.Type == NotificationType.ProbationExtended);
         Assert.Contains(notificationWriter.Written, n => n.EmployeeId == managerId && n.Type == NotificationType.ProbationExtended);
 
-        Assert.Single(auditPublisher.Published);
+        var evt = Assert.IsType<ProbationExtendedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(record.Id, evt.ProbationRecordId);
+        Assert.Equal(record.EmployeeId, evt.EmployeeId);
+        Assert.Equal(decisionMakerId, evt.DecisionMakerEmployeeId);
+        Assert.Equal(previousEndDate, evt.PreviousExpectedEndDate);
+        Assert.Equal(newEndDate, evt.NewExpectedEndDate);
+        Assert.True(evt.HasExtensionReason);
+        Assert.Equal(decisionDate, evt.DecisionDate);
+
+        var serialized = System.Text.Json.JsonSerializer.Serialize(evt);
+        Assert.DoesNotContain("Needs more time.", serialized);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_HasExtensionReason_False_When_Reason_Is_Whitespace()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var decisionMakerId = Guid.NewGuid();
+        var previousEndDate = new DateOnly(2026, 9, 15);
+        var newEndDate = new DateOnly(2026, 12, 1);
+
+        var (record, sourceReview) = await SeedRecordAndReview(
+            context, companyId, managerId, ProbationReviewType.FinalDecision, previousEndDate);
+
+        var auditPublisher = new FakeAuditPublisher();
+        var service = TestProbationExtensionServiceFactory.Build(context, auditPublisher: auditPublisher);
+
+        await service.ApplyAsync(
+            record, sourceReview, previousEndDate, newEndDate, "   ",
+            decisionMakerId, new DateOnly(2026, 9, 1), Now, CancellationToken.None);
+
+        var evt = Assert.IsType<ProbationExtendedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.False(evt.HasExtensionReason);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_Publishes_ProbationExtendedIntegrationEvent_With_NewExpectedEndDate()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var decisionMakerId = Guid.NewGuid();
+        var previousEndDate = new DateOnly(2026, 9, 15);
+        var newEndDate = new DateOnly(2026, 12, 1);
+
+        var (record, sourceReview) = await SeedRecordAndReview(
+            context, companyId, managerId, ProbationReviewType.FinalDecision, previousEndDate);
+
+        var integrationPublisher = new CapturingIntegrationEventPublisher();
+        var service = TestProbationExtensionServiceFactory.Build(context, integrationEventPublisher: integrationPublisher);
+
+        await service.ApplyAsync(
+            record, sourceReview, previousEndDate, newEndDate, "Needs more time.",
+            decisionMakerId, new DateOnly(2026, 9, 1), Now, CancellationToken.None);
+
+        var evt = Assert.IsType<HR.SharedKernel.ProbationExtendedIntegrationEvent>(
+            Assert.Single(integrationPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(record.EmployeeId, evt.EmployeeId);
+        Assert.Equal(record.Id, evt.ProbationRecordId);
+        Assert.Equal(newEndDate, evt.NewExpectedEndDate);
     }
 
     [Fact]

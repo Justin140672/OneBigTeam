@@ -86,16 +86,30 @@ internal sealed class CompleteProbationReviewFromTaskAction(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await auditPublisher.PublishAsync(new ProbationReviewCompletedAuditEvent(
-            review.CompanyId,
-            review.Id,
-            review.ProbationRecordId,
-            record.EmployeeId,
-            context.CompletedBy,
-            review.ReviewType.ToString(),
-            review.Outcome?.ToString(),
-            review.Notes,
-            now), cancellationToken);
+        // PROB-07: same distinct Pass/Fail/Extend/checkpoint-completed event split as the direct
+        // API path (CompleteProbationReviewHandler) — see ProbationAudit.cs remarks. Actor is
+        // context.CompletedBy — the person who actually completed the task, never assumed to be
+        // the affected employee.
+        var hasNotes = !string.IsNullOrWhiteSpace(review.Notes);
+
+        if (outcome == ProbationOutcome.Pass)
+        {
+            await auditPublisher.PublishAsync(new ProbationPassedAuditEvent(
+                review.CompanyId, review.ProbationRecordId, review.Id, record.EmployeeId,
+                context.CompletedBy, decisionDate, hasNotes, now), cancellationToken);
+        }
+        else if (outcome == ProbationOutcome.Fail)
+        {
+            await auditPublisher.PublishAsync(new ProbationFailedAuditEvent(
+                review.CompanyId, review.ProbationRecordId, review.Id, record.EmployeeId,
+                context.CompletedBy, decisionDate, hasNotes, now), cancellationToken);
+        }
+        else if (outcome is null)
+        {
+            await auditPublisher.PublishAsync(new ProbationReviewCompletedAuditEvent(
+                review.CompanyId, review.Id, review.ProbationRecordId, record.EmployeeId,
+                context.CompletedBy, review.ReviewType.ToString(), hasNotes, now), cancellationToken);
+        }
 
         if (outcome == ProbationOutcome.Extend && extensionEndDate.HasValue)
         {
@@ -115,6 +129,12 @@ internal sealed class CompleteProbationReviewFromTaskAction(
         {
             await integrationEventPublisher.PublishAsync(
                 new ProbationPassedIntegrationEvent(record.CompanyId, record.EmployeeId, record.Id, now),
+                cancellationToken);
+        }
+        else if (outcome == ProbationOutcome.Fail)
+        {
+            await integrationEventPublisher.PublishAsync(
+                new ProbationFailedIntegrationEvent(record.CompanyId, record.EmployeeId, record.Id, now),
                 cancellationToken);
         }
 

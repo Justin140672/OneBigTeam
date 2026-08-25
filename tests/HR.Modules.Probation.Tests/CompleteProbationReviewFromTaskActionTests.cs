@@ -233,7 +233,7 @@ public class CompleteProbationReviewFromTaskActionTests
         var companyId   = Guid.NewGuid();
         var completedBy = Guid.NewGuid();
 
-        var (_, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Fail", notes: "Did not meet targets.");
         var integrationPublisher = new Infrastructure.CapturingIntegrationEventPublisher();
@@ -241,7 +241,13 @@ public class CompleteProbationReviewFromTaskActionTests
         await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), integrationPublisher, TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
-        Assert.Empty(integrationPublisher.Published);
+        // PROB-07: a Fail outcome now publishes ProbationFailedIntegrationEvent (to drive the
+        // ProbationFailed employee timeline entry) — it must never publish ProbationPassedIntegrationEvent.
+        Assert.DoesNotContain(integrationPublisher.Published, e => e is ProbationPassedIntegrationEvent);
+        var evt = Assert.IsType<ProbationFailedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(record.EmployeeId, evt.EmployeeId);
+        Assert.Equal(record.Id, evt.ProbationRecordId);
     }
 
     [Fact]
@@ -588,6 +594,109 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var savedRecord = await context.ProbationRecords.SingleAsync(r => r.Id == record.Id);
         Assert.Equal(ProbationStatus.Active, savedRecord.Status);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Pass_Outcome_Publishes_ProbationPassedAuditEvent_With_CompletedBy_As_Actor()
+    {
+        await using var context = BuildContext();
+        var companyId   = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Pass", notes: "Excellent.");
+        var auditPublisher = new FakeAuditPublisher();
+
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), auditPublisher, new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+            .ExecuteAsync(taskContext, CancellationToken.None);
+
+        var evt = Assert.IsType<ProbationPassedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(record.Id, evt.ProbationRecordId);
+        Assert.Equal(review.Id, evt.ProbationReviewId);
+        Assert.Equal(completedBy, evt.DecisionMakerEmployeeId);
+        Assert.Equal(Today, evt.DecisionDate);
+        Assert.True(evt.HasNotes);
+
+        var serialized = System.Text.Json.JsonSerializer.Serialize(evt);
+        Assert.DoesNotContain("Excellent.", serialized);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Fail_Outcome_Publishes_ProbationFailedAuditEvent_With_CompletedBy_As_Actor()
+    {
+        await using var context = BuildContext();
+        var companyId   = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Fail", notes: "Did not meet targets.");
+        var auditPublisher = new FakeAuditPublisher();
+
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), auditPublisher, new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+            .ExecuteAsync(taskContext, CancellationToken.None);
+
+        var evt = Assert.IsType<ProbationFailedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(record.Id, evt.ProbationRecordId);
+        Assert.Equal(review.Id, evt.ProbationReviewId);
+        Assert.Equal(completedBy, evt.DecisionMakerEmployeeId);
+        Assert.Equal(Today, evt.DecisionDate);
+        Assert.True(evt.HasNotes);
+
+        var serialized = System.Text.Json.JsonSerializer.Serialize(evt);
+        Assert.DoesNotContain("Did not meet targets.", serialized);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Checkpoint_Review_Publishes_ProbationReviewCompletedAuditEvent_With_CompletedBy_As_Actor()
+    {
+        await using var context = BuildContext();
+        var companyId   = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ManagerCheckIn);
+
+        var taskContext = BuildContext(companyId, completedBy, review.Id, notes: "Good progress.");
+        var auditPublisher = new FakeAuditPublisher();
+
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), auditPublisher, new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+            .ExecuteAsync(taskContext, CancellationToken.None);
+
+        var evt = Assert.IsType<ProbationReviewCompletedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(review.Id, evt.ProbationReviewId);
+        Assert.Equal(record.Id, evt.ProbationRecordId);
+        Assert.Equal(completedBy, evt.CompletedByEmployeeId);
+        Assert.True(evt.HasNotes);
+
+        var serialized = System.Text.Json.JsonSerializer.Serialize(evt);
+        Assert.DoesNotContain("Good progress.", serialized);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Extend_Outcome_Does_Not_Publish_ProbationReviewCompletedAuditEvent()
+    {
+        await using var context = BuildContext();
+        var companyId   = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+        var newEndDate  = new DateOnly(2026, 10, 7);
+
+        var (_, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var taskContext = BuildContext(companyId, completedBy, review.Id,
+            outcomeDecision: $"Extend|{newEndDate:yyyy-MM-dd}",
+            notes: "Needs more time.");
+        var auditPublisher = new FakeAuditPublisher();
+
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), auditPublisher, new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+            .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.DoesNotContain(auditPublisher.Published, e => e is ProbationReviewCompletedAuditEvent);
+        Assert.DoesNotContain(auditPublisher.Published, e => e is ProbationPassedAuditEvent);
+        Assert.DoesNotContain(auditPublisher.Published, e => e is ProbationFailedAuditEvent);
     }
 
     private static TaskCompletionContext BuildContext(

@@ -51,7 +51,8 @@ internal sealed class MarkProbationNotApplicableHandler
                 await _dbContext.SaveChangesAsync(cancellationToken);
 
                 await _auditPublisher.PublishAsync(new ProbationMarkedNotApplicableAuditEvent(
-                    existing.CompanyId, existing.Id, existing.EmployeeId, reason, now), cancellationToken);
+                    existing.CompanyId, existing.Id, existing.EmployeeId, request.ActorEmployeeId,
+                    HasReason: reason is not null, now), cancellationToken);
 
                 return Result.Success(new MarkProbationNotApplicableResponse(
                     existing.Id, existing.CompanyId, existing.EmployeeId,
@@ -85,7 +86,8 @@ internal sealed class MarkProbationNotApplicableHandler
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         await _auditPublisher.PublishAsync(new ProbationMarkedNotApplicableAuditEvent(
-            record.CompanyId, record.Id, record.EmployeeId, reason, now), cancellationToken);
+            record.CompanyId, record.Id, record.EmployeeId, request.ActorEmployeeId,
+            HasReason: reason is not null, now), cancellationToken);
 
         return Result.Success(new MarkProbationNotApplicableResponse(
             record.Id, record.CompanyId, record.EmployeeId,

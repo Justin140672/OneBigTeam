@@ -1,10 +1,12 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Probation.Features.MarkProbationNotApplicable;
 
 internal sealed class Endpoint(
-    MarkProbationNotApplicableHandler handler) : Endpoint<MarkProbationNotApplicableRequest, MarkProbationNotApplicableResponse>
+    MarkProbationNotApplicableHandler handler,
+    ICurrentUser currentUser) : Endpoint<MarkProbationNotApplicableRequest, MarkProbationNotApplicableResponse>
 {
     public override void Configure()
     {
@@ -16,7 +18,9 @@ internal sealed class Endpoint(
         MarkProbationNotApplicableRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var result = await handler.HandleAsync(
+            request with { ActorEmployeeId = currentUser.UserId },
+            cancellationToken);
 
         if (result.IsFailure)
         {

@@ -28,7 +28,8 @@ internal sealed class ProbationExtensionService(
     IEmployeeNameReader employeeNameReader,
     IHrAdministratorDirectory hrAdministratorDirectory,
     INotificationWriter notificationWriter,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    IIntegrationEventPublisher integrationEventPublisher)
 {
     public async Task ApplyAsync(
         ProbationRecord record,
@@ -122,11 +123,18 @@ internal sealed class ProbationExtensionService(
             decisionMakerEmployeeId,
             previousExpectedEndDate,
             newExpectedEndDate,
-            extensionReason,
+            HasExtensionReason: !string.IsNullOrWhiteSpace(extensionReason),
             decisionDate,
             extensionConfirmationReview.Id,
             newFinalReview.Id,
             now), cancellationToken);
+
+        // PROB-07: completes the "add timeline events for extended and failed outcomes"
+        // requirement — previously only Pass produced an EmployeeTimelineEntry. Body text carries
+        // only the new expected end date, never the free-text extension reason.
+        await integrationEventPublisher.PublishAsync(
+            new ProbationExtendedIntegrationEvent(record.CompanyId, record.EmployeeId, record.Id, newExpectedEndDate, now),
+            cancellationToken);
     }
 
     private async Task NotifyAsync(

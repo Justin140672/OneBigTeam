@@ -241,6 +241,35 @@ public class ManagerChangedHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Deferred_Record_Creation_Publishes_Audit_Event_With_System_Actor()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var newManagerId = Guid.NewGuid();
+        var probationStartDate = new DateOnly(2026, 1, 1);
+        var probationEndDate = new DateOnly(2026, 4, 1);
+
+        var probationDatesReader = new FakeEmployeeProbationDatesReader(
+            new EmployeeProbationDates(probationStartDate, probationEndDate));
+
+        var taskCreator = new FakeTaskCreator();
+        var taskCanceller = new FakeTaskCanceller();
+        var auditPublisher = new FakeAuditPublisher();
+        var handler = BuildHandler(context, taskCreator, taskCanceller, probationDatesReader, auditPublisher);
+
+        await handler.HandleAsync(
+            new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, Guid.NewGuid(), newManagerId, Now),
+            CancellationToken.None);
+
+        var evt = Assert.IsType<ProbationRecordCreatedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal(ProbationSystemActor.Id, evt.ActorEmployeeIdValue);
+        Assert.NotEqual(employeeId, evt.ActorEmployeeIdValue);
+        Assert.NotEqual(newManagerId, evt.ActorEmployeeIdValue);
+        Assert.False(evt.HasNotes);
+    }
+
+    [Fact]
     public async Task HandleAsync_No_Record_Exists_With_Future_StartDate_Creates_Deferred_NotStarted_Record()
     {
         await using var context = BuildContext();
@@ -411,7 +440,8 @@ public class ManagerChangedHandlerTests
         ProbationDbContext context,
         FakeTaskCreator taskCreator,
         FakeTaskCanceller taskCanceller,
-        IEmployeeProbationDatesReader? probationDatesReader = null) =>
+        IEmployeeProbationDatesReader? probationDatesReader = null,
+        FakeAuditPublisher? auditPublisher = null) =>
         new(context,
             taskCreator,
             taskCanceller,
@@ -419,6 +449,7 @@ public class ManagerChangedHandlerTests
             probationDatesReader ?? new FakeEmployeeProbationDatesReader(),
             new FakeCompanyTimeZoneReader(),
             new FakeClock(FixedUtcNow),
+            auditPublisher ?? new FakeAuditPublisher(),
             NullLogger<ManagerChangedHandler>.Instance);
 
     private static ProbationDbContext BuildContext() =>

@@ -587,6 +587,361 @@ public class AuditHistoryIntegrationTests
         Assert.DoesNotContain(sensitiveManagerNotes, auditRecord.AfterJson ?? string.Empty);
     }
 
+    // PROB-07: actor attribution, structured before/after and sensitive-notes exclusion, verified
+    // end-to-end through the real DbAuditEventPublisher/AuditDbContext (not just the fake publisher
+    // used by the unit tests in HR.Modules.Probation.Tests).
+    [Fact]
+    public async Task CreateProbationRecord_Persists_Audit_Record_With_Actor_And_Without_Notes_Content()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+        var employeeId = Guid.NewGuid();
+        const string sensitiveNotes = "AuditIntegration-Sensitive-ProbationNotes-Detail";
+
+        var createResp = await hrAdminClient.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
+        {
+            companyId,
+            employeeId,
+            managerEmployeeId = Guid.NewGuid(),
+            startDate = "2026-06-01",
+            expectedEndDate = "2026-09-01",
+            notes = sensitiveNotes
+        });
+        createResp.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "probation-record.created")
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("ProbationRecord", auditRecord!.EntityType);
+        Assert.Equal(employeeId, auditRecord.EmployeeId);
+        Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
+        Assert.NotEqual(employeeId, auditRecord.ActorEmployeeId);
+        Assert.DoesNotContain(sensitiveNotes, auditRecord.AfterJson ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task UpdateProbationRecord_Persists_Audit_Record_With_Before_After_And_Without_Notes_Content()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+        var oldManagerId = Guid.NewGuid();
+        var newManagerId = Guid.NewGuid();
+        const string sensitiveNotes = "AuditIntegration-Sensitive-ProbationUpdateNotes-Detail";
+
+        var createResp = await hrAdminClient.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
+        {
+            companyId,
+            employeeId = Guid.NewGuid(),
+            managerEmployeeId = oldManagerId,
+            startDate = "2026-06-01",
+            expectedEndDate = "2026-09-01"
+        });
+        createResp.EnsureSuccessStatusCode();
+        var created = await createResp.Content.ReadFromJsonAsync<IdPayload>();
+
+        var updateResp = await hrAdminClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{created!.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                managerEmployeeId = newManagerId,
+                expectedEndDate = "2026-10-01",
+                notes = sensitiveNotes
+            });
+        updateResp.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "probation-record.updated")
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("ProbationRecord", auditRecord!.EntityType);
+        Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
+        Assert.NotNull(auditRecord.BeforeJson);
+        Assert.NotNull(auditRecord.AfterJson);
+        Assert.Contains(oldManagerId.ToString(), auditRecord.BeforeJson);
+        Assert.Contains(newManagerId.ToString(), auditRecord.AfterJson);
+        Assert.DoesNotContain(sensitiveNotes, auditRecord.BeforeJson);
+        Assert.DoesNotContain(sensitiveNotes, auditRecord.AfterJson);
+    }
+
+    [Fact]
+    public async Task UpdateProbationRecord_Returns_NotFound_For_Missing_Record()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+
+        var response = await hrAdminClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{Guid.NewGuid()}", new
+            {
+                companyId,
+                id = Guid.NewGuid(),
+                managerEmployeeId = Guid.NewGuid(),
+                expectedEndDate = "2026-09-01"
+            });
+
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateProbationRecord_Returns_Conflict_For_Terminal_Status_Record()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+        var managerId = Guid.NewGuid();
+
+        var createResp = await hrAdminClient.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
+        {
+            companyId,
+            employeeId = Guid.NewGuid(),
+            managerEmployeeId = managerId,
+            startDate = "2026-06-01",
+            expectedEndDate = "2026-09-01"
+        });
+        createResp.EnsureSuccessStatusCode();
+        var created = await createResp.Content.ReadFromJsonAsync<IdPayload>();
+
+        var reviewResp = await hrAdminClient.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
+        {
+            companyId,
+            probationRecordId = created!.Id,
+            reviewType = "FinalDecision",
+            dueDate = "2026-09-01"
+        });
+        reviewResp.EnsureSuccessStatusCode();
+        var review = await reviewResp.Content.ReadFromJsonAsync<IdPayload>();
+
+        var completeResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{created.Id}/reviews/{review!.Id}/complete",
+            new
+            {
+                companyId,
+                probationRecordId = created.Id,
+                reviewId = review.Id,
+                outcome = "Pass",
+                decisionDate = "2026-09-01"
+            });
+        completeResp.EnsureSuccessStatusCode();
+
+        var response = await hrAdminClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                managerEmployeeId = managerId,
+                expectedEndDate = "2026-12-01"
+            });
+
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompleteProbationReview_Pass_Fail_Checkpoint_Persist_Distinct_Audit_Event_Types_Without_Notes_Content()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+        const string sensitivePassNotes = "AuditIntegration-Sensitive-PassNotes-Detail";
+        const string sensitiveFailNotes = "AuditIntegration-Sensitive-FailNotes-Detail";
+        const string sensitiveCheckpointNotes = "AuditIntegration-Sensitive-CheckpointNotes-Detail";
+
+        // Pass
+        var (passRecordId, passReviewId) = await CreateProbationRecordAndReviewAsync(hrAdminClient, companyId, "FinalDecision");
+        var passResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{passRecordId}/reviews/{passReviewId}/complete",
+            new { companyId, probationRecordId = passRecordId, reviewId = passReviewId, notes = sensitivePassNotes, outcome = "Pass", decisionDate = "2026-09-01" });
+        passResp.EnsureSuccessStatusCode();
+
+        // Fail
+        var (failRecordId, failReviewId) = await CreateProbationRecordAndReviewAsync(hrAdminClient, companyId, "FinalDecision");
+        var failResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{failRecordId}/reviews/{failReviewId}/complete",
+            new { companyId, probationRecordId = failRecordId, reviewId = failReviewId, notes = sensitiveFailNotes, outcome = "Fail", decisionDate = "2026-09-01" });
+        failResp.EnsureSuccessStatusCode();
+
+        // Checkpoint (no outcome)
+        var (checkpointRecordId, checkpointReviewId) = await CreateProbationRecordAndReviewAsync(hrAdminClient, companyId, "ManagerCheckIn");
+        var checkpointResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{checkpointRecordId}/reviews/{checkpointReviewId}/complete",
+            new { companyId, probationRecordId = checkpointRecordId, reviewId = checkpointReviewId, notes = sensitiveCheckpointNotes });
+        checkpointResp.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var passAudit = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "probation-record.passed" && e.EntityId == passRecordId)
+            .OrderByDescending(e => e.OccurredAt).FirstOrDefaultAsync();
+        Assert.NotNull(passAudit);
+        Assert.DoesNotContain(sensitivePassNotes, passAudit!.AfterJson ?? string.Empty);
+
+        var failAudit = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "probation-record.failed" && e.EntityId == failRecordId)
+            .OrderByDescending(e => e.OccurredAt).FirstOrDefaultAsync();
+        Assert.NotNull(failAudit);
+        Assert.DoesNotContain(sensitiveFailNotes, failAudit!.AfterJson ?? string.Empty);
+
+        var checkpointAudit = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "probation-review.completed" && e.EntityId == checkpointReviewId)
+            .OrderByDescending(e => e.OccurredAt).FirstOrDefaultAsync();
+        Assert.NotNull(checkpointAudit);
+        Assert.DoesNotContain(sensitiveCheckpointNotes, checkpointAudit!.AfterJson ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task CreateProbationReview_Persists_Audit_Record_With_Human_Actor()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+
+        var (recordId, _) = await CreateProbationRecordAndReviewAsync(hrAdminClient, companyId, "ManagerCheckIn");
+
+        var reviewResp = await hrAdminClient.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
+        {
+            companyId,
+            probationRecordId = recordId,
+            reviewType = "HrReview",
+            dueDate = "2026-08-01"
+        });
+        reviewResp.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecords = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "probation-review.created")
+            .OrderByDescending(e => e.OccurredAt)
+            .ToListAsync();
+
+        // The first review (ManagerCheckIn) created via CreateProbationRecordAndReviewAsync produces
+        // its own audit record too — assert on the most recent (HrReview) one.
+        var auditRecord = auditRecords.First();
+        Assert.Equal("ProbationReview", auditRecord.EntityType);
+        Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
+        Assert.Contains("HrReview", auditRecord.AfterJson);
+    }
+
+    // PROB-07: end-to-end coverage for the Extend outcome — actor attribution, structured
+    // before/after expected-end dates and free-text extension-reason exclusion, verified through
+    // the real DbAuditEventPublisher/AuditDbContext (unit-level coverage lives in
+    // ProbationExtensionServiceTests / CompleteProbationReviewHandlerTests).
+    [Fact]
+    public async Task CompleteProbationReview_Extend_Persists_Audit_Record_With_Actor_And_Without_ExtensionReason_Content()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+        const string sensitiveExtensionReason = "AuditIntegration-Sensitive-ExtensionReason-Detail";
+
+        var (recordId, reviewId) = await CreateProbationRecordAndReviewAsync(hrAdminClient, companyId, "FinalDecision");
+
+        var completeResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{recordId}/reviews/{reviewId}/complete",
+            new
+            {
+                companyId,
+                probationRecordId = recordId,
+                reviewId,
+                outcome = "Extend",
+                decisionDate = "2026-09-01",
+                newExpectedEndDate = "2026-12-01",
+                extensionReason = sensitiveExtensionReason
+            });
+        completeResp.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "probation-record.extended" && e.EntityId == recordId)
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("ProbationRecord", auditRecord!.EntityType);
+        Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
+        Assert.NotNull(auditRecord.BeforeJson);
+        Assert.NotNull(auditRecord.AfterJson);
+        Assert.Contains("2026-09-01", auditRecord.BeforeJson);
+        Assert.Contains("2026-12-01", auditRecord.AfterJson);
+        Assert.DoesNotContain(sensitiveExtensionReason, auditRecord.BeforeJson);
+        Assert.DoesNotContain(sensitiveExtensionReason, auditRecord.AfterJson);
+    }
+
+    [Fact]
+    public async Task MarkProbationNotApplicable_Persists_Audit_Record_With_HasReason_And_Without_Reason_Content()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+        var employeeId = Guid.NewGuid();
+        const string sensitiveReason = "AuditIntegration-Sensitive-NotApplicableReason-Detail";
+
+        var response = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation/employees/{employeeId}/not-applicable",
+            new
+            {
+                companyId,
+                employeeId,
+                managerEmployeeId = Guid.NewGuid(),
+                startDate = "2026-06-01",
+                expectedEndDate = "2026-09-01",
+                reason = sensitiveReason
+            });
+        response.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "probation-record.marked-not-applicable")
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("ProbationRecord", auditRecord!.EntityType);
+        Assert.Equal(employeeId, auditRecord.EmployeeId);
+        // jsonb round-trips through Postgres's canonical text output, which inserts a space after
+        // ':' — assert loosely on the property name/value rather than an exact compact-JSON substring.
+        Assert.Contains("\"HasReason\"", auditRecord.AfterJson ?? string.Empty);
+        Assert.Contains("true", auditRecord.AfterJson ?? string.Empty);
+        Assert.DoesNotContain(sensitiveReason, auditRecord.AfterJson ?? string.Empty);
+    }
+
+    private static async Task<(Guid recordId, Guid reviewId)> CreateProbationRecordAndReviewAsync(
+        HttpClient client, Guid companyId, string reviewType)
+    {
+        var recordResp = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
+        {
+            companyId,
+            employeeId = Guid.NewGuid(),
+            managerEmployeeId = Guid.NewGuid(),
+            startDate = "2026-06-01",
+            expectedEndDate = "2026-09-01"
+        });
+        recordResp.EnsureSuccessStatusCode();
+        var record = await recordResp.Content.ReadFromJsonAsync<IdPayload>();
+
+        var reviewResp = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
+        {
+            companyId,
+            probationRecordId = record!.Id,
+            reviewType,
+            dueDate = "2026-07-01"
+        });
+        reviewResp.EnsureSuccessStatusCode();
+        var review = await reviewResp.Content.ReadFromJsonAsync<IdPayload>();
+
+        return (record.Id, review!.Id);
+    }
+
     private async Task<Guid> CreateSicknessCategoryAsync(HttpClient client, Guid companyId)
     {
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/sickness-categories", new

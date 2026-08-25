@@ -76,6 +76,36 @@ public class CreateProbationReviewHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_Actor_From_Request()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var actorEmployeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        var publisher = new FakeAuditPublisher();
+        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow), publisher);
+
+        await handler.HandleAsync(new CreateProbationReviewRequest
+        {
+            CompanyId = companyId,
+            ProbationRecordId = record.Id,
+            ReviewType = "ManagerCheckIn",
+            DueDate = new DateOnly(2026, 7, 1),
+            ActorEmployeeId = actorEmployeeId
+        }, CancellationToken.None);
+
+        var published = Assert.IsType<ProbationReviewCreatedAuditEvent>(Assert.Single(publisher.Published));
+        Assert.Equal(actorEmployeeId, published.ActorEmployeeIdValue);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_When_ProbationRecord_Does_Not_Exist()
     {
         await using var context = BuildContext();

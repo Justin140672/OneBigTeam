@@ -1,10 +1,12 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Probation.Features.CreateProbationReview;
 
 internal sealed class Endpoint(
-    CreateProbationReviewHandler handler) : Endpoint<CreateProbationReviewRequest, CreateProbationReviewResponse>
+    CreateProbationReviewHandler handler,
+    ICurrentUser currentUser) : Endpoint<CreateProbationReviewRequest, CreateProbationReviewResponse>
 {
     public override void Configure()
     {
@@ -16,7 +18,9 @@ internal sealed class Endpoint(
         CreateProbationReviewRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var result = await handler.HandleAsync(
+            request with { ActorEmployeeId = currentUser.UserId },
+            cancellationToken);
 
         if (result.IsFailure)
         {

@@ -20,6 +20,7 @@ internal sealed class GenerateDueProbationReviewsJob(
     IEmployeeNameReader employeeNameReader,
     IHrAdministratorDirectory hrAdministratorDirectory,
     INotificationWriter notificationWriter,
+    IAuditEventPublisher auditPublisher,
     ILogger<GenerateDueProbationReviewsJob> logger)
 {
     public async Task ExecuteAsync()
@@ -103,6 +104,22 @@ internal sealed class GenerateDueProbationReviewsJob(
             "GenerateDueProbationReviewsJob created {ReviewCount} review(s) across {RecordCount} record(s)",
             reviewsToCreate.Count,
             reviewsToCreate.Select(x => x.Review.ProbationRecordId).Distinct().Count());
+
+        // PROB-07: system-generated review creation — actor is ProbationSystemActor.Id, clearly
+        // distinguishing this scheduled/automatic creation from a human directly creating a review
+        // via CreateProbationReviewHandler.
+        foreach (var (review, record) in reviewsToCreate)
+        {
+            await auditPublisher.PublishAsync(new ProbationReviewCreatedAuditEvent(
+                review.CompanyId,
+                review.Id,
+                review.ProbationRecordId,
+                record.EmployeeId,
+                ProbationSystemActor.Id,
+                review.ReviewType.ToString(),
+                review.DueDate,
+                review.CreatedAt), CancellationToken.None);
+        }
 
         foreach (var companyGroup in reviewsToCreate.GroupBy(x => x.Record.CompanyId))
         {

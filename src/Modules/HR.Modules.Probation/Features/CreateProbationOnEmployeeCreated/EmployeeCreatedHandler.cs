@@ -30,12 +30,18 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
     private readonly ProbationDbContext _dbContext;
     private readonly IClock _clock;
     private readonly ICompanyTimeZoneReader _timeZoneReader;
+    private readonly IAuditEventPublisher _auditPublisher;
 
-    public EmployeeCreatedHandler(ProbationDbContext dbContext, IClock clock, ICompanyTimeZoneReader timeZoneReader)
+    public EmployeeCreatedHandler(
+        ProbationDbContext dbContext,
+        IClock clock,
+        ICompanyTimeZoneReader timeZoneReader,
+        IAuditEventPublisher auditPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _timeZoneReader = timeZoneReader;
+        _auditPublisher = auditPublisher;
     }
 
     public async Task HandleAsync(EmployeeCreatedIntegrationEvent integrationEvent, CancellationToken cancellationToken)
@@ -56,6 +62,7 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
 
         var timeZoneId = await _timeZoneReader.GetTimeZoneAsync(integrationEvent.CompanyId, cancellationToken);
         var today = _clock.TodayIn(timeZoneId);
+        var now = _clock.UtcNowOffset();
 
         var record = ProbationRecord.Create(
             Guid.NewGuid(),
@@ -66,9 +73,22 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
             integrationEvent.ProbationEndDate,
             notes: null,
             today,
-            _clock.UtcNowOffset());
+            now);
 
         _dbContext.ProbationRecords.Add(record);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // PROB-07: system-generated creation — actor is ProbationSystemActor.Id, distinct from a
+        // human directly creating a record via CreateProbationRecordHandler.
+        await _auditPublisher.PublishAsync(new ProbationRecordCreatedAuditEvent(
+            record.CompanyId,
+            record.Id,
+            record.EmployeeId,
+            record.ManagerEmployeeId,
+            ProbationSystemActor.Id,
+            record.StartDate,
+            record.ExpectedEndDate,
+            HasNotes: false,
+            now), cancellationToken);
     }
 }

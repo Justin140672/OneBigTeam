@@ -124,23 +124,48 @@ internal sealed class CompleteProbationReviewHandler
                 cancellationToken);
         }
 
-        await _auditPublisher.PublishAsync(new ProbationReviewCompletedAuditEvent(
-            review.CompanyId,
-            review.Id,
-            review.ProbationRecordId,
-            record.EmployeeId,
-            completedByEmployeeId,
-            review.ReviewType.ToString(),
-            review.Outcome?.ToString(),
-            review.Notes,
-            now), cancellationToken);
+        // PROB-07: Pass, Fail and Extend are each recorded as their own distinct, clearly-typed
+        // audit event rather than one generic "outcome recorded" event — see ProbationAudit.cs
+        // remarks on ProbationReviewCompletedAuditEvent/ProbationPassedAuditEvent/
+        // ProbationFailedAuditEvent for the rationale. Extend already gets its own dedicated event
+        // published by ProbationExtensionService.ApplyAsync below, so it is intentionally not
+        // duplicated here. The generic ProbationReviewCompletedAuditEvent is only used for
+        // checkpoint reviews (ManagerCheckIn/HrReview) that carry no outcome at all.
+        var hasNotes = !string.IsNullOrWhiteSpace(review.Notes);
 
-        // Only a Pass outcome maps to the timeline's ProbationPassed event this wave — Fail and
-        // Extend outcomes do not get a dedicated timeline entry (see Wave 2a scope notes).
+        if (request.Outcome == ProbationOutcome.Pass)
+        {
+            await _auditPublisher.PublishAsync(new ProbationPassedAuditEvent(
+                review.CompanyId, review.ProbationRecordId, review.Id, record.EmployeeId,
+                completedByEmployeeId, request.DecisionDate!.Value, hasNotes, now), cancellationToken);
+        }
+        else if (request.Outcome == ProbationOutcome.Fail)
+        {
+            await _auditPublisher.PublishAsync(new ProbationFailedAuditEvent(
+                review.CompanyId, review.ProbationRecordId, review.Id, record.EmployeeId,
+                completedByEmployeeId, request.DecisionDate!.Value, hasNotes, now), cancellationToken);
+        }
+        else if (request.Outcome is null)
+        {
+            await _auditPublisher.PublishAsync(new ProbationReviewCompletedAuditEvent(
+                review.CompanyId, review.Id, review.ProbationRecordId, record.EmployeeId,
+                completedByEmployeeId, review.ReviewType.ToString(), hasNotes, now), cancellationToken);
+        }
+
+        // PROB-07: Pass, Fail and Extend outcomes each get a dedicated EmployeeTimelineEntry via
+        // their own integration event — previously only Pass did (see Wave 2a scope notes this
+        // ticket completes). Extend's timeline entry is published by
+        // ProbationExtensionService.ApplyAsync below, alongside its own audit event.
         if (request.Outcome == ProbationOutcome.Pass)
         {
             await _integrationEventPublisher.PublishAsync(
                 new ProbationPassedIntegrationEvent(record.CompanyId, record.EmployeeId, record.Id, now),
+                cancellationToken);
+        }
+        else if (request.Outcome == ProbationOutcome.Fail)
+        {
+            await _integrationEventPublisher.PublishAsync(
+                new ProbationFailedIntegrationEvent(record.CompanyId, record.EmployeeId, record.Id, now),
                 cancellationToken);
         }
 

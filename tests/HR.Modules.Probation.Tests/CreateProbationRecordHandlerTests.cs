@@ -45,6 +45,60 @@ public class CreateProbationRecordHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_Actor_And_HasNotes_True_When_Notes_Provided()
+    {
+        await using var context = BuildContext();
+        var publisher = new FakeAuditPublisher();
+        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeCompanyTimeZoneReader());
+        var actorEmployeeId = Guid.NewGuid();
+
+        var result = await handler.HandleAsync(
+            new CreateProbationRecordRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                EmployeeId = Guid.NewGuid(),
+                ManagerEmployeeId = Guid.NewGuid(),
+                StartDate = new DateOnly(2026, 6, 25),
+                ExpectedEndDate = new DateOnly(2026, 9, 25),
+                Notes = "New hire probation.",
+                ActorEmployeeId = actorEmployeeId
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<ProbationRecordCreatedAuditEvent>(Assert.Single(publisher.Published));
+        Assert.Equal(actorEmployeeId, evt.ActorEmployeeIdValue);
+        Assert.True(evt.HasNotes);
+
+        var serialized = System.Text.Json.JsonSerializer.Serialize(evt);
+        Assert.DoesNotContain("New hire probation.", serialized);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_HasNotes_False_When_Notes_Omitted()
+    {
+        await using var context = BuildContext();
+        var publisher = new FakeAuditPublisher();
+        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeCompanyTimeZoneReader());
+
+        var result = await handler.HandleAsync(
+            new CreateProbationRecordRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                EmployeeId = Guid.NewGuid(),
+                ManagerEmployeeId = Guid.NewGuid(),
+                StartDate = new DateOnly(2026, 6, 25),
+                ExpectedEndDate = new DateOnly(2026, 9, 25)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<ProbationRecordCreatedAuditEvent>(Assert.Single(publisher.Published));
+        Assert.Null(evt.ActorEmployeeIdValue);
+        Assert.False(evt.HasNotes);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_Conflict_When_Active_Record_Exists()
     {
         await using var context = BuildContext();

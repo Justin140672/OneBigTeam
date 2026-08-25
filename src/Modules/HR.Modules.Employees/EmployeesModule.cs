@@ -356,6 +356,8 @@ public static class EmployeesModule
         services.AddScoped<IIntegrationEventHandler<CompensationChangedIntegrationEvent>, CompensationChangedHandler>();
         services.AddScoped<IIntegrationEventHandler<OnboardingCompletedIntegrationEvent>, OnboardingCompletedHandler>();
         services.AddScoped<IIntegrationEventHandler<ProbationPassedIntegrationEvent>, ProbationPassedHandler>();
+        services.AddScoped<IIntegrationEventHandler<ProbationFailedIntegrationEvent>, HR.Modules.Employees.Features.CreateTimelineEntryOnProbationFailed.ProbationFailedHandler>();
+        services.AddScoped<IIntegrationEventHandler<ProbationExtendedIntegrationEvent>, HR.Modules.Employees.Features.CreateTimelineEntryOnProbationExtended.ProbationExtendedHandler>();
         services.AddScoped<IIntegrationEventHandler<SharedCompanyDocumentAcknowledgedIntegrationEvent>, SharedCompanyDocumentAcknowledgedHandler>();
         services.AddScoped<IIntegrationEventHandler<EmployeeDocumentUploadedIntegrationEvent>, EmployeeDocumentUploadedHandler>();
         services.AddScoped<IIntegrationEventHandler<OffboardingStartedIntegrationEvent>, OffboardingStartedHandler>();

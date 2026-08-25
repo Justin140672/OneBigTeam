@@ -482,6 +482,38 @@ public class GenerateDueProbationReviewsJobTests
         Assert.Equal(notificationCountAfterFirst, notificationWriter.Written.Count);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_Publishes_ProbationReviewCreatedAuditEvent_With_System_Actor_Per_Review()
+    {
+        await using var context = BuildContext();
+        var record = await SeedActiveRecord(context);
+
+        var auditPublisher = new FakeAuditPublisher();
+        // Mar 15: ManagerCheckIn (Jan 31) and HrReview (Mar 2) both due.
+        await BuildJob(context, today: new DateTime(2026, 3, 15, 0, 0, 0, DateTimeKind.Utc), auditPublisher: auditPublisher).ExecuteAsync();
+
+        Assert.Equal(2, auditPublisher.Published.Count);
+        Assert.All(auditPublisher.Published, e =>
+        {
+            var evt = Assert.IsType<ProbationReviewCreatedAuditEvent>(e);
+            Assert.Equal(ProbationSystemActor.Id, evt.ActorEmployeeIdValue);
+            Assert.NotEqual(record.EmployeeId, evt.ActorEmployeeIdValue);
+            Assert.Equal(record.EmployeeId, evt.EmployeeId);
+        });
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Not_Publish_Audit_Events_When_No_Reviews_Are_Due()
+    {
+        await using var context = BuildContext();
+        await SeedActiveRecord(context);
+
+        var auditPublisher = new FakeAuditPublisher();
+        await BuildJob(context, today: new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc), auditPublisher: auditPublisher).ExecuteAsync();
+
+        Assert.Empty(auditPublisher.Published);
+    }
+
     private async Task<ProbationRecord> SeedActiveRecord(
         ProbationDbContext context,
         Guid? employeeId = null,
@@ -505,7 +537,8 @@ public class GenerateDueProbationReviewsJobTests
         FakeCompanyTimeZoneReader? companyTimeZoneReader = null,
         FakeCompanyProbationSettingsReader? companyProbationSettingsReader = null,
         FakeHrAdministratorDirectory? hrAdministratorDirectory = null,
-        FakeNotificationWriter? notificationWriter = null) =>
+        FakeNotificationWriter? notificationWriter = null,
+        FakeAuditPublisher? auditPublisher = null) =>
         new(context,
             new FakeClock(today),
             companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
@@ -514,6 +547,7 @@ public class GenerateDueProbationReviewsJobTests
             employeeNameReader ?? new FakeEmployeeNameReader(),
             hrAdministratorDirectory ?? new FakeHrAdministratorDirectory(),
             notificationWriter ?? new FakeNotificationWriter(),
+            auditPublisher ?? new FakeAuditPublisher(),
             NullLogger<GenerateDueProbationReviewsJob>.Instance);
 
     // -------- PROB-06: NotStarted activation and NotApplicable exclusion --------

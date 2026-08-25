@@ -41,6 +41,7 @@ internal sealed class ManagerChangedHandler(
     IEmployeeProbationDatesReader probationDatesReader,
     ICompanyTimeZoneReader timeZoneReader,
     IClock clock,
+    IAuditEventPublisher auditPublisher,
     ILogger<ManagerChangedHandler> logger) : IIntegrationEventHandler<EmployeeManagerChangedIntegrationEvent>
 {
     public async Task HandleAsync(EmployeeManagerChangedIntegrationEvent integrationEvent, CancellationToken cancellationToken)
@@ -170,6 +171,19 @@ internal sealed class ManagerChangedHandler(
 
         dbContext.ProbationRecords.Add(newRecord);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // PROB-07: system-generated deferred creation — actor is ProbationSystemActor.Id, distinct
+        // from a human directly creating a record via CreateProbationRecordHandler.
+        await auditPublisher.PublishAsync(new ProbationRecordCreatedAuditEvent(
+            newRecord.CompanyId,
+            newRecord.Id,
+            newRecord.EmployeeId,
+            newRecord.ManagerEmployeeId,
+            ProbationSystemActor.Id,
+            newRecord.StartDate,
+            newRecord.ExpectedEndDate,
+            HasNotes: false,
+            now), cancellationToken);
 
         logger.LogInformation(
             "Probation record {ProbationRecordId} created for employee {EmployeeId} on manager assignment " +

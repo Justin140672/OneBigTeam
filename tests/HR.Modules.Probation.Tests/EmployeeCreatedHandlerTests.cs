@@ -23,7 +23,7 @@ public class EmployeeCreatedHandlerTests
         var startDate = new DateOnly(2026, 1, 1);
         var probationEndDate = new DateOnly(2026, 7, 1);
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), new FakeAuditPublisher());
 
         await handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(companyId, employeeId, startDate, managerId, probationEndDate),
@@ -41,13 +41,37 @@ public class EmployeeCreatedHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_System_Actor()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var startDate = new DateOnly(2026, 1, 1);
+        var probationEndDate = new DateOnly(2026, 7, 1);
+
+        var publisher = new FakeAuditPublisher();
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), publisher);
+
+        await handler.HandleAsync(
+            new EmployeeCreatedIntegrationEvent(companyId, employeeId, startDate, managerId, probationEndDate),
+            CancellationToken.None);
+
+        var evt = Assert.IsType<ProbationRecordCreatedAuditEvent>(Assert.Single(publisher.Published));
+        Assert.Equal(ProbationSystemActor.Id, evt.ActorEmployeeIdValue);
+        Assert.NotNull(evt.ActorEmployeeIdValue);
+        Assert.NotEqual(employeeId, evt.ActorEmployeeIdValue);
+        Assert.False(evt.HasNotes);
+    }
+
+    [Fact]
     public async Task HandleAsync_Uses_ProbationEndDate_From_Event_As_ExpectedEndDate()
     {
         await using var context = BuildContext();
         var startDate = new DateOnly(2026, 1, 1);
         var probationEndDate = new DateOnly(2026, 10, 15);
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), new FakeAuditPublisher());
 
         await handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid(), startDate, Guid.NewGuid(), probationEndDate),
@@ -62,7 +86,7 @@ public class EmployeeCreatedHandlerTests
     {
         await using var context = BuildContext();
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), new FakeAuditPublisher());
 
         await handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), ManagerId: null, new DateOnly(2027, 1, 1)),
@@ -80,7 +104,7 @@ public class EmployeeCreatedHandlerTests
         var startDate = new DateOnly(2026, 7, 1);
         var probationEndDate = new DateOnly(2027, 1, 1);
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), new FakeAuditPublisher());
 
         await handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(companyId, Guid.NewGuid(), startDate, managerId, probationEndDate),
@@ -111,7 +135,7 @@ public class EmployeeCreatedHandlerTests
         context.ProbationRecords.Add(existing);
         await context.SaveChangesAsync();
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), new FakeAuditPublisher());
 
         var exception = await Record.ExceptionAsync(() => handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(companyId, employeeId, startDate, managerId, probationEndDate),
@@ -131,7 +155,7 @@ public class EmployeeCreatedHandlerTests
         var startDate = DateOnly.FromDateTime(FixedUtcNow).AddDays(10);
         var probationEndDate = startDate.AddMonths(6);
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), new FakeAuditPublisher());
 
         await handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(companyId, employeeId, startDate, managerId, probationEndDate),
@@ -146,7 +170,7 @@ public class EmployeeCreatedHandlerTests
     {
         await using var context = BuildContext();
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), new FakeAuditPublisher());
 
         await handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(
@@ -162,7 +186,7 @@ public class EmployeeCreatedHandlerTests
     {
         await using var context = BuildContext();
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), new FakeAuditPublisher());
 
         await handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(
@@ -178,7 +202,7 @@ public class EmployeeCreatedHandlerTests
     {
         await using var context = BuildContext();
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader());
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), new FakeAuditPublisher());
 
         await handler.HandleAsync(
             new EmployeeCreatedIntegrationEvent(

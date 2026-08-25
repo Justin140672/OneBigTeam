@@ -60,6 +60,7 @@ internal sealed class CreateProbationReviewHandler
             review.Id,
             review.ProbationRecordId,
             record.EmployeeId,
+            request.ActorEmployeeId,
             review.ReviewType.ToString(),
             review.DueDate,
             review.CreatedAt), cancellationToken);

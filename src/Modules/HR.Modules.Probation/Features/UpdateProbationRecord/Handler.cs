@@ -13,17 +13,20 @@ internal sealed class UpdateProbationRecordHandler
     private readonly IClock _clock;
     private readonly ProbationReviewRecalculationService _recalculationService;
     private readonly ICompanyProbationSettingsReader _probationSettingsReader;
+    private readonly IAuditEventPublisher _auditPublisher;
 
     public UpdateProbationRecordHandler(
         ProbationDbContext dbContext,
         IClock clock,
         ProbationReviewRecalculationService recalculationService,
-        ICompanyProbationSettingsReader probationSettingsReader)
+        ICompanyProbationSettingsReader probationSettingsReader,
+        IAuditEventPublisher auditPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _recalculationService = recalculationService;
         _probationSettingsReader = probationSettingsReader;
+        _auditPublisher = auditPublisher;
     }
 
     public async Task<Result<UpdateProbationRecordResponse>> HandleAsync(
@@ -46,6 +49,7 @@ internal sealed class UpdateProbationRecordHandler
                 Error.Conflict($"Cannot edit a probation record that has already reached the terminal status '{record.Status}'."));
 
         var previousExpectedEndDate = record.ExpectedEndDate;
+        var previousManagerEmployeeId = record.ManagerEmployeeId;
         var now = _clock.UtcNowOffset();
 
         record.ApplyAdministrativeCorrection(
@@ -55,6 +59,21 @@ internal sealed class UpdateProbationRecordHandler
             now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // PROB-07: administrative-correction audit — before/after carry only the structured,
+        // non-sensitive fields that can actually change here (manager, expected end date); Notes
+        // content itself is deliberately excluded, only a presence flag is recorded.
+        await _auditPublisher.PublishAsync(new ProbationRecordUpdatedAuditEvent(
+            record.CompanyId,
+            record.Id,
+            record.EmployeeId,
+            request.ActorEmployeeId,
+            previousManagerEmployeeId,
+            previousExpectedEndDate,
+            record.ManagerEmployeeId,
+            record.ExpectedEndDate,
+            HasNotes: !string.IsNullOrWhiteSpace(record.Notes),
+            now), cancellationToken);
 
         // PROB-03: the expected end date directly drives the checkpoint/final-decision review
         // schedule, so any still-pending (not yet completed) reviews must be recalculated against
