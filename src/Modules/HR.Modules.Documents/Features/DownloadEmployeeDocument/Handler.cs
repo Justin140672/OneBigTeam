@@ -23,6 +23,7 @@ internal sealed class DownloadEmployeeDocumentHandler(
             where ed.Id         == request.EmployeeDocumentId
                && ed.CompanyId  == request.CompanyId
                && ed.EmployeeId == request.EmployeeId
+               && !ed.IsArchived
             select new
             {
                 d.StorageKey,

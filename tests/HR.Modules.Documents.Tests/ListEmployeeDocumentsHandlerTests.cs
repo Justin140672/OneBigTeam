@@ -254,4 +254,29 @@ public class ListEmployeeDocumentsHandlerTests
         Assert.True(result.IsSuccess);
         Assert.True(result.Value!.Items[0].IsAcknowledged);
     }
+
+    // DOC-04: archived (soft-deleted) employee documents must behave as if they don't exist
+    // through the normal list endpoint.
+    [Fact]
+    public async Task HandleAsync_Excludes_Archived_EmployeeDocuments()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var employeeId     = Guid.NewGuid();
+        var dt             = SeedDocumentType(db, companyId);
+        var visibleDoc     = SeedDocument(db, companyId, employeeId, dt.Id, "Visible");
+        var archivedDoc    = SeedDocument(db, companyId, employeeId, dt.Id, "Archived");
+        SeedEmployeeDocument(db, companyId, employeeId, visibleDoc.Id);
+        var archivedEmpDoc = SeedEmployeeDocument(db, companyId, employeeId, archivedDoc.Id);
+        archivedEmpDoc.Archive(Guid.NewGuid(), null, Now);
+        await db.SaveChangesAsync();
+
+        var result = await BuildHandler(db).HandleAsync(
+            new ListEmployeeDocumentsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal("Visible", item.Title);
+    }
 }

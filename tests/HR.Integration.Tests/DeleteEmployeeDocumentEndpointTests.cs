@@ -77,6 +77,31 @@ public class DeleteEmployeeDocumentEndpointTests
         Assert.Empty(payload!.Items);
     }
 
+    [Fact]
+    public async Task Deleted_Document_Is_Retrievable_Via_Archived_List_Endpoint()
+    {
+        // DOC-04: closes the loop between delete (archive) and the new archived-list view — a
+        // deleted document must not simply vanish, it must reappear here for HR to review/restore.
+        var employeeId   = Guid.NewGuid();
+        using var client = await ManagerClient();
+
+        var uploadResponse = await client.PostAsync(
+            $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents",
+            BuildPdfUpload(AcmeContractTypeId));
+        uploadResponse.EnsureSuccessStatusCode();
+        var uploaded = await uploadResponse.Content.ReadFromJsonAsync<UploadPayload>();
+
+        var deleteResponse = await client.DeleteAsync(
+            $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents/{uploaded!.EmployeeDocumentId}");
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        var archivedResponse = await client.GetAsync(
+            $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents/archived");
+        Assert.Equal(HttpStatusCode.OK, archivedResponse.StatusCode);
+        var archivedPayload = await archivedResponse.Content.ReadFromJsonAsync<DocsPayload>();
+        Assert.Contains(archivedPayload!.Items, i => i.EmployeeDocumentId == uploaded.EmployeeDocumentId);
+    }
+
     private async Task<HttpClient> ManagerClient()
     {
         var client = _factory.CreateClient();

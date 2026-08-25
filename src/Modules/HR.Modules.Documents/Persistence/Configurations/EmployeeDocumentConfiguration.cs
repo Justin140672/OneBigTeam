@@ -64,6 +64,30 @@ internal sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<E
             .HasColumnName("updated_at")
             .IsRequired();
 
+        // DOC-04: recoverable soft-delete/archive state. IsArchived defaults to false so the
+        // migration adding these columns is purely additive — every pre-existing row becomes
+        // IsArchived = false with no other changes.
+        builder.Property(ed => ed.IsArchived)
+            .HasColumnName("is_archived")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(ed => ed.ArchivedByUserId)
+            .HasColumnName("archived_by_user_id");
+
+        builder.Property(ed => ed.ArchivedAt)
+            .HasColumnName("archived_at");
+
+        builder.Property(ed => ed.ArchiveReason)
+            .HasColumnName("archive_reason")
+            .HasMaxLength(1000);
+
+        builder.Property(ed => ed.RestoredByUserId)
+            .HasColumnName("restored_by_user_id");
+
+        builder.Property(ed => ed.RestoredAt)
+            .HasColumnName("restored_at");
+
         builder.HasOne<Document>()
             .WithMany()
             .HasForeignKey(ed => ed.DocumentId)
@@ -71,5 +95,6 @@ internal sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<E
 
         builder.HasIndex(ed => new { ed.CompanyId, ed.EmployeeId });
         builder.HasIndex(ed => new { ed.EmployeeId, ed.DocumentId }).IsUnique();
+        builder.HasIndex(ed => new { ed.CompanyId, ed.IsArchived });
     }
 }

@@ -265,4 +265,31 @@ public class DownloadEmployeeDocumentHandlerTests
         await db.SaveChangesAsync();
         return (docType, doc, empDoc);
     }
+
+    // DOC-04: archived (soft-deleted) employee documents must behave as not-found through the
+    // download endpoint.
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Document_Is_Archived()
+    {
+        await using var db   = BuildContext();
+        var companyId        = Guid.NewGuid();
+        var employeeId       = Guid.NewGuid();
+        var (_, _, empDoc)   = await Seed(db, companyId, employeeId);
+        empDoc.Archive(Guid.NewGuid(), null, DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
+        var handler          = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new DownloadEmployeeDocumentRequest
+            {
+                CompanyId          = companyId,
+                EmployeeId         = employeeId,
+                EmployeeDocumentId = empDoc.Id,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
 }

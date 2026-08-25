@@ -16,6 +16,7 @@ internal sealed class ListEmployeeDocumentsHandler(DocumentsDbContext db)
             join dt in db.DocumentTypes.AsNoTracking() on d.DocumentTypeId equals dt.Id
             where ed.CompanyId  == request.CompanyId
                && ed.EmployeeId == request.EmployeeId
+               && !ed.IsArchived
             select new { ed, d, dt };
 
         if (request.Status.HasValue)

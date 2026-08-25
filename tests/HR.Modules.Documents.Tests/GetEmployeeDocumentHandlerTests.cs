@@ -196,4 +196,30 @@ public class GetEmployeeDocumentHandlerTests
         Assert.Single(ctor.GetParameters());
         Assert.Equal(typeof(DocumentsDbContext), ctor.GetParameters()[0].ParameterType);
     }
+
+    // DOC-04: archived (soft-deleted) employee documents must behave as not-found through the
+    // normal get-detail endpoint.
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Document_Is_Archived()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var employeeId     = Guid.NewGuid();
+        var (_, _, empDoc) = await SeedAll(db, companyId, employeeId, Guid.NewGuid());
+        empDoc.Archive(Guid.NewGuid(), null, Now);
+        await db.SaveChangesAsync();
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeDocumentRequest
+            {
+                CompanyId          = companyId,
+                EmployeeId         = employeeId,
+                EmployeeDocumentId = empDoc.Id,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
 }

@@ -1,15 +1,12 @@
 using HR.Modules.Documents.Domain;
-using HR.Modules.Documents.Features.DeleteEmployeeDocument;
+using HR.Modules.Documents.Features.RestoreEmployeeDocument;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Tests;
 
-// DOC-04: "delete" now archives (soft-deletes) the employee-document record instead of hard
-// deleting it — no DB row is removed and no file is deleted from storage. Permanent deletion is
-// now the exclusive responsibility of PurgeEligibleArchivedEmployeeDocumentsHandler.
-public class DeleteEmployeeDocumentHandlerTests
+public class RestoreEmployeeDocumentHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 18, 10, 0, 0, DateTimeKind.Utc);
 
@@ -18,7 +15,7 @@ public class DeleteEmployeeDocumentHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
-    private static DeleteEmployeeDocumentHandler BuildHandler(
+    private static RestoreEmployeeDocumentHandler BuildHandler(
         DocumentsDbContext db,
         FakeAuditPublisher? auditPublisher = null) =>
         new(db,
@@ -29,8 +26,7 @@ public class DeleteEmployeeDocumentHandlerTests
         DocumentsDbContext db,
         Guid companyId,
         Guid employeeId,
-        DateOnly? issueDate = null,
-        DateOnly? expiryDate = null)
+        bool archived = true)
     {
         var docType = DocumentType.Create(Guid.NewGuid(), companyId, "Contract", null, DateTimeOffset.UtcNow);
         db.DocumentTypes.Add(docType);
@@ -43,69 +39,51 @@ public class DeleteEmployeeDocumentHandlerTests
         db.Documents.Add(doc);
 
         var empDoc = EmployeeDocument.Create(
-            Guid.NewGuid(), companyId, employeeId, doc.Id, Guid.NewGuid(), DateTimeOffset.UtcNow,
-            issueDate: issueDate, expiryDate: expiryDate);
+            Guid.NewGuid(), companyId, employeeId, doc.Id, Guid.NewGuid(), DateTimeOffset.UtcNow);
+        if (archived)
+            empDoc.Archive(Guid.NewGuid(), "No longer needed", DateTimeOffset.UtcNow.AddDays(-1));
         db.EmployeeDocuments.Add(empDoc);
 
         await db.SaveChangesAsync();
         return (docType, doc, empDoc);
     }
 
-    private static DeleteEmployeeDocumentRequest BuildRequest(
-        Guid companyId, Guid employeeId, Guid employeeDocumentId, string? reason = null) =>
+    private static RestoreEmployeeDocumentRequest BuildRequest(
+        Guid companyId, Guid employeeId, Guid employeeDocumentId) =>
         new()
         {
             CompanyId          = companyId,
             EmployeeId         = employeeId,
             EmployeeDocumentId = employeeDocumentId,
-            Reason              = reason,
         };
 
     [Fact]
-    public async Task HandleAsync_Archives_EmployeeDocument_Without_Removing_Rows()
+    public async Task HandleAsync_Restores_Archived_Document()
     {
-        await using var db   = BuildContext();
-        var companyId        = Guid.NewGuid();
-        var employeeId       = Guid.NewGuid();
-        var (_, _, empDoc)   = await Seed(db, companyId, employeeId);
-        var handler          = BuildHandler(db);
-        var deletedBy        = Guid.NewGuid();
-
-        var result = await handler.HandleAsync(
-            BuildRequest(companyId, employeeId, empDoc.Id, "No longer required"),
-            deletedBy,
-            CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-
-        var stored = await db.EmployeeDocuments.SingleAsync(ed => ed.Id == empDoc.Id);
-        Assert.True(stored.IsArchived);
-        Assert.Equal(deletedBy, stored.ArchivedByUserId);
-        Assert.Equal(FixedUtcNow, stored.ArchivedAt!.Value.UtcDateTime);
-        Assert.Equal("No longer required", stored.ArchiveReason);
-
-        // The row and its Document remain in the database — archive is recoverable, not a delete.
-        Assert.Single(await db.EmployeeDocuments.ToListAsync());
-        Assert.Single(await db.Documents.ToListAsync());
-    }
-
-    [Fact]
-    public async Task HandleAsync_Archives_With_Null_Reason_When_None_Supplied()
-    {
-        await using var db  = BuildContext();
+        await using var db = BuildContext();
         var companyId       = Guid.NewGuid();
         var employeeId      = Guid.NewGuid();
         var (_, _, empDoc)  = await Seed(db, companyId, employeeId);
         var handler         = BuildHandler(db);
+        var restoredBy      = Guid.NewGuid();
 
-        await handler.HandleAsync(
+        var result = await handler.HandleAsync(
             BuildRequest(companyId, employeeId, empDoc.Id),
-            Guid.NewGuid(),
+            restoredBy,
             CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
+        Assert.Equal(empDoc.Id, result.Value!.EmployeeDocumentId);
+        Assert.Equal(companyId, result.Value.CompanyId);
+        Assert.Equal(restoredBy, result.Value.RestoredByUserId);
+        Assert.Equal(FixedUtcNow, result.Value.RestoredAt.UtcDateTime);
+
         var stored = await db.EmployeeDocuments.SingleAsync(ed => ed.Id == empDoc.Id);
-        Assert.True(stored.IsArchived);
+        Assert.False(stored.IsArchived);
+        Assert.Null(stored.ArchivedByUserId);
+        Assert.Null(stored.ArchivedAt);
         Assert.Null(stored.ArchiveReason);
+        Assert.Equal(restoredBy, stored.RestoredByUserId);
     }
 
     [Fact]
@@ -126,7 +104,7 @@ public class DeleteEmployeeDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_CompanyId_Does_Not_Match()
     {
-        await using var db  = BuildContext();
+        await using var db = BuildContext();
         var companyId       = Guid.NewGuid();
         var employeeId      = Guid.NewGuid();
         var (_, _, empDoc)  = await Seed(db, companyId, employeeId);
@@ -144,7 +122,7 @@ public class DeleteEmployeeDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_EmployeeId_Does_Not_Match()
     {
-        await using var db  = BuildContext();
+        await using var db = BuildContext();
         var companyId       = Guid.NewGuid();
         var employeeId      = Guid.NewGuid();
         var (_, _, empDoc)  = await Seed(db, companyId, employeeId);
@@ -160,16 +138,13 @@ public class DeleteEmployeeDocumentHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_NotFound_When_Already_Archived()
+    public async Task HandleAsync_Returns_Conflict_When_Document_Is_Not_Archived()
     {
-        await using var db  = BuildContext();
+        await using var db = BuildContext();
         var companyId       = Guid.NewGuid();
         var employeeId      = Guid.NewGuid();
-        var (_, _, empDoc)  = await Seed(db, companyId, employeeId);
-        empDoc.Archive(Guid.NewGuid(), "first archive", FixedUtcNow);
-        await db.SaveChangesAsync();
-
-        var handler = BuildHandler(db);
+        var (_, _, empDoc)  = await Seed(db, companyId, employeeId, archived: false);
+        var handler         = BuildHandler(db);
 
         var result = await handler.HandleAsync(
             BuildRequest(companyId, employeeId, empDoc.Id),
@@ -177,47 +152,62 @@ public class DeleteEmployeeDocumentHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("not_found", result.Error.Code);
+        Assert.Equal("conflict", result.Error.Code);
     }
 
     [Fact]
-    public async Task HandleAsync_Publishes_EmployeeDocumentArchived_Audit_Event()
+    public async Task HandleAsync_Publishes_EmployeeDocumentRestored_Audit_Event()
     {
-        await using var db        = BuildContext();
-        var audit                 = new FakeAuditPublisher();
-        var companyId             = Guid.NewGuid();
-        var employeeId            = Guid.NewGuid();
-        var deletedBy             = Guid.NewGuid();
-        var issueDate             = new DateOnly(2025, 1, 1);
-        var expiryDate            = new DateOnly(2027, 1, 1);
-        var (docType, doc, empDoc) = await Seed(db, companyId, employeeId, issueDate, expiryDate);
-        var handler               = BuildHandler(db, audit);
+        await using var db     = BuildContext();
+        var audit               = new FakeAuditPublisher();
+        var companyId           = Guid.NewGuid();
+        var employeeId          = Guid.NewGuid();
+        var restoredBy          = Guid.NewGuid();
+        var (_, _, empDoc)      = await Seed(db, companyId, employeeId);
+        var handler              = BuildHandler(db, audit);
 
         await handler.HandleAsync(
-            BuildRequest(companyId, employeeId, empDoc.Id, "Superseded"),
-            deletedBy,
+            BuildRequest(companyId, employeeId, empDoc.Id),
+            restoredBy,
             CancellationToken.None);
 
         var evt = Assert.Single(audit.Published);
-        Assert.Equal("employee_document.archived", evt.EventType);
+        Assert.Equal("employee_document.restored", evt.EventType);
         Assert.Equal("EmployeeDocument",           evt.EntityType);
         Assert.Equal(empDoc.Id,                    evt.EntityId);
         Assert.Equal(companyId,                    evt.CompanyId);
-        Assert.Equal(deletedBy,                     evt.ActorUserId);
+        Assert.Equal(restoredBy,                   evt.ActorUserId);
         Assert.Null(evt.ActorEmployeeId);
         Assert.Contains("Employment Contract", evt.Summary);
-        Assert.NotNull(evt.After);
     }
 
     [Fact]
     public async Task HandleAsync_Does_Not_Publish_Audit_When_Document_Not_Found()
     {
         await using var db = BuildContext();
-        var audit          = new FakeAuditPublisher();
-        var handler        = BuildHandler(db, audit);
+        var audit           = new FakeAuditPublisher();
+        var handler          = BuildHandler(db, audit);
 
         await handler.HandleAsync(
             BuildRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.Empty(audit.Published);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_Audit_When_Not_Archived()
+    {
+        await using var db = BuildContext();
+        var audit           = new FakeAuditPublisher();
+        var companyId       = Guid.NewGuid();
+        var employeeId      = Guid.NewGuid();
+        var (_, _, empDoc)  = await Seed(db, companyId, employeeId, archived: false);
+        var handler          = BuildHandler(db, audit);
+
+        await handler.HandleAsync(
+            BuildRequest(companyId, employeeId, empDoc.Id),
             Guid.NewGuid(),
             CancellationToken.None);
 

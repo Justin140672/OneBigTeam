@@ -18,6 +18,7 @@ internal sealed class GetEmployeeDocumentHandler(
             where ed.Id         == request.EmployeeDocumentId
                && ed.CompanyId  == request.CompanyId
                && ed.EmployeeId == request.EmployeeId
+               && !ed.IsArchived
             select new { ed, d, dt }
         ).FirstOrDefaultAsync(cancellationToken);
 

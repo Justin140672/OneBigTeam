@@ -2,21 +2,16 @@ using HR.Modules.Documents.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Documents.Features.DeleteEmployeeDocument;
+namespace HR.Modules.Documents.Features.RestoreEmployeeDocument;
 
-// DOC-04: "delete" now archives (soft-delete) the employee-document record instead of hard
-// deleting the row and the underlying stored file. No DB row is removed here and no
-// IDocumentStorageService.DeleteAsync call is made — physical file removal only ever happens via
-// the separately authorised PurgeEligibleArchivedEmployeeDocuments retention process, once a
-// document has been archived for the configured minimum retention period.
-internal sealed class DeleteEmployeeDocumentHandler(
+internal sealed class RestoreEmployeeDocumentHandler(
     DocumentsDbContext db,
     IClock clock,
     IAuditEventPublisher auditPublisher)
 {
-    public async Task<Result> HandleAsync(
-        DeleteEmployeeDocumentRequest request,
-        Guid deletedBy,
+    public async Task<Result<RestoreEmployeeDocumentResponse>> HandleAsync(
+        RestoreEmployeeDocumentRequest request,
+        Guid restoredBy,
         CancellationToken cancellationToken)
     {
         var row = await (
@@ -26,28 +21,35 @@ internal sealed class DeleteEmployeeDocumentHandler(
             where ed.Id        == request.EmployeeDocumentId
                && ed.CompanyId == request.CompanyId
                && ed.EmployeeId == request.EmployeeId
-               && !ed.IsArchived
             select new { ed, d, DocumentTypeName = dt.Name })
             .SingleOrDefaultAsync(cancellationToken);
 
         if (row is null)
-            return Result.Failure(Error.NotFound("Employee document was not found."));
+            return Result.Failure<RestoreEmployeeDocumentResponse>(
+                Error.NotFound("Employee document was not found."));
+
+        if (!row.ed.IsArchived)
+            return Result.Failure<RestoreEmployeeDocumentResponse>(
+                Error.Conflict("This document is not archived."));
 
         var now = clock.UtcNowOffset();
-        row.ed.Archive(deletedBy, request.Reason, now);
+        row.ed.Restore(restoredBy, now);
 
         await db.SaveChangesAsync(cancellationToken);
 
-        await auditPublisher.PublishAsync(new EmployeeDocumentArchivedAuditEvent(
+        await auditPublisher.PublishAsync(new EmployeeDocumentRestoredAuditEvent(
             request.CompanyId,
             row.ed.Id,
             request.EmployeeId,
             row.d.Title,
             row.DocumentTypeName,
-            row.ed.ArchiveReason,
-            deletedBy,
+            restoredBy,
             now), cancellationToken);
 
-        return Result.Success();
+        return Result.Success(new RestoreEmployeeDocumentResponse(
+            row.ed.Id,
+            row.ed.CompanyId,
+            restoredBy,
+            now));
     }
 }

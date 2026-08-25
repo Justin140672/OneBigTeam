@@ -36,6 +36,9 @@ using HR.Modules.Documents.Features.ReissueSharedCompanyDocumentAcknowledgement;
 using HR.Modules.Documents.Features.DeleteEmployeeDocument;
 using HR.Modules.Documents.Features.DownloadEmployeeDocument;
 using HR.Modules.Documents.Features.GetEmployeeDocument;
+using HR.Modules.Documents.Features.GetArchivedEmployeeDocuments;
+using HR.Modules.Documents.Features.RestoreEmployeeDocument;
+using HR.Modules.Documents.Features.PurgeEligibleArchivedEmployeeDocuments;
 using HR.Modules.Documents.Features.GetEmployeeProfilePhoto;
 using HR.Modules.Documents.Features.GetExpiringDocuments;
 using HR.Modules.Documents.Features.ListSharedCompanyDocumentsDueForReview;
@@ -246,6 +249,17 @@ public static class DocumentsModule
 
         services.AddScoped<DeleteEmployeeDocumentHandler>();
         services.AddScoped<DownloadEmployeeDocumentHandler>();
+
+        // DOC-04: recoverable archive/restore for employee documents, plus the separately
+        // authorised (role:company-administrator) permanent-purge retention process.
+        services.AddScoped<GetArchivedEmployeeDocumentsHandler>();
+        services.AddScoped<IValidator<GetArchivedEmployeeDocumentsRequest>, GetArchivedEmployeeDocumentsValidator>();
+
+        services.AddScoped<RestoreEmployeeDocumentHandler>();
+        services.AddScoped<IValidator<RestoreEmployeeDocumentRequest>, RestoreEmployeeDocumentValidator>();
+
+        services.AddScoped<PurgeEligibleArchivedEmployeeDocumentsHandler>();
+        services.AddScoped<IValidator<PurgeEligibleArchivedEmployeeDocumentsRequest>, PurgeEligibleArchivedEmployeeDocumentsValidator>();
 
         // DOC-01: centralised resource-level (self/manager-hierarchy/HR administrator)
         // authorization shared by every employee-document and document-request endpoint.

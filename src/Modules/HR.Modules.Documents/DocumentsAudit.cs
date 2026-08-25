@@ -73,6 +73,81 @@ internal sealed record DocumentDeletedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
+internal sealed record EmployeeDocumentArchivedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeDocumentId,
+    Guid EmployeeId,
+    string Title,
+    string DocumentTypeName,
+    string? Reason,
+    Guid ArchivedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "employee_document.archived";
+    string  IAuditEvent.EntityType      => "EmployeeDocument";
+    Guid    IAuditEvent.EntityId        => EmployeeDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?   IAuditEvent.ActorUserId     => ArchivedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Document '{Title}' archived";
+    object? IAuditEvent.Before          => new { Status = "Active" };
+    object? IAuditEvent.After           => new { Status = "Archived", Reason };
+    object? IAuditEvent.Metadata        => new { DocumentTypeName, EmployeeId };
+}
+
+internal sealed record EmployeeDocumentRestoredAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeDocumentId,
+    Guid EmployeeId,
+    string Title,
+    string DocumentTypeName,
+    Guid RestoredBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "employee_document.restored";
+    string  IAuditEvent.EntityType      => "EmployeeDocument";
+    Guid    IAuditEvent.EntityId        => EmployeeDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?   IAuditEvent.ActorUserId     => RestoredBy;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Document '{Title}' restored";
+    object? IAuditEvent.Before          => new { Status = "Archived" };
+    object? IAuditEvent.After           => new { Status = "Active" };
+    object? IAuditEvent.Metadata        => new { DocumentTypeName, EmployeeId };
+}
+
+/// <summary>
+/// DOC-04: raised by the separately authorised retention-purge process when it permanently
+/// deletes an archived employee document's row and stored file. Distinct from
+/// EmployeeDocumentArchivedAuditEvent — this is the terminal, unrecoverable operation, so the
+/// event captures what was destroyed (Before) with no After, since nothing remains.
+/// </summary>
+internal sealed record EmployeeDocumentPurgedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeDocumentId,
+    Guid EmployeeId,
+    string Title,
+    string DocumentTypeName,
+    string FileName,
+    DateTimeOffset ArchivedAt,
+    Guid PurgedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "employee_document.purged";
+    string  IAuditEvent.EntityType      => "EmployeeDocument";
+    Guid    IAuditEvent.EntityId        => EmployeeDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?   IAuditEvent.ActorUserId     => PurgedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Document '{Title}' permanently purged";
+    object? IAuditEvent.Before          => new { Title, DocumentTypeName, FileName, EmployeeId, ArchivedAt };
+    object? IAuditEvent.After           => null;
+    object? IAuditEvent.Metadata        => null;
+}
+
 internal sealed record DocumentDownloadedAuditEvent(
     Guid CompanyId,
     Guid EmployeeDocumentId,

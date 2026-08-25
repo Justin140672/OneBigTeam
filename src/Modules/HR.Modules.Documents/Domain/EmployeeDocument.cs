@@ -25,6 +25,21 @@ internal sealed class EmployeeDocument
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    // DOC-04: recoverable soft-delete/archive state. Normal deletion (DeleteEmployeeDocument)
+    // now archives instead of hard-deleting; ArchivedBy/ArchivedAt/ArchiveReason are a permanent
+    // record of who archived, when and why — the same "never overwritten by later edits"
+    // convention as SharedCompanyDocument.ArchivedBy/ArchivedAt/ArchiveReason. RestoredBy/
+    // RestoredAt capture the most recent restore for symmetry with the acceptance criteria
+    // ("archive and restore capture actor, timestamp and reason where applicable") — full
+    // archive/restore history lives in the audit trail (EmployeeDocumentArchivedAuditEvent /
+    // EmployeeDocumentRestoredAuditEvent), these fields just reflect current/most-recent state.
+    public bool IsArchived { get; private set; }
+    public Guid? ArchivedByUserId { get; private set; }
+    public DateTimeOffset? ArchivedAt { get; private set; }
+    public string? ArchiveReason { get; private set; }
+    public Guid? RestoredByUserId { get; private set; }
+    public DateTimeOffset? RestoredAt { get; private set; }
+
     public static EmployeeDocument Create(
         Guid id,
         Guid companyId,
@@ -116,6 +131,41 @@ internal sealed class EmployeeDocument
         ExpiredNotifiedAt      = null;
 
         UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// DOC-04: recoverable soft-delete. Replaces the previous hard-delete behaviour of
+    /// DeleteEmployeeDocumentHandler — no database row is removed and no stored file is deleted;
+    /// the record simply becomes excluded from normal list/get/download queries until restored.
+    /// Reason is optional (the acceptance criteria says "capture actor, timestamp and reason
+    /// where applicable" — a caller may not always supply one), matching DeleteEmployeeDocument's
+    /// existing request shape which never required a reason before this ticket.
+    /// </summary>
+    public void Archive(Guid archivedBy, string? reason, DateTimeOffset now)
+    {
+        IsArchived       = true;
+        ArchivedByUserId = archivedBy;
+        ArchivedAt       = now;
+        ArchiveReason    = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        UpdatedAt        = now;
+    }
+
+    /// <summary>
+    /// DOC-04: reverses <see cref="Archive"/>, making the document visible again in normal
+    /// list/get/download queries. Deliberately clears the archive fields rather than keeping
+    /// them for "was previously archived" history on the entity itself — that history is
+    /// preserved in the audit trail (EmployeeDocumentArchivedAuditEvent /
+    /// EmployeeDocumentRestoredAuditEvent), not on the row.
+    /// </summary>
+    public void Restore(Guid restoredBy, DateTimeOffset now)
+    {
+        IsArchived       = false;
+        ArchivedByUserId = null;
+        ArchivedAt       = null;
+        ArchiveReason    = null;
+        RestoredByUserId = restoredBy;
+        RestoredAt       = now;
+        UpdatedAt        = now;
     }
 }
 
