@@ -215,6 +215,55 @@ public class SaveReportViewEndpointTests
         Assert.Equal(HttpStatusCode.Created, second.StatusCode);
     }
 
+    [Fact]
+    public async Task Post_SavedViews_Returns_BadRequest_For_Unknown_Report_Id()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = await ClientFor(userId, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "not-a-real-report", name = "My View", filterCriteriaJson = "{}" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_SavedViews_Returns_Forbidden_When_Caller_Lacks_Access_To_The_Reports_Gate()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        // HrAdministrator only — no Recruiter role, so the caller lacks reporting:view-recruitment,
+        // which "recruitment-pipeline-summary" requires. They still satisfy the endpoint-level
+        // "reporting:view" policy (HrAdministrator is one of its OR'd roles), so this exercises the
+        // handler's per-report access-gate check, not the endpoint policy.
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = await ClientFor(userId, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "recruitment-pipeline-summary", name = "My View", filterCriteriaJson = "{}" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_SavedViews_Returns_BadRequest_When_FilterCriteriaJson_References_Unsupported_Field()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = await ClientFor(userId, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = "My View", filterCriteriaJson = "{\"TotallyBogusField\":1}" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private sealed record SavedViewPayload(Guid Id, string ReportId, string Name, string FilterCriteriaJson, bool IsDefault, DateTimeOffset CreatedAt);
 
     private sealed record ViewsListPayload(List<SavedViewPayload> Views);

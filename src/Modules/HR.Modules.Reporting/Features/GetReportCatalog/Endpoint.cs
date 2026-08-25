@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HR.Modules.Reporting.ReportRegistry;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
@@ -23,20 +24,21 @@ internal sealed class Endpoint(
         GetReportCatalogRequest request,
         CancellationToken cancellationToken)
     {
-        var canViewRecruitment = (await authorizationService.AuthorizeAsync(User, "reporting:view-recruitment")).Succeeded;
-        var canViewHr = (await authorizationService.AuthorizeAsync(User, "reporting:view-hr")).Succeeded;
-        var canViewEmployeeStarter = (await authorizationService.AuthorizeAsync(User, "reporting:view-employee-starter")).Succeeded;
-        var canViewLeaveSummary = (await authorizationService.AuthorizeAsync(User, "reporting:view-leave-summary")).Succeeded;
-        var canViewProbation = (await authorizationService.AuthorizeAsync(User, "reporting:view-probation")).Succeeded;
-        var canViewOnboarding = (await authorizationService.AuthorizeAsync(User, "reporting:view-onboarding")).Succeeded;
+        // Bug fix retained: workload-actions is gated on a dedicated Manager/HrAdministrator-only
+        // policy (reporting:view-workload-actions) rather than the plain Category-based split — see
+        // IdentityModule.cs — so a Recruiter with no HR/Manager role never sees it.
+        var gates = await ReportAccessGateEvaluator.EvaluateAsync(authorizationService, User);
 
-        // Bug fix: this was previously hardcoded to true for every caller who passed the baseline
-        // reporting:view policy, which meant a Recruiter with no HR/Manager role saw this HR-category
-        // report in their Recruitment reports list. Gated on a dedicated Manager/HrAdministrator-only
-        // policy instead — see reporting:view-workload-actions in IdentityModule.cs.
-        var canViewWorkloadActions = (await authorizationService.AuthorizeAsync(User, "reporting:view-workload-actions")).Succeeded;
-
-        var result = await handler.HandleAsync(request, canViewRecruitment, canViewHr, canViewEmployeeStarter, canViewLeaveSummary, canViewProbation, canViewOnboarding, canViewWorkloadActions, cancellationToken);
+        var result = await handler.HandleAsync(
+            request,
+            gates.CanViewRecruitment,
+            gates.CanViewHr,
+            gates.CanViewEmployeeStarter,
+            gates.CanViewLeaveSummary,
+            gates.CanViewProbation,
+            gates.CanViewOnboarding,
+            gates.CanViewWorkloadActions,
+            cancellationToken);
 
         await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }

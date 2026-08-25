@@ -1,5 +1,6 @@
 using HR.Modules.Reporting.Domain;
 using HR.Modules.Reporting.Persistence;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,8 +16,25 @@ internal sealed class SaveReportViewHandler(ReportingDbContext dbContext, IClock
     public async Task<Result<SaveReportViewResponse>> HandleAsync(
         SaveReportViewRequest request,
         Guid userId,
+        ReportAccessGates accessGates,
         CancellationToken cancellationToken)
     {
+        // REP-03: reject saved views for unknown report ids, reports the caller is not currently
+        // authorized to view, or filter JSON that references fields/values the report doesn't
+        // support — a saved view must never be persistable as a way to smuggle references to
+        // reports/filters the caller cannot legitimately query.
+        if (!ReportCatalog.TryGet(request.ReportId, out var definition))
+            return Result.Failure<SaveReportViewResponse>(
+                Error.Validation($"'{request.ReportId}' is not a recognised report."));
+
+        if (!accessGates.IsAuthorized(definition.AccessGate))
+            return Result.Failure<SaveReportViewResponse>(
+                Error.Forbidden($"You do not have access to report '{request.ReportId}'."));
+
+        var filterValidation = ReportFilterValidator.Validate(definition, request.FilterCriteriaJson);
+        if (filterValidation.IsFailure)
+            return Result.Failure<SaveReportViewResponse>(filterValidation.Error);
+
         var name = request.Name.Trim();
 
         if (string.Equals(name, ReservedStandardViewName, StringComparison.OrdinalIgnoreCase))

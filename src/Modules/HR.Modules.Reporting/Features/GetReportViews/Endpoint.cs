@@ -1,11 +1,14 @@
 using FastEndpoints;
-using HR.SharedKernel;
+using HR.Modules.Reporting.ReportRegistry;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Reporting.Features.GetReportViews;
 
-internal sealed class Endpoint(GetReportViewsHandler handler, ICurrentUser currentUser)
-    : Endpoint<GetReportViewsRequest, GetReportViewsResponse>
+internal sealed class Endpoint(
+    GetReportViewsHandler handler,
+    HR.SharedKernel.ICurrentUser currentUser,
+    IAuthorizationService authorizationService) : Endpoint<GetReportViewsRequest, GetReportViewsResponse>
 {
     public override void Configure()
     {
@@ -23,7 +26,9 @@ internal sealed class Endpoint(GetReportViewsHandler handler, ICurrentUser curre
             return;
         }
 
-        var result = await handler.HandleAsync(request, userId, cancellationToken);
+        var accessGates = await ReportAccessGateEvaluator.EvaluateAsync(authorizationService, User);
+
+        var result = await handler.HandleAsync(request, userId, accessGates, cancellationToken);
 
         await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }

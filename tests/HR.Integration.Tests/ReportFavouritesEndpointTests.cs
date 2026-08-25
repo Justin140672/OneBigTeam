@@ -3,6 +3,9 @@ using System.Net.Http.Json;
 using System.Text;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Reporting.Domain;
+using HR.Modules.Reporting.Persistence;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -155,6 +158,96 @@ public class ReportFavouritesEndpointTests
 
         Assert.NotNull(payload);
         Assert.Single(payload!.ReportIds, id => id == "employee-directory");
+    }
+
+    [Fact]
+    public async Task Add_Favourite_Returns_BadRequest_For_Unknown_Report_Id()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = await ClientFor(userId, companyId);
+
+        var response = await client.PutAsync(
+            $"/api/companies/{companyId}/reporting/favourites/not-a-real-report", EmptyJsonBody());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Add_Favourite_Returns_Forbidden_When_Caller_Lacks_Access_To_The_Reports_Gate()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        // HrAdministrator only — no Recruiter role, so lacks reporting:view-recruitment, which
+        // "recruitment-pipeline-summary" requires. Still satisfies the endpoint-level
+        // "reporting:view" policy, so this exercises the handler's per-report access-gate check.
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = await ClientFor(userId, companyId);
+
+        var response = await client.PutAsync(
+            $"/api/companies/{companyId}/reporting/favourites/recruitment-pipeline-summary", EmptyJsonBody());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_Favourites_Omits_A_Favourite_The_Caller_Is_No_Longer_Authorized_To_View()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        // Seed directly into the ReportingDbContext rather than through the Add endpoint: the Add
+        // endpoint itself now (by design) refuses to add a favourite for a report the caller isn't
+        // authorized for, so the only way to exercise GetReportFavourites' "no longer accessible"
+        // filtering path is to persist the row directly, as if it had been added under a permission
+        // the caller has since lost.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
+            db.ReportFavourites.Add(ReportFavourite.Create(
+                Guid.NewGuid(), companyId, userId, "employee-directory", DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+
+        // Employee role satisfies none of the reporting:view-* gates (and not even the baseline
+        // "reporting:view" policy — see Get_Favourites_Returns_Forbidden_For_Employee above), so
+        // this exercises the "not authorized" filtering by seeding data for a user/company that a
+        // Manager (who does pass the baseline policy but has no HR-gated access) then queries.
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager, companyId);
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/favourites");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<FavouritesPayload>();
+        Assert.NotNull(payload);
+        Assert.DoesNotContain("employee-directory", payload!.ReportIds);
+    }
+
+    [Fact]
+    public async Task Get_Favourites_Omits_A_Favourite_For_A_Report_No_Longer_In_The_Catalogue()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = await ClientFor(userId, companyId);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
+            db.ReportFavourites.Add(ReportFavourite.Create(
+                Guid.NewGuid(), companyId, userId, "retired-report", DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/favourites");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<FavouritesPayload>();
+        Assert.NotNull(payload);
+        Assert.DoesNotContain("retired-report", payload!.ReportIds);
     }
 
     // ── Remove favourite ──────────────────────────────────────────────────────

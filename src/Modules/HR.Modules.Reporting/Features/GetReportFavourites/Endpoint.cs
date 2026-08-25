@@ -1,11 +1,14 @@
 using FastEndpoints;
-using HR.SharedKernel;
+using HR.Modules.Reporting.ReportRegistry;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Reporting.Features.GetReportFavourites;
 
-internal sealed class Endpoint(GetReportFavouritesHandler handler, ICurrentUser currentUser)
-    : Endpoint<GetReportFavouritesRequest, GetReportFavouritesResponse>
+internal sealed class Endpoint(
+    GetReportFavouritesHandler handler,
+    HR.SharedKernel.ICurrentUser currentUser,
+    IAuthorizationService authorizationService) : Endpoint<GetReportFavouritesRequest, GetReportFavouritesResponse>
 {
     public override void Configure()
     {
@@ -25,7 +28,9 @@ internal sealed class Endpoint(GetReportFavouritesHandler handler, ICurrentUser 
             return;
         }
 
-        var result = await handler.HandleAsync(request, userId, cancellationToken);
+        var accessGates = await ReportAccessGateEvaluator.EvaluateAsync(authorizationService, User);
+
+        var result = await handler.HandleAsync(request, userId, accessGates, cancellationToken);
 
         await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }

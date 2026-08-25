@@ -1,11 +1,14 @@
 using FastEndpoints;
-using HR.SharedKernel;
+using HR.Modules.Reporting.ReportRegistry;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Reporting.Features.SaveReportView;
 
-internal sealed class Endpoint(SaveReportViewHandler handler, ICurrentUser currentUser)
-    : Endpoint<SaveReportViewRequest, SaveReportViewResponse>
+internal sealed class Endpoint(
+    SaveReportViewHandler handler,
+    HR.SharedKernel.ICurrentUser currentUser,
+    IAuthorizationService authorizationService) : Endpoint<SaveReportViewRequest, SaveReportViewResponse>
 {
     public override void Configure()
     {
@@ -23,10 +26,18 @@ internal sealed class Endpoint(SaveReportViewHandler handler, ICurrentUser curre
             return;
         }
 
-        var result = await handler.HandleAsync(request, userId, cancellationToken);
+        var accessGates = await ReportAccessGateEvaluator.EvaluateAsync(authorizationService, User);
+
+        var result = await handler.HandleAsync(request, userId, accessGates, cancellationToken);
 
         if (result.IsFailure)
         {
+            if (result.Error.Code == "forbidden")
+            {
+                await Send.ResultAsync(TypedResults.Forbid());
+                return;
+            }
+
             await Send.ResultAsync(TypedResults.BadRequest(new { error = result.Error.Message }));
             return;
         }
