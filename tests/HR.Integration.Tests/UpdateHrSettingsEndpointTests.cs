@@ -142,6 +142,106 @@ public class UpdateHrSettingsEndpointTests
     }
 
     [Fact]
+    public async Task Put_Hr_Settings_Returns_UnprocessableEntity_When_ProbationMonths_Is_Zero()
+    {
+        var tenantId = Guid.NewGuid();
+        var companyId = await CreateCompanyAsync(tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
+        {
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 25,
+            probationMonths = 0,
+        });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_Hr_Settings_Returns_Ok_When_DefaultHolidayAllowance_Is_Zero()
+    {
+        var tenantId = Guid.NewGuid();
+        var companyId = await CreateCompanyAsync(tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
+        {
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 0,
+            probationMonths = 6,
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<UpdateHrSettingsPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(0, payload!.DefaultHolidayAllowance);
+    }
+
+    [Fact]
+    public async Task Put_Hr_Settings_Returns_Conflict_When_Version_Is_Stale()
+    {
+        var tenantId = Guid.NewGuid();
+        var companyId = await CreateCompanyAsync(tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
+
+        var firstResponse = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
+        {
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 25,
+            probationMonths = 6,
+            version = 1,
+        });
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        var firstPayload = await firstResponse.Content.ReadFromJsonAsync<UpdateHrSettingsPayload>();
+        // UpdateHrSettingsHandler calls both UpdateHrPolicy and UpdateAssetNumberSettings, each of
+        // which increments Version once — a single successful HR-settings update therefore bumps
+        // Version by 2 (1 -> 3), not 1.
+        Assert.Equal(3, firstPayload!.Version);
+
+        var secondResponse = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
+        {
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 4,
+            defaultHolidayAllowance = 28,
+            probationMonths = 3,
+            version = 1,
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_Hr_Settings_Returns_Version_Incremented_On_Success()
+    {
+        var tenantId = Guid.NewGuid();
+        var companyId = await CreateCompanyAsync(tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
+        {
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 4,
+            defaultHolidayAllowance = 28,
+            probationMonths = 3,
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UpdateHrSettingsPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(3, payload!.Version);
+    }
+
+    [Fact]
     public async Task Put_Hr_Settings_Returns_Forbidden_For_Unknown_Id()
     {
         // Under the SEC-001 tenant-isolation fix, a route companyId must match the caller's
@@ -175,7 +275,9 @@ public class UpdateHrSettingsEndpointTests
         });
         Assert.Equal(HttpStatusCode.OK, settingsResponse.StatusCode);
 
-        // Update HR settings — hr-settings:manage is HrAdministrator-only.
+        // Update HR settings — hr-settings:manage is HrAdministrator-only. The prior company-profile
+        // update above created the settings row (Version 1) and incremented it to 2, so this
+        // request must supply Version 2 to avoid a SET-03 concurrency conflict.
         var hrResponse = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
         {
             workingDays = 31,
@@ -183,6 +285,7 @@ public class UpdateHrSettingsEndpointTests
             leaveYearStartMonth = 4,
             defaultHolidayAllowance = 28,
             probationMonths = 3,
+            version = 2,
         });
         Assert.Equal(HttpStatusCode.OK, hrResponse.StatusCode);
 
@@ -210,7 +313,8 @@ public class UpdateHrSettingsEndpointTests
     private sealed record UpdateHrSettingsPayload(
         Guid CompanyId,
         int LeaveYearStartMonth,
-        decimal DefaultHolidayAllowance);
+        decimal DefaultHolidayAllowance,
+        int Version);
 
     private sealed record GetCompanySettingsPayload(
         Guid CompanyId,

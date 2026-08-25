@@ -28,6 +28,15 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             tableBuilder.HasCheckConstraint(
                 "CK_company_settings_asset_number_minimum_length",
                 "asset_number_minimum_length BETWEEN 1 AND 10");
+            tableBuilder.HasCheckConstraint(
+                "CK_company_settings_probation_months",
+                "probation_months > 0");
+            tableBuilder.HasCheckConstraint(
+                "CK_company_settings_default_holiday_allowance",
+                "default_holiday_allowance >= 0");
+            tableBuilder.HasCheckConstraint(
+                "CK_company_settings_working_days",
+                "working_days BETWEEN 1 AND 127");
         });
 
         builder.HasKey(settings => settings.CompanyId);
@@ -218,6 +227,12 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
         builder.Property(settings => settings.AssetNumberMinimumLength)
             .HasColumnName("asset_number_minimum_length")
             .IsRequired()
+            .HasDefaultValue(1);
+
+        builder.Property(settings => settings.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
             .HasDefaultValue(1);
 
         builder.Property(settings => settings.CreatedAt)

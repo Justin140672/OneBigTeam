@@ -62,4 +62,30 @@ public class UpdateCompanySettingsValidatorTests
 		Assert.False(result.IsValid);
 		Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateCompanySettingsRequest.Locale));
 	}
+
+	[Fact]
+	public void Validate_Fails_When_TimeZone_Does_Not_Resolve()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { TimeZone = "Not/A_Real_Zone" });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateCompanySettingsRequest.TimeZone));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_Locale_Is_Not_On_The_Supported_Allow_List()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { Locale = "xx-XX" });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateCompanySettingsRequest.Locale));
+	}
+
+	[Fact]
+	public void Validate_Passes_For_Valid_TimeZone_And_Locale_Combination()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { TimeZone = "UTC", Locale = "fr-FR" });
+		Assert.True(result.IsValid);
+	}
 }

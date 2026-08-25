@@ -4,4 +4,5 @@ internal sealed record UpdateCompanySettingsResponse(
 	Guid CompanyId,
 	string TimeZone,
 	string Locale,
-	DateTimeOffset UpdatedAt);
+	DateTimeOffset UpdatedAt,
+	int Version);

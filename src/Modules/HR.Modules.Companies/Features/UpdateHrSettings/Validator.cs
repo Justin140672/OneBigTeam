@@ -11,9 +11,15 @@ internal sealed class UpdateHrSettingsValidator : AbstractValidator<UpdateHrSett
 		RuleFor(request => request.CompanyId)
 			.NotEmpty();
 
+		const WorkingDays AllDefinedWorkingDays = WorkingDays.Monday | WorkingDays.Tuesday |
+			WorkingDays.Wednesday | WorkingDays.Thursday | WorkingDays.Friday |
+			WorkingDays.Saturday | WorkingDays.Sunday;
+
 		RuleFor(request => request.WorkingDays)
 			.Must(w => w != WorkingDays.None)
-			.WithMessage("At least one working day must be selected.");
+			.WithMessage("At least one working day must be selected.")
+			.Must(w => (w & ~AllDefinedWorkingDays) == WorkingDays.None)
+			.WithMessage("Working days contains an undefined value.");
 
 		RuleFor(request => request.HoursPerDay)
 			.GreaterThan(0)
@@ -23,11 +29,12 @@ internal sealed class UpdateHrSettingsValidator : AbstractValidator<UpdateHrSett
 			.InclusiveBetween(1, 12);
 
 		RuleFor(request => request.DefaultHolidayAllowance)
-			.GreaterThan(0)
+			.GreaterThanOrEqualTo(0)
 			.LessThanOrEqualTo(365);
 
 		RuleFor(request => request.ProbationMonths)
-			.InclusiveBetween(0, 24);
+			.GreaterThan(0)
+			.LessThanOrEqualTo(24);
 
 		RuleFor(request => request.FitNoteRequiredAfterDays)
 			.GreaterThan(0);

@@ -29,12 +29,12 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
             return Result.Success(new GetCompanySettingsResponse(
                 defaults.CompanyId, defaults.TimeZone, defaults.Locale,
                 defaults.PostcodeRegex, defaults.TelephoneRegex, defaults.MobileRegex,
-                defaults.UpdatedAt));
+                defaults.UpdatedAt, defaults.Version));
         }
 
         return Result.Success(new GetCompanySettingsResponse(
             settings.CompanyId, settings.TimeZone, settings.Locale,
             settings.PostcodeRegex, settings.TelephoneRegex, settings.MobileRegex,
-            settings.UpdatedAt));
+            settings.UpdatedAt, settings.Version));
     }
 }

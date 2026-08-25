@@ -84,6 +84,12 @@ internal sealed class CompanySettings
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    // SET-03: explicit, persisted optimistic-concurrency token. Incremented on every mutation
+    // below. A manual application-managed token (rather than EF's provider-generated
+    // IsRowVersion()/Postgres xmin) so the value is a plain, portable, persisted column that both
+    // company-settings and HR-settings updates share, since they mutate the same aggregate row.
+    public int Version { get; private set; }
+
     public static CompanySettings CreateDefault(Guid companyId, DateTimeOffset now)
     {
         return new CompanySettings
@@ -151,6 +157,7 @@ internal sealed class CompanySettings
             AssetNumberMinimumLength = 4,
             CreatedAt = now,
             UpdatedAt = now,
+            Version = 1,
         };
     }
 
@@ -167,6 +174,7 @@ internal sealed class CompanySettings
         TimeZone = timeZone;
         Locale = locale;
         UpdatedAt = now;
+        Version++;
     }
 
     /// <summary>
@@ -217,6 +225,7 @@ internal sealed class CompanySettings
         NextEmployeeNumber = nextEmployeeNumber;
         EmployeeNumberMinimumLength = employeeNumberMinimumLength;
         UpdatedAt = now;
+        Version++;
     }
 
     /// <summary>
@@ -241,6 +250,7 @@ internal sealed class CompanySettings
         ProbationCheckpointDay2 = checkpointDay2;
         ProbationCheckpointDay3 = checkpointDay3;
         UpdatedAt = now;
+        Version++;
     }
 
     public void UpdateAssetNumberSettings(
@@ -255,5 +265,6 @@ internal sealed class CompanySettings
         NextAssetNumber = nextAssetNumber;
         AssetNumberMinimumLength = assetNumberMinimumLength;
         UpdatedAt = now;
+        Version++;
     }
 }

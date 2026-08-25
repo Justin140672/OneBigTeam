@@ -99,6 +99,83 @@ public class UpdateCompanySettingsEndpointTests
     }
 
     [Fact]
+    public async Task Put_Company_Settings_Returns_UnprocessableEntity_For_Unrecognised_TimeZone()
+    {
+        var tenantId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(tenantId);
+        var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Settings Test {Guid.NewGuid():N}", companyId: tenantId);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{createdCompanyId}/settings", new
+        {
+            timeZone = "Not/A_Real_Zone",
+            locale = "en-GB",
+        });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_Company_Settings_Returns_UnprocessableEntity_For_Unsupported_Locale()
+    {
+        var tenantId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(tenantId);
+        var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Settings Test {Guid.NewGuid():N}", companyId: tenantId);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{createdCompanyId}/settings", new
+        {
+            timeZone = "UTC",
+            locale = "xx-XX",
+        });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_Company_Settings_Returns_Canonical_TimeZone_And_Version_On_Success()
+    {
+        var tenantId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(tenantId);
+        var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Settings Test {Guid.NewGuid():N}", companyId: tenantId);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{createdCompanyId}/settings", new
+        {
+            timeZone = "Europe/London",
+            locale = "en-GB",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UpdateCompanySettingsPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("Europe/London", payload!.TimeZone);
+        Assert.Equal(2, payload.Version);
+    }
+
+    [Fact]
+    public async Task Put_Company_Settings_Returns_Conflict_When_Version_Is_Stale()
+    {
+        var tenantId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(tenantId);
+        var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Settings Test {Guid.NewGuid():N}", companyId: tenantId);
+
+        var firstResponse = await client.PutAsJsonAsync($"/api/companies/{createdCompanyId}/settings", new
+        {
+            timeZone = "Europe/London",
+            locale = "en-GB",
+            version = 1,
+        });
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+
+        var secondResponse = await client.PutAsJsonAsync($"/api/companies/{createdCompanyId}/settings", new
+        {
+            timeZone = "UTC",
+            locale = "en-GB",
+            version = 1,
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task Put_Company_Settings_Returns_Forbidden_For_Unknown_Id()
     {
         // Under the SEC-001 tenant-isolation fix, a route companyId must match the caller's
@@ -124,5 +201,6 @@ public class UpdateCompanySettingsEndpointTests
         Guid CompanyId,
         string TimeZone,
         string Locale,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        int Version);
 }

@@ -25,7 +25,8 @@ public class UpdateCompanySettingsHandlerTests
 		var handler = new UpdateCompanySettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher());
+			new NoOpAuditEventPublisher(),
+			new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			new UpdateCompanySettingsRequest
@@ -33,6 +34,7 @@ public class UpdateCompanySettingsHandlerTests
 				CompanyId = company.Id,
 				TimeZone = "Europe/London",
 				Locale = "en-GB",
+				Version = 1,
 			},
 			CancellationToken.None);
 
@@ -67,7 +69,8 @@ public class UpdateCompanySettingsHandlerTests
 		var handler = new UpdateCompanySettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher());
+			new NoOpAuditEventPublisher(),
+			new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			new UpdateCompanySettingsRequest
@@ -96,7 +99,7 @@ public class UpdateCompanySettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateCompanySettingsHandler(context, new FakeClock(updateTime), auditPublisher);
+		var handler = new UpdateCompanySettingsHandler(context, new FakeClock(updateTime), auditPublisher, new FakeCurrentUser(null));
 
 		await handler.HandleAsync(
 			new UpdateCompanySettingsRequest
@@ -104,13 +107,14 @@ public class UpdateCompanySettingsHandlerTests
 				CompanyId = company.Id,
 				TimeZone = "Europe/London",
 				Locale = "en-GB",
+				Version = 1,
 			},
 			CancellationToken.None);
 
 		var auditEvt = Assert.Single(auditPublisher.Published);
 		var auditEvent = Assert.IsType<CompanySettingsUpdatedAuditEvent>(auditEvt);
 		Assert.Equal(company.Id, auditEvent.CompanyId);
-		Assert.Null(auditEvent.ActorId);
+		Assert.Null(auditEvent.ActorUserId);
 		Assert.Equal(new DateTimeOffset(updateTime, TimeSpan.Zero), auditEvent.OccurredAt);
 
 		Assert.NotNull(auditEvent.PreviousSettings);
@@ -119,6 +123,132 @@ public class UpdateCompanySettingsHandlerTests
 
 		Assert.Equal("Europe/London", auditEvent.CurrentSettings.TimeZone);
 		Assert.Equal("en-GB", auditEvent.CurrentSettings.Locale);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Captures_CurrentUser_As_Actor_On_AuditEvent()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var actorUserId = Guid.NewGuid();
+		var auditPublisher = new CapturingAuditEventPublisher();
+		var handler = new UpdateCompanySettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
+			auditPublisher,
+			new FakeCurrentUser(actorUserId));
+
+		await handler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				CompanyId = company.Id,
+				TimeZone = "Europe/London",
+				Locale = "en-GB",
+				Version = 1,
+			},
+			CancellationToken.None);
+
+		var auditEvt = Assert.Single(auditPublisher.Published);
+		var auditEvent = Assert.IsType<CompanySettingsUpdatedAuditEvent>(auditEvt);
+		Assert.Equal(actorUserId, auditEvent.ActorUserId);
+	}
+
+	[Theory]
+	[InlineData("Europe/London")]
+	[InlineData("UTC")]
+	public async Task HandleAsync_Normalises_TimeZone_To_Canonical_Id(string requestedTimeZone)
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var handler = new UpdateCompanySettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(),
+			new FakeCurrentUser(null));
+
+		CompanySettingsValidation.TryResolveTimeZone(requestedTimeZone, out var expectedCanonicalId);
+
+		var result = await handler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				CompanyId = company.Id,
+				TimeZone = requestedTimeZone,
+				Locale = "en-GB",
+				Version = 1,
+			},
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+		Assert.Equal(expectedCanonicalId, result.Value!.TimeZone);
+
+		var savedSettings = await context.CompanySettings.SingleAsync();
+		Assert.Equal(expectedCanonicalId, savedSettings.TimeZone);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Returns_Conflict_And_Publishes_No_AuditEvent_When_Version_Is_Stale()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		// First update succeeds and bumps Version from 1 to 2.
+		var firstHandler = new UpdateCompanySettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(),
+			new FakeCurrentUser(null));
+
+		var firstResult = await firstHandler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				CompanyId = company.Id,
+				TimeZone = "Europe/London",
+				Locale = "en-GB",
+				Version = 1,
+			},
+			CancellationToken.None);
+
+		Assert.True(firstResult.IsSuccess);
+		Assert.Equal(2, firstResult.Value!.Version);
+
+		// Second attempt is submitted against the stale Version = 1 read before the first update.
+		var auditPublisher = new CapturingAuditEventPublisher();
+		var secondHandler = new UpdateCompanySettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 6, 5, 12, 0, 0, DateTimeKind.Utc)),
+			auditPublisher,
+			new FakeCurrentUser(null));
+
+		var secondResult = await secondHandler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				CompanyId = company.Id,
+				TimeZone = "UTC",
+				Locale = "en-GB",
+				Version = 1,
+			},
+			CancellationToken.None);
+
+		Assert.True(secondResult.IsFailure);
+		Assert.Equal("conflict", secondResult.Error.Code);
+		Assert.Empty(auditPublisher.Published);
 	}
 
 	private static CompaniesDbContext BuildContext()

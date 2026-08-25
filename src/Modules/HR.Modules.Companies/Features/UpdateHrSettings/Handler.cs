@@ -14,17 +14,20 @@ internal sealed class UpdateHrSettingsHandler
 	private readonly IClock _clock;
 	private readonly IAuditEventPublisher _auditEventPublisher;
 	private readonly IEmployeeRenumberingService _employeeRenumberingService;
+	private readonly ICurrentUser _currentUser;
 
 	public UpdateHrSettingsHandler(
 		CompaniesDbContext dbContext,
 		IClock clock,
 		IAuditEventPublisher auditEventPublisher,
-		IEmployeeRenumberingService employeeRenumberingService)
+		IEmployeeRenumberingService employeeRenumberingService,
+		ICurrentUser currentUser)
 	{
 		_dbContext = dbContext;
 		_clock = clock;
 		_auditEventPublisher = auditEventPublisher;
 		_employeeRenumberingService = employeeRenumberingService;
+		_currentUser = currentUser;
 	}
 
 	public async Task<Result<UpdateHrSettingsResponse>> HandleAsync(
@@ -105,7 +108,22 @@ internal sealed class UpdateHrSettingsHandler
 
 		company.SetSettings(settings, now);
 
-		await _dbContext.SaveChangesAsync(cancellationToken);
+		// SET-03: same forced-OriginalValue concurrency check as UpdateCompanySettingsHandler —
+		// both slices mutate the same CompanySettings row and share one version counter.
+		_dbContext.Entry(settings).Property(s => s.Version).OriginalValue = request.Version;
+
+		try
+		{
+			await _dbContext.SaveChangesAsync(cancellationToken);
+		}
+		catch (DbUpdateConcurrencyException)
+		{
+			// Nothing has committed (SaveChangesAsync throws before the transaction commits), so no
+			// renumbering call below runs and no audit/integration event is published for this
+			// rejected attempt.
+			return Result.Failure<UpdateHrSettingsResponse>(
+				Error.Conflict("HR settings were changed by someone else. Reload the latest settings and try again."));
+		}
 
 		// Format-change renumbering (item 27): only triggered when the format actually changed
 		// while the company STAYS in Automatic mode — never on a Manual<->Automatic mode switch,
@@ -124,7 +142,7 @@ internal sealed class UpdateHrSettingsHandler
 		await _auditEventPublisher.PublishAsync(
 			new HrSettingsUpdatedAuditEvent(
 				company.Id,
-				null,
+				_currentUser.UserId,
 				now,
 				previousSettings,
 				new HrSettingsAuditSnapshot(
@@ -178,6 +196,7 @@ internal sealed class UpdateHrSettingsHandler
 			settings.AssetNumberPrefix,
 			settings.NextAssetNumber,
 			settings.AssetNumberMinimumLength,
-			settings.UpdatedAt));
+			settings.UpdatedAt,
+			settings.Version));
 	}
 }

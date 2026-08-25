@@ -13,15 +13,18 @@ internal sealed class UpdateCompanySettingsHandler
 	private readonly CompaniesDbContext _dbContext;
 	private readonly IClock _clock;
 	private readonly IAuditEventPublisher _auditEventPublisher;
+	private readonly ICurrentUser _currentUser;
 
 	public UpdateCompanySettingsHandler(
 		CompaniesDbContext dbContext,
 		IClock clock,
-		IAuditEventPublisher auditEventPublisher)
+		IAuditEventPublisher auditEventPublisher,
+		ICurrentUser currentUser)
 	{
 		_dbContext = dbContext;
 		_clock = clock;
 		_auditEventPublisher = auditEventPublisher;
+		_currentUser = currentUser;
 	}
 
 	public async Task<Result<UpdateCompanySettingsResponse>> HandleAsync(
@@ -45,13 +48,22 @@ internal sealed class UpdateCompanySettingsHandler
 				company.Settings.TimeZone,
 				company.Settings.Locale);
 
+		// Validator already confirmed these resolve; normalise to the canonical time-zone id
+		// before persistence so downstream TimeZoneInfo lookups are always consistent.
+		CompanySettingsValidation.TryResolveTimeZone(request.TimeZone, out var canonicalTimeZone);
+
 		var settings = company.Settings ?? CompanySettings.CreateDefault(company.Id, now);
 		settings.UpdateCompanyProfile(
-			request.TimeZone.Trim(),
+			canonicalTimeZone,
 			request.Locale.Trim(),
 			now);
 
 		company.SetSettings(settings, now);
+
+		// SET-03: force the concurrency check against the version the client actually read,
+		// rather than whatever this handler's own SingleOrDefaultAsync just loaded a moment ago
+		// (which would always match and never detect a conflict).
+		_dbContext.Entry(settings).Property(s => s.Version).OriginalValue = request.Version;
 
 		var payload = JsonSerializer.Serialize(new CompanySettingsUpdatedIntegrationEvent(
 			company.Id,
@@ -67,12 +79,23 @@ internal sealed class UpdateCompanySettingsHandler
 			now);
 
 		_dbContext.OutboxMessages.Add(outboxMessage);
-		await _dbContext.SaveChangesAsync(cancellationToken);
+
+		try
+		{
+			await _dbContext.SaveChangesAsync(cancellationToken);
+		}
+		catch (DbUpdateConcurrencyException)
+		{
+			// No partial change and no audit/integration event: SaveChangesAsync throws before
+			// anything commits, so the outbox message added above is rolled back with it.
+			return Result.Failure<UpdateCompanySettingsResponse>(
+				Error.Conflict("Company settings were changed by someone else. Reload the latest settings and try again."));
+		}
 
 		await _auditEventPublisher.PublishAsync(
 			new CompanySettingsUpdatedAuditEvent(
 				company.Id,
-				null,
+				_currentUser.UserId,
 				now,
 				previousSettings,
 				new CompanySettingsAuditSnapshot(
@@ -84,6 +107,7 @@ internal sealed class UpdateCompanySettingsHandler
 			company.Id,
 			settings.TimeZone,
 			settings.Locale,
-			settings.UpdatedAt));
+			settings.UpdatedAt,
+			settings.Version));
 	}
 }

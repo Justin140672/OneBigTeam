@@ -8,7 +8,7 @@ internal sealed record CompanySettingsAuditSnapshot(
 
 internal sealed record CompanySettingsUpdatedAuditEvent(
     Guid CompanyId,
-    string? ActorId,
+    Guid? ActorUserId,
     DateTimeOffset OccurredAt,
     CompanySettingsAuditSnapshot? PreviousSettings,
     CompanySettingsAuditSnapshot CurrentSettings) : IAuditEvent
@@ -16,7 +16,7 @@ internal sealed record CompanySettingsUpdatedAuditEvent(
     string IAuditEvent.EventType => "company-settings.updated";
     string IAuditEvent.EntityType => "CompanySettings";
     Guid IAuditEvent.EntityId => CompanyId;
-    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorUserId => ActorUserId;
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Company settings updated";

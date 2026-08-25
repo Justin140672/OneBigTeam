@@ -62,12 +62,104 @@ public class UpdateHrSettingsValidatorTests
 	}
 
 	[Fact]
-	public void Validate_Fails_When_DefaultHolidayAllowance_Is_Invalid()
+	public void Validate_Passes_When_DefaultHolidayAllowance_Is_Zero()
 	{
+		// SET-01: zero is now an allowed value (only negative values are rejected).
 		var validator = new UpdateHrSettingsValidator();
 		var result = validator.Validate(ValidRequest() with { DefaultHolidayAllowance = 0 });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_DefaultHolidayAllowance_Is_Negative()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { DefaultHolidayAllowance = -1 });
 		Assert.False(result.IsValid);
 		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.DefaultHolidayAllowance));
+	}
+
+	[Fact]
+	public void Validate_Passes_When_DefaultHolidayAllowance_At_Upper_Boundary()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { DefaultHolidayAllowance = 365 });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_DefaultHolidayAllowance_Exceeds_Upper_Boundary()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { DefaultHolidayAllowance = 366 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.DefaultHolidayAllowance));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_ProbationMonths_Is_Zero()
+	{
+		// SET-01: ProbationMonths must now be strictly greater than zero.
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { ProbationMonths = 0 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.ProbationMonths));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_ProbationMonths_Is_Negative()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { ProbationMonths = -1 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.ProbationMonths));
+	}
+
+	[Fact]
+	public void Validate_Passes_When_ProbationMonths_Is_One()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { ProbationMonths = 1 });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Passes_When_ProbationMonths_At_Upper_Boundary()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { ProbationMonths = 24 });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_ProbationMonths_Exceeds_Upper_Boundary()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { ProbationMonths = 25 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.ProbationMonths));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_WorkingDays_Contains_A_Bit_Outside_The_Defined_Flags()
+	{
+		// SET-01: any bit outside the 7 defined WorkingDays flags (values 1,2,4,8,16,32,64 — i.e.
+		// anything satisfying (value & ~127) != 0) must be rejected, not silently ignored.
+		var validator = new UpdateHrSettingsValidator();
+		var undefinedWorkingDays = (WorkingDays)128;
+		var result = validator.Validate(ValidRequest() with { WorkingDays = WorkingDays.Monday | undefinedWorkingDays });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.WorkingDays));
+	}
+
+	[Fact]
+	public void Validate_Passes_When_WorkingDays_Is_All_Seven_Defined_Flags()
+	{
+		var validator = new UpdateHrSettingsValidator();
+		const WorkingDays allDefinedWorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+			WorkingDays.Thursday | WorkingDays.Friday | WorkingDays.Saturday | WorkingDays.Sunday;
+		var result = validator.Validate(ValidRequest() with { WorkingDays = allDefinedWorkingDays });
+		Assert.True(result.IsValid);
 	}
 
 	[Fact]

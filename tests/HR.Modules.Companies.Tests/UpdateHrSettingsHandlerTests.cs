@@ -19,6 +19,7 @@ public class UpdateHrSettingsHandlerTests
 		LeaveYearStartMonth = 1,
 		DefaultHolidayAllowance = 25,
 		ProbationMonths = 6,
+		Version = 1,
 	};
 
 	[Fact]
@@ -28,7 +29,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(ValidRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -51,7 +52,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(ValidRequest(company.Id), CancellationToken.None);
 
@@ -75,7 +76,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 12, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with { ExcludePublicHolidaysFromLeave = excludePublicHolidays },
@@ -104,7 +105,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 12, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with { DisplaySalaryOnEmployeeProfile = displaySalaryOnEmployeeProfile },
@@ -130,7 +131,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService());
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -145,7 +146,7 @@ public class UpdateHrSettingsHandlerTests
 		var auditEvt = Assert.Single(auditPublisher.Published);
 		var auditEvent = Assert.IsType<HrSettingsUpdatedAuditEvent>(auditEvt);
 		Assert.Equal(company.Id, auditEvent.CompanyId);
-		Assert.Null(auditEvent.ActorId);
+		Assert.Null(auditEvent.ActorUserId);
 		Assert.Equal(new DateTimeOffset(updateTime, TimeSpan.Zero), auditEvent.OccurredAt);
 
 		Assert.NotNull(auditEvent.PreviousSettings);
@@ -171,7 +172,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 7, 19, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with { DefaultAcknowledgementStatement = "Please confirm you have read this policy." },
@@ -198,7 +199,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 7, 19, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with { DefaultAcknowledgementStatement = "   " },
@@ -222,7 +223,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 7, 19, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService());
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with { DefaultAcknowledgementStatement = "New acknowledgement statement." },
@@ -250,7 +251,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 7, 24, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -285,7 +286,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 7, 24, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService());
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -323,7 +324,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 7, 26, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService());
+			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -361,7 +362,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 7, 26, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService());
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -386,6 +387,73 @@ public class UpdateHrSettingsHandlerTests
 		Assert.Equal("EMP-", auditEvent.CurrentSettings.EmployeeNumberPrefix);
 		Assert.Equal(200, auditEvent.CurrentSettings.NextEmployeeNumber);
 		Assert.Equal(6, auditEvent.CurrentSettings.EmployeeNumberMinimumLength);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Captures_CurrentUser_As_Actor_On_AuditEvent()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var actorUserId = Guid.NewGuid();
+		var auditPublisher = new CapturingAuditEventPublisher();
+		var handler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
+			auditPublisher,
+			new NoOpEmployeeRenumberingService(),
+			new FakeCurrentUser(actorUserId));
+
+		await handler.HandleAsync(ValidRequest(company.Id), CancellationToken.None);
+
+		var auditEvt = Assert.Single(auditPublisher.Published);
+		var auditEvent = Assert.IsType<HrSettingsUpdatedAuditEvent>(auditEvt);
+		Assert.Equal(actorUserId, auditEvent.ActorUserId);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Returns_Conflict_And_Publishes_No_AuditEvent_When_Version_Is_Stale()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		// First update succeeds and bumps Version from 1 to 3 (UpdateHrPolicy and
+		// UpdateAssetNumberSettings each increment the shared Version counter once).
+		var firstHandler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(),
+			new NoOpEmployeeRenumberingService(),
+			new FakeCurrentUser(null));
+
+		var firstResult = await firstHandler.HandleAsync(ValidRequest(company.Id) with { Version = 1 }, CancellationToken.None);
+		Assert.True(firstResult.IsSuccess);
+		Assert.Equal(3, firstResult.Value!.Version);
+
+		// Second attempt is submitted against the stale Version = 1 read before the first update.
+		var auditPublisher = new CapturingAuditEventPublisher();
+		var secondHandler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 6, 5, 12, 0, 0, DateTimeKind.Utc)),
+			auditPublisher,
+			new NoOpEmployeeRenumberingService(),
+			new FakeCurrentUser(null));
+
+		var secondResult = await secondHandler.HandleAsync(ValidRequest(company.Id) with { Version = 1 }, CancellationToken.None);
+
+		Assert.True(secondResult.IsFailure);
+		Assert.Equal("conflict", secondResult.Error.Code);
+		Assert.Empty(auditPublisher.Published);
 	}
 
 	private static CompaniesDbContext BuildContext()

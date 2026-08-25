@@ -32,7 +32,7 @@ internal sealed record HrSettingsAuditSnapshot(
 
 internal sealed record HrSettingsUpdatedAuditEvent(
     Guid CompanyId,
-    string? ActorId,
+    Guid? ActorUserId,
     DateTimeOffset OccurredAt,
     HrSettingsAuditSnapshot? PreviousSettings,
     HrSettingsAuditSnapshot CurrentSettings) : IAuditEvent
@@ -40,7 +40,7 @@ internal sealed record HrSettingsUpdatedAuditEvent(
     string IAuditEvent.EventType => "hr-settings.updated";
     string IAuditEvent.EntityType => "CompanySettings";
     Guid IAuditEvent.EntityId => CompanyId;
-    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorUserId => ActorUserId;
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "HR settings updated";

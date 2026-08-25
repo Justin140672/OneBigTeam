@@ -52,7 +52,8 @@ internal sealed class GetHrSettingsHandler(CompaniesDbContext dbContext)
                 defaults.AssetNumberPrefix,
                 defaults.NextAssetNumber,
                 defaults.AssetNumberMinimumLength,
-                defaults.UpdatedAt));
+                defaults.UpdatedAt,
+                defaults.Version));
         }
 
         return Result.Success(new GetHrSettingsResponse(
@@ -80,6 +81,7 @@ internal sealed class GetHrSettingsHandler(CompaniesDbContext dbContext)
             settings.AssetNumberPrefix,
             settings.NextAssetNumber,
             settings.AssetNumberMinimumLength,
-            settings.UpdatedAt));
+            settings.UpdatedAt,
+            settings.Version));
     }
 }

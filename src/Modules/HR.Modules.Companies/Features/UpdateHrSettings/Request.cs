@@ -31,4 +31,7 @@ internal sealed record UpdateHrSettingsRequest
 	public string? AssetNumberPrefix { get; init; }
 	public int NextAssetNumber { get; init; } = 1;
 	public int AssetNumberMinimumLength { get; init; } = 1;
+
+	/// <summary>See UpdateCompanySettingsRequest.Version (SET-03) — same concurrency scheme.</summary>
+	public int Version { get; init; }
 }

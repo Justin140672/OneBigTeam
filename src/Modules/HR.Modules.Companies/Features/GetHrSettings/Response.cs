@@ -30,4 +30,5 @@ internal sealed record GetHrSettingsResponse(
     string? AssetNumberPrefix,
     int NextAssetNumber,
     int AssetNumberMinimumLength,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);
