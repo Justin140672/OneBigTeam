@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Features.GetLeaveSummaryReport;
@@ -31,7 +32,7 @@ internal sealed class GetLeaveSummaryReportHandler(
             employeeIds = directReportIds.ToList();
 
             if (employeeIds.Count == 0)
-                return Result.Success(new GetLeaveSummaryReportResponse([]));
+                return Result.Success(new GetLeaveSummaryReportResponse([], 0, false));
         }
 
         var rows = await leaveSummaryReader.GetLeaveSummaryAsync(
@@ -108,6 +109,10 @@ internal sealed class GetLeaveSummaryReportHandler(
                 .ToList(),
         };
 
-        return Result.Success(new GetLeaveSummaryReportResponse(grouped));
+        var totalCount = grouped.Count;
+        var isTruncated = totalCount > ReportLimits.DisplayRowLimit;
+        var cappedGroups = grouped.Take(ReportLimits.DisplayRowLimit).ToList();
+
+        return Result.Success(new GetLeaveSummaryReportResponse(cappedGroups, totalCount, isTruncated));
     }
 }

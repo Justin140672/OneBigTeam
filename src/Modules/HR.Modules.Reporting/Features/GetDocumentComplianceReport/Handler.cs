@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Features.GetDocumentComplianceReport;
@@ -16,13 +17,19 @@ internal sealed class GetDocumentComplianceReportHandler(
             request.CompanyId, request.PositionProfileId, cancellationToken);
 
         if (items.Count == 0)
-            return Result.Success(new GetDocumentComplianceReportResponse([], 0, 0, 0, 0));
+            return Result.Success(new GetDocumentComplianceReportResponse([], 0, 0, 0, 0, false));
 
-        var employeeIds = items.Select(i => i.EmployeeId).ToHashSet();
+        // Summary totals (REP-05) are computed from the full filtered set below, before the
+        // display cap is applied to the returned rows.
+        var totalCount = items.Count;
+        var isTruncated = totalCount > ReportLimits.DisplayRowLimit;
+        var cappedItems = items.Take(ReportLimits.DisplayRowLimit).ToList();
+
+        var employeeIds = cappedItems.Select(i => i.EmployeeId).ToHashSet();
         var departments = await employeeDepartmentReader.GetDepartmentsAsync(
             request.CompanyId, employeeIds, cancellationToken);
 
-        var rows = items
+        var rows = cappedItems
             .Select(i => new DocumentComplianceReportRow(
                 i.EmployeeId,
                 departments.TryGetValue(i.EmployeeId, out var d) ? d.EmployeeName : i.EmployeeId.ToString(),
@@ -36,9 +43,10 @@ internal sealed class GetDocumentComplianceReportHandler(
 
         return Result.Success(new GetDocumentComplianceReportResponse(
             rows,
-            rows.Count,
-            rows.Sum(r => r.MissingCount),
-            rows.Sum(r => r.ExpiringSoonCount),
-            rows.Sum(r => r.ExpiredCount)));
+            totalCount,
+            items.Sum(i => i.MissingCount),
+            items.Sum(i => i.ExpiringSoonCount),
+            items.Sum(i => i.ExpiredCount),
+            isTruncated));
     }
 }

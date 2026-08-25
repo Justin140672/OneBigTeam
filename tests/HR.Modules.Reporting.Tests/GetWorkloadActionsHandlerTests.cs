@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.Features.GetWorkloadActions;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.Modules.Reporting.Tests.Infrastructure;
 
 namespace HR.Modules.Reporting.Tests;
@@ -330,5 +331,62 @@ public class GetWorkloadActionsHandlerTests
 
         var items = result.Value!.Items;
         Assert.Equal("Overdue Item", items[0].EmployeeName);
+    }
+
+    // ── REP-05: bounded results ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Below_DisplayRowLimit_Is_Not_Truncated()
+    {
+        var actions = Enumerable.Range(0, 5).Select(_ => Action()).ToArray();
+        var provider = new FakeWorkloadActionProvider("Cat", actions);
+        var handler = MakeHandler([provider], new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new GetWorkloadActionsRequest(Guid.NewGuid()), AnyCaller(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.IsTruncated);
+        Assert.Equal(5, result.Value.TotalCount);
+        Assert.Equal(5, result.Value.Items.Count);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Above_DisplayRowLimit_Is_Truncated_But_Reports_Full_Total()
+    {
+        const int overLimitBy = 500;
+        var totalActions = ReportLimits.DisplayRowLimit + overLimitBy;
+        var actions = Enumerable.Range(0, totalActions).Select(_ => Action()).ToArray();
+        var provider = new FakeWorkloadActionProvider("Cat", actions);
+        var handler = MakeHandler([provider], new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new GetWorkloadActionsRequest(Guid.NewGuid()), AnyCaller(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsTruncated);
+        Assert.Equal(totalActions, result.Value.TotalCount);
+        Assert.Equal(ReportLimits.DisplayRowLimit, result.Value.Items.Count);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Summary_Counts_Reflect_Full_Filtered_Set_Not_Capped_Rows()
+    {
+        // Seed limit+500 overdue actions — if the summary were computed AFTER the display cap was
+        // applied (a regression), Overdue/TotalOutstanding would read DisplayRowLimit instead of
+        // the true total.
+        const int overLimitBy = 500;
+        var totalActions = ReportLimits.DisplayRowLimit + overLimitBy;
+        var actions = Enumerable.Range(0, totalActions)
+            .Select(_ => Action(dueDate: Today.AddDays(-1))) // Overdue
+            .ToArray();
+        var provider = new FakeWorkloadActionProvider("Cat", actions);
+        var handler = MakeHandler([provider], new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new GetWorkloadActionsRequest(Guid.NewGuid()), AnyCaller(), CancellationToken.None);
+
+        var summary = result.Value!.Summary;
+        Assert.True(result.Value.IsTruncated);
+        Assert.Equal(totalActions, summary.TotalOutstanding);
+        Assert.Equal(totalActions, summary.Overdue);
+        Assert.Equal(ReportLimits.DisplayRowLimit, result.Value.Items.Count);
     }
 }

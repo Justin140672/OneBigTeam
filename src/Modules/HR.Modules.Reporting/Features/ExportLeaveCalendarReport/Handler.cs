@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Features.ExportLeaveCalendarReport;
@@ -9,9 +10,6 @@ internal sealed class ExportLeaveCalendarReportHandler(
     IEmployeeDepartmentReader employeeDepartmentReader,
     IReportExporter reportExporter)
 {
-    // Export is the primary path for this report per OBT-707 — bounded but generous cap.
-    private const int MaxExportRows = 50_000;
-
     private static readonly string[] ColumnHeaders =
     [
         "Employee", "Department", "Leave Start", "Leave End", "Leave Type", "Duration (Days)", "Approval Status",
@@ -36,8 +34,12 @@ internal sealed class ExportLeaveCalendarReportHandler(
                 departments.TryGetValue(r.EmployeeId, out var dept) && dept.DepartmentId == request.DepartmentId);
         }
 
-        var exportRows = filtered
-            .Take(MaxExportRows)
+        var filteredList = filtered.ToList();
+        var totalCount = filteredList.Count;
+        var isTruncated = totalCount > ReportLimits.ExportRowLimit;
+
+        var exportRows = filteredList
+            .Take(ReportLimits.ExportRowLimit)
             .Select(r => (IReadOnlyList<string?>)new List<string?>
             {
                 departments.TryGetValue(r.EmployeeId, out var dept) ? dept.EmployeeName : r.EmployeeId.ToString(),
@@ -53,6 +55,6 @@ internal sealed class ExportLeaveCalendarReportHandler(
         var exportData = new ReportExportData("Leave Calendar Export", ColumnHeaders, exportRows);
         var file = reportExporter.Export(request.Format, exportData);
 
-        return Result.Success(new ExportLeaveCalendarReportResponse(file));
+        return Result.Success(new ExportLeaveCalendarReportResponse(file, totalCount, isTruncated));
     }
 }

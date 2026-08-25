@@ -1,6 +1,7 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.Features.ExportSicknessReport;
 using HR.Modules.Reporting.Features.GetSicknessReport;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.Modules.Reporting.Tests.Infrastructure;
 
 namespace HR.Modules.Reporting.Tests;
@@ -45,5 +46,25 @@ public class ExportSicknessReportHandlerTests
             new ExportSicknessReportRequest(Guid.NewGuid(), Format: ReportExportFormat.Pdf), CancellationToken.None);
 
         Assert.Equal(ReportExportFormat.Pdf, exporter.LastFormat);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Propagates_IsTruncated_And_TotalCount_From_GetHandler()
+    {
+        const int overLimitBy = 500;
+        var totalGroups = ReportLimits.DisplayRowLimit + overLimitBy;
+        var records = Enumerable.Range(0, totalGroups)
+            .Select(_ => new SicknessReportRecordItem(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 1, 1), null, 1m))
+            .ToList();
+        var reader = new FakeSicknessReportReader(records);
+        var getHandler = new GetSicknessReportHandler(reader, new FakeEmployeeDepartmentReader());
+        var exporter = new FakeReportExporter();
+        var handler = new ExportSicknessReportHandler(getHandler, exporter);
+
+        var result = await handler.HandleAsync(new ExportSicknessReportRequest(Guid.NewGuid()), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsTruncated);
+        Assert.Equal(totalGroups, result.Value.TotalCount);
     }
 }

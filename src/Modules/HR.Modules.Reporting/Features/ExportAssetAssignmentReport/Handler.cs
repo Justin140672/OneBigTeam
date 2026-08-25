@@ -38,6 +38,7 @@ internal sealed class ExportAssetAssignmentReportHandler(
         var exportData = new ReportExportData("Asset Assignment Report", ColumnHeaders, rows);
         var file = reportExporter.Export(request.Format, exportData);
 
-        return Result.Success(new ExportAssetAssignmentReportResponse(file));
+        return Result.Success(new ExportAssetAssignmentReportResponse(
+            file, getResult.Value!.TotalAssignments, getResult.Value!.IsTruncated));
     }
 }

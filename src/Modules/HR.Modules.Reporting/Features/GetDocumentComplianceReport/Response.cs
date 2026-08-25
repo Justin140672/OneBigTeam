@@ -5,7 +5,8 @@ internal sealed record GetDocumentComplianceReportResponse(
     int TotalEmployees,
     int TotalMissing,
     int TotalExpiringSoon,
-    int TotalExpired);
+    int TotalExpired,
+    bool IsTruncated);
 
 internal sealed record DocumentComplianceReportRow(
     Guid EmployeeId,

@@ -6,6 +6,11 @@ namespace HR.Modules.Leave.Services;
 
 internal sealed class LeaveCalendarReader(LeaveDbContext dbContext) : ILeaveCalendarReader
 {
+    // Row cap (REP-05) — mirrors HR.Modules.Sickness.Services.SicknessReportReader.MaxRows so this
+    // reader (used by both the on-screen calendar and its export) can't return an unbounded result
+    // set for a company with an unusually large volume of leave requests in a single month.
+    private const int MaxRows = 50_000;
+
     public async Task<IReadOnlyList<LeaveCalendarReportItem>> GetLeaveCalendarAsync(
         Guid companyId,
         IReadOnlyCollection<Guid>? employeeIds,
@@ -25,7 +30,13 @@ internal sealed class LeaveCalendarReader(LeaveDbContext dbContext) : ILeaveCale
         if (employeeIds is { Count: > 0 })
             query = query.Where(r => employeeIds.Contains(r.EmployeeId));
 
-        var requests = await query.ToListAsync(cancellationToken);
+        // Deterministic ordering with an explicit tiebreaker (REP-05) — StartDate alone is not
+        // unique across rows.
+        var requests = await query
+            .OrderBy(r => r.StartDate)
+            .ThenBy(r => r.Id)
+            .Take(MaxRows)
+            .ToListAsync(cancellationToken);
 
         var leaveTypeIds = requests.Select(r => r.LeaveTypeId).ToHashSet();
         var leaveTypeNames = leaveTypeIds.Count > 0

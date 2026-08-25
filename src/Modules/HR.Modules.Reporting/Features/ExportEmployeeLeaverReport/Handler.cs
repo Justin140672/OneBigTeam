@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Features.ExportEmployeeLeaverReport;
@@ -7,8 +8,6 @@ internal sealed class ExportEmployeeLeaverReportHandler(
     IEmployeeLeaverReader employeeLeaverReader,
     IReportExporter reportExporter)
 {
-    private const int MaxExportRows = 50_000;
-
     private static readonly string[] ColumnHeaders =
     [
         "Name", "Leaving Date", "Last Working Day", "Department", "Position", "Reason",
@@ -25,7 +24,7 @@ internal sealed class ExportEmployeeLeaverReportHandler(
             DateRangeStart: request.DateRangeStart,
             DateRangeEnd: request.DateRangeEnd);
 
-        var pagination = new Pagination(PageNumber: 1, PageSize: MaxExportRows);
+        var pagination = new Pagination(PageNumber: 1, PageSize: ReportLimits.ExportRowLimit);
 
         var result = await employeeLeaverReader.GetEmployeeLeaversAsync(
             request.CompanyId,
@@ -52,6 +51,8 @@ internal sealed class ExportEmployeeLeaverReportHandler(
         var exportData = new ReportExportData("Employee Leaver Report", ColumnHeaders, rows);
         var file = reportExporter.Export(request.Format, exportData);
 
-        return Result.Success(new ExportEmployeeLeaverReportResponse(file));
+        var isTruncated = result.TotalCount > ReportLimits.ExportRowLimit;
+
+        return Result.Success(new ExportEmployeeLeaverReportResponse(file, result.TotalCount, isTruncated));
     }
 }

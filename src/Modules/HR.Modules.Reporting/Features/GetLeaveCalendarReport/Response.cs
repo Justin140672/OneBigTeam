@@ -1,6 +1,9 @@
 namespace HR.Modules.Reporting.Features.GetLeaveCalendarReport;
 
-internal sealed record GetLeaveCalendarReportResponse(IReadOnlyList<LeaveCalendarReportRow> Items);
+internal sealed record GetLeaveCalendarReportResponse(
+    IReadOnlyList<LeaveCalendarReportRow> Items,
+    int TotalCount,
+    bool IsTruncated);
 
 internal sealed record LeaveCalendarReportRow(
     Guid EmployeeId,

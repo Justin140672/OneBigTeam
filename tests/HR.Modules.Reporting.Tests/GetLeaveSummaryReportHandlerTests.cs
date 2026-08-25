@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.Features.GetLeaveSummaryReport;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.Modules.Reporting.Tests.Infrastructure;
 
 namespace HR.Modules.Reporting.Tests;
@@ -121,5 +122,51 @@ public class GetLeaveSummaryReportHandlerTests
         Assert.True(result.IsSuccess);
         var row = Assert.Single(result.Value!.Items);
         Assert.Equal(employeeWithAnnual.ToString(), row.GroupKey);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Below_DisplayRowLimit_Is_Not_Truncated()
+    {
+        var annualTypeId = Guid.NewGuid();
+        var rows = Enumerable.Range(0, 5)
+            .Select(_ => new LeaveSummaryReportRow(Guid.NewGuid(), annualTypeId, "Annual Leave", 25m, 0m, 0m, 25m, 0))
+            .ToList();
+        var reader = new FakeLeaveSummaryReader(rows);
+        var handler = new GetLeaveSummaryReportHandler(reader, new FakeEmployeeDepartmentReader(), new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new GetLeaveSummaryReportRequest(Guid.NewGuid()),
+            callerIsHr: true,
+            callerEmployeeId: Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.IsTruncated);
+        Assert.Equal(5, result.Value.TotalCount);
+        Assert.Equal(5, result.Value.Items.Count);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Above_DisplayRowLimit_Is_Truncated_But_Reports_Full_Total()
+    {
+        const int overLimitBy = 500;
+        var totalGroups = ReportLimits.DisplayRowLimit + overLimitBy;
+        var annualTypeId = Guid.NewGuid();
+        var rows = Enumerable.Range(0, totalGroups)
+            .Select(_ => new LeaveSummaryReportRow(Guid.NewGuid(), annualTypeId, "Annual Leave", 25m, 0m, 0m, 25m, 0))
+            .ToList();
+        var reader = new FakeLeaveSummaryReader(rows);
+        var handler = new GetLeaveSummaryReportHandler(reader, new FakeEmployeeDepartmentReader(), new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new GetLeaveSummaryReportRequest(Guid.NewGuid()),
+            callerIsHr: true,
+            callerEmployeeId: Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsTruncated);
+        Assert.Equal(totalGroups, result.Value.TotalCount);
+        Assert.Equal(ReportLimits.DisplayRowLimit, result.Value.Items.Count);
     }
 }

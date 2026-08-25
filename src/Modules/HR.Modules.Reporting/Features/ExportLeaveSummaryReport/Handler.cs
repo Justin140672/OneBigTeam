@@ -43,6 +43,7 @@ internal sealed class ExportLeaveSummaryReportHandler(
         var exportData = new ReportExportData("Leave Summary Report", ColumnHeaders, rows);
         var file = reportExporter.Export(request.Format, exportData);
 
-        return Result.Success(new ExportLeaveSummaryReportResponse(file));
+        return Result.Success(new ExportLeaveSummaryReportResponse(
+            file, getResult.Value!.TotalCount, getResult.Value!.IsTruncated));
     }
 }

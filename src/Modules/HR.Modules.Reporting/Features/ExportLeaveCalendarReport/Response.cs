@@ -2,4 +2,4 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Reporting.Features.ExportLeaveCalendarReport;
 
-internal sealed record ExportLeaveCalendarReportResponse(ReportExportFile File);
+internal sealed record ExportLeaveCalendarReportResponse(ReportExportFile File, int TotalCount, bool IsTruncated);

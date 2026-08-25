@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.Features.GetDocumentComplianceReport;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.Modules.Reporting.Tests.Infrastructure;
 
 namespace HR.Modules.Reporting.Tests;
@@ -95,5 +96,50 @@ public class GetDocumentComplianceReportHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Items);
         Assert.Equal(0, result.Value.TotalMissing);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Below_DisplayRowLimit_Is_Not_Truncated()
+    {
+        var reader = new FakeDocumentComplianceReportReader(
+        [
+            BuildItem(Guid.NewGuid()),
+            BuildItem(Guid.NewGuid()),
+        ]);
+        var handler = new GetDocumentComplianceReportHandler(reader, new FakeEmployeeDepartmentReader());
+
+        var result = await handler.HandleAsync(
+            new GetDocumentComplianceReportRequest(Guid.NewGuid(), null), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.IsTruncated);
+        Assert.Equal(2, result.Value.TotalEmployees);
+        Assert.Equal(2, result.Value.Items.Count);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Above_DisplayRowLimit_Is_Truncated_And_Sums_Computed_From_Full_Set()
+    {
+        // Seed limit+500 items, each contributing 1 to missing/expiringSoon/expired, so the
+        // full-set sum (limit+500) is clearly distinguishable from the capped-set sum (limit).
+        const int overLimitBy = 500;
+        var totalItems = ReportLimits.DisplayRowLimit + overLimitBy;
+        var items = Enumerable.Range(0, totalItems)
+            .Select(_ => BuildItem(Guid.NewGuid(), missing: 1, expiringSoon: 1, expired: 1))
+            .ToList();
+        var reader = new FakeDocumentComplianceReportReader(items);
+        var handler = new GetDocumentComplianceReportHandler(reader, new FakeEmployeeDepartmentReader());
+
+        var result = await handler.HandleAsync(
+            new GetDocumentComplianceReportRequest(Guid.NewGuid(), null), CancellationToken.None);
+
+        var response = result.Value!;
+        Assert.True(response.IsTruncated);
+        Assert.Equal(totalItems, response.TotalEmployees);
+        Assert.Equal(ReportLimits.DisplayRowLimit, response.Items.Count);
+        // Sums must reflect the FULL set (totalItems), not just the capped rows (DisplayRowLimit).
+        Assert.Equal(totalItems, response.TotalMissing);
+        Assert.Equal(totalItems, response.TotalExpiringSoon);
+        Assert.Equal(totalItems, response.TotalExpired);
     }
 }

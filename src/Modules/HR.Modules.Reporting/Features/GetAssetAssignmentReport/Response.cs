@@ -2,7 +2,8 @@ namespace HR.Modules.Reporting.Features.GetAssetAssignmentReport;
 
 internal sealed record GetAssetAssignmentReportResponse(
     IReadOnlyList<AssetAssignmentReportRow> Items,
-    int TotalAssignments);
+    int TotalAssignments,
+    bool IsTruncated);
 
 internal sealed record AssetAssignmentReportRow(
     Guid EmployeeId,

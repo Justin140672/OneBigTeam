@@ -129,6 +129,10 @@ internal sealed class DocumentComplianceReportReader(
                 missingTypeNames));
         }
 
-        return results;
+        // Deterministic ordering with an explicit tiebreaker (REP-05) — a Dictionary's enumeration
+        // order is an implementation detail, not a guarantee.
+        return results
+            .OrderBy(r => r.EmployeeId)
+            .ToList();
     }
 }

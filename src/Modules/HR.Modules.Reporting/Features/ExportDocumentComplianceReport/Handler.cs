@@ -40,6 +40,7 @@ internal sealed class ExportDocumentComplianceReportHandler(
         var exportData = new ReportExportData("Document Compliance Report", ColumnHeaders, rows);
         var file = reportExporter.Export(request.Format, exportData);
 
-        return Result.Success(new ExportDocumentComplianceReportResponse(file));
+        return Result.Success(new ExportDocumentComplianceReportResponse(
+            file, getResult.Value!.TotalEmployees, getResult.Value!.IsTruncated));
     }
 }

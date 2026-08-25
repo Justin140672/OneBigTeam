@@ -5,7 +5,9 @@ namespace HR.Modules.Reporting.Features.GetWorkloadActions;
 internal sealed record GetWorkloadActionsResponse(
     IReadOnlyList<WorkloadActionRow> Items,
     IReadOnlyList<WorkloadActionGroup> Groups,
-    WorkloadActionSummary Summary);
+    WorkloadActionSummary Summary,
+    int TotalCount,
+    bool IsTruncated);
 
 internal sealed record WorkloadActionRow(
     Guid EmployeeId,

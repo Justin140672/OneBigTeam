@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Features.ExportEmployeeDirectoryReport;
@@ -7,10 +8,6 @@ internal sealed class ExportEmployeeDirectoryReportHandler(
     IEmployeeDirectoryReader employeeDirectoryReader,
     IReportExporter reportExporter)
 {
-    // Exports must respect current filters but are not paged for display purposes — fetch the
-    // full filtered result set in one page large enough to cover realistic company sizes.
-    private const int MaxExportRows = 50_000;
-
     private static readonly string[] ColumnHeaders =
     [
         "Employee Number", "Name", "Department", "Position", "Manager",
@@ -31,7 +28,7 @@ internal sealed class ExportEmployeeDirectoryReportHandler(
             DateRangeEnd: request.DateRangeEnd,
             EmployeeStatus: request.EmployeeStatus);
 
-        var pagination = new Pagination(PageNumber: 1, PageSize: MaxExportRows);
+        var pagination = new Pagination(PageNumber: 1, PageSize: ReportLimits.ExportRowLimit);
 
         var result = await employeeDirectoryReader.GetEmployeeDirectoryAsync(
             request.CompanyId,
@@ -60,6 +57,8 @@ internal sealed class ExportEmployeeDirectoryReportHandler(
         var exportData = new ReportExportData("Employee Directory", ColumnHeaders, rows);
         var file = reportExporter.Export(request.Format, exportData);
 
-        return Result.Success(new ExportEmployeeDirectoryReportResponse(file));
+        var isTruncated = result.TotalCount > ReportLimits.ExportRowLimit;
+
+        return Result.Success(new ExportEmployeeDirectoryReportResponse(file, result.TotalCount, isTruncated));
     }
 }

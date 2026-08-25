@@ -1,6 +1,7 @@
 using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.Features.GetSicknessReport;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.Modules.Reporting.Tests.Infrastructure;
 
 namespace HR.Modules.Reporting.Tests;
@@ -103,5 +104,42 @@ public class GetSicknessReportHandlerTests
         Assert.Equal(companyId, reader.LastCompanyId);
         Assert.Equal(start, reader.LastStartDate);
         Assert.Equal(end, reader.LastEndDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Below_DisplayRowLimit_Is_Not_Truncated()
+    {
+        var records = Enumerable.Range(0, 5)
+            .Select(_ => new SicknessReportRecordItem(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 1, 1), null, 1m))
+            .ToList();
+        var reader = new FakeSicknessReportReader(records);
+        var handler = new GetSicknessReportHandler(reader, new FakeEmployeeDepartmentReader());
+
+        var result = await handler.HandleAsync(new GetSicknessReportRequest(Guid.NewGuid()), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.IsTruncated);
+        Assert.Equal(5, result.Value.TotalCount);
+        Assert.Equal(5, result.Value.Items.Count);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Above_DisplayRowLimit_Is_Truncated_But_Reports_Full_Total()
+    {
+        // Grouped by employee (default), so distinct employees are needed to exceed the cap.
+        const int overLimitBy = 500;
+        var totalGroups = ReportLimits.DisplayRowLimit + overLimitBy;
+        var records = Enumerable.Range(0, totalGroups)
+            .Select(_ => new SicknessReportRecordItem(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 1, 1), null, 1m))
+            .ToList();
+        var reader = new FakeSicknessReportReader(records);
+        var handler = new GetSicknessReportHandler(reader, new FakeEmployeeDepartmentReader());
+
+        var result = await handler.HandleAsync(new GetSicknessReportRequest(Guid.NewGuid()), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsTruncated);
+        Assert.Equal(totalGroups, result.Value.TotalCount);
+        Assert.Equal(ReportLimits.DisplayRowLimit, result.Value.Items.Count);
     }
 }

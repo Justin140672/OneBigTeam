@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Features.GetSicknessReport;
@@ -41,7 +42,11 @@ internal sealed class GetSicknessReportHandler(
                 .ToList(),
         };
 
-        return Result.Success(new GetSicknessReportResponse(grouped));
+        var totalCount = grouped.Count;
+        var isTruncated = totalCount > ReportLimits.DisplayRowLimit;
+        var rows = grouped.Take(ReportLimits.DisplayRowLimit).ToList();
+
+        return Result.Success(new GetSicknessReportResponse(rows, totalCount, isTruncated));
     }
 
     /// <summary>

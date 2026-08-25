@@ -2,4 +2,4 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Reporting.Features.ExportEmployeeDirectoryReport;
 
-internal sealed record ExportEmployeeDirectoryReportResponse(ReportExportFile File);
+internal sealed record ExportEmployeeDirectoryReportResponse(ReportExportFile File, int TotalCount, bool IsTruncated);

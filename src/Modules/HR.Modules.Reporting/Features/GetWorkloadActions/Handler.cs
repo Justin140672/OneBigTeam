@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.SharedKernel;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -132,7 +133,11 @@ internal sealed class GetWorkloadActionsHandler(
             .ThenBy(a => a.EmployeeName)
             .ToList();
 
-        var rows = sorted.Select(ToRow).ToList();
+        // REP-05: display cap with an explicit truncation flag. Summary above is already computed
+        // from the full filtered set, so it remains accurate even when rows/groups are capped.
+        var totalCount = sorted.Count;
+        var isTruncated = totalCount > ReportLimits.DisplayRowLimit;
+        var rows = sorted.Take(ReportLimits.DisplayRowLimit).Select(ToRow).ToList();
 
         var groups = request.GroupBy switch
         {
@@ -143,7 +148,7 @@ internal sealed class GetWorkloadActionsHandler(
             _ => []
         };
 
-        return Result.Success(new GetWorkloadActionsResponse(rows, groups, summary));
+        return Result.Success(new GetWorkloadActionsResponse(rows, groups, summary, totalCount, isTruncated));
     }
 
     private static WorkloadActionRow ToRow(WorkloadAction a) => new(

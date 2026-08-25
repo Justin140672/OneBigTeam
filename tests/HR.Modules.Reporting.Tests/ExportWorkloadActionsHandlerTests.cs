@@ -1,6 +1,7 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.Features.ExportWorkloadActions;
 using HR.Modules.Reporting.Features.GetWorkloadActions;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.Modules.Reporting.Tests.Infrastructure;
 
 namespace HR.Modules.Reporting.Tests;
@@ -105,5 +106,23 @@ public class ExportWorkloadActionsHandlerTests
         Assert.True(result.IsSuccess);
         var row = Assert.Single(exporter.LastData!.Rows);
         Assert.Equal("Approve Leave Request", row[2]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Propagates_IsTruncated_And_TotalCount_From_GetHandler()
+    {
+        const int overLimitBy = 500;
+        var totalActions = ReportLimits.DisplayRowLimit + overLimitBy;
+        var actions = Enumerable.Range(0, totalActions).Select(_ => Action()).ToArray();
+        var provider = new FakeWorkloadActionProvider("Cat", actions);
+        var exporter = new FakeReportExporter();
+        var handler = BuildHandler([provider], exporter);
+
+        var result = await handler.HandleAsync(
+            new ExportWorkloadActionsRequest(Guid.NewGuid()), AnyCaller(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsTruncated);
+        Assert.Equal(totalActions, result.Value.TotalCount);
     }
 }

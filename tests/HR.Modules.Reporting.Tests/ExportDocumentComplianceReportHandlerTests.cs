@@ -1,6 +1,7 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.Features.ExportDocumentComplianceReport;
 using HR.Modules.Reporting.Features.GetDocumentComplianceReport;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.Modules.Reporting.Tests.Infrastructure;
 
 namespace HR.Modules.Reporting.Tests;
@@ -53,5 +54,24 @@ public class ExportDocumentComplianceReportHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Empty(exporter.LastData!.Rows);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Propagates_IsTruncated_And_TotalCount_From_GetHandler()
+    {
+        const int overLimitBy = 500;
+        var totalItems = ReportLimits.DisplayRowLimit + overLimitBy;
+        var items = Enumerable.Range(0, totalItems).Select(_ => BuildItem(Guid.NewGuid())).ToList();
+        var reader = new FakeDocumentComplianceReportReader(items);
+        var getHandler = new GetDocumentComplianceReportHandler(reader, new FakeEmployeeDepartmentReader());
+        var exporter = new FakeReportExporter();
+        var handler = new ExportDocumentComplianceReportHandler(getHandler, exporter);
+
+        var result = await handler.HandleAsync(
+            new ExportDocumentComplianceReportRequest(Guid.NewGuid(), null), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsTruncated);
+        Assert.Equal(totalItems, result.Value.TotalCount);
     }
 }

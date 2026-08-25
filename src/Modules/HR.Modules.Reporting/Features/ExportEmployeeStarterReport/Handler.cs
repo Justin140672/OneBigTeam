@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Features.ExportEmployeeStarterReport;
@@ -7,8 +8,6 @@ internal sealed class ExportEmployeeStarterReportHandler(
     IEmployeeStarterReader employeeStarterReader,
     IReportExporter reportExporter)
 {
-    private const int MaxExportRows = 50_000;
-
     private static readonly string[] ColumnHeaders =
     [
         "Name", "Start Date", "Recruiter", "Department", "Position", "Onboarding Status", "Probation Status",
@@ -26,7 +25,7 @@ internal sealed class ExportEmployeeStarterReportHandler(
             DateRangeStart: request.DateRangeStart,
             DateRangeEnd: request.DateRangeEnd);
 
-        var pagination = new Pagination(PageNumber: 1, PageSize: MaxExportRows);
+        var pagination = new Pagination(PageNumber: 1, PageSize: ReportLimits.ExportRowLimit);
 
         var result = await employeeStarterReader.GetEmployeeStartersAsync(
             request.CompanyId,
@@ -52,6 +51,8 @@ internal sealed class ExportEmployeeStarterReportHandler(
         var exportData = new ReportExportData("Employee Starter Report", ColumnHeaders, rows);
         var file = reportExporter.Export(request.Format, exportData);
 
-        return Result.Success(new ExportEmployeeStarterReportResponse(file));
+        var isTruncated = result.TotalCount > ReportLimits.ExportRowLimit;
+
+        return Result.Success(new ExportEmployeeStarterReportResponse(file, result.TotalCount, isTruncated));
     }
 }

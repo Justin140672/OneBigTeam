@@ -62,6 +62,7 @@ internal sealed class ExportWorkloadActionsHandler(
         var exportData = new ReportExportData("Workload & HR Actions Report", ColumnHeaders, rows);
         var file = reportExporter.Export(request.Format, exportData);
 
-        return Result.Success(new ExportWorkloadActionsResponse(file));
+        return Result.Success(new ExportWorkloadActionsResponse(
+            file, getResult.Value!.TotalCount, getResult.Value!.IsTruncated));
     }
 }

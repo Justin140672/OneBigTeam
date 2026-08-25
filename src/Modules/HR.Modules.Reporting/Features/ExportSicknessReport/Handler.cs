@@ -37,6 +37,7 @@ internal sealed class ExportSicknessReportHandler(
         var exportData = new ReportExportData("Sickness Report", ColumnHeaders, rows);
         var file = reportExporter.Export(request.Format, exportData);
 
-        return Result.Success(new ExportSicknessReportResponse(file));
+        return Result.Success(new ExportSicknessReportResponse(
+            file, getResult.Value!.TotalCount, getResult.Value!.IsTruncated));
     }
 }

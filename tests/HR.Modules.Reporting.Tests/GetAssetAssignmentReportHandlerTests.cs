@@ -1,6 +1,7 @@
 using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.Features.GetAssetAssignmentReport;
+using HR.Modules.Reporting.ReportRegistry;
 using HR.Modules.Reporting.Tests.Infrastructure;
 
 namespace HR.Modules.Reporting.Tests;
@@ -78,5 +79,38 @@ public class GetAssetAssignmentReportHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Items);
         Assert.Equal(0, result.Value.TotalAssignments);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Below_DisplayRowLimit_Is_Not_Truncated()
+    {
+        var items = Enumerable.Range(0, 5).Select(_ => BuildItem(Guid.NewGuid())).ToList();
+        var reader = new FakeAssetAssignmentReportReader(items);
+        var handler = new GetAssetAssignmentReportHandler(reader, new FakeEmployeeDepartmentReader());
+
+        var result = await handler.HandleAsync(new GetAssetAssignmentReportRequest(Guid.NewGuid()), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.IsTruncated);
+        Assert.Equal(5, result.Value.TotalAssignments);
+        Assert.Equal(5, result.Value.Items.Count);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Above_DisplayRowLimit_Is_Truncated_But_Reports_Full_Total()
+    {
+        const int overLimitBy = 500;
+        var items = Enumerable.Range(0, ReportLimits.DisplayRowLimit + overLimitBy)
+            .Select(_ => BuildItem(Guid.NewGuid()))
+            .ToList();
+        var reader = new FakeAssetAssignmentReportReader(items);
+        var handler = new GetAssetAssignmentReportHandler(reader, new FakeEmployeeDepartmentReader());
+
+        var result = await handler.HandleAsync(new GetAssetAssignmentReportRequest(Guid.NewGuid()), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsTruncated);
+        Assert.Equal(ReportLimits.DisplayRowLimit + overLimitBy, result.Value.TotalAssignments);
+        Assert.Equal(ReportLimits.DisplayRowLimit, result.Value.Items.Count);
     }
 }
