@@ -1,6 +1,6 @@
 ---
 title: Data Processing Agreement
-lastUpdated: 21 August 2026
+lastUpdated: 25 August 2026
 ---
 
 # Data Processing Agreement
@@ -69,9 +69,9 @@ Where required, One Big Team will complete an appropriate transfer risk assessme
 
 ## 10. Return, export and deletion
 
-At the Customer's choice, One Big Team will enable the Customer to export its data or will return it in an available standard export format before account closure. The export remains available during the 30-day account recovery period following cancellation. Subject to applicable law, One Big Team will delete the Customer's active database records and stored files when that period ends.
+At the Customer's choice, One Big Team will make available the self-service exports supported by the service and will provide reasonable assistance to return other Customer personal data in an available standard format before account closure. Export requests should be made before the 30-day account recovery period following cancellation ends. Subject to applicable law, One Big Team will disable ordinary access at the end of that period and complete deletion of the Customer's active database records and stored files through its controlled deletion process.
 
-Residual copies may remain in encrypted backups until the relevant backup expires, for no longer than a further 30 days. Backup data is isolated from ordinary use and will be restored only where reasonably required for disaster recovery. If a backup is restored, deletion instructions that remain applicable will be reapplied.
+Residual copies may remain in encrypted, access-restricted provider backups until the applicable backup retention cycle expires. Backup data is isolated from ordinary use and will be restored only where reasonably required for disaster recovery. If a backup is restored, deletion instructions that remain applicable will be reapplied. One Big Team will provide the applicable maximum backup retention period on request and will not extend it for the purpose of retaining deleted Customer personal data.
 
 One Big Team may retain limited information where necessary to comply with legal obligations or establish, exercise or defend legal claims, including applicable billing and tax records.
 
@@ -97,7 +97,7 @@ One Big Team processes personal data as necessary to provide, secure, maintain a
 
 ### Duration
 
-Processing continues for the term of the Customer's agreement and during the agreed 30-day account recovery period. Personal data may remain in encrypted backups for up to a further 30 days before automatic deletion, unless retention is required by law.
+Processing continues for the term of the Customer's agreement, during the agreed 30-day account recovery period and for the limited period required to complete controlled deletion. Personal data may remain in encrypted, access-restricted provider backups until the applicable backup retention cycle expires, unless retention is required by law.
 
 ### Data subjects
 
@@ -193,9 +193,9 @@ personal data is processed.
 
 ### Availability, backup and recovery
 
-- Database backups are maintained through the database hosting provider.
-- Customer files are backed up daily to encrypted, private storage that is independent of the primary file store.
-- File backups are retained for 30 days and then automatically deleted.
+- Production database backups are maintained through the database hosting provider once configured and verified for the live environment.
+- Any independent Customer-file backup service must be implemented, contractually approved and restoration-tested before it is described as an active production control.
+- Backup retention is configured according to the documented production recovery and deletion schedule.
 - Backup access is restricted and backups are used only for disaster recovery.
 - Recovery procedures are documented and restoration is tested periodically.
 - Health checks and monitoring are used to identify service and dependency failures.

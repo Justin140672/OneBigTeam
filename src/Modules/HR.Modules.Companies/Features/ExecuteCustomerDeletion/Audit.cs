@@ -21,8 +21,8 @@ internal sealed record CustomerDeletionExecutedAuditEvent(
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary =>
-        $"Permanent deletion executed (status marked deleted, access revoked; underlying data " +
-        $"retained pending a dedicated hard-deletion process). Reason: {Reason}";
+        $"Controlled deletion started (customer access revoked; per-store deletion and independent " +
+        $"verification still required). Reason: {Reason}";
     object? IAuditEvent.Before => new { DeletionExecutedAt = (DateTimeOffset?)null };
     object? IAuditEvent.After => new { DeletionExecutedAt = OccurredAt };
     object? IAuditEvent.Metadata => new { Reason };

@@ -49,6 +49,20 @@ internal sealed class OffboardingTaskConfiguration : IEntityTypeConfiguration<Of
             .HasColumnName("requires_hr_confirmation")
             .IsRequired();
 
+        builder.Property(t => t.IsMandatory)
+            .HasColumnName("is_mandatory")
+            .IsRequired();
+
+        builder.Property(t => t.SkipReason)
+            .HasColumnName("skip_reason")
+            .HasMaxLength(1000);
+
+        builder.Property(t => t.SkippedByUserId)
+            .HasColumnName("skipped_by_user_id");
+
+        builder.Property(t => t.SkippedAt)
+            .HasColumnName("skipped_at");
+
         builder.Property(t => t.DueDate)
             .HasColumnName("due_date");
 

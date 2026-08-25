@@ -48,20 +48,35 @@ internal sealed class OffboardingReportReader(OffboardingDbContext dbContext) : 
         foreach (var plan in latestPlans)
         {
             var planTasks = tasksByPlan[plan.Id].ToList();
-            var completed = planTasks.Where(t => t.Status == OffboardingTaskStatus.Completed).ToList();
-            var outstanding = planTasks.Where(t => t.Status != OffboardingTaskStatus.Completed && t.Status != OffboardingTaskStatus.Skipped).ToList();
+
+            // OFF-07: uses the same OffboardingProgressCalculator as GetOffboardingOverviewHandler
+            // (and, by extension, the Blazor UI, which now displays the overview's server-computed
+            // numbers rather than recomputing them) — this used to only count Status == Completed as
+            // "done", silently excluding Skipped tasks and disagreeing with the UI's own
+            // Completed-or-Skipped definition of progress. CompletedTasks below is therefore
+            // "resolved" (Completed + Skipped), matching the UI exactly.
+            var progress = OffboardingProgressCalculator.Calculate(planTasks);
+            var resolvedTitles = planTasks
+                .Where(t => t.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped)
+                .Select(t => t.Title)
+                .ToList();
+            var outstanding = planTasks
+                .Where(t => t.Status != OffboardingTaskStatus.Completed && t.Status != OffboardingTaskStatus.Skipped)
+                .Select(t => t.Title)
+                .ToList();
 
             var documentReviewTask = planTasks.FirstOrDefault(t => t.Title == DocumentReviewTaskTitle);
-            var documentsReturned = documentReviewTask is null || documentReviewTask.Status == OffboardingTaskStatus.Completed;
+            var documentsReturned = documentReviewTask is null
+                || documentReviewTask.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped;
 
             results.Add(new OffboardingReportItem(
                 plan.EmployeeId,
                 plan.LastWorkingDay,
                 plan.Status.ToString(),
-                planTasks.Count,
-                completed.Count,
-                outstanding.Select(t => t.Title).ToList(),
-                completed.Select(t => t.Title).ToList(),
+                progress.TotalTasks,
+                progress.ResolvedTasks,
+                outstanding,
+                resolvedTitles,
                 documentsReturned));
         }
 

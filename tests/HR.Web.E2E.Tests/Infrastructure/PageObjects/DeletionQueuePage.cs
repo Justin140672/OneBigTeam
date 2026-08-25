@@ -75,13 +75,13 @@ public sealed class DeletionQueuePage(IPage page, string baseUrl)
     }
 
     // The shared AdminActionConfirmDialog, addressed by its per-action title so tests can
-    // disambiguate "Cancel deletion" from "Execute deletion now" — see AdminActionConfirmDialog.razor
+    // disambiguate "Cancel deletion" from "Begin controlled deletion" — see AdminActionConfirmDialog.razor
     // and DeletionQueue.razor's DialogTitle.
     private ILocator DialogByTitle(string title) => page.GetByRole(AriaRole.Dialog, new() { Name = title });
 
     public ILocator CancelDeletionDialog => DialogByTitle("Cancel deletion");
 
-    public ILocator ExecuteDeletionDialog => DialogByTitle("Execute deletion now");
+    public ILocator ExecuteDeletionDialog => DialogByTitle("Begin controlled deletion");
 
     public Task<bool> IsCancelDeletionDialogVisibleAsync() => CancelDeletionDialog.IsVisibleAsync();
 

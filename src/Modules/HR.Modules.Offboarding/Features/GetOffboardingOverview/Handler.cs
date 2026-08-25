@@ -1,3 +1,4 @@
+using HR.Modules.Offboarding.Domain;
 using HR.Modules.Offboarding.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,6 +26,10 @@ internal sealed class GetOffboardingOverviewHandler(OffboardingDbContext dbConte
                 null,
                 false,
                 false,
+                false,
+                0,
+                0,
+                0,
                 []);
         }
 
@@ -32,6 +37,8 @@ internal sealed class GetOffboardingOverviewHandler(OffboardingDbContext dbConte
             .AsNoTracking()
             .Where(t => t.OffboardingPlanId == plan.Id)
             .ToListAsync(cancellationToken);
+
+        var progress = OffboardingProgressCalculator.Calculate(tasks);
 
         var taskItems = tasks
             .Select(t => new OffboardingTaskOverviewItem(
@@ -44,7 +51,11 @@ internal sealed class GetOffboardingOverviewHandler(OffboardingDbContext dbConte
                 t.CompletedAt,
                 t.CreatedAt,
                 t.UpdatedAt,
-                t.RequiresHrConfirmation))
+                t.RequiresHrConfirmation,
+                t.IsMandatory,
+                t.SkipReason,
+                t.SkippedByUserId,
+                t.SkippedAt))
             .ToList();
 
         return new GetOffboardingOverviewResponse(
@@ -55,6 +66,10 @@ internal sealed class GetOffboardingOverviewHandler(OffboardingDbContext dbConte
             plan.Notes,
             plan.IsBackdated,
             plan.RequiresHrReconciliation,
+            plan.HasIncompleteOffboardingAtDeparture,
+            progress.TotalTasks,
+            progress.ResolvedTasks,
+            progress.ProgressPercent,
             taskItems);
     }
 }

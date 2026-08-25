@@ -1,6 +1,6 @@
 ---
 title: Terms of Service
-lastUpdated: 21 August 2026
+lastUpdated: 25 August 2026
 ---
 
 # Terms of Service
@@ -79,7 +79,7 @@ The Customer may cancel at any time. Unless stated otherwise at purchase, cancel
 
 Either party may terminate immediately if the other materially breaches these Terms and, where the breach can be remedied, fails to remedy it within 30 days after written notice. Either party may also terminate if the other becomes insolvent or ceases business, subject to applicable law.
 
-After cancellation or termination, the Customer will have a 30-day recovery period in which an authorised administrator may access or export Customer Data. Active Customer Data will then be deleted in accordance with the DPA. Provisions intended by their nature to continue—including payment obligations, confidentiality, intellectual property, liability and governing law—survive termination.
+After cancellation or termination, the Customer will have a 30-day recovery period in which an authorised administrator may access available self-service exports and may request assistance returning other Customer Data. Ordinary access will then be disabled and Customer Data will enter the controlled deletion process described in the DPA. Provisions intended by their nature to continue—including payment obligations, confidentiality, intellectual property, liability and governing law—survive termination.
 
 ## 13. Confidentiality
 

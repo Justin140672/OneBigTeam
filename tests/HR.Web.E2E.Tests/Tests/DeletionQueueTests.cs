@@ -199,14 +199,14 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : CrossUserTena
 
         await queue.ClickExecuteNowAsync("Beta Corp");
         Assert.True(await queue.IsExecuteDeletionDialogVisibleAsync(),
-            "Expected the Execute deletion now confirmation dialog to open");
+            "Expected the Begin controlled deletion confirmation dialog to open");
 
         // Deliberate wording assertion: the "Execute now" warning must read as a safe, status-only,
         // reversible-in-principle action and must NOT claim it deletes real employee/document/
         // company data — see CustomerDetails.razor's DialogWarning for AdminAction.ScheduleDeletion
         // and DeletionQueue.razor's DialogWarning for DeletionAction.Execute.
         var warningText = await queue.GetExecuteDeletionWarningTextAsync() ?? "";
-        Assert.Contains("does NOT delete any real", warningText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("does not delete customer data", warningText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("permanently deletes all data", warningText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("cannot be undone", warningText, StringComparison.OrdinalIgnoreCase);
 

@@ -6,6 +6,7 @@ using HR.Modules.Offboarding.Features.CancelOffboardingOnLeavingProcessCancelled
 using HR.Modules.Offboarding.Features.CompleteOffboardingTaskFromTask;
 using HR.Modules.Offboarding.Features.GetOffboardingOverview;
 using HR.Modules.Offboarding.Features.GetOffboardingStatus;
+using HR.Modules.Offboarding.Features.MarkOffboardingIncompleteOnDepartureFinalised;
 using HR.Modules.Offboarding.Features.RescheduleOffboardingOnLeavingDateChanged;
 using HR.Modules.Offboarding.Features.StartOffboarding;
 using HR.Modules.Offboarding.Jobs;
@@ -63,6 +64,12 @@ public static class OffboardingModule
         // process start and amendment) — keeps the active plan's LastWorkingDay and outstanding
         // task due dates aligned whenever HR changes the employee's leaving date/last working day.
         services.AddScoped<IIntegrationEventHandler<EmployeeLeavingDateSetIntegrationEvent>, RescheduleOffboardingOnLeavingDateChangedHandler>();
+
+        // OFF-07: consumer of EmployeeDepartureFinalisedIntegrationEvent — raises a persistent HR
+        // exception on the plan (HasIncompleteOffboardingAtDeparture) whenever an employee's
+        // departure is finalised while mandatory offboarding tasks remain outstanding, rather than
+        // relying solely on Employees' one-time manager notification.
+        services.AddScoped<IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>, MarkOffboardingIncompleteOnDepartureFinalisedHandler>();
 
         return services;
     }

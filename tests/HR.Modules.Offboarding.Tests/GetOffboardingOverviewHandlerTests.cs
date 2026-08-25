@@ -60,7 +60,7 @@ public class GetOffboardingOverviewHandlerTests
         if (status == OffboardingTaskStatus.Completed)
             task.Complete(completedAt ?? createdAt);
         else if (status == OffboardingTaskStatus.Skipped)
-            task.Skip(createdAt);
+            task.Skip(createdAt, "Skipped for test.", Guid.NewGuid());
 
         dbContext.OffboardingTasks.Add(task);
         return task;
@@ -170,6 +170,78 @@ public class GetOffboardingOverviewHandlerTests
         Assert.Equal("Manager", skippedItem.AssignTo);
         Assert.Equal("Skipped", skippedItem.Status);
         Assert.Null(skippedItem.CompletedAt);
+    }
+
+    // ---- OFF-07 ----
+
+    [Fact]
+    public async Task HandleAsync_Returns_HasIncompleteOffboardingAtDeparture_Progress_Fields_When_No_Plan_Found()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var handler = BuildHandler(db);
+        var result = await handler.HandleAsync(
+            new GetOffboardingOverviewRequest(companyId, employeeId),
+            CancellationToken.None);
+
+        Assert.False(result.HasIncompleteOffboardingAtDeparture);
+        Assert.Equal(0, result.TotalTasks);
+        Assert.Equal(0, result.ResolvedTasks);
+        Assert.Equal(0, result.ProgressPercent);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Surfaces_HasIncompleteOffboardingAtDeparture_And_Progress_Fields_And_Task_MandatorySkipFields()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), companyId, employeeId, DateOnly.FromDateTime(Now.Date), null, Now);
+        plan.Start(Now);
+        plan.MarkIncompleteOffboardingAtDeparture(Now);
+        db.OffboardingPlans.Add(plan);
+
+        var completedTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, Now);
+        completedTask.Complete(Now);
+
+        var skippedTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Optional handover note", null,
+            OffboardingTaskAssignTo.Manager, null, Now, isMandatory: false);
+        var skipActor = Guid.NewGuid();
+        skippedTask.Skip(Now, "Not applicable for this role.", skipActor);
+
+        var pendingMandatoryTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Confirm exit interview", null,
+            OffboardingTaskAssignTo.Manager, null, Now);
+
+        db.OffboardingTasks.AddRange(completedTask, skippedTask, pendingMandatoryTask);
+        await db.SaveChangesAsync();
+
+        var handler = BuildHandler(db);
+        var result = await handler.HandleAsync(
+            new GetOffboardingOverviewRequest(companyId, employeeId),
+            CancellationToken.None);
+
+        Assert.True(result.HasIncompleteOffboardingAtDeparture);
+        Assert.Equal(3, result.TotalTasks);
+        Assert.Equal(2, result.ResolvedTasks); // Completed + Skipped
+        Assert.Equal(67, result.ProgressPercent); // 2/3 rounded
+
+        var skippedItem = Assert.Single(result.Tasks, t => t.Id == skippedTask.Id);
+        Assert.False(skippedItem.IsMandatory);
+        Assert.Equal("Not applicable for this role.", skippedItem.SkipReason);
+        Assert.Equal(skipActor, skippedItem.SkippedByUserId);
+        Assert.Equal(Now, skippedItem.SkippedAt);
+
+        var completedItem = Assert.Single(result.Tasks, t => t.Id == completedTask.Id);
+        Assert.True(completedItem.IsMandatory);
+        Assert.Null(completedItem.SkipReason);
     }
 
     [Fact]

@@ -1,6 +1,6 @@
 ---
 title: Privacy Policy
-lastUpdated: 21 August 2026
+lastUpdated: 25 August 2026
 ---
 
 # Privacy Policy
@@ -15,7 +15,7 @@ This policy explains how we handle personal data when you visit our website, con
 
 For employee, worker, applicant and other HR data entered by a customer, the customer is normally the controller and One Big Team acts as its processor. Questions or rights requests about that information should normally be directed to the relevant employer or organisation. Our [Data Processing Agreement](/data-processing-agreement) governs that processing.
 
-Crazy Cat Software Limited is the controller for information used to operate our own business, including website enquiries, trial and account administration, billing, security, supplier management and direct communications.
+Crazy Cat Software Limited is the controller for information used to operate our own business, including website enquiries, trial and account administration, billing, supplier management, direct communications and platform-level security records created for our own security and legal purposes. We do not become controller of Customer-controlled HR information merely because it appears in a tenant audit record or is accessed during support.
 
 ## Information we handle as controller
 
@@ -50,7 +50,7 @@ Customers may use the service to process employee records, contact details, empl
 
 We disclose personal data only where necessary to:
 
-- Provide the service using the providers listed on our [Subprocessors](/subprocessors) page;
+- Provide the service using the processors listed on our [Subprocessors](/subprocessors) page and the other service providers identified there;
 - Process subscription payments and prevent fraud;
 - Obtain professional advice, insurance or business support under appropriate confidentiality obligations;
 - Comply with law, court orders or lawful requests; or
@@ -60,18 +60,19 @@ We do not sell personal data.
 
 ## International transfers
 
-Some providers may process information outside the UK. Where a restricted transfer occurs, we use a lawful transfer mechanism such as UK adequacy regulations, the UK International Data Transfer Agreement or the UK Addendum to the European Commission's Standard Contractual Clauses, together with a transfer risk assessment and additional safeguards where required.
+Some providers may process information outside the UK. Where a restricted transfer occurs, we use a lawful transfer mechanism such as UK adequacy regulations, the UK International Data Transfer Agreement or the UK Addendum to the European Commission's Standard Contractual Clauses, together with a transfer risk assessment and additional safeguards where required. You may ask [privacy@onebigteam.co.uk](mailto:privacy@onebigteam.co.uk) for information about the safeguard relevant to your personal data. We may redact confidential commercial or security information from any copy we provide.
 
 ## Retention
 
 We keep personal data only for as long as needed for the purposes described above, including legal, accounting, security and dispute-resolution requirements.
 
-- Customer service data remains available during the subscription and for a 30-day recovery period after cancellation, then active copies are deleted;
-- Residual customer data may remain in encrypted backups for up to a further 30 days;
-- Generated customer exports expire after seven days;
-- Website enquiries and support correspondence are periodically reviewed and deleted when no longer needed;
+- Customer service data remains available during the subscription and for a 30-day recovery period after cancellation. We then disable ordinary access and complete deletion of active Customer-controlled records and stored files through our controlled deletion process, subject to any lawful retention requirement;
+- Residual customer data may remain in provider-managed, access-restricted backups until those backups expire under the applicable provider retention cycle. It is not restored for ordinary use and applicable deletion instructions are reapplied following a disaster-recovery restoration;
+- Customer exports generated for immediate download are not intentionally retained by One Big Team after delivery. Where an assisted export must be staged temporarily, it is deleted within seven days;
+- Website enquiries and unsuccessful sales enquiries are normally retained for up to 24 months after the last meaningful contact, unless a longer period is needed for an ongoing matter or legal claim;
+- Support correspondence is normally retained for the subscription term and up to 24 months afterwards, unless a longer period is needed for security, a complaint or a legal claim;
 - Account, transaction and billing records may be retained for the period required by tax, accounting and legal rules; and
-- Security and audit records are retained for a proportionate period based on their purpose and risk.
+- Platform security records are normally retained for up to 12 months and Customer audit records for the subscription term and controlled deletion period, unless a longer period is necessary to investigate an incident, meet a legal obligation or establish, exercise or defend a legal claim.
 
 The customer controls retention of HR records while its account remains active and is responsible for applying appropriate retention periods to those records.
 
@@ -85,7 +86,13 @@ Depending on the circumstances, you may have rights to access, correct, erase or
 
 For information controlled by your employer or another One Big Team customer, contact that organisation first. For information controlled by us, email [privacy@onebigteam.co.uk](mailto:privacy@onebigteam.co.uk). We may need to verify your identity before acting on a request.
 
-You may complain to the Information Commissioner's Office at [ico.org.uk](https://ico.org.uk/). We would appreciate the opportunity to address your concern first.
+## Data protection complaints
+
+You may make a data protection complaint by emailing [privacy@onebigteam.co.uk](mailto:privacy@onebigteam.co.uk). Please describe what you believe has gone wrong and include enough information for us to identify the relevant account, communication or processing. Do not send passwords or unnecessary sensitive information.
+
+We will acknowledge your complaint within 30 days, investigate it without undue delay, keep you informed where an investigation takes longer, and tell you the outcome. We will record complaints and the steps taken to resolve them. If the complaint concerns information controlled by a Customer, we will normally forward it securely to that Customer or explain how to contact them; we will still investigate any part concerning our own conduct as processor.
+
+You may also complain to the Information Commissioner's Office at [ico.org.uk](https://ico.org.uk/). You do not have to contact us before approaching the ICO, although giving us the opportunity to investigate may resolve the concern sooner.
 
 ## Whether you must provide information
 

@@ -8,6 +8,14 @@ internal sealed record GetOffboardingOverviewResponse(
     string? Notes,
     bool IsBackdated,
     bool RequiresHrReconciliation,
+    bool HasIncompleteOffboardingAtDeparture,
+    // OFF-07: server-computed via OffboardingProgressCalculator — the single source of truth for
+    // plan progress. Consumers (the Blazor Offboarding tab) should display these rather than
+    // recomputing their own counts, so progress can never drift between UI/reports/cross-module
+    // readers again.
+    int TotalTasks,
+    int ResolvedTasks,
+    int ProgressPercent,
     IReadOnlyList<OffboardingTaskOverviewItem> Tasks);
 
 internal sealed record OffboardingTaskOverviewItem(
@@ -20,4 +28,8 @@ internal sealed record OffboardingTaskOverviewItem(
     DateTimeOffset? CompletedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    bool RequiresHrConfirmation);
+    bool RequiresHrConfirmation,
+    bool IsMandatory,
+    string? SkipReason,
+    Guid? SkippedByUserId,
+    DateTimeOffset? SkippedAt);

@@ -104,7 +104,7 @@ public class OffboardingTaskTests
             OffboardingTaskAssignTo.Employee, null, FixedNow);
         var later = FixedNow.AddDays(1);
 
-        task.Skip(later);
+        task.Skip(later, "No longer applicable.", Guid.NewGuid());
 
         Assert.Equal(OffboardingTaskStatus.Skipped, task.Status);
         Assert.Null(task.CompletedAt);
@@ -203,5 +203,82 @@ public class OffboardingTaskTests
         Assert.Null(task.CompletedAt);
         Assert.Equal(description, task.Description);
         Assert.Equal(FixedNow, task.UpdatedAt);
+    }
+
+    // ---- OFF-07 ----
+
+    [Fact]
+    public void Create_Defaults_IsMandatory_True_When_Not_Supplied()
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+
+        Assert.True(task.IsMandatory);
+    }
+
+    [Fact]
+    public void Create_Sets_IsMandatory_False_When_Explicitly_Supplied()
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Optional handover note", null,
+            OffboardingTaskAssignTo.Manager, null, FixedNow, isMandatory: false);
+
+        Assert.False(task.IsMandatory);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Skip_Throws_ArgumentException_When_Reason_Is_Null_Empty_Or_Whitespace(string? reason)
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+
+        var ex = Assert.Throws<ArgumentException>(() => task.Skip(FixedNow.AddDays(1), reason!, Guid.NewGuid()));
+        Assert.Equal("reason", ex.ParamName);
+
+        // The task must be left completely untouched — the exception is thrown before any state change.
+        Assert.Equal(OffboardingTaskStatus.Pending, task.Status);
+        Assert.Null(task.SkipReason);
+        Assert.Null(task.SkippedByUserId);
+        Assert.Null(task.SkippedAt);
+        Assert.Equal(FixedNow, task.UpdatedAt);
+    }
+
+    [Fact]
+    public void Skip_Populates_SkipReason_SkippedByUserId_And_SkippedAt()
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+        var later = FixedNow.AddDays(1);
+        var actorUserId = Guid.NewGuid();
+
+        task.Skip(later, "Employee already handed it in.", actorUserId);
+
+        Assert.Equal(OffboardingTaskStatus.Skipped, task.Status);
+        Assert.Equal("Employee already handed it in.", task.SkipReason);
+        Assert.Equal(actorUserId, task.SkippedByUserId);
+        Assert.Equal(later, task.SkippedAt);
+        Assert.Equal(later, task.UpdatedAt);
+    }
+
+    [Fact]
+    public void CreateWaived_Produces_IsMandatory_False_With_SkipReason_And_SystemActor()
+    {
+        const string description = "Waived automatically — access already disabled.";
+
+        var task = OffboardingTask.CreateWaived(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Revoke system access and accounts — Jamie Smith",
+            description, OffboardingTaskAssignTo.Manager, new DateOnly(2026, 7, 1), FixedNow);
+
+        Assert.False(task.IsMandatory);
+        Assert.Equal(OffboardingTaskStatus.Skipped, task.Status);
+        Assert.Equal(description, task.SkipReason);
+        Assert.Equal(Guid.Empty, task.SkippedByUserId); // OffboardingSystemActor.Id
+        Assert.Equal(FixedNow, task.SkippedAt);
     }
 }

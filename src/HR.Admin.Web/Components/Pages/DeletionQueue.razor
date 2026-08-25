@@ -6,9 +6,9 @@
 
 <h1>Permanent deletion queue</h1>
 <p class="admin-actions-intro">
-    Companies that currently have, or have ever had, a permanent deletion scheduled. Executing a
-    deletion marks the company deletion-executed and revokes access — it does not destroy any
-    employee, document, or company data.
+    Companies that currently have, or have ever had, a permanent deletion scheduled. Beginning
+    controlled deletion revokes customer access and records that the per-store deletion runbook
+    must be completed. It does not by itself destroy underlying customer data.
 </p>
 
 @if (_loading)
@@ -52,7 +52,7 @@ else
                         {
                             <div class="admin-actions-buttons">
                                 <SfButton OnClick="@(() => OpenAction(item, DeletionAction.Cancel))">Cancel deletion</SfButton>
-                                <SfButton CssClass="e-danger" OnClick="@(() => OpenAction(item, DeletionAction.Execute))">Execute now</SfButton>
+                                <SfButton CssClass="e-danger" OnClick="@(() => OpenAction(item, DeletionAction.Execute))">Begin deletion</SfButton>
                             </div>
                         }
                     </td>
@@ -97,7 +97,7 @@ else
     private string DialogTitle => _activeAction switch
     {
         DeletionAction.Cancel => "Cancel deletion",
-        DeletionAction.Execute => "Execute deletion now",
+        DeletionAction.Execute => "Begin controlled deletion",
         _ => "Confirm action",
     };
 
@@ -107,16 +107,16 @@ else
             $"This will cancel the pending permanent deletion for {_activeItem?.CompanyName}. " +
             "The company will keep normal access.",
         DeletionAction.Execute =>
-            $"This marks {_activeItem?.CompanyName} as deletion-executed and forces read-only / " +
-            "revokes access immediately. This is a safe, status-only, reversible-in-principle " +
-            "action — it does NOT delete any real employee, document, or company data.",
+            $"This revokes ordinary access for {_activeItem?.CompanyName} and records that controlled " +
+            "deletion has started. You must then complete and verify every store in the data-protection " +
+            "deletion runbook; this action alone does not delete customer data.",
         _ => "This action will affect the company's deletion status.",
     };
 
     private string DialogConfirmText => _activeAction switch
     {
         DeletionAction.Cancel => "Cancel deletion",
-        DeletionAction.Execute => "Execute deletion",
+        DeletionAction.Execute => "Begin deletion",
         _ => "Confirm",
     };
 
@@ -162,7 +162,7 @@ else
     private static MarkupString FormatStatus(DeletionQueueItem item)
     {
         if (item.ExecutedAt is not null)
-            return new MarkupString($"<span class=\"status-pill status-pill-executed\">Executed on {item.ExecutedAt.Value:dd MMM yyyy HH:mm}</span>");
+            return new MarkupString($"<span class=\"status-pill status-pill-executed\">Deletion started {item.ExecutedAt.Value:dd MMM yyyy HH:mm}</span>");
         if (item.CancelledAt is not null)
             return new MarkupString($"<span class=\"status-pill status-pill-cancelled\">Cancelled on {item.CancelledAt.Value:dd MMM yyyy HH:mm}</span>");
         return new MarkupString("<span class=\"status-pill status-pill-pending\">Pending</span>");

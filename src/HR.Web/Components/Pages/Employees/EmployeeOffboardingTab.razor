@@ -96,9 +96,13 @@ else
     private bool _loading = true;
     private OffboardingOverviewModel? _overview;
 
-    private int TotalCount => _overview?.Tasks.Count ?? 0;
-    private int CompletedCount => _overview?.Tasks.Count(t => t.Status is "Completed" or "Skipped") ?? 0;
-    private int ProgressPercent => TotalCount == 0 ? 0 : (int)Math.Round(CompletedCount * 100.0 / TotalCount);
+    // OFF-07: server-computed by OffboardingProgressCalculator (GetOffboardingOverviewHandler) —
+    // displayed directly rather than recomputed here, so this can never drift from the Reporting
+    // module's own progress numbers again (they previously disagreed: this counted Skipped tasks as
+    // done while OffboardingReportReader did not).
+    private int TotalCount => _overview?.TotalTasks ?? 0;
+    private int CompletedCount => _overview?.ResolvedTasks ?? 0;
+    private int ProgressPercent => _overview?.ProgressPercent ?? 0;
 
     protected override async Task OnParametersSetAsync()
     {

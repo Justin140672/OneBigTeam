@@ -10,6 +10,14 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Offboarding.Tests;
 
+// OFF-07: note on concurrency coverage — TryCompletePlanAsync's row-lock guarantee (`SELECT ... FOR
+// UPDATE` inside an explicit transaction) is a Postgres-specific mechanism. This test class uses
+// EF Core's InMemory provider (see BuildContext below), which does not support transactions or raw
+// SQL statements like FOR UPDATE, so the actual "two concurrent completions of a plan's last two
+// mandatory tasks only complete the plan once" guarantee cannot be exercised here. That scenario is
+// covered instead by the Aspire/Postgres integration test in
+// HR.Integration.Tests/OffboardingCompletionRulesIntegrationTests.cs, which runs against a real
+// Postgres instance.
 public class CompleteOffboardingTaskFromTaskActionTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 25, 10, 0, 0, DateTimeKind.Utc);
@@ -46,18 +54,20 @@ public class CompleteOffboardingTaskFromTaskActionTests
         OffboardingTaskStatus status = OffboardingTaskStatus.Pending,
         string title = "Some task",
         Guid? assetAssignmentId = null,
-        bool requiresHrConfirmation = false)
+        bool requiresHrConfirmation = false,
+        bool isMandatory = true)
     {
         var task = OffboardingTask.Create(
             Guid.NewGuid(), companyId, planId, title, null,
             OffboardingTaskAssignTo.Employee, null, createdAt,
             assetAssignmentId: assetAssignmentId,
-            requiresHrConfirmation: requiresHrConfirmation);
+            requiresHrConfirmation: requiresHrConfirmation,
+            isMandatory: isMandatory);
 
         if (status == OffboardingTaskStatus.Completed)
             task.Complete(createdAt);
         else if (status == OffboardingTaskStatus.Skipped)
-            task.Skip(createdAt);
+            task.Skip(createdAt, "Skipped for test.", Guid.NewGuid());
 
         dbContext.OffboardingTasks.Add(task);
         return task;
@@ -86,7 +96,8 @@ public class CompleteOffboardingTaskFromTaskActionTests
         BuildAction(
             OffboardingDbContext dbContext,
             Dictionary<Guid, string>? names = null,
-            FakeAssetReturnService? assetReturnService = null)
+            FakeAssetReturnService? assetReturnService = null,
+            FakeHrAdministratorDirectory? hrAdministratorDirectory = null)
     {
         var notifications = new FakeNotificationWriter();
         var taskCreator = new FakeTaskCreator();
@@ -99,6 +110,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
             notifications,
             taskCreator,
             assetReturnService,
+            hrAdministratorDirectory ?? new FakeHrAdministratorDirectory(),
             auditPublisher,
             new HR.Modules.Offboarding.Tests.Infrastructure.FakeIntegrationEventPublisher(),
             NullLogger<CompleteOffboardingTaskFromTaskAction>.Instance);
@@ -182,7 +194,11 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
         var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
         SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Completed, "Task B");
-        SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Skipped, "Task C");
+        // OFF-07: Task C is explicitly non-mandatory here — a Skipped *mandatory* task would keep
+        // the plan from completing (see ExecuteAsync_Completing_Optional_Tasks_Does_Not_Complete_Plan_While_Mandatory_Task_Outstanding
+        // and the sibling test below), so this test only proves "final task completion" once every
+        // remaining task is legitimately resolvable.
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Skipped, "Task C", isMandatory: false);
         await dbContext.SaveChangesAsync();
 
         var (action, _, _, auditPublisher, _) = BuildAction(dbContext);
@@ -252,7 +268,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_Skipped_Siblings_Count_As_Terminal_When_Completing_Final_Pending_Task()
+    public async Task ExecuteAsync_Skipped_Optional_Siblings_Count_As_Terminal_When_Completing_Final_Pending_Task()
     {
         await using var dbContext = BuildContext();
         var companyId = Guid.NewGuid();
@@ -261,7 +277,8 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
         var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
         SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Completed, "Task B");
-        SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Skipped, "Task C");
+        // OFF-07: only a Skipped *non-mandatory* task counts as resolved for completion purposes.
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Skipped, "Task C", isMandatory: false);
         await dbContext.SaveChangesAsync();
 
         var (action, _, taskCreator, _, _) = BuildAction(dbContext);
@@ -645,5 +662,240 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.Equal(OffboardingStatus.Completed, afterSecond.Status);
         Assert.Single(taskCreator.Created);
         Assert.Single(auditPublisher.Published);
+    }
+
+    // ---- OFF-07: "Skip" outcome decision ----
+
+    [Fact]
+    public async Task ExecuteAsync_Skip_OutcomeDecision_With_Reason_Skips_The_Task_Instead_Of_Completing_It()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Optional handover note");
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, _, _, _) = BuildAction(dbContext);
+        var context = BuildTaskContext(
+            companyId, task.Id, outcomeDecision: "Skip", outcomeReason: "No handover required.");
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(OffboardingTaskStatus.Skipped, savedTask.Status);
+        Assert.Null(savedTask.CompletedAt);
+        Assert.Equal("No handover required.", savedTask.SkipReason);
+        Assert.Equal(context.CompletedBy, savedTask.SkippedByUserId);
+        Assert.Equal(Now, savedTask.SkippedAt);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ExecuteAsync_Skip_OutcomeDecision_Without_Reason_Leaves_Task_Outstanding_And_Does_Not_Throw(
+        string? outcomeReason)
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Optional handover note");
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, taskCreator, auditPublisher, _) = BuildAction(dbContext);
+        var context = BuildTaskContext(companyId, task.Id, outcomeDecision: "Skip", outcomeReason: outcomeReason);
+
+        var exception = await Record.ExceptionAsync(() => action.ExecuteAsync(context, CancellationToken.None));
+
+        Assert.Null(exception);
+        var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(OffboardingTaskStatus.Pending, savedTask.Status);
+        Assert.Null(savedTask.SkipReason);
+        Assert.Null(savedTask.SkippedByUserId);
+        Assert.Null(savedTask.SkippedAt);
+        Assert.Equal(seedAt, savedTask.UpdatedAt);
+        Assert.Empty(taskCreator.Created);
+        Assert.Empty(auditPublisher.Published);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Skipping_The_Final_Remaining_Mandatory_Task_Does_Not_Complete_The_Plan()
+    {
+        // OFF-07: a mandatory task that is Skipped (even with a valid reason/actor) is still an
+        // unresolved material exit obligation — Skip is a legitimate way to close out the task
+        // itself, but it must not let the plan auto-complete. Only a non-mandatory task's Skip can
+        // stand in for Completed when deciding whether the plan is done.
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
+        var taskToSkip = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Completed, "Task B");
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, taskCreator, _, _) = BuildAction(dbContext);
+        var context = BuildTaskContext(
+            companyId, taskToSkip.Id, outcomeDecision: "Skip", outcomeReason: "Not applicable.");
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == taskToSkip.Id);
+        Assert.Equal(OffboardingTaskStatus.Skipped, savedTask.Status);
+        Assert.Equal("Not applicable.", savedTask.SkipReason);
+
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OffboardingStatus.InProgress, savedPlan.Status);
+        Assert.Empty(taskCreator.Created);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Skipping_The_Final_Remaining_Optional_Task_Completes_The_Plan()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
+        var taskToSkip = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A", isMandatory: false);
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Completed, "Task B");
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, taskCreator, _, _) = BuildAction(dbContext);
+        var context = BuildTaskContext(
+            companyId, taskToSkip.Id, outcomeDecision: "Skip", outcomeReason: "Not applicable.");
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OffboardingStatus.Completed, savedPlan.Status);
+        Assert.Single(taskCreator.Created);
+    }
+
+    // ---- OFF-07: mandatory-vs-optional completion gating ----
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_Optional_Tasks_Does_Not_Complete_Plan_While_Mandatory_Task_Outstanding()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
+        var optionalTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Optional task", null,
+            OffboardingTaskAssignTo.Employee, null, seedAt, isMandatory: false);
+        dbContext.OffboardingTasks.Add(optionalTask);
+        // A mandatory task remains Pending — the plan must not complete no matter what happens to
+        // the optional task above.
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Mandatory task");
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, taskCreator, _, _) = BuildAction(dbContext);
+        var context = BuildTaskContext(companyId, optionalTask.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OffboardingStatus.InProgress, savedPlan.Status);
+        Assert.Empty(taskCreator.Created);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_The_Last_Mandatory_Task_Completes_Plan_Even_With_Optional_Tasks_Present()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
+        var lastMandatoryTask = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Last mandatory task");
+        var completedOptional = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Completed optional task", null,
+            OffboardingTaskAssignTo.Employee, null, seedAt, isMandatory: false);
+        completedOptional.Complete(seedAt);
+        var skippedOptional = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Skipped optional task", null,
+            OffboardingTaskAssignTo.Employee, null, seedAt, isMandatory: false);
+        skippedOptional.Skip(seedAt, "Not applicable.", Guid.NewGuid());
+        dbContext.OffboardingTasks.AddRange(completedOptional, skippedOptional);
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, taskCreator, _, _) = BuildAction(dbContext);
+        var context = BuildTaskContext(companyId, lastMandatoryTask.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OffboardingStatus.Completed, savedPlan.Status);
+        Assert.Single(taskCreator.Created);
+    }
+
+    // ---- OFF-07: HR completion-review task assignment ----
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_Final_Task_Assigns_Review_Task_To_Lowest_Guid_HR_Administrator_With_HighPriority_And_DueDate()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var lastWorkingDay = new DateOnly(2026, 7, 1);
+
+        var seedAt = Now.AddDays(-1);
+        var plan = OffboardingPlan.Create(Guid.NewGuid(), companyId, employeeId, lastWorkingDay, null, seedAt);
+        plan.Start(seedAt);
+        dbContext.OffboardingPlans.Add(plan);
+        var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        await dbContext.SaveChangesAsync();
+
+        var higherGuidAdmin = new Guid("ffffffff-ffff-ffff-ffff-ffffffffffff");
+        var lowerGuidAdmin = new Guid("00000000-0000-0000-0000-000000000001");
+        var hrAdministratorDirectory = new FakeHrAdministratorDirectory([higherGuidAdmin, lowerGuidAdmin]);
+
+        var (action, notifications, taskCreator, _, _) = BuildAction(
+            dbContext, hrAdministratorDirectory: hrAdministratorDirectory);
+        var context = BuildTaskContext(companyId, taskToComplete.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var created = Assert.Single(taskCreator.Created);
+        Assert.Equal(lowerGuidAdmin, created.AssignedEmployeeId);
+        Assert.Equal(TaskPriority.High, created.Priority);
+        Assert.Equal(lastWorkingDay.AddDays(3), created.DueDate);
+
+        // Every other HR administrator (not the assignee) gets an in-app notification.
+        var notification = Assert.Single(notifications.Written);
+        Assert.Equal(higherGuidAdmin, notification.EmployeeId);
+        Assert.Equal(NotificationType.OffboardingCompleted, notification.Type);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_Final_Task_With_No_HR_Administrators_Assigns_Review_Task_To_Nobody_And_Sends_No_Notifications()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), companyId, employeeId, new DateOnly(2026, 7, 1), null, seedAt);
+        plan.Start(seedAt);
+        dbContext.OffboardingPlans.Add(plan);
+        var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        await dbContext.SaveChangesAsync();
+
+        var (action, notifications, taskCreator, _, _) = BuildAction(
+            dbContext, hrAdministratorDirectory: new FakeHrAdministratorDirectory([]));
+        var context = BuildTaskContext(companyId, taskToComplete.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var created = Assert.Single(taskCreator.Created);
+        Assert.Null(created.AssignedEmployeeId);
+        Assert.Empty(notifications.Written);
     }
 }

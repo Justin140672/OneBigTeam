@@ -34,6 +34,22 @@ internal sealed class OffboardingTask
     // drive OffboardingPlan.RequiresHrReconciliation.
     public bool RequiresHrConfirmation { get; private set; }
 
+    // OFF-07: whether this task represents a material exit obligation that must actually block
+    // plan completion. Defaults to true (most offboarding checklist items — asset returns, document/
+    // access confirmation, manager exit checklist items — are material by nature). Set to false only
+    // for tasks that are created already-resolved because the underlying obligation is moot given
+    // the circumstances (see CreateWaived) — those are not "skippable without consequence" in the
+    // general sense, they are auto-resolved because the real-world action already happened.
+    public bool IsMandatory { get; private set; }
+
+    // OFF-07: every skip (system- or human-initiated) must carry a reason and an actor — see Skip()
+    // below, which requires both as parameters. SkippedAt is distinct from CompletedAt: a skipped
+    // task never gets a CompletedAt (it explicitly was not completed), so reporting/audit code that
+    // wants "when did this task reach a terminal state" must check whichever of the two is set.
+    public string? SkipReason { get; private set; }
+    public Guid? SkippedByUserId { get; private set; }
+    public DateTimeOffset? SkippedAt { get; private set; }
+
     public DateOnly? DueDate { get; private set; }
     public OffboardingTaskStatus Status { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
@@ -60,7 +76,8 @@ internal sealed class OffboardingTask
         DateTimeOffset now,
         Guid? assignedEmployeeId = null,
         Guid? assetAssignmentId = null,
-        bool requiresHrConfirmation = false)
+        bool requiresHrConfirmation = false,
+        bool isMandatory = true)
     {
         return new OffboardingTask
         {
@@ -73,6 +90,7 @@ internal sealed class OffboardingTask
             AssignedEmployeeId = assignedEmployeeId,
             AssetAssignmentId = assetAssignmentId,
             RequiresHrConfirmation = requiresHrConfirmation,
+            IsMandatory = isMandatory,
             DueDate = dueDate,
             Status = OffboardingTaskStatus.Pending,
             CreatedAt = now,
@@ -96,8 +114,15 @@ internal sealed class OffboardingTask
         DateOnly? dueDate,
         DateTimeOffset now)
     {
-        var task = Create(id, companyId, offboardingPlanId, title, description, assignTo, dueDate, now);
-        task.Skip(now);
+        // OFF-07: waived tasks are created IsMandatory = false — the obligation they represented is
+        // moot given the circumstances (e.g. system access already disabled for a backdated
+        // departure), so it is not a material exit obligation remaining against the plan and must
+        // never block plan completion. The reason is always the caller-supplied description (why the
+        // obligation is moot), and the actor is the system, never the leaving employee themself.
+        var task = Create(
+            id, companyId, offboardingPlanId, title, description, assignTo, dueDate, now,
+            isMandatory: false);
+        task.Skip(now, description, OffboardingSystemActor.Id);
         return task;
     }
 
@@ -117,9 +142,19 @@ internal sealed class OffboardingTask
         UpdatedAt = now;
     }
 
-    public void Skip(DateTimeOffset now)
+    // OFF-07: every skip requires a non-empty reason and a resolved actor — never silent, and never
+    // client-trusted (callers must resolve actorUserId server-side, e.g. from the authenticated
+    // user's claim, or OffboardingSystemActor.Id for system-initiated skips such as CreateWaived and
+    // cancellation cascades).
+    public void Skip(DateTimeOffset now, string reason, Guid actorUserId)
     {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("A reason is required to skip an offboarding task.", nameof(reason));
+
         Status = OffboardingTaskStatus.Skipped;
+        SkipReason = reason;
+        SkippedByUserId = actorUserId;
+        SkippedAt = now;
         UpdatedAt = now;
     }
 

@@ -1,6 +1,6 @@
 ---
 title: Security
-lastUpdated: 21 August 2026
+lastUpdated: 25 August 2026
 ---
 
 # Security
@@ -21,18 +21,24 @@ other company's, and access is scoped to a user's own organisation.
 
 ## Encryption
 Data is encrypted in transit using HTTPS and by the production hosting providers at rest.
-Private documents use restricted storage and time-limited signed access links. Additional
-application-level protection for equal-opportunities information is a production launch
-requirement and will be verified before that information is collected.
+Private documents use restricted storage and time-limited signed access links. The production
+service will not collect equal-opportunities information until additional application-level
+protection appropriate to that information has been implemented and verified.
 
 ## Backups
-The production database will use the database provider's managed backups. Private files will
-be backed up daily to encrypted, private AWS storage in London, independently of the primary
-file store, and automatically deleted after 30 days. Restoration will be tested before live
-customer files are stored and periodically thereafter.
+Production backup retention and restoration controls are configured and verified as part of the
+production-readiness process. Provider-managed backups are access-restricted, used only for
+disaster recovery and retained only for the configured recovery period. We do not describe an
+independent backup provider as active until that integration has been implemented and tested.
 
 ## Audit logging
 Security-relevant activity is logged so that changes can be reviewed and investigated.
+
+## Support access
+Authorised One Big Team personnel may obtain time-limited access to a Customer organisation where
+reasonably necessary to investigate or resolve a support issue. A reason is required, access is
+restricted to authorised personnel, and support-session creation and use are recorded in the audit
+history. Support personnel remain subject to confidentiality obligations.
 
 ## Vulnerability management
 We aim to keep our software and its dependencies up to date and to address known

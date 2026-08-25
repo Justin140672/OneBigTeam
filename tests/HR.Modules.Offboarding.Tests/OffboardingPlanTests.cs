@@ -183,4 +183,157 @@ public class OffboardingPlanTests
         // Guard returns early without touching UpdatedAt when the flag was already false.
         Assert.Equal(FixedNow, plan.UpdatedAt);
     }
+
+    // ---- OFF-07: CanComplete ----
+
+    [Fact]
+    public void CanComplete_Returns_False_For_Empty_Task_List()
+    {
+        Assert.False(OffboardingPlan.CanComplete([]));
+    }
+
+    [Fact]
+    public void CanComplete_Returns_True_When_All_Mandatory_Tasks_Completed()
+    {
+        var taskA = MandatoryTask();
+        taskA.Complete(FixedNow);
+        var taskB = MandatoryTask();
+        taskB.Complete(FixedNow);
+
+        Assert.True(OffboardingPlan.CanComplete([taskA, taskB]));
+    }
+
+    [Fact]
+    public void CanComplete_Returns_False_When_A_Mandatory_Task_Is_Skipped_Not_Completed()
+    {
+        var completedMandatory = MandatoryTask();
+        completedMandatory.Complete(FixedNow);
+        var skippedMandatory = MandatoryTask();
+        skippedMandatory.Skip(FixedNow, "Not applicable.", Guid.NewGuid());
+
+        Assert.False(OffboardingPlan.CanComplete([completedMandatory, skippedMandatory]));
+    }
+
+    [Fact]
+    public void CanComplete_Returns_True_When_Mandatory_Tasks_Completed_And_Optional_Tasks_Completed_Or_Skipped()
+    {
+        var mandatoryTask = MandatoryTask();
+        mandatoryTask.Complete(FixedNow);
+        var optionalCompleted = OptionalTask();
+        optionalCompleted.Complete(FixedNow);
+        var optionalSkipped = OptionalTask();
+        optionalSkipped.Skip(FixedNow, "Not applicable.", Guid.NewGuid());
+
+        Assert.True(OffboardingPlan.CanComplete([mandatoryTask, optionalCompleted, optionalSkipped]));
+    }
+
+    [Fact]
+    public void CanComplete_Returns_False_When_An_Optional_Task_Is_Still_Pending()
+    {
+        var mandatoryTask = MandatoryTask();
+        mandatoryTask.Complete(FixedNow);
+        var optionalPending = OptionalTask();
+
+        Assert.False(OffboardingPlan.CanComplete([mandatoryTask, optionalPending]));
+    }
+
+    private static OffboardingTask MandatoryTask() =>
+        OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Mandatory task", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+
+    private static OffboardingTask OptionalTask() =>
+        OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Optional task", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow, isMandatory: false);
+
+    // ---- OFF-07: HasIncompleteOffboardingAtDeparture ----
+
+    [Fact]
+    public void MarkIncompleteOffboardingAtDeparture_Sets_Flag_And_Bumps_UpdatedAt()
+    {
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), null, FixedNow);
+        var later = FixedNow.AddDays(1);
+
+        plan.MarkIncompleteOffboardingAtDeparture(later);
+
+        Assert.True(plan.HasIncompleteOffboardingAtDeparture);
+        Assert.Equal(later, plan.UpdatedAt);
+    }
+
+    [Fact]
+    public void MarkIncompleteOffboardingAtDeparture_Is_Idempotent_When_Already_Flagged()
+    {
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), null, FixedNow);
+        var firstCallAt = FixedNow.AddDays(1);
+        plan.MarkIncompleteOffboardingAtDeparture(firstCallAt);
+
+        plan.MarkIncompleteOffboardingAtDeparture(FixedNow.AddDays(5));
+
+        Assert.True(plan.HasIncompleteOffboardingAtDeparture);
+        Assert.Equal(firstCallAt, plan.UpdatedAt); // No spurious UpdatedAt bump on the repeat call.
+    }
+
+    [Fact]
+    public void ResolveIncompleteOffboardingAtDeparture_Clears_Flag_And_Bumps_UpdatedAt_When_Currently_True()
+    {
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), null, FixedNow);
+        plan.MarkIncompleteOffboardingAtDeparture(FixedNow.AddDays(1));
+        var later = FixedNow.AddDays(2);
+
+        plan.ResolveIncompleteOffboardingAtDeparture(later);
+
+        Assert.False(plan.HasIncompleteOffboardingAtDeparture);
+        Assert.Equal(later, plan.UpdatedAt);
+    }
+
+    [Fact]
+    public void ResolveIncompleteOffboardingAtDeparture_Is_NoOp_When_Flag_Already_False()
+    {
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), null, FixedNow);
+        var later = FixedNow.AddDays(1);
+
+        plan.ResolveIncompleteOffboardingAtDeparture(later);
+
+        Assert.False(plan.HasIncompleteOffboardingAtDeparture);
+        Assert.Equal(FixedNow, plan.UpdatedAt);
+    }
+
+    // ---- OFF-07: TryClaimFinalReviewTaskCreation ----
+
+    [Fact]
+    public void TryClaimFinalReviewTaskCreation_Returns_True_And_Sets_Timestamp_On_First_Call()
+    {
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), null, FixedNow);
+        var claimedAt = FixedNow.AddDays(1);
+
+        var claimed = plan.TryClaimFinalReviewTaskCreation(claimedAt);
+
+        Assert.True(claimed);
+        Assert.Equal(claimedAt, plan.FinalReviewTaskCreatedAt);
+        Assert.Equal(claimedAt, plan.UpdatedAt);
+    }
+
+    [Fact]
+    public void TryClaimFinalReviewTaskCreation_Returns_False_And_Leaves_State_Untouched_On_Repeat_Calls()
+    {
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), null, FixedNow);
+        var firstClaimAt = FixedNow.AddDays(1);
+        var firstClaim = plan.TryClaimFinalReviewTaskCreation(firstClaimAt);
+
+        var secondClaim = plan.TryClaimFinalReviewTaskCreation(FixedNow.AddDays(5));
+        var thirdClaim = plan.TryClaimFinalReviewTaskCreation(FixedNow.AddDays(10));
+
+        Assert.True(firstClaim);
+        Assert.False(secondClaim);
+        Assert.False(thirdClaim);
+        Assert.Equal(firstClaimAt, plan.FinalReviewTaskCreatedAt);
+        Assert.Equal(firstClaimAt, plan.UpdatedAt);
+    }
 }

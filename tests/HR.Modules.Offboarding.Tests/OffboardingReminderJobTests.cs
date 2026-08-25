@@ -210,7 +210,7 @@ public class OffboardingReminderJobTests
 
         var plan = SeedPlan(dbContext, companyId, employeeId);
         var task = SeedTask(dbContext, companyId, plan.Id, OffboardingTaskAssignTo.Manager, Today.AddDays(-1));
-        task.Skip(Now);
+        task.Skip(Now, "Skipped for test.", Guid.NewGuid());
         await dbContext.SaveChangesAsync();
 
         var notifications = new FakeNotificationWriter();

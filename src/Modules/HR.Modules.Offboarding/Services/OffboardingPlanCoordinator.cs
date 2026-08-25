@@ -123,7 +123,10 @@ internal sealed class OffboardingPlanCoordinator(
                 .ToListAsync(cancellationToken);
 
             foreach (var task in outstandingTasks)
-                task.Skip(now);
+                task.Skip(
+                    now,
+                    "Skipped automatically — employee's leaving process was withdrawn.",
+                    OffboardingSystemActor.Id);
 
             plan.Cancel("Cancelled — employee's leaving process was withdrawn.", now);
 

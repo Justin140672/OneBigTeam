@@ -36,7 +36,7 @@ public class OffboardingTaskSynchronizerTests
         if (status == OffboardingTaskStatus.Completed)
             task.Complete(Now);
         else if (status == OffboardingTaskStatus.Skipped)
-            task.Skip(Now);
+            task.Skip(Now, "Skipped for test.", Guid.NewGuid());
 
         dbContext.OffboardingTasks.Add(task);
         return task;

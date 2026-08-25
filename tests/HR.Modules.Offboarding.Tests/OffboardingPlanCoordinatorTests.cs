@@ -156,7 +156,7 @@ public class OffboardingPlanCoordinatorTests
 
         var alreadySkippedTask = OffboardingTask.Create(
             Guid.NewGuid(), companyId, plan.Id, "Return laptop", null, OffboardingTaskAssignTo.Employee, null, Now.AddDays(-5));
-        alreadySkippedTask.Skip(Now.AddDays(-2));
+        alreadySkippedTask.Skip(Now.AddDays(-2), "Already skipped for test.", Guid.NewGuid());
         dbContext.OffboardingTasks.Add(alreadySkippedTask);
         await dbContext.SaveChangesAsync();
 
@@ -295,6 +295,36 @@ public class OffboardingPlanCoordinatorTests
         Assert.Empty(taskCanceller.CancelManyCalls);
     }
 
+    // OFF-07: cascade-skip via CancelOutstandingTasksAsync must go through OffboardingTask.Skip's
+    // new required reason/actor overload, not a bare "no reason" call — verifies the actual
+    // SkipReason/SkippedByUserId/SkippedAt values recorded on the automatically-skipped task.
+    [Fact]
+    public async Task CancelOutstandingTasksAsync_Records_SkipReason_And_SystemActor_On_Skipped_Tasks()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = CreateActivePlan(companyId, employeeId, Now.AddDays(-5));
+        dbContext.OffboardingPlans.Add(plan);
+
+        var pendingTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Return laptop", null, OffboardingTaskAssignTo.Employee, null, Now.AddDays(-5));
+        dbContext.OffboardingTasks.Add(pendingTask);
+        await dbContext.SaveChangesAsync();
+
+        var coordinator = BuildCoordinator(dbContext);
+
+        await coordinator.CancelOutstandingTasksAsync(companyId, employeeId, CancellationToken.None);
+
+        var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == pendingTask.Id);
+        Assert.Equal(OffboardingTaskStatus.Skipped, savedTask.Status);
+        Assert.Equal(
+            "Skipped automatically — employee's leaving process was withdrawn.", savedTask.SkipReason);
+        Assert.Equal(Guid.Empty, savedTask.SkippedByUserId); // OffboardingSystemActor.Id
+        Assert.Equal(Now, savedTask.SkippedAt);
+    }
+
     // OFF-02: RescheduleOutstandingTasksAsync tests below.
 
     [Fact]
@@ -385,7 +415,7 @@ public class OffboardingPlanCoordinatorTests
         var skippedTask = OffboardingTask.Create(
             Guid.NewGuid(), companyId, plan.Id, "Revoke system access", null,
             OffboardingTaskAssignTo.Manager, new DateOnly(2026, 8, 1), Now.AddDays(-5));
-        skippedTask.Skip(Now.AddDays(-2));
+        skippedTask.Skip(Now.AddDays(-2), "Already skipped for test.", Guid.NewGuid());
         dbContext.OffboardingTasks.AddRange(pendingTask, completedTask, skippedTask);
         await dbContext.SaveChangesAsync();
 

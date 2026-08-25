@@ -1,6 +1,6 @@
 ---
 title: Cookies and Browser Storage Policy
-lastUpdated: 21 August 2026
+lastUpdated: 25 August 2026
 ---
 
 # Cookies and Browser Storage Policy
@@ -19,6 +19,7 @@ Cookies are small pieces of information stored by a website in your browser. Sim
 | `theme` | First-party local storage | Remembers the light or dark display preference | Until removed through the browser |
 | `orgChartZoom` | First-party local storage | Remembers the organisation-chart zoom preference | Until removed through the browser |
 | `lastDashboard` | First-party local storage | Returns an authorised user to their previously selected dashboard | Until removed through the browser |
+| `lastEmployeeTab:*` | First-party local storage | Returns an authorised user to the last tab they selected on an employee record | Until removed through the browser |
 | `scrollPos:*` | First-party session storage | Restores page position during the current browser session | Until the browser tab or session ends |
 
 The authentication cookie is marked HttpOnly and SameSite=Lax and is sent securely over HTTPS in production. It is strictly necessary to provide the signed-in service. The preference and interface-storage entries support functionality requested through use of the application and are not used for advertising or cross-site tracking.

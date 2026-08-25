@@ -80,3 +80,28 @@ internal sealed record OffboardingPlanRescheduledAuditEvent(
     object? IAuditEvent.After           => new { LastWorkingDay = AfterLastWorkingDay, OutstandingTasksRescheduled };
     object? IAuditEvent.Metadata        => null;
 }
+
+// OFF-07: published when an employee's departure is finalised (Employees' EmployeeDepartureFinalizer)
+// while their offboarding plan still had unresolved mandatory tasks — the durable counterpart to
+// EmployeeDepartureFinalizer's one-time manager notification, giving HR a permanent audit trail of
+// exactly when and for whom offboarding was left incomplete at departure. Published at most once per
+// plan (see MarkOffboardingIncompleteOnDepartureFinalisedHandler's wasAlreadyFlagged guard).
+internal sealed record OffboardingIncompleteAtDepartureAuditEvent(
+    Guid CompanyId,
+    Guid OffboardingPlanId,
+    Guid EmployeeId,
+    int OutstandingMandatoryTasks,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType        => "offboarding-plan.incomplete-at-departure";
+    string IAuditEvent.EntityType       => "OffboardingPlan";
+    Guid   IAuditEvent.EntityId         => OffboardingPlanId;
+    Guid?  IAuditEvent.EmployeeId       => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId      => null;
+    Guid?  IAuditEvent.ActorEmployeeId  => null;
+    Guid?  IAuditEvent.CorrelationId    => null;
+    string? IAuditEvent.Summary         => $"Employee departed with {OutstandingMandatoryTasks} outstanding mandatory offboarding task(s) — HR exception raised";
+    object? IAuditEvent.Before          => new { HasIncompleteOffboardingAtDeparture = false };
+    object? IAuditEvent.After           => new { HasIncompleteOffboardingAtDeparture = true, OutstandingMandatoryTasks };
+    object? IAuditEvent.Metadata        => null;
+}
