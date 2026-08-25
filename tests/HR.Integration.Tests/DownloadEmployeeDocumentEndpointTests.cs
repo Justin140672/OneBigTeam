@@ -24,7 +24,10 @@ public class DownloadEmployeeDocumentEndpointTests(ApiWebApplicationFactory fact
     [Fact]
     public async Task Returns_Redirect_For_Seeded_Document()
     {
-        using var client = await NoRedirectClient(AcmeCompanyId);
+        // DOC-01: an unrelated employee is no longer authorized to download Sarah's document
+        // (see DocumentsResourceAuthorizationTests for the full matrix), so this "does a
+        // successful download actually redirect" check now uses an HR administrator caller.
+        using var client = await NoRedirectAdminClient(AcmeCompanyId);
         var response     = await client.GetAsync(DownloadUrl(AcmeCompanyId, SarahEmployeeId, SarahContractDocId));
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
@@ -33,7 +36,7 @@ public class DownloadEmployeeDocumentEndpointTests(ApiWebApplicationFactory fact
     [Fact]
     public async Task Returns_NotFound_For_Unknown_Document()
     {
-        using var client = await AuthenticatedClient(AcmeCompanyId);
+        using var client = await AdminClient(AcmeCompanyId);
         var response     = await client.GetAsync(DownloadUrl(AcmeCompanyId, SarahEmployeeId, Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -41,7 +44,7 @@ public class DownloadEmployeeDocumentEndpointTests(ApiWebApplicationFactory fact
     [Fact]
     public async Task Returns_NotFound_When_EmployeeId_Does_Not_Match()
     {
-        using var client = await AuthenticatedClient(AcmeCompanyId);
+        using var client = await AdminClient(AcmeCompanyId);
         var response     = await client.GetAsync(DownloadUrl(AcmeCompanyId, Guid.NewGuid(), SarahContractDocId));
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -49,27 +52,25 @@ public class DownloadEmployeeDocumentEndpointTests(ApiWebApplicationFactory fact
     private static string DownloadUrl(Guid companyId, Guid employeeId, Guid docId) =>
         $"/api/companies/{companyId}/employees/{employeeId}/documents/{docId}/download";
 
-    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var userId = Guid.NewGuid();
-        TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
-
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee, companyId);
+        await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
-    private async Task<HttpClient> NoRedirectClient(Guid companyId)
+    private async Task<HttpClient> NoRedirectAdminClient(Guid companyId)
     {
         var userId = Guid.NewGuid();
-        TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
-
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee, companyId);
+        await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 }

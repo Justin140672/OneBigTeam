@@ -247,6 +247,10 @@ public static class DocumentsModule
         services.AddScoped<DeleteEmployeeDocumentHandler>();
         services.AddScoped<DownloadEmployeeDocumentHandler>();
 
+        // DOC-01: centralised resource-level (self/manager-hierarchy/HR administrator)
+        // authorization shared by every employee-document and document-request endpoint.
+        services.AddScoped<Services.DocumentResourceAuthorizer>();
+
         services.AddScoped<GetExpiringDocumentsHandler>();
         services.AddScoped<IValidator<GetExpiringDocumentsRequest>, GetExpiringDocumentsValidator>();
 

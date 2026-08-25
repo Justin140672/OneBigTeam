@@ -40,7 +40,10 @@ public class GetEmployeeDocumentEndpointTests
     [Fact]
     public async Task Returns_NotFound_For_Unknown_Document()
     {
-        using var client = await AuthenticatedClient();
+        // DOC-01: uses an HR-administrator caller, which is unconditionally in-scope for
+        // SarahEmployeeId — a plain, unrelated employee caller is now denied with 403 before the
+        // handler's NotFound lookup ever runs (see DocumentsResourceAuthorizationTests).
+        using var client = await AdminClient();
         var response     = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{SarahEmployeeId}/documents/{Guid.NewGuid()}");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -49,7 +52,10 @@ public class GetEmployeeDocumentEndpointTests
     [Fact]
     public async Task Returns_NotFound_When_EmployeeId_Does_Not_Match()
     {
-        using var client = await AuthenticatedClient();
+        // DOC-01: uses an HR-administrator caller so the mismatched-employeeId 404 (from the
+        // handler) is what's under test here, not resource authorization (see
+        // DocumentsResourceAuthorizationTests for the peer-denial case).
+        using var client = await AdminClient();
         var response     = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{Guid.NewGuid()}/documents/{SarahContractDocId}");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -58,7 +64,7 @@ public class GetEmployeeDocumentEndpointTests
     [Fact]
     public async Task Returns_OK_With_Document_Details_For_Seeded_Document()
     {
-        using var client = await AuthenticatedClient();
+        using var client = await AdminClient();
         var response     = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{SarahEmployeeId}/documents/{SarahContractDocId}");
 
@@ -98,18 +104,6 @@ public class GetEmployeeDocumentEndpointTests
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
-
-    private async Task<HttpClient> AuthenticatedClient()
-    {
-        var userId = Guid.NewGuid();
-        TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
-
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
-        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, AcmeCompanyId);
-        return client;
-    }
 
     private async Task<HttpClient> AdminClient()
     {

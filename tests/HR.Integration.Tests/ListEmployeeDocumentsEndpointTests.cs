@@ -24,7 +24,11 @@ public class ListEmployeeDocumentsEndpointTests(ApiWebApplicationFactory factory
     [Fact]
     public async Task Returns_Two_Seeded_Documents_For_Sarah()
     {
-        using var client = await AuthenticatedClient(AcmeCompanyId);
+        // DOC-01: an unrelated employee is no longer authorized to list Sarah's documents (see
+        // DocumentsResourceAuthorizationTests for the full self/manager/HR-admin/peer matrix), so
+        // this "does the handler actually return the seeded rows" check now uses an HR
+        // administrator caller, which is unconditionally in-scope.
+        using var client = await AdminClient(AcmeCompanyId);
         var response     = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{SarahEmployeeId}/documents");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -35,7 +39,7 @@ public class ListEmployeeDocumentsEndpointTests(ApiWebApplicationFactory factory
     [Fact]
     public async Task Returns_Empty_For_Employee_With_No_Documents()
     {
-        using var client     = await AuthenticatedClient(AcmeCompanyId);
+        using var client     = await AdminClient(AcmeCompanyId);
         var unknownEmployeeId = Guid.NewGuid();
         var response         = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{unknownEmployeeId}/documents");
@@ -45,15 +49,17 @@ public class ListEmployeeDocumentsEndpointTests(ApiWebApplicationFactory factory
     }
 
     [Fact]
-    public async Task Returns_Empty_When_CompanyId_Does_Not_Match()
+    public async Task Returns_Forbidden_When_CompanyId_Does_Not_Match_Employee()
     {
+        // DOC-01: previously this leaked a 200 with an empty list (data-isolation-by-filter);
+        // now the resource authorizer denies the caller before the handler ever runs, since a
+        // plain employee is neither self, HR administrator, nor a manager of SarahEmployeeId —
+        // see DocumentsResourceAuthorizationTests for the equivalent cross-company matrix.
         var otherCompanyId = Guid.NewGuid();
         using var client   = await AuthenticatedClient(otherCompanyId);
         var response       = await client.GetAsync(
             $"/api/companies/{otherCompanyId}/employees/{SarahEmployeeId}/documents");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload        = await response.Content.ReadFromJsonAsync<DocsPayload>();
-        Assert.Empty(payload!.Items);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     private async Task<HttpClient> AuthenticatedClient(Guid companyId)
@@ -65,6 +71,17 @@ public class ListEmployeeDocumentsEndpointTests(ApiWebApplicationFactory factory
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee, companyId);
+        return client;
+    }
+
+    private async Task<HttpClient> AdminClient(Guid companyId)
+    {
+        var userId = Guid.NewGuid();
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee, companyId);
+        await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
