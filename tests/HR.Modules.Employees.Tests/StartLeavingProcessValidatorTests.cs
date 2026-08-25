@@ -150,6 +150,41 @@ public class StartLeavingProcessValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(StartLeavingProcessRequest.LeavingReason));
     }
 
+    [Fact]
+    public void Validate_Fails_When_ReplacementManagerEmployeeId_Equals_EmployeeId()
+    {
+        var validator = new StartLeavingProcessValidator();
+        var employeeId = Guid.NewGuid();
+        var request = ValidRequest() with { EmployeeId = employeeId, ReplacementManagerEmployeeId = employeeId };
+
+        var result = validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(StartLeavingProcessRequest.ReplacementManagerEmployeeId));
+    }
+
+    [Fact]
+    public void Validate_Passes_When_ReplacementManagerEmployeeId_Differs_From_EmployeeId()
+    {
+        var validator = new StartLeavingProcessValidator();
+        var request = ValidRequest() with { ReplacementManagerEmployeeId = Guid.NewGuid() };
+
+        var result = validator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_ReplacementManagerEmployeeId_Is_Null()
+    {
+        var validator = new StartLeavingProcessValidator();
+        var request = ValidRequest() with { ReplacementManagerEmployeeId = null };
+
+        var result = validator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
+
     // LeavingReason is internal, so the theory parameter must be a publicly-accessible type
     // (int) to avoid CS0051 — the enum value is cast back internally in the method body.
     [Theory]

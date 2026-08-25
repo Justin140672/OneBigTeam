@@ -11,6 +11,11 @@ public interface IOffboardingPlanCoordinator
         Guid employeeId,
         DateOnly lastWorkingDay,
         string? notes,
+        // OFF-06: manager HR nominated to take over the departing employee's direct reports (and
+        // any of their own pending manager-scoped approvals/reviews), if the departing employee
+        // has any. Null when none was nominated (or the departing employee has no reports) — the
+        // Offboarding module routes any resulting unresolved reports to an HR exception queue.
+        Guid? replacementManagerEmployeeId,
         CancellationToken cancellationToken);
 
     // Used by Employees' CancelLeavingProcess handler when a leaving process is withdrawn after

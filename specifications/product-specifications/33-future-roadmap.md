@@ -100,6 +100,43 @@ Potential integrations:
 
 # Employee Enhancements
 
+## Employee Profile Integrations
+
+Potential features:
+
+- Configurable **Apps** area within My Profile for external employee services
+- Company-configured integration cards for services such as benefits, staff recognition, wellbeing, payroll and learning
+- Optional dedicated profile tabs for high-priority integrations without requiring application code changes
+- Configurable integration name, icon, display order, eligibility and launch behaviour
+- Support for secure external links, single sign-on and embedded experiences where the provider permits embedding
+- Explicit data scopes, tenant isolation and audit logging for every integration
+
+---
+
+## Company Directory
+
+Potential features:
+
+- Employee-facing company directory available to active employees
+- Search and filtering by name, department, location, job title and manager
+- Privacy controls governing which contact and profile information is visible
+- Direct access from the employee profile through a prominent quick-action button
+- A friendly people-finding experience separate from administrative employee reports
+
+---
+
+## Internal Vacancies
+
+Potential features:
+
+- Employee-facing list of published internal vacancies
+- Search and filtering by department, location and working arrangement
+- Vacancy details presented without recruiter-only administration controls
+- Direct access from the employee profile through a prominent quick-action button
+- Future support for applying, referring a candidate or registering interest
+
+---
+
 ## Performance Management
 
 Potential features:
@@ -217,6 +254,8 @@ Potential additions:
 
 Potential future integrations:
 
+- Benefits providers
+- Staff recognition platforms
 - Payroll systems
 - Accounting systems
 - Identity providers

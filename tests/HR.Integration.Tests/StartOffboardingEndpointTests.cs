@@ -227,6 +227,25 @@ public class StartOffboardingEndpointTests
     }
 
     [Fact]
+    public async Task Post_StartOffboarding_With_Valid_ReplacementManagerEmployeeId_Succeeds()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AdminClient(companyId);
+        var employeeId = await CreateEmployeeAsync(client, companyId);
+        var replacementManagerId = await CreateEmployeeAsync(client, companyId, firstName: "Riley", lastName: "Replacement");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/offboarding/start",
+            new { companyId, employeeId, lastWorkingDay = "2026-08-01", replacementManagerEmployeeId = replacementManagerId });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<OffboardingPlanPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(employeeId, payload!.EmployeeId);
+        Assert.Equal("InProgress", payload.Status);
+    }
+
+    [Fact]
     public async Task Post_StartOffboarding_Returns_ValidationError_When_LastWorkingDay_Is_Missing()
     {
         var companyId = Guid.NewGuid();

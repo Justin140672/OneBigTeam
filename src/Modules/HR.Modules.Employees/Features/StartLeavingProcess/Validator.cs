@@ -27,5 +27,10 @@ internal sealed class StartLeavingProcessValidator : AbstractValidator<StartLeav
 
         RuleFor(r => r.LeavingReason)
             .IsInEnum();
+
+        RuleFor(r => r.ReplacementManagerEmployeeId)
+            .NotEqual(r => r.EmployeeId)
+            .When(r => r.ReplacementManagerEmployeeId.HasValue)
+            .WithMessage("ReplacementManagerEmployeeId cannot be the departing employee themself.");
     }
 }

@@ -21,7 +21,9 @@ internal sealed class StartOffboardingHandler(
     INotificationWriter notificationWriter,
     IIntegrationEventPublisher integrationEventPublisher,
     ICompanyLeavingSettingsReader leavingSettingsReader,
-    IHrAdministratorDirectory hrAdministratorDirectory)
+    IHrAdministratorDirectory hrAdministratorDirectory,
+    IDirectReportsReader directReportsReader,
+    ITaskReassigner taskReassigner)
 {
     public async Task<Result<StartOffboardingResponse>> HandleAsync(
         StartOffboardingRequest request,
@@ -76,11 +78,26 @@ internal sealed class StartOffboardingHandler(
 
         var managerId = await managerReader.GetManagerIdAsync(request.CompanyId, request.EmployeeId, cancellationToken);
 
+        // OFF-06: a departing employee with direct reports needs special handling beyond the
+        // ordinary individual checklist — their reports' ManagerId is cascaded to
+        // request.ReplacementManagerEmployeeId (or cleared) by Employees'
+        // EmployeeDepartureFinalizer when the departure is actually finalised (which publishes
+        // EmployeeManagerChangedIntegrationEvent per report, already consumed by Probation's
+        // ManagerChangedHandler). This handler's own responsibility is (a) reassigning/unassigning
+        // the departing manager's own outstanding Tasks-module tasks (see the taskReassigner call
+        // below) and (b) raising an explicit HR exception for any report whose manager reassignment
+        // has no resolved replacement.
+        var directReportIds = await directReportsReader.GetDirectReportIdsAsync(
+            request.CompanyId, request.EmployeeId, cancellationToken);
+        var isDepartingManager = directReportIds.Count > 0;
+
         // OFF-05: resolved once, up front, and reused for every reconciliation task generated below —
         // mirrors ProbationReviewAssignment's "single deterministic HR assignee" approach for the
         // Tasks module's single-assignee model. Only resolved when actually needed (backdated).
+        var needsManagerReassignmentEscalation = isDepartingManager && request.ReplacementManagerEmployeeId is null;
+
         Guid? hrReconciliationAssigneeId = null;
-        if (isBackdated)
+        if (isBackdated || needsManagerReassignmentEscalation)
         {
             var hrAdministratorIds = await hrAdministratorDirectory.GetHrAdministratorEmployeeIdsAsync(
                 request.CompanyId, cancellationToken);
@@ -98,6 +115,12 @@ internal sealed class StartOffboardingHandler(
         await CreateManagerExitChecklistAsync(
             request, plan, employeeName, managerId, isBackdated, accessAlreadyDisabled, now, generatedTaskIds,
             cancellationToken);
+
+        if (needsManagerReassignmentEscalation)
+        {
+            await CreateManagerReassignmentExceptionTasksAsync(
+                request, plan, directReportIds, hrReconciliationAssigneeId, now, generatedTaskIds, cancellationToken);
+        }
 
         var reconciliationTaskCreated = dbContext.OffboardingTasks.Local
             .Any(t => t.OffboardingPlanId == plan.Id && t.RequiresHrConfirmation);
@@ -127,6 +150,21 @@ internal sealed class StartOffboardingHandler(
         // log-only dead end: any task left unsynced is retried by
         // OffboardingPlanCreationReconciliationJob until it succeeds.
         await taskSynchronizer.SyncPlanAsync(plan.CompanyId, plan.Id, cancellationToken);
+
+        // OFF-06: catch-all reassignment of every open Tasks-module task still assigned to the
+        // departing manager themself (across every Source/ActionType — general Tasks items,
+        // Leave approvals, Sickness reviews, etc), separate from the report-cascade above which
+        // is handled by Employees' EmployeeDepartureFinalizer + module-specific consumers (e.g.
+        // Probation's ManagerChangedHandler). If no replacement was nominated, this unassigns
+        // those tasks rather than leaving them pointing at a former employee — the corresponding
+        // "needs manager reassignment" HR exception tasks created above cover the follow-up.
+        // Best-effort, mirroring every other post-commit cross-module call in this handler: never
+        // fails the offboarding-start request itself.
+        if (isDepartingManager)
+        {
+            await taskReassigner.ReassignAllByAssigneeAsync(
+                request.CompanyId, request.EmployeeId, request.ReplacementManagerEmployeeId, cancellationToken);
+        }
 
         await NotifyOffboardingStartedAsync(
             plan, employeeName, managerId, isBackdated, accessAlreadyDisabled, now, cancellationToken);
@@ -234,6 +272,51 @@ internal sealed class StartOffboardingHandler(
             requiresHrConfirmation: isReconciliation);
         dbContext.OffboardingTasks.Add(task);
         generatedTaskIds.Add(task.Id);
+    }
+
+    // OFF-06: raised once per direct report when the departing manager leaves without a resolved
+    // replacement — this is the HR exception queue entry for "unresolved manager ownership".
+    // Employees' EmployeeDepartureFinalizer already clears each report's ManagerId in this case;
+    // this task is what makes that gap visible and actionable to HR rather than a silent null.
+    // Idempotent by title-per-plan check, defensive against this ever being invoked more than once
+    // for the same plan (StartOffboardingHandler itself only runs once per employee, guarded by
+    // the unique active-plan index).
+    private async Task CreateManagerReassignmentExceptionTasksAsync(
+        StartOffboardingRequest request,
+        OffboardingPlan plan,
+        IReadOnlyList<Guid> directReportIds,
+        Guid? hrReconciliationAssigneeId,
+        DateTimeOffset now,
+        List<Guid> generatedTaskIds,
+        CancellationToken cancellationToken)
+    {
+        var reportNames = await employeeNameReader.GetNamesAsync(request.CompanyId, directReportIds, cancellationToken);
+
+        var existingTitles = dbContext.OffboardingTasks.Local
+            .Where(t => t.OffboardingPlanId == plan.Id)
+            .Select(t => t.Title)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var reportId in directReportIds)
+        {
+            var reportName = reportNames.GetValueOrDefault(reportId, "Unknown Employee");
+            var title = $"Assign new manager for {reportName} (manager departing)";
+
+            if (!existingTitles.Add(title))
+                continue; // Already generated for this report in this run — avoid duplicates.
+
+            var task = OffboardingTask.Create(
+                Guid.NewGuid(), request.CompanyId, plan.Id,
+                title,
+                $"{reportName} reported to the departing employee and has no confirmed replacement " +
+                    "manager. Assign a new manager and update any pending approvals/reviews accordingly.",
+                OffboardingTaskAssignTo.HR,
+                dueDate: request.LastWorkingDay, now: now, assignedEmployeeId: hrReconciliationAssigneeId,
+                requiresHrConfirmation: true);
+
+            dbContext.OffboardingTasks.Add(task);
+            generatedTaskIds.Add(task.Id);
+        }
     }
 
     private Task CreateManagerExitChecklistAsync(

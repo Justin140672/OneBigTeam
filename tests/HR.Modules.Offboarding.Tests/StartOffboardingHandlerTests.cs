@@ -22,14 +22,16 @@ public class StartOffboardingHandlerTests
             .Options);
 
     private static StartOffboardingRequest BuildRequest(
-        Guid companyId, Guid employeeId, DateOnly? lastWorkingDay = null, string? notes = null) =>
-        new(companyId, employeeId, lastWorkingDay ?? new DateOnly(2026, 7, 15), notes);
+        Guid companyId, Guid employeeId, DateOnly? lastWorkingDay = null, string? notes = null,
+        Guid? replacementManagerEmployeeId = null) =>
+        new(companyId, employeeId, lastWorkingDay ?? new DateOnly(2026, 7, 15), notes, replacementManagerEmployeeId);
 
     private sealed record Harness(
         StartOffboardingHandler Handler,
         FakeNotificationWriter Notifications,
         FakeTaskCreator TaskCreator,
-        CapturingIntegrationEventPublisher IntegrationPublisher);
+        CapturingIntegrationEventPublisher IntegrationPublisher,
+        FakeTaskReassigner TaskReassigner);
 
     private static Harness BuildHandler(
         OffboardingDbContext dbContext,
@@ -38,11 +40,13 @@ public class StartOffboardingHandlerTests
         IReadOnlyList<AssignedAssetItem>? assignedAssets = null,
         IReadOnlyList<OutstandingDocumentRequestItem>? outstandingDocuments = null,
         bool autoDisableAccessOnLeavingDate = false,
-        IReadOnlyList<Guid>? hrAdministratorEmployeeIds = null)
+        IReadOnlyList<Guid>? hrAdministratorEmployeeIds = null,
+        IReadOnlyList<Guid>? directReportIds = null)
     {
         var notifications = new FakeNotificationWriter();
         var taskCreator = new FakeTaskCreator();
         var integrationPublisher = new CapturingIntegrationEventPublisher();
+        var taskReassigner = new FakeTaskReassigner();
         var taskSynchronizer = new OffboardingTaskSynchronizer(
             dbContext,
             taskCreator,
@@ -59,8 +63,10 @@ public class StartOffboardingHandlerTests
             notifications,
             integrationPublisher,
             new FakeCompanyLeavingSettingsReader(autoDisableAccessOnLeavingDate),
-            new FakeHrAdministratorDirectory(hrAdministratorEmployeeIds));
-        return new Harness(handler, notifications, taskCreator, integrationPublisher);
+            new FakeHrAdministratorDirectory(hrAdministratorEmployeeIds),
+            new FakeDirectReportsReader((directReportIds ?? []).ToArray()),
+            taskReassigner);
+        return new Harness(handler, notifications, taskCreator, integrationPublisher, taskReassigner);
     }
 
     [Fact]
@@ -670,5 +676,113 @@ public class StartOffboardingHandlerTests
 
         Assert.DoesNotContain(harness.Notifications.Written,
             n => n.Type == NotificationType.OffboardingRequiresHrReconciliation);
+    }
+
+    // ---- OFF-06: departing manager cascade ----
+
+    [Fact]
+    public async Task HandleAsync_Departing_Manager_With_Replacement_Creates_No_Exception_Tasks_And_Reassigns_Own_Tasks()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var replacementManagerId = Guid.NewGuid();
+        var reportId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith", [reportId] = "Robin Report" };
+        var harness = BuildHandler(dbContext, names, directReportIds: [reportId]);
+
+        var request = BuildRequest(companyId, employeeId, replacementManagerEmployeeId: replacementManagerId);
+        var result = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        Assert.Empty(dbContext.OffboardingTasks.Where(t => t.Title.Contains("Assign new manager for")));
+
+        var plan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == result.Value!.Id);
+        Assert.False(plan.RequiresHrReconciliation);
+
+        var call = Assert.Single(harness.TaskReassigner.Calls);
+        Assert.Equal(companyId, call.CompanyId);
+        Assert.Equal(employeeId, call.FromEmployeeId);
+        Assert.Equal(replacementManagerId, call.ToEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Departing_Manager_Without_Replacement_Creates_Exception_Task_Per_Report_And_Unassigns_Own_Tasks()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var reportId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith", [reportId] = "Robin Report" };
+        var harness = BuildHandler(dbContext, names, directReportIds: [reportId]);
+
+        var request = BuildRequest(companyId, employeeId);
+        var result = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var exceptionTask = await dbContext.OffboardingTasks.SingleAsync(
+            t => t.Title.Contains("Assign new manager for"));
+        Assert.Contains("Robin Report", exceptionTask.Title);
+        Assert.True(exceptionTask.RequiresHrConfirmation);
+
+        var plan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == result.Value!.Id);
+        Assert.True(plan.RequiresHrReconciliation);
+
+        var call = Assert.Single(harness.TaskReassigner.Calls);
+        Assert.Equal(employeeId, call.FromEmployeeId);
+        Assert.Null(call.ToEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Employee_With_No_Direct_Reports_Skips_Manager_Cascade_Entirely()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var harness = BuildHandler(dbContext, names, directReportIds: []);
+
+        var request = BuildRequest(companyId, employeeId);
+        var result = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        Assert.Empty(dbContext.OffboardingTasks.Where(t => t.Title.Contains("Assign new manager for")));
+        Assert.Empty(harness.TaskReassigner.Calls);
+
+        var plan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == result.Value!.Id);
+        Assert.False(plan.RequiresHrReconciliation);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Departing_Manager_With_Two_Reports_And_No_Replacement_Creates_Two_Distinct_Exception_Tasks()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var report1Id = Guid.NewGuid();
+        var report2Id = Guid.NewGuid();
+        var names = new Dictionary<Guid, string>
+        {
+            [employeeId] = "Jamie Smith",
+            [report1Id] = "Robin Report",
+            [report2Id] = "Casey Colleague",
+        };
+        var harness = BuildHandler(dbContext, names, directReportIds: [report1Id, report2Id]);
+
+        var request = BuildRequest(companyId, employeeId);
+        var result = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var exceptionTasks = dbContext.OffboardingTasks
+            .Where(t => t.Title.Contains("Assign new manager for"))
+            .ToList();
+        Assert.Equal(2, exceptionTasks.Count);
+        Assert.Contains(exceptionTasks, t => t.Title.Contains("Robin Report"));
+        Assert.Contains(exceptionTasks, t => t.Title.Contains("Casey Colleague"));
+        Assert.All(exceptionTasks, t => Assert.True(t.RequiresHrConfirmation));
     }
 }

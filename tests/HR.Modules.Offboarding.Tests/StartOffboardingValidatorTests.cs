@@ -111,4 +111,39 @@ public class StartOffboardingValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(StartOffboardingRequest.Notes));
     }
+
+    [Fact]
+    public void Validate_Fails_When_ReplacementManagerEmployeeId_Equals_EmployeeId()
+    {
+        var validator = new StartOffboardingValidator();
+        var employeeId = Guid.NewGuid();
+        var request = ValidRequest() with { EmployeeId = employeeId, ReplacementManagerEmployeeId = employeeId };
+
+        var result = validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(StartOffboardingRequest.ReplacementManagerEmployeeId));
+    }
+
+    [Fact]
+    public void Validate_Passes_When_ReplacementManagerEmployeeId_Differs_From_EmployeeId()
+    {
+        var validator = new StartOffboardingValidator();
+        var request = ValidRequest() with { ReplacementManagerEmployeeId = Guid.NewGuid() };
+
+        var result = validator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_ReplacementManagerEmployeeId_Is_Null()
+    {
+        var validator = new StartOffboardingValidator();
+        var request = ValidRequest() with { ReplacementManagerEmployeeId = null };
+
+        var result = validator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
 }

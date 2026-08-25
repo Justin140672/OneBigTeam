@@ -58,6 +58,25 @@ internal sealed class StartLeavingProcessHandler(
                 Error.Conflict(
                     "LeavingDate is in the past. Confirm to backdate and finalise the employee's departure immediately."));
 
+        // OFF-06: validate the nominated replacement manager, if any, up front — mirrors
+        // AssignManagerHandler's existence/active checks. A replacement is only meaningful when
+        // the departing employee actually has direct reports; that is resolved later, inside
+        // EmployeeDepartureFinalizer, at the point the departure is actually finalised (which may
+        // be now, if backdated, or on a later day via ProcessLeavingEmployeesJob).
+        if (request.ReplacementManagerEmployeeId is not null)
+        {
+            var replacementManagerExists = await dbContext.Employees
+                .AnyAsync(
+                    e => e.Id == request.ReplacementManagerEmployeeId
+                        && e.CompanyId == request.CompanyId
+                        && e.Status != EmploymentStatus.FormerEmployee,
+                    cancellationToken);
+
+            if (!replacementManagerExists)
+                return Result.Failure<StartLeavingProcessResponse>(
+                    Error.NotFound($"Replacement manager '{request.ReplacementManagerEmployeeId}' was not found."));
+        }
+
         var positionProfileOverrides = await dbContext.PositionProfiles
             .Where(p => p.Id == employee.PositionProfileId)
             .Select(p => new { p.NoticePeriodUnitOverride, p.NoticePeriodLengthOverride })
@@ -85,7 +104,8 @@ internal sealed class StartLeavingProcessHandler(
             effectiveNoticePeriod.Source,
             request.LeavingReason,
             actorEmployeeId,
-            now);
+            now,
+            request.ReplacementManagerEmployeeId);
 
         dbContext.EmployeeLeavingProcesses.Add(leavingProcess);
 
@@ -94,7 +114,8 @@ internal sealed class StartLeavingProcessHandler(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await offboardingPlanCoordinator.StartAsync(
-            request.CompanyId, request.EmployeeId, request.LastWorkingDay, notes: null, cancellationToken);
+            request.CompanyId, request.EmployeeId, request.LastWorkingDay, notes: null,
+            request.ReplacementManagerEmployeeId, cancellationToken);
 
         await auditEventPublisher.PublishAsync(
             new LeavingProcessStartedAuditEvent(

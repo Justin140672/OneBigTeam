@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
@@ -46,12 +47,13 @@ public class EmployeeDepartureFinalizerTests
     }
 
     private static EmployeeLeavingProcess CreateLeavingProcess(
-        Guid companyId, Guid employeeId, DateOnly leavingDate, DateTimeOffset now) =>
+        Guid companyId, Guid employeeId, DateOnly leavingDate, DateTimeOffset now,
+        Guid? replacementManagerEmployeeId = null) =>
         EmployeeLeavingProcess.Create(
             Guid.NewGuid(), companyId, employeeId,
             leavingDate.AddMonths(-1), leavingDate, leavingDate.AddDays(-1),
             NoticePeriodUnit.Weeks, 4, NoticePeriodSource.Employee, LeavingReason.Resignation,
-            Guid.NewGuid(), now);
+            Guid.NewGuid(), now, replacementManagerEmployeeId);
 
     private static EmployeeDepartureFinalizer BuildFinalizer(
         EmployeesDbContext dbContext,
@@ -60,7 +62,8 @@ public class EmployeeDepartureFinalizerTests
         FakeCompanyLeavingSettingsReader? leavingSettingsReader = null,
         FakeNotificationWriter? notificationWriter = null,
         FakeEmployeeTimelineWriter? timelineWriter = null,
-        CapturingIntegrationEventPublisher? integrationEventPublisher = null) =>
+        CapturingIntegrationEventPublisher? integrationEventPublisher = null,
+        FakeDirectReportsReader? directReportsReader = null) =>
         new(
             dbContext,
             auditPublisher ?? new FakeAuditPublisher(),
@@ -68,7 +71,8 @@ public class EmployeeDepartureFinalizerTests
             offboardingStatusReader ?? new FakeOffboardingStatusReader(new OffboardingStatusSummary("Completed")),
             leavingSettingsReader ?? new FakeCompanyLeavingSettingsReader(),
             notificationWriter ?? new FakeNotificationWriter(),
-            timelineWriter ?? new FakeEmployeeTimelineWriter());
+            timelineWriter ?? new FakeEmployeeTimelineWriter(),
+            directReportsReader ?? new FakeDirectReportsReader());
 
     [Fact]
     public async Task FinalizeAsync_Writes_EmploymentEnded_Timeline_Entry_With_Correct_Fields()
@@ -297,6 +301,164 @@ public class EmployeeDepartureFinalizerTests
         await finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None);
 
         Assert.Empty(notificationWriter.Written);
+    }
+
+    // -- OFF-06: manager departure cascade --------------------------------------------------
+
+    [Fact]
+    public async Task FinalizeAsync_Reassigns_Direct_Reports_ManagerId_To_Replacement_And_Publishes_Event()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var employee = CreateLeavingEmployee(companyId, Now); // the departing manager
+        var replacement = CreateManager(companyId, Now);
+        var report = CreateManager(companyId, Now);
+        report.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), employee.Id, Now);
+        context.Employees.AddRange(employee, replacement, report);
+        var process = CreateLeavingProcess(
+            companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now,
+            replacementManagerEmployeeId: replacement.Id);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var integrationEventPublisher = new CapturingIntegrationEventPublisher();
+        var finalizer = BuildFinalizer(
+            context,
+            integrationEventPublisher: integrationEventPublisher,
+            directReportsReader: new FakeDirectReportsReader(report.Id));
+
+        await finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None);
+
+        var savedReport = await context.Employees.SingleAsync(e => e.Id == report.Id);
+        Assert.Equal(replacement.Id, savedReport.ManagerId);
+
+        var managerChangedEvent = Assert.Single(
+            integrationEventPublisher.Published.OfType<EmployeeManagerChangedIntegrationEvent>());
+        Assert.Equal(companyId, managerChangedEvent.CompanyId);
+        Assert.Equal(report.Id, managerChangedEvent.EmployeeId);
+        Assert.Equal(employee.Id, managerChangedEvent.PreviousManagerId);
+        Assert.Equal(replacement.Id, managerChangedEvent.NewManagerId);
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_Clears_Direct_Reports_ManagerId_When_No_Replacement_Given()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var employee = CreateLeavingEmployee(companyId, Now);
+        var report = CreateManager(companyId, Now);
+        report.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), employee.Id, Now);
+        context.Employees.AddRange(employee, report);
+        var process = CreateLeavingProcess(companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var integrationEventPublisher = new CapturingIntegrationEventPublisher();
+        var finalizer = BuildFinalizer(
+            context,
+            integrationEventPublisher: integrationEventPublisher,
+            directReportsReader: new FakeDirectReportsReader(report.Id));
+
+        await finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None);
+
+        var savedReport = await context.Employees.SingleAsync(e => e.Id == report.Id);
+        Assert.Null(savedReport.ManagerId);
+
+        var managerChangedEvent = Assert.Single(
+            integrationEventPublisher.Published.OfType<EmployeeManagerChangedIntegrationEvent>());
+        Assert.Equal(employee.Id, managerChangedEvent.PreviousManagerId);
+        Assert.Null(managerChangedEvent.NewManagerId);
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_Only_Reassigns_Direct_Reports_Not_Their_Own_Reports()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var employee = CreateLeavingEmployee(companyId, Now); // departing top-level manager
+        var midManager = CreateManager(companyId, Now); // direct report of employee, manager of grandReport
+        midManager.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), employee.Id, Now);
+        var grandReport = CreateManager(companyId, Now);
+        grandReport.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), midManager.Id, Now);
+        context.Employees.AddRange(employee, midManager, grandReport);
+        var process = CreateLeavingProcess(companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var integrationEventPublisher = new CapturingIntegrationEventPublisher();
+        // Only midManager is a direct report of employee; grandReport is not.
+        var finalizer = BuildFinalizer(
+            context,
+            integrationEventPublisher: integrationEventPublisher,
+            directReportsReader: new FakeDirectReportsReader(midManager.Id));
+
+        await finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None);
+
+        var savedMidManager = await context.Employees.SingleAsync(e => e.Id == midManager.Id);
+        Assert.Null(savedMidManager.ManagerId);
+
+        var savedGrandReport = await context.Employees.SingleAsync(e => e.Id == grandReport.Id);
+        Assert.Equal(midManager.Id, savedGrandReport.ManagerId); // untouched
+
+        Assert.Single(integrationEventPublisher.Published.OfType<EmployeeManagerChangedIntegrationEvent>());
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_Publishes_No_ManagerChanged_Event_When_No_Direct_Reports()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var employee = CreateLeavingEmployee(companyId, Now);
+        context.Employees.Add(employee);
+        var process = CreateLeavingProcess(companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var integrationEventPublisher = new CapturingIntegrationEventPublisher();
+        var finalizer = BuildFinalizer(
+            context,
+            integrationEventPublisher: integrationEventPublisher,
+            directReportsReader: new FakeDirectReportsReader());
+
+        await finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None);
+
+        Assert.Empty(integrationEventPublisher.Published.OfType<EmployeeManagerChangedIntegrationEvent>());
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_Does_Not_Reassign_Or_Republish_For_Report_Already_Moved_Off_Departing_Manager()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var employee = CreateLeavingEmployee(companyId, Now);
+        var someoneElse = CreateManager(companyId, Now);
+        var report = CreateManager(companyId, Now);
+        // Report's ManagerId no longer points at the departing employee (e.g. reassigned separately
+        // before finalisation ran) — the idempotency guard should leave it untouched.
+        report.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), someoneElse.Id, Now);
+        context.Employees.AddRange(employee, someoneElse, report);
+        var process = CreateLeavingProcess(companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var integrationEventPublisher = new CapturingIntegrationEventPublisher();
+        var finalizer = BuildFinalizer(
+            context,
+            integrationEventPublisher: integrationEventPublisher,
+            // GetDirectReportIdsAsync still returns this report (e.g. stale cache/read model)
+            // but its ManagerId no longer matches, so the cascade must skip it.
+            directReportsReader: new FakeDirectReportsReader(report.Id));
+
+        await finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None);
+
+        var savedReport = await context.Employees.SingleAsync(e => e.Id == report.Id);
+        Assert.Equal(someoneElse.Id, savedReport.ManagerId);
+        Assert.Empty(integrationEventPublisher.Published.OfType<EmployeeManagerChangedIntegrationEvent>());
     }
 
     [Fact]

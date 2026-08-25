@@ -10,5 +10,10 @@ internal sealed class StartOffboardingValidator : AbstractValidator<StartOffboar
         RuleFor(r => r.EmployeeId).NotEmpty();
         RuleFor(r => r.LastWorkingDay).NotEqual(default(DateOnly));
         RuleFor(r => r.Notes).MaximumLength(2000);
+
+        RuleFor(r => r.ReplacementManagerEmployeeId)
+            .NotEqual(r => r.EmployeeId)
+            .When(r => r.ReplacementManagerEmployeeId.HasValue)
+            .WithMessage("ReplacementManagerEmployeeId cannot be the departing employee themself.");
     }
 }

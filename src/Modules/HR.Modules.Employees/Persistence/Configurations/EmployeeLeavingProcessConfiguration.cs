@@ -79,6 +79,9 @@ internal sealed class EmployeeLeavingProcessConfiguration : IEntityTypeConfigura
             .HasColumnName("cancellation_reason")
             .HasMaxLength(2000);
 
+        builder.Property(p => p.ReplacementManagerEmployeeId)
+            .HasColumnName("replacement_manager_employee_id");
+
         builder.Property(p => p.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

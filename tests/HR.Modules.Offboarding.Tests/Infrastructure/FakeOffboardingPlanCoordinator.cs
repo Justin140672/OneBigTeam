@@ -4,7 +4,7 @@ namespace HR.Modules.Offboarding.Tests.Infrastructure;
 
 internal sealed class FakeOffboardingPlanCoordinator : IOffboardingPlanCoordinator
 {
-    public record StartCall(Guid CompanyId, Guid EmployeeId, DateOnly LastWorkingDay, string? Notes);
+    public record StartCall(Guid CompanyId, Guid EmployeeId, DateOnly LastWorkingDay, string? Notes, Guid? ReplacementManagerEmployeeId);
     public record CancelOutstandingTasksCall(Guid CompanyId, Guid EmployeeId);
     public record RescheduleOutstandingTasksCall(Guid CompanyId, Guid EmployeeId, DateOnly NewLastWorkingDay);
 
@@ -22,9 +22,10 @@ internal sealed class FakeOffboardingPlanCoordinator : IOffboardingPlanCoordinat
         Guid employeeId,
         DateOnly lastWorkingDay,
         string? notes,
+        Guid? replacementManagerEmployeeId,
         CancellationToken cancellationToken)
     {
-        StartCalls.Add(new StartCall(companyId, employeeId, lastWorkingDay, notes));
+        StartCalls.Add(new StartCall(companyId, employeeId, lastWorkingDay, notes, replacementManagerEmployeeId));
         return Task.CompletedTask;
     }
 

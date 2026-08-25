@@ -27,7 +27,8 @@ public class StartLeavingProcessHandlerTests
     }
 
     private static StartLeavingProcessRequest BuildRequest(
-        Guid companyId, Guid employeeId, DateOnly? leavingDate = null, bool confirmBackdatedLeavingDate = false) =>
+        Guid companyId, Guid employeeId, DateOnly? leavingDate = null, bool confirmBackdatedLeavingDate = false,
+        Guid? replacementManagerEmployeeId = null) =>
         new(
             companyId,
             employeeId,
@@ -35,7 +36,8 @@ public class StartLeavingProcessHandlerTests
             LeavingDate: leavingDate ?? new DateOnly(2026, 8, 1),
             LastWorkingDay: (leavingDate ?? new DateOnly(2026, 8, 1)).AddDays(-1),
             LeavingReason.Resignation,
-            confirmBackdatedLeavingDate);
+            confirmBackdatedLeavingDate,
+            replacementManagerEmployeeId);
 
     // Builds a real EmployeeDepartureFinalizer from the same Fakes passed to the handler so
     // assertions on auditPublisher/notificationWriter state after a confirmed-backdated
@@ -62,7 +64,8 @@ public class StartLeavingProcessHandlerTests
             offboardingStatusReader ?? new FakeOffboardingStatusReader(new OffboardingStatusSummary("Completed")),
             leavingSettingsReader ?? new FakeCompanyLeavingSettingsReader(),
             notificationWriter,
-            new FakeEmployeeTimelineWriter());
+            new FakeEmployeeTimelineWriter(),
+            new FakeDirectReportsReader());
 
         return new(
             context,
@@ -386,6 +389,112 @@ public class StartLeavingProcessHandlerTests
 
         var auditEvent = Assert.IsType<LeavingProcessStartedAuditEvent>(Assert.Single(auditPublisher.Published));
         Assert.NotNull(auditEvent);
+    }
+
+    // -- OFF-06: ReplacementManagerEmployeeId ------------------------------------------------
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_ReplacementManagerEmployeeId_Does_Not_Exist()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, employee.Id, replacementManagerEmployeeId: Guid.NewGuid()),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+        Assert.Equal(0, await context.EmployeeLeavingProcesses.CountAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_ReplacementManagerEmployeeId_Belongs_To_Different_Company()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        context.Employees.Add(employee);
+
+        var otherCompanyManager = CreateEmployee(Guid.NewGuid(), now);
+        context.Employees.Add(otherCompanyManager);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, employee.Id, replacementManagerEmployeeId: otherCompanyManager.Id),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_ReplacementManagerEmployeeId_Is_A_FormerEmployee()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        context.Employees.Add(employee);
+
+        var formerManager = CreateEmployee(companyId, now);
+        formerManager.SetLeaving(now);
+        formerManager.SetFormerEmployee(now);
+        context.Employees.Add(formerManager);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, employee.Id, replacementManagerEmployeeId: formerManager.Id),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Passes_ReplacementManagerEmployeeId_Through_To_LeavingProcess_And_OffboardingPlanCoordinator()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        var replacement = CreateEmployee(companyId, now);
+        context.Employees.AddRange(employee, replacement);
+        await context.SaveChangesAsync();
+
+        var offboardingPlanCoordinator = new FakeOffboardingPlanCoordinator();
+        var handler = BuildHandler(context, offboardingPlanCoordinator: offboardingPlanCoordinator);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, employee.Id, replacementManagerEmployeeId: replacement.Id),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var saved = await context.EmployeeLeavingProcesses.SingleAsync();
+        Assert.Equal(replacement.Id, saved.ReplacementManagerEmployeeId);
+
+        var call = Assert.Single(offboardingPlanCoordinator.StartCalls);
+        Assert.Equal(replacement.Id, call.ReplacementManagerEmployeeId);
     }
 
     private static EmployeesDbContext BuildContext()

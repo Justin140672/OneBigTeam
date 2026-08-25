@@ -49,7 +49,9 @@ public class OffboardingPlanCreationReconciliationJobTests
             new FakeNotificationWriter(),
             new CapturingIntegrationEventPublisher(),
             new FakeCompanyLeavingSettingsReader(),
-            new FakeHrAdministratorDirectory());
+            new FakeHrAdministratorDirectory(),
+            new FakeDirectReportsReader(),
+            new FakeTaskReassigner());
 
         var activeLeavingProcessReader = new FakeActiveLeavingProcessReader(inProgressLeavingProcesses);
 

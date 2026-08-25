@@ -28,9 +28,11 @@ internal sealed class OffboardingPlanCoordinator(
         Guid employeeId,
         DateOnly lastWorkingDay,
         string? notes,
+        Guid? replacementManagerEmployeeId,
         CancellationToken cancellationToken)
     {
-        var request = new StartOffboardingRequest(companyId, employeeId, lastWorkingDay, notes);
+        var request = new StartOffboardingRequest(
+            companyId, employeeId, lastWorkingDay, notes, replacementManagerEmployeeId);
         var result = await startOffboardingHandler.HandleAsync(request, cancellationToken);
 
         if (result.IsFailure)

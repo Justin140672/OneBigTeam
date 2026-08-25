@@ -23,6 +23,15 @@ internal sealed class EmployeeLeavingProcess
     public Guid StartedByUserId { get; private set; }
     public DateTimeOffset? CancelledAt { get; private set; }
     public string? CancellationReason { get; private set; }
+
+    // OFF-06: the manager HR has nominated to take over this employee's direct reports (and any
+    // pending manager-scoped approvals/reviews assigned to this employee) once their departure is
+    // finalised. Optional — when null, direct reports are left without a manager and the
+    // departure is routed to an HR exception queue instead (see
+    // EmployeeDepartureFinalizer/StartOffboardingHandler). Only meaningful when this employee
+    // actually has direct reports; otherwise it is simply unused.
+    public Guid? ReplacementManagerEmployeeId { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -38,7 +47,8 @@ internal sealed class EmployeeLeavingProcess
         NoticePeriodSource noticeSource,
         LeavingReason leavingReason,
         Guid startedByUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? replacementManagerEmployeeId = null)
     {
         return new EmployeeLeavingProcess
         {
@@ -55,6 +65,7 @@ internal sealed class EmployeeLeavingProcess
             Status = LeavingProcessStatus.InProgress,
             StartedAt = now,
             StartedByUserId = startedByUserId,
+            ReplacementManagerEmployeeId = replacementManagerEmployeeId,
             CreatedAt = now,
             UpdatedAt = now,
         };

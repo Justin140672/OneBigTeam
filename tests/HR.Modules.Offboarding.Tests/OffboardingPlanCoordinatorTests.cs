@@ -38,7 +38,9 @@ public class OffboardingPlanCoordinatorTests
             new FakeNotificationWriter(),
             new NoOpIntegrationEventPublisher(),
             new FakeCompanyLeavingSettingsReader(),
-            new FakeHrAdministratorDirectory());
+            new FakeHrAdministratorDirectory(),
+            new FakeDirectReportsReader(),
+            new FakeTaskReassigner());
 
     private static OffboardingPlanCoordinator BuildCoordinator(
         OffboardingDbContext dbContext,

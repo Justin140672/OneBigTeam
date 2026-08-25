@@ -418,6 +418,67 @@ public class StartLeavingProcessEndpointTests
         Assert.Equal("FormerEmployee", employee!.Status);
     }
 
+    // OFF-06: ReplacementManagerEmployeeId
+    [Fact]
+    public async Task Post_LeavingProcess_With_Valid_ReplacementManagerEmployeeId_Succeeds()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var user = new Guid("ffffffff-1000-0000-0000-00000000000b");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, user.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, user, SystemRoles.HrAdministrator, companyId);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId);
+        var replacementManagerId = await CreateEmployeeAsync(client, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
+            new
+            {
+                companyId,
+                employeeId,
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LastWorkingDayString,
+                leavingReason = "Resignation",
+                replacementManagerEmployeeId = replacementManagerId
+            });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<LeavingProcessPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("InProgress", payload!.Status);
+    }
+
+    [Fact]
+    public async Task Post_LeavingProcess_Returns_NotFound_When_ReplacementManagerEmployeeId_Does_Not_Exist()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var user = new Guid("ffffffff-1000-0000-0000-00000000000c");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, user.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, user, SystemRoles.HrAdministrator, companyId);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
+            new
+            {
+                companyId,
+                employeeId,
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LastWorkingDayString,
+                leavingReason = "Resignation",
+                replacementManagerEmployeeId = Guid.NewGuid()
+            });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private sealed record IdPayload(Guid Id);
 
     private sealed record ErrorPayload(string Error);
