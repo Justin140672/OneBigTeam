@@ -11,6 +11,7 @@ internal sealed class NotificationsDbContext : DbContext
     }
 
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<EmailDelivery> EmailDeliveries => Set<EmailDelivery>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

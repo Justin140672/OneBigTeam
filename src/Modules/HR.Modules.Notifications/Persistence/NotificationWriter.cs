@@ -1,10 +1,14 @@
+using Hangfire;
 using HR.Modules.Notifications.Domain;
+using HR.Modules.Notifications.Jobs;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Notifications.Persistence;
 
-internal sealed class NotificationWriter(NotificationsDbContext dbContext) : INotificationWriter
+internal sealed class NotificationWriter(
+    NotificationsDbContext dbContext,
+    IBackgroundJobClient backgroundJobClient) : INotificationWriter
 {
     public async Task WriteAsync(
         Guid id,
@@ -20,7 +24,27 @@ internal sealed class NotificationWriter(NotificationsDbContext dbContext) : INo
     {
         var notification = Notification.Create(id, companyId, employeeId, title, body, sourceEntityId, createdAt, type, priority);
         dbContext.Notifications.Add(notification);
+
+        // NOT-02: channel-aware delivery. In-app is always written above (existing baseline
+        // behaviour, unchanged); if this notification type also defaults to Email (see
+        // NotificationChannelDefaults), an EmailDelivery row is persisted in the same transaction
+        // as the notification and a Hangfire job is enqueued to perform the actual Postmark send
+        // asynchronously — the caller (any of the 30+ handlers/jobs across the app that call
+        // WriteAsync) never blocks on that external HTTP call.
+        var channel = NotificationChannelDefaults.GetChannel(type);
+        EmailDelivery? emailDelivery = null;
+        if (channel.HasFlag(NotificationChannel.Email))
+        {
+            emailDelivery = EmailDelivery.Create(Guid.NewGuid(), companyId, id, createdAt);
+            dbContext.EmailDeliveries.Add(emailDelivery);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (emailDelivery is not null)
+        {
+            backgroundJobClient.Enqueue<EmailDeliveryJob>(job => job.SendAsync(id, null));
+        }
     }
 
     public async Task<bool> ExistsAsync(

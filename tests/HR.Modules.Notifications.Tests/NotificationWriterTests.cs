@@ -1,4 +1,6 @@
 using HR.Modules.Notifications.Persistence;
+using HR.Modules.Notifications.Jobs;
+using HR.Modules.Notifications.Tests.Infrastructure;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,7 +14,7 @@ public class NotificationWriterTests
     public async Task WriteAsync_Persists_Notification()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx);
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient());
         var companyId        = Guid.NewGuid();
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
@@ -36,7 +38,7 @@ public class NotificationWriterTests
     public async Task ExistsAsync_Returns_True_When_Notification_Exists()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx);
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient());
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
 
@@ -53,7 +55,7 @@ public class NotificationWriterTests
     public async Task ExistsAsync_Returns_False_When_Notification_Does_Not_Exist()
     {
         await using var ctx = BuildContext();
-        var writer          = new NotificationWriter(ctx);
+        var writer          = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient());
 
         var exists = await writer.ExistsAsync(Guid.NewGuid(), Guid.NewGuid(), NotificationType.TaskDueSoon);
         Assert.False(exists);
@@ -63,7 +65,7 @@ public class NotificationWriterTests
     public async Task ExistsAsync_Returns_False_When_Type_Does_Not_Match()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx);
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient());
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
 
@@ -80,7 +82,7 @@ public class NotificationWriterTests
     public async Task ExistsAsync_Returns_False_When_SourceEntityId_Does_Not_Match()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx);
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient());
         var employeeId       = Guid.NewGuid();
 
         await writer.WriteAsync(
@@ -96,7 +98,7 @@ public class NotificationWriterTests
     public async Task GetLastSentAtAsync_Returns_Null_When_None_Exists()
     {
         await using var ctx = BuildContext();
-        var writer          = new NotificationWriter(ctx);
+        var writer          = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient());
 
         var result = await writer.GetLastSentAtAsync(Guid.NewGuid(), Guid.NewGuid(), NotificationType.TaskDueSoon);
         Assert.Null(result);
@@ -106,7 +108,7 @@ public class NotificationWriterTests
     public async Task GetLastSentAtAsync_Returns_Most_Recent_CreatedAt_When_Multiple_Exist()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx);
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient());
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
 
@@ -131,7 +133,7 @@ public class NotificationWriterTests
     public async Task GetLastSentAtAsync_Ignores_NonMatching_Type()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx);
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient());
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
 
@@ -148,7 +150,7 @@ public class NotificationWriterTests
     public async Task RemoveBySourceEntityAsync_Returns_Zero_When_None_Match()
     {
         await using var ctx = BuildContext();
-        var writer          = new NotificationWriter(ctx);
+        var writer          = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient());
 
         var removed = await writer.RemoveBySourceEntityAsync(Guid.NewGuid(), Guid.NewGuid(), NotificationType.TaskDueSoon);
         Assert.Equal(0, removed);
@@ -158,7 +160,7 @@ public class NotificationWriterTests
     public async Task RemoveBySourceEntityAsync_Removes_Only_Matching_Notifications()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx);
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient());
         var companyId        = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
 
@@ -193,6 +195,54 @@ public class NotificationWriterTests
         Assert.Equal(
             new[] { "Different company", "Different source", "Different type" },
             remainingTitles);
+    }
+
+    // NOT-02: channel-aware delivery ------------------------------------------------------------
+
+    [Fact]
+    public async Task WriteAsync_Persists_EmailDelivery_And_Enqueues_Job_For_Email_Eligible_Type()
+    {
+        await using var ctx    = BuildContext();
+        var backgroundJobClient = new RecordingBackgroundJobClient();
+        var writer              = new NotificationWriter(ctx, backgroundJobClient);
+        var companyId           = Guid.NewGuid();
+        var employeeId          = Guid.NewGuid();
+        var sourceEntityId      = Guid.NewGuid();
+        var id                  = Guid.NewGuid();
+
+        await writer.WriteAsync(
+            id, companyId, employeeId,
+            "Leave approved", null,
+            sourceEntityId, NotificationType.LeaveApproved, NotificationPriority.Normal,
+            Now);
+
+        var delivery = await ctx.EmailDeliveries.SingleAsync();
+        Assert.Equal(id,        delivery.NotificationId);
+        Assert.Equal(id,        delivery.IdempotencyKey);
+        Assert.Equal(companyId, delivery.CompanyId);
+        Assert.Equal(HR.Modules.Notifications.Domain.EmailDeliveryStatus.Pending, delivery.Status);
+
+        var job = Assert.Single(backgroundJobClient.CreatedJobs);
+        Assert.Equal(typeof(EmailDeliveryJob), job.Type);
+        Assert.Equal(nameof(EmailDeliveryJob.SendAsync), job.Method.Name);
+        Assert.Equal(id, job.Args[0]);
+    }
+
+    [Fact]
+    public async Task WriteAsync_Does_Not_Persist_EmailDelivery_Or_Enqueue_Job_For_InApp_Only_Type()
+    {
+        await using var ctx    = BuildContext();
+        var backgroundJobClient = new RecordingBackgroundJobClient();
+        var writer              = new NotificationWriter(ctx, backgroundJobClient);
+
+        await writer.WriteAsync(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "Task assigned", null,
+            Guid.NewGuid(), NotificationType.TaskAssigned, NotificationPriority.Normal,
+            Now);
+
+        Assert.Empty(ctx.EmailDeliveries);
+        Assert.Empty(backgroundJobClient.CreatedJobs);
     }
 
     private static NotificationsDbContext BuildContext()
