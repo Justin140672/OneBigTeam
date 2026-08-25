@@ -52,6 +52,16 @@ internal sealed class EmailDeliveryConfiguration : IEntityTypeConfiguration<Emai
             .HasColumnName("created_at")
             .IsRequired();
 
+        builder.Property(e => e.TemplateVersion)
+            .HasColumnName("template_version");
+
+        builder.Property(e => e.EmailSubject)
+            .HasColumnName("email_subject")
+            .HasMaxLength(500);
+
+        builder.Property(e => e.EmailBody)
+            .HasColumnName("email_body");
+
         builder.HasIndex(e => e.NotificationId).IsUnique();
         builder.HasIndex(e => e.IdempotencyKey).IsUnique();
         builder.HasIndex(e => new { e.CompanyId, e.Status });

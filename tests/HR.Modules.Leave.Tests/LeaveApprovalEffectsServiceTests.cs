@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
 using HR.Modules.Leave.Services;
@@ -149,5 +150,39 @@ public class LeaveApprovalEffectsServiceTests
         Assert.Single(notif.Written);
         Assert.IsType<LeaveApprovedAuditEvent>(Assert.Single(auditPublisher.Published));
         Assert.IsType<LeaveApprovedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
+    }
+
+    // NOT-03: wording-migration fidelity — PublishApprovalOutcomeAsync now raises this notification
+    // via WriteTemplatedAsync(NotificationType.LeaveApproved, ...) instead of a pre-formatted string;
+    // this pins the exact previous wording ("Your leave request has been approved" /
+    // "Your leave from {StartDate} to {EndDate} has been approved.") so a future catalogue wording
+    // change is caught here, not just in HR.Modules.Notifications.Tests.
+    [Fact]
+    public async Task PublishApprovalOutcomeAsync_Notification_Has_Expected_Title_And_Body_Wording()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var reviewerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(), Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Holiday", now);
+        leaveRequest.Approve(reviewerId, now);
+
+        var notif = new FakeNotificationWriter();
+        var service = new LeaveApprovalEffectsService(
+            context, notif, new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(),
+            new NoOpAuditEventPublisher(), new ToilLedgerService(context));
+
+        await service.PublishApprovalOutcomeAsync(leaveRequest, reviewerId, now, CancellationToken.None);
+
+        var written = Assert.Single(notif.Written);
+        Assert.Equal(NotificationType.LeaveApproved, written.Type);
+        Assert.Equal("Your leave request has been approved", written.Title);
+        Assert.Equal("Your leave from 3 Aug 2026 to 7 Aug 2026 has been approved.", written.Body);
     }
 }

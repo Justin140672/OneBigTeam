@@ -54,4 +54,11 @@ public enum NotificationType
     // finalisation if offboarding is still incomplete) and from OffboardingStarted (the routine
     // "plan created" notice).
     OffboardingRequiresHrReconciliation           = 42,
+
+    // NOT-03: added for the initial notification-template catalogue. No existing call site raises
+    // these yet — Employees/Recruitment do not currently trigger a notification on employee
+    // creation or candidate hire — but the template catalogue is defined for them now so a future
+    // call site can adopt WriteTemplatedAsync without also having to add template plumbing.
+    EmployeeCreated                                = 43,
+    CandidateHired                                 = 44,
 }

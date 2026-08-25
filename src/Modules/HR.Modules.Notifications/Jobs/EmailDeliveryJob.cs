@@ -90,8 +90,14 @@ internal sealed class EmailDeliveryJob(
 
         try
         {
-            var htmlBody = BuildHtmlBody(notification.Title, notification.Body);
-            await emailSender.SendAsync(recipientEmail, notification.Title, htmlBody, CancellationToken.None);
+            // NOT-03: a templated delivery already carries its own rendered (HTML-encoded) subject
+            // and body — see EmailDelivery.CreateTemplated / NotificationTemplateRenderer — and is
+            // sent as-is. A non-templated delivery (every notification type outside the NOT-03
+            // catalogue) falls back to the pre-existing behaviour of wrapping the notification's own
+            // Title/Body.
+            var subject = delivery.EmailSubject ?? notification.Title;
+            var htmlBody = delivery.EmailBody ?? BuildHtmlBody(notification.Title, notification.Body);
+            await emailSender.SendAsync(recipientEmail, subject, htmlBody, CancellationToken.None);
 
             delivery.MarkSent(clock.UtcNowOffset());
             await db.SaveChangesAsync();

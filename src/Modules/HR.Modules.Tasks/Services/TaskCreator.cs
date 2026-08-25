@@ -39,15 +39,27 @@ internal sealed class TaskCreator(
 
         if (assignedEmployeeId.HasValue && notifyAssignee)
         {
-            await notificationWriter.WriteAsync(
+            // NOT-03: TaskAssigned is one of the six template-backed notification types (see
+            // NotificationTemplateCatalogue). The rendered in-app title/body reproduce exactly what
+            // the previous inline "$New task assigned: {task.Title}$" / task.Description strings
+            // produced.
+            var tokens = new Dictionary<string, string> { ["TaskTitle"] = task.Title };
+            if (!string.IsNullOrWhiteSpace(task.Description))
+                tokens["TaskDescription"] = task.Description;
+
+            var writeResult = await notificationWriter.WriteTemplatedAsync(
                 Guid.NewGuid(), companyId, assignedEmployeeId.Value,
-                $"New task assigned: {task.Title}",
-                task.Description,
-                task.Id,
                 NotificationType.TaskAssigned,
+                tokens,
+                task.Id,
                 ToNotificationPriority(priority),
                 clock.UtcNowOffset(),
                 cancellationToken);
+
+            // TaskTitle is always present (see above), so this should never actually fail — but
+            // surface it loudly rather than silently swallowing a template regression.
+            if (writeResult.IsFailure)
+                throw new InvalidOperationException($"Failed to write TaskAssigned notification: {writeResult.Error.Message}");
         }
 
         await auditPublisher.PublishAsync(new TaskCreatedAuditEvent(

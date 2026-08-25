@@ -2,6 +2,7 @@ using Hangfire;
 using HR.Modules.Notifications.Domain;
 using HR.Modules.Notifications.Jobs;
 using HR.Infrastructure.Abstractions;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Notifications.Persistence;
@@ -10,6 +11,60 @@ internal sealed class NotificationWriter(
     NotificationsDbContext dbContext,
     IBackgroundJobClient backgroundJobClient) : INotificationWriter
 {
+    /// <summary>
+    /// NOT-03: template-based write path for the six NotificationType values registered in
+    /// NotificationTemplateCatalogue. Required-token validation happens before any entity is added
+    /// to the change tracker or SaveChangesAsync is called — a validation failure here means nothing
+    /// is queued for delivery, per NOT-03's "missing required tokens fail before delivery is queued"
+    /// acceptance criterion.
+    /// </summary>
+    public async Task<Result> WriteTemplatedAsync(
+        Guid id,
+        Guid companyId,
+        Guid employeeId,
+        NotificationType type,
+        IReadOnlyDictionary<string, string> tokens,
+        Guid sourceEntityId,
+        NotificationPriority priority,
+        DateTimeOffset createdAt,
+        CancellationToken cancellationToken = default)
+    {
+        if (!NotificationTemplateCatalogue.TryGet(type, out var template) || template is null)
+        {
+            throw new InvalidOperationException(
+                $"No notification template is registered for NotificationType '{type}'. " +
+                $"Use {nameof(WriteAsync)} with a pre-formatted string for types outside the NOT-03 template catalogue.");
+        }
+
+        var renderResult = NotificationTemplateRenderer.Render(template, tokens);
+        if (renderResult.IsFailure)
+            return Result.Failure(renderResult.Error);
+
+        var rendered = renderResult.Value!;
+
+        var notification = Notification.Create(
+            id, companyId, employeeId, rendered.InAppTitle, rendered.InAppBody, sourceEntityId, createdAt, type, priority);
+        dbContext.Notifications.Add(notification);
+
+        var channel = NotificationChannelDefaults.GetChannel(type);
+        EmailDelivery? emailDelivery = null;
+        if (channel.HasFlag(NotificationChannel.Email))
+        {
+            emailDelivery = EmailDelivery.CreateTemplated(
+                Guid.NewGuid(), companyId, id, template.Version, rendered.EmailSubject, rendered.EmailBody, createdAt);
+            dbContext.EmailDeliveries.Add(emailDelivery);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (emailDelivery is not null)
+        {
+            backgroundJobClient.Enqueue<EmailDeliveryJob>(job => job.SendAsync(id, null));
+        }
+
+        return Result.Success();
+    }
+
     public async Task WriteAsync(
         Guid id,
         Guid companyId,

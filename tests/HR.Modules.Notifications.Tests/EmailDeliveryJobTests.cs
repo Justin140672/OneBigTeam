@@ -172,6 +172,70 @@ public class EmailDeliveryJobTests
         Assert.Empty(db.EmailDeliveries);
     }
 
+    // NOT-03: templated vs non-templated wording -----------------------------------------------
+
+    [Fact]
+    public async Task SendAsync_Templated_Delivery_Sends_Its_Own_Rendered_Subject_And_Body()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var notificationId = Guid.NewGuid();
+
+        // Notification's own Title/Body deliberately differ from the templated delivery's rendered
+        // subject/body, so this test can distinguish "sent the delivery's own content" from
+        // "re-wrapped Notification.Title/Body".
+        var notification = Notification.Create(
+            notificationId, companyId, Guid.NewGuid(),
+            "Notification title (should not be sent)", "Notification body (should not be sent)",
+            Guid.NewGuid(), DateTimeOffset.UtcNow, NotificationType.LeaveApproved);
+        db.Notifications.Add(notification);
+
+        var delivery = EmailDelivery.CreateTemplated(
+            Guid.NewGuid(), companyId, notificationId, templateVersion: 1,
+            emailSubject: "Your leave request has been approved",
+            emailBody: "<html><body><p>Your leave from 3 Aug 2026 to 7 Aug 2026 has been approved.</p></body></html>",
+            now: DateTimeOffset.UtcNow);
+        db.EmailDeliveries.Add(delivery);
+        await db.SaveChangesAsync();
+
+        var emailSender = new FakeEmailSender();
+        var job = BuildJob(db, emailSender);
+
+        await job.SendAsync(notificationId);
+
+        var call = Assert.Single(emailSender.Calls);
+        Assert.Equal("Your leave request has been approved", call.Subject);
+        Assert.Equal(
+            "<html><body><p>Your leave from 3 Aug 2026 to 7 Aug 2026 has been approved.</p></body></html>",
+            call.HtmlBody);
+
+        var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
+        Assert.Equal(EmailDeliveryStatus.Sent, stored.Status);
+    }
+
+    [Fact]
+    public async Task SendAsync_NonTemplated_Delivery_Falls_Back_To_BuildHtmlBody_With_Notification_Title_And_Body()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var notificationId = Guid.NewGuid();
+        var (notification, delivery) = await SeedPendingDelivery(db, companyId, notificationId);
+
+        Assert.Null(delivery.TemplateVersion);
+        Assert.Null(delivery.EmailSubject);
+        Assert.Null(delivery.EmailBody);
+
+        var emailSender = new FakeEmailSender();
+        var job = BuildJob(db, emailSender);
+
+        await job.SendAsync(notificationId);
+
+        var call = Assert.Single(emailSender.Calls);
+        Assert.Equal(notification.Title, call.Subject);
+        Assert.Contains(notification.Title, call.HtmlBody);
+        Assert.Contains(notification.Body!, call.HtmlBody);
+    }
+
     [Fact]
     public async Task SendAsync_Missing_Notification_Marks_Delivery_Failed_Without_Throwing()
     {

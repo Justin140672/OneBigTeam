@@ -25,6 +25,21 @@ internal sealed class EmailDelivery
     public string? FailureReason { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>
+    /// NOT-03: which NotificationTemplate version (see NotificationTemplateCatalogue) rendered
+    /// EmailSubject/EmailBody below, or null when this delivery was raised via the pre-existing
+    /// non-templated WriteAsync path (EmailDeliveryJob falls back to Notification.Title/Body in
+    /// that case). Lets a support engineer see exactly what template version produced a given
+    /// historical email even after the catalogue's wording later changes.
+    /// </summary>
+    public int? TemplateVersion { get; private set; }
+
+    /// <summary>Rendered email subject, set only for templated deliveries (see TemplateVersion).</summary>
+    public string? EmailSubject { get; private set; }
+
+    /// <summary>Rendered, HTML-encoded email body, set only for templated deliveries (see TemplateVersion).</summary>
+    public string? EmailBody { get; private set; }
+
     public static EmailDelivery Create(
         Guid id, Guid companyId, Guid notificationId, DateTimeOffset now) => new()
     {
@@ -35,6 +50,28 @@ internal sealed class EmailDelivery
         Status         = EmailDeliveryStatus.Pending,
         AttemptCount   = 0,
         CreatedAt      = now,
+    };
+
+    /// <summary>
+    /// NOT-03: creates an EmailDelivery whose subject/body were already rendered from a
+    /// NotificationTemplate (see NotificationTemplateRenderer) rather than being derived later, at
+    /// send time, from the notification's own Title/Body — this preserves the exact rendered
+    /// (HTML-encoded) content and records which template version produced it.
+    /// </summary>
+    public static EmailDelivery CreateTemplated(
+        Guid id, Guid companyId, Guid notificationId, int templateVersion,
+        string emailSubject, string emailBody, DateTimeOffset now) => new()
+    {
+        Id              = id,
+        CompanyId       = companyId,
+        NotificationId  = notificationId,
+        IdempotencyKey  = notificationId,
+        Status          = EmailDeliveryStatus.Pending,
+        AttemptCount    = 0,
+        TemplateVersion = templateVersion,
+        EmailSubject    = emailSubject,
+        EmailBody       = emailBody,
+        CreatedAt       = now,
     };
 
     /// <summary>Records that a real delivery attempt (an actual Postmark call) is being made.</summary>

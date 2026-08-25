@@ -90,15 +90,29 @@ internal sealed class LeaveApprovalEffectsService(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        await notificationWriter.WriteAsync(
+        // NOT-03: LeaveApproved is one of the six template-backed notification types (see
+        // NotificationTemplateCatalogue). The rendered in-app title/body reproduce exactly what the
+        // previous inline strings produced ("Your leave request has been approved" /
+        // "Your leave from {StartDate:d MMM yyyy} to {EndDate:d MMM yyyy} has been approved."),
+        // since StartDate/EndDate are formatted here with the same "d MMM yyyy" format before being
+        // passed as token values.
+        var writeResult = await notificationWriter.WriteTemplatedAsync(
             Guid.NewGuid(), leaveRequest.CompanyId, leaveRequest.EmployeeId,
-            "Your leave request has been approved",
-            $"Your leave from {leaveRequest.StartDate:d MMM yyyy} to {leaveRequest.EndDate:d MMM yyyy} has been approved.",
-            leaveRequest.Id,
             NotificationType.LeaveApproved,
+            new Dictionary<string, string>
+            {
+                ["StartDate"] = leaveRequest.StartDate.ToString("d MMM yyyy"),
+                ["EndDate"] = leaveRequest.EndDate.ToString("d MMM yyyy"),
+            },
+            leaveRequest.Id,
             NotificationPriority.Normal,
             now,
             cancellationToken);
+
+        // StartDate/EndDate are always supplied above, so this should never actually fail — but
+        // surface it loudly rather than silently swallowing a template regression.
+        if (writeResult.IsFailure)
+            throw new InvalidOperationException($"Failed to write LeaveApproved notification: {writeResult.Error.Message}");
 
         await auditPublisher.PublishAsync(new LeaveApprovedAuditEvent(
             leaveRequest.CompanyId,
