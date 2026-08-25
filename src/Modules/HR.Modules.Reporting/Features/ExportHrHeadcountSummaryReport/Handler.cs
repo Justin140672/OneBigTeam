@@ -1,12 +1,16 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Reporting.Services;
 using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Features.ExportHrHeadcountSummaryReport;
 
 internal sealed class ExportHrHeadcountSummaryReportHandler(
     IHrHeadcountSummaryReader hrHeadcountSummaryReader,
-    IReportExporter reportExporter)
+    IReportExporter reportExporter,
+    ReportExportAuditor auditor)
 {
+    private const string ReportId = "hr-headcount-summary";
+
     private static readonly string[] ColumnHeaders =
     [
         "Employee", "Department", "Location", "Position", "Employment Type",
@@ -17,32 +21,46 @@ internal sealed class ExportHrHeadcountSummaryReportHandler(
         ExportHrHeadcountSummaryReportRequest request,
         CancellationToken cancellationToken)
     {
-        var filter = new ReportFilterCriteria(
-            DepartmentId: request.DepartmentId,
-            LocationId: request.LocationId,
-            EmploymentTypeId: request.EmploymentTypeId,
-            EmployeeStatus: request.EmployeeStatus);
+        try
+        {
+            var filter = new ReportFilterCriteria(
+                DepartmentId: request.DepartmentId,
+                LocationId: request.LocationId,
+                EmploymentTypeId: request.EmploymentTypeId,
+                EmployeeStatus: request.EmployeeStatus);
 
-        var result = await hrHeadcountSummaryReader.GetHeadcountSummaryAsync(request.CompanyId, filter, cancellationToken);
+            var result = await hrHeadcountSummaryReader.GetHeadcountSummaryAsync(request.CompanyId, filter, cancellationToken);
 
-        var rows = result.Items
-            .Select(item => (IReadOnlyList<string?>)new List<string?>
-            {
-                item.EmployeeName,
-                item.Department,
-                item.Location,
-                item.Position,
-                item.EmploymentType,
-                item.Status,
-                item.StartDate.ToString("yyyy-MM-dd"),
-                item.LeavingDate?.ToString("yyyy-MM-dd"),
-                item.Fte?.ToString("0.00"),
-            })
-            .ToList();
+            var rows = result.Items
+                .Select(item => (IReadOnlyList<string?>)new List<string?>
+                {
+                    item.EmployeeName,
+                    item.Department,
+                    item.Location,
+                    item.Position,
+                    item.EmploymentType,
+                    item.Status,
+                    item.StartDate.ToString("yyyy-MM-dd"),
+                    item.LeavingDate?.ToString("yyyy-MM-dd"),
+                    item.Fte?.ToString("0.00"),
+                })
+                .ToList();
 
-        var exportData = new ReportExportData("HR Headcount Summary", ColumnHeaders, rows);
-        var file = reportExporter.Export(request.Format, exportData);
+            var exportData = new ReportExportData("HR Headcount Summary", ColumnHeaders, rows);
+            var file = reportExporter.Export(request.Format, exportData);
 
-        return Result.Success(new ExportHrHeadcountSummaryReportResponse(file));
+            await auditor.PublishSuccessAsync(
+                request.CompanyId, ReportId, request.Format.ToString(), result.Items.Count,
+                managerScopeApplied: false, request, cancellationToken);
+
+            return Result.Success(new ExportHrHeadcountSummaryReportResponse(file));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            await auditor.PublishFailureAsync(
+                request.CompanyId, ReportId, request.Format.ToString(),
+                managerScopeApplied: false, request, ex.Message, cancellationToken);
+            return Result.Failure<ExportHrHeadcountSummaryReportResponse>(Error.Unexpected("Report export failed."));
+        }
     }
 }

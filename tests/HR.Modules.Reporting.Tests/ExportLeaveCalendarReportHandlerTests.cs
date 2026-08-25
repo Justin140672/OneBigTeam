@@ -16,7 +16,7 @@ public class ExportLeaveCalendarReportHandlerTests
         var employeeId = Guid.NewGuid();
         var reader = new FakeLeaveCalendarReader([BuildItem(employeeId)]);
         var exporter = new FakeReportExporter();
-        var handler = new ExportLeaveCalendarReportHandler(reader, new FakeEmployeeDepartmentReader(), exporter);
+        var handler = new ExportLeaveCalendarReportHandler(reader, new FakeEmployeeDepartmentReader(), exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(new ExportLeaveCalendarReportRequest(Guid.NewGuid(), 2026, 8), CancellationToken.None);
 
@@ -32,7 +32,7 @@ public class ExportLeaveCalendarReportHandlerTests
         var items = Enumerable.Range(0, 5).Select(_ => BuildItem(Guid.NewGuid())).ToList();
         var reader = new FakeLeaveCalendarReader(items);
         var exporter = new FakeReportExporter();
-        var handler = new ExportLeaveCalendarReportHandler(reader, new FakeEmployeeDepartmentReader(), exporter);
+        var handler = new ExportLeaveCalendarReportHandler(reader, new FakeEmployeeDepartmentReader(), exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(new ExportLeaveCalendarReportRequest(Guid.NewGuid(), 2026, 8), CancellationToken.None);
 
@@ -53,7 +53,7 @@ public class ExportLeaveCalendarReportHandlerTests
         var items = Enumerable.Range(0, totalItems).Select(_ => BuildItem(Guid.NewGuid())).ToList();
         var reader = new FakeLeaveCalendarReader(items);
         var exporter = new FakeReportExporter();
-        var handler = new ExportLeaveCalendarReportHandler(reader, new FakeEmployeeDepartmentReader(), exporter);
+        var handler = new ExportLeaveCalendarReportHandler(reader, new FakeEmployeeDepartmentReader(), exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(new ExportLeaveCalendarReportRequest(Guid.NewGuid(), 2026, 8), CancellationToken.None);
 
@@ -73,7 +73,7 @@ public class ExportLeaveCalendarReportHandlerTests
         var items = Enumerable.Range(0, totalItems).Select(_ => BuildItem(Guid.NewGuid())).ToList();
         var reader = new FakeLeaveCalendarReader(items);
         var exporter = new FakeReportExporter();
-        var handler = new ExportLeaveCalendarReportHandler(reader, new FakeEmployeeDepartmentReader(), exporter);
+        var handler = new ExportLeaveCalendarReportHandler(reader, new FakeEmployeeDepartmentReader(), exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(new ExportLeaveCalendarReportRequest(Guid.NewGuid(), 2026, 8), CancellationToken.None);
 

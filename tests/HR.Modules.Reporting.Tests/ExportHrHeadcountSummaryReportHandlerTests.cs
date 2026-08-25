@@ -27,7 +27,7 @@ public class ExportHrHeadcountSummaryReportHandlerTests
         var reader = new FakeHrHeadcountSummaryReader(
             new HrHeadcountSummaryResult(items, 1, 1, 0, 0, 1.0m));
         var exporter = new FakeReportExporter();
-        var handler = new ExportHrHeadcountSummaryReportHandler(reader, exporter);
+        var handler = new ExportHrHeadcountSummaryReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportHrHeadcountSummaryReportRequest(Guid.NewGuid(), null, null, null, null), CancellationToken.None);
@@ -49,7 +49,7 @@ public class ExportHrHeadcountSummaryReportHandlerTests
     {
         var reader = new FakeHrHeadcountSummaryReader();
         var exporter = new FakeReportExporter();
-        var handler = new ExportHrHeadcountSummaryReportHandler(reader, exporter);
+        var handler = new ExportHrHeadcountSummaryReportHandler(reader, exporter, TestReportExportAuditor.Create());
         var departmentId = Guid.NewGuid();
 
         await handler.HandleAsync(

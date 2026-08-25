@@ -26,7 +26,7 @@ public class ExportRecruitmentPipelineSummaryReportHandlerTests
         var reader = new FakeRecruitmentPipelineSummaryReader(
             new RecruitmentPipelineSummaryResult(rows, stages));
         var exporter = new FakeReportExporter();
-        var handler = new ExportRecruitmentPipelineSummaryReportHandler(reader, exporter);
+        var handler = new ExportRecruitmentPipelineSummaryReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportRecruitmentPipelineSummaryReportRequest(Guid.NewGuid()), CancellationToken.None);
@@ -53,7 +53,7 @@ public class ExportRecruitmentPipelineSummaryReportHandlerTests
         var reader = new FakeRecruitmentPipelineSummaryReader(
             new RecruitmentPipelineSummaryResult(rows, stages));
         var exporter = new FakeReportExporter();
-        var handler = new ExportRecruitmentPipelineSummaryReportHandler(reader, exporter);
+        var handler = new ExportRecruitmentPipelineSummaryReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         await handler.HandleAsync(new ExportRecruitmentPipelineSummaryReportRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -66,7 +66,7 @@ public class ExportRecruitmentPipelineSummaryReportHandlerTests
     {
         var reader = new FakeRecruitmentPipelineSummaryReader();
         var exporter = new FakeReportExporter();
-        var handler = new ExportRecruitmentPipelineSummaryReportHandler(reader, exporter);
+        var handler = new ExportRecruitmentPipelineSummaryReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         await handler.HandleAsync(
             new ExportRecruitmentPipelineSummaryReportRequest(Guid.NewGuid(), IncludeClosed: true), CancellationToken.None);

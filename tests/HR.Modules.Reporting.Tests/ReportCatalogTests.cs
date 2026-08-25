@@ -84,4 +84,63 @@ public class ReportCatalogTests
             Assert.False(string.IsNullOrWhiteSpace(definition.Description));
         }
     }
+
+    // REP-06: every catalogue entry must carry an explicit sensitivity classification driving
+    // export audit policy (HR.Modules.Reporting.Services.ReportExportAuditor).
+    [Theory]
+    [InlineData("employee-directory", "Sensitive")]
+    [InlineData("employee-starters", "Sensitive")]
+    [InlineData("employee-leavers", "Sensitive")]
+    [InlineData("leave-summary", "Sensitive")]
+    [InlineData("leave-calendar", "Sensitive")]
+    [InlineData("sickness-report", "Sensitive")]
+    [InlineData("probation-report", "Sensitive")]
+    [InlineData("onboarding-progress", "Sensitive")]
+    [InlineData("offboarding-progress", "Sensitive")]
+    [InlineData("document-compliance", "Sensitive")]
+    [InlineData("document-acknowledgement", "Sensitive")]
+    [InlineData("asset-assignment", "Sensitive")]
+    [InlineData("workload-actions", "Sensitive")]
+    [InlineData("hr-headcount-summary", "Sensitive")]
+    [InlineData("recruitment-pipeline-summary", "Standard")]
+    [InlineData("recruitment-pipeline-report", "Standard")]
+    [InlineData("vacancy-performance-report", "Standard")]
+    public void Definition_Has_Expected_Sensitivity_Classification(string reportId, string expectedSensitivity)
+    {
+        var found = ReportCatalog.TryGet(reportId, out var definition);
+
+        Assert.True(found, $"Expected '{reportId}' to be present in the catalogue.");
+        Assert.Equal(expectedSensitivity, definition.Sensitivity.ToString());
+    }
+
+    [Fact]
+    public void Every_Definition_Has_A_Sensitivity_Of_Standard_Or_Sensitive()
+    {
+        foreach (var definition in ReportCatalog.All)
+        {
+            Assert.True(
+                definition.Sensitivity is ReportSensitivity.Standard or ReportSensitivity.Sensitive,
+                $"'{definition.Id}' has an unexpected sensitivity value: {definition.Sensitivity}.");
+        }
+    }
+
+    [Fact]
+    public void All_Seventeen_Catalogue_Entries_Are_Covered_By_The_Sensitivity_Classification_Above()
+    {
+        // Guards against a new report being added to the catalogue without also being added to the
+        // classification test above (and, per the REP-06 spec, without a deliberate Sensitive/Standard
+        // decision being made for it).
+        var classifiedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "employee-directory", "employee-starters", "employee-leavers", "leave-summary", "leave-calendar",
+            "sickness-report", "probation-report", "onboarding-progress", "offboarding-progress",
+            "document-compliance", "document-acknowledgement", "asset-assignment", "workload-actions",
+            "hr-headcount-summary", "recruitment-pipeline-summary", "recruitment-pipeline-report",
+            "vacancy-performance-report",
+        };
+
+        var actualIds = ReportCatalog.All.Select(d => d.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        Assert.Equal(classifiedIds.OrderBy(x => x), actualIds.OrderBy(x => x));
+    }
 }

@@ -41,7 +41,7 @@ public class ExportEmployeeLeaverReportHandlerTests
         var employeeId = Guid.NewGuid();
         var reader = new FakeEmployeeLeaverReader([BuildItem(employeeId)]);
         var exporter = new FakeReportExporter();
-        var handler = new ExportEmployeeLeaverReportHandler(reader, exporter);
+        var handler = new ExportEmployeeLeaverReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         await handler.HandleAsync(BuildRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -61,7 +61,7 @@ public class ExportEmployeeLeaverReportHandlerTests
     {
         var reader = new FakeEmployeeLeaverReader([]);
         var exporter = new FakeReportExporter();
-        var handler = new ExportEmployeeLeaverReportHandler(reader, exporter);
+        var handler = new ExportEmployeeLeaverReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         await handler.HandleAsync(BuildRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -75,7 +75,7 @@ public class ExportEmployeeLeaverReportHandlerTests
     {
         var reader = new FakeEmployeeLeaverReader([]);
         var exporter = new FakeReportExporter();
-        var handler = new ExportEmployeeLeaverReportHandler(reader, exporter);
+        var handler = new ExportEmployeeLeaverReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         await handler.HandleAsync(BuildRequest(Guid.NewGuid(), ReportExportFormat.Pdf), CancellationToken.None);
 
@@ -87,7 +87,7 @@ public class ExportEmployeeLeaverReportHandlerTests
     {
         var reader = new FakeEmployeeLeaverReader([BuildItem(Guid.NewGuid())], totalCount: ReportLimits.ExportRowLimit);
         var exporter = new FakeReportExporter();
-        var handler = new ExportEmployeeLeaverReportHandler(reader, exporter);
+        var handler = new ExportEmployeeLeaverReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(BuildRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -102,7 +102,7 @@ public class ExportEmployeeLeaverReportHandlerTests
         var totalCount = ReportLimits.ExportRowLimit + 1;
         var reader = new FakeEmployeeLeaverReader([BuildItem(Guid.NewGuid())], totalCount: totalCount);
         var exporter = new FakeReportExporter();
-        var handler = new ExportEmployeeLeaverReportHandler(reader, exporter);
+        var handler = new ExportEmployeeLeaverReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(BuildRequest(Guid.NewGuid()), CancellationToken.None);
 

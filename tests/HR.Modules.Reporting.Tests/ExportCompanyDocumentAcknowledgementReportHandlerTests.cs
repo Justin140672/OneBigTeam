@@ -17,7 +17,7 @@ public class ExportCompanyDocumentAcknowledgementReportHandlerTests
         var reader = new FakeCompanyDocumentAcknowledgementReportReader([BuildItem(employeeId)]);
         var getHandler = new GetCompanyDocumentAcknowledgementReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportCompanyDocumentAcknowledgementReportHandler(getHandler, exporter);
+        var handler = new ExportCompanyDocumentAcknowledgementReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportCompanyDocumentAcknowledgementReportRequest(Guid.NewGuid()), CancellationToken.None);
@@ -37,7 +37,7 @@ public class ExportCompanyDocumentAcknowledgementReportHandlerTests
         var reader = new FakeCompanyDocumentAcknowledgementReportReader([]);
         var getHandler = new GetCompanyDocumentAcknowledgementReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportCompanyDocumentAcknowledgementReportHandler(getHandler, exporter);
+        var handler = new ExportCompanyDocumentAcknowledgementReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportCompanyDocumentAcknowledgementReportRequest(Guid.NewGuid()), CancellationToken.None);

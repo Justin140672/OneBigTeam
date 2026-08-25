@@ -1,6 +1,7 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.Modules.Reporting.ReportRegistry;
+using HR.Modules.Reporting.Services;
 using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Features.ExportLeaveCalendarReport;
@@ -8,8 +9,11 @@ namespace HR.Modules.Reporting.Features.ExportLeaveCalendarReport;
 internal sealed class ExportLeaveCalendarReportHandler(
     ILeaveCalendarReader leaveCalendarReader,
     IEmployeeDepartmentReader employeeDepartmentReader,
-    IReportExporter reportExporter)
+    IReportExporter reportExporter,
+    ReportExportAuditor auditor)
 {
+    private const string ReportId = "leave-calendar";
+
     private static readonly string[] ColumnHeaders =
     [
         "Employee", "Department", "Leave Start", "Leave End", "Leave Type", "Duration (Days)", "Approval Status",
@@ -19,42 +23,56 @@ internal sealed class ExportLeaveCalendarReportHandler(
         ExportLeaveCalendarReportRequest request,
         CancellationToken cancellationToken)
     {
-        var rows = await leaveCalendarReader.GetLeaveCalendarAsync(
-            request.CompanyId, employeeIds: null, request.Year, request.Month, cancellationToken);
-
-        var employeeIds = rows.Select(r => r.EmployeeId).ToHashSet();
-        var departments = employeeIds.Count > 0
-            ? await employeeDepartmentReader.GetDepartmentsAsync(request.CompanyId, employeeIds, cancellationToken)
-            : new Dictionary<Guid, EmployeeDepartmentInfo>();
-
-        var filtered = rows.AsEnumerable();
-        if (request.DepartmentId is not null)
+        try
         {
-            filtered = filtered.Where(r =>
-                departments.TryGetValue(r.EmployeeId, out var dept) && dept.DepartmentId == request.DepartmentId);
-        }
+            var rows = await leaveCalendarReader.GetLeaveCalendarAsync(
+                request.CompanyId, employeeIds: null, request.Year, request.Month, cancellationToken);
 
-        var filteredList = filtered.ToList();
-        var totalCount = filteredList.Count;
-        var isTruncated = totalCount > ReportLimits.ExportRowLimit;
+            var employeeIds = rows.Select(r => r.EmployeeId).ToHashSet();
+            var departments = employeeIds.Count > 0
+                ? await employeeDepartmentReader.GetDepartmentsAsync(request.CompanyId, employeeIds, cancellationToken)
+                : new Dictionary<Guid, EmployeeDepartmentInfo>();
 
-        var exportRows = filteredList
-            .Take(ReportLimits.ExportRowLimit)
-            .Select(r => (IReadOnlyList<string?>)new List<string?>
+            var filtered = rows.AsEnumerable();
+            if (request.DepartmentId is not null)
             {
-                departments.TryGetValue(r.EmployeeId, out var dept) ? dept.EmployeeName : r.EmployeeId.ToString(),
-                departments.TryGetValue(r.EmployeeId, out var d2) ? d2.DepartmentName : null,
-                r.LeaveStart.ToString("yyyy-MM-dd"),
-                r.LeaveEnd.ToString("yyyy-MM-dd"),
-                r.LeaveTypeName,
-                r.DurationDays.ToString("0.##"),
-                r.ApprovalStatus,
-            })
-            .ToList();
+                filtered = filtered.Where(r =>
+                    departments.TryGetValue(r.EmployeeId, out var dept) && dept.DepartmentId == request.DepartmentId);
+            }
 
-        var exportData = new ReportExportData("Leave Calendar Export", ColumnHeaders, exportRows);
-        var file = reportExporter.Export(request.Format, exportData);
+            var filteredList = filtered.ToList();
+            var totalCount = filteredList.Count;
+            var isTruncated = totalCount > ReportLimits.ExportRowLimit;
 
-        return Result.Success(new ExportLeaveCalendarReportResponse(file, totalCount, isTruncated));
+            var exportRows = filteredList
+                .Take(ReportLimits.ExportRowLimit)
+                .Select(r => (IReadOnlyList<string?>)new List<string?>
+                {
+                    departments.TryGetValue(r.EmployeeId, out var dept) ? dept.EmployeeName : r.EmployeeId.ToString(),
+                    departments.TryGetValue(r.EmployeeId, out var d2) ? d2.DepartmentName : null,
+                    r.LeaveStart.ToString("yyyy-MM-dd"),
+                    r.LeaveEnd.ToString("yyyy-MM-dd"),
+                    r.LeaveTypeName,
+                    r.DurationDays.ToString("0.##"),
+                    r.ApprovalStatus,
+                })
+                .ToList();
+
+            var exportData = new ReportExportData("Leave Calendar Export", ColumnHeaders, exportRows);
+            var file = reportExporter.Export(request.Format, exportData);
+
+            await auditor.PublishSuccessAsync(
+                request.CompanyId, ReportId, request.Format.ToString(), totalCount,
+                managerScopeApplied: false, request, cancellationToken);
+
+            return Result.Success(new ExportLeaveCalendarReportResponse(file, totalCount, isTruncated));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            await auditor.PublishFailureAsync(
+                request.CompanyId, ReportId, request.Format.ToString(),
+                managerScopeApplied: false, request, ex.Message, cancellationToken);
+            return Result.Failure<ExportLeaveCalendarReportResponse>(Error.Unexpected("Report export failed."));
+        }
     }
 }

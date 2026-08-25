@@ -12,7 +12,8 @@ public class ExportLeaveSummaryReportHandlerTests
         FakeLeaveSummaryReader reader, FakeReportExporter exporter) =>
         new(
             new GetLeaveSummaryReportHandler(reader, new FakeEmployeeDepartmentReader(), new FakeDirectReportsReader()),
-            exporter);
+            exporter,
+            TestReportExportAuditor.Create());
 
     [Fact]
     public async Task HandleAsync_Exports_Rows_From_GetHandler_Result()

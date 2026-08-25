@@ -43,6 +43,7 @@ using HR.Modules.Reporting.Features.RenameReportView;
 using HR.Modules.Reporting.Features.SaveReportView;
 using HR.Modules.Reporting.Features.SetDefaultReportView;
 using HR.Modules.Reporting.Persistence;
+using HR.Modules.Reporting.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -65,6 +66,9 @@ public static class ReportingModule
 
     private static void AddFeatureServices(IServiceCollection services)
     {
+        // REP-06: shared export auditing helper used by every Export*Report handler.
+        services.AddScoped<ReportExportAuditor>();
+
         services.AddScoped<GetReportCatalogHandler>();
         services.AddScoped<IValidator<GetReportCatalogRequest>, GetReportCatalogValidator>();
 

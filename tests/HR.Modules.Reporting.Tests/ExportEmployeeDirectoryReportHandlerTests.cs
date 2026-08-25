@@ -2,11 +2,21 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.Features.ExportEmployeeDirectoryReport;
 using HR.Modules.Reporting.ReportRegistry;
 using HR.Modules.Reporting.Tests.Infrastructure;
+using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Tests;
 
 public class ExportEmployeeDirectoryReportHandlerTests
 {
+    /// <summary>Throws from the reader call so the handler's catch block is exercised (REP-06).</summary>
+    private sealed class ThrowingEmployeeDirectoryReader : IEmployeeDirectoryReader
+    {
+        public Task<PagedResult<EmployeeDirectoryReportItem>> GetEmployeeDirectoryAsync(
+            Guid companyId, ReportFilterCriteria filter, Pagination pagination, string? sortBy,
+            bool sortDescending, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("reader exploded");
+    }
+
     private static readonly string[] ExpectedColumnHeaders =
     [
         "Employee Number", "Name", "Department", "Position", "Manager",
@@ -47,7 +57,7 @@ public class ExportEmployeeDirectoryReportHandlerTests
         var employeeId = Guid.NewGuid();
         var reader = new FakeEmployeeDirectoryReader([BuildItem(employeeId)]);
         var exporter = new FakeReportExporter();
-        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter);
+        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         await handler.HandleAsync(BuildRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -70,7 +80,7 @@ public class ExportEmployeeDirectoryReportHandlerTests
     {
         var reader = new FakeEmployeeDirectoryReader([]);
         var exporter = new FakeReportExporter();
-        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter);
+        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         await handler.HandleAsync(BuildRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -84,7 +94,7 @@ public class ExportEmployeeDirectoryReportHandlerTests
     {
         var reader = new FakeEmployeeDirectoryReader([]);
         var exporter = new FakeReportExporter();
-        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter);
+        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         await handler.HandleAsync(BuildRequest(Guid.NewGuid(), ReportExportFormat.Pdf), CancellationToken.None);
 
@@ -97,7 +107,7 @@ public class ExportEmployeeDirectoryReportHandlerTests
         var reader = new FakeEmployeeDirectoryReader([]);
         var file = new ReportExportFile([9, 9, 9], "application/pdf", "employee-directory.pdf");
         var exporter = new FakeReportExporter(file);
-        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter);
+        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(BuildRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -110,7 +120,7 @@ public class ExportEmployeeDirectoryReportHandlerTests
     {
         var reader = new FakeEmployeeDirectoryReader([BuildItem(Guid.NewGuid())], totalCount: ReportLimits.ExportRowLimit);
         var exporter = new FakeReportExporter();
-        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter);
+        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(BuildRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -125,12 +135,46 @@ public class ExportEmployeeDirectoryReportHandlerTests
         var totalCount = ReportLimits.ExportRowLimit + 1;
         var reader = new FakeEmployeeDirectoryReader([BuildItem(Guid.NewGuid())], totalCount: totalCount);
         var exporter = new FakeReportExporter();
-        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter);
+        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(BuildRequest(Guid.NewGuid()), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.True(result.Value!.IsTruncated);
         Assert.Equal(totalCount, result.Value.TotalCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_On_Success_Publishes_Audit_Event_With_Success_True_And_Row_Count()
+    {
+        var reader = new FakeEmployeeDirectoryReader([BuildItem(Guid.NewGuid())], totalCount: 7);
+        var exporter = new FakeReportExporter();
+        var auditor = TestReportExportAuditor.Create(out var publisher);
+        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter, auditor);
+
+        var result = await handler.HandleAsync(BuildRequest(Guid.NewGuid()), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<ReportExportAuditEvent>(Assert.Single(publisher.Published));
+        Assert.True(evt.Success);
+        Assert.Equal(7, evt.RowCount);
+        Assert.False(evt.ManagerScopeApplied);
+    }
+
+    [Fact]
+    public async Task HandleAsync_On_Thrown_Exception_Publishes_Audit_Event_With_Success_False_And_Returns_Failure()
+    {
+        var reader = new ThrowingEmployeeDirectoryReader();
+        var exporter = new FakeReportExporter();
+        var auditor = TestReportExportAuditor.Create(out var publisher);
+        var handler = new ExportEmployeeDirectoryReportHandler(reader, exporter, auditor);
+
+        var result = await handler.HandleAsync(BuildRequest(Guid.NewGuid()), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        var evt = Assert.IsType<ReportExportAuditEvent>(Assert.Single(publisher.Published));
+        Assert.False(evt.Success);
+        Assert.Null(evt.RowCount);
+        Assert.Equal("reader exploded", evt.FailureReason);
     }
 }

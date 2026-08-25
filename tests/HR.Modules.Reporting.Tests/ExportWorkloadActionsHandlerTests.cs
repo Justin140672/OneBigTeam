@@ -32,7 +32,9 @@ public class ExportWorkloadActionsHandlerTests
                 new FakeEmployeeDirectoryReader([]),
                 new FakeEmployeeRecruiterReader(),
                 new FakeClock(FixedUtcNow)),
-            exporter);
+            exporter,
+            new FakeAuthorizationService(),
+            TestReportExportAuditor.Create());
 
     private static System.Security.Claims.ClaimsPrincipal AnyCaller() =>
         new(new System.Security.Claims.ClaimsIdentity());

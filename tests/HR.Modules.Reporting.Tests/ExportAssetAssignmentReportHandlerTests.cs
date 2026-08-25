@@ -24,7 +24,7 @@ public class ExportAssetAssignmentReportHandlerTests
         var reader = new FakeAssetAssignmentReportReader([BuildItem(employeeId)]);
         var getHandler = new GetAssetAssignmentReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportAssetAssignmentReportHandler(getHandler, exporter);
+        var handler = new ExportAssetAssignmentReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(new ExportAssetAssignmentReportRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -47,7 +47,7 @@ public class ExportAssetAssignmentReportHandlerTests
         var reader = new FakeAssetAssignmentReportReader([]);
         var getHandler = new GetAssetAssignmentReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportAssetAssignmentReportHandler(getHandler, exporter);
+        var handler = new ExportAssetAssignmentReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(new ExportAssetAssignmentReportRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -61,7 +61,7 @@ public class ExportAssetAssignmentReportHandlerTests
         var reader = new FakeAssetAssignmentReportReader([BuildItem(Guid.NewGuid())]);
         var getHandler = new GetAssetAssignmentReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportAssetAssignmentReportHandler(getHandler, exporter);
+        var handler = new ExportAssetAssignmentReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportAssetAssignmentReportRequest(Guid.NewGuid(), ReportExportFormat.Pdf), CancellationToken.None);
@@ -80,7 +80,7 @@ public class ExportAssetAssignmentReportHandlerTests
         var reader = new FakeAssetAssignmentReportReader(items);
         var getHandler = new GetAssetAssignmentReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportAssetAssignmentReportHandler(getHandler, exporter);
+        var handler = new ExportAssetAssignmentReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(new ExportAssetAssignmentReportRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -95,7 +95,7 @@ public class ExportAssetAssignmentReportHandlerTests
         var reader = new FakeAssetAssignmentReportReader([BuildItem(Guid.NewGuid())]);
         var getHandler = new GetAssetAssignmentReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportAssetAssignmentReportHandler(getHandler, exporter);
+        var handler = new ExportAssetAssignmentReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(new ExportAssetAssignmentReportRequest(Guid.NewGuid()), CancellationToken.None);
 

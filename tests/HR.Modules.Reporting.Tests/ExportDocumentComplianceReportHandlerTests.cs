@@ -26,7 +26,7 @@ public class ExportDocumentComplianceReportHandlerTests
         var reader = new FakeDocumentComplianceReportReader([BuildItem(employeeId)]);
         var getHandler = new GetDocumentComplianceReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportDocumentComplianceReportHandler(getHandler, exporter);
+        var handler = new ExportDocumentComplianceReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportDocumentComplianceReportRequest(Guid.NewGuid(), null), CancellationToken.None);
@@ -47,7 +47,7 @@ public class ExportDocumentComplianceReportHandlerTests
         var reader = new FakeDocumentComplianceReportReader([]);
         var getHandler = new GetDocumentComplianceReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportDocumentComplianceReportHandler(getHandler, exporter);
+        var handler = new ExportDocumentComplianceReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportDocumentComplianceReportRequest(Guid.NewGuid(), null), CancellationToken.None);
@@ -65,7 +65,7 @@ public class ExportDocumentComplianceReportHandlerTests
         var reader = new FakeDocumentComplianceReportReader(items);
         var getHandler = new GetDocumentComplianceReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportDocumentComplianceReportHandler(getHandler, exporter);
+        var handler = new ExportDocumentComplianceReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportDocumentComplianceReportRequest(Guid.NewGuid(), null), CancellationToken.None);

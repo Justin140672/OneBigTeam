@@ -26,7 +26,7 @@ public class ExportOffboardingProgressReportHandlerTests
         var getHandler = new GetOffboardingProgressReportHandler(
             reader, new FakeEmployeeDepartmentReader(), new FakeEmployeeUserAccountStatusReader(), new FakeAssignedAssetReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportOffboardingProgressReportHandler(getHandler, exporter);
+        var handler = new ExportOffboardingProgressReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(new ExportOffboardingProgressReportRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -47,7 +47,7 @@ public class ExportOffboardingProgressReportHandlerTests
         var getHandler = new GetOffboardingProgressReportHandler(
             reader, new FakeEmployeeDepartmentReader(), new FakeEmployeeUserAccountStatusReader(), new FakeAssignedAssetReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportOffboardingProgressReportHandler(getHandler, exporter);
+        var handler = new ExportOffboardingProgressReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(new ExportOffboardingProgressReportRequest(Guid.NewGuid()), CancellationToken.None);
 

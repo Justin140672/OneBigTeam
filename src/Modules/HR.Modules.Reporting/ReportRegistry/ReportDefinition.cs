@@ -18,4 +18,5 @@ internal sealed record ReportDefinition(
     ReportCategory Category,
     string Description,
     ReportAccessGate AccessGate,
-    IReadOnlyDictionary<string, IReadOnlyCollection<string>?> Fields);
+    IReadOnlyDictionary<string, IReadOnlyCollection<string>?> Fields,
+    ReportSensitivity Sensitivity);

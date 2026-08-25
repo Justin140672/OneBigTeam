@@ -14,7 +14,7 @@ public class ExportRecruitmentPipelineReportHandlerTests
             recruiterRows: [new RecruitmentPipelineRecruiterRow(Guid.NewGuid(), "Bob", 3, 10, 4, 2, 1)]);
         var getHandler = new GetRecruitmentPipelineReportHandler(reader);
         var exporter = new FakeReportExporter();
-        var handler = new ExportRecruitmentPipelineReportHandler(getHandler, exporter);
+        var handler = new ExportRecruitmentPipelineReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportRecruitmentPipelineReportRequest(Guid.NewGuid()), CancellationToken.None);

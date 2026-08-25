@@ -18,7 +18,7 @@ public class ExportSicknessReportHandlerTests
         ]);
         var getHandler = new GetSicknessReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportSicknessReportHandler(getHandler, exporter);
+        var handler = new ExportSicknessReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportSicknessReportRequest(Guid.NewGuid()), CancellationToken.None);
@@ -40,7 +40,7 @@ public class ExportSicknessReportHandlerTests
         var reader = new FakeSicknessReportReader([]);
         var getHandler = new GetSicknessReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportSicknessReportHandler(getHandler, exporter);
+        var handler = new ExportSicknessReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         await handler.HandleAsync(
             new ExportSicknessReportRequest(Guid.NewGuid(), Format: ReportExportFormat.Pdf), CancellationToken.None);
@@ -59,7 +59,7 @@ public class ExportSicknessReportHandlerTests
         var reader = new FakeSicknessReportReader(records);
         var getHandler = new GetSicknessReportHandler(reader, new FakeEmployeeDepartmentReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportSicknessReportHandler(getHandler, exporter);
+        var handler = new ExportSicknessReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(new ExportSicknessReportRequest(Guid.NewGuid()), CancellationToken.None);
 

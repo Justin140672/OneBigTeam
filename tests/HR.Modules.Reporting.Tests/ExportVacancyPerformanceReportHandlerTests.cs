@@ -16,7 +16,7 @@ public class ExportVacancyPerformanceReportHandlerTests
         ]);
         var getHandler = new GetVacancyPerformanceReportHandler(reader);
         var exporter = new FakeReportExporter();
-        var handler = new ExportVacancyPerformanceReportHandler(getHandler, exporter);
+        var handler = new ExportVacancyPerformanceReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportVacancyPerformanceReportRequest(Guid.NewGuid()), CancellationToken.None);
@@ -38,7 +38,7 @@ public class ExportVacancyPerformanceReportHandlerTests
         ]);
         var getHandler = new GetVacancyPerformanceReportHandler(reader);
         var exporter = new FakeReportExporter();
-        var handler = new ExportVacancyPerformanceReportHandler(getHandler, exporter);
+        var handler = new ExportVacancyPerformanceReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         await handler.HandleAsync(new ExportVacancyPerformanceReportRequest(Guid.NewGuid()), CancellationToken.None);
 

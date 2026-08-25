@@ -24,7 +24,7 @@ public class ExportOnboardingProgressReportHandlerTests
         var reader = new FakeOnboardingReportReader([BuildItem(employeeId)]);
         var getHandler = new GetOnboardingProgressReportHandler(reader, new FakeEmployeeDepartmentReader(), new FakeDirectReportsReader());
         var exporter = new FakeReportExporter();
-        var handler = new ExportOnboardingProgressReportHandler(getHandler, exporter);
+        var handler = new ExportOnboardingProgressReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportOnboardingProgressReportRequest(Guid.NewGuid()),
@@ -49,7 +49,7 @@ public class ExportOnboardingProgressReportHandlerTests
         var directReportsReader = new FakeDirectReportsReader([]);
         var getHandler = new GetOnboardingProgressReportHandler(reader, new FakeEmployeeDepartmentReader(), directReportsReader);
         var exporter = new FakeReportExporter();
-        var handler = new ExportOnboardingProgressReportHandler(getHandler, exporter);
+        var handler = new ExportOnboardingProgressReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
 
         var result = await handler.HandleAsync(
             new ExportOnboardingProgressReportRequest(Guid.NewGuid()),
