@@ -28,9 +28,12 @@ internal sealed class DocumentExpiryReminderJob(
 {
     public async Task ExecuteAsync()
     {
+        // DOC-05: only latest-version, non-archived documents can still be actionable — a
+        // superseded version's expiry date is moot once a replacement exists, and this filter is
+        // also applied inside ProcessDocumentExpiryNotificationsHandler's own candidate query.
         var companyIds = await dbContext.EmployeeDocuments
             .AsNoTracking()
-            .Where(ed => ed.ExpiryDate != null)
+            .Where(ed => ed.ExpiryDate != null && ed.IsLatestVersion && !ed.IsArchived)
             .Select(ed => ed.CompanyId)
             .Distinct()
             .ToListAsync();

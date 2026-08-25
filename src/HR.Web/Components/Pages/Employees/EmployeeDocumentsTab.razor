@@ -87,6 +87,25 @@
                            IsOpen="_requestOpen"
                            OnSaved="OnDocumentRequested"
                            OnCancelled="@(() => _requestOpen = false)" />
+
+    @if (_versionTargetId.HasValue)
+    {
+        <UploadEmployeeDocumentVersionDialog CompanyId="CompanyId"
+                                             EmployeeId="EmployeeId"
+                                             EmployeeDocumentId="_versionTargetId.Value"
+                                             IsOpen="_uploadVersionOpen"
+                                             OnSaved="OnDocumentVersionUploaded"
+                                             OnCancelled="@(() => _uploadVersionOpen = false)" />
+    }
+
+    @if (_historyTargetId.HasValue)
+    {
+        <EmployeeDocumentVersionHistoryDialog CompanyId="CompanyId"
+                                              EmployeeId="EmployeeId"
+                                              EmployeeDocumentId="_historyTargetId.Value"
+                                              IsOpen="_historyOpen"
+                                              OnClosed="@(() => _historyOpen = false)" />
+    }
 }
 else
 {
@@ -154,7 +173,7 @@ else
                             <span class="badge @css">@label</span>
                         </Template>
                     </GridColumn>
-                    <GridColumn HeaderText="" Width="220" AllowSorting="false" AllowFiltering="false"
+                    <GridColumn HeaderText="" Width="380" AllowSorting="false" AllowFiltering="false"
                                 TextAlign="TextAlign.Right">
                         <Template>
                             @{ var r = (context as EmployeeDocumentListItem)!; }
@@ -176,6 +195,16 @@ else
                                 </a>
                                 @if (!EmployeeSelfUpload)
                                 {
+                                    <SfButton CssClass="e-outline e-small me-1"
+                                              OnClick="() => OpenUploadVersion(r.EmployeeDocumentId)"
+                                              title="Upload a replacement as a new version">
+                                        New Version
+                                    </SfButton>
+                                    <SfButton CssClass="e-outline e-small me-1"
+                                              OnClick="() => OpenHistory(r.EmployeeDocumentId)"
+                                              title="View version history">
+                                        History
+                                    </SfButton>
                                     <SfButton CssClass="e-danger e-outline e-small"
                                               OnClick="() => StartDelete(r.EmployeeDocumentId)">
                                         Delete
@@ -204,6 +233,11 @@ else
 
     private Guid? _deleteTargetId;
     private Guid? _cancelTargetId;
+
+    private bool _uploadVersionOpen;
+    private Guid? _versionTargetId;
+    private bool _historyOpen;
+    private Guid? _historyTargetId;
 
     private UploadRequestedDocumentDialog? _uploadRequestedDialog;
     private bool _uploadRequestedOpen;
@@ -251,6 +285,24 @@ else
     {
         _requestOpen = false;
         await LoadAsync();
+    }
+
+    private void OpenUploadVersion(Guid id)
+    {
+        _versionTargetId = id;
+        _uploadVersionOpen = true;
+    }
+
+    private async Task OnDocumentVersionUploaded()
+    {
+        _uploadVersionOpen = false;
+        await LoadAsync();
+    }
+
+    private void OpenHistory(Guid id)
+    {
+        _historyTargetId = id;
+        _historyOpen = true;
     }
 
     private void StartDelete(Guid id)   => _deleteTargetId = id;

@@ -60,6 +60,8 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
             join dt in db.DocumentTypes.AsNoTracking() on d.DocumentTypeId equals dt.Id
             where ed.CompanyId == request.CompanyId
                && ed.ExpiryDate != null
+               && ed.IsLatestVersion
+               && !ed.IsArchived
                && ((ed.ExpiryDate >= today && ed.ExpiryDate <= widestThreshold
                     && (ed.ExpiryReminder90SentAt == null || ed.ExpiryReminder30SentAt == null || ed.ExpiryReminder7SentAt == null))
                 || (ed.ExpiryDate < today && ed.ExpiredNotifiedAt == null))

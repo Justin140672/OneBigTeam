@@ -88,13 +88,36 @@ internal sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<E
         builder.Property(ed => ed.RestoredAt)
             .HasColumnName("restored_at");
 
+        // DOC-05: version lineage. IsLatestVersion defaults to true so the migration adding it
+        // is purely additive — every pre-existing row (all of which are, by definition, the only
+        // version that exists) becomes IsLatestVersion = true with no other changes.
+        builder.Property(ed => ed.PreviousVersionId)
+            .HasColumnName("previous_version_id");
+
+        builder.Property(ed => ed.IsLatestVersion)
+            .HasColumnName("is_latest_version")
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.HasOne<Document>()
             .WithMany()
             .HasForeignKey(ed => ed.DocumentId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Self-referencing FK for version lineage. Restrict (not Cascade) — deleting an
+        // EmployeeDocument row is not a supported operation in this module (archive is used
+        // instead), so there is no scenario where cascading a delete through the version chain
+        // should ever be needed; Restrict makes an accidental hard-delete of a linked row fail
+        // loudly instead of silently orphaning/cascading the chain.
+        builder.HasOne<EmployeeDocument>()
+            .WithMany()
+            .HasForeignKey(ed => ed.PreviousVersionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(ed => new { ed.CompanyId, ed.EmployeeId });
         builder.HasIndex(ed => new { ed.EmployeeId, ed.DocumentId }).IsUnique();
         builder.HasIndex(ed => new { ed.CompanyId, ed.IsArchived });
+        builder.HasIndex(ed => new { ed.CompanyId, ed.EmployeeId, ed.IsLatestVersion });
+        builder.HasIndex(ed => ed.PreviousVersionId).IsUnique();
     }
 }

@@ -1,0 +1,83 @@
+@using HR.Web.Models
+@using Syncfusion.Blazor.Grids
+@inject DocumentService DocumentService
+
+<SfDialog Visible="IsOpen" IsModal="true" Width="800px" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleClosed" />
+    <DialogTemplates>
+        <Header>Version History</Header>
+        <Content>
+            @if (_loading)
+            {
+                <HrLoadingIndicator Label="Loading version history…" />
+            }
+            else if (_versions.Count == 0)
+            {
+                <HrEmptyState Message="No version history recorded for this document." Icon="fa-solid fa-clock-rotate-left" />
+            }
+            else
+            {
+                <HrGrid TValue="EmployeeDocumentVersionHistoryItem" DataSource="@_versions" AllowPaging="false" AllowTextWrap="true" data-testid="employee-document-version-history-grid">
+                    <GridColumns>
+                        <GridColumn HeaderText="Status" Width="110">
+                            <Template>
+                                @{ var v = (context as EmployeeDocumentVersionHistoryItem)!; }
+                                @if (v.IsLatestVersion)
+                                {
+                                    <span class="badge text-bg-success">Current</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-secondary">Previous</span>
+                                }
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Field="@nameof(EmployeeDocumentVersionHistoryItem.FileName)" HeaderText="File Name" Width="220" />
+                        <GridColumn Field="@nameof(EmployeeDocumentVersionHistoryItem.IssueDate)" HeaderText="Issue Date" Width="120" Format="d" />
+                        <GridColumn Field="@nameof(EmployeeDocumentVersionHistoryItem.ExpiryDate)" HeaderText="Expiry Date" Width="120" Format="d" />
+                        <GridColumn Field="@nameof(EmployeeDocumentVersionHistoryItem.UploadedAt)" HeaderText="Uploaded At" Width="170" Format="g" />
+                        <GridColumn HeaderText="Download" Width="100">
+                            <Template>
+                                @{ var v = (context as EmployeeDocumentVersionHistoryItem)!; }
+                                <a class="e-btn e-outline e-small"
+                                   href="@DocumentService.GetEmployeeDocumentDownloadUrl(CompanyId, EmployeeId, v.EmployeeDocumentId)"
+                                   target="_blank">
+                                    Download
+                                </a>
+                            </Template>
+                        </GridColumn>
+                    </GridColumns>
+                </HrGrid>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton OnClick="HandleClosed">Close</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId          { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId         { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeDocumentId { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    private bool _loading = true;
+    private IReadOnlyList<EmployeeDocumentVersionHistoryItem> _versions = [];
+    private bool _wasOpen;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && !_wasOpen)
+        {
+            _loading = true;
+            _versions = await DocumentService.GetEmployeeDocumentVersionHistoryAsync(CompanyId, EmployeeId, EmployeeDocumentId);
+            _loading = false;
+        }
+
+        _wasOpen = IsOpen;
+    }
+
+    private async Task HandleClosed() => await OnClosed.InvokeAsync();
+}

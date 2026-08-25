@@ -14,6 +14,35 @@ public sealed record EmployeeDocumentListItem(
     bool     IsAcknowledged,
     DateTimeOffset CreatedAt);
 
+public sealed record UploadEmployeeDocumentVersionResponse(
+    Guid     DocumentId,
+    Guid     EmployeeDocumentId,
+    Guid?    PreviousVersionId,
+    Guid     CompanyId,
+    Guid     EmployeeId,
+    string   Title,
+    string   FileName,
+    long     FileSize,
+    string   ContentType,
+    Guid     DocumentTypeId,
+    DateOnly? IssueDate,
+    DateOnly? ExpiryDate,
+    DateTimeOffset CreatedAt);
+
+public sealed record GetEmployeeDocumentVersionHistoryResponse(IReadOnlyList<EmployeeDocumentVersionHistoryItem> Versions);
+
+public sealed record EmployeeDocumentVersionHistoryItem(
+    Guid     EmployeeDocumentId,
+    Guid?    PreviousVersionId,
+    bool     IsLatestVersion,
+    string   FileName,
+    long     FileSize,
+    Guid     UploadedBy,
+    DateTimeOffset UploadedAt,
+    DateOnly? IssueDate,
+    DateOnly? ExpiryDate,
+    bool     IsArchived);
+
 public sealed record DocumentTypeListResponse(IReadOnlyList<DocumentTypeItem> Items);
 
 public sealed record DocumentTypeItem(Guid Id, string Name, string? Description, bool IsActive, bool AllowEmployeeUpload);

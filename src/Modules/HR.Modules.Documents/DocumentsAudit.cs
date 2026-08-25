@@ -579,6 +579,66 @@ internal sealed record DocumentUploadedAuditEvent(
     object? IAuditEvent.Metadata       => new { IsManagerUpload };
 }
 
+/// <summary>
+/// DOC-05: raised when a new version of an employee document is uploaded (e.g. renewing an
+/// expired passport/visa/licence). Distinct from DocumentUploadedAuditEvent — that event covers
+/// the first version of a lineage; this one captures the supersession relationship (PreviousVersionId)
+/// so the audit trail can show "this replaced that" without needing to separately query the entity.
+/// </summary>
+internal sealed record EmployeeDocumentVersionUploadedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeDocumentId,
+    Guid PreviousVersionId,
+    Guid EmployeeId,
+    string Title,
+    string DocumentTypeName,
+    string FileName,
+    long FileSize,
+    DateOnly? IssueDate,
+    DateOnly? ExpiryDate,
+    Guid UploadedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "employee_document.version_uploaded";
+    string  IAuditEvent.EntityType      => "EmployeeDocument";
+    Guid    IAuditEvent.EntityId        => EmployeeDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?   IAuditEvent.ActorUserId     => UploadedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"New version uploaded for document '{Title}'";
+    object? IAuditEvent.Before          => new { PreviousVersionId };
+    object? IAuditEvent.After           => new { Title, DocumentTypeName, FileName, FileSize, IssueDate, ExpiryDate, EmployeeId };
+    object? IAuditEvent.Metadata        => null;
+}
+
+/// <summary>
+/// DOC-05: raised whenever an HR administrator views the full version history of an employee
+/// document lineage — mirrors the audit-on-read convention used for other HR-only history/archive
+/// views in this module (e.g. archived-document access is itself only reachable via an audited
+/// HR-only endpoint).
+/// </summary>
+internal sealed record EmployeeDocumentVersionHistoryViewedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeDocumentId,
+    Guid EmployeeId,
+    int VersionCount,
+    Guid ViewedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "employee_document.version_history_viewed";
+    string  IAuditEvent.EntityType      => "EmployeeDocument";
+    Guid    IAuditEvent.EntityId        => EmployeeDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?   IAuditEvent.ActorUserId     => ViewedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Version history viewed for employee '{EmployeeId}'";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => null;
+    object? IAuditEvent.Metadata        => new { VersionCount };
+}
+
 internal sealed record ProfilePhotoUploadedAuditEvent(
     Guid CompanyId,
     Guid EmployeeProfilePhotoId,

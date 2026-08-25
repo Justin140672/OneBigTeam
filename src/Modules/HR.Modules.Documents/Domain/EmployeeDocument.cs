@@ -40,6 +40,20 @@ internal sealed class EmployeeDocument
     public Guid? RestoredByUserId { get; private set; }
     public DateTimeOffset? RestoredAt { get; private set; }
 
+    // DOC-05: version lineage. PreviousVersionId links a replacement upload back to the
+    // EmployeeDocument row it supersedes (null for the first version of a lineage).
+    // IsLatestVersion is a persisted flag (per the standing "prefer a real column over a
+    // computed property" preference) rather than derived by absence of a "next version" FK,
+    // because deriving it would require either a reverse-navigation query per row or a
+    // NextVersionId column maintained on the OLD row at the moment a new version is created —
+    // this is simpler and lets normal list/get queries filter with a single indexed boolean.
+    // A new version never mutates or archives the row it replaces; the old row stays exactly as
+    // it was (IsArchived unchanged, its own audit trail untouched) with only IsLatestVersion
+    // flipped to false, so "previous versions remain immutable and available" holds by
+    // construction — nothing about the previous row's content ever changes here.
+    public Guid? PreviousVersionId { get; private set; }
+    public bool IsLatestVersion { get; private set; }
+
     public static EmployeeDocument Create(
         Guid id,
         Guid companyId,
@@ -48,18 +62,35 @@ internal sealed class EmployeeDocument
         Guid addedBy,
         DateTimeOffset now,
         DateOnly? issueDate  = null,
-        DateOnly? expiryDate = null) => new()
+        DateOnly? expiryDate = null,
+        Guid? previousVersionId = null) => new()
     {
-        Id         = id,
-        CompanyId  = companyId,
-        EmployeeId = employeeId,
-        DocumentId = documentId,
-        AddedBy    = addedBy,
-        IssueDate  = issueDate,
-        ExpiryDate = expiryDate,
-        CreatedAt  = now,
-        UpdatedAt  = now,
+        Id                = id,
+        CompanyId         = companyId,
+        EmployeeId        = employeeId,
+        DocumentId        = documentId,
+        AddedBy           = addedBy,
+        IssueDate         = issueDate,
+        ExpiryDate        = expiryDate,
+        CreatedAt         = now,
+        UpdatedAt         = now,
+        PreviousVersionId = previousVersionId,
+        IsLatestVersion   = true,
     };
+
+    /// <summary>
+    /// DOC-05: marks this row as no longer the latest version, because a replacement has just
+    /// been uploaded (see UploadEmployeeDocumentVersionHandler). Deliberately does nothing else —
+    /// no archive flag, no expiry/reminder state change, no metadata edit — so this row's own
+    /// audit history (uploads, downloads, prior archive/restore events) is preserved exactly as
+    /// it was; it simply stops being returned by normal "current documents" views and only
+    /// remains reachable through GetEmployeeDocumentVersionHistory.
+    /// </summary>
+    public void SupersedeAsPreviousVersion(DateTimeOffset now)
+    {
+        IsLatestVersion = false;
+        UpdatedAt       = now;
+    }
 
     public DocumentExpiryStatus GetExpiryStatus(DateOnly today) => ExpiryDate switch
     {

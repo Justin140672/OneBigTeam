@@ -1,0 +1,96 @@
+@using System.ComponentModel.DataAnnotations
+@inject DocumentService DocumentService
+@inherits EditDialogBase<UploadEmployeeDocumentVersionDialog.UploadEmployeeDocumentVersionFormModel>
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="560px" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>Upload New Version</Header>
+        <Content>
+            @if (!string.IsNullOrEmpty(GlobalError))
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @GlobalError
+                    <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
+                </div>
+            }
+            <EditForm EditContext="EditContext">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">File <span class="text-danger">*</span></label>
+                        <InputFile class="form-control" OnChange="OnFileSelected"
+                                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
+                        <div class="form-text">
+                            PDF, Word, or image files up to 20 MB. Replaces this document with a new version —
+                            the previous version is kept and remains available in version history.
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Issue Date</label>
+                        <SfDatePicker TValue="DateOnly?"
+                                      @bind-Value="Model.IssueDate"
+                                      Format="dd/MM/yyyy"
+                                      Placeholder="dd/mm/yyyy"
+                                      ShowClearButton="true" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Expiry Date</label>
+                        <SfDatePicker TValue="DateOnly?"
+                                      @bind-Value="Model.ExpiryDate"
+                                      Format="dd/MM/yyyy"
+                                      Placeholder="dd/mm/yyyy"
+                                      ShowClearButton="true" />
+                    </div>
+                </div>
+            </EditForm>
+        </Content>
+        <FooterTemplate>
+            <HrDialogButtonBar SaveLabel="Upload" Saving="Saving" OnSave="SubmitAsync" OnCancel="CancelAsync" />
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+<UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                      OnSaveAndClose="ConfirmSaveInsteadOfCancelAsync"
+                      OnDiscard="ConfirmDiscardAsync"
+                      OnCancel="CancelUnsavedChangesDialog" />
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId          { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId         { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeDocumentId { get; set; }
+
+    private IBrowserFile? _selectedFile;
+
+    protected override Task OnOpenedAsync()
+    {
+        GlobalError = null;
+        _selectedFile = null;
+        return Task.CompletedTask;
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+
+    protected override string? ValidateExtra() =>
+        _selectedFile is null ? "Please select a file." : null;
+
+    protected override async Task<string?> SaveCoreAsync() =>
+        await DocumentService.UploadEmployeeDocumentVersionAsync(
+            CompanyId, EmployeeId, EmployeeDocumentId,
+            Model.IssueDate, Model.ExpiryDate,
+            _selectedFile!);
+
+    protected override void ResetForm()
+    {
+        Model.IssueDate = null;
+        Model.ExpiryDate = null;
+        _selectedFile = null;
+    }
+
+    public sealed class UploadEmployeeDocumentVersionFormModel
+    {
+        public DateOnly? IssueDate { get; set; }
+        public DateOnly? ExpiryDate { get; set; }
+    }
+}

@@ -49,6 +49,8 @@ using HR.Modules.Documents.Features.CancelDocumentRequest;
 using HR.Modules.Documents.Features.RequestAdditionalEmployeeDocument;
 using HR.Modules.Documents.Features.ListEmployeeDocuments;
 using HR.Modules.Documents.Features.UploadEmployeeDocument;
+using HR.Modules.Documents.Features.UploadEmployeeDocumentVersion;
+using HR.Modules.Documents.Features.GetEmployeeDocumentVersionHistory;
 using HR.Modules.Documents.Features.UploadEmployeeProfilePhoto;
 using HR.Modules.Documents.Features.UploadMyProfilePhoto;
 using HR.Modules.Documents.Features.CancelPendingProfilePhoto;
@@ -209,6 +211,15 @@ public static class DocumentsModule
 
         services.AddScoped<UploadEmployeeDocumentHandler>();
         services.AddScoped<IValidator<UploadEmployeeDocumentRequest>, UploadEmployeeDocumentValidator>();
+
+        // DOC-05: version history for employee documents — a replacement upload creates a new
+        // linked EmployeeDocument row (see EmployeeDocument.PreviousVersionId/IsLatestVersion)
+        // rather than an unrelated record.
+        services.AddScoped<UploadEmployeeDocumentVersionHandler>();
+        services.AddScoped<IValidator<UploadEmployeeDocumentVersionRequest>, UploadEmployeeDocumentVersionValidator>();
+
+        services.AddScoped<GetEmployeeDocumentVersionHistoryHandler>();
+        services.AddScoped<IValidator<GetEmployeeDocumentVersionHistoryRequest>, GetEmployeeDocumentVersionHistoryValidator>();
 
         services.AddScoped<UploadEmployeeProfilePhotoHandler>();
         services.AddScoped<IValidator<UploadEmployeeProfilePhotoRequest>, UploadEmployeeProfilePhotoValidator>();

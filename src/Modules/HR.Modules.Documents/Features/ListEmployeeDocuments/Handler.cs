@@ -17,6 +17,7 @@ internal sealed class ListEmployeeDocumentsHandler(DocumentsDbContext db)
             where ed.CompanyId  == request.CompanyId
                && ed.EmployeeId == request.EmployeeId
                && !ed.IsArchived
+               && ed.IsLatestVersion
             select new { ed, d, dt };
 
         if (request.Status.HasValue)
