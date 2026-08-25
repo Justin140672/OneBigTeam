@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using HR.Infrastructure.Abstractions;
 using HR.Infrastructure.Persistence;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
@@ -394,6 +395,213 @@ public class NotificationsEndpointTests
         Assert.All(payload.Items, n => Assert.True(n.IsRead));
     }
 
+    // ── NOT-06: pagination, filters, and independent unread count ───────────────────
+
+    [Fact]
+    public async Task GetMyNotifications_Returns_Validation_Error_For_PageNumber_Zero()
+    {
+        using var client = await AuthenticatedClient(Guid.NewGuid());
+
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/my?PageNumber=0");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetMyNotifications_Returns_Validation_Error_For_PageSize_Zero()
+    {
+        using var client = await AuthenticatedClient(Guid.NewGuid());
+
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/my?PageSize=0");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetMyNotifications_Returns_Validation_Error_For_PageSize_Above_OneHundred()
+    {
+        using var client = await AuthenticatedClient(Guid.NewGuid());
+
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/my?PageSize=101");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetMyNotifications_Returns_Correct_Shape_With_Pagination_Fields()
+    {
+        var userId       = Guid.NewGuid();
+        using var client = await AuthenticatedClient(userId);
+
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Shape test", assignedEmployeeId: userId);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/my?PageNumber=1&PageSize=10");
+        var payload = await response.Content.ReadFromJsonAsync<NotifListPayload>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, payload!.TotalCount);
+        Assert.Equal(1, payload.PageNumber);
+        Assert.Equal(10, payload.PageSize);
+        Assert.Equal(1, payload.TotalPages);
+        Assert.Equal(1, payload.UnreadCount);
+    }
+
+    [Fact]
+    public async Task GetMyNotifications_UnreadCount_Is_Not_Capped_By_PageSize_When_More_Than_Fifty_Unread()
+    {
+        var userId       = Guid.NewGuid();
+        using var client = await AuthenticatedClient(userId);
+
+        for (var i = 0; i < 60; i++)
+        {
+            await NotificationSeeder.SeedAsync(
+                _factory, SeededCompanyId, userId, $"Bulk {i}",
+                createdAt: DateTimeOffset.UtcNow.AddMinutes(-i));
+        }
+
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/my?PageNumber=1&PageSize=20");
+        var payload = await response.Content.ReadFromJsonAsync<NotifListPayload>();
+
+        Assert.Equal(60, payload!.UnreadCount);
+        Assert.Equal(20, payload.Items.Count);
+        Assert.Equal(60, payload.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetMyNotifications_Filters_By_IsRead()
+    {
+        var userId       = Guid.NewGuid();
+        using var client = await AuthenticatedClient(userId);
+
+        await NotificationSeeder.SeedAsync(_factory, SeededCompanyId, userId, "Read one", isRead: true);
+        await NotificationSeeder.SeedAsync(_factory, SeededCompanyId, userId, "Unread one", isRead: false);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/my?IsRead=true");
+        var payload = await response.Content.ReadFromJsonAsync<NotifListPayload>();
+
+        var item = Assert.Single(payload!.Items);
+        Assert.Equal("Read one", item.Title);
+        Assert.Equal(1, payload.UnreadCount);
+    }
+
+    [Fact]
+    public async Task GetMyNotifications_Filters_By_Type_And_Priority()
+    {
+        var userId       = Guid.NewGuid();
+        using var client = await AuthenticatedClient(userId);
+
+        await NotificationSeeder.SeedAsync(
+            _factory, SeededCompanyId, userId, "Leave notification",
+            type: NotificationType.LeaveApproved, priority: NotificationPriority.Urgent);
+        await NotificationSeeder.SeedAsync(
+            _factory, SeededCompanyId, userId, "Task notification",
+            type: NotificationType.TaskAssigned, priority: NotificationPriority.Low);
+
+        var typeResponse = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/my?Type=LeaveApproved");
+        var typePayload = await typeResponse.Content.ReadFromJsonAsync<NotifListPayload>();
+        var typeItem = Assert.Single(typePayload!.Items);
+        Assert.Equal("Leave notification", typeItem.Title);
+
+        var priorityResponse = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/my?Priority=Urgent");
+        var priorityPayload = await priorityResponse.Content.ReadFromJsonAsync<NotifListPayload>();
+        var priorityItem = Assert.Single(priorityPayload!.Items);
+        Assert.Equal("Leave notification", priorityItem.Title);
+    }
+
+    [Fact]
+    public async Task GetMyNotifications_Filters_By_CreatedFrom_And_CreatedTo()
+    {
+        var userId       = Guid.NewGuid();
+        using var client = await AuthenticatedClient(userId);
+
+        var now = DateTimeOffset.UtcNow;
+        await NotificationSeeder.SeedAsync(_factory, SeededCompanyId, userId, "Too old", createdAt: now.AddDays(-10));
+        await NotificationSeeder.SeedAsync(_factory, SeededCompanyId, userId, "In range", createdAt: now.AddDays(-2));
+        await NotificationSeeder.SeedAsync(_factory, SeededCompanyId, userId, "Too new", createdAt: now.AddDays(5));
+
+        var from = now.AddDays(-3);
+        var to   = now.AddDays(-1);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/my?CreatedFrom={Uri.EscapeDataString(from.ToString("O"))}&CreatedTo={Uri.EscapeDataString(to.ToString("O"))}");
+        var payload = await response.Content.ReadFromJsonAsync<NotifListPayload>();
+
+        var item = Assert.Single(payload!.Items);
+        Assert.Equal("In range", item.Title);
+    }
+
+    [Fact]
+    public async Task GetMyNotifications_MarkNotificationRead_Updates_Subsequent_UnreadCount()
+    {
+        var userId       = Guid.NewGuid();
+        using var client = await AuthenticatedClient(userId);
+
+        await NotificationSeeder.SeedAsync(_factory, SeededCompanyId, userId, "First");
+        await NotificationSeeder.SeedAsync(_factory, SeededCompanyId, userId, "Second");
+
+        var listResp    = await client.GetAsync($"/api/companies/{SeededCompanyId}/notifications/my");
+        var listPayload = await listResp.Content.ReadFromJsonAsync<NotifListPayload>();
+        Assert.Equal(2, listPayload!.UnreadCount);
+
+        var notifId = listPayload.Items[0].Id;
+        var markResp = await client.PutAsJsonAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/{notifId}/read",
+            new { companyId = SeededCompanyId, notificationId = notifId });
+        Assert.Equal(HttpStatusCode.NoContent, markResp.StatusCode);
+
+        var afterResp    = await client.GetAsync($"/api/companies/{SeededCompanyId}/notifications/my");
+        var afterPayload = await afterResp.Content.ReadFromJsonAsync<NotifListPayload>();
+        Assert.Equal(1, afterPayload!.UnreadCount);
+    }
+
+    [Fact]
+    public async Task GetMyNotifications_MarkAllNotificationsRead_Updates_Subsequent_UnreadCount()
+    {
+        var userId       = Guid.NewGuid();
+        using var client = await AuthenticatedClient(userId);
+
+        await NotificationSeeder.SeedAsync(_factory, SeededCompanyId, userId, "First");
+        await NotificationSeeder.SeedAsync(_factory, SeededCompanyId, userId, "Second");
+        await NotificationSeeder.SeedAsync(_factory, SeededCompanyId, userId, "Third");
+
+        var markAllResp = await client.PutAsJsonAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{userId}/notifications/read-all",
+            new { companyId = SeededCompanyId, employeeId = userId });
+        Assert.Equal(HttpStatusCode.NoContent, markAllResp.StatusCode);
+
+        var afterResp    = await client.GetAsync($"/api/companies/{SeededCompanyId}/notifications/my");
+        var afterPayload = await afterResp.Content.ReadFromJsonAsync<NotifListPayload>();
+        Assert.Equal(0, afterPayload!.UnreadCount);
+    }
+
+    [Fact]
+    public async Task GetMyNotifications_Tenant_Isolation_Employee_Cannot_See_Other_Companys_Notifications()
+    {
+        var userId      = Guid.NewGuid();
+        var companyB    = Guid.NewGuid();
+
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, companyB);
+        await NotificationSeeder.SeedAsync(_factory, companyB, userId, "Company B notification");
+
+        // Same employee id, but authenticated against the seeded company (A) — the notification
+        // was written for company B and must not leak across the CompanyId scope.
+        using var client = await AuthenticatedClient(userId);
+
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/notifications/my");
+        var payload  = await response.Content.ReadFromJsonAsync<NotifListPayload>();
+
+        Assert.Empty(payload!.Items);
+        Assert.Equal(0, payload.UnreadCount);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId)
@@ -415,6 +623,13 @@ public class NotificationsEndpointTests
         return listPayload!.Items[0].Id;
     }
 
-    private sealed record NotifListPayload(int UnreadCount, IReadOnlyList<NotifItem> Items);
+    private sealed record NotifListPayload(
+        int UnreadCount,
+        IReadOnlyList<NotifItem> Items,
+        int TotalCount = 0,
+        int PageNumber = 0,
+        int PageSize = 0,
+        int TotalPages = 0);
+
     private sealed record NotifItem(Guid Id, string Title, bool IsRead, string Type);
 }

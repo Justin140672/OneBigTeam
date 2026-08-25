@@ -61,7 +61,11 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
             .HasColumnName("action_url")
             .HasMaxLength(500);
 
-        builder.HasIndex(n => new { n.CompanyId, n.EmployeeId, n.IsRead });
+        // NOT-06: composite index optimized for the most common query shape — "my
+        // (unread) notifications, newest first" — used by both GetMyNotifications' paginated/
+        // filtered history query and GetUnreadNotificationCount's independent COUNT query.
+        // Replaces the narrower (CompanyId, EmployeeId, IsRead) index below.
+        builder.HasIndex(n => new { n.CompanyId, n.EmployeeId, n.IsRead, n.CreatedAt });
 
         builder.HasIndex(n => new { n.EmployeeId, n.SourceEntityId, n.Type }).IsUnique();
     }

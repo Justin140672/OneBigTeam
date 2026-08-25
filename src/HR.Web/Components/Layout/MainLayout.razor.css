@@ -334,6 +334,31 @@
     font-size: 0.875rem;
 }
 
+.notif-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--hr-gray-100);
+    text-align: center;
+}
+
+.notif-load-more {
+    border: none;
+    background: none;
+    color: var(--hr-color-primary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 4px 0;
+    width: 100%;
+}
+
+.notif-load-more:hover:not(:disabled) {
+    text-decoration: underline;
+}
+
+.notif-load-more:disabled {
+    color: var(--hr-gray-400);
+    cursor: default;
+}
+
 .notif-item {
     padding: 12px 16px;
     cursor: pointer;

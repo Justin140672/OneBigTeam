@@ -228,6 +228,14 @@ else
                                             }
                                         }
                                     </div>
+                                    @if (_notifications.Count > 0 && _notifHasMore)
+                                    {
+                                        <div class="notif-footer">
+                                            <button class="notif-load-more" disabled="@_notifLoadingMore" @onclick="LoadMoreNotificationsAsync">
+                                                @(_notifLoadingMore ? "Loading…" : "Load more")
+                                            </button>
+                                        </div>
+                                    }
                                 </div>
                             }
                         </div>
@@ -326,6 +334,12 @@ else
     private bool _notifOpen;
     private bool _helpOpen;
 
+    // NOT-06: progressive "load more" paging state for the notification dropdown.
+    private const int NotifPageSize = 20;
+    private int _notifPageNumber = 1;
+    private bool _notifHasMore;
+    private bool _notifLoadingMore;
+
     private IReadOnlyList<DevPersonaDto> _personas = [];
     private List<PersonaOption> _personaOptions = [];
 
@@ -413,10 +427,37 @@ else
     private async Task LoadNotificationsAsync()
     {
         if (!Session.EmployeeId.HasValue) return;
-        var result = await NotificationService.GetAsync(Session.CompanyId);
+        _notifPageNumber = 1;
+        var result = await NotificationService.GetAsync(Session.CompanyId, _notifPageNumber, NotifPageSize);
         if (result is null) return;
         _unreadCount = result.UnreadCount;
         _notifications = result.Items;
+        _notifHasMore = result.PageNumber < result.TotalPages;
+    }
+
+    // NOT-06: appends the next page to the existing list rather than replacing it, so the user can
+    // progressively load older notifications from the dropdown. UnreadCount is re-synced from each
+    // response too, since it's independent of which page was just fetched.
+    private async Task LoadMoreNotificationsAsync()
+    {
+        if (!Session.EmployeeId.HasValue || _notifLoadingMore || !_notifHasMore) return;
+
+        _notifLoadingMore = true;
+        try
+        {
+            var nextPage = _notifPageNumber + 1;
+            var result = await NotificationService.GetAsync(Session.CompanyId, nextPage, NotifPageSize);
+            if (result is null) return;
+
+            _notifPageNumber = nextPage;
+            _unreadCount = result.UnreadCount;
+            _notifications.AddRange(result.Items);
+            _notifHasMore = result.PageNumber < result.TotalPages;
+        }
+        finally
+        {
+            _notifLoadingMore = false;
+        }
     }
 
     private async Task ToggleNotifications()

@@ -24,7 +24,18 @@ internal sealed class Endpoint(GetMyNotificationsHandler handler, ICurrentUser c
         }
 
         var result = await handler.HandleAsync(
-            new GetMyNotificationsRequest { CompanyId = request.CompanyId, EmployeeId = employeeId },
+            new GetMyNotificationsRequest
+            {
+                CompanyId = request.CompanyId,
+                EmployeeId = employeeId,
+                IsRead = request.IsRead,
+                Type = request.Type,
+                Priority = request.Priority,
+                CreatedFrom = request.CreatedFrom,
+                CreatedTo = request.CreatedTo,
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+            },
             cancellationToken);
 
         await Send.ResultAsync(TypedResults.Ok(result));
