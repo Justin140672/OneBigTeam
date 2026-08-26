@@ -26,6 +26,16 @@ internal sealed class Endpoint(
                 await Send.ResultAsync(TypedResults.NotFound(error));
                 return;
             }
+            if (result.Error.Code == "forbidden")
+            {
+                await Send.ResultAsync(Results.Json(error, statusCode: StatusCodes.Status403Forbidden));
+                return;
+            }
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(error));
+                return;
+            }
             await Send.ResultAsync(TypedResults.UnprocessableEntity(error));
             return;
         }

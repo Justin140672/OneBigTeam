@@ -1,4 +1,5 @@
 using HR.Modules.Identity.Authorization;
+using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -14,7 +15,8 @@ internal sealed class DisableUserHandler(
     IdentityDbContext db,
     IClock clock,
     IAuditEventPublisher auditEventPublisher,
-    ITargetUserCompanyGuard targetUserCompanyGuard)
+    ITargetUserCompanyGuard targetUserCompanyGuard,
+    LastActiveAdministratorGuard lastActiveAdministratorGuard)
 {
     public async Task<Result<DisableUserResponse>> HandleAsync(
         DisableUserRequest request,
@@ -34,6 +36,43 @@ internal sealed class DisableUserHandler(
             return Result.Failure<DisableUserResponse>(Error.Conflict("User account is already disabled."));
 
         var now = clock.UtcNow;
+
+        // IAM-02: disabling the account of the last active holder of a lockout-protected role
+        // (Company Administrator, HR Administrator) would silently lock the company out of that
+        // administration capability just as effectively as removing the role directly — apply the
+        // same safeguard as Features/UpdateUserRoles, evaluated per role independently so a
+        // multi-role holder can still be disabled as long as someone else actively holds each of
+        // their protected roles.
+        var protectedRoleIds = (await db.UserRoles
+            .Where(ur => ur.UserId == request.UserId)
+            .Select(ur => ur.RoleId)
+            .ToListAsync(cancellationToken))
+            .Where(RoleAdministrationPolicy.IsLockoutProtected)
+            .ToList();
+
+        foreach (var protectedRoleId in protectedRoleIds)
+        {
+            var hasOtherActiveHolder = await lastActiveAdministratorGuard.HasOtherActiveHolderAsync(
+                request.CompanyId, protectedRoleId, request.UserId, cancellationToken);
+
+            if (!hasOtherActiveHolder)
+            {
+                await auditEventPublisher.PublishAsync(
+                    new RoleChangeRejectedAuditEvent(
+                        request.CompanyId,
+                        request.UserId,
+                        request.UserId,
+                        "last_active_administrator_disable",
+                        [],
+                        actorUserId,
+                        now),
+                    cancellationToken);
+
+                return Result.Failure<DisableUserResponse>(
+                    Error.Conflict("This user is the last active holder of a protected administrator role and cannot be disabled."));
+            }
+        }
+
         user.Deactivate(now);
         await db.SaveChangesAsync(cancellationToken);
 

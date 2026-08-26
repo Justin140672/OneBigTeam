@@ -80,6 +80,7 @@ public static class IdentityModule
         services.AddScoped<HR.Modules.Identity.Authorization.ITargetUserCompanyGuard,
             HR.Modules.Identity.Authorization.TargetUserCompanyGuard>();
         services.AddScoped<HR.SharedKernel.IAuthorizationService, IdentityAuthorizationService>();
+        services.AddScoped<HR.Modules.Identity.Authorization.LastActiveAdministratorGuard>();
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, RoleAuthorizationHandler>();
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PlatformAdminAuthorizationHandler>();
         services.AddSingleton<IClock, SystemClock>();

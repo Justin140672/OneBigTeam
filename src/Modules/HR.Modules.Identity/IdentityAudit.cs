@@ -93,6 +93,34 @@ internal sealed record UserRolesChangedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
+// IAM-02: published when a role-change request is rejected by a server-side safeguard
+// (self-elevation, granting/revoking a role the actor is not authorised to administer, attempting
+// to remove the mandatory Employee role, or attempting to remove/disable the last active holder of
+// a lockout-protected role). CompanyId/UserId identify the target of the attempted change;
+// ActorUserId identifies who attempted it. Reason is a short machine-readable code, not raw request
+// payload, so this never leaks sensitive data into the audit trail.
+internal sealed record RoleChangeRejectedAuditEvent(
+    Guid CompanyId,
+    Guid UserId,
+    Guid EmployeeId,
+    string Reason,
+    IReadOnlyList<Guid> RequestedRoleIds,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "user.role-change-rejected";
+    string IAuditEvent.EntityType      => "ApplicationUser";
+    Guid   IAuditEvent.EntityId        => UserId;
+    Guid?  IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId     => ActorUserId;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => $"Rejected role change: {Reason}";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => new { RequestedRoleIds };
+    object? IAuditEvent.Metadata       => new { Reason };
+}
+
 // Published when a user account is manually disabled by an administrator (Features/DisableUser).
 internal sealed record UserDisabledAuditEvent(
     Guid CompanyId,

@@ -131,17 +131,51 @@ public class UpdateUserRolesEndpointTests
         using var client = AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
         var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, "test3@test.com");
-        var roleId = await IdentityUserAdminTestHelpers.SeedRoleAsync(_factory, $"Role-{Guid.NewGuid():N}");
 
+        // IAM-02: the Employee role is mandatory and can never be removed via this endpoint, and
+        // HR Administrator (the seeded actor) may only administer Employee/Manager/Recruiter/
+        // HrAdministrator — a freestanding custom role is outside its administrable set.
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/users/{userId}/roles",
-            new { companyId, userId, roleIds = new[] { roleId } });
+            new { companyId, userId, roleIds = new[] { SystemRoles.Employee, SystemRoles.Manager } });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         var roles = await db.UserRoles.Where(ur => ur.UserId == userId).Select(ur => ur.RoleId).ToListAsync();
-        Assert.Contains(roleId, roles);
+        Assert.Contains(SystemRoles.Manager, roles);
+        Assert.Contains(SystemRoles.Employee, roles);
+    }
+
+    [Fact]
+    public async Task Put_UpdateUserRoles_Returns_Forbidden_When_Granting_A_Role_Outside_Actors_Administrable_Set()
+    {
+        // HR Administrator (the seeded actor) is not authorised to administer Company Administrator.
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
+        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, $"forbid.{Guid.NewGuid():N}@test.com");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/users/{userId}/roles",
+            new { companyId, userId, roleIds = new[] { SystemRoles.Employee, SystemRoles.CompanyAdministrator } });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_UpdateUserRoles_Returns_UnprocessableEntity_When_Employee_Role_Removed()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
+        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, $"noemp.{Guid.NewGuid():N}@test.com");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/users/{userId}/roles",
+            new { companyId, userId, roleIds = new[] { SystemRoles.Manager } });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 }
