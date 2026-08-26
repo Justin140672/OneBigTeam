@@ -82,6 +82,24 @@ public class GetUserDetailsEndpointTests
         Assert.Equal("NoAccount", payload.AccountStatus);
     }
 
+    [Fact]
+    public async Task Get_UserDetails_Returns_NotFound_When_Employee_Belongs_To_Another_Company()
+    {
+        // IAM-01 regression: an HR Administrator for Company A must not be able to resolve a
+        // real employee that belongs to Company B just by supplying their id, even though the
+        // route's companyId is Company A's own (so tenant middleware alone would let this through).
+        var ownCompanyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        var otherCompanyEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, otherCompanyId, "Other", "Company");
+        await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, otherCompanyId, otherCompanyEmployeeId, "othercompany@test.com");
+
+        using var client = AuthenticatedClient(ownCompanyId);
+
+        var response = await client.GetAsync($"/api/companies/{ownCompanyId}/users/{otherCompanyEmployeeId}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private sealed record DetailsPayload(
         Guid EmployeeId,
         Guid? UserId,

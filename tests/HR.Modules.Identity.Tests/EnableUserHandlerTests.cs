@@ -11,8 +11,8 @@ public class EnableUserHandlerTests(IdentityDatabaseFixture fixture)
     private static readonly DateTimeOffset Now = new(2026, 6, 6, 12, 0, 0, TimeSpan.Zero);
     private static readonly FakeClock Clock = new(Now.UtcDateTime);
 
-    private EnableUserHandler BuildHandler(FakeAuditEventPublisher auditPublisher) =>
-        new(fixture.BuildContext(), Clock, auditPublisher);
+    private EnableUserHandler BuildHandler(FakeAuditEventPublisher auditPublisher, FakeTargetUserCompanyGuard? guard = null) =>
+        new(fixture.BuildContext(), Clock, auditPublisher, guard ?? new FakeTargetUserCompanyGuard());
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_User_Missing()
@@ -77,5 +77,35 @@ public class EnableUserHandlerTests(IdentityDatabaseFixture fixture)
         Assert.True(reloaded.IsActive);
 
         Assert.Single(auditPublisher.PublishedEvents, e => e is UserEnabledAuditEvent);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_And_Does_Not_Enable_User_When_Guard_Reports_Not_A_Member()
+    {
+        var userId = Guid.NewGuid();
+        await using (var db = fixture.BuildContext())
+        {
+            var user = ApplicationUser.Create(userId, $"cross-tenant-{userId}@test.com", "hash", "Test", "User", Now);
+            user.Deactivate(Now);
+            db.Users.Add(user);
+            await db.SaveChangesAsync();
+        }
+
+        var auditPublisher = new FakeAuditEventPublisher();
+        var handler = BuildHandler(auditPublisher, new FakeTargetUserCompanyGuard(isMember: false));
+
+        var result = await handler.HandleAsync(
+            new EnableUserRequest { CompanyId = Guid.NewGuid(), UserId = userId },
+            actorUserId: Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+
+        await using var db2 = fixture.BuildContext();
+        var reloaded = await db2.Users.FirstAsync(u => u.Id == userId);
+        Assert.False(reloaded.IsActive); // untouched — guard short-circuited before any read/write
+
+        Assert.Empty(auditPublisher.PublishedEvents);
     }
 }

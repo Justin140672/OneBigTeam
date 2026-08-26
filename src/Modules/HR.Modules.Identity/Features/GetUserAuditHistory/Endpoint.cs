@@ -17,7 +17,13 @@ internal sealed class Endpoint(GetUserAuditHistoryHandler handler) : Endpoint<Ge
 
         if (result.IsFailure)
         {
-            await Send.ResultAsync(TypedResults.BadRequest(new { error = result.Error.Message }));
+            var error = new { error = result.Error.Message };
+            if (result.Error.Code == "not_found")
+            {
+                await Send.ResultAsync(TypedResults.NotFound(error));
+                return;
+            }
+            await Send.ResultAsync(TypedResults.BadRequest(error));
             return;
         }
 

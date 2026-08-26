@@ -105,6 +105,26 @@ public class UpdateUserRolesEndpointTests
     }
 
     [Fact]
+    public async Task Put_UpdateUserRoles_Returns_NotFound_When_User_Belongs_To_Another_Company()
+    {
+        // IAM-01 regression: caller's own companyId is in the route (passes tenant middleware),
+        // but the target userId belongs to a different company's employee — must 404, not update roles.
+        var ownCompanyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(ownCompanyId);
+        var otherCompanyEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, otherCompanyId, "Other", "Company");
+        var otherCompanyUserId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+            _factory, otherCompanyEmployeeId, $"othercompany.{Guid.NewGuid():N}@test.com");
+        var roleId = await IdentityUserAdminTestHelpers.SeedRoleAsync(_factory, $"Role-{Guid.NewGuid():N}");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{ownCompanyId}/users/{otherCompanyUserId}/roles",
+            new { companyId = ownCompanyId, userId = otherCompanyUserId, roleIds = new[] { roleId } });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Put_UpdateUserRoles_Replaces_Role_Set_On_Happy_Path()
     {
         var companyId = Guid.NewGuid();

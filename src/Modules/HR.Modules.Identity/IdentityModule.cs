@@ -75,6 +75,10 @@ public static class IdentityModule
 
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
         services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();
+        // IAM-01: reusable target-user company-membership guard used by every user-administration
+        // handler that resolves a target user/employee by id from the route.
+        services.AddScoped<HR.Modules.Identity.Authorization.ITargetUserCompanyGuard,
+            HR.Modules.Identity.Authorization.TargetUserCompanyGuard>();
         services.AddScoped<HR.SharedKernel.IAuthorizationService, IdentityAuthorizationService>();
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, RoleAuthorizationHandler>();
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PlatformAdminAuthorizationHandler>();

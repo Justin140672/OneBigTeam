@@ -11,8 +11,8 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
     private static readonly DateTimeOffset Now = new(2026, 6, 6, 12, 0, 0, TimeSpan.Zero);
     private static readonly FakeClock Clock = new(Now.UtcDateTime);
 
-    private DisableUserHandler BuildHandler(FakeAuditEventPublisher auditPublisher) =>
-        new(fixture.BuildContext(), Clock, auditPublisher);
+    private DisableUserHandler BuildHandler(FakeAuditEventPublisher auditPublisher, FakeTargetUserCompanyGuard? guard = null) =>
+        new(fixture.BuildContext(), Clock, auditPublisher, guard ?? new FakeTargetUserCompanyGuard());
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_User_Missing()
@@ -77,5 +77,33 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
         Assert.False(reloaded.IsActive);
 
         Assert.Single(auditPublisher.PublishedEvents, e => e is UserDisabledAuditEvent);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_And_Does_Not_Disable_User_When_Guard_Reports_Not_A_Member()
+    {
+        var userId = Guid.NewGuid();
+        await using (var db = fixture.BuildContext())
+        {
+            db.Users.Add(ApplicationUser.Create(userId, $"cross-tenant-{userId}@test.com", "hash", "Test", "User", Now));
+            await db.SaveChangesAsync();
+        }
+
+        var auditPublisher = new FakeAuditEventPublisher();
+        var handler = BuildHandler(auditPublisher, new FakeTargetUserCompanyGuard(isMember: false));
+
+        var result = await handler.HandleAsync(
+            new DisableUserRequest { CompanyId = Guid.NewGuid(), UserId = userId },
+            actorUserId: Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+
+        await using var db2 = fixture.BuildContext();
+        var reloaded = await db2.Users.FirstAsync(u => u.Id == userId);
+        Assert.True(reloaded.IsActive); // untouched — guard short-circuited before any read/write
+
+        Assert.Empty(auditPublisher.PublishedEvents);
     }
 }

@@ -85,6 +85,29 @@ public class DisableUserEndpointTests
     }
 
     [Fact]
+    public async Task Post_DisableUser_Returns_NotFound_When_User_Belongs_To_Another_Company()
+    {
+        // IAM-01 regression: caller's own companyId is in the route (passes tenant middleware),
+        // but the target userId belongs to a different company's employee — must 404, not disable.
+        var ownCompanyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(ownCompanyId);
+        var otherCompanyEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, otherCompanyId, "Other", "Company");
+        var otherCompanyUserId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+            _factory, otherCompanyEmployeeId, $"othercompany.{Guid.NewGuid():N}@test.com", isActive: true);
+
+        var response = await client.PostAsync(
+            $"/api/companies/{ownCompanyId}/users/{otherCompanyUserId}/disable", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        var reloaded = await db.Users.FirstAsync(u => u.Id == otherCompanyUserId);
+        Assert.True(reloaded.IsActive); // untouched
+    }
+
+    [Fact]
     public async Task Post_DisableUser_Disables_User_On_Happy_Path()
     {
         var companyId = Guid.NewGuid();

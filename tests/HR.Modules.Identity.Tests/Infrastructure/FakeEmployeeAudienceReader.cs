@@ -10,11 +10,16 @@ namespace HR.Modules.Identity.Tests.Infrastructure;
 internal sealed class FakeEmployeeAudienceReader : IEmployeeAudienceReader
 {
     private readonly IReadOnlyList<Guid> _employeeIds;
+    private readonly bool _exists;
 
-    public FakeEmployeeAudienceReader(IReadOnlyList<Guid> employeeIds)
+    public FakeEmployeeAudienceReader(IReadOnlyList<Guid> employeeIds, bool exists = true)
     {
         _employeeIds = employeeIds;
+        _exists = exists;
     }
+
+    /// <summary>Captures the (companyId, employeeId) pair passed to the most recent <see cref="EmployeeExistsAsync"/> call.</summary>
+    public (Guid CompanyId, Guid EmployeeId)? LastEmployeeExistsCall { get; private set; }
 
     public Task<EmployeeAudienceProfile?> GetEmployeeAudienceAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken)
         => throw new NotImplementedException();
@@ -35,7 +40,10 @@ internal sealed class FakeEmployeeAudienceReader : IEmployeeAudienceReader
         => throw new NotImplementedException();
 
     public Task<bool> EmployeeExistsAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken)
-        => throw new NotImplementedException();
+    {
+        LastEmployeeExistsCall = (companyId, employeeId);
+        return Task.FromResult(_exists);
+    }
 
     public Task<string?> GetDepartmentNameAsync(Guid companyId, Guid departmentId, CancellationToken cancellationToken)
         => throw new NotImplementedException();

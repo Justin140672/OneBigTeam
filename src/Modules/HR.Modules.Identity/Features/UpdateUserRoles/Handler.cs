@@ -1,3 +1,4 @@
+using HR.Modules.Identity.Authorization;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.SharedKernel;
@@ -8,13 +9,20 @@ namespace HR.Modules.Identity.Features.UpdateUserRoles;
 internal sealed class UpdateUserRolesHandler(
     IdentityDbContext db,
     IClock clock,
-    IAuditEventPublisher auditEventPublisher)
+    IAuditEventPublisher auditEventPublisher,
+    ITargetUserCompanyGuard targetUserCompanyGuard)
 {
     public async Task<Result<UpdateUserRolesResponse>> HandleAsync(
         UpdateUserRolesRequest request,
         Guid? actorUserId,
         CancellationToken cancellationToken)
     {
+        // IAM-01: the target user id must belong to the route company — otherwise a valid user id
+        // from another company could have its roles read/changed cross-tenant.
+        var isMember = await targetUserCompanyGuard.IsMemberAsync(request.CompanyId, request.UserId, cancellationToken);
+        if (!isMember)
+            return Result.Failure<UpdateUserRolesResponse>(Error.NotFound("User was not found."));
+
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == request.UserId, cancellationToken);
         if (user is null)
             return Result.Failure<UpdateUserRolesResponse>(Error.NotFound("User was not found."));

@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Identity.Authorization;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
@@ -8,10 +9,17 @@ namespace HR.Modules.Identity.Features.GetUserDetails;
 
 internal sealed class GetUserDetailsHandler(
     IdentityDbContext db,
-    IEmployeeNameReader employeeNameReader)
+    IEmployeeNameReader employeeNameReader,
+    ITargetUserCompanyGuard targetUserCompanyGuard)
 {
     public async Task<Result<GetUserDetailsResponse>> HandleAsync(GetUserDetailsRequest request, CancellationToken cancellationToken)
     {
+        // IAM-01: prove the target employee actually belongs to the route company before resolving
+        // anything about them. Tenant middleware only proves the CALLER's company.
+        var isMember = await targetUserCompanyGuard.IsMemberAsync(request.CompanyId, request.EmployeeId, cancellationToken);
+        if (!isMember)
+            return Result.Failure<GetUserDetailsResponse>(Error.NotFound("No user or invitation found for this employee."));
+
         var invite = await db.UserInvites
             .AsNoTracking()
             .Where(i => i.CompanyId == request.CompanyId && i.EmployeeId == request.EmployeeId)
