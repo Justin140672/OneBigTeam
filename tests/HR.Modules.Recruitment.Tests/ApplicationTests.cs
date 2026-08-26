@@ -205,4 +205,42 @@ public class ApplicationTests
         Assert.Null(application.Source);
         Assert.Null(application.SourceExternalRecruiterId);
     }
+
+    // SET-05: offer approval.
+
+    [Fact]
+    public void ApproveOffer_Sets_OfferApprovedAt_And_OfferApprovedByUserId()
+    {
+        var application = CreateApplication();
+        var approvedBy = Guid.NewGuid();
+        var later = Now.AddDays(1);
+
+        application.ApproveOffer(approvedBy, later);
+
+        Assert.Equal(later, application.OfferApprovedAt);
+        Assert.Equal(approvedBy, application.OfferApprovedByUserId);
+    }
+
+    [Fact]
+    public void Create_Defaults_OfferApprovedAt_And_OfferApprovedByUserId_To_Null()
+    {
+        var application = CreateApplication();
+
+        Assert.Null(application.OfferApprovedAt);
+        Assert.Null(application.OfferApprovedByUserId);
+    }
+
+    [Fact]
+    public void ApproveOffer_Can_Be_Called_Again_And_Overwrites_Previous_Approval()
+    {
+        var application = CreateApplication();
+        var firstApprover = Guid.NewGuid();
+        application.ApproveOffer(firstApprover, Now.AddDays(1));
+
+        var secondApprover = Guid.NewGuid();
+        application.ApproveOffer(secondApprover, Now.AddDays(2));
+
+        Assert.Equal(secondApprover, application.OfferApprovedByUserId);
+        Assert.Equal(Now.AddDays(2), application.OfferApprovedAt);
+    }
 }

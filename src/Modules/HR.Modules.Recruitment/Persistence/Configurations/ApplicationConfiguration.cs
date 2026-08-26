@@ -35,6 +35,12 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
         builder.Property(a => a.WithdrawnAt)
             .HasColumnName("withdrawn_at");
 
+        builder.Property(a => a.OfferApprovedAt)
+            .HasColumnName("offer_approved_at");
+
+        builder.Property(a => a.OfferApprovedByUserId)
+            .HasColumnName("offer_approved_by_user_id");
+
         builder.Property(a => a.InterviewOutcome)
             .HasColumnName("interview_outcome")
             .HasConversion<string>()

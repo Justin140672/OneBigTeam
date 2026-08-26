@@ -40,6 +40,7 @@ using HR.Modules.Companies.Features.UpdateCompany;
 using HR.Modules.Companies.Features.UpdateCompanySettings;
 using HR.Modules.Companies.Features.UpdateHrSettings;
 using HR.Modules.Companies.Features.UpdatePublicHoliday;
+using HR.Modules.Companies.Features.UpdateRecruitmentSettings;
 using HR.Modules.Companies.Features.UploadCompanyLogo;
 using HR.Modules.Companies.Features.GetSystemHealth;
 using HR.Modules.Companies.Features.GetApplicationMetrics;
@@ -221,6 +222,7 @@ public static class CompaniesModule
         services.AddScoped<ICompanyNoticePeriodSettingsReader, CompanyNoticePeriodSettingsReader>();
         services.AddScoped<ICompanyLeavingSettingsReader, CompanyLeavingSettingsReader>();
         services.AddScoped<ICompanySicknessSettingsReader, CompanySicknessSettingsReader>();
+        services.AddScoped<ICompanyRecruitmentSettingsReader, CompanyRecruitmentSettingsReader>();
         services.AddScoped<ICompanyAcknowledgementSettingsReader, CompanyAcknowledgementSettingsReader>();
         services.AddScoped<ICompanyContactValidationReader, CompanyContactValidationReader>();
         services.AddScoped<ICompanyTimeZoneReader, CompanyTimeZoneReader>();
@@ -240,6 +242,8 @@ public static class CompaniesModule
         services.AddScoped<IValidator<UpdateCompanyRequest>, UpdateCompanyValidator>();
         services.AddScoped<IValidator<UpdateCompanySettingsRequest>, UpdateCompanySettingsValidator>();
         services.AddScoped<IValidator<UpdateHrSettingsRequest>, UpdateHrSettingsValidator>();
+        services.AddScoped<UpdateRecruitmentSettingsHandler>();
+        services.AddScoped<IValidator<UpdateRecruitmentSettingsRequest>, UpdateRecruitmentSettingsValidator>();
         services.AddScoped<GetCompanySettingsHistoryHandler>();
         services.AddScoped<IValidator<GetCompanySettingsHistoryRequest>, GetCompanySettingsHistoryValidator>();
         services.AddScoped<GetHrSettingsHistoryHandler>();

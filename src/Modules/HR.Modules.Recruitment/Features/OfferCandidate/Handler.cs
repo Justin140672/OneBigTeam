@@ -12,7 +12,8 @@ internal sealed class OfferCandidateHandler(
     RecruitmentDbContext db,
     IClock clock,
     IPositionProfileReader positionProfileReader,
-    RecruitmentStageChangeRecorder recorder)
+    RecruitmentStageChangeRecorder recorder,
+    ICompanyRecruitmentSettingsReader recruitmentSettingsReader)
 {
     public async Task<Result<OfferCandidateResponse>> HandleAsync(
         OfferCandidateRequest request,
@@ -70,6 +71,13 @@ internal sealed class OfferCandidateHandler(
         if (offerStage is null)
             return Result.Failure<OfferCandidateResponse>(
                 Error.Validation("This company has no active non-terminal recruitment stage to move this application to."));
+
+        // SET-05: when the company requires offer approval, an offer cannot be made until this
+        // specific application has been explicitly approved via the ApproveOffer endpoint.
+        var recruitmentSettings = await recruitmentSettingsReader.GetRecruitmentSettingsAsync(request.CompanyId, cancellationToken);
+        if (recruitmentSettings.OfferApprovalRequired && application.OfferApprovedAt is null)
+            return Result.Failure<OfferCandidateResponse>(
+                Error.Validation("This offer requires approval before it can be made."));
 
         var vacancy = await db.Vacancies
             .AsNoTracking()

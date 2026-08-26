@@ -11,7 +11,8 @@ internal sealed class PublishVacancyHandler(
     RecruitmentDbContext db,
     IClock clock,
     IAuditEventPublisher auditPublisher,
-    IPositionProfileReader positionProfileReader)
+    IPositionProfileReader positionProfileReader,
+    ICompanyRecruitmentSettingsReader recruitmentSettingsReader)
 {
     public async Task<Result<PublishVacancyResponse>> HandleAsync(
         PublishVacancyRequest request,
@@ -29,6 +30,13 @@ internal sealed class PublishVacancyHandler(
         if (vacancy.Status is not (VacancyStatus.Draft or VacancyStatus.OnHold))
             return Result.Failure<PublishVacancyResponse>(
                 Error.Validation($"Cannot publish a vacancy with status '{vacancy.Status}'."));
+
+        // SET-05: when the company requires vacancy approval, a vacancy cannot be published until
+        // it has been explicitly approved via the ApproveVacancy endpoint.
+        var recruitmentSettings = await recruitmentSettingsReader.GetRecruitmentSettingsAsync(request.CompanyId, cancellationToken);
+        if (recruitmentSettings.VacancyApprovalRequired && vacancy.ApprovedAt is null)
+            return Result.Failure<PublishVacancyResponse>(
+                Error.Validation("This vacancy requires approval before it can be published."));
 
         var previousStatus = vacancy.Status;
         var now = clock.UtcNowOffset();
@@ -59,5 +67,6 @@ internal sealed class PublishVacancyHandler(
             vacancy.ClosedAt,
             vacancy.CreatedAt,
             vacancy.UpdatedAt));
+
     }
 }

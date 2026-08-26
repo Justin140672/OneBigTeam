@@ -2,6 +2,8 @@ using FluentValidation;
 using Hangfire;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.ApplyPositionProfileMatches;
+using HR.Modules.Recruitment.Features.ApproveOffer;
+using HR.Modules.Recruitment.Features.ApproveVacancy;
 using HR.Modules.Recruitment.Features.AssignVacancyPositionProfile;
 using HR.Modules.Recruitment.Features.CloseVacancy;
 using HR.Modules.Recruitment.Features.CloseVacancyOnEmployeePromoted;
@@ -36,6 +38,7 @@ using HR.Modules.Recruitment.Features.ListVacancies;
 using HR.Modules.Recruitment.Features.MoveApplicationStage;
 using HR.Modules.Recruitment.Features.OfferCandidate;
 using HR.Modules.Recruitment.Features.PublishVacancy;
+using HR.Modules.Recruitment.Features.PurgeEligibleCandidates;
 using HR.Modules.Recruitment.Features.ReactivateCandidate;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Features.RejectCandidate;
@@ -110,6 +113,14 @@ public static class RecruitmentModule
 
         services.AddScoped<PublishVacancyHandler>();
         services.AddScoped<IValidator<PublishVacancyRequest>, PublishVacancyValidator>();
+
+        // SET-05
+        services.AddScoped<ApproveVacancyHandler>();
+        services.AddScoped<IValidator<ApproveVacancyRequest>, ApproveVacancyValidator>();
+        services.AddScoped<ApproveOfferHandler>();
+        services.AddScoped<IValidator<ApproveOfferRequest>, ApproveOfferValidator>();
+        services.AddScoped<PurgeEligibleCandidatesHandler>();
+        services.AddScoped<IValidator<PurgeEligibleCandidatesRequest>, PurgeEligibleCandidatesValidator>();
 
         services.AddScoped<HR.SharedKernel.IIntegrationEventHandler<HR.Modules.Employees.Contracts.EmployeePromotedIntegrationEvent>, EmployeePromotedHandler>();
 

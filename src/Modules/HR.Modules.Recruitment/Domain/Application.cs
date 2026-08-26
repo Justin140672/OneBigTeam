@@ -25,6 +25,12 @@ internal sealed class Application
     // WithdrawApplicationHandler and GetRecruitmentKanbanHandler.
     public DateTimeOffset? WithdrawnAt { get; private set; }
 
+    // SET-05: when the company's OfferApprovalRequired setting is on, an offer must be approved
+    // (see ApproveOffer()) before OfferCandidateHandler will move the application to the offer
+    // stage. Null means "not yet approved" — always null for companies that never require approval.
+    public DateTimeOffset? OfferApprovedAt { get; private set; }
+    public Guid? OfferApprovedByUserId { get; private set; }
+
     public DateTimeOffset AppliedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -126,6 +132,18 @@ internal sealed class Application
     /// WithdrawnAt remarks above). Does not change CurrentStageId — the stage the application was at
     /// when withdrawn is preserved.
     /// </summary>
+    /// <summary>
+    /// SET-05: records that making an offer for this application has been approved. Only meaningful
+    /// when the company's OfferApprovalRequired setting is on — OfferCandidateHandler enforces that
+    /// OfferApprovedAt is set before allowing the application to move to the offer stage in that case.
+    /// </summary>
+    public void ApproveOffer(Guid approvedByUserId, DateTimeOffset now)
+    {
+        OfferApprovedAt = now;
+        OfferApprovedByUserId = approvedByUserId;
+        UpdatedAt = now;
+    }
+
     public void Withdraw(DateTimeOffset now)
     {
         // A scheduled-but-not-yet-resolved interview shouldn't linger as "Pending" once the

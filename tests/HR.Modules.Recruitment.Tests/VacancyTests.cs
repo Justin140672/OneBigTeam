@@ -349,4 +349,44 @@ public class VacancyTests
 
         Assert.Null(vacancy.AssignedRecruiterId);
     }
+
+    // SET-05: vacancy approval.
+
+    [Fact]
+    public void Approve_Sets_ApprovedAt_And_ApprovedByUserId()
+    {
+        var vacancy = CreateVacancy();
+        var approvedBy = Guid.NewGuid();
+        var later = Now.AddDays(1);
+
+        vacancy.Approve(approvedBy, later);
+
+        Assert.Equal(later, vacancy.ApprovedAt);
+        Assert.Equal(approvedBy, vacancy.ApprovedByUserId);
+    }
+
+    [Fact]
+    public void Create_Defaults_ApprovedAt_And_ApprovedByUserId_To_Null()
+    {
+        var vacancy = CreateVacancy();
+
+        Assert.Null(vacancy.ApprovedAt);
+        Assert.Null(vacancy.ApprovedByUserId);
+    }
+
+    [Fact]
+    public void Approve_Can_Be_Called_Again_And_Overwrites_Previous_Approval()
+    {
+        // Approve() is not guarded against re-approval (unlike Purge/LinkToEmployee) — re-approving
+        // simply overwrites ApprovedAt/ApprovedByUserId with the latest actor/time.
+        var vacancy = CreateVacancy();
+        var firstApprover = Guid.NewGuid();
+        vacancy.Approve(firstApprover, Now.AddDays(1));
+
+        var secondApprover = Guid.NewGuid();
+        vacancy.Approve(secondApprover, Now.AddDays(2));
+
+        Assert.Equal(secondApprover, vacancy.ApprovedByUserId);
+        Assert.Equal(Now.AddDays(2), vacancy.ApprovedAt);
+    }
 }

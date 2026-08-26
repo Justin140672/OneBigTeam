@@ -47,6 +47,13 @@ internal sealed class Vacancy
 
     public DateOnly? OpenedAt { get; private set; }
     public DateOnly? ClosedAt { get; private set; }
+
+    // SET-05: when the company's VacancyApprovalRequired setting is on, a vacancy must be approved
+    // (see Approve()) before it can be published (see PublishVacancyHandler). Null means "not yet
+    // approved" — always null for companies that never require approval.
+    public DateTimeOffset? ApprovedAt { get; private set; }
+    public Guid? ApprovedByUserId { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -151,6 +158,19 @@ internal sealed class Vacancy
 
         Status    = VacancyStatus.Closed;
         ClosedAt  = closedAt;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// SET-05: records that this vacancy has been approved for publishing. Only meaningful when the
+    /// company's VacancyApprovalRequired setting is on — PublishVacancyHandler enforces that
+    /// ApprovedAt is set before allowing the vacancy to open in that case. Idempotency/re-approval is
+    /// the caller's concern; this always overwrites with the latest approver/timestamp.
+    /// </summary>
+    public void Approve(Guid approvedByUserId, DateTimeOffset now)
+    {
+        ApprovedAt = now;
+        ApprovedByUserId = approvedByUserId;
         UpdatedAt = now;
     }
 

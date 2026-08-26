@@ -77,6 +77,70 @@ internal sealed record VacancyPublishedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
+// SET-05: published when a vacancy is explicitly approved (required before it can be published if
+// the company's VacancyApprovalRequired setting is on — see ApproveVacancyHandler/PublishVacancyHandler).
+internal sealed record VacancyApprovedAuditEvent(
+    Guid CompanyId,
+    Guid VacancyId,
+    string EffectiveTitle,
+    Guid ApprovedByUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "vacancy.approved";
+    string IAuditEvent.EntityType => "Vacancy";
+    Guid IAuditEvent.EntityId => VacancyId;
+    Guid? IAuditEvent.ActorUserId => ApprovedByUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Vacancy '{EffectiveTitle}' approved";
+    object? IAuditEvent.Before => new { ApprovedAt = (DateTimeOffset?)null };
+    object? IAuditEvent.After => new { ApprovedAt = OccurredAt };
+    object? IAuditEvent.Metadata => null;
+}
+
+// SET-05: published when an offer for a specific application is explicitly approved (required
+// before OfferCandidateHandler will move the application to the offer stage if the company's
+// OfferApprovalRequired setting is on).
+internal sealed record OfferApprovedAuditEvent(
+    Guid CompanyId,
+    Guid ApplicationId,
+    Guid VacancyId,
+    Guid CandidateId,
+    Guid ApprovedByUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "offer.approved";
+    string IAuditEvent.EntityType => "Application";
+    Guid IAuditEvent.EntityId => ApplicationId;
+    Guid? IAuditEvent.ActorUserId => ApprovedByUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Offer approved";
+    object? IAuditEvent.Before => new { OfferApprovedAt = (DateTimeOffset?)null };
+    object? IAuditEvent.After => new { OfferApprovedAt = OccurredAt };
+    object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
+}
+
+// SET-05: published once per PurgeEligibleCandidates run, summarising how many candidates (past the
+// company's CandidateRetentionDays window, per DOC-04-style explicit authorised action) were purged.
+internal sealed record CandidatesPurgedAuditEvent(
+    Guid CompanyId,
+    IReadOnlyList<Guid> PurgedCandidateIds,
+    Guid PurgedByUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "candidate.purged";
+    string IAuditEvent.EntityType => "Candidate";
+    Guid IAuditEvent.EntityId => CompanyId;
+    Guid? IAuditEvent.ActorUserId => PurgedByUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"{PurgedCandidateIds.Count} candidate(s) purged past the retention window";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { PurgedCandidateIds };
+    object? IAuditEvent.Metadata => null;
+}
+
 internal sealed record VacancyPositionProfileAssignedAuditEvent(
     Guid CompanyId,
     Guid VacancyId,

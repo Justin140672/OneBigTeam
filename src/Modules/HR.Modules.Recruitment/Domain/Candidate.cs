@@ -18,6 +18,13 @@ internal sealed class Candidate
     public string? DeactivationReason { get; private set; }
     public DateTimeOffset? ReactivatedAt { get; private set; }
     public Guid? ReactivatedByUserId { get; private set; }
+
+    // SET-05: set only by the explicit, separately-authorised PurgeEligibleCandidates action once
+    // the company's CandidateRetentionDays window has elapsed — never automatically, and never as a
+    // side effect of merely changing the retention setting. See PurgeEligibleCandidatesHandler.
+    public DateTimeOffset? PurgedAt { get; private set; }
+    public Guid? PurgedByUserId { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -101,5 +108,28 @@ internal sealed class Candidate
         ReactivatedAt        = now;
         ReactivatedByUserId  = reactivatedByUserId;
         UpdatedAt            = now;
+    }
+
+    /// <summary>
+    /// SET-05: redacts this candidate's personal data (name/email/phone/resume) once the company's
+    /// candidate-retention window has elapsed, per the explicit, separately-authorised
+    /// PurgeEligibleCandidates action (mirrors Documents' PurgeEligibleArchivedEmployeeDocuments —
+    /// see DOC-04). This is deliberately never triggered automatically by changing
+    /// CandidateRetentionDays alone. The row itself (and its Id, so applications/audit history keep a
+    /// valid reference) is retained; only personal-data fields are redacted.
+    /// </summary>
+    public void Purge(Guid purgedByUserId, DateTimeOffset now)
+    {
+        if (PurgedAt is not null)
+            throw new InvalidOperationException("Candidate has already been purged.");
+
+        FirstName  = "[purged]";
+        LastName   = "[purged]";
+        Email      = $"purged-{Id:N}@purged.invalid";
+        Phone      = null;
+        ResumeUrl  = null;
+        PurgedAt       = now;
+        PurgedByUserId = purgedByUserId;
+        UpdatedAt      = now;
     }
 }

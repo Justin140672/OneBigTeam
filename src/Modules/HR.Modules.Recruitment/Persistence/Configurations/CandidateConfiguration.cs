@@ -67,6 +67,12 @@ internal sealed class CandidateConfiguration : IEntityTypeConfiguration<Candidat
         builder.Property(c => c.ReactivatedByUserId)
             .HasColumnName("reactivated_by_user_id");
 
+        builder.Property(c => c.PurgedAt)
+            .HasColumnName("purged_at");
+
+        builder.Property(c => c.PurgedByUserId)
+            .HasColumnName("purged_by_user_id");
+
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

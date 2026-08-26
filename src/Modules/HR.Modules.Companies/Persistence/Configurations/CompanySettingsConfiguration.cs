@@ -37,6 +37,9 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             tableBuilder.HasCheckConstraint(
                 "CK_company_settings_working_days",
                 "working_days BETWEEN 1 AND 127");
+            tableBuilder.HasCheckConstraint(
+                "CK_company_settings_candidate_retention_days",
+                "candidate_retention_days BETWEEN 90 AND 3650");
         });
 
         builder.HasKey(settings => settings.CompanyId);
@@ -228,6 +231,21 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .HasColumnName("asset_number_minimum_length")
             .IsRequired()
             .HasDefaultValue(1);
+
+        builder.Property(settings => settings.VacancyApprovalRequired)
+            .HasColumnName("vacancy_approval_required")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(settings => settings.OfferApprovalRequired)
+            .HasColumnName("offer_approval_required")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(settings => settings.CandidateRetentionDays)
+            .HasColumnName("candidate_retention_days")
+            .IsRequired()
+            .HasDefaultValue(730);
 
         builder.Property(settings => settings.Version)
             .HasColumnName("version")

@@ -81,6 +81,12 @@ internal sealed class CompanySettings
     // Same 1-10 rationale as EmployeeNumberMinimumLength.
     public int AssetNumberMinimumLength { get; private set; }
 
+    // SET-05: recruitment-workflow settings. Approvals default to off (false) and retention defaults
+    // to 730 days (2 years) so existing companies get backward-compatible, unchanged behaviour.
+    public bool VacancyApprovalRequired { get; private set; }
+    public bool OfferApprovalRequired { get; private set; }
+    public int CandidateRetentionDays { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -155,6 +161,10 @@ internal sealed class CompanySettings
             AssetNumberPrefix = null,
             NextAssetNumber = 1,
             AssetNumberMinimumLength = 4,
+            // SET-05 defaults: no approval gates, 730-day (2-year) candidate data retention window.
+            VacancyApprovalRequired = false,
+            OfferApprovalRequired = false,
+            CandidateRetentionDays = 730,
             CreatedAt = now,
             UpdatedAt = now,
             Version = 1,
@@ -270,6 +280,23 @@ internal sealed class CompanySettings
         LongAbsenceDayThreshold = longAbsenceDayThreshold;
         WeekdayPatternOccurrenceThreshold = weekdayPatternOccurrenceThreshold;
         WeekdayPatternWindowDays = weekdayPatternWindowDays;
+        UpdatedAt = now;
+        Version++;
+    }
+
+    /// <summary>
+    /// SET-05: updates the recruitment approval/retention settings. Kept separate from
+    /// <see cref="UpdateHrPolicy"/> as its own concern, matching <see cref="UpdateAttendanceAlertThresholds"/>.
+    /// </summary>
+    public void UpdateRecruitmentSettings(
+        bool vacancyApprovalRequired,
+        bool offerApprovalRequired,
+        int candidateRetentionDays,
+        DateTimeOffset now)
+    {
+        VacancyApprovalRequired = vacancyApprovalRequired;
+        OfferApprovalRequired = offerApprovalRequired;
+        CandidateRetentionDays = candidateRetentionDays;
         UpdatedAt = now;
         Version++;
     }

@@ -70,6 +70,12 @@ internal sealed class VacancyConfiguration : IEntityTypeConfiguration<Vacancy>
         builder.Property(v => v.ClosedAt)
             .HasColumnName("closed_at");
 
+        builder.Property(v => v.ApprovedAt)
+            .HasColumnName("approved_at");
+
+        builder.Property(v => v.ApprovedByUserId)
+            .HasColumnName("approved_by_user_id");
+
         builder.Property(v => v.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

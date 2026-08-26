@@ -1,6 +1,7 @@
 using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
+
 using HR.Modules.Recruitment.Features.OfferCandidate;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
@@ -270,12 +271,97 @@ public class OfferCandidateHandlerTests
         Assert.Equal(stages.Interview.Id, savedApplication.CurrentStageId);
     }
 
+    // SET-05: OfferApprovalRequired gating.
+
+    [Fact]
+    public async Task HandleAsync_Fails_When_OfferApprovalRequired_And_Application_Not_Approved()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var settingsReader = new FakeCompanyRecruitmentSettingsReader(
+            new CompanyRecruitmentSettings(false, true, 730));
+
+        var result = await handler(db, recruitmentSettingsReader: settingsReader).HandleAsync(
+            new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Equal("This offer requires approval before it can be made.", result.Error.Message);
+
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal(stages.Interview.Id, saved.CurrentStageId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_When_OfferApprovalRequired_And_Application_Approved()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        application.ApproveOffer(Guid.NewGuid(), Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var settingsReader = new FakeCompanyRecruitmentSettingsReader(
+            new CompanyRecruitmentSettings(false, true, 730));
+
+        var result = await handler(db, recruitmentSettingsReader: settingsReader).HandleAsync(
+            new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(stages.Offer.Id, result.Value!.CurrentStageId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_When_OfferApprovalRequired_Is_False_Regardless_Of_Approval_State()
+    {
+        // Regression coverage: default settings (OfferApprovalRequired = false) must not change
+        // pre-existing OfferCandidate behaviour for an unapproved application.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, recruitmentSettingsReader: new FakeCompanyRecruitmentSettingsReader()).HandleAsync(
+            new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(stages.Offer.Id, result.Value!.CurrentStageId);
+    }
+
     private static OfferCandidateHandler handler(
         RecruitmentDbContext db,
         FakePositionProfileReader? positionProfileReader = null,
         FakeIntegrationEventPublisher? eventPublisher = null,
-        FakeAuditPublisher? auditPublisher = null) =>
-        new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), new RecruitmentStageChangeRecorder(db, eventPublisher ?? new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher()));
+        FakeAuditPublisher? auditPublisher = null,
+        FakeCompanyRecruitmentSettingsReader? recruitmentSettingsReader = null) =>
+        new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), new RecruitmentStageChangeRecorder(db, eventPublisher ?? new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher()), recruitmentSettingsReader ?? new FakeCompanyRecruitmentSettingsReader());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()
