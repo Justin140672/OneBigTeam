@@ -29,7 +29,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(ValidRequest(Guid.NewGuid()), CancellationToken.None);
 
@@ -52,7 +52,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(ValidRequest(company.Id), CancellationToken.None);
 
@@ -76,7 +76,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 12, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with { ExcludePublicHolidaysFromLeave = excludePublicHolidays },
@@ -105,7 +105,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 12, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with { DisplaySalaryOnEmployeeProfile = displaySalaryOnEmployeeProfile },
@@ -131,7 +131,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -172,7 +172,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 7, 19, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with { DefaultAcknowledgementStatement = "Please confirm you have read this policy." },
@@ -199,7 +199,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 7, 19, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with { DefaultAcknowledgementStatement = "   " },
@@ -223,7 +223,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 7, 19, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with { DefaultAcknowledgementStatement = "New acknowledgement statement." },
@@ -251,7 +251,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 7, 24, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -286,7 +286,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 7, 24, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -324,7 +324,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 7, 26, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -362,7 +362,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 7, 26, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -406,7 +406,7 @@ public class UpdateHrSettingsHandlerTests
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
 			auditPublisher,
-			new NoOpEmployeeRenumberingService(),
+			new NoOpBackgroundJobClient(),
 			new FakeCurrentUser(actorUserId));
 
 		await handler.HandleAsync(ValidRequest(company.Id), CancellationToken.None);
@@ -433,7 +433,7 @@ public class UpdateHrSettingsHandlerTests
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
 			new NoOpAuditEventPublisher(),
-			new NoOpEmployeeRenumberingService(),
+			new NoOpBackgroundJobClient(),
 			new FakeCurrentUser(null));
 
 		var firstResult = await firstHandler.HandleAsync(ValidRequest(company.Id) with { Version = 1 }, CancellationToken.None);
@@ -446,7 +446,7 @@ public class UpdateHrSettingsHandlerTests
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 12, 0, 0, DateTimeKind.Utc)),
 			auditPublisher,
-			new NoOpEmployeeRenumberingService(),
+			new NoOpBackgroundJobClient(),
 			new FakeCurrentUser(null));
 
 		var secondResult = await secondHandler.HandleAsync(ValidRequest(company.Id) with { Version = 1 }, CancellationToken.None);
@@ -470,7 +470,7 @@ public class UpdateHrSettingsHandlerTests
 		var handler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 8, 25, 11, 0, 0, DateTimeKind.Utc)),
-			new NoOpAuditEventPublisher(), new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -520,7 +520,7 @@ public class UpdateHrSettingsHandlerTests
 
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var updateTime = new DateTime(2026, 8, 25, 11, 0, 0, DateTimeKind.Utc);
-		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpEmployeeRenumberingService(), new FakeCurrentUser(null));
+		var handler = new UpdateHrSettingsHandler(context, new FakeClock(updateTime), auditPublisher, new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
 		await handler.HandleAsync(
 			ValidRequest(company.Id) with
@@ -567,5 +567,329 @@ public class UpdateHrSettingsHandlerTests
 			.Options;
 
 		return new CompaniesDbContext(options);
+	}
+
+	// --- SET-08: durable/recoverable employee-renumber side effect scenarios --------------------
+
+	[Fact]
+	public async Task HandleAsync_FormatChange_While_Staying_Automatic_Creates_Pending_Outbox_Message_And_Enqueues_Job()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 8, 26, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		// CreateDefault seeds EmployeeNumberMode=Automatic, Prefix=null, MinimumLength=4.
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var jobClient = new NoOpBackgroundJobClient();
+		var handler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 8, 26, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(), jobClient, new FakeCurrentUser(null));
+
+		var result = await handler.HandleAsync(
+			ValidRequest(company.Id) with
+			{
+				EmployeeNumberMode = EmployeeNumberMode.Automatic,
+				EmployeeNumberPrefix = "EMP-",
+				NextEmployeeNumber = 1,
+				EmployeeNumberMinimumLength = 6,
+			},
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+
+		var outboxMessage = Assert.Single(context.OutboxMessages);
+		Assert.Equal(UpdateHrSettingsHandler.EmployeeRenumberEventType, outboxMessage.EventType);
+		Assert.Equal(OutboxMessage.StatusPending, outboxMessage.Status);
+		Assert.Equal(company.Id, outboxMessage.CompanyId);
+
+		Assert.Equal("EmployeeRenumberSideEffectJob", Assert.Single(jobClient.EnqueuedJobTypes));
+
+		Assert.Equal(outboxMessage.Id, result.Value!.EmployeeRenumberSideEffectId);
+		Assert.Equal("pending", result.Value.EmployeeRenumberSideEffectStatus);
+	}
+
+	[Fact]
+	public async Task HandleAsync_NonFormatChange_Does_Not_Create_Outbox_Message_Or_Enqueue_Job()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 8, 26, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var jobClient = new NoOpBackgroundJobClient();
+		var handler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 8, 26, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(), jobClient, new FakeCurrentUser(null));
+
+		// Stay Automatic, keep prefix/minimum-length exactly as CreateDefault's — only WorkingDays
+		// changes, so no format change is detected at all.
+		var result = await handler.HandleAsync(
+			ValidRequest(company.Id) with
+			{
+				EmployeeNumberMode = EmployeeNumberMode.Automatic,
+				EmployeeNumberPrefix = null,
+				NextEmployeeNumber = 1,
+				EmployeeNumberMinimumLength = 4,
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday,
+			},
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+		Assert.Empty(context.OutboxMessages);
+		Assert.Empty(jobClient.EnqueuedJobTypes);
+		Assert.Null(result.Value!.EmployeeRenumberSideEffectId);
+		Assert.Null(result.Value.EmployeeRenumberSideEffectStatus);
+	}
+
+	[Fact]
+	public async Task HandleAsync_FormatChange_While_Switching_Automatic_To_Manual_Does_Not_Trigger_Renumber()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 8, 26, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		// CreateDefault: Automatic, prefix null, minlength 4.
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var jobClient = new NoOpBackgroundJobClient();
+		var handler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 8, 26, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(), jobClient, new FakeCurrentUser(null));
+
+		// Format changes (prefix + minlength) AND mode switches Automatic -> Manual.
+		var result = await handler.HandleAsync(
+			ValidRequest(company.Id) with
+			{
+				EmployeeNumberMode = EmployeeNumberMode.Manual,
+				EmployeeNumberPrefix = "MAN-",
+				NextEmployeeNumber = 1,
+				EmployeeNumberMinimumLength = 8,
+			},
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+		Assert.Empty(context.OutboxMessages);
+		Assert.Empty(jobClient.EnqueuedJobTypes);
+		Assert.Null(result.Value!.EmployeeRenumberSideEffectId);
+	}
+
+	[Fact]
+	public async Task HandleAsync_FormatChange_While_Switching_Manual_To_Automatic_Does_Not_Trigger_Renumber()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 8, 26, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		var settings = CompanySettings.CreateDefault(company.Id, now);
+		// Manually flip to Manual first so the "before" mode is Manual for this scenario.
+		settings.UpdateHrPolicy(
+			WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday | WorkingDays.Thursday | WorkingDays.Friday,
+			7.5m, 1, 25, 6, true, false, false, 7, 1, "", 3, NoticePeriodUnit.Months, 1, true,
+			EmployeeNumberMode.Manual, null, 1, 4, now);
+		company.SetSettings(settings, now);
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var jobClient = new NoOpBackgroundJobClient();
+		var handler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 8, 26, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(), jobClient, new FakeCurrentUser(null));
+
+		var currentVersion = (await context.CompanySettings.SingleAsync()).Version;
+
+		// Format changes AND mode switches Manual -> Automatic.
+		var result = await handler.HandleAsync(
+			ValidRequest(company.Id) with
+			{
+				Version = currentVersion,
+				EmployeeNumberMode = EmployeeNumberMode.Automatic,
+				EmployeeNumberPrefix = "EMP-",
+				NextEmployeeNumber = 1,
+				EmployeeNumberMinimumLength = 6,
+			},
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+		Assert.Empty(context.OutboxMessages);
+		Assert.Empty(jobClient.EnqueuedJobTypes);
+		Assert.Null(result.Value!.EmployeeRenumberSideEffectId);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Returns_Conflict_When_Renumber_Already_InFlight_And_Does_Not_Change_Settings_Or_Create_Second_Outbox_Message()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 8, 26, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var firstJobClient = new NoOpBackgroundJobClient();
+		var firstHandler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 8, 26, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(), firstJobClient, new FakeCurrentUser(null));
+
+		var firstResult = await firstHandler.HandleAsync(
+			ValidRequest(company.Id) with
+			{
+				EmployeeNumberMode = EmployeeNumberMode.Automatic,
+				EmployeeNumberPrefix = "EMP-",
+				NextEmployeeNumber = 1,
+				EmployeeNumberMinimumLength = 6,
+			},
+			CancellationToken.None);
+		Assert.True(firstResult.IsSuccess);
+		Assert.Single(context.OutboxMessages);
+
+		var secondJobClient = new NoOpBackgroundJobClient();
+		var secondHandler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 8, 26, 12, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(), secondJobClient, new FakeCurrentUser(null));
+
+		var secondResult = await secondHandler.HandleAsync(
+			ValidRequest(company.Id) with
+			{
+				Version = firstResult.Value!.Version,
+				EmployeeNumberMode = EmployeeNumberMode.Automatic,
+				EmployeeNumberPrefix = "EMP2-",
+				NextEmployeeNumber = 1,
+				EmployeeNumberMinimumLength = 9,
+			},
+			CancellationToken.None);
+
+		Assert.True(secondResult.IsFailure);
+		Assert.Equal("conflict", secondResult.Error.Code);
+		Assert.Empty(secondJobClient.EnqueuedJobTypes);
+
+		// Only the one outbox row from the first call exists — the settings and the outbox table
+		// were both left untouched by the rejected second call.
+		Assert.Single(context.OutboxMessages);
+
+		// The rejected second call mutated the tracked CompanySettings instance in memory (via
+		// UpdateHrPolicy) before returning Conflict without saving — reload from the store (as a
+		// fresh request's own DbContext would see it) rather than reading the same in-memory
+		// instance, which would otherwise still reflect the unsaved in-memory mutation.
+		var savedSettings = await context.CompanySettings.SingleAsync();
+		await context.Entry(savedSettings).ReloadAsync();
+		Assert.Equal("EMP-", savedSettings.EmployeeNumberPrefix);
+		Assert.Equal(6, savedSettings.EmployeeNumberMinimumLength);
+		Assert.Equal(firstResult.Value.Version, savedSettings.Version);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Allows_Unrelated_Settings_Update_While_Renumber_Is_InFlight()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 8, 26, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var firstHandler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 8, 26, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
+
+		var firstResult = await firstHandler.HandleAsync(
+			ValidRequest(company.Id) with
+			{
+				EmployeeNumberMode = EmployeeNumberMode.Automatic,
+				EmployeeNumberPrefix = "EMP-",
+				NextEmployeeNumber = 1,
+				EmployeeNumberMinimumLength = 6,
+			},
+			CancellationToken.None);
+		Assert.True(firstResult.IsSuccess);
+		Assert.Single(context.OutboxMessages);
+
+		var secondHandler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 8, 26, 12, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
+
+		// Same employee-number format (no format change) — only an unrelated field (WorkingDays)
+		// changes — must succeed even though a renumber for this company is still Pending.
+		var secondResult = await secondHandler.HandleAsync(
+			ValidRequest(company.Id) with
+			{
+				Version = firstResult.Value!.Version,
+				EmployeeNumberMode = EmployeeNumberMode.Automatic,
+				EmployeeNumberPrefix = "EMP-",
+				NextEmployeeNumber = 1,
+				EmployeeNumberMinimumLength = 6,
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday,
+			},
+			CancellationToken.None);
+
+		Assert.True(secondResult.IsSuccess);
+		// Still only the one outbox row from the first call — this update didn't trigger another.
+		Assert.Single(context.OutboxMessages);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Allows_New_FormatChange_Once_Previous_InFlight_Outbox_Message_Is_Processed()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 8, 26, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var firstHandler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 8, 26, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
+
+		var firstResult = await firstHandler.HandleAsync(
+			ValidRequest(company.Id) with
+			{
+				EmployeeNumberMode = EmployeeNumberMode.Automatic,
+				EmployeeNumberPrefix = "EMP-",
+				NextEmployeeNumber = 1,
+				EmployeeNumberMinimumLength = 6,
+			},
+			CancellationToken.None);
+		Assert.True(firstResult.IsSuccess);
+
+		// Manually transition the in-flight row to Processed, simulating the background job having
+		// completed the first renumber.
+		var firstOutboxMessage = await context.OutboxMessages.SingleAsync();
+		firstOutboxMessage.MarkProcessing(now.AddMinutes(30));
+		firstOutboxMessage.MarkProcessed(now.AddMinutes(31));
+		await context.SaveChangesAsync();
+
+		var secondHandler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 8, 26, 12, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
+
+		var secondResult = await secondHandler.HandleAsync(
+			ValidRequest(company.Id) with
+			{
+				Version = firstResult.Value!.Version,
+				EmployeeNumberMode = EmployeeNumberMode.Automatic,
+				EmployeeNumberPrefix = "EMP2-",
+				NextEmployeeNumber = 1,
+				EmployeeNumberMinimumLength = 9,
+			},
+			CancellationToken.None);
+
+		Assert.True(secondResult.IsSuccess);
+		Assert.Equal(2, context.OutboxMessages.Count());
+		Assert.NotNull(secondResult.Value!.EmployeeRenumberSideEffectId);
+		Assert.NotEqual(firstOutboxMessage.Id, secondResult.Value.EmployeeRenumberSideEffectId);
 	}
 }
