@@ -62,7 +62,8 @@ public class DocumentExpiryReminderJobTests
                 new FakeClock(FixedUtcNow),
                 tzReader ?? new FakeCompanyTimeZoneReader(),
                 new FakeAuditPublisher(),
-                new FakeTaskCreator()),
+                new FakeTaskCreator(),
+                new FakeCompanyDocumentReminderSettingsReader()),
             new FakeLogger<DocumentExpiryReminderJob>());
 
     [Fact]

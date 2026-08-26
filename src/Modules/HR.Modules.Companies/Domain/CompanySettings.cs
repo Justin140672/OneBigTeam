@@ -92,6 +92,17 @@ internal sealed class CompanySettings
     public bool EmailNotificationsEnabled { get; private set; }
     public bool ScheduledRemindersEnabled { get; private set; }
 
+    // SET-07: configurable document expiry reminder schedule. Mirrors the ProbationCheckpointDay1/2/3
+    // pattern above — a fixed set of up to 3 nullable day-offset columns rather than a delimited/JSON
+    // column, since the schedule is always exactly "up to 3 reminder stages" (matching the existing
+    // Documents module's 3 fixed *SentAt tracking columns on EmployeeDocument). A null slot disables
+    // that stage; when set, values must be positive, unique and strictly decreasing
+    // (Day1 &gt; Day2 &gt; Day3) — enforced by UpdateDocumentReminderSettingsValidator.
+    public bool DocumentRemindersEnabled { get; private set; }
+    public int? DocumentReminderOffsetDays1 { get; private set; }
+    public int? DocumentReminderOffsetDays2 { get; private set; }
+    public int? DocumentReminderOffsetDays3 { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -173,6 +184,11 @@ internal sealed class CompanySettings
             // SET-06 defaults: both notification channels on (unchanged pre-existing behaviour).
             EmailNotificationsEnabled = true,
             ScheduledRemindersEnabled = true,
+            // SET-07 defaults: the standard 90/30/7-day schedule, enabled.
+            DocumentRemindersEnabled = true,
+            DocumentReminderOffsetDays1 = 90,
+            DocumentReminderOffsetDays2 = 30,
+            DocumentReminderOffsetDays3 = 7,
             CreatedAt = now,
             UpdatedAt = now,
             Version = 1,
@@ -320,6 +336,25 @@ internal sealed class CompanySettings
     {
         EmailNotificationsEnabled = emailNotificationsEnabled;
         ScheduledRemindersEnabled = scheduledRemindersEnabled;
+        UpdatedAt = now;
+        Version++;
+    }
+
+    /// <summary>
+    /// SET-07: updates the document expiry reminder schedule. Kept separate from
+    /// <see cref="UpdateHrPolicy"/> as its own concern, matching <see cref="UpdateProbationCheckpoints"/>.
+    /// </summary>
+    public void UpdateDocumentReminderSettings(
+        bool remindersEnabled,
+        int? offsetDays1,
+        int? offsetDays2,
+        int? offsetDays3,
+        DateTimeOffset now)
+    {
+        DocumentRemindersEnabled = remindersEnabled;
+        DocumentReminderOffsetDays1 = offsetDays1;
+        DocumentReminderOffsetDays2 = offsetDays2;
+        DocumentReminderOffsetDays3 = offsetDays3;
         UpdatedAt = now;
         Version++;
     }

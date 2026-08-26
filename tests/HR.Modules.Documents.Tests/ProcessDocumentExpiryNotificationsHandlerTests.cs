@@ -24,12 +24,14 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         FakeAuditPublisher? audit        = null,
         FakeTaskCreator?    taskCreator  = null,
         DateTime?           fixedUtcNow  = null,
-        FakeCompanyTimeZoneReader? companyTimeZoneReader = null) =>
+        FakeCompanyTimeZoneReader? companyTimeZoneReader = null,
+        FakeCompanyDocumentReminderSettingsReader? documentReminderSettingsReader = null) =>
         new(db,
             new FakeClock(fixedUtcNow ?? FixedUtcNow),
             companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
             audit       ?? new FakeAuditPublisher(),
-            taskCreator ?? new FakeTaskCreator());
+            taskCreator ?? new FakeTaskCreator(),
+            documentReminderSettingsReader ?? new FakeCompanyDocumentReminderSettingsReader());
 
     private static async Task<EmployeeDocument> SeedDocumentAsync(
         DocumentsDbContext db,
@@ -550,7 +552,8 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
             new FakeClock(FixedUtcNow),
             new RecordingCompanyTimeZoneReader(requestedFor, "UTC"),
             new FakeAuditPublisher(),
-            new FakeTaskCreator());
+            new FakeTaskCreator(),
+            new FakeCompanyDocumentReminderSettingsReader());
 
         await handler.HandleAsync(
             new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
@@ -566,6 +569,172 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         {
             requestedFor.Add(companyId);
             return Task.FromResult(timeZoneId);
+        }
+    }
+
+    // ── SET-07: configurable reminder schedule ──────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Custom_Single_Slot_Schedule_Fires_At_Configured_Threshold_Not_Old_Hardcoded_90()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var tasks = new FakeTaskCreator();
+        // Only slot 1 configured, at 60 days — slots 2/3 disabled.
+        var reader = new FakeCompanyDocumentReminderSettingsReader(
+            new CompanyDocumentReminderSettings(true, 60, null, null));
+        var empDoc = await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(60));
+        var handler = BuildHandler(db, taskCreator: tasks, documentReminderSettingsReader: reader);
+
+        var result = await handler.HandleAsync(
+            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Equal(1, result.Reminder90Count); // slot 1 counter, now representing the 60-day threshold
+        Assert.Equal(0, result.Reminder30Count);
+        Assert.Equal(0, result.Reminder7Count);
+        Assert.Equal(1, result.ExpiringSoonCount);
+
+        var updated = await db.EmployeeDocuments.FindAsync(empDoc.Id);
+        Assert.NotNull(updated!.ExpiryReminder90SentAt);
+        Assert.Single(tasks.Created);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Custom_Single_Slot_Schedule_Does_Not_Fire_At_The_Old_Hardcoded_90_Day_Threshold()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var reader = new FakeCompanyDocumentReminderSettingsReader(
+            new CompanyDocumentReminderSettings(true, 60, null, null));
+        // 90 days out would have fired under the old hardcoded stage — this company's schedule no
+        // longer has a 90-day stage at all.
+        await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(90));
+        var handler = BuildHandler(db, documentReminderSettingsReader: reader);
+
+        var result = await handler.HandleAsync(
+            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Equal(0, result.Reminder90Count);
+        Assert.Equal(0, result.ExpiringSoonCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RemindersDisabled_Does_Not_Fire_Any_Upcoming_Expiry_Reminder()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var reader = new FakeCompanyDocumentReminderSettingsReader(
+            new CompanyDocumentReminderSettings(false, 90, 30, 7));
+        var tasks = new FakeTaskCreator();
+        var audit = new FakeAuditPublisher();
+        // Inside all three legacy windows — none should fire while disabled.
+        await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(3));
+        var handler = BuildHandler(db, audit, tasks, documentReminderSettingsReader: reader);
+
+        var result = await handler.HandleAsync(
+            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Equal(0, result.Reminder90Count);
+        Assert.Equal(0, result.Reminder30Count);
+        Assert.Equal(0, result.Reminder7Count);
+        Assert.Equal(0, result.ExpiringSoonCount);
+        Assert.Empty(tasks.Created);
+        Assert.Empty(audit.Published);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RemindersDisabled_Still_Fires_Overdue_Notification_For_Already_Expired_Document()
+    {
+        // Proves the overdue/expired path is completely unaffected by RemindersEnabled=false.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var reader = new FakeCompanyDocumentReminderSettingsReader(
+            new CompanyDocumentReminderSettings(false, null, null, null));
+        var tasks = new FakeTaskCreator();
+        var audit = new FakeAuditPublisher();
+        var empDoc = await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(-5));
+        var handler = BuildHandler(db, audit, tasks, documentReminderSettingsReader: reader);
+
+        var result = await handler.HandleAsync(
+            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExpiringSoonCount);
+        Assert.Equal(1, result.ExpiredCount);
+
+        var updated = await db.EmployeeDocuments.FindAsync(empDoc.Id);
+        Assert.NotNull(updated!.ExpiredNotifiedAt);
+        Assert.Single(tasks.Created);
+        Assert.Single(audit.Published);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Defensive_AllNull_But_Enabled_Settings_Fires_No_Reminder_Stage()
+    {
+        // Pathological state the validator should prevent from ever being persisted — the handler
+        // just trusts whatever it's given and should simply not evaluate any stage.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var reader = new FakeCompanyDocumentReminderSettingsReader(
+            new CompanyDocumentReminderSettings(true, null, null, null));
+        await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(3));
+        var handler = BuildHandler(db, documentReminderSettingsReader: reader);
+
+        var result = await handler.HandleAsync(
+            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Equal(0, result.Reminder90Count);
+        Assert.Equal(0, result.Reminder30Count);
+        Assert.Equal(0, result.Reminder7Count);
+        Assert.Equal(0, result.ExpiringSoonCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Schedule_Change_Between_Runs_Does_Not_ReFire_Already_Sent_Slot()
+    {
+        // First run: default 90/30/7 schedule, document 90 days out — slot 1 fires.
+        var dbName = Guid.NewGuid().ToString("N");
+        var companyId = Guid.NewGuid();
+
+        Guid empDocId;
+        await using (var db1 = new DocumentsDbContext(new DbContextOptionsBuilder<DocumentsDbContext>()
+            .UseInMemoryDatabase(dbName).Options))
+        {
+            var empDoc = await SeedDocumentAsync(db1, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(90));
+            empDocId = empDoc.Id;
+
+            var firstResult = await BuildHandler(db1).HandleAsync(
+                new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+                CancellationToken.None);
+
+            Assert.Equal(1, firstResult.Reminder90Count);
+
+            var updated = await db1.EmployeeDocuments.FindAsync(empDocId);
+            Assert.NotNull(updated!.ExpiryReminder90SentAt);
+        }
+
+        // Second run: schedule changed so slot 1's offset is now 60 (the document, still 90 days
+        // out relative to "today", would newly be inside the 60-day window on a hypothetical
+        // re-evaluation only once time passes — but per-slot idempotency must prevent a re-fire
+        // for the same document/expiry-date/slot regardless).
+        var reconfiguredReader = new FakeCompanyDocumentReminderSettingsReader(
+            new CompanyDocumentReminderSettings(true, 60, 30, 7));
+
+        await using (var db2 = new DocumentsDbContext(new DbContextOptionsBuilder<DocumentsDbContext>()
+            .UseInMemoryDatabase(dbName).Options))
+        {
+            var secondResult = await BuildHandler(db2, documentReminderSettingsReader: reconfiguredReader).HandleAsync(
+                new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+                CancellationToken.None);
+
+            Assert.Equal(0, secondResult.Reminder90Count);
+
+            var updated = await db2.EmployeeDocuments.FindAsync(empDocId);
+            Assert.NotNull(updated!.ExpiryReminder90SentAt);
         }
     }
 }

@@ -257,6 +257,23 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(settings => settings.DocumentRemindersEnabled)
+            .HasColumnName("document_reminders_enabled")
+            .IsRequired()
+            .HasDefaultValue(true);
+
+        builder.Property(settings => settings.DocumentReminderOffsetDays1)
+            .HasColumnName("document_reminder_offset_days_1")
+            .HasDefaultValue(90);
+
+        builder.Property(settings => settings.DocumentReminderOffsetDays2)
+            .HasColumnName("document_reminder_offset_days_2")
+            .HasDefaultValue(30);
+
+        builder.Property(settings => settings.DocumentReminderOffsetDays3)
+            .HasColumnName("document_reminder_offset_days_3")
+            .HasDefaultValue(7);
+
         builder.Property(settings => settings.Version)
             .HasColumnName("version")
             .IsRequired()

@@ -29,31 +29,42 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
     IClock clock,
     ICompanyTimeZoneReader timeZoneReader,
     IAuditEventPublisher auditPublisher,
-    ITaskCreator taskCreator)
+    ITaskCreator taskCreator,
+    ICompanyDocumentReminderSettingsReader documentReminderSettingsReader)
 {
-    // DOC-03: the three independent upcoming-expiry reminder stages, each evaluated against its
-    // own day-before-expiry threshold. Ordered furthest-out first purely for readability.
-    private static readonly (ExpiryReminderStage Stage, int Days)[] ReminderStages =
-    [
-        (ExpiryReminderStage.NinetyDays, 90),
-        (ExpiryReminderStage.ThirtyDays, 30),
-        (ExpiryReminderStage.SevenDays, 7),
-    ];
-
-    private const int WidestLookaheadDays = 90;
-
     public async Task<ProcessDocumentExpiryNotificationsResponse> HandleAsync(
         ProcessDocumentExpiryNotificationsRequest request,
         CancellationToken cancellationToken)
     {
+        // SET-07: the company's configured reminder schedule replaces the previously hardcoded
+        // 90/30/7-day stages. ExpiryReminderStage.NinetyDays/ThirtyDays/SevenDays are now purely
+        // positional slots (slot 1/2/3, furthest-out first) — the *SentAt column each maps to on
+        // EmployeeDocument no longer necessarily corresponds to its historical day count once a
+        // company customises the schedule, but per-slot idempotency (see IsStageAlreadySent /
+        // EmployeeDocument.MarkExpiryReminderSent) is unaffected by that, since idempotency keys off
+        // (document, expiry date, stage slot), never the configured day count itself. A disabled
+        // reminder schedule (RemindersEnabled=false) or a null slot skips upcoming-expiry stage
+        // evaluation entirely; the separate overdue/expired path below is unaffected by this setting.
+        var reminderSettings = await documentReminderSettingsReader.GetDocumentReminderSettingsAsync(request.CompanyId, cancellationToken);
+
+        var reminderStages = reminderSettings.RemindersEnabled
+            ? BuildReminderStages(reminderSettings)
+            : [];
+
         var now        = clock.UtcNowOffset();
         var timeZoneId = await timeZoneReader.GetTimeZoneAsync(request.CompanyId, cancellationToken);
         var today      = clock.TodayIn(timeZoneId);
-        var widestThreshold = today.AddDays(WidestLookaheadDays);
+        var widestLookaheadDays = reminderStages.Count == 0 ? 0 : reminderStages.Max(s => s.Days);
+        var widestThreshold = today.AddDays(widestLookaheadDays);
 
         // Read-only projection to gather event data — no change tracking needed. Superset query:
         // anything within the widest (90-day) lookahead, or already expired and not yet notified.
         // Exact per-stage evaluation happens in-memory below against the tracked entity.
+        // SET-07: when reminders are disabled (or no stage is configured) the upcoming-expiry half
+        // of this condition matches nothing (reminderStages.Count == 0), leaving only the
+        // always-on overdue/expired half — reminders being off never suppresses the overdue alert.
+        var remindersActive = reminderStages.Count > 0;
+
         var candidates = await (
             from ed in db.EmployeeDocuments.AsNoTracking()
             join d  in db.Documents.AsNoTracking()     on ed.DocumentId    equals d.Id
@@ -62,7 +73,7 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
                && ed.ExpiryDate != null
                && ed.IsLatestVersion
                && !ed.IsArchived
-               && ((ed.ExpiryDate >= today && ed.ExpiryDate <= widestThreshold
+               && ((remindersActive && ed.ExpiryDate >= today && ed.ExpiryDate <= widestThreshold
                     && (ed.ExpiryReminder90SentAt == null || ed.ExpiryReminder30SentAt == null || ed.ExpiryReminder7SentAt == null))
                 || (ed.ExpiryDate < today && ed.ExpiredNotifiedAt == null))
             select new
@@ -98,7 +109,7 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
 
             if (c.ExpiryDate >= today)
             {
-                foreach (var (stage, days) in ReminderStages)
+                foreach (var (stage, days) in reminderStages)
                 {
                     if (IsStageAlreadySent(entity, stage))
                         continue;
@@ -184,6 +195,23 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
             Reminder90Count:   reminderCounts[ExpiryReminderStage.NinetyDays],
             Reminder30Count:   reminderCounts[ExpiryReminderStage.ThirtyDays],
             Reminder7Count:    reminderCounts[ExpiryReminderStage.SevenDays]);
+    }
+
+    /// <summary>
+    /// SET-07: maps the company's configured (up to 3) day-offsets onto the fixed
+    /// NinetyDays/ThirtyDays/SevenDays stage slots by position (slot 1/2/3), skipping any null slot.
+    /// The stage enum member names are now purely positional/historical — see the class-level remarks.
+    /// </summary>
+    private static IReadOnlyList<(ExpiryReminderStage Stage, int Days)> BuildReminderStages(
+        CompanyDocumentReminderSettings settings)
+    {
+        var stages = new List<(ExpiryReminderStage Stage, int Days)>(3);
+
+        if (settings.OffsetDays1 is int day1) stages.Add((ExpiryReminderStage.NinetyDays, day1));
+        if (settings.OffsetDays2 is int day2) stages.Add((ExpiryReminderStage.ThirtyDays, day2));
+        if (settings.OffsetDays3 is int day3) stages.Add((ExpiryReminderStage.SevenDays, day3));
+
+        return stages;
     }
 
     private static bool IsStageAlreadySent(EmployeeDocument entity, ExpiryReminderStage stage) => stage switch
