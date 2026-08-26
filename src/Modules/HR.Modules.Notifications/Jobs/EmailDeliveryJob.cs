@@ -38,6 +38,7 @@ internal sealed class EmailDeliveryJob(
     IUserEmailReader userEmailReader,
     IClock clock,
     IAuditEventPublisher auditPublisher,
+    ICompanyNotificationSettingsReader notificationSettingsReader,
     ILogger<EmailDeliveryJob> logger)
 {
     public const int MaxAttempts = 4;
@@ -68,6 +69,22 @@ internal sealed class EmailDeliveryJob(
         {
             delivery.MarkFailed("Notification no longer exists.");
             await db.SaveChangesAsync();
+            return;
+        }
+
+        // SET-06: re-check current settings immediately before dispatch — covers the
+        // configuration-changed-after-queueing scenario (a delivery queued while email was enabled,
+        // then the company disabled it before this job ran). Skipped is a final state: it is never
+        // retried, so disabling email never leaves rows indefinitely Pending. Mandatory/compliance
+        // types are still sent regardless.
+        var notificationSettings = await notificationSettingsReader.GetNotificationSettingsAsync(delivery.CompanyId, CancellationToken.None);
+        if (!notificationSettings.EmailNotificationsEnabled && !NotificationChannelDefaults.IsMandatoryEmail(notification.Type))
+        {
+            delivery.MarkSkipped("Email notifications disabled for this company.");
+            await db.SaveChangesAsync();
+            logger.LogInformation(
+                "EmailDeliveryJob: email notifications disabled for company {CompanyId} — delivery for notification {NotificationId} skipped.",
+                delivery.CompanyId, notificationId);
             return;
         }
 

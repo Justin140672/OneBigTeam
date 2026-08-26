@@ -74,4 +74,27 @@ public class EmailDeliveryTests
         Assert.Equal(EmailDeliveryStatus.Failed, delivery.Status);
         Assert.Equal("Invalid recipient address.", delivery.FailureReason);
     }
+
+    // SET-06 -------------------------------------------------------------------------------------
+
+    [Fact]
+    public void MarkSkipped_Sets_Status_Skipped_And_FailureReason()
+    {
+        var delivery = EmailDelivery.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
+
+        delivery.MarkSkipped("Email notifications disabled for this company.");
+
+        Assert.Equal(EmailDeliveryStatus.Skipped, delivery.Status);
+        Assert.Equal("Email notifications disabled for this company.", delivery.FailureReason);
+    }
+
+    [Fact]
+    public void MarkSkipped_Is_Distinct_From_MarkFailed()
+    {
+        var delivery = EmailDelivery.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
+
+        delivery.MarkSkipped("Email notifications disabled for this company.");
+
+        Assert.NotEqual(EmailDeliveryStatus.Failed, delivery.Status);
+    }
 }

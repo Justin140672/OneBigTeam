@@ -10,7 +10,8 @@ namespace HR.Modules.Notifications.Persistence;
 internal sealed class NotificationWriter(
     NotificationsDbContext dbContext,
     IBackgroundJobClient backgroundJobClient,
-    IAuditEventPublisher auditPublisher) : INotificationWriter
+    IAuditEventPublisher auditPublisher,
+    ICompanyNotificationSettingsReader notificationSettingsReader) : INotificationWriter
 {
     /// <summary>
     /// NOT-03: template-based write path for the six NotificationType values registered in
@@ -37,6 +38,13 @@ internal sealed class NotificationWriter(
                 $"Use {nameof(WriteAsync)} with a pre-formatted string for types outside the NOT-03 template catalogue.");
         }
 
+        // SET-06: a scheduled-reminder type is suppressed entirely (no in-app notification, no
+        // email) while the company has ScheduledRemindersEnabled off — this is a deliberate no-op,
+        // not a failure.
+        var notificationSettings = await notificationSettingsReader.GetNotificationSettingsAsync(companyId, cancellationToken);
+        if (NotificationChannelDefaults.IsScheduledReminder(type) && !notificationSettings.ScheduledRemindersEnabled)
+            return Result.Success();
+
         var renderResult = NotificationTemplateRenderer.Render(template, tokens);
         if (renderResult.IsFailure)
             return Result.Failure(renderResult.Error);
@@ -48,9 +56,14 @@ internal sealed class NotificationWriter(
             id, companyId, employeeId, rendered.InAppTitle, rendered.InAppBody, sourceEntityId, createdAt, type, priority, actionUrl);
         dbContext.Notifications.Add(notification);
 
+        // SET-06: in-app notifications continue per the documented channel policy regardless of the
+        // company's EmailNotificationsEnabled setting — only the Email channel below is gated by it
+        // (mandatory/compliance types are never gated, even when disabled).
         var channel = NotificationChannelDefaults.GetChannel(type);
+        var emailEligible = channel.HasFlag(NotificationChannel.Email) &&
+            (notificationSettings.EmailNotificationsEnabled || NotificationChannelDefaults.IsMandatoryEmail(type));
         EmailDelivery? emailDelivery = null;
-        if (channel.HasFlag(NotificationChannel.Email))
+        if (emailEligible)
         {
             emailDelivery = EmailDelivery.CreateTemplated(
                 Guid.NewGuid(), companyId, id, template.Version, rendered.EmailSubject, rendered.EmailBody, createdAt);
@@ -84,6 +97,12 @@ internal sealed class NotificationWriter(
         DateTimeOffset createdAt,
         CancellationToken cancellationToken = default)
     {
+        // SET-06: a scheduled-reminder type is suppressed entirely (no in-app notification, no
+        // email) while the company has ScheduledRemindersEnabled off — this is a deliberate no-op.
+        var notificationSettings = await notificationSettingsReader.GetNotificationSettingsAsync(companyId, cancellationToken);
+        if (NotificationChannelDefaults.IsScheduledReminder(type) && !notificationSettings.ScheduledRemindersEnabled)
+            return;
+
         var actionUrl = NotificationActionRouteBuilder.BuildActionUrl(type, companyId, employeeId, sourceEntityId);
         var notification = Notification.Create(id, companyId, employeeId, title, body, sourceEntityId, createdAt, type, priority, actionUrl);
         dbContext.Notifications.Add(notification);
@@ -94,9 +113,13 @@ internal sealed class NotificationWriter(
         // as the notification and a Hangfire job is enqueued to perform the actual Postmark send
         // asynchronously — the caller (any of the 30+ handlers/jobs across the app that call
         // WriteAsync) never blocks on that external HTTP call.
+        // SET-06: only the Email channel is gated by EmailNotificationsEnabled (mandatory/compliance
+        // types are never gated) — in-app continues per the documented channel policy either way.
         var channel = NotificationChannelDefaults.GetChannel(type);
+        var emailEligible = channel.HasFlag(NotificationChannel.Email) &&
+            (notificationSettings.EmailNotificationsEnabled || NotificationChannelDefaults.IsMandatoryEmail(type));
         EmailDelivery? emailDelivery = null;
-        if (channel.HasFlag(NotificationChannel.Email))
+        if (emailEligible)
         {
             emailDelivery = EmailDelivery.Create(Guid.NewGuid(), companyId, id, createdAt);
             dbContext.EmailDeliveries.Add(emailDelivery);

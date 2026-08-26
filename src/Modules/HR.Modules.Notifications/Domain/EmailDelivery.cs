@@ -95,4 +95,12 @@ internal sealed class EmailDelivery
     /// support/reporting-visible record.
     /// </summary>
     public void MarkFailed(string reason) => (Status, FailureReason) = (EmailDeliveryStatus.Failed, reason);
+
+    /// <summary>
+    /// SET-06: marks this delivery as permanently (not retried) skipped because the company had
+    /// email notifications disabled at dispatch time — re-checked by EmailDeliveryJob immediately
+    /// before sending, even if the row was queued before the setting changed. Distinct from
+    /// MarkFailed: this is expected, intended non-delivery, not an error.
+    /// </summary>
+    public void MarkSkipped(string reason) => (Status, FailureReason) = (EmailDeliveryStatus.Skipped, reason);
 }

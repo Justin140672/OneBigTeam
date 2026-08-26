@@ -112,7 +112,7 @@ public class NotifyOnEmployeeCreatedHandlerTests
         FakeHrAdministratorDirectory hrDirectory,
         FakeLogger<NotifyOnEmployeeCreatedHandler>? logger = null) =>
         new(
-            new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher()),
+            new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader()),
             nameReader,
             positionProfileReader,
             hrDirectory,

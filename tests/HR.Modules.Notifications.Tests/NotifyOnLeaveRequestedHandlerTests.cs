@@ -24,7 +24,7 @@ public class NotifyOnLeaveRequestedHandlerTests
         var nameReader     = new FakeEmployeeNameReader();
         nameReader.Names[employeeId] = "Alex Doe";
 
-        var writer  = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
+        var writer  = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var handler = new NotifyOnLeaveRequestedHandler(
             writer, managerReader, nameReader, new FakeLogger<NotifyOnLeaveRequestedHandler>());
 
@@ -48,7 +48,7 @@ public class NotifyOnLeaveRequestedHandlerTests
         var managerReader = new FakeManagerReader { ManagerId = null };
         var logger = new FakeLogger<NotifyOnLeaveRequestedHandler>();
 
-        var writer  = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
+        var writer  = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var handler = new NotifyOnLeaveRequestedHandler(
             writer, managerReader, new FakeEmployeeNameReader(), logger);
 
@@ -72,7 +72,7 @@ public class NotifyOnLeaveRequestedHandlerTests
         var requestId  = Guid.NewGuid();
 
         var managerReader = new FakeManagerReader { ManagerId = managerId };
-        var writer  = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
+        var writer  = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var handler = new NotifyOnLeaveRequestedHandler(
             writer, managerReader, new FakeEmployeeNameReader(), new FakeLogger<NotifyOnLeaveRequestedHandler>());
 

@@ -45,4 +45,40 @@ internal static class NotificationChannelDefaults
 
     public static NotificationChannel GetChannel(NotificationType type) =>
         EmailEligibleTypes.Contains(type) ? NotificationChannel.Both : NotificationChannel.InApp;
+
+    // SET-06: the subset of EmailEligibleTypes that are mandatory/non-optional security or
+    // compliance communications — the company's EmailNotificationsEnabled=false setting never
+    // suppresses these (see NotificationWriter/EmailDeliveryJob). Deliberately the same three
+    // "compliance-relevant overdue/expiry states" already called out in the class-level remarks
+    // above; every other EmailEligibleType is optional and respects the company's setting.
+    private static readonly HashSet<NotificationType> MandatoryEmailTypes =
+    [
+        NotificationType.DocumentExpired,
+        NotificationType.SicknessEvidenceOverdue,
+        NotificationType.ReturnToWorkReviewOverdue,
+    ];
+
+    public static bool IsMandatoryEmail(NotificationType type) => MandatoryEmailTypes.Contains(type);
+
+    // SET-06: notification types raised by a recurring/scheduled background job rather than
+    // directly by a user action, gated separately by the company's ScheduledRemindersEnabled
+    // setting (in-app AND email both suppressed when off — distinct from EmailNotificationsEnabled,
+    // which only ever gates the email channel). Overdue/escalation types (TaskOverdue,
+    // DocumentExpired, etc.) are deliberately NOT included here even though they too originate from
+    // scheduled jobs — they represent an already-missed deadline, a materially different
+    // "something needs to happen now" alert rather than a proactive advance reminder, so they
+    // remain unaffected by this setting.
+    private static readonly HashSet<NotificationType> ScheduledReminderTypes =
+    [
+        NotificationType.TaskDueSoon,
+        NotificationType.DocumentExpiring,
+        NotificationType.AssetAcknowledgementReminder,
+        NotificationType.AssetReturnReminder,
+        NotificationType.SicknessEvidenceReminder,
+        NotificationType.ReturnToWorkReviewReminder,
+        NotificationType.InterviewReminder,
+        NotificationType.SharedCompanyDocumentAcknowledgementReminder,
+    ];
+
+    public static bool IsScheduledReminder(NotificationType type) => ScheduledReminderTypes.Contains(type);
 }

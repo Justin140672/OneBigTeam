@@ -15,7 +15,7 @@ public class NotificationWriterTests
     public async Task WriteAsync_Persists_Notification()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher());
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var companyId        = Guid.NewGuid();
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
@@ -42,7 +42,7 @@ public class NotificationWriterTests
     {
         await using var ctx  = BuildContext();
         var auditPublisher   = new FakeAuditPublisher();
-        var writer           = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), auditPublisher);
+        var writer           = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), auditPublisher, new FakeCompanyNotificationSettingsReader());
         var companyId        = Guid.NewGuid();
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
@@ -69,7 +69,7 @@ public class NotificationWriterTests
     {
         await using var ctx  = BuildContext();
         var auditPublisher   = new FakeAuditPublisher();
-        var writer           = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), auditPublisher);
+        var writer           = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), auditPublisher, new FakeCompanyNotificationSettingsReader());
 
         await writer.WriteAsync(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
@@ -86,7 +86,7 @@ public class NotificationWriterTests
     public async Task ExistsAsync_Returns_True_When_Notification_Exists()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher());
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
 
@@ -103,7 +103,7 @@ public class NotificationWriterTests
     public async Task ExistsAsync_Returns_False_When_Notification_Does_Not_Exist()
     {
         await using var ctx = BuildContext();
-        var writer          = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher());
+        var writer          = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
 
         var exists = await writer.ExistsAsync(Guid.NewGuid(), Guid.NewGuid(), NotificationType.TaskDueSoon);
         Assert.False(exists);
@@ -113,7 +113,7 @@ public class NotificationWriterTests
     public async Task ExistsAsync_Returns_False_When_Type_Does_Not_Match()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher());
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
 
@@ -130,7 +130,7 @@ public class NotificationWriterTests
     public async Task ExistsAsync_Returns_False_When_SourceEntityId_Does_Not_Match()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher());
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var employeeId       = Guid.NewGuid();
 
         await writer.WriteAsync(
@@ -146,7 +146,7 @@ public class NotificationWriterTests
     public async Task GetLastSentAtAsync_Returns_Null_When_None_Exists()
     {
         await using var ctx = BuildContext();
-        var writer          = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher());
+        var writer          = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
 
         var result = await writer.GetLastSentAtAsync(Guid.NewGuid(), Guid.NewGuid(), NotificationType.TaskDueSoon);
         Assert.Null(result);
@@ -156,7 +156,7 @@ public class NotificationWriterTests
     public async Task GetLastSentAtAsync_Returns_Most_Recent_CreatedAt_When_Multiple_Exist()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher());
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
 
@@ -181,7 +181,7 @@ public class NotificationWriterTests
     public async Task GetLastSentAtAsync_Ignores_NonMatching_Type()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher());
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
 
@@ -198,7 +198,7 @@ public class NotificationWriterTests
     public async Task RemoveBySourceEntityAsync_Returns_Zero_When_None_Match()
     {
         await using var ctx = BuildContext();
-        var writer          = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher());
+        var writer          = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
 
         var removed = await writer.RemoveBySourceEntityAsync(Guid.NewGuid(), Guid.NewGuid(), NotificationType.TaskDueSoon);
         Assert.Equal(0, removed);
@@ -208,7 +208,7 @@ public class NotificationWriterTests
     public async Task RemoveBySourceEntityAsync_Removes_Only_Matching_Notifications()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher());
+        var writer           = new NotificationWriter(ctx, new HR.Modules.Notifications.Tests.Infrastructure.NoOpBackgroundJobClient(), new HR.Modules.Notifications.Tests.Infrastructure.FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var companyId        = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
 
@@ -252,7 +252,7 @@ public class NotificationWriterTests
     {
         await using var ctx    = BuildContext();
         var backgroundJobClient = new RecordingBackgroundJobClient();
-        var writer              = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher());
+        var writer              = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var companyId           = Guid.NewGuid();
         var employeeId          = Guid.NewGuid();
         var sourceEntityId      = Guid.NewGuid();
@@ -281,7 +281,7 @@ public class NotificationWriterTests
     {
         await using var ctx    = BuildContext();
         var backgroundJobClient = new RecordingBackgroundJobClient();
-        var writer              = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher());
+        var writer              = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
 
         await writer.WriteAsync(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
@@ -299,7 +299,7 @@ public class NotificationWriterTests
     public async Task WriteAsync_Persists_ActionUrl_Matching_NotificationActionRouteBuilder_For_Mapped_Type()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
+        var writer           = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var companyId        = Guid.NewGuid();
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
@@ -323,7 +323,7 @@ public class NotificationWriterTests
     public async Task WriteAsync_Persists_Null_ActionUrl_For_Type_With_No_Destination()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
+        var writer           = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
 
         await writer.WriteAsync(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
@@ -333,6 +333,112 @@ public class NotificationWriterTests
 
         var saved = await ctx.Notifications.SingleAsync();
         Assert.Null(saved.ActionUrl);
+    }
+
+    // SET-06: notification-channel settings ----------------------------------------------------
+
+    [Fact]
+    public async Task WriteAsync_Scheduled_Reminder_Type_With_ScheduledRemindersEnabled_False_Creates_No_Notification_Or_EmailDelivery()
+    {
+        await using var ctx = BuildContext();
+        var backgroundJobClient = new RecordingBackgroundJobClient();
+        var settingsReader = new FakeCompanyNotificationSettingsReader(
+            new CompanyNotificationSettings(true, false));
+        var writer = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher(), settingsReader);
+
+        await writer.WriteAsync(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "Task due soon", null,
+            Guid.NewGuid(), NotificationType.TaskDueSoon, NotificationPriority.Normal,
+            Now);
+
+        Assert.Empty(ctx.Notifications);
+        Assert.Empty(ctx.EmailDeliveries);
+        Assert.Empty(backgroundJobClient.CreatedJobs);
+    }
+
+    [Fact]
+    public async Task WriteAsync_Scheduled_Reminder_Type_With_ScheduledRemindersEnabled_True_Behaves_As_Before()
+    {
+        await using var ctx = BuildContext();
+        var backgroundJobClient = new RecordingBackgroundJobClient();
+        var settingsReader = new FakeCompanyNotificationSettingsReader(
+            new CompanyNotificationSettings(true, true));
+        var writer = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher(), settingsReader);
+
+        await writer.WriteAsync(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "Task due soon", null,
+            Guid.NewGuid(), NotificationType.TaskDueSoon, NotificationPriority.Normal,
+            Now);
+
+        var saved = await ctx.Notifications.SingleAsync();
+        Assert.Equal("Task due soon", saved.Title);
+        // TaskDueSoon is InApp-only regardless of email setting.
+        Assert.Empty(ctx.EmailDeliveries);
+        Assert.Empty(backgroundJobClient.CreatedJobs);
+    }
+
+    [Fact]
+    public async Task WriteAsync_NonMandatory_Email_Eligible_Type_With_EmailNotificationsEnabled_False_Still_Creates_Notification_But_No_EmailDelivery()
+    {
+        await using var ctx = BuildContext();
+        var backgroundJobClient = new RecordingBackgroundJobClient();
+        var settingsReader = new FakeCompanyNotificationSettingsReader(
+            new CompanyNotificationSettings(false, true));
+        var writer = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher(), settingsReader);
+
+        await writer.WriteAsync(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "Leave approved", null,
+            Guid.NewGuid(), NotificationType.LeaveApproved, NotificationPriority.Normal,
+            Now);
+
+        var saved = await ctx.Notifications.SingleAsync();
+        Assert.Equal("Leave approved", saved.Title);
+        Assert.Empty(ctx.EmailDeliveries);
+        Assert.Empty(backgroundJobClient.CreatedJobs);
+    }
+
+    [Fact]
+    public async Task WriteAsync_NonMandatory_Email_Eligible_Type_With_EmailNotificationsEnabled_True_Still_Creates_EmailDelivery()
+    {
+        await using var ctx = BuildContext();
+        var backgroundJobClient = new RecordingBackgroundJobClient();
+        var settingsReader = new FakeCompanyNotificationSettingsReader(
+            new CompanyNotificationSettings(true, true));
+        var writer = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher(), settingsReader);
+
+        await writer.WriteAsync(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "Leave approved", null,
+            Guid.NewGuid(), NotificationType.LeaveApproved, NotificationPriority.Normal,
+            Now);
+
+        Assert.Single(await ctx.EmailDeliveries.ToListAsync());
+        Assert.Single(backgroundJobClient.CreatedJobs);
+    }
+
+    [Fact]
+    public async Task WriteAsync_Mandatory_Email_Type_With_EmailNotificationsEnabled_False_Still_Creates_EmailDelivery()
+    {
+        await using var ctx = BuildContext();
+        var backgroundJobClient = new RecordingBackgroundJobClient();
+        var settingsReader = new FakeCompanyNotificationSettingsReader(
+            new CompanyNotificationSettings(false, true));
+        var writer = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher(), settingsReader);
+        var id = Guid.NewGuid();
+
+        await writer.WriteAsync(
+            id, Guid.NewGuid(), Guid.NewGuid(),
+            "Document expired", null,
+            Guid.NewGuid(), NotificationType.DocumentExpired, NotificationPriority.Normal,
+            Now);
+
+        var delivery = await ctx.EmailDeliveries.SingleAsync();
+        Assert.Equal(id, delivery.NotificationId);
+        var job = Assert.Single(backgroundJobClient.CreatedJobs);
+        Assert.Equal(id, job.Args[0]);
     }
 
     private static NotificationsDbContext BuildContext()

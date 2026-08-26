@@ -87,6 +87,11 @@ internal sealed class CompanySettings
     public bool OfferApprovalRequired { get; private set; }
     public int CandidateRetentionDays { get; private set; }
 
+    // SET-06: notification-channel settings. Both default to true (on) so existing behaviour is
+    // preserved for existing companies.
+    public bool EmailNotificationsEnabled { get; private set; }
+    public bool ScheduledRemindersEnabled { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -165,6 +170,9 @@ internal sealed class CompanySettings
             VacancyApprovalRequired = false,
             OfferApprovalRequired = false,
             CandidateRetentionDays = 730,
+            // SET-06 defaults: both notification channels on (unchanged pre-existing behaviour).
+            EmailNotificationsEnabled = true,
+            ScheduledRemindersEnabled = true,
             CreatedAt = now,
             UpdatedAt = now,
             Version = 1,
@@ -297,6 +305,21 @@ internal sealed class CompanySettings
         VacancyApprovalRequired = vacancyApprovalRequired;
         OfferApprovalRequired = offerApprovalRequired;
         CandidateRetentionDays = candidateRetentionDays;
+        UpdatedAt = now;
+        Version++;
+    }
+
+    /// <summary>
+    /// SET-06: updates the notification-channel settings. Kept separate from
+    /// <see cref="UpdateHrPolicy"/> as its own concern, matching <see cref="UpdateRecruitmentSettings"/>.
+    /// </summary>
+    public void UpdateNotificationSettings(
+        bool emailNotificationsEnabled,
+        bool scheduledRemindersEnabled,
+        DateTimeOffset now)
+    {
+        EmailNotificationsEnabled = emailNotificationsEnabled;
+        ScheduledRemindersEnabled = scheduledRemindersEnabled;
         UpdatedAt = now;
         Version++;
     }

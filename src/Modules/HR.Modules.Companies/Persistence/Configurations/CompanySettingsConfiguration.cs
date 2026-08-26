@@ -247,6 +247,16 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .IsRequired()
             .HasDefaultValue(730);
 
+        builder.Property(settings => settings.EmailNotificationsEnabled)
+            .HasColumnName("email_notifications_enabled")
+            .IsRequired()
+            .HasDefaultValue(true);
+
+        builder.Property(settings => settings.ScheduledRemindersEnabled)
+            .HasColumnName("scheduled_reminders_enabled")
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.Property(settings => settings.Version)
             .HasColumnName("version")
             .IsRequired()

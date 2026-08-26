@@ -25,7 +25,7 @@ public class NotifyOnCandidateHiredHandlerTests
         var nameReader = new FakeEmployeeNameReader();
         nameReader.Names[employeeId] = "Taylor Smith";
 
-        var writer  = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
+        var writer  = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var handler = new NotifyOnCandidateHiredHandler(
             writer, managerReader, nameReader, new FakeLogger<NotifyOnCandidateHiredHandler>());
 
@@ -47,7 +47,7 @@ public class NotifyOnCandidateHiredHandlerTests
         var managerReader = new FakeManagerReader { ManagerId = null };
         var logger = new FakeLogger<NotifyOnCandidateHiredHandler>();
 
-        var writer  = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
+        var writer  = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var handler = new NotifyOnCandidateHiredHandler(writer, managerReader, new FakeEmployeeNameReader(), logger);
 
         await handler.HandleAsync(
@@ -66,7 +66,7 @@ public class NotifyOnCandidateHiredHandlerTests
         var managerId = Guid.NewGuid();
         var managerReader = new FakeManagerReader { ManagerId = managerId };
 
-        var writer  = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
+        var writer  = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var handler = new NotifyOnCandidateHiredHandler(
             writer, managerReader, new FakeEmployeeNameReader(), new FakeLogger<NotifyOnCandidateHiredHandler>());
 

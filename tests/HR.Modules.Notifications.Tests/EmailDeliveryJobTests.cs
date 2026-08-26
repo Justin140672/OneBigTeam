@@ -33,13 +33,15 @@ public class EmailDeliveryJobTests
         NotificationsDbContext db,
         FakeEmailSender emailSender,
         FakeUserEmailReader? userEmailReader = null,
-        FakeAuditPublisher? auditPublisher = null) =>
+        FakeAuditPublisher? auditPublisher = null,
+        FakeCompanyNotificationSettingsReader? notificationSettingsReader = null) =>
         new(
             db,
             emailSender,
             userEmailReader ?? new FakeUserEmailReader(),
             new FakeClock(FixedUtcNow),
             auditPublisher ?? new FakeAuditPublisher(),
+            notificationSettingsReader ?? new FakeCompanyNotificationSettingsReader(),
             new FakeLogger<EmailDeliveryJob>());
 
     private static async Task<(Notification Notification, EmailDelivery Delivery)> SeedPendingDelivery(
@@ -282,6 +284,99 @@ public class EmailDeliveryJobTests
         Assert.Equal(notification.Title, call.Subject);
         Assert.Contains(notification.Title, call.HtmlBody);
         Assert.Contains(notification.Body!, call.HtmlBody);
+    }
+
+    // SET-06: notification-channel settings ----------------------------------------------------
+
+    [Fact]
+    public async Task SendAsync_EmailNotificationsEnabled_False_For_NonMandatory_Type_Marks_Delivery_Skipped_Without_Sending()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var notificationId = Guid.NewGuid();
+        await SeedPendingDelivery(db, companyId, notificationId); // LeaveApproved — non-mandatory
+        var emailSender = new FakeEmailSender();
+        var settingsReader = new FakeCompanyNotificationSettingsReader(
+            new HR.Infrastructure.Abstractions.CompanyNotificationSettings(false, true));
+        var job = BuildJob(db, emailSender, notificationSettingsReader: settingsReader);
+
+        await job.SendAsync(notificationId); // must not throw
+
+        var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
+        Assert.Equal(EmailDeliveryStatus.Skipped, stored.Status);
+        Assert.NotEqual(EmailDeliveryStatus.Failed, stored.Status);
+        Assert.NotEqual(EmailDeliveryStatus.Sent, stored.Status);
+        Assert.Equal("Email notifications disabled for this company.", stored.FailureReason);
+        Assert.Empty(emailSender.Calls);
+    }
+
+    [Fact]
+    public async Task SendAsync_EmailNotificationsEnabled_False_For_Mandatory_Type_Still_Sends_Normally()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var notificationId = Guid.NewGuid();
+        var notification = Notification.Create(
+            notificationId, companyId, Guid.NewGuid(),
+            "Document expired", "Your document has expired.",
+            Guid.NewGuid(), DateTimeOffset.UtcNow, NotificationType.DocumentExpired);
+        db.Notifications.Add(notification);
+        var delivery = EmailDelivery.Create(Guid.NewGuid(), companyId, notificationId, DateTimeOffset.UtcNow);
+        db.EmailDeliveries.Add(delivery);
+        await db.SaveChangesAsync();
+
+        var emailSender = new FakeEmailSender();
+        var settingsReader = new FakeCompanyNotificationSettingsReader(
+            new HR.Infrastructure.Abstractions.CompanyNotificationSettings(false, true));
+        var job = BuildJob(db, emailSender, notificationSettingsReader: settingsReader);
+
+        await job.SendAsync(notificationId);
+
+        var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
+        Assert.Equal(EmailDeliveryStatus.Sent, stored.Status);
+        Assert.Single(emailSender.Calls);
+    }
+
+    [Fact]
+    public async Task SendAsync_Delivery_Queued_While_Enabled_Then_Disabled_Before_Job_Runs_Is_Skipped_Not_Sent()
+    {
+        // Configuration-changed-after-queueing: the delivery was created while
+        // EmailNotificationsEnabled was true (simulated by the plain SeedPendingDelivery helper,
+        // which mirrors what NotificationWriter would have persisted at queue time), but by the
+        // time this job actually runs, the setting has been switched off.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var notificationId = Guid.NewGuid();
+        await SeedPendingDelivery(db, companyId, notificationId);
+        var emailSender = new FakeEmailSender();
+        var settingsReader = new FakeCompanyNotificationSettingsReader(
+            new HR.Infrastructure.Abstractions.CompanyNotificationSettings(false, true));
+        var job = BuildJob(db, emailSender, notificationSettingsReader: settingsReader);
+
+        await job.SendAsync(notificationId);
+
+        var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
+        Assert.Equal(EmailDeliveryStatus.Skipped, stored.Status);
+        Assert.Empty(emailSender.Calls);
+    }
+
+    [Fact]
+    public async Task SendAsync_EmailNotificationsEnabled_True_Sends_Normally_Regression()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var notificationId = Guid.NewGuid();
+        await SeedPendingDelivery(db, companyId, notificationId);
+        var emailSender = new FakeEmailSender();
+        var settingsReader = new FakeCompanyNotificationSettingsReader(
+            new HR.Infrastructure.Abstractions.CompanyNotificationSettings(true, true));
+        var job = BuildJob(db, emailSender, notificationSettingsReader: settingsReader);
+
+        await job.SendAsync(notificationId);
+
+        var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
+        Assert.Equal(EmailDeliveryStatus.Sent, stored.Status);
+        Assert.Single(emailSender.Calls);
     }
 
     [Fact]

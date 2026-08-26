@@ -20,7 +20,7 @@ public class NotificationWriterTemplatedTests
     {
         await using var ctx = BuildContext();
         var backgroundJobClient = new RecordingBackgroundJobClient();
-        var writer = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher());
+        var writer = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var sourceEntityId = Guid.NewGuid();
@@ -60,7 +60,7 @@ public class NotificationWriterTemplatedTests
     {
         await using var ctx = BuildContext();
         var auditPublisher = new FakeAuditPublisher();
-        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), auditPublisher);
+        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), auditPublisher, new FakeCompanyNotificationSettingsReader());
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var sourceEntityId = Guid.NewGuid();
@@ -91,7 +91,7 @@ public class NotificationWriterTemplatedTests
     {
         await using var ctx = BuildContext();
         var backgroundJobClient = new RecordingBackgroundJobClient();
-        var writer = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher());
+        var writer = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var tokens = new Dictionary<string, string>
         {
             ["TaskTitle"] = "Review leave request",
@@ -118,7 +118,7 @@ public class NotificationWriterTemplatedTests
         await using var ctx = BuildContext();
         var backgroundJobClient = new RecordingBackgroundJobClient();
         var auditPublisher = new FakeAuditPublisher();
-        var writer = new NotificationWriter(ctx, backgroundJobClient, auditPublisher);
+        var writer = new NotificationWriter(ctx, backgroundJobClient, auditPublisher, new FakeCompanyNotificationSettingsReader());
         var tokens = new Dictionary<string, string> { ["StartDate"] = "3 Aug 2026" }; // EndDate missing
 
         var result = await writer.WriteTemplatedAsync(
@@ -137,7 +137,7 @@ public class NotificationWriterTemplatedTests
     public async Task WriteTemplatedAsync_With_Unregistered_NotificationType_Throws_InvalidOperationException()
     {
         await using var ctx = BuildContext();
-        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
+        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WriteTemplatedAsync(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), NotificationType.TaskOverdue,
@@ -150,7 +150,7 @@ public class NotificationWriterTemplatedTests
     public async Task WriteTemplatedAsync_LeaveApproved_Persists_ActionUrl_Matching_NotificationActionRouteBuilder()
     {
         await using var ctx = BuildContext();
-        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
+        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var sourceEntityId = Guid.NewGuid();
@@ -178,7 +178,7 @@ public class NotificationWriterTemplatedTests
     public async Task WriteTemplatedAsync_TaskAssigned_Persists_ActionUrl_Matching_NotificationActionRouteBuilder()
     {
         await using var ctx = BuildContext();
-        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher());
+        var writer = new NotificationWriter(ctx, new NoOpBackgroundJobClient(), new FakeAuditPublisher(), new FakeCompanyNotificationSettingsReader());
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var sourceEntityId = Guid.NewGuid();
@@ -200,6 +200,63 @@ public class NotificationWriterTemplatedTests
         var notification = await ctx.Notifications.SingleAsync();
         Assert.NotNull(expected);
         Assert.Equal(expected, notification.ActionUrl);
+    }
+
+    // SET-06: notification-channel settings ----------------------------------------------------
+
+    [Fact]
+    public async Task WriteTemplatedAsync_Scheduled_Reminder_Type_With_ScheduledRemindersEnabled_False_Is_A_NoOp()
+    {
+        await using var ctx = BuildContext();
+        var backgroundJobClient = new RecordingBackgroundJobClient();
+        var auditPublisher = new FakeAuditPublisher();
+        var settingsReader = new FakeCompanyNotificationSettingsReader(
+            new CompanyNotificationSettings(true, false));
+        var writer = new NotificationWriter(ctx, backgroundJobClient, auditPublisher, settingsReader);
+        var tokens = new Dictionary<string, string>
+        {
+            ["DocumentTitle"] = "Passport",
+            ["DocumentTypeName"] = "ID Document",
+            ["DaysUntilExpiry"] = "5",
+            ["ExpiryDate"] = "20 Aug 2026",
+        };
+
+        var result = await writer.WriteTemplatedAsync(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), NotificationType.DocumentExpiring, tokens,
+            Guid.NewGuid(), NotificationPriority.Normal, Now);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(ctx.Notifications);
+        Assert.Empty(ctx.EmailDeliveries);
+        Assert.Empty(backgroundJobClient.CreatedJobs);
+        Assert.Empty(auditPublisher.Published);
+    }
+
+    [Fact]
+    public async Task WriteTemplatedAsync_Scheduled_Reminder_Type_With_ScheduledRemindersEnabled_True_Behaves_As_Before()
+    {
+        await using var ctx = BuildContext();
+        var backgroundJobClient = new RecordingBackgroundJobClient();
+        var settingsReader = new FakeCompanyNotificationSettingsReader(
+            new CompanyNotificationSettings(true, true));
+        var writer = new NotificationWriter(ctx, backgroundJobClient, new FakeAuditPublisher(), settingsReader);
+        var tokens = new Dictionary<string, string>
+        {
+            ["DocumentTitle"] = "Passport",
+            ["DocumentTypeName"] = "ID Document",
+            ["DaysUntilExpiry"] = "5",
+            ["ExpiryDate"] = "20 Aug 2026",
+        };
+
+        var result = await writer.WriteTemplatedAsync(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), NotificationType.DocumentExpiring, tokens,
+            Guid.NewGuid(), NotificationPriority.Normal, Now);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(await ctx.Notifications.ToListAsync());
+        // DocumentExpiring is not an email-eligible type — no EmailDelivery regardless of setting.
+        Assert.Empty(ctx.EmailDeliveries);
+        Assert.Empty(backgroundJobClient.CreatedJobs);
     }
 
     private static NotificationsDbContext BuildContext()
