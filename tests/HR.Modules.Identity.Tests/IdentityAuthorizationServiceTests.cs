@@ -42,7 +42,7 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
         var roleId = Guid.NewGuid();
 
         db.Users.Add(ApplicationUser.Create(userId, $"pos{suffix}@test.com", "hash", "Test", "User", Now));
-        db.Positions.Add(Position.Create(positionId, "tenant-1", $"Position{suffix}", Now));
+        db.Positions.Add(Position.Create(positionId, Guid.NewGuid(), $"Position{suffix}", Now));
         db.Roles.Add(Role.Create(roleId, $"PosRole{suffix}", Now));
         db.PositionRoles.Add(PositionRole.Create(positionId, roleId, Now));
         db.UserPositions.Add(UserPosition.Create(userId, positionId, Now, positionExpiresAt));

@@ -322,6 +322,10 @@ try
 	// (appsettings.json / appsettings.Staging.json / production config) and admin accounts must
 	// exist as real PlatformAdministrator rows wherever the Admin Portal is reachable. Idempotent.
 	await app.Services.SeedPlatformAdministratorsFromConfigAsync(app.Configuration);
+	// IAM-03: backfill/reconciliation for employees whose position assignment predates
+	// position-based role bridging (see IdentityModule.ReconcilePositionRoleAssignmentsAsync
+	// remarks). Idempotent and additive-only; runs in every environment.
+	await app.Services.ReconcilePositionRoleAssignmentsAsync();
 	if (app.Environment.IsDevelopment())
 	{
 		await app.Services.SeedDevUserAsync();

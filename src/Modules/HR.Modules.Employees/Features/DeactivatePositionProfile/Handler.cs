@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
@@ -9,11 +10,14 @@ internal sealed class DeactivatePositionProfileHandler
 {
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
+    private readonly IIntegrationEventPublisher _integrationEventPublisher;
 
-    public DeactivatePositionProfileHandler(EmployeesDbContext dbContext, IClock clock)
+    public DeactivatePositionProfileHandler(
+        EmployeesDbContext dbContext, IClock clock, IIntegrationEventPublisher integrationEventPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
+        _integrationEventPublisher = integrationEventPublisher;
     }
 
     public async Task<Result> HandleAsync(
@@ -42,8 +46,14 @@ internal sealed class DeactivatePositionProfileHandler
                 $"{currentEmployeeCount} active employee{(currentEmployeeCount == 1 ? "" : "s")}."));
         }
 
-        positionProfile.Deactivate(_clock.UtcNowOffset());
+        var now = _clock.UtcNowOffset();
+        positionProfile.Deactivate(now);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _integrationEventPublisher.PublishAsync(
+            new PositionProfileUpsertedIntegrationEvent(
+                positionProfile.CompanyId, positionProfile.Id, positionProfile.Title, positionProfile.IsActive, now),
+            cancellationToken);
 
         return Result.Success();
     }

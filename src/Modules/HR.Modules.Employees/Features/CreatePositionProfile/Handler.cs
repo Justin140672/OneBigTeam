@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
@@ -12,17 +13,20 @@ internal sealed class CreatePositionProfileHandler
     private readonly IClock _clock;
     private readonly ILeavePolicyReader _leavePolicyReader;
     private readonly IAuditEventPublisher _auditEventPublisher;
+    private readonly IIntegrationEventPublisher _integrationEventPublisher;
 
     public CreatePositionProfileHandler(
         EmployeesDbContext dbContext,
         IClock clock,
         ILeavePolicyReader leavePolicyReader,
-        IAuditEventPublisher auditEventPublisher)
+        IAuditEventPublisher auditEventPublisher,
+        IIntegrationEventPublisher integrationEventPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _leavePolicyReader = leavePolicyReader;
         _auditEventPublisher = auditEventPublisher;
+        _integrationEventPublisher = integrationEventPublisher;
     }
 
     public async Task<Result<CreatePositionProfileResponse>> HandleAsync(
@@ -140,6 +144,10 @@ internal sealed class CreatePositionProfileHandler
                     profile.DefaultLeavePolicyId,
                     profile.OnboardingTemplateId,
                     profile.IsActive)),
+            cancellationToken);
+
+        await _integrationEventPublisher.PublishAsync(
+            new PositionProfileUpsertedIntegrationEvent(profile.CompanyId, profile.Id, profile.Title, profile.IsActive, now),
             cancellationToken);
 
         return Result.Success(new CreatePositionProfileResponse(

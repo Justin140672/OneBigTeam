@@ -185,6 +185,56 @@ internal sealed record UserEnabledAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
+// IAM-03: published when an administrator changes a position's default role set
+// (Features/SetPositionRoleDefaults). EntityId is the Position (== owning PositionProfile) id.
+internal sealed record PositionRoleDefaultsChangedAuditEvent(
+    Guid CompanyId,
+    Guid PositionId,
+    IReadOnlyList<Guid> BeforeRoleIds,
+    IReadOnlyList<Guid> AfterRoleIds,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "position.role-defaults-changed";
+    string IAuditEvent.EntityType      => "Position";
+    Guid   IAuditEvent.EntityId        => PositionId;
+    Guid?  IAuditEvent.ActorUserId     => ActorUserId;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => "Position default roles updated";
+    object? IAuditEvent.Before         => new { RoleIds = BeforeRoleIds };
+    object? IAuditEvent.After          => new { RoleIds = AfterRoleIds };
+    object? IAuditEvent.Metadata       => null;
+}
+
+// IAM-03: published when an employee's position assignment changes (new hire or transfer) and the
+// resulting change in inherited roles is applied to identity.user_positions. ActorUserId is always
+// null — the triggering integration events (EmployeeCreatedIntegrationEvent,
+// EmployeePositionChangedIntegrationEvent) do not carry the acting HR administrator's id; that
+// attribution already exists on the Employees module's own audit trail for the profile/create
+// action (EmployeeProfileUpdatedAuditEvent etc.) and can be cross-referenced by EmployeeId + time.
+internal sealed record EmployeeInheritedRolesRecalculatedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid? PreviousPositionId,
+    Guid? NewPositionId,
+    IReadOnlyList<Guid> BeforeRoleIds,
+    IReadOnlyList<Guid> AfterRoleIds,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "employee.inherited-roles-recalculated";
+    string IAuditEvent.EntityType      => "UserPosition";
+    Guid   IAuditEvent.EntityId        => EmployeeId;
+    Guid?  IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId     => null;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => "Inherited roles recalculated following a position assignment change";
+    object? IAuditEvent.Before         => new { PositionId = PreviousPositionId, RoleIds = BeforeRoleIds };
+    object? IAuditEvent.After          => new { PositionId = NewPositionId, RoleIds = AfterRoleIds };
+    object? IAuditEvent.Metadata       => null;
+}
+
 // Platform administrator management (Admin Portal "administrator management" screen). These
 // events cover a platform-level concept with no company relationship — CompanyId is always
 // Guid.Empty since IAuditEvent requires a non-nullable CompanyId.

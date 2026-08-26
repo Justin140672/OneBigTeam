@@ -120,4 +120,22 @@ internal sealed class PositionProfileReader(EmployeesDbContext dbContext)
                     location.Name))
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Guid>> GetAllActiveIdsAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        return await dbContext.PositionProfiles
+            .AsNoTracking()
+            .Where(p => p.CompanyId == companyId && p.IsActive)
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Guid>> GetAllIdsAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        return await dbContext.PositionProfiles
+            .AsNoTracking()
+            .Where(p => p.CompanyId == companyId)
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+    }
 }

@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.DeactivatePositionProfile;
 using HR.Modules.Employees.Persistence;
@@ -23,7 +24,7 @@ public class DeactivatePositionProfileHandlerTests
         context.PositionProfiles.Add(positionProfile);
         await context.SaveChangesAsync();
 
-        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new DeactivatePositionProfileRequest { CompanyId = companyId, Id = positionProfile.Id },
@@ -39,7 +40,7 @@ public class DeactivatePositionProfileHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_PositionProfile_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new DeactivatePositionProfileRequest { CompanyId = Guid.NewGuid(), Id = Guid.NewGuid() },
@@ -62,7 +63,7 @@ public class DeactivatePositionProfileHandlerTests
         context.PositionProfiles.Add(positionProfile);
         await context.SaveChangesAsync();
 
-        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new DeactivatePositionProfileRequest { CompanyId = companyId, Id = positionProfile.Id },
@@ -83,7 +84,7 @@ public class DeactivatePositionProfileHandlerTests
         context.PositionProfiles.Add(positionProfile);
         await context.SaveChangesAsync();
 
-        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new DeactivatePositionProfileRequest { CompanyId = Guid.NewGuid(), Id = positionProfile.Id },
@@ -111,7 +112,7 @@ public class DeactivatePositionProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new DeactivatePositionProfileRequest { CompanyId = companyId, Id = positionProfile.Id },
@@ -145,7 +146,7 @@ public class DeactivatePositionProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new DeactivatePositionProfileRequest { CompanyId = companyId, Id = positionProfile.Id },
@@ -155,6 +156,34 @@ public class DeactivatePositionProfileHandlerTests
 
         var saved = await context.PositionProfiles.SingleAsync();
         Assert.False(saved.IsActive);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_PositionProfileUpsertedIntegrationEvent_On_Success()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var positionProfile = PositionProfile.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer", null,
+            probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
+            salaryMin: null, salaryMax: null, salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), FixedOffset);
+        context.PositionProfiles.Add(positionProfile);
+        await context.SaveChangesAsync();
+
+        var integrationEventPublisher = new CapturingIntegrationEventPublisher();
+        var handler = new DeactivatePositionProfileHandler(context, new FakeClock(FixedUtcNow), integrationEventPublisher);
+
+        var result = await handler.HandleAsync(
+            new DeactivatePositionProfileRequest { CompanyId = companyId, Id = positionProfile.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var published = Assert.IsType<PositionProfileUpsertedIntegrationEvent>(Assert.Single(integrationEventPublisher.Published));
+        Assert.Equal(companyId, published.CompanyId);
+        Assert.Equal(positionProfile.Id, published.PositionProfileId);
+        Assert.Equal("Software Developer", published.Title);
+        Assert.False(published.IsActive);
     }
 
     private static EmployeesDbContext BuildContext()

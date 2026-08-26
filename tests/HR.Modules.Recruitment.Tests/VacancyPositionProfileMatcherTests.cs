@@ -148,5 +148,11 @@ public class VacancyPositionProfileMatcherTests
         public Task<PositionProfileEmploymentDefaults?> GetEmploymentDefaultsAsync(
             Guid companyId, Guid positionProfileId, CancellationToken cancellationToken) =>
             Task.FromResult<PositionProfileEmploymentDefaults?>(null);
+
+        public Task<IReadOnlyList<Guid>> GetAllActiveIdsAsync(Guid companyId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Guid>>([]);
+
+        public Task<IReadOnlyList<Guid>> GetAllIdsAsync(Guid companyId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Guid>>([]);
     }
 }

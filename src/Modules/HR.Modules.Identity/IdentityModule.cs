@@ -13,6 +13,7 @@ using HR.Modules.Identity.Features.GetUserAuditHistory;
 using HR.Modules.Identity.Features.GetUserDetails;
 using HR.Modules.Identity.Features.InviteEmployeeUser;
 using HR.Modules.Identity.Features.ListPlatformAdministrators;
+using HR.Modules.Identity.Features.ListPositionRoleDefaults;
 using HR.Modules.Identity.Features.ListUsers;
 using HR.Modules.Identity.Features.Login;
 using HR.Modules.Identity.Features.RequestPasswordReset;
@@ -21,6 +22,7 @@ using HR.Modules.Identity.Features.ResendVerification;
 using HR.Modules.Identity.Features.ResetPassword;
 using HR.Modules.Identity.Features.ResetPlatformAdministratorMfa;
 using HR.Modules.Identity.Features.ResetPlatformAdministratorPassword;
+using HR.Modules.Identity.Features.SetPositionRoleDefaults;
 using HR.Modules.Identity.Features.SignUp;
 using HR.Modules.Identity.Features.UpdateUserRoles;
 using HR.Modules.Identity.Features.VerifyEmail;
@@ -153,6 +155,22 @@ public static class IdentityModule
         services.AddScoped<
             IIntegrationEventHandler<OffboardingPlanCompletedIntegrationEvent>,
             Features.OnOffboardingPlanCompleted.Handler>();
+
+        // IAM-03: position-based default role administration.
+        services.AddScoped<HR.Modules.Identity.Services.PositionSync>();
+        services.AddScoped<ListPositionRoleDefaultsHandler>();
+        services.AddScoped<IValidator<ListPositionRoleDefaultsRequest>, ListPositionRoleDefaultsValidator>();
+        services.AddScoped<SetPositionRoleDefaultsHandler>();
+        services.AddScoped<IValidator<SetPositionRoleDefaultsRequest>, SetPositionRoleDefaultsValidator>();
+        services.AddScoped<
+            IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>,
+            Features.OnEmployeeCreated.Handler>();
+        services.AddScoped<
+            IIntegrationEventHandler<EmployeePositionChangedIntegrationEvent>,
+            Features.OnEmployeePositionChanged.Handler>();
+        services.AddScoped<
+            IIntegrationEventHandler<PositionProfileUpsertedIntegrationEvent>,
+            Features.OnPositionProfileUpserted.Handler>();
 
         services.AddScoped<IWorkloadActionProvider, EmployeeAccountsAwaitingInvitationWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, EmployeeAccountsAwaitingDisablementWorkloadActionProvider>();
@@ -452,6 +470,56 @@ public static class IdentityModule
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         await db.Database.ExecuteSqlRawAsync("CREATE SCHEMA IF NOT EXISTS identity");
         await db.Database.MigrateAsync();
+    }
+
+    /// <summary>
+    /// IAM-03 backfill/reconciliation: ensures every current employee's position assignment
+    /// (as of now, per HR.Modules.Employees) has a matching identity.user_positions row, for
+    /// employees created before position-based role bridging existed (see
+    /// Features/OnEmployeeCreated and Features/OnEmployeePositionChanged, which only fire on new
+    /// integration-event traffic going forward). Called on every startup, in every environment,
+    /// right after MigrateIdentityAsync — idempotent and additive only: it never expires or
+    /// removes an existing UserPosition row, so it cannot clobber a manually-corrected assignment.
+    /// Scoped per company (via UserProfile.CompanyId) so it never processes cross-tenant data.
+    /// </summary>
+    public static async Task ReconcilePositionRoleAssignmentsAsync(this IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        var employeeAudienceReader = scope.ServiceProvider.GetRequiredService<IEmployeeAudienceReader>();
+        var positionSync = scope.ServiceProvider.GetRequiredService<HR.Modules.Identity.Services.PositionSync>();
+        var now = DateTimeOffset.UtcNow;
+
+        var companyIds = await db.UserProfiles.Select(p => p.CompanyId).Distinct().ToListAsync();
+
+        foreach (var companyId in companyIds)
+        {
+            var employeeIds = await employeeAudienceReader.GetAllEmployeeIdsAsync(companyId, CancellationToken.None);
+            if (employeeIds.Count == 0)
+                continue;
+
+            var profiles = await employeeAudienceReader.GetEmployeeAudienceProfilesAsync(
+                companyId, employeeIds, CancellationToken.None);
+
+            foreach (var (employeeId, profile) in profiles)
+            {
+                if (profile.PositionProfileId is null)
+                    continue;
+
+                var positionId = profile.PositionProfileId.Value;
+
+                var hasActiveAssignment = await db.UserPositions.AnyAsync(up =>
+                    up.UserId == employeeId && up.PositionId == positionId &&
+                    (up.ExpiresAt == null || up.ExpiresAt > now));
+                if (hasActiveAssignment)
+                    continue;
+
+                await positionSync.EnsureExistsAsync(companyId, positionId, now, CancellationToken.None);
+                db.UserPositions.Add(UserPosition.Create(employeeId, positionId, now));
+            }
+        }
+
+        await db.SaveChangesAsync();
     }
 
     /// <summary>

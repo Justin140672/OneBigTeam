@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -11,17 +12,20 @@ internal sealed class UpdatePositionProfileHandler
     private readonly IClock _clock;
     private readonly ILeavePolicyReader _leavePolicyReader;
     private readonly IAuditEventPublisher _auditEventPublisher;
+    private readonly IIntegrationEventPublisher _integrationEventPublisher;
 
     public UpdatePositionProfileHandler(
         EmployeesDbContext dbContext,
         IClock clock,
         ILeavePolicyReader leavePolicyReader,
-        IAuditEventPublisher auditEventPublisher)
+        IAuditEventPublisher auditEventPublisher,
+        IIntegrationEventPublisher integrationEventPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _leavePolicyReader = leavePolicyReader;
         _auditEventPublisher = auditEventPublisher;
+        _integrationEventPublisher = integrationEventPublisher;
     }
 
     public async Task<Result<UpdatePositionProfileResponse>> HandleAsync(
@@ -167,6 +171,10 @@ internal sealed class UpdatePositionProfileHandler
 
         await _auditEventPublisher.PublishAsync(
             new PositionProfileUpdatedAuditEvent(profile.CompanyId, profile.Id, actorEmployeeId, now, before, after),
+            cancellationToken);
+
+        await _integrationEventPublisher.PublishAsync(
+            new PositionProfileUpsertedIntegrationEvent(profile.CompanyId, profile.Id, profile.Title, profile.IsActive, now),
             cancellationToken);
 
         return Result.Success(new UpdatePositionProfileResponse(

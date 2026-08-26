@@ -39,7 +39,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -68,7 +68,7 @@ public class UpdatePositionProfileHandlerTests
     {
         await using var context = BuildContext();
         var auditPublisher = new FakeAuditPublisher();
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), auditPublisher);
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), auditPublisher, new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -100,7 +100,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -133,7 +133,7 @@ public class UpdatePositionProfileHandlerTests
         await context.SaveChangesAsync();
 
         var auditPublisher = new FakeAuditPublisher();
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), auditPublisher);
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), auditPublisher, new NoOpIntegrationEventPublisher());
 
         // Try to rename profile1 to the same title as profile2
         var result = await handler.HandleAsync(
@@ -166,7 +166,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -196,7 +196,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -227,7 +227,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -261,7 +261,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -292,7 +292,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: false), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: false), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -324,7 +324,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: true), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: true), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -363,7 +363,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -400,7 +400,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -435,7 +435,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -467,7 +467,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -499,7 +499,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -539,7 +539,7 @@ public class UpdatePositionProfileHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -581,7 +581,7 @@ public class UpdatePositionProfileHandlerTests
         await context.SaveChangesAsync();
 
         var auditPublisher = new FakeAuditPublisher();
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), auditPublisher);
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), auditPublisher, new NoOpIntegrationEventPublisher());
         var actorEmployeeId = Guid.NewGuid();
         var newLeavePolicyId = Guid.NewGuid();
 
@@ -618,6 +618,44 @@ public class UpdatePositionProfileHandlerTests
         Assert.Equal(newLeavePolicyId, auditEvent.After.DefaultLeavePolicyId);
         Assert.Equal(NoticePeriodUnit.Months, auditEvent.After.NoticePeriodUnitOverride);
         Assert.Equal(2, auditEvent.After.NoticePeriodLengthOverride);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_PositionProfileUpsertedIntegrationEvent_On_Success()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
+
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Old Title", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        context.PositionProfiles.Add(profile);
+        await context.SaveChangesAsync();
+
+        var integrationEventPublisher = new CapturingIntegrationEventPublisher();
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), integrationEventPublisher);
+
+        var result = await handler.HandleAsync(
+            new UpdatePositionProfileRequest
+            {
+                CompanyId = companyId,
+                Id = profile.Id,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
+                Title = "New Title",
+                Description = "Updated description"
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var published = Assert.IsType<PositionProfileUpsertedIntegrationEvent>(Assert.Single(integrationEventPublisher.Published));
+        Assert.Equal(companyId, published.CompanyId);
+        Assert.Equal(profile.Id, published.PositionProfileId);
+        Assert.Equal("New Title", published.Title);
+        Assert.True(published.IsActive);
     }
 
     private static EmployeesDbContext BuildContext()

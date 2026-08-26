@@ -119,4 +119,21 @@ public interface IPositionProfileReader
     /// </summary>
     Task<PositionProfileEmploymentDefaults?> GetEmploymentDefaultsAsync(
         Guid companyId, Guid positionProfileId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns the IDs of every active position profile in the given company. Used by IAM-03
+    /// (position-based default role administration, owned by HR.Modules.Identity) to list the
+    /// full set of position profiles an administrator can configure default roles for, without a
+    /// direct module-to-module reference or database join.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetAllActiveIdsAsync(Guid companyId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns the IDs of every position profile in the given company, active or inactive. Used by
+    /// IAM-03's Identity-side reconciliation pass (see IdentityModule.ReconcilePositionRoleAssignmentsAsync)
+    /// to backfill Identity's Position table for profiles that existed before position/role bridging
+    /// was wired up — unlike <see cref="GetAllActiveIdsAsync"/>, inactive profiles must still be
+    /// included so a subsequently-reactivated profile already has a matching Position row.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetAllIdsAsync(Guid companyId, CancellationToken cancellationToken);
 }

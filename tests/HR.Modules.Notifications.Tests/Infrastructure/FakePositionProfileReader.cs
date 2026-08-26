@@ -34,4 +34,10 @@ internal sealed class FakePositionProfileReader : IPositionProfileReader
     public Task<PositionProfileEmploymentDefaults?> GetEmploymentDefaultsAsync(
         Guid companyId, Guid positionProfileId, CancellationToken cancellationToken) =>
         throw new NotImplementedException();
+
+    public Task<IReadOnlyList<Guid>> GetAllActiveIdsAsync(Guid companyId, CancellationToken cancellationToken) =>
+        throw new NotImplementedException();
+
+    public Task<IReadOnlyList<Guid>> GetAllIdsAsync(Guid companyId, CancellationToken cancellationToken) =>
+        throw new NotImplementedException();
 }
