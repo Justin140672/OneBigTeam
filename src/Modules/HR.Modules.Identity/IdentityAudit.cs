@@ -235,6 +235,81 @@ internal sealed record EmployeeInheritedRolesRecalculatedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
+// IAM-04: published when an administrator creates (or replaces) an employee-level role override
+// (Features/AddEmployeeRoleOverride).
+internal sealed record EmployeeRoleOverrideCreatedAuditEvent(
+    Guid CompanyId,
+    Guid UserId,
+    Guid OverrideId,
+    Guid RoleId,
+    EmployeeRoleOverrideType OverrideType,
+    string Reason,
+    DateTimeOffset? ExpiresAt,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "user.role-override-created";
+    string IAuditEvent.EntityType      => "EmployeeRoleOverride";
+    Guid   IAuditEvent.EntityId        => OverrideId;
+    Guid?  IAuditEvent.EmployeeId      => UserId;
+    Guid?  IAuditEvent.ActorUserId     => ActorUserId;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => $"Created {OverrideType} override for role {RoleId}: {Reason}";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => new { RoleId, OverrideType, Reason, ExpiresAt };
+    object? IAuditEvent.Metadata       => null;
+}
+
+// IAM-04: published when an administrator removes an employee-level role override
+// (Features/RemoveEmployeeRoleOverride).
+internal sealed record EmployeeRoleOverrideRemovedAuditEvent(
+    Guid CompanyId,
+    Guid UserId,
+    Guid OverrideId,
+    Guid RoleId,
+    EmployeeRoleOverrideType OverrideType,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "user.role-override-removed";
+    string IAuditEvent.EntityType      => "EmployeeRoleOverride";
+    Guid   IAuditEvent.EntityId        => OverrideId;
+    Guid?  IAuditEvent.EmployeeId      => UserId;
+    Guid?  IAuditEvent.ActorUserId     => ActorUserId;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => $"Removed {OverrideType} override for role {RoleId}";
+    object? IAuditEvent.Before         => new { RoleId, OverrideType };
+    object? IAuditEvent.After          => null;
+    object? IAuditEvent.Metadata       => null;
+}
+
+// IAM-04: published by the daily sweep (Jobs/ExpireEmployeeRoleOverridesJob) when a temporary
+// override's ExpiresAt has passed and it is cleared out — distinct from a manual removal so audit
+// history can tell the two apart. ActorUserId is always null (system-driven, not an administrator
+// action).
+internal sealed record EmployeeRoleOverrideExpiredAuditEvent(
+    Guid CompanyId,
+    Guid UserId,
+    Guid OverrideId,
+    Guid RoleId,
+    EmployeeRoleOverrideType OverrideType,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "user.role-override-expired";
+    string IAuditEvent.EntityType      => "EmployeeRoleOverride";
+    Guid   IAuditEvent.EntityId        => OverrideId;
+    Guid?  IAuditEvent.EmployeeId      => UserId;
+    Guid?  IAuditEvent.ActorUserId     => null;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => $"{OverrideType} override for role {RoleId} expired";
+    object? IAuditEvent.Before         => new { RoleId, OverrideType };
+    object? IAuditEvent.After          => null;
+    object? IAuditEvent.Metadata       => null;
+}
+
 // Platform administrator management (Admin Portal "administrator management" screen). These
 // events cover a platform-level concept with no company relationship — CompanyId is always
 // Guid.Empty since IAuditEvent requires a non-nullable CompanyId.

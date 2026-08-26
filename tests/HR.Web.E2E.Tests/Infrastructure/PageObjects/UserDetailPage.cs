@@ -110,4 +110,60 @@ public sealed class UserDetailPage(IPage page, string baseUrl)
             names.Add(await badges.Nth(i).InnerTextAsync());
         return names;
     }
+
+    // ── Permission Overrides (UserDetail.razor's "Permission Overrides" card) ──────────────────
+
+    /// <summary>
+    /// The "Permission Override" badge shown next to the Account/Invitation Status badges when
+    /// the user has at least one active override — scoped to the header row (not the
+    /// Permission Overrides card body) via ".d-flex.align-items-center.gap-2.mb-1", the same
+    /// container <see cref="GetAccountStatusAsync"/> reads from.
+    /// </summary>
+    public Task<bool> HasPermissionOverrideBadgeAsync() =>
+        page.Locator(".d-flex.align-items-center.gap-2.mb-1 span.badge")
+            .Filter(new() { HasText = "Permission Override" })
+            .IsVisibleAsync();
+
+    private ILocator PermissionOverridesCard => page.Locator(".card", new() { HasText = "Permission Overrides" });
+
+    public async Task<bool> HasNoOverridesMessageAsync()
+    {
+        await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
+        return await PermissionOverridesCard.GetByText("No permission overrides for this user.").IsVisibleAsync();
+    }
+
+    /// <summary>Number of override rows currently listed in the "Permission Overrides" card.</summary>
+    public async Task<int> GetOverrideCountAsync()
+    {
+        await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
+        return await PermissionOverridesCard.Locator("ul.list-unstyled > li").CountAsync();
+    }
+
+    /// <summary>The override row (li) whose role name contains <paramref name="roleName"/>.</summary>
+    private ILocator OverrideRow(string roleName) =>
+        PermissionOverridesCard.Locator("li").Filter(new() { HasText = roleName });
+
+    public Task<bool> HasOverrideAsync(string roleName) => OverrideRow(roleName).IsVisibleAsync();
+
+    public async Task<string?> GetOverrideTypeAsync(string roleName) =>
+        (await OverrideRow(roleName).Locator(".badge").InnerTextAsync())?.Trim();
+
+    public async Task OpenAddOverrideDialogAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "+ Add Override" }).ClickAsync();
+        await page.GetByRole(AriaRole.Dialog, new() { Name = "Add Permission Override" })
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Clicks the per-row "Remove" button for the override on <paramref name="roleName"/> and
+    /// waits for the row to disappear (UserDetail.razor's RemoveOverrideAsync reloads the page's
+    /// state on success).
+    /// </summary>
+    public async Task RemoveOverrideAsync(string roleName)
+    {
+        var row = OverrideRow(roleName);
+        await row.GetByRole(AriaRole.Button, new() { Name = "Remove" }).ClickAsync();
+        await row.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
 }

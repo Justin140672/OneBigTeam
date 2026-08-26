@@ -92,3 +92,43 @@ public record UpdateUserRolesRequest(
 
 // ── Generic action responses (resend/cancel invite, disable/enable user) ───
 public record UserActionResponse(bool Success);
+
+// ── Employee role overrides (IAM-04) ────────────────────────────────────────
+// Mirrors HR.Modules.Identity.Domain.EmployeeRoleOverrideType (internal to that module), the
+// same duplication rationale as SystemRoleOptions above — serialized as a string via the global
+// JsonStringEnumConverter, so the member names below must match "Grant"/"Deny" exactly.
+public enum EmployeeRoleOverrideType
+{
+    Grant,
+    Deny,
+}
+
+// GET /api/companies/{companyId}/users/{userId}/role-overrides
+public record ListEmployeeRoleOverridesResponse(List<EmployeeRoleOverrideModel> Overrides);
+
+public record EmployeeRoleOverrideModel(
+    Guid RoleId,
+    EmployeeRoleOverrideType OverrideType,
+    string Reason,
+    DateTimeOffset? ExpiresAt,
+    DateTimeOffset AssignedAt,
+    Guid? AssignedBy);
+
+// POST /api/companies/{companyId}/users/{userId}/role-overrides
+public record AddEmployeeRoleOverrideRequest(
+    Guid CompanyId,
+    Guid UserId,
+    Guid RoleId,
+    EmployeeRoleOverrideType OverrideType,
+    string Reason,
+    DateTimeOffset? ExpiresAt);
+
+public record AddEmployeeRoleOverrideResponse(
+    Guid UserId,
+    Guid RoleId,
+    EmployeeRoleOverrideType OverrideType,
+    string Reason,
+    DateTimeOffset? ExpiresAt);
+
+// DELETE /api/companies/{companyId}/users/{userId}/role-overrides/{roleId}
+public record RemoveEmployeeRoleOverrideResponse(Guid UserId, Guid RoleId);

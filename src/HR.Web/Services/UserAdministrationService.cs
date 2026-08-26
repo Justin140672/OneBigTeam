@@ -110,6 +110,43 @@ public sealed class UserAdministrationService(IHttpClientFactory httpClientFacto
             : (false, await ReadErrorAsync(response, "Failed to enable this account."));
     }
 
+    public async Task<List<EmployeeRoleOverrideModel>?> GetRoleOverridesAsync(Guid companyId, Guid userId)
+    {
+        try
+        {
+            var result = await Http.GetFromJsonAsync<ListEmployeeRoleOverridesResponse>(
+                $"api/companies/{companyId}/users/{userId}/role-overrides", HrApiJsonOptions.Default);
+            return result?.Overrides;
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<(AddEmployeeRoleOverrideResponse? Result, string? Error)> AddRoleOverrideAsync(
+        Guid companyId, Guid userId, Guid roleId, EmployeeRoleOverrideType overrideType, string reason, DateTimeOffset? expiresAt)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/users/{userId}/role-overrides",
+            new AddEmployeeRoleOverrideRequest(companyId, userId, roleId, overrideType, reason, expiresAt),
+            HrApiJsonOptions.Default);
+
+        if (response.IsSuccessStatusCode)
+            return (await response.Content.ReadFromJsonAsync<AddEmployeeRoleOverrideResponse>(HrApiJsonOptions.Default), null);
+
+        return (null, await ReadErrorAsync(response, "Failed to add the permission override."));
+    }
+
+    public async Task<(bool Success, string? Error)> RemoveRoleOverrideAsync(Guid companyId, Guid userId, Guid roleId)
+    {
+        var response = await Http.DeleteAsync($"api/companies/{companyId}/users/{userId}/role-overrides/{roleId}");
+
+        return response.IsSuccessStatusCode
+            ? (true, null)
+            : (false, await ReadErrorAsync(response, "Failed to remove the permission override."));
+    }
+
     private static async Task<string?> ReadErrorAsync(HttpResponseMessage response, string fallback)
     {
         try

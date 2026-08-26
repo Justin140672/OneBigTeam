@@ -147,7 +147,7 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
 
         await using var db = fixture.BuildContext();
         db.EmployeeRoleOverrides.Add(
-            EmployeeRoleOverride.Create(userId, roleId, EmployeeRoleOverrideType.Deny, Now));
+            EmployeeRoleOverride.Create(Guid.NewGuid(), userId, roleId, EmployeeRoleOverrideType.Deny, "test", null, Now));
         await db.SaveChangesAsync();
 
         var svc = BuildService();
@@ -165,7 +165,7 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
         var extraRoleId = Guid.NewGuid();
         db.Roles.Add(Role.Create(extraRoleId, "ExtraGrantRole", Now));
         db.EmployeeRoleOverrides.Add(
-            EmployeeRoleOverride.Create(userId, extraRoleId, EmployeeRoleOverrideType.Grant, Now));
+            EmployeeRoleOverride.Create(Guid.NewGuid(), userId, extraRoleId, EmployeeRoleOverrideType.Grant, "test", null, Now));
         await db.SaveChangesAsync();
 
         var svc = BuildService();
@@ -181,7 +181,7 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
 
         await using var db = fixture.BuildContext();
         db.EmployeeRoleOverrides.Add(
-            EmployeeRoleOverride.Create(userId, roleId, EmployeeRoleOverrideType.Deny, Now));
+            EmployeeRoleOverride.Create(Guid.NewGuid(), userId, roleId, EmployeeRoleOverrideType.Deny, "test", null, Now));
         await db.SaveChangesAsync();
 
         var svc = BuildService();
@@ -225,7 +225,7 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
 
         await using var db = fixture.BuildContext();
         db.EmployeeRoleOverrides.Add(
-            EmployeeRoleOverride.Create(userId, roleId, EmployeeRoleOverrideType.Deny, Now));
+            EmployeeRoleOverride.Create(Guid.NewGuid(), userId, roleId, EmployeeRoleOverrideType.Deny, "test", null, Now));
         await db.SaveChangesAsync();
 
         var svc = BuildService();
@@ -341,7 +341,7 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
         db.RolePermissions.Add(RolePermission.Create(roleA, permId));
         db.RolePermissions.Add(RolePermission.Create(roleB, permId));
         db.EmployeeRoleOverrides.Add(
-            EmployeeRoleOverride.Create(userId, roleA, EmployeeRoleOverrideType.Deny, Now));
+            EmployeeRoleOverride.Create(Guid.NewGuid(), userId, roleA, EmployeeRoleOverrideType.Deny, "test", null, Now));
         await db.SaveChangesAsync();
 
         var svc = BuildService();

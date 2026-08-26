@@ -1,0 +1,143 @@
+@inject UserAdministrationService UserAdministrationService
+
+<SfDialog Visible="IsOpen" IsModal="true" Width="480px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Add Permission Override</Header>
+        <Content>
+            <div class="mb-3">
+                <label class="form-label">Role <span class="text-danger">*</span></label>
+                <SfDropDownList TValue="Guid?" TItem="RoleOption"
+                                DataSource="@_roleOptions"
+                                @bind-Value="_roleId"
+                                Placeholder="Select a role"
+                                AllowFiltering="true">
+                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                </SfDropDownList>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Override Type <span class="text-danger">*</span></label>
+                <SfDropDownList TValue="EmployeeRoleOverrideType?" TItem="OverrideTypeOption"
+                                DataSource="@_overrideTypeOptions"
+                                @bind-Value="_overrideType"
+                                Placeholder="Select Grant or Deny">
+                    <DropDownListFieldSettings Value="Value" Text="Label" />
+                </SfDropDownList>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Reason <span class="text-danger">*</span></label>
+                <HrTextBox @bind-Value="_reason" Multiline="true" Rows="2" Maxlength="1000" Placeholder="Why is this override needed?" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Expires</label>
+                <SfDatePicker TValue="DateOnly?" @bind-Value="_expiresOn" Format="dd/MM/yyyy" Placeholder="Leave blank for permanent" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="alert alert-danger py-2">@_error</div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAsync">
+                @if (_saving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Save
+            </SfButton>
+            <SfButton Disabled="@_saving" OnClick="CancelAsync">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    private sealed record OverrideTypeOption(EmployeeRoleOverrideType Value, string Label);
+
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid UserId { get; set; }
+    [Parameter] public List<Guid> ExistingOverrideRoleIds { get; set; } = [];
+    [Parameter] public EventCallback OnCancelled { get; set; }
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private bool _wasOpen;
+    private bool _saving;
+    private string? _error;
+    private Guid? _roleId;
+    private EmployeeRoleOverrideType? _overrideType;
+    private string _reason = string.Empty;
+    private DateOnly? _expiresOn;
+
+    private List<RoleOption> _roleOptions = [];
+
+    private readonly List<OverrideTypeOption> _overrideTypeOptions =
+    [
+        new(EmployeeRoleOverrideType.Grant, "Grant"),
+        new(EmployeeRoleOverrideType.Deny, "Deny"),
+    ];
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_wasOpen)
+        {
+            _roleOptions = SystemRoleOptions.All.Where(r => !ExistingOverrideRoleIds.Contains(r.Id)).ToList();
+            _roleId = null;
+            _overrideType = null;
+            _reason = string.Empty;
+            _expiresOn = null;
+            _error = null;
+            _saving = false;
+        }
+
+        _wasOpen = IsOpen;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_roleId is null)
+        {
+            _error = "Select a role.";
+            return;
+        }
+
+        if (_overrideType is null)
+        {
+            _error = "Select Grant or Deny.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_reason))
+        {
+            _error = "A reason is required.";
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+
+        var expiresAt = _expiresOn is { } expiresOn
+            ? new DateTimeOffset(expiresOn.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
+            : (DateTimeOffset?)null;
+
+        var (result, error) = await UserAdministrationService.AddRoleOverrideAsync(
+            CompanyId, UserId, _roleId.Value, _overrideType.Value, _reason.Trim(), expiresAt);
+
+        _saving = false;
+
+        if (result is null)
+        {
+            _error = error ?? "Failed to add the permission override.";
+            return;
+        }
+
+        await OnCompleted.InvokeAsync();
+    }
+
+    private async Task CancelAsync()
+    {
+        await OnCancelled.InvokeAsync();
+    }
+}

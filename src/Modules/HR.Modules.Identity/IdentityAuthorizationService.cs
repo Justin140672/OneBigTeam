@@ -65,9 +65,12 @@ internal sealed class IdentityAuthorizationService(
         var effectiveRoles = new HashSet<Guid>(positionRoleIds);
         effectiveRoles.UnionWith(directRoleIds);
 
-        // 4. Apply employee-level overrides (Deny removes, Grant adds).
+        // 4. Apply employee-level overrides (Deny removes, Grant adds). IAM-04: an expired
+        // override (ExpiresAt <= now) must stop affecting access automatically — excluded here at
+        // read time, same strictly-greater-than convention as position-assignment expiry above, so
+        // an override expiring exactly "now" is already treated as expired.
         var overrides = await db.EmployeeRoleOverrides
-            .Where(o => o.UserId == userId)
+            .Where(o => o.UserId == userId && (o.ExpiresAt == null || o.ExpiresAt > now))
             .ToListAsync(ct);
 
         foreach (var @override in overrides)

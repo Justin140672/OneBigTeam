@@ -16,6 +16,16 @@ internal sealed class EmployeeRoleOverrideConfiguration : IEntityTypeConfigurati
             .HasColumnName("id")
             .IsRequired();
 
+        // IAM-04: company_id is required on every tenant-owned table per the database standards
+        // (05-database-standards.md) — also lets override administration/search/reporting (IAM-05,
+        // IAM-08) filter by company without joining through UserProfile.
+        builder.Property(e => e.CompanyId)
+            .HasColumnName("company_id")
+            .IsRequired();
+
+        builder.HasIndex(e => e.CompanyId)
+            .HasDatabaseName("ix_employee_role_overrides_company_id");
+
         builder.Property(e => e.UserId)
             .HasColumnName("user_id")
             .IsRequired();
@@ -29,6 +39,15 @@ internal sealed class EmployeeRoleOverrideConfiguration : IEntityTypeConfigurati
             .HasConversion<int>()
             .IsRequired();
 
+        builder.Property(e => e.Reason)
+            .HasColumnName("reason")
+            .HasMaxLength(500)
+            .IsRequired();
+
+        builder.Property(e => e.ExpiresAt)
+            .HasColumnName("expires_at")
+            .IsRequired(false);
+
         builder.Property(e => e.AssignedAt)
             .HasColumnName("assigned_at")
             .IsRequired();
@@ -41,10 +60,10 @@ internal sealed class EmployeeRoleOverrideConfiguration : IEntityTypeConfigurati
             .IsUnique()
             .HasDatabaseName("ix_employee_role_overrides_user_role");
 
-        builder.HasOne<ApplicationUser>()
-            .WithMany()
-            .HasForeignKey(e => e.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // IAM-04: no FK constraint on UserId, matching UserRoleConfiguration/UserPositionConfiguration's
+        // precedent — UserId is the owning Employee's id (ApplicationUser.Id == EmployeeId by
+        // convention) and overrides may need to be administered for a user id before an
+        // ApplicationUser row necessarily exists for every code path that could set one.
 
         builder.HasOne<Role>()
             .WithMany()

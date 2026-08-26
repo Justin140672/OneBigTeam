@@ -63,6 +63,24 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
         return await badge.IsVisibleAsync() ? await badge.InnerTextAsync() : null;
     }
 
+    /// <summary>
+    /// Whether the row for <paramref name="nameOrEmailFragment"/> shows the "Permission Override"
+    /// badge in the grid's "Permission Override" column (rendered only when the user has at least
+    /// one active override — see UserAdministrationList.razor's _usersWithOverrides lookup).
+    /// </summary>
+    public async Task<bool> HasPermissionOverrideBadgeAsync(string nameOrEmailFragment)
+    {
+        await SearchAsync(nameOrEmailFragment);
+
+        var row = page.Locator(".e-row")
+            .Filter(new() { HasText = nameOrEmailFragment })
+            .First;
+
+        return await row.Locator(".e-rowcell .badge")
+            .Filter(new() { HasText = "Permission Override" })
+            .IsVisibleAsync();
+    }
+
     public async Task OpenUserDetailAsync(string nameOrEmailFragment)
     {
         await SearchAsync(nameOrEmailFragment);

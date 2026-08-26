@@ -31,6 +31,10 @@
             {
                 <span class="badge @InvitationStatusBadgeClass(_user.InvitationStatus)">@_user.InvitationStatus</span>
             }
+            @if (_overrides.Count > 0)
+            {
+                <span class="badge bg-warning text-dark">Permission Override</span>
+            }
         </div>
         <p class="text-muted mb-4">View this user's access details and manage their account.</p>
 
@@ -109,6 +113,49 @@
                     </div>
                 }
 
+                @if (_user.UserId is not null)
+                {
+                    <div class="card mb-4">
+                        <div class="card-header d-flex align-items-center justify-content-between">
+                            <h5 class="mb-0">Permission Overrides</h5>
+                            @if (_canManage)
+                            {
+                                <SfButton Disabled="@_actionInProgress" OnClick="OpenAddOverrideDialog">+ Add Override</SfButton>
+                            }
+                        </div>
+                        <div class="card-body">
+                            @if (_overrides.Count == 0)
+                            {
+                                <p class="text-muted mb-0">No permission overrides for this user.</p>
+                            }
+                            else
+                            {
+                                <ul class="list-unstyled mb-0">
+                                    @foreach (var ov in _overrides)
+                                    {
+                                        <li class="mb-3 d-flex align-items-start justify-content-between">
+                                            <div>
+                                                <div>
+                                                    <span class="fw-semibold">@SystemRoleOptions.NameFor(ov.RoleId)</span>
+                                                    <span class="badge @(ov.OverrideType == EmployeeRoleOverrideType.Grant ? "bg-success" : "bg-danger") ms-1">@ov.OverrideType</span>
+                                                </div>
+                                                <div class="text-muted small">@ov.Reason</div>
+                                                <div class="text-muted small">
+                                                    Expires: @(ov.ExpiresAt is { } expiresAt ? expiresAt.ToString("dd MMM yyyy") : "Permanent")
+                                                </div>
+                                            </div>
+                                            @if (_canManage)
+                                            {
+                                                <SfButton Disabled="@_actionInProgress" OnClick="@(() => RemoveOverrideAsync(ov.RoleId))">Remove</SfButton>
+                                            }
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                }
+
                 <div class="card mb-4">
                     <div class="card-header">
                         <h5 class="mb-0">Audit History</h5>
@@ -152,6 +199,13 @@
                                    IsOpen="_showManageRolesDialog"
                                    OnCancelled="CloseManageRolesDialog"
                                    OnCompleted="OnRolesUpdated" />
+
+            <AddRoleOverrideDialog CompanyId="CompanyId"
+                                   UserId="_user.UserId.Value"
+                                   ExistingOverrideRoleIds="@(_overrides.Select(o => o.RoleId).ToList())"
+                                   IsOpen="_showAddOverrideDialog"
+                                   OnCancelled="CloseAddOverrideDialog"
+                                   OnCompleted="OnOverrideAdded" />
         }
     }
 </div>
@@ -168,6 +222,8 @@
     private string? _globalSuccess;
     private bool _actionInProgress;
     private bool _showManageRolesDialog;
+    private bool _showAddOverrideDialog;
+    private List<EmployeeRoleOverrideModel> _overrides = [];
 
     private bool _canManage => Session.IsHrAdministrator;
 
@@ -199,6 +255,10 @@
 
         var history = await UserAdministrationService.GetAuditHistoryAsync(CompanyId, EmployeeId);
         _auditHistory = history?.Items ?? [];
+
+        _overrides = _user.UserId is { } userId
+            ? await UserAdministrationService.GetRoleOverridesAsync(CompanyId, userId) ?? []
+            : [];
 
         IsLoading = false;
     }
@@ -294,6 +354,40 @@
         _showManageRolesDialog = false;
         _globalSuccess = "Roles updated.";
         await LoadAsync();
+    }
+
+    private void OpenAddOverrideDialog()
+    {
+        _globalError = null;
+        _showAddOverrideDialog = true;
+    }
+
+    private void CloseAddOverrideDialog() => _showAddOverrideDialog = false;
+
+    private async Task OnOverrideAdded()
+    {
+        _showAddOverrideDialog = false;
+        _globalSuccess = "Permission override added.";
+        await LoadAsync();
+    }
+
+    private async Task RemoveOverrideAsync(Guid roleId)
+    {
+        if (_user?.UserId is null) return;
+        _actionInProgress = true;
+        _globalError = null;
+
+        var (success, error) = await UserAdministrationService.RemoveRoleOverrideAsync(CompanyId, _user.UserId.Value, roleId);
+
+        _actionInProgress = false;
+
+        if (!success)
+            _globalError = error;
+        else
+        {
+            _globalSuccess = "Permission override removed.";
+            await LoadAsync();
+        }
     }
 
     private static string AccountStatusBadgeClass(string status) => status switch

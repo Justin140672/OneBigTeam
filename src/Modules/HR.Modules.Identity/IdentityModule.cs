@@ -1,7 +1,9 @@
 using FluentValidation;
+using Hangfire;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Identity.Authorization;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Identity.Features.AddEmployeeRoleOverride;
 using HR.Modules.Identity.Features.AssignPlatformAdministratorRole;
 using HR.Modules.Identity.Features.CancelInvite;
 using HR.Modules.Identity.Features.CreatePlatformAdministrator;
@@ -12,10 +14,12 @@ using HR.Modules.Identity.Features.EnableUser;
 using HR.Modules.Identity.Features.GetUserAuditHistory;
 using HR.Modules.Identity.Features.GetUserDetails;
 using HR.Modules.Identity.Features.InviteEmployeeUser;
+using HR.Modules.Identity.Features.ListEmployeeRoleOverrides;
 using HR.Modules.Identity.Features.ListPlatformAdministrators;
 using HR.Modules.Identity.Features.ListPositionRoleDefaults;
 using HR.Modules.Identity.Features.ListUsers;
 using HR.Modules.Identity.Features.Login;
+using HR.Modules.Identity.Features.RemoveEmployeeRoleOverride;
 using HR.Modules.Identity.Features.RequestPasswordReset;
 using HR.Modules.Identity.Features.ResendInvite;
 using HR.Modules.Identity.Features.ResendVerification;
@@ -26,6 +30,7 @@ using HR.Modules.Identity.Features.SetPositionRoleDefaults;
 using HR.Modules.Identity.Features.SignUp;
 using HR.Modules.Identity.Features.UpdateUserRoles;
 using HR.Modules.Identity.Features.VerifyEmail;
+using HR.Modules.Identity.Jobs;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
 using HR.Modules.Identity.Services.OnboardingTasks;
@@ -171,6 +176,15 @@ public static class IdentityModule
         services.AddScoped<
             IIntegrationEventHandler<PositionProfileUpsertedIntegrationEvent>,
             Features.OnPositionProfileUpserted.Handler>();
+
+        // IAM-04: employee-level role-override administration.
+        services.AddScoped<ListEmployeeRoleOverridesHandler>();
+        services.AddScoped<IValidator<ListEmployeeRoleOverridesRequest>, ListEmployeeRoleOverridesValidator>();
+        services.AddScoped<AddEmployeeRoleOverrideHandler>();
+        services.AddScoped<IValidator<AddEmployeeRoleOverrideRequest>, AddEmployeeRoleOverrideValidator>();
+        services.AddScoped<RemoveEmployeeRoleOverrideHandler>();
+        services.AddScoped<IValidator<RemoveEmployeeRoleOverrideRequest>, RemoveEmployeeRoleOverrideValidator>();
+        services.AddScoped<ExpireEmployeeRoleOverridesJob>();
 
         services.AddScoped<IWorkloadActionProvider, EmployeeAccountsAwaitingInvitationWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, EmployeeAccountsAwaitingDisablementWorkloadActionProvider>();
@@ -470,6 +484,21 @@ public static class IdentityModule
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         await db.Database.ExecuteSqlRawAsync("CREATE SCHEMA IF NOT EXISTS identity");
         await db.Database.MigrateAsync();
+    }
+
+    /// <summary>
+    /// IAM-04: daily sweep that clears out expired employee-level role overrides and audits the
+    /// expiry (access is already enforced correctly before this runs — see
+    /// IdentityAuthorizationService — this job only produces the audit trail and tidies the table).
+    /// </summary>
+    public static WebApplication UseIdentityRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        jobManager.AddOrUpdate<ExpireEmployeeRoleOverridesJob>(
+            "expire-employee-role-overrides",
+            job => job.ExecuteAsync(),
+            Cron.Daily(2));
+        return app;
     }
 
     /// <summary>
