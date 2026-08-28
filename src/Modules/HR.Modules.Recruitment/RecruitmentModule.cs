@@ -16,6 +16,7 @@ using HR.Modules.Recruitment.Features.DeleteCandidateDocument;
 using HR.Modules.Recruitment.Features.DownloadCandidateDocument;
 using HR.Modules.Recruitment.Features.GetApplication;
 using HR.Modules.Recruitment.Features.GetApplicationsByStatus;
+using HR.Modules.Recruitment.Features.SearchApplications;
 using HR.Modules.Recruitment.Features.GetCandidate;
 using HR.Modules.Recruitment.Features.GetExternalRecruiter;
 using HR.Modules.Recruitment.Features.GetExternalRecruiterActivitySummary;
@@ -160,6 +161,9 @@ public static class RecruitmentModule
 
         services.AddScoped<GetApplicationsByStatusHandler>();
         services.AddScoped<IValidator<GetApplicationsByStatusRequest>, GetApplicationsByStatusValidator>();
+
+        services.AddScoped<SearchApplicationsHandler>();
+        services.AddScoped<IValidator<SearchApplicationsRequest>, SearchApplicationsValidator>();
 
         services.AddScoped<WithdrawApplicationHandler>();
         services.AddScoped<IValidator<WithdrawApplicationRequest>, WithdrawApplicationValidator>();
