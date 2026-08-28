@@ -13,6 +13,7 @@ using HR.Modules.Sickness.Features.GetMySicknessRecords;
 using HR.Modules.Sickness.Features.GetOverdueReturnToWorkReviews;
 using HR.Modules.Sickness.Features.GetReturnToWorkReview;
 using HR.Modules.Sickness.Features.GetSicknessRecord;
+using HR.Modules.Sickness.Features.GetSicknessRecordAuditHistory;
 using HR.Modules.Sickness.Features.GetTeamSicknessToday;
 using HR.Modules.Sickness.Features.ListAttendanceAlerts;
 using HR.Modules.Sickness.Features.ListEmployeeSicknessRecords;
@@ -57,6 +58,7 @@ public static class SicknessModule
         services.AddScoped<RecordSicknessHandler>();
         services.AddScoped<RecordMySicknessHandler>();
         services.AddScoped<GetSicknessRecordHandler>();
+        services.AddScoped<GetSicknessRecordAuditHistoryHandler>();
         services.AddScoped<ListEmployeeSicknessRecordsHandler>();
         services.AddScoped<UpdateSicknessRecordHandler>();
         services.AddScoped<CloseSicknessRecordHandler>();
