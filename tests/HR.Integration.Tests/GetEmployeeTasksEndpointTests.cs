@@ -44,7 +44,10 @@ public class GetEmployeeTasksEndpointTests
     {
         // Endpoint requires only the baseline "role:employee" policy (any authenticated
         // employee), not employee:manage, so employees can view their own tasks without
-        // needing management permissions.
+        // needing management permissions. IAM-07: the caller must still pass resource-level
+        // authorization, so this requests the caller's own tasks (self-access) rather than an
+        // arbitrary employeeId — an unrelated employeeId is covered by the authorization-matrix
+        // tests below.
         var unprivilegedUser = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, unprivilegedUser, SystemRoles.Employee);
 
@@ -54,7 +57,7 @@ public class GetEmployeeTasksEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, unprivilegedUser, SystemRoles.Employee, SeededCompanyId);
 
         var response = await client.GetAsync(
-            $"/api/companies/{SeededCompanyId}/employees/{Guid.NewGuid()}/tasks");
+            $"/api/companies/{SeededCompanyId}/employees/{unprivilegedUser}/tasks");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -116,6 +119,118 @@ public class GetEmployeeTasksEndpointTests
         Assert.All(payload.Items, item => Assert.Equal("Open", item.Status));
     }
 
+    // ── IAM-07: resource-ownership authorization matrix ───────────────────────
+    // Unlike GetTask, this check runs directly in the Endpoint (the target employeeId is known
+    // from the route, no DB lookup needed first) — see Endpoint.cs. Mirrors
+    // CompleteTaskAuthorizationTests's matrix for the same underlying TasksResourceAuthorizer.
+
+    [Fact]
+    public async Task Get_EmployeeTasks_Returns_Ok_For_Self()
+    {
+        var employee = await CreateEmployeeAsCallerAsync();
+
+        using var client = await AuthenticatedAsAsync(employee);
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{employee}/tasks");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_EmployeeTasks_Returns_Ok_For_The_Employees_Direct_Manager()
+    {
+        var manager = await CreateEmployeeAsCallerAsync();
+        var report = await CreateEmployeeAsCallerAsync();
+
+        using (var setupClient = await AuthenticatedAsAsync(Guid.NewGuid(), hrAdministrator: true))
+        {
+            await AssignManagerAsync(setupClient, report, manager);
+        }
+
+        using var client = await AuthenticatedAsAsync(manager);
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{report}/tasks");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_EmployeeTasks_Returns_Ok_For_Skip_Level_Manager_In_Three_Level_Hierarchy()
+    {
+        var seniorManager = await CreateEmployeeAsCallerAsync(); // C
+        var manager = await CreateEmployeeAsCallerAsync();       // B
+        var report = await CreateEmployeeAsCallerAsync();        // A
+
+        using (var setupClient = await AuthenticatedAsAsync(Guid.NewGuid(), hrAdministrator: true))
+        {
+            await AssignManagerAsync(setupClient, report, manager);
+            await AssignManagerAsync(setupClient, manager, seniorManager);
+        }
+
+        using var client = await AuthenticatedAsAsync(seniorManager);
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{report}/tasks");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_EmployeeTasks_Returns_Forbidden_For_Unrelated_Peer_Employee()
+    {
+        var peer = await CreateEmployeeAsCallerAsync();
+        var target = await CreateEmployeeAsCallerAsync();
+
+        using var client = await AuthenticatedAsAsync(peer);
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{target}/tasks");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_EmployeeTasks_Returns_Forbidden_For_Manager_Of_A_Different_Team()
+    {
+        var manager = await CreateEmployeeAsCallerAsync();
+        var otherManager = await CreateEmployeeAsCallerAsync();
+        var report = await CreateEmployeeAsCallerAsync();
+
+        using (var setupClient = await AuthenticatedAsAsync(Guid.NewGuid(), hrAdministrator: true))
+        {
+            await AssignManagerAsync(setupClient, report, manager);
+        }
+
+        using var client = await AuthenticatedAsAsync(otherManager);
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{report}/tasks");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_EmployeeTasks_Returns_Ok_For_HrAdministrator_Even_When_Not_Self_Or_Manager()
+    {
+        var target = await CreateEmployeeAsCallerAsync();
+
+        using var client = await AuthenticatedAsAsync(Guid.NewGuid(), hrAdministrator: true);
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{target}/tasks");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_EmployeeTasks_Returns_Forbidden_When_Route_Company_Does_Not_Match_Auth_Tenant()
+    {
+        var target = await CreateEmployeeAsCallerAsync();
+        var otherCompanyId = Guid.NewGuid();
+
+        using var client = await AuthenticatedAsAsync(Guid.NewGuid());
+        var response = await client.GetAsync(
+            $"/api/companies/{otherCompanyId}/employees/{target}/tasks");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient()
@@ -125,6 +240,39 @@ public class GetEmployeeTasksEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, SeededCompanyId);
         return client;
+    }
+
+    private async Task<HttpClient> AuthenticatedAsAsync(Guid userId, bool hrAdministrator = false)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, SeededCompanyId);
+
+        if (hrAdministrator)
+            await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator, SeededCompanyId);
+
+        return client;
+    }
+
+    private static async Task AssignManagerAsync(HttpClient client, Guid employeeId, Guid managerId)
+    {
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{employeeId}/manager",
+            new { companyId = SeededCompanyId, id = employeeId, managerId });
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// Creates a real employee record whose id doubles as the identity user id used for
+    /// TestAuthHandler.UserHeader, so the returned id can act as a caller in
+    /// AuthenticatedAsAsync — mirrors CompleteTaskAuthorizationTests.CreateEmployeeAsync.
+    /// </summary>
+    private async Task<Guid> CreateEmployeeAsCallerAsync()
+    {
+        using var setupClient = await AuthenticatedAsAsync(Guid.NewGuid(), hrAdministrator: true);
+        var employee = await CreateEmployeeAsync(setupClient, "Test", $"Employee-{Guid.NewGuid():N}"[..20]);
+        return employee.Id;
     }
 
     private async Task<EmployeePayload> CreateEmployeeAsync(HttpClient client, string firstName, string lastName)
@@ -141,7 +289,9 @@ public class GetEmployeeTasksEndpointTests
                 dateOfBirth = "1990-01-01",
                 nationality = "British",
                 gender = "Male",
-                employeeNumber = $"{firstName}-{lastName}-{Guid.NewGuid():N}",
+                // Max 50 chars (CreateEmployeeValidator) — a full firstName-lastName-guid
+                // combination can exceed that, so use a short, still-unique suffix instead.
+                employeeNumber = $"EN-{Guid.NewGuid():N}"[..20],
                 employmentTypeId = Guid.Parse("40000000-0000-0000-0000-000000000001"),
                 departmentId = Guid.Parse("10000000-0000-0000-0000-000000000001"),
                 locationId = Guid.Parse("70000000-0000-0000-0000-000000000001"),

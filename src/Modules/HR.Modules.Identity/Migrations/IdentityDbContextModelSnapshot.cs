@@ -255,6 +255,168 @@ namespace HR.Modules.Identity.Migrations
                             Id = new Guid("00000000-0000-0000-0001-000000000015"),
                             CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             Name = "sickness.manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000016"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "users.view"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000017"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "users.manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000018"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "hr-settings.manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000019"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "onboarding.view"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000020"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "onboarding.manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000021"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "subscription.manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000022"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "leave.manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000023"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "probation.manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000024"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "probation.review"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000025"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "asset.view"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000026"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "recruitment.manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000027"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "recruitment.view"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000028"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "candidate.view"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000029"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "shared-document.view-published"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000030"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "shared-document.manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000031"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "shared-document.publish"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000032"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "shared-document.archive"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000033"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "shared-document.view-acknowledgement-status"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000034"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "reporting.view"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000035"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "reporting.view-recruitment"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000036"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "reporting.view-hr"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000037"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "reporting.view-employee-starter"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000038"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "reporting.view-leave-summary"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000039"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "reporting.view-probation"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000040"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "reporting.view-onboarding"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000041"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "reporting.view-workload-actions"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000042"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "support.manage"
                         });
                 });
 
@@ -558,6 +720,11 @@ namespace HR.Modules.Identity.Migrations
                         new
                         {
                             RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000007")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
                             PermissionId = new Guid("00000000-0000-0000-0001-000000000008")
                         },
                         new
@@ -592,8 +759,238 @@ namespace HR.Modules.Identity.Migrations
                         },
                         new
                         {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000016")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000017")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000018")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000019")
+                        },
+                        new
+                        {
                             RoleId = new Guid("00000000-0000-0000-0000-000000000006"),
-                            PermissionId = new Guid("00000000-0000-0000-0001-000000000013")
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000019")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000020")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000006"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000020")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000021")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000006"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000021")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000022")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000023")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000024")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000024")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000025")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000025")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000025")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000026")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000028")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000027")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000027")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000027")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000027")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000029")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000029")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000029")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000029")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000030")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000031")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000032")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000033")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000034")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000034")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000034")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000035")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000036")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000037")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000037")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000038")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000038")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000039")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000039")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000040")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000040")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000041")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000041")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000042")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000006"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000042")
                         });
                 });
 

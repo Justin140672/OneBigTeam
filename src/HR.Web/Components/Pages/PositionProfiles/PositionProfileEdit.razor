@@ -193,6 +193,17 @@
                     @if (!IsNew)
                     {
                         <TabItem>
+                            <ChildContent><TabHeader Text="Inherited Roles" /></ChildContent>
+                            <ContentTemplate>
+                                <div class="mt-4">
+                                    <PositionProfileInheritedRolesTab
+                                        CompanyId="CompanyId"
+                                        PositionProfileId="Id!.Value"
+                                        CanEdit="!IsViewMode" />
+                                </div>
+                            </ContentTemplate>
+                        </TabItem>
+                        <TabItem>
                             <ChildContent><TabHeader Text="Assigned Employees" /></ChildContent>
                             <ContentTemplate>
                                 <div class="mt-4">

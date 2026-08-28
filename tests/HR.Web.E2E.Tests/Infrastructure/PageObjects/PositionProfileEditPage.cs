@@ -282,4 +282,72 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
 
     public async Task ConfirmRemoveAsync() =>
         await page.GetByRole(AriaRole.Button, new() { Name = "Yes" }).ClickAsync();
+
+    // ── Inherited Roles tab (PositionProfileInheritedRolesTab.razor) ───────────────────────────
+
+    private ILocator InheritedRolesCard => page.Locator(".card", new() { HasText = "Inherited Roles" });
+
+    public async Task OpenInheritedRolesTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Inherited Roles" }).ClickAsync();
+        // Wait for the tab content's table (or the "no roles" table is always rendered — the
+        // stable anchor here is the card heading itself becoming visible).
+        await InheritedRolesCard.WaitForAsync(new() { Timeout = 15_000 });
+    }
+
+    public async Task<bool> HasInheritedRolesTabAsync() =>
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Inherited Roles" }).WaitUntilVisibleAsync();
+
+    /// <summary>The &lt;tr&gt; for the given role's display name (e.g. "Recruiter", "HR Administrator").</summary>
+    private ILocator InheritedRoleRow(string roleName) =>
+        InheritedRolesCard.Locator("tr", new() { HasText = roleName }).First;
+
+    private ILocator InheritedRoleCheckbox(string roleName) =>
+        InheritedRoleRow(roleName).Locator("input[type='checkbox']");
+
+    public Task<bool> IsInheritedRoleCheckedAsync(string roleName) =>
+        InheritedRoleCheckbox(roleName).IsCheckedAsync();
+
+    /// <summary>Checks or unchecks the given role's checkbox on the Inherited Roles tab, without saving.</summary>
+    public async Task SetInheritedRoleCheckedAsync(string roleName, bool isChecked)
+    {
+        var checkbox = InheritedRoleCheckbox(roleName);
+        if (isChecked)
+            await checkbox.CheckAsync();
+        else
+            await checkbox.UncheckAsync();
+    }
+
+    /// <summary>Returns the display names of every currently-checked role on the Inherited Roles tab.</summary>
+    public async Task<IReadOnlyList<string>> GetCheckedInheritedRoleNamesAsync()
+    {
+        var rows = InheritedRolesCard.Locator("tbody tr");
+        var count = await rows.CountAsync();
+        var names = new List<string>();
+        for (var i = 0; i < count; i++)
+        {
+            var row = rows.Nth(i);
+            if (await row.Locator("input[type='checkbox']").IsCheckedAsync())
+                names.Add((await row.Locator("label").InnerTextAsync()).Trim());
+        }
+        return names;
+    }
+
+    /// <summary>Clicks Save on the Inherited Roles tab and waits for the resulting alert (success or error).</summary>
+    public async Task SaveInheritedRolesAsync()
+    {
+        await InheritedRolesCard.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await InheritedRolesCard.Locator(".alert-success, .alert-danger")
+            .First
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+    }
+
+    public async Task<string?> GetInheritedRolesAlertTextAsync()
+    {
+        var alert = InheritedRolesCard.Locator(".alert-success, .alert-danger").First;
+        return await alert.IsVisibleAsync() ? (await alert.InnerTextAsync()).Trim() : null;
+    }
+
+    public Task<bool> HasInheritedRolesSuccessAlertAsync() =>
+        InheritedRolesCard.Locator(".alert-success").IsVisibleAsync();
 }

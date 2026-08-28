@@ -172,6 +172,23 @@ public abstract class SupabaseAuthSerialEmployeeTestBase(EmployeePersonaFixture 
 }
 
 /// <summary>
+/// Tests that mutate a shared seeded Position Profile's inherited-role defaults
+/// (PositionProfileInheritedRolesTab.razor / SetPositionRoleDefaultsAsync) — see
+/// PositionProfileInheritedRolesTabTests and EffectiveAccessViewTests' remarks. Both files read a
+/// position's full RoleIds list, add/remove an entry, and save the whole list back, which races if
+/// two tests target the same position profile concurrently (last save wins, silently dropping the
+/// other test's change). Serializing this narrow group avoids that without pulling in the much
+/// larger CrossUserVacancy group (which serializes on entity creation, not this specific
+/// read-modify-write-the-whole-list race).
+/// </summary>
+public abstract class PositionRoleDefaultsSerialTestBase(HrAdminPersonaFixture fixture)
+    : GroupSerializedE2ETestBase<HrAdminPersonaFixture>(fixture)
+{
+    private static readonly SemaphoreSlim GateInstance = new(1, 1);
+    protected override SemaphoreSlim Gate => GateInstance;
+}
+
+/// <summary>
 /// A narrow, method-level (not class-level) serialization gate for the single seeded Sophie
 /// Laurent probation review shared between two files in two different class-level groups:
 /// ProbationReviewFlowTests.CompletingReviewTask_IsReflectedOnProbationTab (group

@@ -246,5 +246,37 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
         return body?.Error ?? "Failed to deactivate position profile.";
     }
 
+    public async Task<ListPositionRoleDefaultsResponse?> ListPositionRoleDefaultsAsync(Guid companyId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<ListPositionRoleDefaultsResponse>(
+                $"api/companies/{companyId}/positions/role-defaults", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<(bool Success, string? Error)> SetPositionRoleDefaultsAsync(
+        Guid companyId, Guid positionProfileId, SetPositionRoleDefaultsRequest request)
+    {
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/positions/{positionProfileId}/role-defaults", request);
+
+        if (response.IsSuccessStatusCode)
+            return (true, null);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            return (false, "You are not permitted to grant one or more of the selected roles.");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return (false, "Position profile not found.");
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+        return (false, body?.Error ?? "Failed to save inherited roles.");
+    }
+
     private sealed record ErrorEnvelope(string? Error);
 }

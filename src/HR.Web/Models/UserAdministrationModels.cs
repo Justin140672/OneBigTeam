@@ -132,3 +132,25 @@ public record AddEmployeeRoleOverrideResponse(
 
 // DELETE /api/companies/{companyId}/users/{userId}/role-overrides/{roleId}
 public record RemoveEmployeeRoleOverrideResponse(Guid UserId, Guid RoleId);
+
+// ── GET /api/companies/{companyId}/users/{employeeId}/effective-access (IAM-05) ────
+public record GetEffectiveAccessResponse(
+    Guid EmployeeId,
+    Guid? UserId,
+    string EmployeeName,
+    PositionSummaryModel? Position,
+    List<RoleSummaryModel> DirectRoles,
+    List<InheritedRoleModel> InheritedRoles,
+    List<RoleOverrideModel> Overrides,
+    List<EffectiveRoleModel> EffectiveRoles,
+    List<EffectivePermissionModel> EffectivePermissions,
+    List<DeniedPermissionModel> DeniedPermissions);
+
+public record PositionSummaryModel(Guid Id, string Name);
+public record RoleSummaryModel(Guid Id, string Name);
+public record InheritedRoleModel(Guid RoleId, string RoleName, Guid PositionId, string PositionName);
+public record RoleOverrideModel(Guid Id, Guid RoleId, string RoleName, string OverrideType, string Reason, DateTimeOffset? ExpiresAt, bool IsActive);
+public record PermissionSourceModel(Guid RoleId, string RoleName, string Origin);
+public record EffectiveRoleModel(Guid RoleId, string RoleName, List<string> Sources);
+public record EffectivePermissionModel(Guid PermissionId, string PermissionName, string Scope, List<PermissionSourceModel> Sources);
+public record DeniedPermissionModel(Guid PermissionId, string PermissionName, string Scope, Guid DeniedByRoleId, string DeniedByRoleName, Guid OverrideId, string Reason);

@@ -28,11 +28,13 @@ public class CompleteTaskHandlerTests
         FakeRoleAuthorizationService? authorizationService = null,
         FakeDirectReportsReader? directReportsReader = null) =>
         new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher(), NoOpDispatcher,
-            // Defaults to an HR-Administrator caller so tests unrelated to SEC-003 authorization
-            // (pre-existing behavior around completion/notification/audit) don't need to wire up
-            // assignee/manager relationships just to get past the authorization check.
-            authorizationService ?? new FakeRoleAuthorizationService(HrAdministratorRoleId),
-            directReportsReader ?? new FakeDirectReportsReader());
+            // Defaults to an HR-Administrator caller so tests unrelated to SEC-003/IAM-07
+            // authorization (pre-existing behavior around completion/notification/audit) don't
+            // need to wire up assignee/manager relationships just to get past the authorization
+            // check.
+            new TasksResourceAuthorizer(
+                authorizationService ?? new FakeRoleAuthorizationService(HrAdministratorRoleId),
+                directReportsReader ?? new FakeDirectReportsReader()));
 
     private static TaskItem MakeTask(Guid companyId, TaskItemStatus status = TaskItemStatus.Open)
     {

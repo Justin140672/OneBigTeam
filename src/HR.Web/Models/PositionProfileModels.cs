@@ -191,6 +191,23 @@ public record AddOnboardingTemplateToProfileRequest(
 
 public record AddOnboardingTemplateToProfileResponse(Guid Id);
 
+// ── ROLE DEFAULTS (INHERITED ROLES) ───────────────────────────────────────────
+
+public record ListPositionRoleDefaultsResponse(IReadOnlyList<PositionRoleDefaultsListItemModel> Positions);
+
+public record PositionRoleDefaultsListItemModel(
+    Guid PositionProfileId,
+    string Title,
+    bool IsActive,
+    IReadOnlyList<Guid> RoleIds);
+
+public record SetPositionRoleDefaultsRequest(
+    Guid CompanyId,
+    Guid PositionProfileId,
+    IReadOnlyList<Guid> RoleIds);
+
+public record SetPositionRoleDefaultsResponse(Guid PositionProfileId, IReadOnlyList<Guid> RoleIds);
+
 // ── UPDATE ────────────────────────────────────────────────────────────────────
 
 public record UpdatePositionProfileRequest(

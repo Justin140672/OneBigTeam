@@ -158,6 +158,161 @@
 
                 <div class="card mb-4">
                     <div class="card-header">
+                        <h5 class="mb-0">Effective Access</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(_effectiveAccessError))
+                        {
+                            <div class="alert alert-warning mb-0">@_effectiveAccessError</div>
+                        }
+                        else if (_effectiveAccess is null)
+                        {
+                            <HrLoadingIndicator />
+                        }
+                        else
+                        {
+                            <div class="mb-4">
+                                <h6 class="text-muted text-uppercase small fw-semibold mb-2">Position Profile</h6>
+                                @if (_effectiveAccess.Position is null)
+                                {
+                                    <span class="text-muted">No position assigned.</span>
+                                }
+                                else
+                                {
+                                    <span class="fw-semibold">@_effectiveAccess.Position.Name</span>
+                                }
+                            </div>
+
+                            <div class="row mb-4">
+                                <div class="col-md-4">
+                                    <h6 class="text-muted text-uppercase small fw-semibold mb-2">Direct Roles</h6>
+                                    @if (_effectiveAccess.DirectRoles.Count == 0)
+                                    {
+                                        <span class="text-muted">None</span>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var role in _effectiveAccess.DirectRoles)
+                                        {
+                                            <div class="mb-1"><span class="badge bg-secondary-subtle text-secondary-emphasis">@role.Name</span></div>
+                                        }
+                                    }
+                                </div>
+                                <div class="col-md-4">
+                                    <h6 class="text-muted text-uppercase small fw-semibold mb-2">Inherited Roles</h6>
+                                    @if (_effectiveAccess.InheritedRoles.Count == 0)
+                                    {
+                                        <span class="text-muted">None</span>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var role in _effectiveAccess.InheritedRoles)
+                                        {
+                                            <div class="mb-1">
+                                                <span class="badge bg-info-subtle text-info-emphasis">@role.RoleName</span>
+                                                <span class="text-muted small">via @role.PositionName</span>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                                <div class="col-md-4">
+                                    <h6 class="text-muted text-uppercase small fw-semibold mb-2">Overrides</h6>
+                                    @if (_effectiveAccess.Overrides.Count == 0)
+                                    {
+                                        <span class="text-muted">None</span>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var ov in _effectiveAccess.Overrides)
+                                        {
+                                            <div class="mb-1">
+                                                <span class="fw-semibold">@ov.RoleName</span>
+                                                <span class="badge @(ov.OverrideType == "Grant" ? "bg-success" : "bg-danger")">@ov.OverrideType</span>
+                                                @if (!ov.IsActive)
+                                                {
+                                                    <span class="badge bg-secondary">Inactive</span>
+                                                }
+                                                <div class="text-muted small">@ov.Reason</div>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <h6 class="text-muted text-uppercase small fw-semibold mb-2">Effective Roles</h6>
+                                @if (_effectiveAccess.EffectiveRoles.Count == 0)
+                                {
+                                    <span class="text-muted">None</span>
+                                }
+                                else
+                                {
+                                    <ul class="list-unstyled mb-0">
+                                        @foreach (var role in _effectiveAccess.EffectiveRoles)
+                                        {
+                                            <li class="mb-2">
+                                                <span class="fw-semibold">@role.RoleName</span>
+                                                @foreach (var source in role.Sources)
+                                                {
+                                                    <span class="badge bg-light text-dark border ms-1">@source</span>
+                                                }
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </div>
+
+                            <div class="mb-4">
+                                <h6 class="text-muted text-uppercase small fw-semibold mb-2">Effective Permissions</h6>
+                                @if (_effectiveAccess.EffectivePermissions.Count == 0)
+                                {
+                                    <span class="text-muted">None</span>
+                                }
+                                else
+                                {
+                                    <ul class="list-unstyled mb-0">
+                                        @foreach (var perm in _effectiveAccess.EffectivePermissions)
+                                        {
+                                            <li class="mb-2">
+                                                <span class="fw-semibold">@perm.PermissionName</span>
+                                                <span class="badge @(perm.Scope == "Company" ? "bg-primary-subtle text-primary-emphasis" : "bg-secondary-subtle text-secondary-emphasis") ms-1">@perm.Scope</span>
+                                                <div class="text-muted small">
+                                                    Granted by @string.Join(", ", perm.Sources.Select(s => $"{s.RoleName} ({s.Origin})"))
+                                                </div>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </div>
+
+                            <div>
+                                <h6 class="text-muted text-uppercase small fw-semibold mb-2">Denied Permissions</h6>
+                                @if (_effectiveAccess.DeniedPermissions.Count == 0)
+                                {
+                                    <span class="text-muted">None</span>
+                                }
+                                else
+                                {
+                                    <ul class="list-unstyled mb-0">
+                                        @foreach (var denied in _effectiveAccess.DeniedPermissions)
+                                        {
+                                            <li class="mb-2 p-2 bg-danger-subtle rounded">
+                                                <span class="fw-semibold text-danger-emphasis">@denied.PermissionName</span>
+                                                <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">@denied.Scope</span>
+                                                <div class="text-muted small">
+                                                    Would be granted by @denied.DeniedByRoleName, but denied by an override: @denied.Reason
+                                                </div>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
                         <h5 class="mb-0">Audit History</h5>
                     </div>
                     <div class="card-body">
@@ -224,6 +379,8 @@
     private bool _showManageRolesDialog;
     private bool _showAddOverrideDialog;
     private List<EmployeeRoleOverrideModel> _overrides = [];
+    private GetEffectiveAccessResponse? _effectiveAccess;
+    private string? _effectiveAccessError;
 
     private bool _canManage => Session.IsHrAdministrator;
 
@@ -259,6 +416,10 @@
         _overrides = _user.UserId is { } userId
             ? await UserAdministrationService.GetRoleOverridesAsync(CompanyId, userId) ?? []
             : [];
+
+        var (effectiveAccess, effectiveAccessError) = await UserAdministrationService.GetEffectiveAccessAsync(CompanyId, EmployeeId);
+        _effectiveAccess = effectiveAccess;
+        _effectiveAccessError = effectiveAccessError;
 
         IsLoading = false;
     }

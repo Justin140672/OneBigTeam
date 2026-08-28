@@ -147,6 +147,23 @@ public sealed class UserAdministrationService(IHttpClientFactory httpClientFacto
             : (false, await ReadErrorAsync(response, "Failed to remove the permission override."));
     }
 
+    public async Task<(GetEffectiveAccessResponse? Result, string? Error)> GetEffectiveAccessAsync(Guid companyId, Guid employeeId)
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/companies/{companyId}/users/{employeeId}/effective-access");
+
+            if (response.IsSuccessStatusCode)
+                return (await response.Content.ReadFromJsonAsync<GetEffectiveAccessResponse>(HrApiJsonOptions.Default), null);
+
+            return (null, await ReadErrorAsync(response, "Failed to load effective access for this user."));
+        }
+        catch (HttpRequestException)
+        {
+            return (null, "Failed to load effective access for this user.");
+        }
+    }
+
     private static async Task<string?> ReadErrorAsync(HttpResponseMessage response, string fallback)
     {
         try

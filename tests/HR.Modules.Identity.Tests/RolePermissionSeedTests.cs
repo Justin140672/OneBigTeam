@@ -22,11 +22,18 @@ public class RolePermissionSeedTests(IdentityDatabaseFixture fixture)
             .Select(rp => rp.PermissionId)
             .ToListAsync();
 
+        // IAM-06: role.assign removed from this set — see RolePermissionConfiguration.cs remarks.
+        // No authorization policy actually grants Company Administrator role-assignment access
+        // (Features/UpdateUserRoles is gated by "users:manage", which is HR Administrator-only), so
+        // that grant was misleading seeded data implying a capability the role could never exercise.
         var expected = new HashSet<Guid>
         {
             SystemPermissions.CompanyRead,
             SystemPermissions.CompanyEdit,
-            SystemPermissions.RoleAssign
+            SystemPermissions.OnboardingView,
+            SystemPermissions.OnboardingManage,
+            SystemPermissions.SubscriptionManage,
+            SystemPermissions.SupportManage,
         };
 
         Assert.Equal(expected, actual.ToHashSet());
@@ -35,7 +42,6 @@ public class RolePermissionSeedTests(IdentityDatabaseFixture fixture)
     [Theory]
     [InlineData(nameof(SystemPermissions.CompanyRead))]
     [InlineData(nameof(SystemPermissions.CompanyEdit))]
-    [InlineData(nameof(SystemPermissions.RoleAssign))]
     public async Task CompanyAdministrator_Retains_Company_Profile_Permissions(string permissionName)
     {
         await using var db = fixture.BuildContext();
@@ -44,7 +50,6 @@ public class RolePermissionSeedTests(IdentityDatabaseFixture fixture)
         {
             nameof(SystemPermissions.CompanyRead) => SystemPermissions.CompanyRead,
             nameof(SystemPermissions.CompanyEdit) => SystemPermissions.CompanyEdit,
-            nameof(SystemPermissions.RoleAssign) => SystemPermissions.RoleAssign,
             _ => throw new ArgumentOutOfRangeException(nameof(permissionName))
         };
 
@@ -66,6 +71,7 @@ public class RolePermissionSeedTests(IdentityDatabaseFixture fixture)
     [InlineData(nameof(SystemPermissions.DocumentManage))]
     [InlineData(nameof(SystemPermissions.SicknessRead))]
     [InlineData(nameof(SystemPermissions.SicknessManage))]
+    [InlineData(nameof(SystemPermissions.RoleAssign))]
     public async Task CompanyAdministrator_No_Longer_Has_HR_Admin_Permissions(string permissionName)
     {
         await using var db = fixture.BuildContext();
@@ -83,6 +89,7 @@ public class RolePermissionSeedTests(IdentityDatabaseFixture fixture)
             nameof(SystemPermissions.DocumentManage) => SystemPermissions.DocumentManage,
             nameof(SystemPermissions.SicknessRead) => SystemPermissions.SicknessRead,
             nameof(SystemPermissions.SicknessManage) => SystemPermissions.SicknessManage,
+            nameof(SystemPermissions.RoleAssign) => SystemPermissions.RoleAssign,
             _ => throw new ArgumentOutOfRangeException(nameof(permissionName))
         };
 

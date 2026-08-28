@@ -1,5 +1,6 @@
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Authorization;
 
 namespace HR.Modules.Documents.Services;
 
@@ -9,10 +10,12 @@ namespace HR.Modules.Documents.Services;
 /// caller holds a role (e.g. "role:employee", which every Employee/Manager/Recruiter/HR
 /// Administrator satisfies) — they never prove the caller has a relationship to the specific
 /// employeeId in the route, so that check lives here and must be applied per endpoint before the
-/// handler runs (DOC-01). Mirrors HR.Modules.Leave.Services.LeaveResourceAuthorizer /
-/// HR.Modules.Sickness.Services.SicknessResourceAuthorizer /
-/// HR.Modules.Probation.Services.ProbationResourceAuthorizer (LEAVE-02/SICK-02/PROB-02's
-/// established "complete reporting hierarchy" scope decision).
+/// handler runs (DOC-01, standardised on the shared IAM-07 evaluation order by
+/// HR.SharedKernel.Authorization.EmployeeResourceAuthorizer). Mirrors
+/// HR.Modules.Leave.Services.LeaveResourceAuthorizer / HR.Modules.Sickness.Services
+/// .SicknessResourceAuthorizer / HR.Modules.Probation.Services.ProbationResourceAuthorizer /
+/// HR.Modules.Tasks.Services.TasksResourceAuthorizer (LEAVE-02/SICK-02/PROB-02's established
+/// "complete reporting hierarchy" scope decision).
 ///
 /// Every employee-document endpoint (list, detail, download, delete, upload, document-request
 /// read/write) must resolve its own <see cref="ICurrentUser.UserId"/>, verify company membership,
@@ -20,9 +23,7 @@ namespace HR.Modules.Documents.Services;
 /// every such check through this single class (rather than ad-hoc inline role/permission checks
 /// per endpoint) is what makes the rule hard for a future endpoint to accidentally omit.
 /// </summary>
-internal sealed class DocumentResourceAuthorizer(
-    IAuthorizationService authorizationService,
-    IDirectReportsReader directReportsReader)
+internal sealed class DocumentResourceAuthorizer
 {
     // Mirrors HR.Modules.Identity.Domain.SystemPermissions.DocumentManage. Documents cannot
     // reference Identity's internal SystemPermissions directly, so the permission id is
@@ -36,8 +37,21 @@ internal sealed class DocumentResourceAuthorizer(
     // hierarchy/self checks below exist.
     private static readonly Guid DocumentManagePermissionId = new("00000000-0000-0000-0001-000000000010");
 
-    public async Task<bool> IsHrAdministratorAsync(Guid callerEmployeeId, CancellationToken cancellationToken)
-        => await authorizationService.HasPermissionAsync(callerEmployeeId, DocumentManagePermissionId, cancellationToken);
+    private readonly IAuthorizationService _authorizationService;
+    private readonly EmployeeResourceAuthorizer _resourceAuthorizer;
+
+    public DocumentResourceAuthorizer(
+        IAuthorizationService authorizationService,
+        IDirectReportsReader directReportsReader)
+    {
+        _authorizationService = authorizationService;
+        _resourceAuthorizer = new EmployeeResourceAuthorizer(
+            IsHrAdministratorAsync,
+            directReportsReader.GetAllDescendantIdsAsync);
+    }
+
+    public Task<bool> IsHrAdministratorAsync(Guid callerEmployeeId, CancellationToken cancellationToken)
+        => _authorizationService.HasPermissionAsync(callerEmployeeId, DocumentManagePermissionId, cancellationToken);
 
     /// <summary>
     /// Self, any manager in the target employee's complete reporting hierarchy (direct or
@@ -45,18 +59,8 @@ internal sealed class DocumentResourceAuthorizer(
     /// requests. Used to gate list, detail, download, delete, upload and document-request
     /// endpoints alike.
     /// </summary>
-    public async Task<bool> CanAccessEmployeeDocumentsAsync(
+    public Task<bool> CanAccessEmployeeDocumentsAsync(
         Guid companyId, Guid callerEmployeeId, Guid targetEmployeeId, CancellationToken cancellationToken)
-    {
-        if (callerEmployeeId == targetEmployeeId)
-            return true;
-
-        if (await IsHrAdministratorAsync(callerEmployeeId, cancellationToken))
-            return true;
-
-        var descendantIds = await directReportsReader.GetAllDescendantIdsAsync(
-            companyId, callerEmployeeId, cancellationToken);
-
-        return descendantIds.Contains(targetEmployeeId);
-    }
+        => _resourceAuthorizer.CanAccessAsync(
+            companyId, companyId, callerEmployeeId, targetEmployeeId, cancellationToken);
 }

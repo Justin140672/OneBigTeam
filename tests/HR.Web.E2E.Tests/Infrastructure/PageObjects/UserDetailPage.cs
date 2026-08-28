@@ -166,4 +166,63 @@ public sealed class UserDetailPage(IPage page, string baseUrl)
         await row.GetByRole(AriaRole.Button, new() { Name = "Remove" }).ClickAsync();
         await row.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
+
+    // ── Effective Access (UserDetail.razor's "Effective Access" card, IAM-05) ───────────────────
+
+    private ILocator EffectiveAccessCard => page.Locator(".card", new() { HasText = "Effective Access" });
+
+    /// <summary>
+    /// Waits for the Effective Access card to finish loading (i.e. the async
+    /// GetEffectiveAccessAsync call has resolved and either the data or an error is rendered).
+    /// </summary>
+    public async Task WaitForEffectiveAccessLoadedAsync()
+    {
+        await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
+        await EffectiveAccessCard.Locator("h6", new() { HasText = "Position Profile" })
+            .Or(EffectiveAccessCard.Locator(".alert-warning"))
+            .WaitForAsync(new() { Timeout = 15_000 });
+    }
+
+    public Task<bool> HasEffectiveAccessErrorAsync() =>
+        EffectiveAccessCard.Locator(".alert-warning").IsVisibleAsync();
+
+    private ILocator SectionOf(string heading) =>
+        EffectiveAccessCard.Locator("h6", new() { HasText = heading }).Locator("xpath=..");
+
+    public async Task<string> GetPositionProfileTextAsync() =>
+        (await SectionOf("Position Profile").InnerTextAsync()).Replace("Position Profile", "").Trim();
+
+    public async Task<IReadOnlyList<string>> GetDirectRoleNamesAsync() =>
+        await SectionOf("Direct Roles").Locator(".badge").AllInnerTextsAsync();
+
+    public async Task<IReadOnlyList<string>> GetInheritedRoleNamesAsync() =>
+        await SectionOf("Inherited Roles").Locator(".badge").AllInnerTextsAsync();
+
+    public async Task<IReadOnlyList<string>> GetEffectiveAccessOverrideRoleNamesAsync()
+    {
+        var section = SectionOf("Overrides");
+        var count = await section.Locator("div.mb-1").CountAsync();
+        var names = new List<string>();
+        for (var i = 0; i < count; i++)
+            names.Add((await section.Locator("div.mb-1").Nth(i).Locator("span.fw-semibold").InnerTextAsync()).Trim());
+        return names;
+    }
+
+    /// <summary>The Effective Roles list item (li) whose role name contains <paramref name="roleName"/>.</summary>
+    private ILocator EffectiveRoleRow(string roleName) =>
+        SectionOf("Effective Roles").Locator("li").Filter(new() { HasText = roleName });
+
+    public Task<bool> HasEffectiveRoleAsync(string roleName) => EffectiveRoleRow(roleName).IsVisibleAsync();
+
+    public async Task<IReadOnlyList<string>> GetEffectiveRoleSourcesAsync(string roleName) =>
+        await EffectiveRoleRow(roleName).Locator(".badge").AllInnerTextsAsync();
+
+    public async Task<bool> HasEffectivePermissionAsync(string permissionName) =>
+        await SectionOf("Effective Permissions").Locator("li").Filter(new() { HasText = permissionName }).IsVisibleAsync();
+
+    public async Task<int> GetDeniedPermissionsCountAsync() =>
+        await SectionOf("Denied Permissions").Locator("li").CountAsync();
+
+    public async Task<bool> HasDeniedPermissionAsync(string permissionName) =>
+        await SectionOf("Denied Permissions").Locator("li").Filter(new() { HasText = permissionName }).IsVisibleAsync();
 }

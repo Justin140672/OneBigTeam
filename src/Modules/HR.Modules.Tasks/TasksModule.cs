@@ -49,6 +49,9 @@ public static class TasksModule
         services.AddScoped<IWorkloadActionProvider, EmployeeTasksOverdueWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, ManagerTasksOverdueWorkloadActionProvider>();
         services.AddScoped<TaskCompletionDispatcher>();
+        // IAM-07: standardised resource-level (self / manager-hierarchy / HR administrator)
+        // authorization for task endpoints — see TasksResourceAuthorizer remarks.
+        services.AddScoped<TasksResourceAuthorizer>();
         services.AddScoped<ITaskCompletionAction, ProbationTaskCompletionAction>();
         services.AddScoped<ITaskCompletionAction, LeaveTaskCompletionAction>();
         services.AddScoped<ITaskCompletionAction, AssetTaskCompletionAction>();

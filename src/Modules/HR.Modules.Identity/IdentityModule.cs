@@ -11,6 +11,10 @@ using HR.Modules.Identity.Features.DisablePlatformAdministrator;
 using HR.Modules.Identity.Features.DisableUser;
 using HR.Modules.Identity.Features.EnablePlatformAdministrator;
 using HR.Modules.Identity.Features.EnableUser;
+using HR.Modules.Identity.Features.ExportAccessReview;
+using HR.Modules.Identity.Features.GetAccessReview;
+using HR.Modules.Identity.Features.GetEffectiveAccess;
+using HR.Modules.Identity.Features.GetPermissionHistory;
 using HR.Modules.Identity.Features.GetUserAuditHistory;
 using HR.Modules.Identity.Features.GetUserDetails;
 using HR.Modules.Identity.Features.InviteEmployeeUser;
@@ -18,6 +22,7 @@ using HR.Modules.Identity.Features.ListEmployeeRoleOverrides;
 using HR.Modules.Identity.Features.ListPlatformAdministrators;
 using HR.Modules.Identity.Features.ListPositionRoleDefaults;
 using HR.Modules.Identity.Features.ListUsers;
+using HR.Modules.Identity.Features.SearchUserAccess;
 using HR.Modules.Identity.Features.Login;
 using HR.Modules.Identity.Features.RemoveEmployeeRoleOverride;
 using HR.Modules.Identity.Features.RequestPasswordReset;
@@ -90,6 +95,11 @@ public static class IdentityModule
         services.AddScoped<HR.Modules.Identity.Authorization.LastActiveAdministratorGuard>();
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, RoleAuthorizationHandler>();
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PlatformAdminAuthorizationHandler>();
+        // IAM-06: backs every named capability policy resolved through PolicyCatalog/PermissionPolicy.
+        services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PermissionAuthorizationHandler>();
+        // IAM-08: process-wide denial-audit volume control — must be a singleton so the throttle
+        // window is shared across requests/scopes, not reset per request.
+        services.AddSingleton<PermissionDenialAuditThrottle>();
         services.AddSingleton<IClock, SystemClock>();
 
         services.AddScoped<IEmployeeUserAccountStatusReader, EmployeeUserAccountStatusReader>();
@@ -114,6 +124,18 @@ public static class IdentityModule
         services.AddScoped<IValidator<GetUserDetailsRequest>, GetUserDetailsValidator>();
         services.AddScoped<GetUserAuditHistoryHandler>();
         services.AddScoped<IValidator<GetUserAuditHistoryRequest>, GetUserAuditHistoryValidator>();
+        services.AddScoped<GetEffectiveAccessHandler>();
+        services.AddScoped<IValidator<GetEffectiveAccessRequest>, GetEffectiveAccessValidator>();
+
+        // IAM-08: permission history, search and access-review reporting.
+        services.AddScoped<SearchUserAccessHandler>();
+        services.AddScoped<IValidator<SearchUserAccessRequest>, SearchUserAccessValidator>();
+        services.AddScoped<GetPermissionHistoryHandler>();
+        services.AddScoped<IValidator<GetPermissionHistoryRequest>, GetPermissionHistoryValidator>();
+        services.AddScoped<GetAccessReviewHandler>();
+        services.AddScoped<IValidator<GetAccessReviewRequest>, GetAccessReviewValidator>();
+        services.AddScoped<ExportAccessReviewHandler>();
+        services.AddScoped<IValidator<ExportAccessReviewRequest>, ExportAccessReviewValidator>();
         services.AddScoped<InviteEmployeeUserHandler>();
         services.AddScoped<IValidator<InviteEmployeeUserRequest>, InviteEmployeeUserValidator>();
         services.AddScoped<UpdateUserRolesHandler>();
@@ -254,221 +276,20 @@ public static class IdentityModule
         builder.AddPolicy("role:hr-administrator",     RolePolicy(SystemRoles.HrAdministrator));
         builder.AddPolicy("role:company-administrator",RolePolicy(SystemRoles.CompanyAdministrator));
 
-        // Employee domain policies — match spec section 12/13.
-        // Company Administrator is scoped to company profile/settings only and must not
-        // manage employee/HR data — see the mirror-image rule on company:manage below.
-        builder.AddPolicy("employee:manage", RolePolicy(
-            SystemRoles.HrAdministrator));
-
-        // Company domain policies — match spec section 24.
-        // Company profile/settings/branding are Company Administrator territory only —
-        // HR Administrator is a distinct role scoped to employee/leave/sickness data and
-        // must not be able to change company-level configuration.
-        builder.AddPolicy("company:manage", RolePolicy(
-            SystemRoles.CompanyAdministrator));
-
-        // Support & Feedback domain policy — status management and the reporting dashboard are
-        // internal-staff territory. No dedicated "platform staff" role exists yet in SystemRoles,
-        // so this is scoped to HR/Company Administrator (same OR-of-roles shape as users:view
-        // above) as the closest existing approximation. Revisit if a genuine internal-staff role
-        // is introduced later.
-        builder.AddPolicy("support:manage", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
-
-        // HR Settings domain policy — the HR-policy fields split out of Company Settings
-        // (working pattern, leave defaults, probation, sickness, employee profile display-salary,
-        // acknowledgements, leaving/offboarding, employee numbering) are HR Administrator
-        // territory only. Company Administrator must not manage HR policy, matching the
-        // mirror-image rule on company:manage above.
-        builder.AddPolicy("hr-settings:manage", RolePolicy(
-            SystemRoles.HrAdministrator));
-
-        // User Administration domain policies (ticket #92) — viewing/inviting/managing roles and
-        // disabling/enabling accounts, plus resending/cancelling invitations, are HR Administrator
-        // territory only. Company Administrator must not manage user accounts/roles, matching the
-        // same mirror-image restriction already applied to employee:manage/hr-settings:manage above
-        // — Company Administrator is scoped to company profile/settings, not user/security
-        // administration.
-        builder.AddPolicy("users:view", RolePolicy(
-            SystemRoles.HrAdministrator));
-
-        builder.AddPolicy("users:manage", RolePolicy(
-            SystemRoles.HrAdministrator));
-
-        // Getting Started checklist domain policies (CompanyOnboarding epic, Phase A) — same
-        // HR/Company Admin OR-of-roles shape as users:view/users:manage above.
-        builder.AddPolicy("onboarding:view", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
-
-        builder.AddPolicy("onboarding:manage", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
-
-        // Subscription domain policy (Phase C — Stripe checkout) — same HR/Company Admin
-        // OR-of-roles shape as onboarding:manage/users:manage above.
-        builder.AddPolicy("subscription:manage", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
-
-        // Leave domain composite policies — match spec section 14.
-        // Company Administrator no longer participates in HR workflows (see employee:manage above).
-        builder.AddPolicy("leave:request", RolePolicy(
-            SystemRoles.Employee,
-            SystemRoles.Manager,
-            SystemRoles.HrAdministrator));
-
-        builder.AddPolicy("leave:approve", RolePolicy(
-            SystemRoles.Manager,
-            SystemRoles.HrAdministrator));
-
-        builder.AddPolicy("leave:manage", RolePolicy(
-            SystemRoles.HrAdministrator));
-
-        builder.AddPolicy("probation:manage", RolePolicy(
-            SystemRoles.HrAdministrator));
-
-        builder.AddPolicy("probation:review", RolePolicy(
-            SystemRoles.Manager,
-            SystemRoles.HrAdministrator));
-
-        // Sickness domain — read access to a manager's assigned return-to-work review task
-        builder.AddPolicy("sickness:review", RolePolicy(
-            SystemRoles.Manager,
-            SystemRoles.HrAdministrator));
-
-        // Sickness domain — HR-only management of categories/records
-        builder.AddPolicy("sickness:manage", RolePolicy(
-            SystemRoles.HrAdministrator));
-
-        // Sickness domain — team visibility for managers plus HR auditing
-        builder.AddPolicy("sickness:view-team", RolePolicy(
-            SystemRoles.Manager,
-            SystemRoles.HrAdministrator));
-
-        // Asset domain policies
-        builder.AddPolicy("asset:view", RolePolicy(
-            SystemRoles.Employee,
-            SystemRoles.Manager,
-            SystemRoles.HrAdministrator));
-
-        // Recruitment domain policies
-        // Recruiter-only: HR Administrator does NOT automatically get recruitment access — unlike
-        // employee:manage-adjacent domains elsewhere in this file, recruitment is a distinct
-        // function with its own role, and an HR Administrator needs the Recruiter role too (same
-        // non-overlap principle as company:manage/shared-document management below).
-        builder.AddPolicy("recruitment:manage", RolePolicy(
-            SystemRoles.Recruiter));
-
-        // Recruitment domain — vacancy-only reads (internal job board visibility).
-        // Broad by design: seeing what roles are open is general visibility, not sensitive —
-        // unlike recruitment:manage/candidate:view above, this one deliberately keeps
-        // HrAdministrator (and every other role) able to read published vacancies.
-        builder.AddPolicy("recruitment:view", RolePolicy(
-            SystemRoles.Employee,
-            SystemRoles.Manager,
-            SystemRoles.Recruiter,
-            SystemRoles.HrAdministrator));
-
-        // Recruitment domain — candidate/application/interview/document reads. Recruiter-only,
-        // same non-overlap reasoning as recruitment:manage above: candidate PII, resumes, and
-        // interview notes must not be visible to plain Employees/Managers, nor automatically to
-        // HR Administrators who lack the Recruiter role.
-        builder.AddPolicy("candidate:view", RolePolicy(
-            SystemRoles.Recruiter));
-
-        // Shared company document domain policies (documents owned by the company as a whole,
-        // e.g. policies/handbooks — distinct from an employee's own document records).
-        //
-        // Viewing published documents is broad by design, same reasoning as recruitment:view —
-        // any real employee should be able to read company policies. Managing/publishing/
-        // archiving/acknowledgement-status stay HR-only: Company Administrator does NOT
-        // automatically get access here (same non-overlap rule as employee:manage/company:manage
-        // above — a Company Administrator needs the HrAdministrator role too, not just
-        // CompanyAdministrator, to manage these), and Manager does not automatically get manage
-        // rights either, unlike leave:approve/probation:review/sickness:review.
-        builder.AddPolicy("shared-document:view-published", RolePolicy(
-            SystemRoles.Employee,
-            SystemRoles.Manager,
-            SystemRoles.Recruiter,
-            SystemRoles.HrAdministrator));
-
-        builder.AddPolicy("shared-document:manage", RolePolicy(
-            SystemRoles.HrAdministrator));
-
-        builder.AddPolicy("shared-document:publish", RolePolicy(
-            SystemRoles.HrAdministrator));
-
-        builder.AddPolicy("shared-document:archive", RolePolicy(
-            SystemRoles.HrAdministrator));
-
-        builder.AddPolicy("shared-document:view-acknowledgement-status", RolePolicy(
-            SystemRoles.HrAdministrator));
-
-        // Reporting domain policies (Reporting Dashboard epic, phase 1).
-        // "reporting:view" is the baseline gate for the reporting area — Manager, Recruiter,
-        // and HrAdministrator only; plain Employees have no reporting access. Category-scoped
-        // policies below are deliberately non-overlapping (same precedent as
-        // recruitment:manage/candidate:view above): a Recruiter without HrAdministrator sees
-        // only the recruitment category, and an HrAdministrator without Recruiter sees only
-        // the HR category. A user needs both roles to see both categories.
-        builder.AddPolicy("reporting:view", RolePolicy(
-            SystemRoles.Manager,
-            SystemRoles.Recruiter,
-            SystemRoles.HrAdministrator));
-
-        builder.AddPolicy("reporting:view-recruitment", RolePolicy(
-            SystemRoles.Recruiter));
-
-        builder.AddPolicy("reporting:view-hr", RolePolicy(
-            SystemRoles.HrAdministrator));
-
-        // Reporting Dashboard epic, phase 2 (OBT-704..707). Employee Starter Report is HR
-        // territory but is also explicitly relevant to Recruiters tracking their own placements
-        // (ticket OBT-704) — combined OR-of-roles policy, same RolePolicy mechanism used above,
-        // rather than requiring both reporting:view-hr AND reporting:view-recruitment (which would
-        // be an AND and wrongly exclude a Recruiter-only user).
-        builder.AddPolicy("reporting:view-employee-starter", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.Recruiter));
-
-        // Leave Summary Report (OBT-706) is HR-visible company-wide, but the ticket doesn't
-        // restrict it to HR only — a Manager should be able to see their own team's leave summary.
-        // This policy grants baseline endpoint access to both roles; the handler is responsible for
-        // scoping a non-HR caller down to their direct reports via IDirectReportsReader so a
-        // Manager never sees company-wide data through this endpoint (row-level scoping, not just a
-        // relaxed policy — see GetLeaveSummaryReport/Handler.cs).
-        builder.AddPolicy("reporting:view-leave-summary", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.Manager));
-
-        // Probation Report (OBT-711) — modelled exactly on reporting:view-leave-summary above: a
-        // Manager gets baseline endpoint access, but the handler hard-restricts a non-HR caller to
-        // their own direct reports via IDirectReportsReader (row-level scoping, never company-wide
-        // data — see GetProbationReport/Handler.cs).
-        builder.AddPolicy("reporting:view-probation", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.Manager));
-
-        // Onboarding Progress Report (OBT-712) — same OR-of-roles shape as reporting:view-probation:
-        // a Manager gets baseline endpoint access, handler restricts non-HR callers to their own
-        // direct reports.
-        builder.AddPolicy("reporting:view-onboarding", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.Manager));
-
-        // Workload & HR Actions Report catalog visibility (bug fix — this report was previously
-        // shown to every "reporting:view" caller, including a Recruiter with no HR/Manager role,
-        // which surfaced an HR-category report in the Recruitment area alongside Employee Starter
-        // Report. Employee Starter Report intentionally stays visible to Recruiters (see
-        // reporting:view-employee-starter above); this report should not. Matches the
-        // Manager/HrAdministrator shape already used by reporting:view-leave-summary etc. — the
-        // report's actual content still adapts per-role via GetWorkloadActions' IWorkloadActionProvider
-        // scoping, this policy only controls whether the catalog entry is shown.
-        builder.AddPolicy("reporting:view-workload-actions", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.Manager));
+        // IAM-06: every remaining named capability policy resolves through the authoritative
+        // permission catalogue (PolicyCatalog -> SystemPermissions -> RolePermission grants) rather
+        // than a role list duplicated inline per policy. This block is the single place these
+        // policies are registered; the role -> permission grants that determine which of
+        // Employee/Manager/Recruiter/HrAdministrator/CompanyAdministrator actually satisfy each one
+        // live in Persistence/Configurations/RolePermissionConfiguration.cs (and are exercised by
+        // HR.Modules.Identity.Tests' policy-matrix test), so a role-mapping change can never leave
+        // this registration and the underlying data inconsistent with each other. See
+        // PolicyCatalog.cs for the current product-decision reasoning behind each mapping (it
+        // reproduces the same OR-of-roles authorization behaviour these policies already had).
+        foreach (var (policyName, permissionId) in PolicyCatalog.PermissionPolicies)
+        {
+            builder.AddPolicy(policyName, PermissionPolicy(permissionId));
+        }
 
         return builder;
     }
@@ -477,6 +298,11 @@ public static class IdentityModule
         policy => policy
             .RequireAuthenticatedUser()
             .AddRequirements(new RoleRequirement(roleIds.ToHashSet()));
+
+    private static Action<AuthorizationPolicyBuilder> PermissionPolicy(Guid permissionId) =>
+        policy => policy
+            .RequireAuthenticatedUser()
+            .AddRequirements(new PermissionRequirement(permissionId));
 
     public static async Task MigrateIdentityAsync(this IServiceProvider services)
     {

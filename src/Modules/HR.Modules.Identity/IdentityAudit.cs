@@ -310,6 +310,67 @@ internal sealed record EmployeeRoleOverrideExpiredAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
+// IAM-08: published when a policy-backed authorization check denies a caller (PermissionAuthorizationHandler).
+// Volume-controlled by Authorization/PermissionDenialAuditThrottle: at most one entry per
+// (user, permission) per 15-minute window, plus one escalated entry if the burst crosses the
+// repeated-denial threshold within that window (IsRepeatedEscalation = true) — routine, harmless,
+// one-off denials never reach the audit trail at all so they cannot overwhelm it. Deliberately
+// carries no request payload/response data — only the permission id that was denied and the
+// resulting denial count — so this can never leak sensitive data (see 05-database-standards.md,
+// "Sensitive values must not appear in audit payloads").
+internal sealed record PermissionDeniedAuditEvent(
+    Guid CompanyId,
+    Guid UserId,
+    Guid PermissionId,
+    int DenialCountInWindow,
+    bool IsRepeatedEscalation,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "user.permission-denied";
+    string IAuditEvent.EntityType      => "ApplicationUser";
+    Guid   IAuditEvent.EntityId        => UserId;
+    Guid?  IAuditEvent.EmployeeId      => UserId;
+    Guid?  IAuditEvent.ActorUserId     => UserId;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => IsRepeatedEscalation
+        ? $"Repeated permission denial ({DenialCountInWindow} in the last 15 minutes) for permission {PermissionId}"
+        : $"Permission denied: {PermissionId}";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => null;
+    object? IAuditEvent.Metadata       => new { PermissionId, DenialCountInWindow, IsRepeatedEscalation };
+}
+
+// IAM-08: published on every access-review report export (success and failure), same
+// success/failure auditing convention HR.Modules.Reporting.Services.ReportExportAuditor uses for
+// Export*Report handlers — kept as an Identity-owned event (not a call into the Reporting module,
+// which would be a forbidden cross-module reference) since this report is Identity-owned
+// operational data, not part of the Reporting module's formal report catalogue. Carries only row
+// count and format — never the exported rows themselves — so no employee-level access detail ends
+// up duplicated into the audit payload.
+internal sealed record AccessReviewExportedAuditEvent(
+    Guid CompanyId,
+    string Format,
+    bool Success,
+    int? RowCount,
+    string? FailureReason,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "access-review.exported";
+    string IAuditEvent.EntityType      => "AccessReviewReport";
+    Guid   IAuditEvent.EntityId        => CompanyId;
+    Guid?  IAuditEvent.ActorUserId     => ActorUserId;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => Success
+        ? $"Exported access-review report ({Format}, {RowCount} rows)"
+        : $"Access-review report export failed ({Format}): {FailureReason}";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => null;
+    object? IAuditEvent.Metadata       => new { Format, RowCount, Success, FailureReason };
+}
+
 // Platform administrator management (Admin Portal "administrator management" screen). These
 // events cover a platform-level concept with no company relationship — CompanyId is always
 // Guid.Empty since IAuditEvent requires a non-nullable CompanyId.
