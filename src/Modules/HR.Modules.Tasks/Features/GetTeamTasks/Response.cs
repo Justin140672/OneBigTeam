@@ -1,6 +1,11 @@
 namespace HR.Modules.Tasks.Features.GetTeamTasks;
 
-internal sealed record GetTeamTasksResponse(IReadOnlyList<TeamTaskItem> Items);
+internal sealed record GetTeamTasksResponse(
+    IReadOnlyList<TeamTaskItem> Items,
+    int TotalCount,
+    int PageNumber,
+    int PageSize,
+    int TotalPages);
 
 internal sealed record TeamTaskItem(
     Guid Id,

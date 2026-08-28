@@ -95,11 +95,18 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
 
     public async Task<SharedCompanyDocumentListResponse?> ListSharedCompanyDocumentsAsync(
         Guid companyId,
+        string? search = null,
+        Guid? categoryId = null,
+        int pageNumber = 1,
+        int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var url = $"api/companies/{companyId}/shared-documents";
+            var qs = $"pageNumber={pageNumber}&pageSize={pageSize}";
+            if (!string.IsNullOrWhiteSpace(search))   qs += $"&search={Uri.EscapeDataString(search)}";
+            if (categoryId is not null)                qs += $"&categoryId={categoryId}";
+            var url = $"api/companies/{companyId}/shared-documents?{qs}";
             return await Http.GetFromJsonAsync<SharedCompanyDocumentListResponse>(url, HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }

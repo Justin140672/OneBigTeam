@@ -149,7 +149,12 @@ public sealed record CompanyDocumentCategoryListResponse(IReadOnlyList<CompanyDo
 
 public sealed record CompanyDocumentCategoryItem(Guid Id, string Name, bool IsActive);
 
-public sealed record SharedCompanyDocumentListResponse(IReadOnlyList<SharedCompanyDocumentListItem> Items);
+public sealed record SharedCompanyDocumentListResponse(
+    IReadOnlyList<SharedCompanyDocumentListItem> Items,
+    int TotalCount = 0,
+    int PageNumber = 1,
+    int PageSize = 20,
+    int TotalPages = 0);
 
 public sealed record SharedCompanyDocumentListItem(
     Guid Id,

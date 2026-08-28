@@ -31,15 +31,18 @@ internal sealed class GetMyTasksHandler(TasksDbContext dbContext, IEmployeeNameR
             query = query.Where(t => t.Status == status);
         }
 
-        // Capped rather than unbounded: without a status filter this can otherwise grow forever
-        // as completed/cancelled history accumulates. Terminal-status tasks sort last so the cap
-        // only ever trims old history, never a currently open/in-progress task.
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var pageNumber = request.PageNumber < 1 ? 1 : request.PageNumber;
+        var pageSize   = request.PageSize   < 1 ? 20 : request.PageSize;
+
         var raw = await query
             .OrderBy(t => t.Status == TaskItemStatus.Completed || t.Status == TaskItemStatus.Cancelled ? 1 : 0)
             .ThenBy(t => t.DueDate == null ? 1 : 0)
             .ThenBy(t => t.DueDate)
             .ThenBy(t => t.CreatedAt)
-            .Take(200)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
         var nameMap = await employeeNameReader.GetNamesAsync(
@@ -66,6 +69,8 @@ internal sealed class GetMyTasksHandler(TasksDbContext dbContext, IEmployeeNameR
             t.CreatedAt,
             t.UpdatedAt)).ToList();
 
-        return new GetMyTasksResponse(items);
+        var totalPages = pageSize == 0 ? 0 : (int)Math.Ceiling((double)totalCount / pageSize);
+
+        return new GetMyTasksResponse(items, totalCount, pageNumber, pageSize, totalPages);
     }
 }

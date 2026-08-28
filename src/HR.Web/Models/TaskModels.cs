@@ -2,7 +2,12 @@ namespace HR.Web.Models;
 
 public sealed record GetOutstandingTaskCountResponse(int Count);
 
-public sealed record TaskListResponse(IReadOnlyList<TaskListItem> Items);
+public sealed record TaskListResponse(
+    IReadOnlyList<TaskListItem> Items,
+    int TotalCount = 0,
+    int PageNumber = 1,
+    int PageSize = 20,
+    int TotalPages = 0);
 
 public sealed record UnassignedTaskListResponse(IReadOnlyList<UnassignedTaskItem> Items);
 

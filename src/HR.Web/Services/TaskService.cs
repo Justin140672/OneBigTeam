@@ -8,12 +8,14 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
-    public async Task<TaskListResponse?> GetMyTasksAsync(Guid companyId, CancellationToken cancellationToken = default)
+    public async Task<TaskListResponse?> GetMyTasksAsync(Guid companyId, int pageNumber = 1, int pageSize = 20, string? status = null, CancellationToken cancellationToken = default)
     {
         try
         {
+            var qs = $"pageNumber={pageNumber}&pageSize={pageSize}";
+            if (!string.IsNullOrWhiteSpace(status)) qs += $"&status={Uri.EscapeDataString(status)}";
             return await Http.GetFromJsonAsync<TaskListResponse>(
-                $"api/companies/{companyId}/tasks/my", HrApiJsonOptions.Default, cancellationToken);
+                $"api/companies/{companyId}/tasks/my?{qs}", HrApiJsonOptions.Default, cancellationToken);
         }
         catch
         {
@@ -21,12 +23,14 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
         }
     }
 
-    public async Task<TaskListResponse?> GetEmployeeTasksAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
+    public async Task<TaskListResponse?> GetEmployeeTasksAsync(Guid companyId, Guid employeeId, int pageNumber = 1, int pageSize = 20, string? status = null, CancellationToken cancellationToken = default)
     {
         try
         {
+            var qs = $"pageNumber={pageNumber}&pageSize={pageSize}";
+            if (!string.IsNullOrWhiteSpace(status)) qs += $"&status={Uri.EscapeDataString(status)}";
             return await Http.GetFromJsonAsync<TaskListResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/tasks", HrApiJsonOptions.Default, cancellationToken);
+                $"api/companies/{companyId}/employees/{employeeId}/tasks?{qs}", HrApiJsonOptions.Default, cancellationToken);
         }
         catch
         {
@@ -47,12 +51,14 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
         }
     }
 
-    public async Task<TaskListResponse?> GetTeamTasksAsync(Guid companyId, Guid managerId, CancellationToken cancellationToken = default)
+    public async Task<TaskListResponse?> GetTeamTasksAsync(Guid companyId, Guid managerId, int pageNumber = 1, int pageSize = 20, string? status = null, CancellationToken cancellationToken = default)
     {
         try
         {
+            var qs = $"pageNumber={pageNumber}&pageSize={pageSize}";
+            if (!string.IsNullOrWhiteSpace(status)) qs += $"&status={Uri.EscapeDataString(status)}";
             return await Http.GetFromJsonAsync<TaskListResponse>(
-                $"api/companies/{companyId}/employees/{managerId}/team-tasks", HrApiJsonOptions.Default, cancellationToken);
+                $"api/companies/{companyId}/employees/{managerId}/team-tasks?{qs}", HrApiJsonOptions.Default, cancellationToken);
         }
         catch
         {

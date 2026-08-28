@@ -1,6 +1,11 @@
 namespace HR.Modules.Documents.Features.ListSharedCompanyDocuments;
 
-internal sealed record ListSharedCompanyDocumentsResponse(IReadOnlyList<SharedCompanyDocumentListItem> Items);
+internal sealed record ListSharedCompanyDocumentsResponse(
+    IReadOnlyList<SharedCompanyDocumentListItem> Items,
+    int TotalCount,
+    int PageNumber,
+    int PageSize,
+    int TotalPages);
 
 internal sealed record SharedCompanyDocumentListItem(
     Guid Id,

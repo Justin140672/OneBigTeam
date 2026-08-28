@@ -1,6 +1,11 @@
 namespace HR.Modules.Tasks.Features.GetEmployeeTasks;
 
-internal sealed record GetEmployeeTasksResponse(IReadOnlyList<EmployeeTaskItem> Items);
+internal sealed record GetEmployeeTasksResponse(
+    IReadOnlyList<EmployeeTaskItem> Items,
+    int TotalCount,
+    int PageNumber,
+    int PageSize,
+    int TotalPages);
 
 internal sealed record EmployeeTaskItem(
     Guid Id,

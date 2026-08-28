@@ -16,8 +16,27 @@ internal sealed class ListSharedCompanyDocumentsHandler(DocumentsDbContext db, I
             .AsNoTracking()
             .Where(d => d.CompanyId == request.CompanyId);
 
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim().ToLowerInvariant();
+            query = query.Where(d => d.Title.ToLower().Contains(search));
+        }
+
+        if (request.CategoryId is not null)
+            query = query.Where(d => d.CategoryId == request.CategoryId);
+
+        if (request.Status is not null)
+            query = query.Where(d => d.Status == request.Status);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var pageNumber = request.PageNumber < 1 ? 1 : request.PageNumber;
+        var pageSize   = request.PageSize   < 1 ? 20 : request.PageSize;
+
         var documents = await query
             .OrderByDescending(d => d.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
         var categoryIds = documents.Select(d => d.CategoryId).ToHashSet();
@@ -57,6 +76,8 @@ internal sealed class ListSharedCompanyDocumentsHandler(DocumentsDbContext db, I
                 namesLookup.TryGetValue(d.UpdatedBy, out var updatedByName) ? updatedByName : "Unknown"))
             .ToList();
 
-        return Result.Success(new ListSharedCompanyDocumentsResponse(items));
+        var totalPages = pageSize == 0 ? 0 : (int)Math.Ceiling((double)totalCount / pageSize);
+
+        return Result.Success(new ListSharedCompanyDocumentsResponse(items, totalCount, pageNumber, pageSize, totalPages));
     }
 }

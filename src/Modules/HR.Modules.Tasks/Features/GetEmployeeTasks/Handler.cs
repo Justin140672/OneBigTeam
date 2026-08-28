@@ -22,10 +22,17 @@ internal sealed class GetEmployeeTasksHandler(TasksDbContext dbContext, IEmploye
             query = query.Where(t => t.Status == status);
         }
 
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var pageNumber = request.PageNumber < 1 ? 1 : request.PageNumber;
+        var pageSize   = request.PageSize   < 1 ? 20 : request.PageSize;
+
         var raw = await query
             .OrderBy(t => t.DueDate == null ? 1 : 0)
             .ThenBy(t => t.DueDate)
             .ThenBy(t => t.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
         var nameMap = await employeeNameReader.GetNamesAsync(
@@ -53,6 +60,8 @@ internal sealed class GetEmployeeTasksHandler(TasksDbContext dbContext, IEmploye
             t.UpdatedAt,
             t.SourceEntityId)).ToList();
 
-        return new GetEmployeeTasksResponse(items);
+        var totalPages = pageSize == 0 ? 0 : (int)Math.Ceiling((double)totalCount / pageSize);
+
+        return new GetEmployeeTasksResponse(items, totalCount, pageNumber, pageSize, totalPages);
     }
 }

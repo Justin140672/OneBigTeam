@@ -1,6 +1,11 @@
 namespace HR.Modules.Tasks.Features.GetMyTasks;
 
-internal sealed record GetMyTasksResponse(IReadOnlyList<TaskListItem> Items);
+internal sealed record GetMyTasksResponse(
+    IReadOnlyList<TaskListItem> Items,
+    int TotalCount,
+    int PageNumber,
+    int PageSize,
+    int TotalPages);
 
 internal sealed record TaskListItem(
     Guid Id,
