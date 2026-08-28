@@ -1,4 +1,5 @@
 using HR.Modules.Tasks.Domain;
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
@@ -30,6 +31,24 @@ internal sealed class GetMyTasksHandler(TasksDbContext dbContext, IEmployeeNameR
         {
             query = query.Where(t => t.Status == status);
         }
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var s = request.Search.Trim().ToLower();
+            query = query.Where(t => t.Title.ToLower().Contains(s));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Priority) &&
+            Enum.TryParse<TaskPriority>(request.Priority, ignoreCase: true, out var priority))
+        {
+            query = query.Where(t => t.Priority == priority);
+        }
+
+        if (request.DueDateFrom is not null)
+            query = query.Where(t => t.DueDate != null && t.DueDate >= request.DueDateFrom);
+
+        if (request.DueDateTo is not null)
+            query = query.Where(t => t.DueDate != null && t.DueDate <= request.DueDateTo);
 
         var totalCount = await query.CountAsync(cancellationToken);
 
