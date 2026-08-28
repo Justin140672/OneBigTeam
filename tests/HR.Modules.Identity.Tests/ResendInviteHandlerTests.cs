@@ -11,8 +11,8 @@ public class ResendInviteHandlerTests(IdentityDatabaseFixture fixture)
     private static readonly DateTimeOffset Now = new(2026, 6, 6, 12, 0, 0, TimeSpan.Zero);
     private static readonly FakeClock Clock = new(Now.UtcDateTime);
 
-    private ResendInviteHandler BuildHandler(FakeAuditEventPublisher auditPublisher) =>
-        new(fixture.BuildContext(), Clock, new FakeEmailSender(), new FakeInviteLinkBuilder(), auditPublisher);
+    private ResendInviteHandler BuildHandler(FakeAuditEventPublisher auditPublisher, FakeInvitationEmailSender? emailSender = null) =>
+        new(fixture.BuildContext(), Clock, emailSender ?? new FakeInvitationEmailSender(), new FakeInviteLinkBuilder(), auditPublisher);
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Invite_Missing()
@@ -107,5 +107,63 @@ public class ResendInviteHandlerTests(IdentityDatabaseFixture fixture)
         Assert.NotEqual(originalToken, reloaded.Token);
 
         Assert.Single(auditPublisher.PublishedEvents, e => e is UserInviteResentAuditEvent);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Uses_UserInvitation_Template_With_Correct_ActionUrl_On_Resend()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var invite = UserInvite.Create(employeeId, companyId, "resend@test.com", Now);
+
+        await using (var db = fixture.BuildContext())
+        {
+            db.UserInvites.Add(invite);
+            await db.SaveChangesAsync();
+        }
+
+        var emailSender = new FakeInvitationEmailSender();
+        var handler = BuildHandler(new FakeAuditEventPublisher(), emailSender);
+
+        var result = await handler.HandleAsync(
+            new ResendInviteRequest { CompanyId = companyId, InviteId = invite.Id },
+            actorUserId: null,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var sent = Assert.Single(emailSender.Sent);
+        Assert.Equal("resend@test.com", sent.ToEmail);
+        Assert.Contains("/invite/", sent.ActionUrl);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_EmailSent_False_And_Persists_New_Token_When_Sender_Fails()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var invite = UserInvite.Create(employeeId, companyId, "fail@test.com", Now);
+        var originalToken = invite.Token;
+
+        await using (var db = fixture.BuildContext())
+        {
+            db.UserInvites.Add(invite);
+            await db.SaveChangesAsync();
+        }
+
+        var emailSender = new FakeInvitationEmailSender(succeeds: false);
+        var handler = BuildHandler(new FakeAuditEventPublisher(), emailSender);
+
+        var result = await handler.HandleAsync(
+            new ResendInviteRequest { CompanyId = companyId, InviteId = invite.Id },
+            actorUserId: null,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value.EmailSent);
+
+        // Token must still be regenerated even when email fails.
+        await using var db2 = fixture.BuildContext();
+        var reloaded = await db2.UserInvites.FirstAsync(i => i.Id == invite.Id);
+        Assert.NotEqual(originalToken, reloaded.Token);
     }
 }

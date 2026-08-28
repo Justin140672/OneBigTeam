@@ -11,7 +11,7 @@ internal sealed class InviteEmployeeUserHandler(
     IdentityDbContext db,
     IClock clock,
     IEmployeeNameReader employeeNameReader,
-    IEmailSender emailSender,
+    IInvitationEmailSender invitationEmailSender,
     IInviteLinkBuilder inviteLinkBuilder,
     IAuditEventPublisher auditEventPublisher)
 {
@@ -46,19 +46,13 @@ internal sealed class InviteEmployeeUserHandler(
         await db.SaveChangesAsync(cancellationToken);
 
         var inviteLink = inviteLinkBuilder.Build(invite.Token);
+        var recipientName = names.TryGetValue(request.EmployeeId, out var n) ? n : null;
 
-        try
-        {
-            await emailSender.SendAsync(
-                toEmail: request.Email,
-                subject: "You have been invited to One Big Team",
-                htmlBody: BuildEmailHtml(inviteLink, invite.ExpiresAt),
-                ct: cancellationToken);
-        }
-        catch
-        {
-            // Email failure must not prevent the invite from being saved — mirrors SendInvite.
-        }
+        var emailSent = await invitationEmailSender.SendAsync(
+            toEmail: request.Email,
+            recipientName: recipientName,
+            actionUrl: inviteLink,
+            ct: cancellationToken);
 
         await auditEventPublisher.PublishAsync(
             new UserInvitedAuditEvent(
@@ -71,24 +65,6 @@ internal sealed class InviteEmployeeUserHandler(
                 now),
             cancellationToken);
 
-        return Result.Success(new InviteEmployeeUserResponse(invite.Id, invite.EmployeeId, invite.Email, invite.ExpiresAt));
+        return Result.Success(new InviteEmployeeUserResponse(invite.Id, invite.EmployeeId, invite.Email, invite.ExpiresAt, emailSent));
     }
-
-    private static string BuildEmailHtml(string inviteLink, DateTimeOffset expiresAt) => $"""
-        <html>
-        <body style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
-          <h1>Welcome to One Big Team</h1>
-          <p>You have been invited to join the platform. Click the link below to activate your account and set a password.</p>
-          <p style="margin:24px 0">
-            <a href="{inviteLink}" style="background:#0d6efd;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px">
-              Accept Invitation
-            </a>
-          </p>
-          <p>Or copy this link into your browser:</p>
-          <p style="word-break:break-all">{inviteLink}</p>
-          <hr/>
-          <p style="color:#666;font-size:0.85em">This invitation expires on {expiresAt:f} UTC.</p>
-        </body>
-        </html>
-        """;
 }

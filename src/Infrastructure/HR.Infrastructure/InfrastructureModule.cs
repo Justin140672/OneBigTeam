@@ -93,11 +93,14 @@ public static class InfrastructureModule
         if (postmarkSection.Exists() && !string.IsNullOrWhiteSpace(postmarkSection["ServerToken"]))
         {
             services.Configure<PostmarkOptions>(postmarkSection);
+            services.Configure<EmailBrandingOptions>(configuration.GetSection("EmailBranding"));
             services.AddHttpClient<IEmailSender, PostmarkEmailSender>();
+            services.AddHttpClient<IInvitationEmailSender, PostmarkInvitationEmailSender>();
         }
         else
         {
             services.AddSingleton<IEmailSender, LoggingEmailSender>();
+            services.AddSingleton<IInvitationEmailSender, LoggingInvitationEmailSender>();
         }
     }
 
