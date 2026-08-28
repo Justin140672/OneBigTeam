@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Text.Json;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Persistence;
@@ -53,11 +54,47 @@ internal sealed class GetEmployeeAuditHistoryHandler(
         ["UserInvite"] = "Identity",
     };
 
+    // AUD-06: security/identity event types whose before/after payload should not be
+    // surfaced to non-HR callers (employee self-view or manager view). The event itself
+    // (type, module, actor, timestamp) remains visible — only the before/after snapshot
+    // is redacted at the presentation layer so the audit trail is still useful.
+    private static readonly FrozenSet<string> SecurityEventPrefixes =
+        FrozenSet.ToFrozenSet(["user.", "platform-administrator.", "access-review."],
+            StringComparer.OrdinalIgnoreCase);
+
     public async Task<Result<GetEmployeeAuditHistoryResponse>> HandleAsync(
         Guid companyId,
         Guid employeeId,
+        // AUD-06: caller context drives scope check and security-event filtering.
+        Guid? callerId,
+        bool callerIsHr,
         CancellationToken cancellationToken)
     {
+        // AUD-06: scope check — determine whether the caller is allowed to view this employee's
+        // history and, if so, at what detail level.
+        if (!callerIsHr)
+        {
+            var isSelf   = callerId.HasValue && callerId.Value == employeeId;
+            var isManager = false;
+
+            if (!isSelf && callerId.HasValue)
+            {
+                isManager = await dbContext.Employees
+                    .AsNoTracking()
+                    .AnyAsync(e => e.CompanyId == companyId
+                                && e.Id == employeeId
+                                && e.ManagerId == callerId.Value,
+                        cancellationToken);
+            }
+
+            if (!isSelf && !isManager)
+            {
+                // Caller has no relationship to the target employee — return empty (not an error)
+                // following the same convention as GetEmployeeTimeline.
+                return Result.Success(new GetEmployeeAuditHistoryResponse([]));
+            }
+        }
+
         var entries = await auditHistoryReader.GetEmployeeAuditHistoryAsync(companyId, employeeId, cancellationToken);
 
         var actorEmployeeIds = entries
@@ -72,8 +109,18 @@ internal sealed class GetEmployeeAuditHistoryHandler(
         // DepartmentId/PositionProfileId/LocationId referenced anywhere in the history and
         // resolve them to display names in a single batched query per entity type, then
         // (b) reuse the already-parsed dictionaries to build the change rows below.
+        // AUD-06: for non-HR callers, strip before/after from security/identity events so
+        // account-level detail is never surfaced to employees or managers.
         var parsed = entries
-            .Select(e => (Entry: e, Before: ParseFields(e.BeforeJson), After: ParseFields(e.AfterJson)))
+            .Select(e =>
+            {
+                var isSecurityEvent = !callerIsHr &&
+                    SecurityEventPrefixes.Any(p => e.EventType.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+                return (
+                    Entry: e,
+                    Before: ParseFields(isSecurityEvent ? null : e.BeforeJson),
+                    After:  ParseFields(isSecurityEvent ? null : e.AfterJson));
+            })
             .ToList();
 
         var departmentIds = CollectReferencedIds(parsed, DepartmentIdField);

@@ -25,7 +25,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         var names = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [actorId] = "Alice Smith" });
         var handler = new GetEmployeeAuditHistoryHandler(reader, names, context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -44,7 +44,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -65,7 +65,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         // No names configured — actorId will not resolve.
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -91,7 +91,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -110,7 +110,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -129,7 +129,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -148,7 +148,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -169,7 +169,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -198,7 +198,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -221,7 +221,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -238,7 +238,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         var reader = new FakeAuditHistoryReader([]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Items);
@@ -264,7 +264,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -292,7 +292,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -319,7 +319,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -343,7 +343,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -370,7 +370,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -401,7 +401,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -424,7 +424,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -446,7 +446,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -477,7 +477,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -500,7 +500,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -528,7 +528,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -555,7 +555,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -585,7 +585,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -611,7 +611,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -636,10 +636,126 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, result.Value!.Items.Count);
+    }
+
+    // ── AUD-06: scoped visibility ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Returns_Empty_When_Caller_Has_No_Relationship_To_Employee()
+    {
+        await using var context = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var unrelatedCallerId = Guid.NewGuid();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(Now, "employee.profile.updated", "Employee", null, null, "updated", null, null)
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId,
+            callerId: unrelatedCallerId, callerIsHr: false, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_History_When_Caller_Is_Employee_Self()
+    {
+        await using var context = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid(); // same as callerId → self
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(Now, "employee.profile.updated", "Employee", null, null, "updated", null,
+                """{"FirstName":"Alice"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId,
+            callerId: employeeId, callerIsHr: false, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEmpty(result.Value!.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Strips_SecurityEvent_Details_For_NonHr_Caller()
+    {
+        await using var context = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(Now, "user.invited", "ApplicationUser", null, null, "User invited",
+                null, """{"Email":"alice@example.com"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        // Self view — security event before/after must be stripped.
+        var result = await handler.HandleAsync(companyId, employeeId,
+            callerId: employeeId, callerIsHr: false, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        // No change rows surfaced — payload was stripped.
+        Assert.Empty(item.Changes);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Strip_SecurityEvent_Details_For_Hr_Caller()
+    {
+        await using var context = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(Now, "user.invited", "ApplicationUser", null, null, "User invited",
+                null, """{"IsActive":"True"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId,
+            callerId: null, callerIsHr: true, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        // HR sees the change row.
+        Assert.NotEmpty(item.Changes);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_History_For_Direct_Manager()
+    {
+        await using var context = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var managerId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var employee = Employee.Create(employeeId, companyId, "Bob", "Smith", "bob@example.com",
+            new DateOnly(2023, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Male", "EMP-0001",
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
+        // Set the manager relationship via the Assign method.
+        employee.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), managerId, Now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(Now, "employee.profile.updated", "Employee", null, null, "updated",
+                null, """{"FirstName":"Bob"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId,
+            callerId: managerId, callerIsHr: false, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEmpty(result.Value!.Items);
     }
 
     private static EmployeesDbContext BuildContext()
