@@ -5,6 +5,8 @@ namespace HR.Infrastructure.Persistence;
 internal sealed class AuditDbContext(DbContextOptions<AuditDbContext> options) : DbContext(options)
 {
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    /// <summary>AUD-01: durable staging table — promoted to AuditEvents by the background job.</summary>
+    public DbSet<AuditPendingItem> AuditPendingItems => Set<AuditPendingItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

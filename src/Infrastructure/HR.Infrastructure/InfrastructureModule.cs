@@ -30,6 +30,8 @@ public static class InfrastructureModule
         services.AddSingleton<IInviteLinkBuilder, ConfiguredInviteLinkBuilder>();
         services.AddScoped<IAuditEventPublisher, DbAuditEventPublisher>();
         services.AddScoped<IAuditHistoryReader, AuditHistoryReader>();
+        services.AddScoped<AuditPendingItemPromotionJob>();
+        services.AddSingleton<IRecurringJobRegistrar, AuditJobRegistrar>();
         services.AddDbContext<AuditDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
             {

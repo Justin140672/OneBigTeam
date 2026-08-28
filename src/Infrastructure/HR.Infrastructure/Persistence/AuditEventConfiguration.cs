@@ -15,6 +15,15 @@ internal sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEv
             .HasColumnName("id")
             .ValueGeneratedNever();
 
+        // AUD-01: stable idempotency key — unique so duplicate promotions are rejected safely.
+        builder.Property(e => e.EventId)
+            .HasColumnName("event_id")
+            .IsRequired();
+
+        builder.HasIndex(e => e.EventId)
+            .IsUnique()
+            .HasDatabaseName("ix_audit_events_event_id");
+
         builder.Property(e => e.CompanyId)
             .HasColumnName("company_id")
             .IsRequired();
