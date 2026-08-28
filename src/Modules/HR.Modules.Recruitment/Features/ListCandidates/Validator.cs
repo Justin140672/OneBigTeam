@@ -14,5 +14,9 @@ internal sealed class ListCandidatesValidator : AbstractValidator<ListCandidates
 
         RuleFor(r => r.PageSize)
             .InclusiveBetween(1, 100);
+
+        RuleFor(r => r.Search)
+            .MaximumLength(200)
+            .When(r => r.Search is not null);
     }
 }
