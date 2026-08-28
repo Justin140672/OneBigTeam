@@ -33,6 +33,16 @@ internal sealed class DbAuditEventPublisher(
         {
             await context.SaveChangesAsync(cancellationToken);
         }
+        catch (ProhibitedAuditFieldException pex)
+        {
+            // AUD-03: prohibited sensitive field in payload — this is a programming error in the
+            // audit event definition and must be fixed at the call site. Log at Error so it is
+            // immediately visible; do not propagate so the business mutation response is accurate.
+            logger.LogError(pex,
+                "AUD-03: audit event rejected — prohibited sensitive field. " +
+                "EventType={EventType} EntityType={EntityType} EntityId={EntityId}",
+                evt.EventType, evt.EntityType, evt.EntityId);
+        }
         catch (Exception ex)
         {
             // AUD-01: log the failure without any sensitive payload content so operators can

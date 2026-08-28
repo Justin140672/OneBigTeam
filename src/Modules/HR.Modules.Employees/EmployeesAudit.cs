@@ -28,7 +28,8 @@ internal sealed record CompensationRecordCreatedAuditEvent(
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Compensation record created";
     object? IAuditEvent.Before => null;
-    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Salary, Currency, Reason };
+    // AUD-03: Salary amount and Reason (free-text) are prohibited — record safe structured fields only.
+    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Currency };
     object? IAuditEvent.Metadata => null;
 }
 
@@ -54,7 +55,8 @@ internal sealed record CompensationRecordImportedAuditEvent(
     Guid? IAuditEvent.CorrelationId => ImportBatchId;
     string? IAuditEvent.Summary => "Compensation record created via import";
     object? IAuditEvent.Before => null;
-    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Salary, Currency, Reason };
+    // AUD-03: Salary amount and Reason (free-text) are prohibited.
+    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Currency };
     object? IAuditEvent.Metadata => new { Source = "Import", ImportBatchId };
 }
 
@@ -81,9 +83,10 @@ internal sealed record CompensationRecordBulkAppliedAuditEvent(
     Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => BulkOperationId;
     string? IAuditEvent.Summary => "Compensation record created via bulk adjustment";
-    object? IAuditEvent.Before => new { Salary = PreviousSalary };
-    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Salary, Currency, Reason };
-    object? IAuditEvent.Metadata => new { AdjustmentMode, BulkOperationId };
+    // AUD-03: Salary amounts and Reason (free-text) are prohibited — record direction only.
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Currency, AdjustmentMode };
+    object? IAuditEvent.Metadata => new { BulkOperationId };
 }
 
 internal sealed record CompensationRecordClosedAuditEvent(
@@ -129,7 +132,8 @@ internal sealed record CompensationRecordUpdatedAuditEvent(
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Compensation record updated";
     object? IAuditEvent.Before => null;
-    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Salary, Currency, Reason };
+    // AUD-03: Salary amount and Reason (free-text) are prohibited.
+    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Currency };
     object? IAuditEvent.Metadata => null;
 }
 

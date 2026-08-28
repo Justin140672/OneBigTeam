@@ -30,6 +30,15 @@ internal sealed class AuditPendingItem
 
     internal static AuditPendingItem From(IAuditEvent evt)
     {
+        var beforeJson  = evt.Before   is null ? null : JsonSerializer.Serialize(evt.Before);
+        var afterJson   = evt.After    is null ? null : JsonSerializer.Serialize(evt.After);
+        var metadataJson = evt.Metadata is null ? null : JsonSerializer.Serialize(evt.Metadata);
+
+        // AUD-03: validate payloads for prohibited sensitive fields before persistence.
+        AuditPayloadRedactionGuard.AssertPayloadIsSafe(beforeJson,   "Before");
+        AuditPayloadRedactionGuard.AssertPayloadIsSafe(afterJson,    "After");
+        AuditPayloadRedactionGuard.AssertPayloadIsSafe(metadataJson, "Metadata");
+
         var payload = new PendingAuditPayload(
             evt.EventId,
             evt.CompanyId,
@@ -42,9 +51,9 @@ internal sealed class AuditPendingItem
             evt.OccurredAt,
             evt.CorrelationId,
             evt.Summary,
-            evt.Before  is null ? null : JsonSerializer.Serialize(evt.Before),
-            evt.After   is null ? null : JsonSerializer.Serialize(evt.After),
-            evt.Metadata is null ? null : JsonSerializer.Serialize(evt.Metadata));
+            beforeJson,
+            afterJson,
+            metadataJson);
 
         return new AuditPendingItem
         {
