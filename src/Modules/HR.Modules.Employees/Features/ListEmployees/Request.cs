@@ -8,6 +8,8 @@ internal sealed record ListEmployeesRequest
     public string? Search { get; init; }
     public Guid? DepartmentId { get; init; }
     public Guid? PositionProfileId { get; init; }
+    public Guid? ManagerId { get; init; }
+    public Guid? LocationId { get; init; }
     public EmploymentStatus? Status { get; init; }
     public int PageNumber { get; init; } = 1;
     public int PageSize { get; init; } = 20;

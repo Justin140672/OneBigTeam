@@ -33,12 +33,20 @@ internal sealed class ListEmployeesHandler
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var search = request.Search.Trim().ToLowerInvariant();
+            var matchingDeptIds = _dbContext.Departments
+                .Where(d => d.CompanyId == request.CompanyId && d.Name.ToLower().Contains(search))
+                .Select(d => d.Id);
+            var matchingPosIds = _dbContext.PositionProfiles
+                .Where(p => p.CompanyId == request.CompanyId && p.Title.ToLower().Contains(search))
+                .Select(p => p.Id);
             query = query.Where(e =>
                 e.FirstName.ToLower().Contains(search) ||
                 e.LastName.ToLower().Contains(search) ||
                 (e.FirstName.ToLower() + " " + e.LastName.ToLower()).Contains(search) ||
                 e.WorkEmail.ToLower().Contains(search) ||
-                e.EmployeeNumber.ToLower().Contains(search));
+                e.EmployeeNumber.ToLower().Contains(search) ||
+                matchingDeptIds.Contains(e.DepartmentId) ||
+                matchingPosIds.Contains(e.PositionProfileId));
         }
 
         if (request.DepartmentId is not null)
@@ -46,6 +54,12 @@ internal sealed class ListEmployeesHandler
 
         if (request.PositionProfileId is not null)
             query = query.Where(e => e.PositionProfileId == request.PositionProfileId);
+
+        if (request.ManagerId is not null)
+            query = query.Where(e => e.ManagerId == request.ManagerId);
+
+        if (request.LocationId is not null)
+            query = query.Where(e => e.LocationId == request.LocationId);
 
         if (request.Status is not null)
             query = query.Where(e => e.Status == request.Status);
