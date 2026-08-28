@@ -11,7 +11,16 @@ internal sealed class FakeAuditHistoryReader(IReadOnlyList<AuditHistoryEntry>? e
 {
     private readonly IReadOnlyList<AuditHistoryEntry> _entries = entries ?? [];
 
+    /// <summary>Platform-wide entries returned by GetPlatformAuditLogAsync (used by GetPermissionHistoryHandler).</summary>
+    private IReadOnlyList<AuditHistoryEntry> _platformEntries = [];
+
     public bool WasCalled { get; private set; }
+
+    public FakeAuditHistoryReader WithPlatformEntries(IReadOnlyList<AuditHistoryEntry> platformEntries)
+    {
+        _platformEntries = platformEntries;
+        return this;
+    }
 
     public Task<IReadOnlyList<AuditHistoryEntry>> GetEmployeeAuditHistoryAsync(
         Guid companyId, Guid employeeId, CancellationToken cancellationToken)
@@ -36,5 +45,13 @@ internal sealed class FakeAuditHistoryReader(IReadOnlyList<AuditHistoryEntry>? e
         string? eventType,
         Pagination pagination,
         CancellationToken cancellationToken)
-        => throw new NotImplementedException();
+    {
+        var result = new PagedResult<AuditHistoryEntry>(
+            _platformEntries,
+            _platformEntries.Count,
+            pagination.PageNumber,
+            pagination.PageSize);
+        return Task.FromResult(result);
+    }
 }
+
