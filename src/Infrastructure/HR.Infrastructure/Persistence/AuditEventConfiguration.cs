@@ -51,6 +51,11 @@ internal sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEv
         builder.Property(e => e.ActorEmployeeId)
             .HasColumnName("actor_employee_id");
 
+        // AUD-04: actor origin classification stored as integer enum.
+        builder.Property(e => e.ActorType)
+            .HasColumnName("actor_type")
+            .IsRequired();
+
         builder.Property(e => e.OccurredAt)
             .HasColumnName("occurred_at")
             .IsRequired();

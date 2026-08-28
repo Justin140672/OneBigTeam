@@ -157,6 +157,8 @@ internal sealed record UserAutoDisabledOnOffboardingAuditEvent(
     Guid?  IAuditEvent.EmployeeId      => EmployeeId;
     Guid?  IAuditEvent.ActorUserId     => null;
     Guid?  IAuditEvent.ActorEmployeeId => null;
+    // AUD-04: triggered by an integration event from Offboarding — no human actor.
+    AuditActorType IAuditEvent.ActorType => AuditActorType.IntegrationHandler;
     Guid?  IAuditEvent.CorrelationId   => null;
     string? IAuditEvent.Summary        => "User account automatically disabled — offboarding plan completed";
     object? IAuditEvent.Before         => new { IsActive = true };
@@ -228,6 +230,8 @@ internal sealed record EmployeeInheritedRolesRecalculatedAuditEvent(
     Guid?  IAuditEvent.EmployeeId      => EmployeeId;
     Guid?  IAuditEvent.ActorUserId     => null;
     Guid?  IAuditEvent.ActorEmployeeId => null;
+    // AUD-04: triggered by integration events (EmployeeCreated/EmployeePositionChanged) — no human actor.
+    AuditActorType IAuditEvent.ActorType => AuditActorType.IntegrationHandler;
     Guid?  IAuditEvent.CorrelationId   => null;
     string? IAuditEvent.Summary        => "Inherited roles recalculated following a position assignment change";
     object? IAuditEvent.Before         => new { PositionId = PreviousPositionId, RoleIds = BeforeRoleIds };
@@ -257,7 +261,8 @@ internal sealed record EmployeeRoleOverrideCreatedAuditEvent(
     Guid?  IAuditEvent.CorrelationId   => null;
     string? IAuditEvent.Summary        => $"Created {OverrideType} override for role {RoleId}: {Reason}";
     object? IAuditEvent.Before         => null;
-    object? IAuditEvent.After          => new { RoleId, OverrideType, Reason, ExpiresAt };
+    // AUD-03: Reason is free-text and prohibited in the payload; it is captured in Summary only.
+    object? IAuditEvent.After          => new { RoleId, OverrideType, ExpiresAt };
     object? IAuditEvent.Metadata       => null;
 }
 
@@ -303,6 +308,8 @@ internal sealed record EmployeeRoleOverrideExpiredAuditEvent(
     Guid?  IAuditEvent.EmployeeId      => UserId;
     Guid?  IAuditEvent.ActorUserId     => null;
     Guid?  IAuditEvent.ActorEmployeeId => null;
+    // AUD-04: triggered by the daily expiry sweep job — no human actor.
+    AuditActorType IAuditEvent.ActorType => AuditActorType.ScheduledJob;
     Guid?  IAuditEvent.CorrelationId   => null;
     string? IAuditEvent.Summary        => $"{OverrideType} override for role {RoleId} expired";
     object? IAuditEvent.Before         => new { RoleId, OverrideType };

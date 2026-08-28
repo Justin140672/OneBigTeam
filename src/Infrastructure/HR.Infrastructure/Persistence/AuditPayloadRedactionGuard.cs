@@ -15,42 +15,66 @@ namespace HR.Infrastructure.Persistence;
 internal static class AuditPayloadRedactionGuard
 {
     /// <summary>
-    /// Field name fragments that are unconditionally prohibited in any audit payload.
-    /// Matching is case-insensitive and checks for substring containment so that
-    /// PreviousSalary, CurrentSalary, SalaryAmount, etc. are all caught by "salary".
+    /// Field names that are prohibited in any audit payload — exact case-insensitive matches.
+    /// These are VALUE-bearing fields; boolean display-preference flags (e.g.
+    /// DisplaySalaryOnEmployeeProfile) are not prohibited by exact match.
+    /// </summary>
+    private static readonly HashSet<string> ExactProhibitedNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Compensation / financial
+        "salary",
+        "previousSalary",
+        "currentSalary",
+        "salaryAmount",
+        "annualSalary",
+        "baseSalary",
+        "proposedSalary",
+        "compensation",
+        "compensationAmount",
+        // Tax / government identifiers
+        "nationalInsuranceNumber",
+        "niNumber",
+        "ni",
+        "taxCode",
+        "taxIdentifier",
+        // Banking
+        "bankAccountNumber",
+        "accountNumber",
+        "sortCode",
+        "iban",
+        "bankAccount",
+        // Authentication
+        "password",
+        "passwordHash",
+        "token",
+        "secret",
+        "refreshToken",
+        "accessToken",
+        // Personal identifiers / contact
+        "dateOfBirth",
+        "dob",
+        "personalEmail",
+        "personalPhone",
+        "personalPhoneNumber",
+        "homeAddress",
+        // Medical / sickness
+        "medicalNote",
+        "sicknessNote",
+        "diagnosisNote",
+        "diagnosisCode",
+    };
+
+    /// <summary>
+    /// Fragment patterns that are always prohibited regardless of prefix/suffix.
+    /// Only used for patterns where any compound name is sensitive
+    /// (e.g. "bankaccount" in BankAccountSortCode).
     /// </summary>
     private static readonly string[] ProhibitedFragments =
     [
-        "salary",
-        "compensation",
         "nationalinsurance",
         "national_insurance",
-        "niNumber",
-        "ni_number",
         "bankaccount",
         "bank_account",
-        "sortcode",
-        "sort_code",
-        "taxcode",
-        "tax_code",
-        "password",
-        "token",
-        "secret",
-        "dateofbirth",
-        "date_of_birth",
-        "dob",
-        "personalphone",
-        "personal_phone",
-        "personalemail",
-        "personal_email",
-        "homeaddress",
-        "home_address",
-        "medicalNote",
-        "medical_note",
-        "sicknessNote",
-        "sickness_note",
-        "diagnosisNote",
-        "diagnosis_note",
     ];
 
     public static void AssertPayloadIsSafe(string? json, string fieldName)
@@ -95,13 +119,20 @@ internal static class AuditPayloadRedactionGuard
 
     private static void CheckPropertyName(string propertyName, string context)
     {
+        if (ExactProhibitedNames.Contains(propertyName))
+        {
+            throw new ProhibitedAuditFieldException(
+                $"AUD-03: prohibited field '{propertyName}' found in audit {context} payload. " +
+                $"Remove this field — use a summary-only approach for sensitive values.");
+        }
+
         foreach (var fragment in ProhibitedFragments)
         {
             if (propertyName.Contains(fragment, StringComparison.OrdinalIgnoreCase))
             {
                 throw new ProhibitedAuditFieldException(
-                    $"AUD-03: prohibited field '{propertyName}' found in audit {context} payload. " +
-                    $"Remove this field from the audit event — use a summary-only approach for sensitive values.");
+                    $"AUD-03: prohibited field pattern '{fragment}' matched by '{propertyName}' in audit {context} payload. " +
+                    $"Remove this field from the audit event.");
             }
         }
     }

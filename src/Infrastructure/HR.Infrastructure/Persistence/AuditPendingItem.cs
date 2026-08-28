@@ -30,6 +30,9 @@ internal sealed class AuditPendingItem
 
     internal static AuditPendingItem From(IAuditEvent evt)
     {
+        // AUD-04: validate actor attribution before persistence.
+        AuditActorAttributionGuard.Assert(evt);
+
         var beforeJson  = evt.Before   is null ? null : JsonSerializer.Serialize(evt.Before);
         var afterJson   = evt.After    is null ? null : JsonSerializer.Serialize(evt.After);
         var metadataJson = evt.Metadata is null ? null : JsonSerializer.Serialize(evt.Metadata);
@@ -48,6 +51,7 @@ internal sealed class AuditPendingItem
             evt.EmployeeId,
             evt.ActorUserId,
             evt.ActorEmployeeId,
+            evt.ActorType,
             evt.OccurredAt,
             evt.CorrelationId,
             evt.Summary,
@@ -104,6 +108,8 @@ internal sealed record PendingAuditPayload(
     Guid?          EmployeeId,
     Guid?          ActorUserId,
     Guid?          ActorEmployeeId,
+    /// <summary>AUD-04: actor origin classification stored so the promoter can reproduce the column.</summary>
+    AuditActorType ActorType,
     DateTimeOffset OccurredAt,
     Guid?          CorrelationId,
     string?        Summary,

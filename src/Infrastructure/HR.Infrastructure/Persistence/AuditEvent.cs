@@ -17,6 +17,8 @@ internal sealed class AuditEvent
     public Guid? EmployeeId { get; private set; }
     public Guid? ActorUserId { get; private set; }
     public Guid? ActorEmployeeId { get; private set; }
+    /// <summary>AUD-04: origin classification (Human, ScheduledJob, IntegrationHandler, SupportSession).</summary>
+    public AuditActorType ActorType { get; private set; }
     public DateTimeOffset OccurredAt { get; private set; }
     public Guid? CorrelationId { get; private set; }
     public string? Summary { get; private set; }
@@ -33,11 +35,12 @@ internal sealed class AuditEvent
         EntityType    = evt.EntityType,
         EntityId      = evt.EntityId,
         EmployeeId    = evt.EmployeeId,
-        ActorUserId   = evt.ActorUserId,
+        ActorUserId     = evt.ActorUserId,
         ActorEmployeeId = evt.ActorEmployeeId,
-        OccurredAt    = evt.OccurredAt,
-        CorrelationId = evt.CorrelationId,
-        Summary       = evt.Summary,
+        ActorType       = evt.ActorType,
+        OccurredAt      = evt.OccurredAt,
+        CorrelationId   = evt.CorrelationId,
+        Summary         = evt.Summary,
         BeforeJson    = evt.Before   is null ? null : JsonSerializer.Serialize(evt.Before),
         AfterJson     = evt.After    is null ? null : JsonSerializer.Serialize(evt.After),
         MetadataJson  = evt.Metadata is null ? null : JsonSerializer.Serialize(evt.Metadata),
@@ -55,6 +58,7 @@ internal sealed class AuditEvent
         EmployeeId      = p.EmployeeId,
         ActorUserId     = p.ActorUserId,
         ActorEmployeeId = p.ActorEmployeeId,
+        ActorType       = p.ActorType,
         OccurredAt      = p.OccurredAt,
         CorrelationId   = p.CorrelationId,
         Summary         = p.Summary,

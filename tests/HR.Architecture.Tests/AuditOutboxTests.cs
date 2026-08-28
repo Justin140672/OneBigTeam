@@ -145,7 +145,8 @@ internal sealed class StableAuditEvent : IAuditEvent
     public string EventType    => "test.aud01";
     public string EntityType   => "TestEntity";
     public Guid EntityId       { get; } = Guid.NewGuid();
-    public Guid? ActorUserId   => null;
+    // AUD-04: test fixture uses a fixed actor so the attribution guard passes.
+    public Guid? ActorUserId   => Guid.Parse("00000000-0000-0000-0000-000000000001");
     public Guid? ActorEmployeeId => null;
     public DateTimeOffset OccurredAt => DateTimeOffset.UtcNow;
     public Guid? CorrelationId => null;

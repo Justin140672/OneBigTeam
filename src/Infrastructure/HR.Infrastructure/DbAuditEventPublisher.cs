@@ -35,19 +35,23 @@ internal sealed class DbAuditEventPublisher(
         }
         catch (ProhibitedAuditFieldException pex)
         {
-            // AUD-03: prohibited sensitive field in payload — this is a programming error in the
-            // audit event definition and must be fixed at the call site. Log at Error so it is
-            // immediately visible; do not propagate so the business mutation response is accurate.
+            // AUD-03: prohibited sensitive field in payload — programming error; fix at call site.
             logger.LogError(pex,
                 "AUD-03: audit event rejected — prohibited sensitive field. " +
                 "EventType={EventType} EntityType={EntityType} EntityId={EntityId}",
                 evt.EventType, evt.EntityType, evt.EntityId);
         }
+        catch (MissingAuditActorException aex)
+        {
+            // AUD-04: human event with no actor — programming error; fix the audit event.
+            logger.LogError(aex,
+                "AUD-04: audit event rejected — human-triggered event has no actor identity. " +
+                "EventType={EventType} EntityType={EntityType} EntityId={EntityId}",
+                evt.EventType, evt.EntityType, evt.EntityId);
+        }
         catch (Exception ex)
         {
-            // AUD-01: log the failure without any sensitive payload content so operators can
-            // investigate, but the caller is not propagated an exception — the business
-            // mutation has already committed successfully and the API must not claim it failed.
+            // AUD-01: delivery failure — log without sensitive payload so operators can investigate.
             logger.LogError(ex,
                 "AUD-01: failed to enqueue audit pending item. " +
                 "EventType={EventType} EntityType={EntityType} EntityId={EntityId} CompanyId={CompanyId}",

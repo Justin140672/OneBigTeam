@@ -11,6 +11,13 @@ public interface IAuditEvent
     /// </summary>
     Guid EventId => Guid.NewGuid();
 
+    /// <summary>
+    /// AUD-04: classifies who or what triggered this event.
+    /// Defaults to <see cref="AuditActorType.Human"/> so existing events are unaffected;
+    /// background and integration-handler events should override this explicitly.
+    /// </summary>
+    AuditActorType ActorType => AuditActorType.Human;
+
     Guid CompanyId { get; }
     string EventType { get; }
     string EntityType { get; }
