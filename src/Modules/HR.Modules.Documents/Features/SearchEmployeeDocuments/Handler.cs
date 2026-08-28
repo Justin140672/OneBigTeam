@@ -57,6 +57,9 @@ internal sealed class SearchEmployeeDocumentsHandler(DocumentsDbContext db, IEmp
         if (request.Status is not null)
             query = query.Where(x => x.d.Status == request.Status);
 
+        if (request.UploadedBy is not null)
+            query = query.Where(x => x.d.UploadedBy == request.UploadedBy);
+
         if (request.UploadedFrom is not null)
             query = query.Where(x => DateOnly.FromDateTime(x.ed.CreatedAt.Date) >= request.UploadedFrom.Value);
 

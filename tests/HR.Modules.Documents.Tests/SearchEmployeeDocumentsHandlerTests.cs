@@ -434,6 +434,33 @@ public class SearchEmployeeDocumentsHandlerTests
         Assert.Equal(employeeId.ToString(), result.Value!.Items[0].EmployeeName);
     }
 
+    [Fact]
+    public async Task HandleAsync_Filters_By_UploadedBy()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var type       = await SeedType(db, companyId);
+        var employeeId = Guid.NewGuid();
+        var uploaderA  = Guid.NewGuid();
+        var uploaderB  = Guid.NewGuid();
+
+        // SeedDoc uses Guid.NewGuid() for uploadedBy internally; we seed manually to control uploader.
+        var docA = Document.Create(Guid.NewGuid(), companyId, employeeId, "DocA", null, type.Id, "a.pdf", 100, "application/pdf", "key/a.pdf", null, uploaderA, Now);
+        var edA  = EmployeeDocument.Create(Guid.NewGuid(), companyId, employeeId, docA.Id, Guid.NewGuid(), Now);
+        var docB = Document.Create(Guid.NewGuid(), companyId, employeeId, "DocB", null, type.Id, "b.pdf", 100, "application/pdf", "key/b.pdf", null, uploaderB, Now);
+        var edB  = EmployeeDocument.Create(Guid.NewGuid(), companyId, employeeId, docB.Id, Guid.NewGuid(), Now);
+        db.Documents.AddRange(docA, docB);
+        db.EmployeeDocuments.AddRange(edA, edB);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            Request(companyId) with { UploadedBy = uploaderA },
+            allowedEmployeeIds: null, callerIsHrAdministrator: true, CancellationToken.None);
+
+        Assert.Equal(1, result.Value!.TotalCount);
+        Assert.Equal("DocA", result.Value.Items[0].Title);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private static SearchEmployeeDocumentsHandler Handler(

@@ -20,6 +20,9 @@ internal sealed record SearchEmployeeDocumentsRequest
 
     public DocumentStatus? Status { get; init; }
 
+    /// <summary>Restrict results to documents uploaded by a specific user (matches Document.UploadedBy).</summary>
+    public Guid? UploadedBy { get; init; }
+
     public DateOnly? UploadedFrom { get; init; }
     public DateOnly? UploadedTo { get; init; }
 
