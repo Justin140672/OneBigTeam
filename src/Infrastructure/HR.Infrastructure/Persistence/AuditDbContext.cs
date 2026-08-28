@@ -11,4 +11,36 @@ internal sealed class AuditDbContext(DbContextOptions<AuditDbContext> options) :
         modelBuilder.HasDefaultSchema("audit");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AuditDbContext).Assembly);
     }
+
+    /// <summary>
+    /// AUD-02: audit records are append-only. Any attempt to update or delete an existing
+    /// audit row through this context is rejected — corrective information must be represented
+    /// by a new audit event, not by mutating history.
+    /// </summary>
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        EnforceAppendOnly();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        EnforceAppendOnly();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void EnforceAppendOnly()
+    {
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new InvalidOperationException(
+                    $"AUD-02: audit records are immutable. " +
+                    $"Attempted {entry.State} on {entry.Entity.GetType().Name}. " +
+                    $"Corrective information must be recorded as a new audit event.");
+            }
+        }
+    }
 }
+
