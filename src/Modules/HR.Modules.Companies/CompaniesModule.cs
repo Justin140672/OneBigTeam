@@ -13,6 +13,7 @@ using HR.Modules.Companies.Features.ForceCustomerReadOnly;
 using HR.Modules.Companies.Features.GetCompany;
 using HR.Modules.Companies.Features.GetCompanySettings;
 using HR.Modules.Companies.Features.GetCompanySettingsHistory;
+using HR.Modules.Companies.Features.GetCompanyAuditLog;
 using HR.Modules.Companies.Features.GetHrSettingsHistory;
 using HR.Modules.Companies.Features.GetCustomerBillingBreakdown;
 using HR.Modules.Companies.Features.GetCustomerBillingHistory;
@@ -264,6 +265,8 @@ public static class CompaniesModule
         services.AddScoped<IValidator<GetCompanySettingsHistoryRequest>, GetCompanySettingsHistoryValidator>();
         services.AddScoped<GetHrSettingsHistoryHandler>();
         services.AddScoped<IValidator<GetHrSettingsHistoryRequest>, GetHrSettingsHistoryValidator>();
+        services.AddScoped<GetCompanyAuditLogHandler>();
+        services.AddScoped<IValidator<GetCompanyAuditLogRequest>, GetCompanyAuditLogValidator>();
         services.AddScoped<IValidator<UploadCompanyLogoRequest>, UploadCompanyLogoValidator>();
 
         // Getting Started checklist task definitions (HR.Modules.CompanyOnboarding epic, Phase A) —

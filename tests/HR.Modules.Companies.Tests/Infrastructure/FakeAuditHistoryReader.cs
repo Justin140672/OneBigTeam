@@ -63,4 +63,23 @@ internal sealed class FakeAuditHistoryReader : IAuditHistoryReader
         return Task.FromResult(new PagedResult<AuditHistoryEntry>(
             items, totalCount, pagination.PageNumber, pagination.PageSize));
     }
+
+    public Task<PagedResult<AuditHistoryEntry>> GetCompanyAuditLogAsync(
+        Guid companyId,
+        Guid? employeeId,
+        DateTimeOffset? fromDate,
+        DateTimeOffset? toDate,
+        string? eventType,
+        Pagination pagination,
+        CancellationToken cancellationToken)
+    {
+        var query = PlatformEntries.Where(e => e.CompanyId == companyId);
+        if (employeeId.HasValue) query = query.Where(e => e.EmployeeId == employeeId);
+        if (fromDate.HasValue)   query = query.Where(e => e.OccurredAt >= fromDate.Value);
+        if (toDate.HasValue)     query = query.Where(e => e.OccurredAt <= toDate.Value);
+        if (!string.IsNullOrWhiteSpace(eventType)) query = query.Where(e => e.EventType == eventType);
+        var all = query.OrderByDescending(e => e.OccurredAt).ToList();
+        var items = all.Skip(pagination.Offset).Take(pagination.PageSize).ToList();
+        return Task.FromResult(new PagedResult<AuditHistoryEntry>(items, all.Count, pagination.PageNumber, pagination.PageSize));
+    }
 }

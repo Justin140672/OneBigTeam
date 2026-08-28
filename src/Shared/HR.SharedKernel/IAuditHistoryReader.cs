@@ -23,6 +23,22 @@ public interface IAuditHistoryReader
         Guid companyId, string entityType, Guid entityId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// AUD-05: tenant-scoped paged audit search for HR Administrators and Company Administrators.
+    /// Unlike <see cref="GetPlatformAuditLogAsync"/>, <paramref name="companyId"/> is mandatory —
+    /// this method enforces the company boundary and must never return rows belonging to a different
+    /// tenant. Supports optional filtering by <paramref name="employeeId"/> (narrows to events linked
+    /// to a specific employee), <paramref name="eventType"/>, and a date window.
+    /// </summary>
+    Task<PagedResult<AuditHistoryEntry>> GetCompanyAuditLogAsync(
+        Guid companyId,
+        Guid? employeeId,
+        DateTimeOffset? fromDate,
+        DateTimeOffset? toDate,
+        string? eventType,
+        Pagination pagination,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Platform-wide (cross-company) paged audit log for the Admin Portal's Platform Audit Log
     /// story. Unlike every overload above, this is not scoped to a single company — companyId here
     /// is an optional filter, not a mandatory tenant boundary, because the caller is always a
