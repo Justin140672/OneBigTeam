@@ -12,6 +12,7 @@ internal sealed class NotificationsDbContext : DbContext
 
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<EmailDelivery> EmailDeliveries => Set<EmailDelivery>();
+    public DbSet<AdministrativeAlert> AdministrativeAlerts => Set<AdministrativeAlert>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

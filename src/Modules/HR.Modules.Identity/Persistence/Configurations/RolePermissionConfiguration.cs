@@ -166,7 +166,11 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
 
             // compliance:view — ADM-02 consolidated Compliance Centre. HR Administrator only;
             // Company Administrator is deliberately excluded (administrative role separation).
-            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.ComplianceView)
+            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.ComplianceView),
+
+            // admin-alerts:view — ADM-03 administrative alerts & incidents inbox. HR Administrator
+            // only; Company Administrator deliberately excluded (administrative role separation).
+            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.AdministrativeAlertsView)
         );
     }
 }

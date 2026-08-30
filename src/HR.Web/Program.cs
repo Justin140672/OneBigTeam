@@ -103,6 +103,7 @@ builder.Services.AddScoped<RecruitmentStageService>();
 builder.Services.AddScoped<UserAdministrationService>();
 builder.Services.AddScoped<DataImportService>();
 builder.Services.AddScoped<ReportingService>();
+builder.Services.AddScoped<AdministrativeAlertsService>();
 builder.Services.AddScoped<CompanyOnboardingService>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<SupportService>();

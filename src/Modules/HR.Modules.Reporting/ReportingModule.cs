@@ -35,6 +35,7 @@ using HR.Modules.Reporting.Features.GetReportCatalog;
 using HR.Modules.Reporting.Features.GetReportFavourites;
 using HR.Modules.Reporting.Features.GetReportViews;
 using HR.Modules.Reporting.Features.GetComplianceCentre;
+using HR.Modules.Reporting.Jobs;
 using HR.Modules.Reporting.Features.GetSicknessReport;
 using HR.Modules.Reporting.Features.GetVacancyPerformanceReport;
 using HR.Modules.Reporting.Features.GetWorkloadActions;
@@ -45,6 +46,8 @@ using HR.Modules.Reporting.Features.SaveReportView;
 using HR.Modules.Reporting.Features.SetDefaultReportView;
 using HR.Modules.Reporting.Persistence;
 using HR.Modules.Reporting.Services;
+using Hangfire;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -65,8 +68,26 @@ public static class ReportingModule
         return services;
     }
 
+    /// <summary>
+    /// ADM-03: daily scan that raises Compliance-category administrative alerts for overdue
+    /// compliance items across every active company. Runs after the document/probation reminder
+    /// jobs (Cron.Daily(12)) so the compliance readers reflect that day's reminder processing.
+    /// </summary>
+    public static WebApplication UseReportingRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        jobManager.AddOrUpdate<GenerateComplianceAlertsJob>(
+            "reporting-compliance-alerts",
+            job => job.ExecuteAsync(),
+            Cron.Daily(12));
+        return app;
+    }
+
     private static void AddFeatureServices(IServiceCollection services)
     {
+        // ADM-03: daily compliance-alert scan.
+        services.AddScoped<GenerateComplianceAlertsJob>();
+
         // REP-06: shared export auditing helper used by every Export*Report handler.
         services.AddScoped<ReportExportAuditor>();
 

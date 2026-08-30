@@ -1,5 +1,7 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.ReportRegistry;
 using HR.SharedKernel;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Reporting.Services;
 
@@ -13,8 +15,10 @@ namespace HR.Modules.Reporting.Services;
 /// </summary>
 internal sealed class ReportExportAuditor(
     IAuditEventPublisher auditPublisher,
+    IAdministrativeAlertWriter administrativeAlertWriter,
     IClock clock,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    ILogger<ReportExportAuditor> logger)
 {
     public Task PublishSuccessAsync(
         Guid companyId,
@@ -26,7 +30,7 @@ internal sealed class ReportExportAuditor(
         CancellationToken cancellationToken)
         => PublishAsync(companyId, reportId, format, rowCount, managerScopeApplied, success: true, failureReason: null, request, cancellationToken);
 
-    public Task PublishFailureAsync(
+    public async Task PublishFailureAsync(
         Guid companyId,
         string reportId,
         string format,
@@ -34,7 +38,35 @@ internal sealed class ReportExportAuditor(
         object request,
         string failureReason,
         CancellationToken cancellationToken)
-        => PublishAsync(companyId, reportId, format, rowCount: null, managerScopeApplied, success: false, failureReason, request, cancellationToken);
+    {
+        await PublishAsync(companyId, reportId, format, rowCount: null, managerScopeApplied, success: false, failureReason, request, cancellationToken);
+
+        // ADM-03: a post-authorization report generation failure is an administrative incident —
+        // surface it in the alerts inbox, grouped per report id. Best-effort: an alert-writer failure
+        // must never mask the original export failure the caller is already handling.
+        try
+        {
+            await administrativeAlertWriter.RaiseAsync(new RaiseAdministrativeAlertCommand(
+                companyId,
+                AdministrativeAlertSeverity.Warning,
+                AdministrativeAlertCategory.ReportGeneration,
+                $"Report generation failed: {reportId}",
+                $"A {format} export of report '{reportId}' failed after authorization ({failureReason}).",
+                new DateTimeOffset(clock.UtcNow, TimeSpan.Zero),
+                DedupKey: $"report-generation:{reportId}",
+                AffectedEntityType: "Report",
+                AffectedEntityId: null,
+                RecommendedAction: "Retry the export; if it keeps failing, review the report's data source.",
+                ActionUrl: null),
+                cancellationToken);
+        }
+        catch (Exception alertEx)
+        {
+            logger.LogWarning(alertEx,
+                "ReportExportAuditor: failed to raise administrative alert for report generation failure of {ReportId}.",
+                reportId);
+        }
+    }
 
     private async Task PublishAsync(
         Guid companyId,

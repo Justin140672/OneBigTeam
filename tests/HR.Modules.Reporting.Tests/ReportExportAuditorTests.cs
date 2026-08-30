@@ -2,6 +2,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.ReportRegistry;
 using HR.Modules.Reporting.Services;
 using HR.Modules.Reporting.Tests.Infrastructure;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Reporting.Tests;
 
@@ -13,9 +14,48 @@ public class ReportExportAuditorTests
 
     private static ReportExportAuditor BuildAuditor(
         out FakeAuditEventPublisher publisher, Guid? actorUserId = null)
+        => BuildAuditor(out publisher, out _, actorUserId);
+
+    private static ReportExportAuditor BuildAuditor(
+        out FakeAuditEventPublisher publisher,
+        out CapturingAdministrativeAlertWriter alertWriter,
+        Guid? actorUserId = null)
     {
         publisher = new FakeAuditEventPublisher();
-        return new ReportExportAuditor(publisher, new FakeClock(FixedUtcNow), new FakeCurrentUser(actorUserId ?? Guid.NewGuid()));
+        alertWriter = new CapturingAdministrativeAlertWriter();
+        return new ReportExportAuditor(
+            publisher,
+            alertWriter,
+            new FakeClock(FixedUtcNow),
+            new FakeCurrentUser(actorUserId ?? Guid.NewGuid()),
+            NullLogger<ReportExportAuditor>.Instance);
+    }
+
+    [Fact]
+    public async Task PublishFailureAsync_Raises_One_ReportGeneration_Administrative_Alert()
+    {
+        var auditor = BuildAuditor(out _, out var alertWriter);
+        var companyId = Guid.NewGuid();
+        var request = new FakeExportRequest(companyId, null, null, ReportExportFormat.Csv);
+
+        await auditor.PublishFailureAsync(companyId, "employee-directory", "Csv", managerScopeApplied: false, request, "boom", CancellationToken.None);
+
+        var command = Assert.Single(alertWriter.Commands);
+        Assert.Equal(companyId, command.CompanyId);
+        Assert.Equal(HR.Infrastructure.Abstractions.AdministrativeAlertCategory.ReportGeneration, command.Category);
+        Assert.Equal("report-generation:employee-directory", command.DedupKey);
+    }
+
+    [Fact]
+    public async Task PublishSuccessAsync_Raises_No_Administrative_Alert()
+    {
+        var auditor = BuildAuditor(out _, out var alertWriter);
+        var companyId = Guid.NewGuid();
+        var request = new FakeExportRequest(companyId, null, null, ReportExportFormat.Csv);
+
+        await auditor.PublishSuccessAsync(companyId, "employee-directory", "Csv", rowCount: 1, managerScopeApplied: false, request, CancellationToken.None);
+
+        Assert.Empty(alertWriter.Commands);
     }
 
     [Fact]

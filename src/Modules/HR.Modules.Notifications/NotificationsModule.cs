@@ -3,8 +3,13 @@ using HR.Modules.Tasks.Contracts;
 using HR.Modules.Notifications.Domain;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.Modules.Notifications.Features.AcknowledgeAdministrativeAlert;
+using HR.Modules.Notifications.Features.GetAdministrativeAlerts;
+using HR.Modules.Notifications.Features.GetAdministrativeAlertUnreadCount;
 using HR.Modules.Notifications.Features.GetMyNotifications;
 using HR.Modules.Notifications.Features.GetUnreadNotificationCount;
+using HR.Modules.Notifications.Features.MarkAdministrativeAlertRead;
+using HR.Modules.Notifications.Features.ResolveAdministrativeAlert;
 using HR.Modules.Notifications.Features.MarkAllNotificationsRead;
 using HR.Modules.Notifications.Features.MarkNotificationRead;
 using HR.Modules.Notifications.Features.NotifyOnCandidateHired;
@@ -31,6 +36,14 @@ public static class NotificationsModule
         services.AddScoped<GetUnreadNotificationCountHandler>();
         services.AddScoped<MarkNotificationReadHandler>();
         services.AddScoped<MarkAllNotificationsReadHandler>();
+
+        // ADM-03: administrative alerts / incidents inbox.
+        services.AddScoped<IAdministrativeAlertWriter, AdministrativeAlertWriter>();
+        services.AddScoped<GetAdministrativeAlertsHandler>();
+        services.AddScoped<GetAdministrativeAlertUnreadCountHandler>();
+        services.AddScoped<MarkAdministrativeAlertReadHandler>();
+        services.AddScoped<AcknowledgeAdministrativeAlertHandler>();
+        services.AddScoped<ResolveAdministrativeAlertHandler>();
 
         // NOT-07: event-driven notification consumers. Notifications is a pure consumer of
         // integration events published by their owning modules (Leave, Employees, Recruitment) —

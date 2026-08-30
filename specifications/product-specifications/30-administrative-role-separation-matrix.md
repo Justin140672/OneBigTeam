@@ -65,6 +65,7 @@ Legend: Y = full access · S = scoped (hierarchy / self / function) · — = den
 | Recruitment — candidate GDPR purge (destructive) | `role:company-administrator` | — | — | — | — | **Y** (governance exception — see below) |
 | HR reports | `reporting:view-hr` | — | — | — | Y | **—** |
 | Compliance Centre (consolidated: expiring visas/certifications, missing & requested documents, probation reviews due/overdue) | `compliance:view` | — | — | — | Y | **—** |
+| Administrative alerts & incidents inbox (ADM-03: compliance alerts, failed report generation, failed integrations / external-service delivery, security alerts; acknowledge / resolve) | `admin-alerts:view` | — | — | — | Y | **—** |
 | Recruitment reports | `reporting:view-recruitment` | — | — | Y | — | **—** |
 | Leave / probation / onboarding / workload reports | `reporting:view-*` | — | S | — | Y | **—** |
 | Reporting catalogue / saved views / favourites | `reporting:view` | — | Y | Y | Y | **—** |
@@ -93,6 +94,7 @@ outcome in the UI, category hidden in navigation) for all of:
 - Leave administration and approval
 - Sickness administration
 - Compliance Centre (`compliance:view`)
+- Administrative alerts & incidents inbox (`admin-alerts:view`)
 - Employee documents administration
 
 They retain: company profile/branding/settings, subscription/billing, onboarding checklist,

@@ -38,10 +38,41 @@ internal sealed class EmailDeliveryJob(
     IUserEmailReader userEmailReader,
     IClock clock,
     IAuditEventPublisher auditPublisher,
+    IAdministrativeAlertWriter administrativeAlertWriter,
     ICompanyNotificationSettingsReader notificationSettingsReader,
     ILogger<EmailDeliveryJob> logger)
 {
     public const int MaxAttempts = 4;
+
+    // ADM-03: a permanently-failed notification email is a failed external-service delivery — surface
+    // it in the administrative alerts inbox. Grouped per company (one recurring alert that counts
+    // occurrences) rather than one alert per failed message. Best-effort: never let alert-raising
+    // break the delivery job's own failure handling / retry semantics.
+    private async Task RaiseDeliveryFailureAlertAsync(Guid companyId, Guid notificationId, string sanitizedReason, DateTimeOffset occurredAt)
+    {
+        try
+        {
+            await administrativeAlertWriter.RaiseAsync(new RaiseAdministrativeAlertCommand(
+                companyId,
+                AdministrativeAlertSeverity.Warning,
+                AdministrativeAlertCategory.IntegrationDelivery,
+                "Notification email delivery is failing",
+                $"At least one notification email could not be delivered ({sanitizedReason}). Most recent failed notification: {notificationId}.",
+                occurredAt,
+                DedupKey: "integration:email-delivery-failure",
+                AffectedEntityType: "EmailDelivery",
+                AffectedEntityId: notificationId,
+                RecommendedAction: "Check the email provider configuration and recipient addresses.",
+                ActionUrl: null),
+                CancellationToken.None);
+        }
+        catch (Exception alertEx)
+        {
+            logger.LogWarning(alertEx,
+                "EmailDeliveryJob: failed to raise administrative alert for delivery failure of notification {NotificationId}.",
+                notificationId);
+        }
+    }
 
     public async Task SendAsync(Guid notificationId, PerformContext? context = null)
     {
@@ -107,6 +138,9 @@ internal sealed class EmailDeliveryJob(
                 delivery.CompanyId, notificationId, notification.EmployeeId,
                 delivery.FailureReason!, clock.UtcNowOffset()), CancellationToken.None);
 
+            await RaiseDeliveryFailureAlertAsync(
+                delivery.CompanyId, notificationId, delivery.FailureReason!, clock.UtcNowOffset());
+
             logger.LogWarning(
                 "EmailDeliveryJob: no email on file for employee {EmployeeId} (notification {NotificationId}) — delivery marked permanently failed.",
                 notification.EmployeeId, notificationId);
@@ -156,6 +190,9 @@ internal sealed class EmailDeliveryJob(
                 await auditPublisher.PublishAsync(new EmailDeliveryFailedAuditEvent(
                     delivery.CompanyId, notificationId, notification.EmployeeId,
                     reason, clock.UtcNowOffset()), CancellationToken.None);
+
+                await RaiseDeliveryFailureAlertAsync(
+                    delivery.CompanyId, notificationId, reason, clock.UtcNowOffset());
 
                 logger.LogError(ex,
                     "EmailDeliveryJob: email delivery permanently failed after {Attempts} attempts for notification {NotificationId}.",

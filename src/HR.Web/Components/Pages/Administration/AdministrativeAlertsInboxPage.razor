@@ -1,0 +1,360 @@
+@page "/companies/{CompanyId:guid}/administrative-alerts"
+@rendermode InteractiveServer
+@using HR.Web.Models
+@using HR.Web.Services
+@inject AdministrativeAlertsService AlertsService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+<PageTitle>Administrative Alerts</PageTitle>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-1">Administrative Alerts &amp; Incidents</h1>
+    <p class="text-muted mb-3">Alerts and incidents raised by background processes — compliance checks, report generation, integration delivery and security events. Acknowledge and resolve items as they are handled.</p>
+
+    @if (_isLoading)
+    {
+        <HrLoadingIndicator Label="Loading administrative alerts…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else
+    {
+        @if (_actionMessage is not null)
+        {
+            <div class="alert alert-warning alert-dismissible">
+                @_actionMessage
+                <button type="button" class="btn-close" @onclick="@(() => _actionMessage = null)"></button>
+            </div>
+        }
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <div class="card"><div class="card-body"><div class="text-muted small">Unread</div><div class="fs-4 text-primary">@_unreadCount</div></div></div>
+            </div>
+            <div class="col-md-4">
+                <div class="card"><div class="card-body"><div class="text-muted small">Open</div><div class="fs-4 text-warning">@_openCount</div></div></div>
+            </div>
+            <div class="col-md-4">
+                <div class="card"><div class="card-body"><div class="text-muted small">Critical</div><div class="fs-4 text-danger">@_criticalCount</div></div></div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Severity</label>
+                        <SfDropDownList TValue="string?" TItem="FilterOption"
+                                        DataSource="@_severityOptions"
+                                        Value="@_severity"
+                                        ValueChanged="OnSeverityChangedAsync">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Category</label>
+                        <SfDropDownList TValue="string?" TItem="FilterOption"
+                                        DataSource="@_categoryOptions"
+                                        Value="@_category"
+                                        ValueChanged="OnCategoryChangedAsync">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Status</label>
+                        <SfDropDownList TValue="string?" TItem="FilterOption"
+                                        DataSource="@_statusOptions"
+                                        Value="@_status"
+                                        ValueChanged="OnStatusChangedAsync">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <SfCheckBox TChecked="bool" Label="Unread only" Checked="@_unreadOnly" ValueChange="OnUnreadOnlyChangedAsync" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Occurred from</label>
+                        <SfDatePicker TValue="DateOnly?" Value="@_occurredFrom" ValueChanged="OnOccurredFromChangedAsync" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Occurred to</label>
+                        <SfDatePicker TValue="DateOnly?" Value="@_occurredTo" ValueChanged="OnOccurredToChangedAsync" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
+                    </div>
+                    <div class="col-md-auto d-flex align-items-end">
+                        <SfButton OnClick="ClearFiltersAsync">Clear</SfButton>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (_items.Count == 0)
+        {
+            <div class="alert alert-success">
+                <strong>No administrative alerts.</strong> There is nothing to review for the current filters.
+            </div>
+        }
+        else
+        {
+            <HrGrid TValue="AdministrativeAlertRowModel"
+                    DataSource="@_items"
+                    AllowPaging="true"
+                    AllowSorting="true">
+                <GridColumns>
+                    <GridColumn HeaderText="Severity" Width="110">
+                        <Template>
+                            @{ var a = (AdministrativeAlertRowModel)context; }
+                            <span class="@SeverityBadgeClass(a.Severity)">@a.Severity</span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn Field="@nameof(AdministrativeAlertRowModel.Category)" HeaderText="Category" Width="150" />
+                    <GridColumn HeaderText="Summary" Width="280">
+                        <Template>
+                            @{ var a = (AdministrativeAlertRowModel)context; }
+                            <div class="@(a.IsRead ? "" : "fw-bold")">@a.Summary</div>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn Field="@nameof(AdministrativeAlertRowModel.OccurrenceCount)" HeaderText="Occurrences" Width="110" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+                    <GridColumn Field="@nameof(AdministrativeAlertRowModel.LastOccurredAt)" HeaderText="Last occurred" Width="150" Format="g" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+                    <GridColumn HeaderText="Status" Width="120">
+                        <Template>
+                            @{ var a = (AdministrativeAlertRowModel)context; }
+                            <span class="@StatusBadgeClass(a.Status)">@a.Status</span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn HeaderText="Actions" Width="260">
+                        <Template>
+                            @{ var a = (AdministrativeAlertRowModel)context; }
+                            <div class="d-flex flex-wrap gap-1">
+                                @if (!string.IsNullOrWhiteSpace(a.ActionUrl))
+                                {
+                                    <SfButton CssClass="e-small" OnClick="@(() => Open(a))">Open</SfButton>
+                                }
+                                @if (a.Status == "Open")
+                                {
+                                    <SfButton CssClass="e-small" Disabled="_busy" OnClick="@(() => AcknowledgeAsync(a))">Acknowledge</SfButton>
+                                }
+                                @if (a.Status != "Resolved")
+                                {
+                                    <SfButton CssClass="e-small" Disabled="_busy" OnClick="@(() => OpenResolveDialog(a))">Resolve</SfButton>
+                                }
+                                @if (!a.IsRead)
+                                {
+                                    <SfButton CssClass="e-small e-outline" Disabled="_busy" OnClick="@(() => MarkReadAsync(a))">Mark read</SfButton>
+                                }
+                            </div>
+                        </Template>
+                    </GridColumn>
+                </GridColumns>
+            </HrGrid>
+
+            <div class="mt-3">@_totalCount alert(s)</div>
+        }
+    }
+</div>
+
+<SfDialog Visible="_resolveOpen" IsModal="true" Width="460px" ShowCloseIcon="true">
+    <DialogTemplates>
+        <Header>Resolve alert</Header>
+        <Content>
+            <p class="text-muted">Optionally record a note describing how this alert was resolved.</p>
+            <HrTextBox @bind-Value="_resolutionNote" Multiline="true" Rows="4" Maxlength="1000" Placeholder="Resolution note (optional)…" />
+        </Content>
+        <FooterTemplate>
+            <SfButton CssClass="e-primary" Disabled="_busy" OnClick="ConfirmResolveAsync">Resolve</SfButton>
+            <SfButton Disabled="_busy" OnClick="CancelResolve">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private const int PageSize = 50;
+
+    private List<AdministrativeAlertRowModel> _items = [];
+    private int _totalCount;
+    private int _unreadCount;
+    private int _openCount;
+    private int _criticalCount;
+
+    private bool _isLoading = true;
+    private bool _busy;
+    private string? _error;
+    private string? _actionMessage;
+
+    private string? _severity;
+    private string? _category;
+    private string? _status;
+    private bool _unreadOnly;
+    private DateOnly? _occurredFrom;
+    private DateOnly? _occurredTo;
+
+    private bool _resolveOpen;
+    private string? _resolutionNote;
+    private AdministrativeAlertRowModel? _resolveTarget;
+
+    private sealed record FilterOption(string? Value, string Label);
+
+    private static readonly FilterOption[] _severityOptions =
+    [
+        new(null, "All severities"),
+        new("Info", "Info"),
+        new("Warning", "Warning"),
+        new("Critical", "Critical"),
+    ];
+
+    private static readonly FilterOption[] _categoryOptions =
+    [
+        new(null, "All categories"),
+        new("Compliance", "Compliance"),
+        new("ReportGeneration", "Report generation"),
+        new("IntegrationDelivery", "Integration delivery"),
+        new("Security", "Security"),
+    ];
+
+    private static readonly FilterOption[] _statusOptions =
+    [
+        new(null, "All statuses"),
+        new("Open", "Open"),
+        new("Acknowledged", "Acknowledged"),
+        new("Resolved", "Resolved"),
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!AppSession.GuardAccess(Navigation, Session.CanViewAdminAlerts))
+            return;
+
+        await LoadAsync();
+    }
+
+    private AdministrativeAlertFilter BuildFilter() => new(
+        Severity: _severity,
+        Category: _category,
+        Status: _status,
+        IsRead: _unreadOnly ? false : null,
+        OccurredFrom: _occurredFrom,
+        OccurredTo: _occurredTo);
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+
+        var response = await AlertsService.GetAlertsAsync(CompanyId, BuildFilter(), pageNumber: 1, pageSize: PageSize);
+        if (response is null)
+        {
+            _error = "Failed to load administrative alerts.";
+        }
+        else
+        {
+            _items = response.Items;
+            _totalCount = response.TotalCount;
+            _unreadCount = response.UnreadCount;
+            _openCount = _items.Count(i => i.Status == "Open");
+            _criticalCount = _items.Count(i => i.Severity == "Critical");
+        }
+
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task OnSeverityChangedAsync(string? value) { _severity = value; await LoadAsync(); }
+    private async Task OnCategoryChangedAsync(string? value) { _category = value; await LoadAsync(); }
+    private async Task OnStatusChangedAsync(string? value) { _status = value; await LoadAsync(); }
+    private async Task OnUnreadOnlyChangedAsync(Syncfusion.Blazor.Buttons.ChangeEventArgs<bool> args) { _unreadOnly = args.Checked; await LoadAsync(); }
+    private async Task OnOccurredFromChangedAsync(DateOnly? value) { _occurredFrom = value; await LoadAsync(); }
+    private async Task OnOccurredToChangedAsync(DateOnly? value) { _occurredTo = value; await LoadAsync(); }
+
+    private async Task ClearFiltersAsync()
+    {
+        _severity = null;
+        _category = null;
+        _status = null;
+        _unreadOnly = false;
+        _occurredFrom = null;
+        _occurredTo = null;
+        await LoadAsync();
+    }
+
+    private void Open(AdministrativeAlertRowModel alert)
+    {
+        if (!string.IsNullOrWhiteSpace(alert.ActionUrl))
+            Navigation.NavigateTo(alert.ActionUrl);
+    }
+
+    private async Task MarkReadAsync(AdministrativeAlertRowModel alert)
+        => await RunActionAsync(() => AlertsService.MarkReadAsync(CompanyId, alert.Id));
+
+    private async Task AcknowledgeAsync(AdministrativeAlertRowModel alert)
+        => await RunActionAsync(() => AlertsService.AcknowledgeAsync(CompanyId, alert.Id));
+
+    private void OpenResolveDialog(AdministrativeAlertRowModel alert)
+    {
+        _resolveTarget = alert;
+        _resolutionNote = null;
+        _resolveOpen = true;
+    }
+
+    private void CancelResolve()
+    {
+        _resolveOpen = false;
+        _resolveTarget = null;
+        _resolutionNote = null;
+    }
+
+    private async Task ConfirmResolveAsync()
+    {
+        if (_resolveTarget is null) return;
+        var target = _resolveTarget;
+        var note = _resolutionNote;
+        _resolveOpen = false;
+        await RunActionAsync(() => AlertsService.ResolveAsync(CompanyId, target.Id, note));
+        _resolveTarget = null;
+        _resolutionNote = null;
+    }
+
+    private async Task RunActionAsync(Func<Task<AdministrativeAlertActionResult>> action)
+    {
+        _busy = true;
+        _actionMessage = null;
+        StateHasChanged();
+
+        var result = await action();
+        _busy = false;
+
+        switch (result)
+        {
+            case AdministrativeAlertActionResult.Conflict:
+                _actionMessage = "Alert already updated. The list has been refreshed.";
+                break;
+            case AdministrativeAlertActionResult.NotFound:
+                _actionMessage = "That alert could not be found. The list has been refreshed.";
+                break;
+            case AdministrativeAlertActionResult.Failed:
+                _actionMessage = "That action could not be completed. Please try again.";
+                break;
+        }
+
+        await LoadAsync();
+    }
+
+    private static string SeverityBadgeClass(string severity) => severity switch
+    {
+        "Critical" => "badge bg-danger",
+        "Warning" => "badge bg-warning text-dark",
+        _ => "badge bg-secondary",
+    };
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Open" => "badge bg-warning text-dark",
+        "Acknowledged" => "badge bg-info text-dark",
+        "Resolved" => "badge bg-success",
+        _ => "badge bg-secondary",
+    };
+}

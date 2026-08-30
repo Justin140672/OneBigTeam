@@ -1,5 +1,7 @@
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Identity.Authorization;
 
@@ -21,6 +23,8 @@ internal sealed class PermissionAuthorizationHandler(
     AppAuthorizationService authorizationService,
     PermissionDenialAuditThrottle denialThrottle,
     IAuditEventPublisher auditEventPublisher,
+    IAdministrativeAlertWriter administrativeAlertWriter,
+    ILogger<PermissionAuthorizationHandler> logger,
     IClock clock) : AuthorizationHandler<PermissionRequirement>
 {
     protected override async Task HandleRequirementAsync(
@@ -46,6 +50,36 @@ internal sealed class PermissionAuthorizationHandler(
                 new PermissionDeniedAuditEvent(
                     companyId, currentUser.UserId.Value, requirement.PermissionId, count, isEscalation, clock.UtcNowOffset()),
                 CancellationToken.None);
+
+            // ADM-03: a repeated-denial escalation is a security-relevant event — surface it in the
+            // administrative alerts inbox (grouped per user). Best-effort: never let alert-raising
+            // affect the authorization outcome. Only on the throttle's escalation signal, so routine
+            // one-off denials never create alerts.
+            if (isEscalation)
+            {
+                try
+                {
+                    await administrativeAlertWriter.RaiseAsync(new RaiseAdministrativeAlertCommand(
+                        companyId,
+                        AdministrativeAlertSeverity.Warning,
+                        AdministrativeAlertCategory.Security,
+                        "Repeated access denials for a user",
+                        $"User {currentUser.UserId.Value} has been repeatedly denied access to a protected resource ({count} denials in the current window).",
+                        clock.UtcNowOffset(),
+                        DedupKey: $"security:repeated-denial:{currentUser.UserId.Value}",
+                        AffectedEntityType: "ApplicationUser",
+                        AffectedEntityId: currentUser.UserId.Value,
+                        RecommendedAction: "Review this user's role assignments and recent activity.",
+                        ActionUrl: null),
+                        CancellationToken.None);
+                }
+                catch (Exception alertEx)
+                {
+                    logger.LogWarning(alertEx,
+                        "PermissionAuthorizationHandler: failed to raise administrative alert for repeated access denials by user {UserId}.",
+                        currentUser.UserId.Value);
+                }
+            }
         }
     }
 }

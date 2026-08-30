@@ -34,13 +34,15 @@ public class EmailDeliveryJobTests
         FakeEmailSender emailSender,
         FakeUserEmailReader? userEmailReader = null,
         FakeAuditPublisher? auditPublisher = null,
-        FakeCompanyNotificationSettingsReader? notificationSettingsReader = null) =>
+        FakeCompanyNotificationSettingsReader? notificationSettingsReader = null,
+        CapturingAdministrativeAlertWriter? administrativeAlertWriter = null) =>
         new(
             db,
             emailSender,
             userEmailReader ?? new FakeUserEmailReader(),
             new FakeClock(FixedUtcNow),
             auditPublisher ?? new FakeAuditPublisher(),
+            administrativeAlertWriter ?? new CapturingAdministrativeAlertWriter(),
             notificationSettingsReader ?? new FakeCompanyNotificationSettingsReader(),
             new FakeLogger<EmailDeliveryJob>());
 
@@ -400,5 +402,44 @@ public class EmailDeliveryJobTests
         Assert.Equal(EmailDeliveryStatus.Failed,        stored.Status);
         Assert.Equal("Notification no longer exists.",  stored.FailureReason);
         Assert.Empty(emailSender.Calls);
+    }
+
+    // ADM-03: permanent delivery failures surface in the administrative alerts inbox --------------
+
+    [Fact]
+    public async Task SendAsync_No_Recipient_Email_Raises_Exactly_One_IntegrationDelivery_Alert()
+    {
+        await using var db  = BuildContext();
+        var companyId        = Guid.NewGuid();
+        var notificationId   = Guid.NewGuid();
+        await SeedPendingDelivery(db, companyId, notificationId);
+        var alertWriter       = new CapturingAdministrativeAlertWriter();
+        var job                = BuildJob(db, new FakeEmailSender(), new FakeUserEmailReader(email: null),
+            administrativeAlertWriter: alertWriter);
+
+        await job.SendAsync(notificationId);
+
+        var command = Assert.Single(alertWriter.Commands);
+        Assert.Equal(companyId, command.CompanyId);
+        Assert.Equal(AdministrativeAlertCategory.IntegrationDelivery, command.Category);
+        Assert.Equal(AdministrativeAlertSeverity.Warning, command.Severity);
+        Assert.Equal("integration:email-delivery-failure", command.DedupKey);
+        Assert.Equal(notificationId, command.AffectedEntityId);
+    }
+
+    [Fact]
+    public async Task SendAsync_Transient_Retryable_Failure_Does_Not_Raise_An_Administrative_Alert()
+    {
+        await using var db  = BuildContext();
+        var companyId        = Guid.NewGuid();
+        var notificationId   = Guid.NewGuid();
+        await SeedPendingDelivery(db, companyId, notificationId);
+        var alertWriter       = new CapturingAdministrativeAlertWriter();
+        var job                = BuildJob(db, new FakeEmailSender(failuresBeforeSuccess: int.MaxValue),
+            administrativeAlertWriter: alertWriter);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => job.SendAsync(notificationId));
+
+        Assert.Empty(alertWriter.Commands);
     }
 }

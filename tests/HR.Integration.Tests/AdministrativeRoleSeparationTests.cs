@@ -503,6 +503,37 @@ public class AdministrativeRoleSeparationTests
     }
 
     // ---------------------------------------------------------------------
+    // Administrative alerts inbox  (admin-alerts:view)
+    // GET /api/companies/{companyId}/administrative-alerts
+    // ---------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(Employee)]
+    [InlineData(Manager)]
+    [InlineData(Recruiter)]
+    [InlineData(CompanyAdmin)]
+    public async Task AdministrativeAlerts_IsForbidden_ForEveryRoleExceptHrAdministrator(string roleKey)
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientFor(roleKey, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/administrative-alerts");
+
+        AssertForbidden(response);
+    }
+
+    [Fact]
+    public async Task AdministrativeAlerts_IsAllowed_ForHrAdministrator()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientFor(HrAdmin, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/administrative-alerts");
+
+        AssertReachedHandler(response);
+    }
+
+    // ---------------------------------------------------------------------
     // Anonymous (no auth header) -> 401 across a sample of protected endpoints
     // ---------------------------------------------------------------------
 

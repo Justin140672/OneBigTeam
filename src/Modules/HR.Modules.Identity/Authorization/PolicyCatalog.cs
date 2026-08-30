@@ -62,5 +62,7 @@ internal static class PolicyCatalog
         ["reporting:view-workload-actions"] = SystemPermissions.ReportingViewWorkloadActions,
         // ADM-02: consolidated Compliance Centre — HR Administrator only.
         ["compliance:view"] = SystemPermissions.ComplianceView,
+        // ADM-03: administrative alerts & incidents inbox — HR Administrator only.
+        ["admin-alerts:view"] = SystemPermissions.AdministrativeAlertsView,
     };
 }

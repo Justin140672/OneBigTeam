@@ -93,4 +93,10 @@ internal static class SystemPermissions
     // compliance (ADM-02: consolidated Compliance Centre — authoritative HR-administrator gate,
     // deliberately not granted to Company Administrator per the administrative role separation matrix)
     public static readonly Guid ComplianceView = new("00000000-0000-0000-0001-000000000043");
+
+    // administrative alerts (ADM-03: administrative alerts & incidents inbox — compliance,
+    // failed report generation, failed integrations/external-service delivery, security alerts.
+    // HR Administrator only; Company Administrator deliberately excluded per the administrative
+    // role separation matrix, same as compliance:view above.)
+    public static readonly Guid AdministrativeAlertsView = new("00000000-0000-0000-0001-000000000044");
 }

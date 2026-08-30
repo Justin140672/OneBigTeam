@@ -759,6 +759,7 @@ app.UseOnboardingRecurringJobs();
 app.UseOffboardingRecurringJobs();
 app.UseDocumentsRecurringJobs();
 app.UseLeaveRecurringJobs();
+app.UseReportingRecurringJobs();
 app.UseLoggingMiddleware();
 app.UseRouting();
 app.UseRateLimiter();
