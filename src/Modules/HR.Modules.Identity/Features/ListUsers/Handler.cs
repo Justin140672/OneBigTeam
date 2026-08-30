@@ -10,7 +10,8 @@ namespace HR.Modules.Identity.Features.ListUsers;
 internal sealed class ListUsersHandler(
     IdentityDbContext db,
     IEmployeeNameReader employeeNameReader,
-    IEmployeeAudienceReader employeeAudienceReader)
+    IEmployeeAudienceReader employeeAudienceReader,
+    IPositionProfileReader positionProfileReader)
 {
     public async Task<Result<ListUsersResponse>> HandleAsync(ListUsersRequest request, CancellationToken cancellationToken)
     {
@@ -59,6 +60,18 @@ internal sealed class ListUsersHandler(
 
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, employeeIds, cancellationToken);
 
+        // ADM-01: surface each linked employee's current position on the list.
+        var audienceProfiles = await employeeAudienceReader.GetEmployeeAudienceProfilesAsync(
+            request.CompanyId, employeeIds, cancellationToken);
+        var positionProfileIdByEmployee = audienceProfiles
+            .Where(kvp => kvp.Value.PositionProfileId is not null)
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.PositionProfileId!.Value);
+        var distinctPositionProfileIds = positionProfileIdByEmployee.Values.Distinct().ToList();
+        var positionTitleById = distinctPositionProfileIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : (await positionProfileReader.GetSummariesAsync(request.CompanyId, distinctPositionProfileIds, cancellationToken))
+                .ToDictionary(p => p.Id, p => p.Title);
+
         var rows = new List<UserAdministrationListItem>();
 
         foreach (var employeeId in employeeIds)
@@ -104,6 +117,12 @@ internal sealed class ListUsersHandler(
 
             var email = user?.Email ?? profile?.Email ?? invite?.Email ?? string.Empty;
 
+            positionProfileIdByEmployee.TryGetValue(employeeId, out var positionProfileId);
+            var positionTitle = positionProfileId != Guid.Empty
+                && positionTitleById.TryGetValue(positionProfileId, out var t)
+                    ? t
+                    : null;
+
             rows.Add(new UserAdministrationListItem(
                 employeeId,
                 user?.Id ?? profile?.Id,
@@ -115,7 +134,9 @@ internal sealed class ListUsersHandler(
                 invitationStatus,
                 invite?.Id,
                 user?.LastLoginAt,
-                invite?.CreatedAt ?? user?.CreatedAt ?? profile?.CreatedAt ?? DateTimeOffset.UtcNow));
+                invite?.CreatedAt ?? user?.CreatedAt ?? profile?.CreatedAt ?? DateTimeOffset.UtcNow,
+                positionProfileId == Guid.Empty ? null : positionProfileId,
+                positionTitle));
         }
 
         if (!string.IsNullOrWhiteSpace(request.Search))

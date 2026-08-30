@@ -47,7 +47,7 @@ public class ListUsersValidatorTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(201)]
+    [InlineData(2001)]
     public void Validate_Fails_When_PageSize_Out_Of_Range(int pageSize)
     {
         var validator = new ListUsersValidator();
@@ -61,7 +61,7 @@ public class ListUsersValidatorTests
 
     [Theory]
     [InlineData(1)]
-    [InlineData(200)]
+    [InlineData(2000)]
     public void Validate_Passes_When_PageSize_Is_At_Inclusive_Bounds(int pageSize)
     {
         var validator = new ListUsersValidator();

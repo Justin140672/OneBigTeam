@@ -1,0 +1,259 @@
+@inject UserAdministrationService UserAdministrationService
+
+<SfDialog Visible="IsOpen" IsModal="true" Width="620px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Invite User</Header>
+        <Content>
+            <ol class="wizard-steps">
+                @for (var i = 1; i <= 4; i++)
+                {
+                    var stepIndex = i;
+                    <li class="@StepClass(stepIndex)">
+                        <span class="wizard-step-number">@stepIndex</span>
+                        <span class="wizard-step-label">@StepLabel(stepIndex)</span>
+                    </li>
+                }
+            </ol>
+
+            @if (_loading)
+            {
+                <HrLoadingIndicator Label="Loading employees…" />
+            }
+            else if (_step == 1)
+            {
+                @if (_candidates.Count == 0)
+                {
+                    <div class="alert alert-info mb-0">
+                        All current employees already have an account or a pending invitation.
+                    </div>
+                }
+                else
+                {
+                    <div class="mb-2">
+                        <label class="form-label">Employee <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid?" TItem="InvitableEmployeeModel"
+                                        DataSource="@_candidates"
+                                        @bind-Value="_selectedEmployeeId"
+                                        Placeholder="Select an employee"
+                                        AllowFiltering="true">
+                            <DropDownListFieldSettings Value="EmployeeId" Text="Name" />
+                        </SfDropDownList>
+                    </div>
+                }
+            }
+            else if (_step == 2)
+            {
+                <div class="mb-2">
+                    <label class="form-label">Work email <span class="text-danger">*</span></label>
+                    <HrTextBox @bind-Value="_email" Placeholder="name@company.com" />
+                    @if (string.IsNullOrWhiteSpace(SelectedCandidate?.WorkEmail))
+                    {
+                        <div class="form-text">
+                            This employee has no work email on file. Enter an address to send the invitation to.
+                        </div>
+                    }
+                </div>
+            }
+            else if (_step == 3)
+            {
+                <label class="form-label">Roles <span class="text-danger">*</span></label>
+                <div class="mb-2">
+                    <span class="badge bg-secondary-subtle text-secondary-emphasis">Employee</span>
+                    <span class="text-muted small ms-1">— every user always has this role</span>
+                </div>
+                <table class="table table-sm table-borderless mb-0">
+                    <tbody>
+                        @foreach (var role in _additionalRoleOptions)
+                        {
+                            <tr>
+                                <td class="ps-0 wizard-role-check">
+                                    <input type="checkbox"
+                                           class="form-check-input"
+                                           id="@($"wizard-role-{role.Id}")"
+                                           checked="@_selectedAdditionalRoleIds.Contains(role.Id)"
+                                           @onchange="@(e => OnRoleCheckedChanged(role.Id, e.Value is bool b && b))" />
+                                </td>
+                                <td class="align-middle">
+                                    <label class="form-check-label mb-0" for="@($"wizard-role-{role.Id}")">@role.Name</label>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else if (_step == 4)
+            {
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Employee</dt>
+                    <dd class="col-sm-8">@SelectedCandidate?.Name</dd>
+                    <dt class="col-sm-4 text-muted fw-normal">Position</dt>
+                    <dd class="col-sm-8">@(string.IsNullOrEmpty(SelectedCandidate?.PositionTitle) ? "—" : SelectedCandidate!.PositionTitle)</dd>
+                    <dt class="col-sm-4 text-muted fw-normal">Work email</dt>
+                    <dd class="col-sm-8">@_email</dd>
+                    <dt class="col-sm-4 text-muted fw-normal">Roles</dt>
+                    <dd class="col-sm-8">
+                        @foreach (var name in AllSelectedRoleNames)
+                        {
+                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-1">@name</span>
+                        }
+                    </dd>
+                </dl>
+            }
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="alert alert-danger py-2 mt-3 mb-0">@_error</div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton Disabled="@(_step == 1 || _submitting)" OnClick="Back">Back</SfButton>
+            @if (_step < 4)
+            {
+                <SfButton IsPrimary="true" Disabled="@(!CanAdvance || _submitting)" OnClick="Next">Next</SfButton>
+            }
+            else
+            {
+                <SfButton IsPrimary="true" Disabled="@_submitting" OnClick="SendAsync">
+                    @if (_submitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Send invitation
+                </SfButton>
+            }
+            <SfButton Disabled="@_submitting" OnClick="CancelAsync">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private bool _wasOpen;
+    private bool _loading;
+    private bool _submitting;
+    private string? _error;
+    private int _step = 1;
+
+    private List<InvitableEmployeeModel> _candidates = [];
+    private Guid? _selectedEmployeeId;
+    private string _email = string.Empty;
+    private List<Guid> _selectedAdditionalRoleIds = [];
+
+    private readonly List<RoleOption> _additionalRoleOptions =
+        SystemRoleOptions.All.Where(r => r.Id != SystemRoleOptions.EmployeeRoleId).ToList();
+
+    private InvitableEmployeeModel? SelectedCandidate =>
+        _candidates.FirstOrDefault(c => c.EmployeeId == _selectedEmployeeId);
+
+    private List<Guid> AllSelectedRoleIds =>
+        _selectedAdditionalRoleIds.Prepend(SystemRoleOptions.EmployeeRoleId).Distinct().ToList();
+
+    private IEnumerable<string> AllSelectedRoleNames =>
+        AllSelectedRoleIds.Select(SystemRoleOptions.NameFor);
+
+    private bool CanAdvance => _step switch
+    {
+        1 => _selectedEmployeeId is not null,
+        2 => !string.IsNullOrWhiteSpace(_email),
+        3 => true,
+        _ => false,
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && !_wasOpen)
+        {
+            _wasOpen = true;
+            await ResetAsync();
+        }
+        else if (!IsOpen)
+        {
+            _wasOpen = false;
+        }
+    }
+
+    private async Task ResetAsync()
+    {
+        _step = 1;
+        _selectedEmployeeId = null;
+        _email = string.Empty;
+        _selectedAdditionalRoleIds = [];
+        _error = null;
+        _submitting = false;
+        _loading = true;
+        _candidates = await UserAdministrationService.GetInvitableEmployeesAsync(CompanyId) ?? [];
+        _loading = false;
+    }
+
+    private static string StepLabel(int step) => step switch
+    {
+        1 => "Employee",
+        2 => "Email",
+        3 => "Roles",
+        _ => "Review",
+    };
+
+    private string StepClass(int step) =>
+        step == _step ? "active" : step < _step ? "done" : string.Empty;
+
+    private void OnRoleCheckedChanged(Guid roleId, bool isChecked)
+    {
+        if (isChecked)
+        {
+            if (!_selectedAdditionalRoleIds.Contains(roleId))
+                _selectedAdditionalRoleIds.Add(roleId);
+        }
+        else
+        {
+            _selectedAdditionalRoleIds.Remove(roleId);
+        }
+    }
+
+    private void Next()
+    {
+        if (!CanAdvance) return;
+
+        if (_step == 1)
+            _email = SelectedCandidate?.WorkEmail ?? string.Empty;
+
+        _error = null;
+        if (_step < 4) _step++;
+    }
+
+    private void Back()
+    {
+        _error = null;
+        if (_step > 1) _step--;
+    }
+
+    private async Task SendAsync()
+    {
+        if (_selectedEmployeeId is null || string.IsNullOrWhiteSpace(_email))
+        {
+            _error = "Select an employee and enter a work email before sending.";
+            return;
+        }
+
+        _submitting = true;
+        _error = null;
+
+        var (result, error) = await UserAdministrationService.InviteEmployeeUserAsync(
+            CompanyId, _selectedEmployeeId.Value, _email.Trim(), AllSelectedRoleIds);
+
+        _submitting = false;
+
+        if (result is null)
+        {
+            _error = error ?? "Failed to send the invitation.";
+            return;
+        }
+
+        await OnCompleted.InvokeAsync();
+    }
+
+    private async Task CancelAsync() => await OnCancelled.InvokeAsync();
+}

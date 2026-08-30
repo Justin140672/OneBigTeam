@@ -152,6 +152,78 @@ public class UserAdministrationAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    // ── Cross-company: an HR Administrator for company A cannot act on company B ──────────────
+    // TenantRouteAuthorizationMiddleware rejects any {companyId} route whose GUID isn't the
+    // caller's own tenant with 403, before the endpoint's own policy/handler runs.
+
+    [Fact]
+    public async Task HrAdministrator_Cannot_List_Invitable_Employees_For_Another_Company()
+    {
+        var ownCompanyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        using var client = await ClientFor(LauraBennettHrAdmin, ownCompanyId);
+
+        var response = await client.GetAsync($"/api/companies/{otherCompanyId}/users/invitable-employees");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task HrAdministrator_Cannot_Invite_User_For_Another_Company()
+    {
+        var ownCompanyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        using var client = await ClientFor(LauraBennettHrAdmin, ownCompanyId);
+        var employeeId = Guid.NewGuid();
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{otherCompanyId}/employees/{employeeId}/invite-user",
+            new { companyId = otherCompanyId, employeeId, email = "x@test.com", roleIds = new[] { Guid.NewGuid() } });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task HrAdministrator_Cannot_Disable_User_For_Another_Company()
+    {
+        var ownCompanyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        using var client = await ClientFor(LauraBennettHrAdmin, ownCompanyId);
+
+        var response = await client.PostAsync(
+            $"/api/companies/{otherCompanyId}/users/{Guid.NewGuid()}/disable", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task HrAdministrator_Cannot_Reactivate_User_For_Another_Company()
+    {
+        var ownCompanyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        using var client = await ClientFor(LauraBennettHrAdmin, ownCompanyId);
+
+        var response = await client.PostAsync(
+            $"/api/companies/{otherCompanyId}/users/{Guid.NewGuid()}/enable", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task HrAdministrator_Cannot_Assign_Roles_For_Another_Company()
+    {
+        var ownCompanyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        using var client = await ClientFor(LauraBennettHrAdmin, ownCompanyId);
+        var userId = Guid.NewGuid();
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{otherCompanyId}/users/{userId}/roles",
+            new { companyId = otherCompanyId, userId, roleIds = new[] { Guid.NewGuid() } });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     [Fact]
     public async Task HrAdministrator_Persona_Can_Access_ListUsers()
     {

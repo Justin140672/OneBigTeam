@@ -131,6 +131,49 @@ public class ListUsersEndpointTests
     }
 
     [Fact]
+    public async Task Get_ListUsers_Includes_PositionTitle_For_User_Linked_To_Employee_With_A_Position()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        // SeedEmployeeAsync always links the employee to a seeded PositionProfile (title "Role-...").
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Positioned", "Person");
+        await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, employeeId, "positioned@test.com");
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/users");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        var item = Assert.Single(payload!.Items);
+        Assert.NotNull(item.PositionProfileId);
+        Assert.False(string.IsNullOrWhiteSpace(item.PositionTitle));
+        Assert.StartsWith("Role-", item.PositionTitle);
+    }
+
+    [Fact]
+    public async Task Get_ListUsers_Reports_Accurate_TotalCount_And_RoundTrips_Paging()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        for (var i = 0; i < 3; i++)
+        {
+            var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Pager", $"Person{i}");
+            await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, employeeId, $"pager{i}@test.com");
+        }
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/users?page=1&pageSize=2");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(3, payload!.TotalCount);
+        Assert.Equal(2, payload.Items.Count);
+        Assert.Equal(1, payload.Page);
+        Assert.Equal(2, payload.PageSize);
+    }
+
+    [Fact]
     public async Task Get_ListUsers_Returns_UnprocessableEntity_For_Invalid_PageSize()
     {
         var companyId = Guid.NewGuid();
@@ -153,5 +196,7 @@ public class ListUsersEndpointTests
         string AccountStatus,
         string InvitationStatus,
         DateTimeOffset? LastLoginAt,
-        DateTimeOffset CreatedAt);
+        DateTimeOffset CreatedAt,
+        Guid? PositionProfileId,
+        string? PositionTitle);
 }

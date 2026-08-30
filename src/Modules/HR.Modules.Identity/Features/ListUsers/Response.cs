@@ -26,7 +26,12 @@ internal sealed record UserAdministrationListItem(
     string InvitationStatus,
     Guid? InviteId,
     DateTimeOffset? LastLoginAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    // The linked employee's current position (ADM-01). PositionProfileId is null only when the
+    // employee record can't be resolved via the cross-module reader; PositionTitle is null when
+    // the position profile itself no longer resolves.
+    Guid? PositionProfileId = null,
+    string? PositionTitle = null);
 
 internal sealed record ListUsersResponse(
     IReadOnlyList<UserAdministrationListItem> Items,

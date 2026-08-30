@@ -51,7 +51,7 @@
                     AllowPaging="true"
                     AllowSorting="true"
                     AllowFiltering="true">
-                <GridEvents TValue="UserListItemModel" OnToolbarClick="OnToolbarClick"
+                <GridEvents TValue="UserListItemModel" OnToolbarClick="HandleToolbarClick"
                             RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
                 <GridPageSettings PageSize="20" />
                 <GridColumns>
@@ -64,6 +64,14 @@
                         </Template>
                     </GridColumn>
                     <GridColumn Field="@nameof(UserListItemModel.Email)" HeaderText="Email" Width="220" />
+                    <GridColumn Field="@nameof(UserListItemModel.PositionTitle)" HeaderText="Position" Width="180">
+                        <Template>
+                            @{
+                                var row = (context as UserListItemModel)!;
+                            }
+                            @(string.IsNullOrEmpty(row.PositionTitle) ? "—" : row.PositionTitle)
+                        </Template>
+                    </GridColumn>
                     <GridColumn HeaderText="Roles" Width="220" AllowSorting="false" AllowFiltering="false">
                         <Template>
                             @{
@@ -131,6 +139,11 @@
             <p class="text-muted small mt-2">@Items.Count user(s)</p>
         }
     }
+
+    <InviteUserWizard CompanyId="CompanyId"
+                      IsOpen="_showInviteWizard"
+                      OnCancelled="CloseInviteWizard"
+                      OnCompleted="OnInviteCompleted" />
 </div>
 
 @code {
@@ -146,8 +159,48 @@
     private static bool HasActionableInvite(UserListItemModel row) =>
         row.InviteId is not null && row.InvitationStatus is "Pending" or "Expired";
 
+    private bool _showInviteWizard;
+
+    private void CloseInviteWizard() => _showInviteWizard = false;
+
+    private async Task OnInviteCompleted()
+    {
+        _showInviteWizard = false;
+        await LoadAsync();
+    }
+
+    private async Task HandleToolbarClick(Syncfusion.Blazor.Navigations.ClickEventArgs args)
+    {
+        if (args.Item.Id == "hr-invite-user")
+        {
+            if (!Session.CanManageUsers)
+            {
+                SetActionError("You do not have permission to invite users.");
+                return;
+            }
+
+            ClearActionError();
+            _showInviteWizard = true;
+            StateHasChanged();
+            return;
+        }
+
+        await OnToolbarClick(args);
+    }
+
     protected override void ConfigureToolbar()
     {
+        if (Session.CanManageUsers)
+        {
+            AddToolbarAction(
+                id:               "hr-invite-user",
+                text:             "Invite User",
+                icon:             "fa-solid fa-user-plus",
+                onClick:          _ => Task.CompletedTask,
+                tooltip:          "Invite an existing employee to create a sign-in account",
+                selectionDependent: false);
+        }
+
         AddToolbarAction(
             id:      "hr-resend-invite",
             text:    "Resend Invitation",
@@ -173,7 +226,7 @@
 
     protected override async Task<IReadOnlyList<UserListItemModel>?> FetchItemsAsync(string? search)
     {
-        var result = await UserAdministrationService.ListUsersAsync(CompanyId, pageSize: 200, search: search);
+        var result = await UserAdministrationService.ListAllUsersAsync(CompanyId, search: search);
         var items = result?.Items;
 
         _usersWithOverrides.Clear();

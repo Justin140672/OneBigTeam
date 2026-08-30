@@ -10,6 +10,8 @@ namespace HR.Modules.Identity.Features.GetUserDetails;
 internal sealed class GetUserDetailsHandler(
     IdentityDbContext db,
     IEmployeeNameReader employeeNameReader,
+    IEmployeeAudienceReader employeeAudienceReader,
+    IPositionProfileReader positionProfileReader,
     ITargetUserCompanyGuard targetUserCompanyGuard)
 {
     public async Task<Result<GetUserDetailsResponse>> HandleAsync(GetUserDetailsRequest request, CancellationToken cancellationToken)
@@ -71,6 +73,14 @@ internal sealed class GetUserDetailsHandler(
             ? names.GetValueOrDefault(actorId)
             : null;
 
+        // ADM-01: the linked employee's current position.
+        var audience = await employeeAudienceReader.GetEmployeeAudienceAsync(
+            request.CompanyId, request.EmployeeId, cancellationToken);
+        Guid? positionProfileId = audience?.PositionProfileId;
+        string? positionTitle = positionProfileId is { } ppId
+            ? (await positionProfileReader.GetSummaryAsync(request.CompanyId, ppId, cancellationToken))?.Title
+            : null;
+
         return Result.Success(new GetUserDetailsResponse(
             request.EmployeeId,
             user?.Id,
@@ -84,6 +94,8 @@ internal sealed class GetUserDetailsHandler(
             invite?.ExpiresAt,
             createdByName,
             user?.LastLoginAt,
-            invite?.CreatedAt ?? user!.CreatedAt));
+            invite?.CreatedAt ?? user!.CreatedAt,
+            positionProfileId,
+            positionTitle));
     }
 }

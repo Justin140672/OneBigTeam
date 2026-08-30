@@ -378,6 +378,7 @@ public static class EmployeesModule
         services.AddScoped<IEmployeeLeaverReader, EmployeeLeaverReader>();
         services.AddScoped<IEmployeeNameReader, EmployeeNameReader>();
         services.AddScoped<IEmployeeAudienceReader, EmployeeAudienceReader>();
+        services.AddScoped<IEmployeeInviteCandidateReader, EmployeeInviteCandidateReader>();
         services.AddScoped<IManagerReader, ManagerReader>();
         services.AddScoped<IActiveLeavingProcessReader, ActiveLeavingProcessReader>();
         services.AddScoped<IEmployeeStartDateReader, EmployeeStartDateReader>();

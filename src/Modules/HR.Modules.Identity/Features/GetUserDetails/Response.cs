@@ -13,4 +13,7 @@ internal sealed record GetUserDetailsResponse(
     DateTimeOffset? InviteExpiresAt,
     string? CreatedByName,
     DateTimeOffset? LastLoginAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    // The linked employee's current position (ADM-01).
+    Guid? PositionProfileId = null,
+    string? PositionTitle = null);

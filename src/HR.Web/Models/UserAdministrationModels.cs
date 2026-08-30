@@ -44,7 +44,9 @@ public record UserListItemModel(
     string? InvitationStatus,
     Guid? InviteId,
     DateTimeOffset? LastLoginAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    Guid? PositionProfileId = null,
+    string? PositionTitle = null);
 
 // ── GET /api/companies/{companyId}/users/{employeeId} ───────────────────────
 public record GetUserDetailResponse(
@@ -60,7 +62,19 @@ public record GetUserDetailResponse(
     DateTimeOffset? InviteExpiresAt,
     string? CreatedByName,
     DateTimeOffset? LastLoginAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    Guid? PositionProfileId = null,
+    string? PositionTitle = null);
+
+// ── GET /api/companies/{companyId}/users/invitable-employees ────────────────
+public record GetInvitableEmployeesResponse(List<InvitableEmployeeModel> Items);
+
+public record InvitableEmployeeModel(
+    Guid EmployeeId,
+    string Name,
+    string? WorkEmail,
+    Guid? PositionProfileId,
+    string? PositionTitle);
 
 // ── GET /api/companies/{companyId}/users/{employeeId}/audit-history ────────
 public record GetUserAuditHistoryResponse(List<UserAuditHistoryItemModel> Items);

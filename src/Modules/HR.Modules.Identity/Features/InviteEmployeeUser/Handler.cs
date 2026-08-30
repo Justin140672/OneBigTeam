@@ -27,18 +27,28 @@ internal sealed class InviteEmployeeUserHandler(
             return Result.Failure<InviteEmployeeUserResponse>(
                 Error.NotFound("Employee was not found in this company."));
 
-        // No existing linked user — ApplicationUser.Id == EmployeeId by convention (see UserInvite.EmployeeId).
-        var hasLinkedUser = await db.Users.AnyAsync(u => u.Id == request.EmployeeId, cancellationToken);
+        // No existing linked account — ApplicationUser.Id == EmployeeId by convention (see
+        // UserInvite.EmployeeId). Real Supabase-backed accounts (self-service SignUp, AcceptInvite)
+        // live in UserProfiles rather than Users, so both must be checked (ADM-01).
+        var hasLinkedUser = await db.Users.AnyAsync(u => u.Id == request.EmployeeId, cancellationToken)
+            || await db.UserProfiles.AnyAsync(p => p.Id == request.EmployeeId, cancellationToken);
         if (hasLinkedUser)
             return Result.Failure<InviteEmployeeUserResponse>(
                 Error.Conflict("This employee already has a linked user account."));
 
         var now = clock.UtcNow;
 
-        // Superseding any existing pending invites for this employee, same as SendInvite.
+        // ADM-01: an actionable (still-pending, not expired) invitation must be resent or cancelled
+        // via its own actions rather than silently replaced from here. An expired or cancelled
+        // invite is not actionable, so it can be superseded by a fresh one.
         var existing = await db.UserInvites
             .Where(i => i.EmployeeId == request.EmployeeId && i.ClaimedAt == null)
             .ToListAsync(cancellationToken);
+
+        if (existing.Any(i => i.CancelledAt == null && !i.IsExpired))
+            return Result.Failure<InviteEmployeeUserResponse>(
+                Error.Conflict("This employee already has a pending invitation. Resend or cancel it instead."));
+
         db.UserInvites.RemoveRange(existing);
 
         var invite = UserInvite.Create(request.EmployeeId, request.CompanyId, request.Email, now, request.RoleIds, actorUserId);

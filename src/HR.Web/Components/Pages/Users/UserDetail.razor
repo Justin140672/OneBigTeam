@@ -58,6 +58,12 @@
                     </div>
                     <div class="card-body">
                         <dl class="row mb-0">
+                            <dt class="col-sm-4 text-muted fw-normal">Employee</dt>
+                            <dd class="col-sm-8">
+                                <a href="/companies/@CompanyId/employees/@EmployeeId">@_user.Name</a>
+                            </dd>
+                            <dt class="col-sm-4 text-muted fw-normal">Position</dt>
+                            <dd class="col-sm-8">@(string.IsNullOrEmpty(_user.PositionTitle) ? "—" : _user.PositionTitle)</dd>
                             <dt class="col-sm-4 text-muted fw-normal">Email</dt>
                             <dd class="col-sm-8">@_user.Email</dd>
                             <dt class="col-sm-4 text-muted fw-normal">Roles</dt>

@@ -11,21 +11,31 @@ internal sealed class FakeEmployeeAudienceReader : IEmployeeAudienceReader
 {
     private readonly IReadOnlyList<Guid> _employeeIds;
     private readonly bool _exists;
+    private readonly IReadOnlyDictionary<Guid, EmployeeAudienceProfile> _audienceProfiles;
 
-    public FakeEmployeeAudienceReader(IReadOnlyList<Guid> employeeIds, bool exists = true)
+    public FakeEmployeeAudienceReader(
+        IReadOnlyList<Guid> employeeIds,
+        bool exists = true,
+        IReadOnlyDictionary<Guid, EmployeeAudienceProfile>? audienceProfiles = null)
     {
         _employeeIds = employeeIds;
         _exists = exists;
+        _audienceProfiles = audienceProfiles ?? new Dictionary<Guid, EmployeeAudienceProfile>();
     }
 
     /// <summary>Captures the (companyId, employeeId) pair passed to the most recent <see cref="EmployeeExistsAsync"/> call.</summary>
     public (Guid CompanyId, Guid EmployeeId)? LastEmployeeExistsCall { get; private set; }
 
     public Task<EmployeeAudienceProfile?> GetEmployeeAudienceAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken)
-        => throw new NotImplementedException();
+        => Task.FromResult(_audienceProfiles.TryGetValue(employeeId, out var profile) ? profile : null);
 
     public Task<IReadOnlyDictionary<Guid, EmployeeAudienceProfile>> GetEmployeeAudienceProfilesAsync(Guid companyId, IReadOnlyCollection<Guid> employeeIds, CancellationToken cancellationToken)
-        => throw new NotImplementedException();
+    {
+        IReadOnlyDictionary<Guid, EmployeeAudienceProfile> result = _audienceProfiles
+            .Where(kvp => employeeIds.Contains(kvp.Key))
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        return Task.FromResult(result);
+    }
 
     public Task<IReadOnlyList<EmployeeAudienceDetail>> GetEmployeeAudienceDetailsAsync(Guid companyId, IReadOnlyCollection<Guid> employeeIds, CancellationToken cancellationToken)
         => throw new NotImplementedException();

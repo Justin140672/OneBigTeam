@@ -23,6 +23,50 @@ public sealed class UserAdministrationService(IHttpClientFactory httpClientFacto
         }
     }
 
+    /// <summary>
+    /// Fetches every page of the user list and returns the full set. The list endpoint is paged
+    /// (server default/cap applies), so a single request silently drops anyone past the first page —
+    /// this loops until the collected count reaches the reported TotalCount.
+    /// </summary>
+    public async Task<ListUsersResponse?> ListAllUsersAsync(Guid companyId, string? search = null)
+    {
+        const int pageSize = 500;
+        var all = new List<UserListItemModel>();
+        var page = 1;
+        var totalCount = 0;
+
+        while (true)
+        {
+            var result = await ListUsersAsync(companyId, page, pageSize, search);
+            if (result is null)
+                return page == 1 ? null : new ListUsersResponse(all, all.Count, 1, all.Count);
+
+            totalCount = result.TotalCount;
+            all.AddRange(result.Items);
+
+            if (result.Items.Count == 0 || all.Count >= result.TotalCount)
+                break;
+
+            page++;
+        }
+
+        return new ListUsersResponse(all, Math.Max(totalCount, all.Count), 1, all.Count);
+    }
+
+    public async Task<List<InvitableEmployeeModel>?> GetInvitableEmployeesAsync(Guid companyId)
+    {
+        try
+        {
+            var result = await Http.GetFromJsonAsync<GetInvitableEmployeesResponse>(
+                $"api/companies/{companyId}/users/invitable-employees", HrApiJsonOptions.Default);
+            return result?.Items;
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
     public async Task<GetUserDetailResponse?> GetUserAsync(Guid companyId, Guid employeeId)
     {
         try

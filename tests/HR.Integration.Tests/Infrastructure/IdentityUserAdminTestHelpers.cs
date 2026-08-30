@@ -102,12 +102,15 @@ internal static class IdentityUserAdminTestHelpers
         bool claimed = false,
         bool cancelled = false,
         IEnumerable<Guid>? roleIds = null,
-        Guid? createdByUserId = null)
+        Guid? createdByUserId = null,
+        DateTimeOffset? createdAt = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
 
-        var now = DateTimeOffset.UtcNow;
+        // createdAt backdates both CreatedAt and (CreatedAt + 7 days) ExpiresAt, so passing a value
+        // more than 7 days in the past yields an already-expired invite.
+        var now = createdAt ?? DateTimeOffset.UtcNow;
         var invite = UserInvite.Create(employeeId, companyId, email, now, roleIds, createdByUserId);
 
         if (claimed)

@@ -138,6 +138,9 @@ public static class IdentityModule
         services.AddScoped<IValidator<ExportAccessReviewRequest>, ExportAccessReviewValidator>();
         services.AddScoped<InviteEmployeeUserHandler>();
         services.AddScoped<IValidator<InviteEmployeeUserRequest>, InviteEmployeeUserValidator>();
+        services.AddScoped<HR.Modules.Identity.Features.ListInvitableEmployees.ListInvitableEmployeesHandler>();
+        services.AddScoped<IValidator<HR.Modules.Identity.Features.ListInvitableEmployees.ListInvitableEmployeesRequest>,
+            HR.Modules.Identity.Features.ListInvitableEmployees.ListInvitableEmployeesValidator>();
         services.AddScoped<UpdateUserRolesHandler>();
         services.AddScoped<IValidator<UpdateUserRolesRequest>, UpdateUserRolesValidator>();
         services.AddScoped<ResendInviteHandler>();

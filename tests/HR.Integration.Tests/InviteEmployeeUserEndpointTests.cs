@@ -143,5 +143,20 @@ public class InviteEmployeeUserEndpointTests
         Assert.Contains(roleId, invite!.PendingRoleIds);
     }
 
+    [Fact]
+    public async Task Post_InviteEmployeeUser_Returns_Conflict_When_Pending_Invite_Already_Exists()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
+        await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, employeeId, "pending@test.com");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/invite-user",
+            new { companyId, employeeId, email = "again@test.com", roleIds = new[] { Guid.NewGuid() } });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
     private sealed record InvitePayload(Guid InviteId, Guid EmployeeId, string Email, DateTimeOffset ExpiresAt);
 }

@@ -83,6 +83,24 @@ public class GetUserDetailsEndpointTests
     }
 
     [Fact]
+    public async Task Get_UserDetails_Includes_PositionTitle_For_Invited_Employee_With_A_Position()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Positioned", "Person");
+        await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, employeeId, "positioned@test.com");
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/users/{employeeId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<DetailsPayload>();
+        Assert.NotNull(payload);
+        Assert.NotNull(payload!.PositionProfileId);
+        Assert.StartsWith("Role-", payload.PositionTitle);
+    }
+
+    [Fact]
     public async Task Get_UserDetails_Returns_NotFound_When_Employee_Belongs_To_Another_Company()
     {
         // IAM-01 regression: an HR Administrator for Company A must not be able to resolve a
@@ -113,5 +131,7 @@ public class GetUserDetailsEndpointTests
         DateTimeOffset? InviteExpiresAt,
         string? CreatedByName,
         DateTimeOffset? LastLoginAt,
-        DateTimeOffset CreatedAt);
+        DateTimeOffset CreatedAt,
+        Guid? PositionProfileId,
+        string? PositionTitle);
 }

@@ -75,6 +75,130 @@ public class InviteEmployeeUserHandlerTests(IdentityDatabaseFixture fixture)
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Employee_Already_Has_UserProfile()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        await using (var db = fixture.BuildContext())
+        {
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), companyId, "profile@test.com", "Self", "Signup", Now));
+            await db.SaveChangesAsync();
+        }
+
+        var nameReader = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [employeeId] = "Self Signup" });
+        var handler = BuildHandler(nameReader, new FakeAuditEventPublisher());
+
+        var request = new InviteEmployeeUserRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Email = "profile@test.com",
+            RoleIds = [Guid.NewGuid()],
+        };
+
+        var result = await handler.HandleAsync(request, actorUserId: null, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Pending_NonExpired_Invite_Exists()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var realNow = DateTimeOffset.UtcNow;
+
+        await using (var db = fixture.BuildContext())
+        {
+            db.UserInvites.Add(UserInvite.Create(employeeId, companyId, "pending@test.com", realNow));
+            await db.SaveChangesAsync();
+        }
+
+        var nameReader = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [employeeId] = "Pending Person" });
+        var handler = BuildHandler(nameReader, new FakeAuditEventPublisher());
+
+        var request = new InviteEmployeeUserRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Email = "pending@test.com",
+            RoleIds = [Guid.NewGuid()],
+        };
+
+        var result = await handler.HandleAsync(request, actorUserId: null, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+
+        await using var db2 = fixture.BuildContext();
+        var invites = await db2.UserInvites.Where(i => i.EmployeeId == employeeId).ToListAsync();
+        Assert.Single(invites); // original left untouched
+        Assert.Equal("pending@test.com", invites[0].Email);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Supersedes_When_Only_An_Expired_Invite_Exists()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var longAgo = DateTimeOffset.UtcNow.AddDays(-30);
+
+        await using (var db = fixture.BuildContext())
+        {
+            db.UserInvites.Add(UserInvite.Create(employeeId, companyId, "stale@test.com", longAgo));
+            await db.SaveChangesAsync();
+        }
+
+        var nameReader = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [employeeId] = "Stale Person" });
+        var handler = BuildHandler(nameReader, new FakeAuditEventPublisher());
+
+        var result = await handler.HandleAsync(
+            new InviteEmployeeUserRequest { CompanyId = companyId, EmployeeId = employeeId, Email = "fresh@test.com", RoleIds = [Guid.NewGuid()] },
+            actorUserId: null,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        await using var db2 = fixture.BuildContext();
+        var invites = await db2.UserInvites.Where(i => i.EmployeeId == employeeId).ToListAsync();
+        Assert.Single(invites);
+        Assert.Equal("fresh@test.com", invites[0].Email);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Supersedes_When_Only_A_Cancelled_Invite_Exists()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var realNow = DateTimeOffset.UtcNow;
+
+        await using (var db = fixture.BuildContext())
+        {
+            var invite = UserInvite.Create(employeeId, companyId, "cancelled@test.com", realNow);
+            invite.Cancel(realNow);
+            db.UserInvites.Add(invite);
+            await db.SaveChangesAsync();
+        }
+
+        var nameReader = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [employeeId] = "Cancelled Person" });
+        var handler = BuildHandler(nameReader, new FakeAuditEventPublisher());
+
+        var result = await handler.HandleAsync(
+            new InviteEmployeeUserRequest { CompanyId = companyId, EmployeeId = employeeId, Email = "reinvited@test.com", RoleIds = [Guid.NewGuid()] },
+            actorUserId: null,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        await using var db2 = fixture.BuildContext();
+        var invites = await db2.UserInvites.Where(i => i.EmployeeId == employeeId).ToListAsync();
+        Assert.Single(invites);
+        Assert.Equal("reinvited@test.com", invites[0].Email);
+    }
+
+    [Fact]
     public async Task HandleAsync_Creates_Invite_And_Publishes_Audit_Event_On_Happy_Path()
     {
         var companyId = Guid.NewGuid();
