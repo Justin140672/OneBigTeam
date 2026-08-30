@@ -104,11 +104,8 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
 
     public async Task RequestPasswordResetAsync(string email, string redirectTo, CancellationToken cancellationToken)
     {
-        // Uses the PUBLISHABLE key, not the secret key — Supabase's /auth/v1/recover is the
-        // client-facing password-recovery endpoint (same tier as the sign-in/token endpoints),
-        // not an Admin API call. UNVERIFIED: redirect_to nested under "options", mirroring
-        // CreateUserAsync/ResendVerificationEmailAsync's shape above — not confirmed against a
-        // live project for this specific endpoint.
+        // Client-facing /auth/v1/recover — Supabase composes and sends the recovery email itself.
+        // Retained for the platform administrator reset flow only.
         var http = CreateClient(options.Value.PublishableKey);
 
         var requestBody = new
@@ -125,6 +122,42 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
             throw new InvalidOperationException(
                 $"Supabase password-recovery request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
         }
+    }
+
+    public async Task<string> GenerateRecoveryLinkAsync(string email, string redirectTo, CancellationToken cancellationToken)
+    {
+        // Admin API — uses the SECRET key (server-only), unlike the client-facing
+        // /auth/v1/recover path. Supabase's documented shape is
+        // POST /auth/v1/admin/generate_link with { type: "recovery", email, redirect_to } and a
+        // response body carrying "action_link" (the ready-to-send URL). No email is sent by
+        // Supabase for generate_link — delivery is entirely the caller's responsibility.
+        var http = CreateClient(options.Value.SecretKey);
+
+        var requestBody = new
+        {
+            type = "recovery",
+            email,
+            redirect_to = redirectTo,
+        };
+
+        using var response = await http.PostAsJsonAsync("/auth/v1/admin/generate_link", requestBody, JsonOptions, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase generate-recovery-link request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<SupabaseGenerateLinkResponse>(JsonOptions, cancellationToken);
+        if (string.IsNullOrWhiteSpace(payload?.ActionLink))
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase generate-recovery-link response did not contain an action_link. Response body: {body}");
+        }
+
+        return payload.ActionLink;
     }
 
     public async Task<SupabaseSession> ExchangeCodeForSessionAsync(string code, CancellationToken cancellationToken)
@@ -354,6 +387,12 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
     {
         [JsonPropertyName("id")]
         public string? Id { get; set; }
+    }
+
+    private sealed class SupabaseGenerateLinkResponse
+    {
+        [JsonPropertyName("action_link")]
+        public string? ActionLink { get; set; }
     }
 
     private sealed class SupabaseTokenResponse

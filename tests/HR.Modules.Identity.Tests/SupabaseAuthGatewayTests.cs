@@ -86,6 +86,62 @@ public class SupabaseAuthGatewayTests
     }
 
     [Fact]
+    public async Task GenerateRecoveryLinkAsync_Returns_ActionLink_And_Uses_SecretKey()
+    {
+        var handler = new FakeHttpMessageHandler
+        {
+            StatusCodeToReturn = HttpStatusCode.OK,
+            ResponseBodyToReturn = """{"action_link": "https://example.supabase.co/auth/v1/verify?token=abc&type=recovery&redirect_to=https://app/reset-password"}""",
+        };
+        var options = Options();
+        var gateway = BuildGateway(handler, options);
+
+        var link = await gateway.GenerateRecoveryLinkAsync(
+            "ada@example.com", "https://app/reset-password", CancellationToken.None);
+
+        Assert.Equal(
+            "https://example.supabase.co/auth/v1/verify?token=abc&type=recovery&redirect_to=https://app/reset-password",
+            link);
+
+        var (request, body) = handler.Requests[0];
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.Equal("https://example.supabase.co/auth/v1/admin/generate_link", request.RequestUri!.ToString());
+        Assert.Contains("recovery", body);
+        Assert.Contains("ada@example.com", body);
+        Assert.Equal(options.SecretKey, request.Headers.GetValues("apikey").Single());
+    }
+
+    [Fact]
+    public async Task GenerateRecoveryLinkAsync_Throws_With_ResponseBody_On_Failure()
+    {
+        var handler = new FakeHttpMessageHandler
+        {
+            StatusCodeToReturn = HttpStatusCode.BadRequest,
+            ResponseBodyToReturn = "{\"error\": \"user not found\"}",
+        };
+        var gateway = BuildGateway(handler);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => gateway.GenerateRecoveryLinkAsync("nobody@example.com", "https://app/reset-password", CancellationToken.None));
+
+        Assert.Contains("user not found", ex.Message);
+    }
+
+    [Fact]
+    public async Task GenerateRecoveryLinkAsync_Throws_When_ActionLink_Missing()
+    {
+        var handler = new FakeHttpMessageHandler
+        {
+            StatusCodeToReturn = HttpStatusCode.OK,
+            ResponseBodyToReturn = "{\"hashed_token\": \"abc\"}",
+        };
+        var gateway = BuildGateway(handler);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => gateway.GenerateRecoveryLinkAsync("ada@example.com", "https://app/reset-password", CancellationToken.None));
+    }
+
+    [Fact]
     public async Task ExchangeCodeForSessionAsync_Returns_PopulatedSession_On_Success()
     {
         var userId = Guid.NewGuid();

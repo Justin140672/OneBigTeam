@@ -18,17 +18,27 @@ internal interface ISupabaseAuthGateway
     Task ResendVerificationEmailAsync(string email, string redirectTo, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Sends a password-recovery email whose link redirects to <paramref name="redirectTo"/>.
-    /// Confirmed via live testing (see HR.Web's /verify-email remarks): Supabase uses the
-    /// implicit/fragment flow for this redirect, the same as email verification —
-    /// "{redirectTo}#access_token=...&amp;type=recovery" — not a "code" query parameter.
+    /// Sends a Supabase-generated password-recovery email via the client-facing /auth/v1/recover
+    /// endpoint (Supabase composes and sends the email itself). Still used by the platform
+    /// administrator reset flow; the tenant user forgot-password flow uses
+    /// <see cref="GenerateRecoveryLinkAsync"/> + the branded Postmark template instead.
     /// </summary>
     Task RequestPasswordResetAsync(string email, string redirectTo, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Generates a real, single-use Supabase password-recovery action link via the Admin API
+    /// (<c>POST /auth/v1/admin/generate_link</c>, <c>type: "recovery"</c>) whose redirect target is
+    /// <paramref name="redirectTo"/>. Supabase does NOT send its own email here — the caller
+    /// delivers the returned link via the branded Postmark password-reset template. The link embeds
+    /// a token subject to Supabase's own single-use / expiry semantics, and Supabase uses the
+    /// implicit/fragment flow for the redirect — "{redirectTo}#access_token=...&amp;type=recovery".
+    /// </summary>
+    Task<string> GenerateRecoveryLinkAsync(string email, string redirectTo, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Sets a new password for the user identified by <paramref name="userAccessToken"/> — the
     /// short-lived access token Supabase issues via the password-recovery redirect's fragment
-    /// (see RequestPasswordResetAsync). Calls Supabase's user-scoped PUT /auth/v1/user, which
+    /// (see <see cref="GenerateRecoveryLinkAsync"/>). Calls Supabase's user-scoped PUT /auth/v1/user, which
     /// authenticates via that token directly rather than the publishable/secret API keys used
     /// elsewhere in this gateway.
     /// </summary>

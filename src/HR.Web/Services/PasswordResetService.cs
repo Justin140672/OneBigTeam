@@ -14,11 +14,11 @@ public sealed class PasswordResetService(IHttpClientFactory httpClientFactory, I
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
-    public async Task<bool> RequestResetAsync(string email)
+    public async Task<bool> RequestResetAsync(string email, string? userAgent = null)
     {
         try
         {
-            var response = await Http.PostAsJsonAsync("api/forgot-password", new { Email = email });
+            var response = await Http.PostAsJsonAsync("api/forgot-password", new { Email = email, UserAgent = userAgent });
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)

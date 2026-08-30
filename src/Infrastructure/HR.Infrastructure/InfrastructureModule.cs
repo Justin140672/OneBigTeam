@@ -98,11 +98,13 @@ public static class InfrastructureModule
             services.Configure<EmailBrandingOptions>(configuration.GetSection("EmailBranding"));
             services.AddHttpClient<IEmailSender, PostmarkEmailSender>();
             services.AddHttpClient<IInvitationEmailSender, PostmarkInvitationEmailSender>();
+            services.AddHttpClient<IPasswordResetEmailSender, PostmarkPasswordResetEmailSender>();
         }
         else
         {
             services.AddSingleton<IEmailSender, LoggingEmailSender>();
             services.AddSingleton<IInvitationEmailSender, LoggingInvitationEmailSender>();
+            services.AddSingleton<IPasswordResetEmailSender, LoggingPasswordResetEmailSender>();
         }
     }
 

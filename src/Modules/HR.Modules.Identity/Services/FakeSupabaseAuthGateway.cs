@@ -45,6 +45,10 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
     public Task RequestPasswordResetAsync(string email, string redirectTo, CancellationToken cancellationToken) =>
         Task.CompletedTask;
 
+    public Task<string> GenerateRecoveryLinkAsync(string email, string redirectTo, CancellationToken cancellationToken) =>
+        Task.FromResult(
+            $"{options.Value.ProjectUrl.TrimEnd('/')}/auth/v1/verify?token=e2e-fake-recovery-token&type=recovery&redirect_to={Uri.EscapeDataString(redirectTo)}");
+
     public Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken) =>
         Task.CompletedTask;
 

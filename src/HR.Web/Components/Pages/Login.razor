@@ -26,6 +26,13 @@
             </div>
         }
 
+        @if (PasswordReset && _error is null)
+        {
+            <div class="login-success" data-testid="password-reset-message">
+                <i class="fa-solid fa-circle-check"></i> Your password has been updated. You can now sign in with your new password.
+            </div>
+        }
+
         @if (_error is not null)
         {
             <div class="login-error">
@@ -79,6 +86,9 @@
 @code {
     [SupplyParameterFromQuery(Name = "verified")]
     public bool Verified { get; set; }
+
+    [SupplyParameterFromQuery(Name = "reset")]
+    public bool PasswordReset { get; set; }
 
     private readonly LoginForm _form = new();
     private string? _error;

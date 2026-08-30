@@ -13,7 +13,10 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
     public List<(string Email, string RedirectTo)> CreatedUsers { get; } = [];
     public List<(string Email, string RedirectTo)> ResentEmails { get; } = [];
     public List<(string Email, string RedirectTo)> PasswordResetRequests { get; } = [];
+    public List<(string Email, string RedirectTo)> RecoveryLinksGenerated { get; } = [];
     public List<(string AccessToken, string NewPassword)> PasswordUpdates { get; } = [];
+
+    public string RecoveryLinkToReturn { get; set; } = "https://example.supabase.co/auth/v1/verify?token=fake-recovery&type=recovery";
 
     public Guid? UserIdToReturn { get; set; }
     public bool ShouldThrowOnCreate { get; set; }
@@ -45,6 +48,12 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
     {
         PasswordResetRequests.Add((email, redirectTo));
         return Task.CompletedTask;
+    }
+
+    public Task<string> GenerateRecoveryLinkAsync(string email, string redirectTo, CancellationToken cancellationToken)
+    {
+        RecoveryLinksGenerated.Add((email, redirectTo));
+        return Task.FromResult(RecoveryLinkToReturn);
     }
 
     public Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken)
@@ -99,6 +108,7 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         CreatedUsers.Clear();
         ResentEmails.Clear();
         PasswordResetRequests.Clear();
+        RecoveryLinksGenerated.Clear();
         PasswordUpdates.Clear();
         UserIdToReturn = null;
         ShouldThrowOnCreate = false;
