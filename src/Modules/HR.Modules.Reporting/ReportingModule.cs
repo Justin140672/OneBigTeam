@@ -34,6 +34,7 @@ using HR.Modules.Reporting.Features.GetRecruitmentPipelineSummaryReport;
 using HR.Modules.Reporting.Features.GetReportCatalog;
 using HR.Modules.Reporting.Features.GetReportFavourites;
 using HR.Modules.Reporting.Features.GetReportViews;
+using HR.Modules.Reporting.Features.GetComplianceCentre;
 using HR.Modules.Reporting.Features.GetSicknessReport;
 using HR.Modules.Reporting.Features.GetVacancyPerformanceReport;
 using HR.Modules.Reporting.Features.GetWorkloadActions;
@@ -200,6 +201,9 @@ public static class ReportingModule
 
         services.AddScoped<ExportWorkloadActionsHandler>();
         services.AddScoped<IValidator<ExportWorkloadActionsRequest>, ExportWorkloadActionsValidator>();
+
+        services.AddScoped<GetComplianceCentreHandler>();
+        services.AddScoped<IValidator<GetComplianceCentreRequest>, GetComplianceCentreValidator>();
     }
 
     public static async Task MigrateReportingAsync(this IServiceProvider services)

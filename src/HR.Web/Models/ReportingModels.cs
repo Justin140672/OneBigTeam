@@ -467,6 +467,49 @@ public record HrHeadcountSummaryReportItemModel(
     DateOnly? LeavingDate,
     decimal? Fte);
 
+// ── Compliance Centre (ADM-02) ──────────────────────────────────────────────
+
+public record ComplianceCentreFilter(
+    string? Category = null,
+    string? Department = null,
+    Guid? ManagerId = null,
+    DateOnly? DueDateStart = null,
+    DateOnly? DueDateEnd = null,
+    string? Severity = null);
+
+public record GetComplianceCentreResponse(
+    List<ComplianceItemRowModel> Items,
+    List<ComplianceCategorySummaryModel> CategorySummaries,
+    ComplianceCentreSummaryModel Summary,
+    int TotalCount,
+    bool IsTruncated,
+    bool NoActionRequired);
+
+public record ComplianceItemRowModel(
+    Guid EmployeeId,
+    string EmployeeName,
+    string? Department,
+    string Category,
+    string CategoryLabel,
+    string Detail,
+    DateOnly? DueDate,
+    string Severity,
+    string DeepLinkUrl);
+
+public record ComplianceCategorySummaryModel(
+    string Category,
+    string CategoryLabel,
+    int Total,
+    int Overdue,
+    int DueSoon,
+    int Informational);
+
+public record ComplianceCentreSummaryModel(
+    int Total,
+    int Overdue,
+    int DueSoon,
+    int Informational);
+
 // ── Favourites ────────────────────────────────────────────────────────────────
 
 public record GetReportFavouritesResponse(List<string> ReportIds);

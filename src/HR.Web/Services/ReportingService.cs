@@ -925,6 +925,37 @@ public class ReportingService(IHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
+    // ── Compliance Centre (ADM-02) ──────────────────────────────────────────
+
+    public async Task<GetComplianceCentreResponse?> GetComplianceCentreAsync(
+        Guid companyId, ComplianceCentreFilter filter, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = BuildQuery(filter);
+            return await Http.GetFromJsonAsync<GetComplianceCentreResponse>(
+                $"api/companies/{companyId}/reporting/compliance-centre?{query}", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    private static string BuildQuery(ComplianceCentreFilter filter)
+    {
+        var query = HttpUtility.ParseQueryString(string.Empty);
+
+        if (!string.IsNullOrWhiteSpace(filter.Category)) query["category"] = filter.Category;
+        if (!string.IsNullOrWhiteSpace(filter.Department)) query["department"] = filter.Department;
+        if (filter.ManagerId is not null) query["managerId"] = filter.ManagerId.ToString();
+        if (filter.DueDateStart is not null) query["dueDateStart"] = filter.DueDateStart.Value.ToString("yyyy-MM-dd");
+        if (filter.DueDateEnd is not null) query["dueDateEnd"] = filter.DueDateEnd.Value.ToString("yyyy-MM-dd");
+        if (!string.IsNullOrWhiteSpace(filter.Severity)) query["severity"] = filter.Severity;
+
+        return query.ToString() ?? string.Empty;
+    }
+
     // ── Favourites ────────────────────────────────────────────────────────────
 
     public async Task<GetReportFavouritesResponse?> GetReportFavouritesAsync(

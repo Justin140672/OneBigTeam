@@ -64,6 +64,7 @@ Legend: Y = full access · S = scoped (hierarchy / self / function) · — = den
 | Recruitment — vacancy board (view only) | `recruitment:view` | Y | Y | Y | Y | **—** |
 | Recruitment — candidate GDPR purge (destructive) | `role:company-administrator` | — | — | — | — | **Y** (governance exception — see below) |
 | HR reports | `reporting:view-hr` | — | — | — | Y | **—** |
+| Compliance Centre (consolidated: expiring visas/certifications, missing & requested documents, probation reviews due/overdue) | `compliance:view` | — | — | — | Y | **—** |
 | Recruitment reports | `reporting:view-recruitment` | — | — | Y | — | **—** |
 | Leave / probation / onboarding / workload reports | `reporting:view-*` | — | S | — | Y | **—** |
 | Reporting catalogue / saved views / favourites | `reporting:view` | — | Y | Y | Y | **—** |
@@ -91,6 +92,7 @@ outcome in the UI, category hidden in navigation) for all of:
 - Recruitment (management and board view)
 - Leave administration and approval
 - Sickness administration
+- Compliance Centre (`compliance:view`)
 - Employee documents administration
 
 They retain: company profile/branding/settings, subscription/billing, onboarding checklist,

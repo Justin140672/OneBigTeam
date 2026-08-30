@@ -162,7 +162,11 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             // support:manage — HR or Company Administrator (closest existing approximation; no
             // dedicated "platform staff" role exists yet — see IdentityModule comment).
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.SupportManage),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.SupportManage)
+            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.SupportManage),
+
+            // compliance:view — ADM-02 consolidated Compliance Centre. HR Administrator only;
+            // Company Administrator is deliberately excluded (administrative role separation).
+            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.ComplianceView)
         );
     }
 }

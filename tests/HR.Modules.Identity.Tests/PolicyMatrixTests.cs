@@ -62,6 +62,7 @@ public class PolicyMatrixTests(IdentityDatabaseFixture fixture)
         ["reporting:view-probation"] = [SystemRoles.HrAdministrator, SystemRoles.Manager],
         ["reporting:view-onboarding"] = [SystemRoles.HrAdministrator, SystemRoles.Manager],
         ["reporting:view-workload-actions"] = [SystemRoles.HrAdministrator, SystemRoles.Manager],
+        ["compliance:view"] = [SystemRoles.HrAdministrator],
     };
 
     private static readonly IReadOnlyDictionary<Guid, string> RoleNames = new Dictionary<Guid, string>

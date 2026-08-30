@@ -89,4 +89,8 @@ internal static class SystemPermissions
 
     // support
     public static readonly Guid SupportManage = new("00000000-0000-0000-0001-000000000042");
+
+    // compliance (ADM-02: consolidated Compliance Centre — authoritative HR-administrator gate,
+    // deliberately not granted to Company Administrator per the administrative role separation matrix)
+    public static readonly Guid ComplianceView = new("00000000-0000-0000-0001-000000000043");
 }

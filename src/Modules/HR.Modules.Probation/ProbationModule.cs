@@ -78,6 +78,7 @@ public static class ProbationModule
         services.AddScoped<GenerateDueProbationReviewsJob>();
         services.AddScoped<IProbationHistoryReplayer, ProbationHistoryReplayer>();
         services.AddScoped<IProbationReportReader, ProbationReportReader>();
+        services.AddScoped<IProbationReviewComplianceReader, Services.ProbationReviewComplianceReader>();
         services.AddScoped<Services.ProbationResourceAuthorizer>();
     }
 

@@ -293,6 +293,8 @@ public static class DocumentsModule
         services.AddScoped<IOutstandingDocumentRequestReader, OutstandingDocumentRequestReader>();
         services.AddScoped<IProfilePhotoReader, ProfilePhotoReader>();
         services.AddScoped<IDocumentComplianceReportReader, DocumentComplianceReportReader>();
+        services.AddScoped<IExpiringEmployeeDocumentReader, ExpiringEmployeeDocumentReader>();
+        services.AddScoped<IOutstandingDocumentRequestComplianceReader, OutstandingDocumentRequestComplianceReader>();
         services.AddScoped<ICompanyDocumentAcknowledgementReportReader, CompanyDocumentAcknowledgementReportReader>();
         services.AddScoped<IDocumentStorageReader, DocumentStorageReader>();
 

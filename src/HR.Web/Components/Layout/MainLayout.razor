@@ -112,6 +112,10 @@ else
                             {
                                 <MenuItem Text="Reporting" IconCss="fa-solid fa-chart-column" Url="@_menuItems["Reporting"]" />
                             }
+                            @if (Session.CanViewComplianceCentre)
+                            {
+                                <MenuItem Text="Compliance Centre" IconCss="fa-solid fa-shield-halved" Url="@_menuItems["ComplianceCentre"]" />
+                            }
                             @if (Session.CanManageCompanyConfiguration)
                             {
                                 <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
@@ -373,6 +377,7 @@ else
         ["ExternalRecruiters"] = "/",
         ["RecruitmentStages"] = "/",
         ["Reporting"] = "/",
+        ["ComplianceCentre"] = "/",
         ["Company"] = "/",
         ["HrSettings"] = "/",
         ["UserAdministration"] = "/",
@@ -408,6 +413,7 @@ else
         _menuItems["ExternalRecruiters"] = $"/companies/{companyId}/external-recruiters";
         _menuItems["RecruitmentStages"] = $"/companies/{companyId}/recruitment-stages";
         _menuItems["Reporting"] = $"/companies/{companyId}/reporting";
+        _menuItems["ComplianceCentre"] = $"/companies/{companyId}/reporting/compliance-centre";
         _menuItems["Company"] = $"/companies/{companyId}/edit";
         _menuItems["HrSettings"] = $"/companies/{companyId}/hr-settings";
         _menuItems["UserAdministration"] = $"/companies/{companyId}/user-administration";

@@ -60,5 +60,7 @@ internal static class PolicyCatalog
         ["reporting:view-probation"] = SystemPermissions.ReportingViewProbation,
         ["reporting:view-onboarding"] = SystemPermissions.ReportingViewOnboarding,
         ["reporting:view-workload-actions"] = SystemPermissions.ReportingViewWorkloadActions,
+        // ADM-02: consolidated Compliance Centre — HR Administrator only.
+        ["compliance:view"] = SystemPermissions.ComplianceView,
     };
 }
