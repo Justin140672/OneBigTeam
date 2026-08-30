@@ -23,6 +23,10 @@ internal static class PolicyCatalog
     public static readonly IReadOnlyDictionary<string, Guid> PermissionPolicies = new Dictionary<string, Guid>
     {
         ["employee:manage"] = SystemPermissions.EmployeeEdit,
+        // ADM-05: employee administration reads (list/detail/timeline/headcount) — held by
+        // Manager, Recruiter and HR Administrator, but NOT a plain Employee and NOT a
+        // Company-Administrator-only user, enforcing administrative role separation at the API.
+        ["employee:read"] = SystemPermissions.EmployeeRead,
         ["company:manage"] = SystemPermissions.CompanyEdit,
         ["support:manage"] = SystemPermissions.SupportManage,
         ["hr-settings:manage"] = SystemPermissions.HrSettingsManage,

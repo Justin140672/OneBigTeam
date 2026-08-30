@@ -1,7 +1,7 @@
 @inject EmployeeService EmployeeService
 @inject AppSession Session
 
-@if (Session.CanManageEmployees)
+@if (Session.CanReadEmployees)
 {
     <div class="widget-card chart-tile">
         <div class="widget-header">
@@ -69,7 +69,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Session.CanManageEmployees)
+        if (!Session.CanReadEmployees)
         {
             _loading = false;
             return;

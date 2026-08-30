@@ -8,6 +8,7 @@
 @inject EmployeeService EmployeeService
 @inject LocationService LocationService
 @inject NavigationManager Navigation
+@inject AppSession Session
 @inject IJSRuntime JS
 
 <PageTitle>Workload &amp; HR Actions Report</PageTitle>
@@ -312,6 +313,9 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!AppSession.GuardAccess(Navigation, Session.CanViewReporting))
+            return;
+
         var employeesTask = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
         var locationsTask = LocationService.ListLocationsAsync(CompanyId);
         await LoadAsync();

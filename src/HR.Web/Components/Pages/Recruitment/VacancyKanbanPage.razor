@@ -22,7 +22,7 @@
     // the Kanban board is an operational recruiting tool, not general vacancy visibility.
     protected override void OnInitialized()
     {
-        if (!Session.IsRecruiter)
-            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+        if (!Session.CanManageRecruitment)
+            Navigation.NavigateTo("/access-denied", replace: true);
     }
 }

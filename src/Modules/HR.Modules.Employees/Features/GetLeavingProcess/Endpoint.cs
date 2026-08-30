@@ -9,7 +9,9 @@ internal sealed class Endpoint(GetLeavingProcessHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/{employeeId:guid}/leaving-process");
-        Policies("role:employee");
+        // ADM-05: offboarding administration — not visible to a plain Employee or a
+        // Company-Administrator-only user.
+        Policies("employee:read");
     }
 
     public override async Task HandleAsync(CancellationToken cancellationToken)

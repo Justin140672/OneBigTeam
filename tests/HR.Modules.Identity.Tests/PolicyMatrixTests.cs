@@ -28,6 +28,7 @@ public class PolicyMatrixTests(IdentityDatabaseFixture fixture)
     private static readonly Dictionary<string, HashSet<Guid>> ExpectedGrantees = new()
     {
         ["employee:manage"] = [SystemRoles.HrAdministrator],
+        ["employee:read"] = [SystemRoles.Manager, SystemRoles.Recruiter, SystemRoles.HrAdministrator],
         ["company:manage"] = [SystemRoles.CompanyAdministrator],
         ["support:manage"] = [SystemRoles.HrAdministrator, SystemRoles.CompanyAdministrator],
         ["hr-settings:manage"] = [SystemRoles.HrAdministrator],

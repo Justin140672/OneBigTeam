@@ -1,5 +1,7 @@
 @page "/companies/{CompanyId:guid}/reporting/document-compliance"
 @rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject AppSession Session
 @using HR.Infrastructure.Abstractions
 @using HR.Web.Models
 @using HR.Web.Services
@@ -121,6 +123,8 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!AppSession.GuardAccess(Navigation, Session.CanViewHrReports))
+            return;
         var positionProfilesResponse = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
         _positionProfiles = positionProfilesResponse?.Items.ToList() ?? [];
 

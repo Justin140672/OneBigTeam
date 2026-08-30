@@ -549,9 +549,9 @@
         // HR-policy settings are HR Administrator territory only, matching the "hr-settings:manage"
         // policy that guards the underlying save endpoint.
         await Session.InitialiseAsync();
-        if (!Session.IsHrAdministrator)
+        if (!Session.CanManageHrSettings)
         {
-            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            Navigation.NavigateTo("/access-denied", replace: true);
             return;
         }
 

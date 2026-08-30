@@ -142,7 +142,7 @@
                         </ContentTemplate>
                     </TabItem>
 
-                    @if (Session.IsRecruiter)
+                    @if (Session.CanManageRecruitment)
                     {
                         <TabItem>
                             <ChildContent><TabHeader Text="Kanban" /></ChildContent>
@@ -194,7 +194,7 @@
     // correction — gated behind the same Recruiter role that already owns UpdateVacancy
     // ("recruitment:manage" on the API side), so re-enabling the dropdown here can never grant more
     // access than the endpoint itself would allow.
-    private bool CanRequestCorrection => Session.IsRecruiter && _vacancy is not null && !_vacancy.CanChangePositionProfile;
+    private bool CanRequestCorrection => Session.CanManageRecruitment && _vacancy is not null && !_vacancy.CanChangePositionProfile;
     private bool CanEditPositionProfile => IsNew || (_vacancy?.CanChangePositionProfile ?? false)
         || (Model.IsAuthorisedCorrection && CanRequestCorrection);
 
@@ -204,6 +204,9 @@
 
     protected override async Task OnLoadedAsync()
     {
+        if (!AppSession.GuardAccess(Navigation, Session.CanManageRecruitment))
+            return;
+
         var deptResult = await DepartmentService.ListDepartmentsAsync(CompanyId);
         _departments = deptResult?.Items ?? [];
 

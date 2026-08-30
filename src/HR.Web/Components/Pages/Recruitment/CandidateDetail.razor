@@ -3,6 +3,7 @@
 @page "/companies/{CompanyId:guid}/candidates/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject CandidateService CandidateService
+@inject AppSession Session
 @inherits EditPageBase<CandidateEditModel, Guid>
 
 <PageTitle>@PageTitle</PageTitle>
@@ -208,6 +209,9 @@
 
     protected override async Task OnLoadedAsync()
     {
+        if (!AppSession.GuardAccess(Navigation, Session.CanViewCandidates))
+            return;
+
         if (!IsNew)
             _candidate = await CandidateService.GetCandidateAsync(CompanyId, Id!.Value);
     }

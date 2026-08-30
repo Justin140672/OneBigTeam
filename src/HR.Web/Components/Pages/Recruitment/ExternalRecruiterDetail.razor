@@ -197,9 +197,9 @@
 
     protected override async Task OnLoadedAsync()
     {
-        if (!Session.IsRecruiter)
+        if (!Session.CanManageRecruitment)
         {
-            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            Navigation.NavigateTo("/access-denied", replace: true);
             return;
         }
 

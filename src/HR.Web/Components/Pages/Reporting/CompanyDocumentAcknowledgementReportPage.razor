@@ -1,5 +1,7 @@
 @page "/companies/{CompanyId:guid}/reporting/document-acknowledgement"
 @rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject AppSession Session
 @using HR.Infrastructure.Abstractions
 @using HR.Web.Models
 @using HR.Web.Services
@@ -82,6 +84,8 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!AppSession.GuardAccess(Navigation, Session.CanViewHrReports))
+            return;
         await LoadAsync();
     }
 

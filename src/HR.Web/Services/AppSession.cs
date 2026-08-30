@@ -21,6 +21,33 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     public bool CanManageEmployees => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000004"));
     public bool CanManageCompany { get; private set; }
 
+    // ADM-05: permission-derived capability flags. These compute directly from the effective
+    // PermissionIds fetched from api/me and are the authoritative UI gate for admin pages and
+    // navigation (see specifications/product-specifications/30-administrative-role-separation-matrix.md).
+    // Existing role-name flags below are kept for dashboard-routing/identity decisions only.
+    public bool CanReadEmployees              => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000003"));
+    public bool CanManageCompanyConfiguration => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000012"));
+    public bool CanViewUsers                  => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000016"));
+    public bool CanManageUsers                => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000017"));
+    public bool CanManageHrSettings           => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000018"));
+    public bool CanManageLeavePolicies        => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000022"));
+    public bool CanManageSickness             => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000015"));
+    public bool CanManageRecruitment          => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000026"));
+    public bool CanViewCandidates             => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000028"));
+    public bool CanViewReporting              => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000034"));
+    public bool CanViewHrReports              => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000036"));
+    public bool CanViewRecruitmentReports     => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000035"));
+    public bool CanManageSharedDocuments      => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000030"));
+
+    // ADM-05: shared access-denied outcome. Admin pages call this from OnBeforeLoadAsync/LoadAsync
+    // instead of hand-rolling a redirect; when not allowed it bounces to the consistent
+    // /access-denied page (replace: true so back-button doesn't re-trigger it) and returns false.
+    public static bool GuardAccess(Microsoft.AspNetCore.Components.NavigationManager nav, bool allowed)
+    {
+        if (!allowed) nav.NavigateTo("/access-denied", replace: true);
+        return allowed;
+    }
+
     // Role-derived flags, additive to CanManageCompany/CanManageEmployees above — these drive
     // landing/nav/switcher decisions only. CanManageEmployees keeps gating existing widgets as-is.
     public bool IsHrAdministrator { get; private set; }

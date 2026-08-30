@@ -1,5 +1,7 @@
 @page "/companies/{CompanyId:guid}/reporting/recruitment-pipeline-summary"
 @rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject AppSession Session
 @using HR.Infrastructure.Abstractions
 @using HR.Web.Components.Controls
 @using HR.Web.Models
@@ -89,6 +91,8 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!AppSession.GuardAccess(Navigation, Session.CanViewRecruitmentReports))
+            return;
         await LoadAsync();
     }
 

@@ -89,7 +89,7 @@
     protected override Task OnBeforeLoadAsync()
     {
         if (!Session.CanManageEmployees)
-            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            Navigation.NavigateTo("/access-denied", replace: true);
         return Task.CompletedTask;
     }
 

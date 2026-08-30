@@ -1,0 +1,23 @@
+@page "/access-denied"
+@layout MainLayout
+@rendermode InteractiveServer
+@inject AppSession Session
+
+<PageTitle>Access denied</PageTitle>
+
+<div class="access-denied-wrap">
+    <div class="card access-denied-card">
+        <div class="card-body text-center">
+            <i class="fa-solid fa-lock access-denied-icon"></i>
+            <h1 class="h4 mt-3">Access denied</h1>
+            <p class="text-muted">
+                You don't have permission to view this page. If you think this is a mistake,
+                contact your HR administrator.
+            </p>
+            <div class="d-flex justify-content-center gap-2 mt-3">
+                <a class="btn btn-primary" href="@Session.LandingUrl">Go to home</a>
+                <a class="btn btn-outline-secondary" href="@Session.MyProfileUrl">My Profile</a>
+            </div>
+        </div>
+    </div>
+</div>

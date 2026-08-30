@@ -1,5 +1,7 @@
 @page "/companies/{CompanyId:guid}/reporting/sickness"
 @rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject AppSession Session
 @using HR.Infrastructure.Abstractions
 @using HR.Web.Components.Controls
 @using HR.Web.Models
@@ -96,6 +98,8 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!AppSession.GuardAccess(Navigation, Session.CanViewHrReports))
+            return;
         await LoadAsync();
     }
 

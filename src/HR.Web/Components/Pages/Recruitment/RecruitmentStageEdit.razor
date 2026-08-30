@@ -115,8 +115,8 @@
     // could reach it directly by URL even though the list page and dashboard button were gated.
     protected override Task OnLoadedAsync()
     {
-        if (!Session.IsRecruiter)
-            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+        if (!Session.CanManageRecruitment)
+            Navigation.NavigateTo("/access-denied", replace: true);
         return Task.CompletedTask;
     }
 

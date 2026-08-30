@@ -1,0 +1,17 @@
+.access-denied-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh;
+    padding: 2rem 1rem;
+}
+
+.access-denied-card {
+    max-width: 32rem;
+    width: 100%;
+}
+
+.access-denied-icon {
+    font-size: 2.5rem;
+    color: var(--bs-secondary, #6c757d);
+}

@@ -145,8 +145,8 @@
         // IdentityModule.cs's recruitment:manage policy comment). CanManageEmployees was too broad
         // here and let HR Administrators reach this page directly even though the Recruitment
         // Dashboard's own "Recruitment Settings" button is already Recruiter-only.
-        if (!Session.IsRecruiter)
-            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+        if (!Session.CanManageRecruitment)
+            Navigation.NavigateTo("/access-denied", replace: true);
         return Task.CompletedTask;
     }
 

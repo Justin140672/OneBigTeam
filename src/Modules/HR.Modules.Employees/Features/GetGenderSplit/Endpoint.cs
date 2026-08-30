@@ -9,7 +9,8 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/gender-split");
-        Policies("role:employee");
+        // ADM-05: workforce analytics — Manager / Recruiter / HR Administrator only.
+        Policies("employee:read");
     }
 
     public override async Task HandleAsync(

@@ -75,6 +75,9 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!AppSession.GuardAccess(Navigation, Session.CanViewReporting))
+            return;
+
         _isLoading = true;
         _error = null;
 
@@ -87,7 +90,7 @@
             // error banner here, redirect to the caller's default location — mirroring the
             // Session.MyProfileUrl redirect-on-unauthorized convention used by every other gated
             // list page (see DepartmentList.razor, LocationList.razor, LeaveTypeList.razor, etc.).
-            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            Navigation.NavigateTo("/access-denied", replace: true);
             return;
         }
 

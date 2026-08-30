@@ -9,7 +9,9 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees");
-        Policies("role:employee");
+        // ADM-05: employee administration list — Manager / Recruiter / HR Administrator only.
+        // A plain Employee or a Company-Administrator-only user must not enumerate the workforce.
+        Policies("employee:read");
     }
 
     public override async Task HandleAsync(

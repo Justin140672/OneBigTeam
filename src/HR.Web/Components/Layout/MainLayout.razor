@@ -65,7 +65,7 @@ else
                             {
                                 <MenuItem Text="Manager Dashboard" IconCss="fa-solid fa-gauge" Url="/dashboard/manager" />
                             }
-                            @if (Session.IsRecruiter)
+                            @if (Session.CanManageRecruitment)
                             {
                                 <MenuItem Text="Dashboard" IconCss="fa-solid fa-chart-line" Url="/dashboard/recruitment" />
                                 <MenuItem Text="Vacancies" IconCss="fa-solid fa-briefcase" Url="@_menuItems["Vacancies"]" />
@@ -85,7 +85,6 @@ else
                                         <MenuItem Text="Employment Types" Url="@_menuItems["EmploymentTypes"]" />
                                         <MenuItem Text="Location Types" Url="@_menuItems["LocationTypes"]" />
                                         <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
-                                        <MenuItem Text="Shared Documents" Url="@_menuItems["SharedDocuments"]" />
                                         <MenuItem Text="Onboarding Templates" Url="@_menuItems["OnboardingTemplates"]" />
                                         <MenuItem Text="Data Import" Url="@_menuItems["DataImport"]" />
                                     </MenuItems>
@@ -105,19 +104,23 @@ else
                                     </MenuItems>
                                 </MenuItem>
                             }
-                            @if (Session.IsHrAdministrator || Session.IsRecruiter || Session.IsManager)
+                            @if (Session.CanManageSharedDocuments)
+                            {
+                                <MenuItem Text="Shared Documents" IconCss="fa-solid fa-file-lines" Url="@_menuItems["SharedDocuments"]" />
+                            }
+                            @if (Session.CanViewReporting)
                             {
                                 <MenuItem Text="Reporting" IconCss="fa-solid fa-chart-column" Url="@_menuItems["Reporting"]" />
                             }
-                            @if (Session.CanManageCompany)
+                            @if (Session.CanManageCompanyConfiguration)
                             {
                                 <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
                             }
-                            @if (Session.IsHrAdministrator)
+                            @if (Session.CanManageHrSettings)
                             {
                                 <MenuItem Text="HR Settings" IconCss="fa-solid fa-sliders" Url="@_menuItems["HrSettings"]" />
                             }
-                            @if (Session.IsHrAdministrator)
+                            @if (Session.CanViewUsers)
                             {
                                 <MenuItem Text="User Administration" IconCss="fa-solid fa-user-shield" Url="@_menuItems["UserAdministration"]" />
                             }
@@ -327,7 +330,8 @@ else
     // not via sidebar navigation. A plain Recruiter still gets a sidebar since their workflow
     // (Vacancies, Candidates, etc.) has no dashboard-embedded equivalent for those sections.
     private bool ShowSidebar =>
-        Session.CanManageEmployees || Session.IsHrAdministrator || Session.IsRecruiter;
+        Session.CanManageEmployees || Session.CanReadEmployees || Session.CanManageRecruitment
+        || Session.CanViewUsers || Session.CanManageHrSettings;
 
     private int _unreadCount;
     private List<NotificationDto> _notifications = [];
