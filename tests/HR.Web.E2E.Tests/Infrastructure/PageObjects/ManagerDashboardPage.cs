@@ -138,6 +138,76 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
         return int.TryParse(text?.Trim(), out var value) ? value : 0;
     }
 
+    /// <summary>Team-size count shown in the Team Status widget header (".widget-count-badge").</summary>
+    public async Task<int> GetTeamStatusHeaderCountAsync()
+    {
+        await WaitForTeamStatusLoadedAsync();
+        var text = await TeamStatusWidget.Locator(".widget-count-badge").First.TextContentAsync();
+        return int.TryParse(text?.Trim(), out var value) ? value : -1;
+    }
+
+    /// <summary>Returns true if the Team Status widget is showing its "no reports" empty state.</summary>
+    public async Task<bool> TeamStatusIsEmptyAsync() =>
+        await TeamStatusWidget.Locator(".widget-empty").Filter(new() { HasText = "No one reports up to you yet" }).IsVisibleAsync();
+
+    private ILocator TeamStatusTile(string tileLabel) =>
+        TeamStatusWidget.Locator(".team-status-tile")
+            .Filter(new() { Has = page.GetByText(tileLabel, new() { Exact = true }) })
+            .First;
+
+    /// <summary>Labels (".team-status-label") of every rendered Team Status tile, in order.</summary>
+    public async Task<IReadOnlyList<string>> GetTeamStatusTileLabelsAsync()
+    {
+        await WaitForTeamStatusLoadedAsync();
+        var labels = await TeamStatusWidget.Locator(".team-status-tile .team-status-label").AllAsync();
+        var result = new List<string>();
+        foreach (var l in labels)
+            result.Add((await l.TextContentAsync())?.Trim() ?? "");
+        return result;
+    }
+
+    /// <summary>Lowercase tag name of the tile element (expected "button").</summary>
+    public async Task<string> GetTeamStatusTileTagNameAsync(string tileLabel) =>
+        (await TeamStatusTile(tileLabel).EvaluateAsync<string>("el => el.tagName.toLowerCase()")) ?? "";
+
+    /// <summary>Focuses the tile via keyboard and returns true if it became the active element.</summary>
+    public async Task<bool> TeamStatusTileIsKeyboardFocusableAsync(string tileLabel)
+    {
+        var tile = TeamStatusTile(tileLabel);
+        await tile.FocusAsync();
+        return await tile.EvaluateAsync<bool>("el => el === document.activeElement");
+    }
+
+    public async Task<bool> TeamStatusTileIsExpandedAsync(string tileLabel) =>
+        (await TeamStatusTile(tileLabel).GetAttributeAsync("aria-expanded")) == "true";
+
+    public async Task ClickTeamStatusTileAsync(string tileLabel)
+    {
+        await WaitForTeamStatusLoadedAsync();
+        await TeamStatusTile(tileLabel).ClickAsync();
+    }
+
+    /// <summary>
+    /// Member names (".team-status-drilldown-name") listed in the currently open Team Status
+    /// drill-down panel. Returns an empty list if no panel is open.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetTeamStatusDrilldownNamesAsync()
+    {
+        var panel = TeamStatusWidget.Locator(".team-status-drilldown");
+        if (!await panel.IsVisibleAsync())
+            return [];
+
+        var names = await panel.Locator(".team-status-drilldown-name").AllAsync();
+        var result = new List<string>();
+        foreach (var n in names)
+            result.Add((await n.TextContentAsync())?.Trim() ?? "");
+        return result;
+    }
+
+    /// <summary>True while the whole Team Status strip is replaced by its source-failure warning.</summary>
+    public async Task<bool> TeamStatusHasSourceWarningAsync() =>
+        await TeamStatusWidget.Locator(".widget-source-warning").IsVisibleAsync();
+
     // ── My Team Widget ────────────────────────────────────────────────────────
 
     private ILocator MyTeamWidget =>

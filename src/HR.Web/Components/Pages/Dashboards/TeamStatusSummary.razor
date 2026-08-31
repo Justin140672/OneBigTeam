@@ -1,24 +1,28 @@
-@* Compact team-status metric strip for the redesigned Manager Dashboard. Reuses data already
-   fetched by sibling widgets rather than adding new endpoints. See PRODUCT ticket "Reorganise the
-   Team Manager Dashboard around priority actions" for full context on the proxy measures used.
+@* Compact team-status metric strip for the redesigned Manager Dashboard.
 
-   DSH-03: each source is loaded independently. A failed "In probation" / "Missing fit notes"
-   source renders a compact inline warning + retry and a "—" tile rather than a misleading 0. If
-   the team roster itself fails to load, the whole strip is replaced with a warning + retry (there
-   is nothing meaningful to show without it). *@
+   DSH-05: backed by a single authoritative server endpoint
+   (GET api/companies/{companyId}/employees/{managerId}/team-status-summary) which computes every
+   headline count and the per-member drill-down flags from one payload — so the summary tiles and
+   the drill-down list can never disagree. Previously this widget composed three sibling services
+   and computed counts client-side, including two known-wrong measures.
+
+   DSH-03: the single source is loaded through WidgetSourceLoader as a WidgetResult<T>. On failure
+   the whole strip is replaced with a warning + retry (there is nothing meaningful to show). *@
 @using HR.Web.Components.Pages.Dashboards
 @inject EmployeeService EmployeeService
-@inject ProbationService ProbationService
-@inject SicknessService SicknessService
 @inject WidgetSourceLoader SourceLoader
 @inject AppSession Session
 
-@if (Session.IsManager)
+@if (Session.IsManager && Session.EmployeeId is Guid managerId)
 {
     <div class="widget-card team-status-summary">
         <div class="widget-header">
             <i class="fa-solid fa-chart-simple widget-icon"></i>
             <span class="widget-title">Team Status</span>
+            @if (!_loading && _res.IsLoaded && _res.Value is { } h)
+            {
+                <span class="widget-count-badge">@h.TeamSize</span>
+            }
         </div>
 
         @if (_loading)
@@ -27,11 +31,15 @@
                 <HrLoadingIndicator Label="Loading team status…" />
             </div>
         }
-        else if (_teamRes.IsFailed)
+        else if (_res.IsFailed)
         {
-            <WidgetSourceWarning SourceName="Team status" Retrying="_retrying.Contains(SrcTeam)" OnRetry="() => RetryAsync(SrcTeam)" />
+            <WidgetSourceWarning SourceName="Team status" Retrying="_retrying" OnRetry="RetryAsync" />
         }
-        else if (_teamSize == 0)
+        else if (_res.Value is not { } payload)
+        {
+            <WidgetSourceWarning SourceName="Team status" Retrying="_retrying" OnRetry="RetryAsync" />
+        }
+        else if (payload.TeamSize == 0)
         {
             <div class="widget-empty">
                 <i class="fa-solid fa-people-group fa-lg mb-2"></i>
@@ -40,41 +48,49 @@
         }
         else
         {
-            @if (_probationRes.IsFailed)
-            {
-                <WidgetSourceWarning SourceName="In probation" Retrying="_retrying.Contains(SrcProbation)" OnRetry="() => RetryAsync(SrcProbation)" />
-            }
-            @if (_fitNotesRes.IsFailed)
-            {
-                <WidgetSourceWarning SourceName="Missing fit notes" Retrying="_retrying.Contains(SrcFitNotes)" OnRetry="() => RetryAsync(SrcFitNotes)" />
-            }
-
             <div class="team-status-strip" role="list" aria-label="Team status summary">
-                <div class="team-status-tile" role="listitem">
-                    <span class="team-status-value">@_atWork</span>
-                    <span class="team-status-label">At work</span>
-                </div>
-                <div class="team-status-tile" role="listitem">
-                    <span class="team-status-value">@_awayToday</span>
-                    <span class="team-status-label">Away today</span>
-                </div>
-                <div class="team-status-tile" role="listitem">
-                    <span class="team-status-value">@_onLeave</span>
-                    <span class="team-status-label">On leave</span>
-                </div>
-                <div class="team-status-tile" role="listitem">
-                    <span class="team-status-value">@_sick</span>
-                    <span class="team-status-label">Sick</span>
-                </div>
-                <div class="team-status-tile @(_probationRes.IsLoaded && _inProbation > 0 ? "team-status-tile--warning" : "")" role="listitem">
-                    <span class="team-status-value">@(_probationRes.IsFailed ? "—" : _inProbation.ToString())</span>
-                    <span class="team-status-label">In probation</span>
-                </div>
-                <div class="team-status-tile @(_fitNotesRes.IsLoaded && _missingFitNotes > 0 ? "team-status-tile--warning" : "")" role="listitem">
-                    <span class="team-status-value">@(_fitNotesRes.IsFailed ? "—" : _missingFitNotes.ToString())</span>
-                    <span class="team-status-label">Missing fit notes</span>
-                </div>
+                @foreach (var tile in Tiles(payload))
+                {
+                    var t = tile;
+                    <button type="button"
+                            class="team-status-tile @(t.Warning ? "team-status-tile--warning" : "") @(_openTile == t.Key ? "team-status-tile--active" : "")"
+                            role="listitem"
+                            aria-expanded="@(_openTile == t.Key ? "true" : "false")"
+                            aria-label="@($"{t.Count} {t.Label}. Show matching team members.")"
+                            @onclick="() => ToggleTile(t.Key)">
+                        <span class="team-status-value">@t.Count</span>
+                        <span class="team-status-label">@t.Label</span>
+                    </button>
+                }
             </div>
+
+            @if (_openTile is { } openKey)
+            {
+                var open = Tiles(payload).First(x => x.Key == openKey);
+                var members = open.Filter(payload.Members).ToList();
+                <div class="team-status-drilldown" aria-label="@($"{open.Label} — matching team members")">
+                    <div class="team-status-drilldown-head">
+                        <span class="fw-semibold">@open.Label</span>
+                        <span class="text-muted">@members.Count</span>
+                    </div>
+                    @if (members.Count == 0)
+                    {
+                        <p class="team-status-drilldown-empty mb-0 text-muted">No team members match.</p>
+                    }
+                    else
+                    {
+                        <ul class="team-status-drilldown-list">
+                            @foreach (var m in members)
+                            {
+                                <li class="team-status-drilldown-item">
+                                    <span class="team-status-drilldown-name">@m.FullName</span>
+                                    <span class="team-status-drilldown-role text-muted">@(string.IsNullOrWhiteSpace(m.JobTitle) ? "—" : m.JobTitle)</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
         }
     </div>
 }
@@ -83,86 +99,66 @@
     // Reports the "away today" count up to ManagerDashboard for its one-line activity summary.
     [Parameter] public EventCallback<int> OnAwayTodayChanged { get; set; }
 
-    private const string SrcTeam = "Team status";
-    private const string SrcProbation = "In probation";
-    private const string SrcFitNotes = "Missing fit notes";
+    private const string Src = "Team status";
     private const string WidgetName = "Team Status";
 
-    private readonly string[] _sourceNames = [SrcTeam, SrcProbation, SrcFitNotes];
-    private readonly HashSet<string> _retrying = [];
-
     private bool _loading = true;
+    private bool _retrying;
+    private string? _openTile;
 
-    private WidgetResult<GetMyTeamResponse?> _teamRes = WidgetResult<GetMyTeamResponse?>.Loading(SrcTeam);
-    private WidgetResult<IReadOnlyList<UpcomingProbationReviewItem>> _probationRes = WidgetResult<IReadOnlyList<UpcomingProbationReviewItem>>.Loading(SrcProbation);
-    private WidgetResult<GetMissingFitNotesResponseModel?> _fitNotesRes = WidgetResult<GetMissingFitNotesResponseModel?>.Loading(SrcFitNotes);
-
-    private int _teamSize;
-    private int _atWork;
-    private int _onLeave;
-    private int _sick;
-    private int _awayToday;
-    private int _inProbation;
-    private int _missingFitNotes;
+    private WidgetResult<TeamStatusSummaryResponse?> _res = WidgetResult<TeamStatusSummaryResponse?>.Loading(Src);
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Session.IsManager)
+        if (!Session.IsManager || Session.EmployeeId is not Guid)
         {
             _loading = false;
             return;
         }
 
-        await Task.WhenAll(_sourceNames.Select(LoadSourceAsync));
-        Recompute();
+        await LoadAsync();
         _loading = false;
         await NotifyAsync();
     }
 
-    private async Task LoadSourceAsync(string name)
+    private async Task LoadAsync()
     {
-        switch (name)
-        {
-            case SrcTeam:
-                _teamRes = await SourceLoader.LoadAsync(WidgetName, name,
-                    () => EmployeeService.GetMyTeamOrThrowAsync(Session.CompanyId, includeIndirect: true));
-                break;
-            case SrcProbation:
-                _probationRes = await SourceLoader.LoadAsync(WidgetName, name,
-                    () => ProbationService.GetUpcomingReviewsOrThrowAsync(Session.CompanyId));
-                break;
-            case SrcFitNotes:
-                _fitNotesRes = await SourceLoader.LoadAsync(WidgetName, name,
-                    () => SicknessService.GetMissingFitNotesOrThrowAsync(Session.CompanyId));
-                break;
-        }
+        var managerId = Session.EmployeeId!.Value;
+        _res = await SourceLoader.LoadAsync(WidgetName, Src,
+            () => EmployeeService.GetTeamStatusSummaryOrThrowAsync(Session.CompanyId, managerId));
     }
 
-    private async Task RetryAsync(string name)
+    private async Task RetryAsync()
     {
-        _retrying.Add(name);
+        _retrying = true;
         StateHasChanged();
-        await LoadSourceAsync(name);
-        _retrying.Remove(name);
-        Recompute();
+        await LoadAsync();
+        _retrying = false;
         await NotifyAsync();
     }
 
-    private void Recompute()
-    {
-        var team = _teamRes.IsLoaded ? _teamRes.Value?.Items ?? [] : [];
-        _teamSize = team.Count;
-        _sick = team.Count(m => m.Status == "Sick");
-        _onLeave = team.Count(m => m.Status == "OnLeave");
-        _atWork = _teamSize - _sick - _onLeave;
-        _awayToday = _sick + _onLeave;
-        _inProbation = _probationRes.IsLoaded ? (_probationRes.Value ?? []).Select(p => p.EmployeeId).Distinct().Count() : 0;
-        _missingFitNotes = _fitNotesRes.IsLoaded ? _fitNotesRes.Value?.Items.Count ?? 0 : 0;
-    }
+    private void ToggleTile(string key) => _openTile = _openTile == key ? null : key;
 
     private async Task NotifyAsync()
     {
-        if (OnAwayTodayChanged.HasDelegate && _teamRes.IsLoaded)
-            await OnAwayTodayChanged.InvokeAsync(_awayToday);
+        if (OnAwayTodayChanged.HasDelegate && _res.IsLoaded && _res.Value is { } h)
+            await OnAwayTodayChanged.InvokeAsync(h.AwayToday);
     }
+
+    private static IEnumerable<TileDef> Tiles(TeamStatusSummaryResponse p) =>
+    [
+        new("atwork", "At work", p.AtWork, false, m => m.Where(x => x.PrimaryStatus == "AtWork")),
+        new("away", "Away today", p.AwayToday, false, m => m.Where(x => x.OnLeaveToday || x.OffSickToday)),
+        new("onleave", "On leave", p.OnLeave, false, m => m.Where(x => x.OnLeaveToday)),
+        new("sick", "Sick", p.Sick, false, m => m.Where(x => x.OffSickToday)),
+        new("probation", "In probation", p.InProbation, p.InProbation > 0, m => m.Where(x => x.InProbation)),
+        new("fitnotes", "Missing fit notes", p.MissingFitNotes, p.MissingFitNotes > 0, m => m.Where(x => x.MissingFitNote)),
+    ];
+
+    private sealed record TileDef(
+        string Key,
+        string Label,
+        int Count,
+        bool Warning,
+        Func<IEnumerable<TeamStatusMemberItem>, IEnumerable<TeamStatusMemberItem>> Filter);
 }

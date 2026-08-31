@@ -79,6 +79,7 @@ public static class ProbationModule
         services.AddScoped<IProbationHistoryReplayer, ProbationHistoryReplayer>();
         services.AddScoped<IProbationReportReader, ProbationReportReader>();
         services.AddScoped<IProbationReviewComplianceReader, Services.ProbationReviewComplianceReader>();
+        services.AddScoped<IEmployeesInProbationReader, Services.EmployeesInProbationReader>();
         services.AddScoped<Services.ProbationResourceAuthorizer>();
     }
 

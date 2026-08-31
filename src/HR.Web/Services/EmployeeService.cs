@@ -125,6 +125,12 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         Http.GetFromJsonAsync<GetMyTeamResponse>(
             $"api/companies/{companyId}/employees/me/team?includeIndirect={includeIndirect}", HrApiJsonOptions.Default);
 
+    // DSH-05: authoritative server-computed team status summary (counts + drill-down members
+    // from one payload, so headline counts and lists always agree). Non-swallowing.
+    public Task<TeamStatusSummaryResponse?> GetTeamStatusSummaryOrThrowAsync(Guid companyId, Guid managerId) =>
+        Http.GetFromJsonAsync<TeamStatusSummaryResponse>(
+            $"api/companies/{companyId}/employees/{managerId}/team-status-summary", HrApiJsonOptions.Default);
+
     public async Task<GetEmployeeResponse?> GetEmployeeAsync(Guid companyId, Guid id)
     {
         try

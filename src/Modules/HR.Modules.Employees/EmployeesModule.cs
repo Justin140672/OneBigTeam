@@ -192,6 +192,9 @@ public static class EmployeesModule
         services.AddScoped<GetEmployeeHandler>();
         services.AddScoped<GetMyEmployeeHandler>();
         services.AddScoped<GetMyTeamHandler>();
+        services.AddScoped<Features.GetManagerTeamStatusSummary.GetManagerTeamStatusSummaryHandler>();
+        services.AddScoped<IValidator<Features.GetManagerTeamStatusSummary.GetManagerTeamStatusSummaryRequest>,
+            Features.GetManagerTeamStatusSummary.GetManagerTeamStatusSummaryValidator>();
         services.AddScoped<GetMyPersonalDetailsHandler>();
         services.AddScoped<RequestPersonalDetailsChangeHandler>();
         services.AddScoped<IValidator<RequestPersonalDetailsChangeRequest>, RequestPersonalDetailsChangeValidator>();

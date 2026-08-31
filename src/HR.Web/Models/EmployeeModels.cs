@@ -497,6 +497,30 @@ public sealed record TeamMemberItem(
     string? ProfilePhotoUrl,
     string Status);
 
+// ── DASHBOARD: TEAM STATUS SUMMARY ──────────────────────────────────────────────
+
+public sealed record TeamStatusSummaryResponse(
+    int TeamSize,
+    int AtWork,
+    int AwayToday,
+    int OnLeave,
+    int Sick,
+    int InProbation,
+    int MissingFitNotes,
+    int NotScheduledToday,
+    IReadOnlyList<TeamStatusMemberItem> Members);
+
+public sealed record TeamStatusMemberItem(
+    Guid EmployeeId,
+    string FullName,
+    string? JobTitle,
+    bool OnLeaveToday,
+    bool OffSickToday,
+    bool InProbation,
+    bool MissingFitNote,
+    bool ScheduledToday,
+    string PrimaryStatus);
+
 // ── DASHBOARD: GENDER SPLIT ──────────────────────────────────────────────────
 
 public sealed record GetGenderSplitResponse(IReadOnlyList<GenderSplitItem> Items);
