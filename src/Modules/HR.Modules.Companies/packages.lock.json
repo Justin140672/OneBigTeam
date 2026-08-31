@@ -75,9 +75,9 @@
       },
       "Stripe.net": {
         "type": "Direct",
-        "requested": "[52.3.0, )",
-        "resolved": "52.3.0",
-        "contentHash": "zqaHgeEITTvRGLk9QlxG4GoJ8aQlM17pJeqea6z4uge4cddTgJ5HyTd3znKqfJARxu1rR2pcHFjFbSBlQbYsnQ==",
+        "requested": "[52.4.0, )",
+        "resolved": "52.4.0",
+        "contentHash": "EIsOiIzQBTPNvCb7mvpEVor+rn0z9bcL+D43buAqF2c2aYx3PEyDdjX/XwDWYGq6PTc8r6NVCcRoOs3hrzfcAg==",
         "dependencies": {
           "Newtonsoft.Json": "13.0.3",
           "System.Configuration.ConfigurationManager": "9.0.0"
@@ -287,27 +287,27 @@
       "hr.infrastructure.abstractions": {
         "type": "Project",
         "dependencies": {
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.modules.companies.contracts": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.modules.employees.contracts": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.modules.tasks.contracts": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.sharedkernel": {
