@@ -2,10 +2,12 @@
 @rendermode InteractiveServer
 @inject SubscriptionService SubscriptionService
 @inject NavigationManager NavigationManager
+@inject AppSession Session
 
 <PageTitle>Subscription</PageTitle>
 
 <div class="container-fluid py-4">
+    <HubBreadcrumb CompanyId="@Session.CompanyId" CurrentPage="Subscription" />
     <h1 class="mb-1">Subscription</h1>
 
     @if (_isLoading)

@@ -120,6 +120,10 @@ else
                             {
                                 <MenuItem Text="Administrative Alerts" IconCss="fa-solid fa-triangle-exclamation" Url="@_menuItems["AdministrativeAlerts"]" />
                             }
+                            @if (Session.CanManageCompanyConfiguration || Session.CanManageCompany || Session.CanManageHrSettings || Session.CanManageEmployees || Session.CanManageLeavePolicies || Session.CanManageRecruitment || Session.CanManageSharedDocuments)
+                            {
+                                <MenuItem Text="Administration" IconCss="fa-solid fa-gears" Url="@_menuItems["AdministrationHub"]" />
+                            }
                             @if (Session.CanManageCompanyConfiguration)
                             {
                                 <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
@@ -359,6 +363,7 @@ else
 
     private readonly Dictionary<string, string> _menuItems = new()
     {
+        ["AdministrationHub"] = "/",
         ["Employees"] = "/",
         ["Departments"] = "/",
         ["LocationTypes"] = "/",
@@ -396,6 +401,7 @@ else
         await Session.InitialiseAsync();
 
         var companyId = Session.CompanyId;
+        _menuItems["AdministrationHub"] = $"/companies/{companyId}/administration";
         _menuItems["Employees"] = $"/companies/{companyId}/employees";
         _menuItems["Departments"] = $"/companies/{companyId}/departments";
         _menuItems["LocationTypes"] = $"/companies/{companyId}/location-types";
@@ -667,6 +673,7 @@ else
             // Company edit/view routes are "/companies/{id}/edit" or "/companies/{id}/view" —
             // exactly 3 segments, unlike every other companies/{id}/{resource}/... route.
             _ when segments.Length == 3 && segments[0] == "companies" && (segments[2] == "edit" || segments[2] == "view") => "Company",
+            _ when segments.Length >= 1 && segments[^1] == "administration" => "Administration",
             // Every other admin subpage (Employees, Departments, Vacancies, Leave Types, etc.) keeps
             // the pre-dashboards generic "Dashboard" title for CanManageEmployees users; everyone else
             // (a plain Employee browsing their own linked pages) sees "My Profile".

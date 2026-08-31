@@ -1,0 +1,17 @@
+@* Shared 2-3 item breadcrumb for Administration-hub-linked settings screens (ADM-04). *@
+<SfBreadcrumb Class="mb-3">
+    <BreadcrumbItems>
+        <BreadcrumbItem Text="Administration" Url="@($"/companies/{CompanyId}/administration")" />
+        @if (Parent is { } parent)
+        {
+            <BreadcrumbItem Text="@parent.Text" Url="@parent.Url" />
+        }
+        <BreadcrumbItem Text="@CurrentPage" />
+    </BreadcrumbItems>
+</SfBreadcrumb>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public string CurrentPage { get; set; } = string.Empty;
+    [Parameter] public (string Text, string Url)? Parent { get; set; }
+}
