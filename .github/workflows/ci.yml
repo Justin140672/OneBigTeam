@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+# Quality gate for every change to main. The `ci-success` job at the bottom is the single
+# required status check for branch protection and the precondition every deploy workflow
+# checks before it will run (see docs/runbooks/deployment-pipeline.md).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   DOTNET_NOLOGO: "true"
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
@@ -48,12 +55,35 @@ jobs:
           dotnet list OneBigTeam.slnx package --outdated
 
   # ------------------------------------------------------------------
+  # Compute the immutable build version once, share it with every job.
+  # version  = 1.0.<run_number>+<short_sha>   (SemVer build metadata)
+  # The published artefact and the Railway image are both stamped with
+  # this value + the full git SHA (see docs/runbooks/deployment-pipeline.md).
+  # ------------------------------------------------------------------
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      sha: ${{ steps.v.outputs.sha }}
+    steps:
+      - id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA::7}"
+          echo "version=1.0.${GITHUB_RUN_NUMBER}+${short_sha}" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+  # ------------------------------------------------------------------
   # Build + unit / module / architecture tests (no E2E, no full integration).
   # NuGetAudit is on by default (Directory.Build.props) so NU1902/NU1903/NU1904
   # break the build here too.
   # ------------------------------------------------------------------
   build-test:
     runs-on: ubuntu-latest
+    needs: version
+    env:
+      BUILD_VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -65,8 +95,10 @@ jobs:
       - name: Restore (locked mode)
         run: dotnet restore OneBigTeam.slnx --locked-mode
 
-      - name: Build (Release, no restore)
-        run: dotnet build OneBigTeam.slnx -c Release --no-restore
+      - name: Build (Release, version-stamped, no restore)
+        run: >
+          dotnet build OneBigTeam.slnx -c Release --no-restore
+          -p:Version=$BUILD_VERSION -p:SourceRevisionId=$GITHUB_SHA
 
       - name: Test - architecture + unit/module projects
         shell: bash
@@ -79,3 +111,145 @@ jobs:
             echo "==== $p ===="
             dotnet test "$p" -c Release --no-build
           done
+
+  # ------------------------------------------------------------------
+  # Full integration test suite (HR.Integration.Tests).
+  # Uses Testcontainers -> needs a Docker daemon, which ubuntu-latest
+  # GitHub-hosted runners provide out of the box. Split into its own job
+  # so it runs in parallel with build-test and its ~minutes runtime does
+  # not block the faster feedback.
+  # ------------------------------------------------------------------
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: version
+    env:
+      BUILD_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET (from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore (locked mode)
+        run: dotnet restore tests/HR.Integration.Tests/HR.Integration.Tests.csproj --locked-mode
+
+      - name: Build integration test project (Release)
+        run: >
+          dotnet build tests/HR.Integration.Tests/HR.Integration.Tests.csproj
+          -c Release --no-restore -p:Version=$BUILD_VERSION
+
+      - name: Run integration tests (Testcontainers / Docker)
+        run: >
+          dotnet test tests/HR.Integration.Tests/HR.Integration.Tests.csproj
+          -c Release --no-build --
+          RunConfiguration.TestSessionTimeout=1800000
+
+  # ------------------------------------------------------------------
+  # E2E is NOT a PR gate. Aspire + Playwright + Docker boots the whole
+  # 5-service stack and takes 20-40 min and is flaky headless. It runs
+  # on a schedule instead (.github/workflows/e2e-nightly.yml). Here we
+  # only compile it so a broken E2E project is still caught on every PR.
+  # ------------------------------------------------------------------
+  e2e-compile:
+    runs-on: ubuntu-latest
+    needs: version
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET (from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore (locked mode)
+        run: dotnet restore tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj --locked-mode
+
+      - name: Build E2E test project (compile only - never executed here)
+        run: dotnet build tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj -c Release --no-restore
+
+  # ------------------------------------------------------------------
+  # Immutable, versioned deployment artefact.
+  # Railway builds its own image from the pushed commit, so the primary
+  # immutable reference IS the git SHA. This published bundle is the
+  # belt-and-braces copy: a self-contained framework-dependent publish
+  # of HR.Api + HR.Web, version-stamped, retained 90 days, so any past
+  # deploy can be reproduced / inspected without a working tree.
+  # ------------------------------------------------------------------
+  package:
+    runs-on: ubuntu-latest
+    needs: [version, build-test]
+    env:
+      BUILD_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET (from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore (locked mode)
+        run: dotnet restore OneBigTeam.slnx --locked-mode
+
+      - name: Publish HR.Api
+        run: >
+          dotnet publish src/HR.Api/HR.Api.csproj -c Release --no-restore
+          -p:Version=$BUILD_VERSION -p:SourceRevisionId=$GITHUB_SHA
+          -o artifacts/api
+
+      - name: Publish HR.Web
+        run: >
+          dotnet publish src/HR.Web/HR.Web.csproj -c Release --no-restore
+          -p:Version=$BUILD_VERSION -p:SourceRevisionId=$GITHUB_SHA
+          -o artifacts/web
+
+      - name: Write build manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > artifacts/build-info.json <<EOF
+          {
+            "version": "${BUILD_VERSION}",
+            "gitSha": "${GITHUB_SHA}",
+            "ref": "${GITHUB_REF}",
+            "runId": "${GITHUB_RUN_ID}",
+            "runNumber": "${GITHUB_RUN_NUMBER}",
+            "builtAtUtc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "builtBy": "${GITHUB_ACTOR}"
+          }
+          EOF
+          cat artifacts/build-info.json
+
+      - name: Upload deployment artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-${{ needs.version.outputs.version }}
+          path: artifacts/
+          retention-days: 90
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------
+  # Single required status check. Branch protection requires this job;
+  # every deploy workflow refuses to run unless the target commit has a
+  # successful `ci-success`. This is the "prevent deployment when
+  # mandatory quality gates fail" control.
+  # ------------------------------------------------------------------
+  ci-success:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [dependency-audit, build-test, integration-tests, e2e-compile, package]
+    steps:
+      - name: Verify all required jobs passed
+        shell: bash
+        run: |
+          set -euo pipefail
+          results='${{ toJSON(needs) }}'
+          echo "$results"
+          if echo "$results" | grep -q '"result": *"failure"' \
+             || echo "$results" | grep -q '"result": *"cancelled"'; then
+            echo "::error::One or more required CI jobs did not succeed. Deployment is blocked."
+            exit 1
+          fi
+          echo "All required CI jobs passed."

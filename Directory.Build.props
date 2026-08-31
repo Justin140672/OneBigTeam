@@ -32,4 +32,22 @@
     <NoWarn>$(NoWarn);CS8669</NoWarn>
   </PropertyGroup>
 
+  <!--
+    NFR-06: deterministic, version-stamped builds so every deployment artefact is immutable and
+    traceable to the exact commit that produced it.
+
+    - Local / developer builds get the default '0.1.0-dev' stamp and are otherwise unaffected.
+    - CI overrides these on the command line, e.g.:
+        dotnet build -p:Version=1.2.<run_number>+<short_sha> -p:SourceRevisionId=<full_sha>
+      The published artefact and the container image Railway builds are then tagged with that
+      same version + git SHA (see docs/runbooks/deployment-pipeline.md).
+    - ContinuousIntegrationBuild switches on path normalisation for reproducible output when the
+      GitHub Actions runner sets GITHUB_ACTIONS=true.
+  -->
+  <PropertyGroup>
+    <Version Condition="'$(Version)' == ''">0.1.0-dev</Version>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
 </Project>

@@ -1,0 +1,22 @@
+name: Deploy - Staging
+
+# Manual promotion to Staging. Deploy a specific commit that has already been
+# validated in Test. The GitHub Environment "staging" may add a wait timer or
+# a limited reviewer list.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git SHA or tag to promote to Staging
+        required: true
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+      ref: ${{ inputs.ref }}
+    secrets:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_STAGING }}
+      API_HEALTH_BEARER_TOKEN: ${{ secrets.API_HEALTH_BEARER_TOKEN_STAGING }}

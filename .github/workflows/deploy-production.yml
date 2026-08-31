@@ -1,0 +1,22 @@
+name: Deploy - Production
+
+# Manual promotion to Production. REQUIRES approval: the GitHub Environment
+# "production" must have "Required reviewers" enabled (see the runbook). The
+# job pauses at the `environment:` gate in deploy.yml until a reviewer approves.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git SHA or tag to release to Production (must match a Staging-verified build)
+        required: true
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: production
+      ref: ${{ inputs.ref }}
+    secrets:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PRODUCTION }}
+      API_HEALTH_BEARER_TOKEN: ${{ secrets.API_HEALTH_BEARER_TOKEN_PRODUCTION }}

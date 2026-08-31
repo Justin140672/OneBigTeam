@@ -1,0 +1,60 @@
+name: E2E (nightly)
+
+# Playwright + Aspire end-to-end suite. NOT a PR gate: it boots all 5 services
+# via .NET Aspire against a Postgres testcontainer and drives headless Chromium,
+# which is slow (20-40 min) and historically flaky headless (see MEMORY: E2E
+# headless combobox flakiness). Runs on a schedule so regressions are still
+# caught within a day, and on demand.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # 03:00 UTC daily
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-nightly
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  E2E_TESTING: "true"
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET (from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore (locked mode)
+        run: dotnet restore OneBigTeam.slnx --locked-mode
+
+      - name: Build E2E project (Release)
+        run: dotnet build tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj -c Release --no-restore
+
+      - name: Install Playwright browsers
+        shell: bash
+        run: |
+          set -euo pipefail
+          pw=$(find tests/HR.Web.E2E.Tests -name 'playwright.ps1' | head -n1)
+          pwsh "$pw" install --with-deps chromium
+
+      - name: Run E2E tests
+        run: >
+          dotnet test tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj
+          -c Release --no-build
+          --logger "trx;LogFileName=e2e.trx"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: "**/TestResults/**/*.trx"
+          if-no-files-found: ignore
