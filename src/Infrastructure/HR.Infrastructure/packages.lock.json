@@ -82,9 +82,9 @@
       },
       "QuestPDF": {
         "type": "Direct",
-        "requested": "[2026.7.3, )",
-        "resolved": "2026.7.3",
-        "contentHash": "MYpJrSLwUkgaX/POQj+9GY8QreFoLXjHCiUPCNl0XrHF+nLDT9KeUFZbeaUNu1P5spt5QeYzCbf2tDF0z5idHg=="
+        "requested": "[2026.8.0, )",
+        "resolved": "2026.8.0",
+        "contentHash": "6c/YtDiZm8NgxnFdUDom+IWGVXKhiwBVJ3cvlyIXZYH7Wp0HaXWoR2XWj/RAsZfjpW7J5LMVc1EF6JnJFouoXQ=="
       },
       "Serilog.AspNetCore": {
         "type": "Direct",
@@ -428,21 +428,21 @@
       "hr.infrastructure.abstractions": {
         "type": "Project",
         "dependencies": {
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.modules.employees.contracts": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.modules.tasks.contracts": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.sharedkernel": {
