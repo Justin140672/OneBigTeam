@@ -10,7 +10,8 @@ namespace HR.Modules.Onboarding.Services;
 /// IOnboardingReportReader (already used by GetOnboardingProgressReport/Handler.cs) rather than
 /// querying OnboardingDbContext directly, so the "outstanding task" definition stays in one place.
 /// Row-scoping mirrors GetOnboardingProgressReport/Handler.cs exactly: HR sees every outstanding
-/// task company-wide, a Manager sees only their own direct reports' tasks.
+/// task company-wide, a Manager sees their whole reporting sub-tree's tasks (direct or indirect
+/// reports, per DSH-02).
 /// </summary>
 internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
     IOnboardingReportReader onboardingReportReader,
@@ -41,13 +42,15 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
             if (currentUser.UserId is not { } callerEmployeeId)
                 return [];
 
-            var directReportIds = await directReportsReader.GetDirectReportIdsAsync(
+            // DSH-02: a manager's dashboard scope is their entire reporting sub-tree (direct and
+            // indirect reports). See specifications/architecture/11-manager-hierarchy-scope.md.
+            var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
                 companyId, callerEmployeeId, cancellationToken);
 
-            if (directReportIds.Count == 0)
+            if (teamIds.Count == 0)
                 return [];
 
-            employeeIds = directReportIds;
+            employeeIds = teamIds;
         }
 
         var items = await onboardingReportReader.GetOnboardingReportAsync(companyId, employeeIds, cancellationToken);

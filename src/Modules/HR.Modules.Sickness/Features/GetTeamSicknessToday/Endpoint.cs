@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HR.Modules.Sickness.Services;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
@@ -7,13 +8,8 @@ namespace HR.Modules.Sickness.Features.GetTeamSicknessToday;
 internal sealed class Endpoint(
     GetTeamSicknessTodayHandler handler,
     ICurrentUser currentUser,
-    IAuthorizationService authorizationService) : Endpoint<GetTeamSicknessTodayRequest, GetTeamSicknessTodayResponse>
+    SicknessResourceAuthorizer resourceAuthorizer) : Endpoint<GetTeamSicknessTodayRequest, GetTeamSicknessTodayResponse>
 {
-    // Mirrors HR.Modules.Identity.Domain.SystemPermissions.SicknessManage. Sickness cannot reference
-    // Identity's internal SystemPermissions/SystemRoles directly, so the permission id is duplicated
-    // here as the sanctioned escape hatch for checking a policy other than the endpoint's own.
-    private static readonly Guid SicknessManagePermissionId = new("00000000-0000-0000-0001-000000000015");
-
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/{managerId:guid}/team-sickness-today");
@@ -26,21 +22,22 @@ internal sealed class Endpoint(
     {
         // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
         // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
-        if (currentUser.UserId is not { } authenticatedEmployeeId)
+        if (currentUser.UserId is not { } callerEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;
         }
 
-        if (authenticatedEmployeeId != request.ManagerId)
+        // DSH-02: "sickness:view-team" only proves the caller holds the Manager/HR role. The
+        // {managerId} route value is browser-supplied and must be authorized against the caller:
+        // caller must BE that manager, sit ABOVE them in the reporting hierarchy, or be an HR
+        // administrator. Previously this endpoint accepted any manager id for a caller holding the
+        // company-wide permission and self-only otherwise (no skip-level manager path).
+        if (!await resourceAuthorizer.CanViewManagerTeamAsync(
+                request.CompanyId, callerEmployeeId, request.ManagerId, cancellationToken))
         {
-            var canManageAnyTeam = await authorizationService.HasPermissionAsync(authenticatedEmployeeId, SicknessManagePermissionId, cancellationToken);
-
-            if (!canManageAnyTeam)
-            {
-                await Send.ResultAsync(TypedResults.Forbid());
-                return;
-            }
+            await Send.ResultAsync(TypedResults.Forbid());
+            return;
         }
 
         var response = await handler.HandleAsync(request, cancellationToken);

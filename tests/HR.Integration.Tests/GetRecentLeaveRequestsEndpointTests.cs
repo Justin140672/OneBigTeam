@@ -209,6 +209,36 @@ public class GetRecentLeaveRequestsEndpointTests
     }
 
     [Fact]
+    public async Task Get_RecentLeaveRequests_Manager_Sees_Indirect_Reports_Pending_Requests()
+    {
+        // DSH-02: a manager's non-HR dashboard scope is their entire reporting sub-tree, so a
+        // skip-level manager sees a pending request from an indirect report.
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = await AuthenticatedClient(companyId);
+
+        var seniorId = await SeedEmployeeAsync(companyId, "Sadie", "Senior");
+        var lineId = await SeedEmployeeAsync(companyId, "Leo", "Line");
+        var juniorId = await SeedEmployeeAsync(companyId, "Jo", "Junior");
+        await TestRoleSeeder.AssignRoleAsync(_factory, seniorId, SystemRoles.Employee);
+        await AssignManagerAsync(hrAdminClient, companyId, lineId, seniorId);
+        await AssignManagerAsync(hrAdminClient, companyId, juniorId, lineId);
+
+        var leaveTypeId = await SeedLeaveTypeAsync(companyId);
+        var indirectPendingId = await SeedLeaveRequestAsync(companyId, juniorId, leaveTypeId, Now);
+        var peerId = await SeedEmployeeAsync(companyId, "Perry", "Peer");
+        await SeedLeaveRequestAsync(companyId, peerId, leaveTypeId, Now);
+
+        using var seniorClient = await ClientFor(companyId, seniorId);
+        var response = await seniorClient.GetAsync($"/api/companies/{companyId}/leave-requests/recent");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<RecentPayload>();
+        Assert.NotNull(payload);
+        var item = Assert.Single(payload!.Items);
+        Assert.Equal(indirectPendingId, item.LeaveRequestId);
+    }
+
+    [Fact]
     public async Task Get_RecentLeaveRequests_HrAdministrator_Sees_All_Company_Requests_Regardless_Of_Requester()
     {
         var companyId = Guid.NewGuid();

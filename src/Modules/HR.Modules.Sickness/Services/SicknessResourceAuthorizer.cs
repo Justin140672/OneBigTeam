@@ -72,4 +72,17 @@ internal sealed class SicknessResourceAuthorizer
         Guid companyId, Guid callerEmployeeId, Guid targetEmployeeId, CancellationToken cancellationToken)
         => _resourceAuthorizer.CanAccessAsync(
             companyId, companyId, callerEmployeeId, targetEmployeeId, cancellationToken, allowSelf: false);
+
+    /// <summary>
+    /// DSH-02: gate for a team dashboard endpoint that carries a browser-supplied
+    /// <paramref name="managerId"/> route value. The caller may view that manager's team only if
+    /// they ARE that manager, sit ABOVE that manager in the reporting tree, or hold company-wide
+    /// (HR administrator) access. The <paramref name="managerId"/> value itself is never trusted
+    /// as the authorization identity. See
+    /// specifications/architecture/11-manager-hierarchy-scope.md.
+    /// </summary>
+    public Task<bool> CanViewManagerTeamAsync(
+        Guid companyId, Guid callerEmployeeId, Guid managerId, CancellationToken cancellationToken)
+        => _resourceAuthorizer.CanAccessAsync(
+            companyId, companyId, callerEmployeeId, managerId, cancellationToken);
 }

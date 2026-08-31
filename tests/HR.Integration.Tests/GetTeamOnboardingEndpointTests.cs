@@ -75,7 +75,99 @@ public class GetTeamOnboardingEndpointTests
         Assert.Equal(0, item.PercentComplete);
     }
 
+    // ── DSH-02: {managerId} is authorized against the caller, not trusted ─────────
+
+    [Fact]
+    public async Task Get_TeamOnboarding_Returns_Forbidden_For_Unrelated_Employee_Passing_A_Managers_Id()
+    {
+        // This endpoint previously did NO authorization at all — any employee could read any
+        // manager's team onboarding by editing the URL. DSH-02 closed that.
+        var companyId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(companyId);
+
+        var manager = await CreateEmployeeAsync(client, companyId, "Target", "Manager");
+        var report = await CreateEmployeeAsync(client, companyId, "Their", "Report");
+        await AssignManagerAsync(client, companyId, report.Id, manager.Id);
+
+        var outsider = await CreateEmployeeAsync(client, companyId, "Nosey", "Outsider");
+        using var outsiderClient = await ClientForEmployee(companyId, outsider.Id);
+
+        var response = await outsiderClient.GetAsync(
+            $"/api/companies/{companyId}/employees/{manager.Id}/team-onboarding");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_TeamOnboarding_Returns_Ok_When_Caller_Requests_Their_Own_Team()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(companyId);
+
+        var manager = await CreateEmployeeAsync(client, companyId, "Own", "Manager");
+        var report = await CreateEmployeeAsync(client, companyId, "Own", "Report");
+        await AssignManagerAsync(client, companyId, report.Id, manager.Id);
+
+        using var managerClient = await ClientForEmployee(companyId, manager.Id);
+        var response = await managerClient.GetAsync(
+            $"/api/companies/{companyId}/employees/{manager.Id}/team-onboarding");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        var item = Assert.Single(payload!.Items);
+        Assert.Equal(report.Id, item.EmployeeId);
+    }
+
+    [Fact]
+    public async Task Get_TeamOnboarding_Returns_Ok_And_Indirect_Report_For_Skip_Level_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(companyId);
+
+        var senior = await CreateEmployeeAsync(client, companyId, "Skip", "Level");
+        var lineManager = await CreateEmployeeAsync(client, companyId, "Line", "Manager");
+        var indirectReport = await CreateEmployeeAsync(client, companyId, "Deep", "Report");
+        await AssignManagerAsync(client, companyId, lineManager.Id, senior.Id);
+        await AssignManagerAsync(client, companyId, indirectReport.Id, lineManager.Id);
+
+        using var seniorClient = await ClientForEmployee(companyId, senior.Id);
+        var response = await seniorClient.GetAsync(
+            $"/api/companies/{companyId}/employees/{senior.Id}/team-onboarding");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        Assert.Contains(payload!.Items, i => i.EmployeeId == indirectReport.Id);
+    }
+
+    [Fact]
+    public async Task Get_TeamOnboarding_Returns_Ok_For_Hr_Administrator_Viewing_Any_Managers_Team()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(companyId);
+
+        var manager = await CreateEmployeeAsync(client, companyId, "Any", "Manager");
+        var report = await CreateEmployeeAsync(client, companyId, "Any", "Report");
+        await AssignManagerAsync(client, companyId, report.Id, manager.Id);
+
+        // client is authenticated as AdminUser (HR Administrator) but is not in manager's chain.
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{manager.Id}/team-onboarding");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        Assert.Contains(payload!.Items, i => i.EmployeeId == report.Id);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────────
+
+    private async Task<HttpClient> ClientForEmployee(Guid companyId, Guid employeeId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
+        return client;
+    }
 
     private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {

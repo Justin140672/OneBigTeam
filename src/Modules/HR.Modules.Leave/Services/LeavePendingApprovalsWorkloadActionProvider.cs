@@ -11,7 +11,8 @@ namespace HR.Modules.Leave.Services;
 /// <summary>
 /// OBT-721 Workload &amp; HR Actions Report provider for pending leave requests. Row-scoping mirrors
 /// GetLeaveSummaryReport/Handler.cs: HR sees every pending request company-wide, a Manager sees
-/// only their own direct reports' pending requests, and anyone else (plain Employee, Recruiter with
+/// their whole reporting sub-tree's pending requests (direct or indirect reports, per DSH-02),
+/// and anyone else (plain Employee, Recruiter with
 /// no management/HR role) sees nothing — self-enforced here rather than trusted from the caller.
 /// </summary>
 internal sealed class LeavePendingApprovalsWorkloadActionProvider(
@@ -39,13 +40,15 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
             if (currentUser.UserId is not { } callerEmployeeId)
                 return [];
 
-            var directReportIds = await directReportsReader.GetDirectReportIdsAsync(
+            // DSH-02: a manager's dashboard scope is their entire reporting sub-tree (direct and
+            // indirect reports). See specifications/architecture/11-manager-hierarchy-scope.md.
+            var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
                 companyId, callerEmployeeId, cancellationToken);
 
-            if (directReportIds.Count == 0)
+            if (teamIds.Count == 0)
                 return [];
 
-            employeeIds = directReportIds;
+            employeeIds = teamIds;
         }
 
         var query = dbContext.LeaveRequests

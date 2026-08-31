@@ -68,8 +68,9 @@ internal sealed class EmployeeTasksOverdueWorkloadActionProvider(
 }
 
 /// <summary>
-/// OBT-721 "Manager Tasks Overdue" category: a Manager sees overdue tasks assigned to their own
-/// direct reports; HR sees every overdue task company-wide. See the interpretation note on
+/// OBT-721 "Manager Tasks Overdue" category: a Manager sees overdue tasks assigned to anyone in
+/// their reporting sub-tree (direct or indirect reports, per DSH-02); HR sees every overdue task
+/// company-wide. See the interpretation note on
 /// <see cref="EmployeeTasksOverdueWorkloadActionProvider"/> above.
 /// </summary>
 internal sealed class ManagerTasksOverdueWorkloadActionProvider(
@@ -97,13 +98,15 @@ internal sealed class ManagerTasksOverdueWorkloadActionProvider(
             if (currentUser.UserId is not { } callerEmployeeId)
                 return [];
 
-            var directReportIds = await directReportsReader.GetDirectReportIdsAsync(
+            // DSH-02: a manager's dashboard scope is their entire reporting sub-tree (direct and
+            // indirect reports). See specifications/architecture/11-manager-hierarchy-scope.md.
+            var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
                 companyId, callerEmployeeId, cancellationToken);
 
-            if (directReportIds.Count == 0)
+            if (teamIds.Count == 0)
                 return [];
 
-            employeeIds = directReportIds;
+            employeeIds = teamIds;
         }
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);

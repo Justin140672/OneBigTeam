@@ -15,18 +15,20 @@ internal sealed class GetTeamOnboardingHandler(
         GetTeamOnboardingRequest request,
         CancellationToken cancellationToken)
     {
-        var directReportIds = await directReportsReader.GetDirectReportIdsAsync(
+        // DSH-02: dashboard "my team" = the manager's entire reporting sub-tree (direct and
+        // indirect reports). See specifications/architecture/11-manager-hierarchy-scope.md.
+        var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
             request.CompanyId,
             request.ManagerId,
             cancellationToken);
 
-        if (directReportIds.Count == 0)
+        if (teamIds.Count == 0)
             return new GetTeamOnboardingResponse([]);
 
         var plans = await dbContext.OnboardingPlans
             .AsNoTracking()
             .Where(p => p.CompanyId == request.CompanyId
-                     && directReportIds.Contains(p.EmployeeId)
+                     && teamIds.Contains(p.EmployeeId)
                      && (p.Status == OnboardingStatus.NotStarted || p.Status == OnboardingStatus.InProgress))
             .OrderBy(p => p.StartDate)
             .ToListAsync(cancellationToken);

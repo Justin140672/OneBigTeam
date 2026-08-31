@@ -36,6 +36,7 @@ public static class OnboardingModule
         services.AddScoped<IOnboardingStatusReader, OnboardingStatusReader>();
         services.AddScoped<IOnboardingReportReader, OnboardingReportReader>();
         services.AddScoped<GetTeamOnboardingHandler>();
+        services.AddScoped<OnboardingResourceAuthorizer>();
         services.AddScoped<OnboardingReminderJob>();
         services.AddScoped<IOnboardingHistoryReplayer, OnboardingHistoryReplayer>();
         services.AddScoped<IWorkloadActionProvider, OutstandingOnboardingTasksWorkloadActionProvider>();

@@ -15,17 +15,19 @@ internal sealed class GetTeamSicknessTodayHandler(
         GetTeamSicknessTodayRequest request,
         CancellationToken cancellationToken)
     {
-        var directReportIds = await directReportsReader.GetDirectReportIdsAsync(
+        // DSH-02: dashboard "my team" = the manager's entire reporting sub-tree (direct and
+        // indirect reports). See specifications/architecture/11-manager-hierarchy-scope.md.
+        var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
             request.CompanyId, request.ManagerId, cancellationToken);
 
-        if (directReportIds.Count == 0)
+        if (teamIds.Count == 0)
             return new GetTeamSicknessTodayResponse([]);
 
         var items = await dbContext.SicknessRecords
             .AsNoTracking()
             .Where(r => r.CompanyId == request.CompanyId
                      && r.Status == SicknessStatus.Active
-                     && directReportIds.Contains(r.EmployeeId))
+                     && teamIds.Contains(r.EmployeeId))
             .OrderBy(r => r.StartDate)
             .Select(r => new TeamSicknessTodayItem(
                 r.Id,

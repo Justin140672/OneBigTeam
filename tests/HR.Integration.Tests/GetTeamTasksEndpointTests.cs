@@ -189,6 +189,29 @@ public class GetTeamTasksEndpointTests
     }
 
     [Fact]
+    public async Task Get_TeamTasks_Includes_Tasks_Assigned_To_Indirect_Reports()
+    {
+        // DSH-02: "my team" is the whole reporting sub-tree, not just direct reports.
+        using var admin = await AuthenticatedClient();
+
+        var senior = await CreateEmployeeAsync(admin, "Skip", "Level");
+        var lineManager = await CreateEmployeeAsync(admin, "Line", "Manager");
+        var junior = await CreateEmployeeAsync(admin, "Deep", "Report");
+        await AssignManagerAsync(admin, lineManager.Id, senior.Id);
+        await AssignManagerAsync(admin, junior.Id, lineManager.Id);
+
+        await CreateTaskAsync("Indirect report task", junior.Id);
+
+        using var client = await AuthenticatedAsAsync(senior.Id);
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{senior.Id}/team-tasks");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        Assert.Contains(payload!.Items, t => t.Title == "Indirect report task");
+    }
+
+    [Fact]
     public async Task Get_TeamTasks_Returns_Forbidden_When_Route_Company_Does_Not_Match_Auth_Tenant()
     {
         using var admin = await AuthenticatedClient();

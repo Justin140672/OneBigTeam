@@ -31,19 +31,22 @@ internal sealed class GetRecentLeaveRequestsHandler(
             .Where(r => r.CompanyId == request.CompanyId);
 
         // HR administrators keep the original company-wide, all-statuses view. Everyone else
-        // (managers) is scoped to their own direct reports and pending requests only — mirrors
-        // the IDirectReportsReader scoping pattern used by GetTeamTasksHandler/
+        // (managers) is scoped to their whole reporting sub-tree and pending requests only —
+        // the consistent DSH-02 dashboard rule, matching GetTeamTasksHandler/
         // GetTeamSicknessTodayHandler. The HR/non-HR split itself is resolved server-side by
         // the endpoint (User claims + IAuthorizationService), never trusted from the client.
         if (!isHrAdministrator)
         {
-            var directReportIds = await directReportsReader.GetDirectReportIdsAsync(
+            // DSH-02: a manager's dashboard scope is their entire reporting sub-tree (direct and
+            // indirect reports), resolved server-side. See
+            // specifications/architecture/11-manager-hierarchy-scope.md.
+            var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
                 request.CompanyId, viewerEmployeeId, cancellationToken);
 
-            if (directReportIds.Count == 0)
+            if (teamIds.Count == 0)
                 return new GetRecentLeaveRequestsResponse([]);
 
-            query = query.Where(r => directReportIds.Contains(r.EmployeeId) && r.Status == LeaveRequestStatus.Pending);
+            query = query.Where(r => teamIds.Contains(r.EmployeeId) && r.Status == LeaveRequestStatus.Pending);
         }
         else
         {

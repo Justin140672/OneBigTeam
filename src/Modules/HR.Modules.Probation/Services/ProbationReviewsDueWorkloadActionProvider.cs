@@ -12,7 +12,8 @@ namespace HR.Modules.Probation.Services;
 /// <summary>
 /// OBT-721 Workload &amp; HR Actions Report provider for probation reviews that are pending and due
 /// (not yet overdue). Row-scoping mirrors GetProbationReport/Handler.cs exactly: HR sees every
-/// pending review company-wide, a Manager sees only reviews for their own direct reports.
+/// pending review company-wide, a Manager sees reviews for their whole reporting sub-tree
+/// (direct or indirect reports, per DSH-02).
 /// See <see cref="OverdueProbationReviewsWorkloadActionProvider"/> for the overdue counterpart —
 /// split into two categories/providers per the OBT-721 ticket rather than one, so they can be
 /// filtered/grouped independently on the dashboard.
@@ -95,13 +96,15 @@ internal static class ProbationReviewWorkloadActions
             if (currentUser.UserId is not { } callerEmployeeId)
                 return [];
 
-            var directReportIds = await directReportsReader.GetDirectReportIdsAsync(
+            // DSH-02: a manager's dashboard scope is their entire reporting sub-tree (direct and
+            // indirect reports). See specifications/architecture/11-manager-hierarchy-scope.md.
+            var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
                 companyId, callerEmployeeId, cancellationToken);
 
-            if (directReportIds.Count == 0)
+            if (teamIds.Count == 0)
                 return [];
 
-            employeeIds = directReportIds;
+            employeeIds = teamIds;
         }
 
         var today = DateOnly.FromDateTime(clock.UtcNow.Date);

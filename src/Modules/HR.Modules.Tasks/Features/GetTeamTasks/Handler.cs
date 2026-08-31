@@ -17,19 +17,24 @@ internal sealed class GetTeamTasksHandler(
         GetTeamTasksRequest request,
         CancellationToken cancellationToken)
     {
-        var directReportIds = await directReportsReader.GetDirectReportIdsAsync(
+        // DSH-02: dashboard "my team" = the manager's entire reporting sub-tree (direct and
+        // indirect reports), not just direct reports. See
+        // specifications/architecture/11-manager-hierarchy-scope.md. GetAllDescendantIdsAsync
+        // walks the live projection with a visited-set BFS, so reporting loops terminate and a
+        // re-parented employee moves scope immediately.
+        var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
             request.CompanyId,
             request.ManagerId,
             cancellationToken);
 
-        if (directReportIds.Count == 0)
+        if (teamIds.Count == 0)
             return new GetTeamTasksResponse([], 0, request.PageNumber, request.PageSize, 0);
 
         var query = dbContext.TaskItems
             .AsNoTracking()
             .Where(t => t.CompanyId == request.CompanyId
                      && t.AssignedEmployeeId != null
-                     && directReportIds.Contains(t.AssignedEmployeeId.Value));
+                     && teamIds.Contains(t.AssignedEmployeeId.Value));
 
         if (!string.IsNullOrWhiteSpace(request.Status) &&
             Enum.TryParse<TaskItemStatus>(request.Status, ignoreCase: true, out var status))
