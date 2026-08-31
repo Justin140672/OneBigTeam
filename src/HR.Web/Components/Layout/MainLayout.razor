@@ -73,68 +73,16 @@ else
                                 <MenuItem Text="Recruiters" IconCss="fa-solid fa-people-arrows" Url="@_menuItems["ExternalRecruiters"]" />
                                 <MenuItem Text="Recruitment Stages" IconCss="fa-solid fa-gear" Url="@_menuItems["RecruitmentStages"]" />
                             }
-                            @if (Session.CanManageEmployees)
+                            @foreach (var section in _adminSections)
                             {
-                                <MenuItem Text="People" IconCss="fa-solid fa-users">
+                                <MenuItem Text="@section.Label" IconCss="@SectionIcon(section.Group)">
                                     <MenuItems>
-                                        <MenuItem Text="Employees" Url="@_menuItems["Employees"]" />
-                                        <MenuItem Text="Position Profiles" Url="@_menuItems["PositionProfiles"]" />
-                                        <MenuItem Text="Departments" Url="@_menuItems["Departments"]" />                                        
-                                        <MenuItem Text="Locations" Url="@_menuItems["Locations"]" />
-                                        <MenuItem Text="Organisation Chart" Url="@_menuItems["OrganisationChart"]" />                                        
-                                        <MenuItem Text="Employment Types" Url="@_menuItems["EmploymentTypes"]" />
-                                        <MenuItem Text="Location Types" Url="@_menuItems["LocationTypes"]" />
-                                        <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
-                                        <MenuItem Text="Onboarding Templates" Url="@_menuItems["OnboardingTemplates"]" />
-                                        <MenuItem Text="Data Import" Url="@_menuItems["DataImport"]" />
+                                        @foreach (var dest in section.Destinations)
+                                        {
+                                            <MenuItem Text="@dest.Title" IconCss="@dest.IconCss" Url="@dest.Url" />
+                                        }
                                     </MenuItems>
                                 </MenuItem>
-                                <MenuItem Text="Assets" IconCss="fa-solid fa-box">
-                                    <MenuItems>
-                                        <MenuItem Text="Assets" Url="@_menuItems["Assets"]" />
-                                        <MenuItem Text="Asset Categories" Url="@_menuItems["AssetCategories"]" />
-                                    </MenuItems>
-                                </MenuItem>
-                                <MenuItem Text="Leave" IconCss="fa-solid fa-calendar-days">
-                                    <MenuItems>
-                                        <MenuItem Text="Leave Types" Url="@_menuItems["LeaveTypes"]" />
-                                        <MenuItem Text="Leave Policies" Url="@_menuItems["LeavePolicies"]" />
-                                        <MenuItem Text="Public Holidays" Url="@_menuItems["PublicHolidays"]" />
-                                        <MenuItem Text="Sickness Categories" Url="@_menuItems["SicknessCategories"]" />
-                                    </MenuItems>
-                                </MenuItem>
-                            }
-                            @if (Session.CanManageSharedDocuments)
-                            {
-                                <MenuItem Text="Shared Documents" IconCss="fa-solid fa-file-lines" Url="@_menuItems["SharedDocuments"]" />
-                            }
-                            @if (Session.CanViewReporting)
-                            {
-                                <MenuItem Text="Reporting" IconCss="fa-solid fa-chart-column" Url="@_menuItems["Reporting"]" />
-                            }
-                            @if (Session.CanViewComplianceCentre)
-                            {
-                                <MenuItem Text="Compliance Centre" IconCss="fa-solid fa-shield-halved" Url="@_menuItems["ComplianceCentre"]" />
-                            }
-                            @if (Session.CanViewAdminAlerts)
-                            {
-                                <MenuItem Text="Administrative Alerts" IconCss="fa-solid fa-triangle-exclamation" Url="@_menuItems["AdministrativeAlerts"]" />
-                            }
-                            @if (Session.CanManageCompanyConfiguration || Session.CanManageCompany || Session.CanManageHrSettings || Session.CanManageEmployees || Session.CanManageLeavePolicies || Session.CanManageRecruitment || Session.CanManageSharedDocuments)
-                            {
-                                <MenuItem Text="Administration" IconCss="fa-solid fa-gears" Url="@_menuItems["AdministrationHub"]" />
-                            }
-                            @if (Session.CanManageCompanyConfiguration)
-                            {
-                                <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
-                            }
-                            @if (Session.CanManageHrSettings)
-                            {
-                                <MenuItem Text="HR Settings" IconCss="fa-solid fa-sliders" Url="@_menuItems["HrSettings"]" />
-                            }
-                            @if (Session.CanViewUsers)
-                            {
-                                <MenuItem Text="User Administration" IconCss="fa-solid fa-user-shield" Url="@_menuItems["UserAdministration"]" />
                             }
                             @if (Session.IsHrAdministrator || Session.CanManageCompany)
                             {
@@ -161,6 +109,7 @@ else
                 }
                 <span class="page-title">@CurrentPageTitle</span>
                 <div class="top-bar-actions">
+                    <AdminQuickNav />
                     <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")" aria-label="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
                         @if (IsDark)
                         {
@@ -361,6 +310,22 @@ else
 
     private sealed record PersonaOption(string UserId, string DisplayName);
 
+    // ADM-07 — the seven canonical administrative sections, permission-filtered by the shared
+    // AdminNavigation helper. Replaces the old flat block of hand-maintained admin MenuItems.
+    private IReadOnlyList<AdminNavSection> _adminSections = [];
+
+    private static string SectionIcon(AdminNavGroup group) => group switch
+    {
+        AdminNavGroup.PeopleAndUsers => "fa-solid fa-users",
+        AdminNavGroup.Company => "fa-solid fa-building",
+        AdminNavGroup.HrConfiguration => "fa-solid fa-sliders",
+        AdminNavGroup.Compliance => "fa-solid fa-shield-halved",
+        AdminNavGroup.Reports => "fa-solid fa-chart-column",
+        AdminNavGroup.AuditAndSecurity => "fa-solid fa-triangle-exclamation",
+        AdminNavGroup.PlatformOperations => "fa-solid fa-server",
+        _ => "fa-solid fa-gears",
+    };
+
     private readonly Dictionary<string, string> _menuItems = new()
     {
         ["AdministrationHub"] = "/",
@@ -401,6 +366,7 @@ else
         await Session.InitialiseAsync();
 
         var companyId = Session.CompanyId;
+        _adminSections = AdminNavigation.Sections(AdminNavCapabilities.From(Session), companyId);
         _menuItems["AdministrationHub"] = $"/companies/{companyId}/administration";
         _menuItems["Employees"] = $"/companies/{companyId}/employees";
         _menuItems["Departments"] = $"/companies/{companyId}/departments";

@@ -57,6 +57,31 @@ function goBack() {
     window.history.back();
 }
 
+// ADM-07 quick-navigation command palette. The AdminQuickNav component registers a DotNet
+// reference on first render (and unregisters on dispose); a single global keydown listener
+// opens the palette on Ctrl+K / Cmd+K when one is registered.
+let adminQuickNavRef = null;
+
+function registerAdminQuickNav(dotNetRef) {
+    adminQuickNavRef = dotNetRef;
+}
+
+function unregisterAdminQuickNav() {
+    adminQuickNavRef = null;
+}
+
+function openAdminQuickNav() {
+    if (adminQuickNavRef) adminQuickNavRef.invokeMethodAsync('OpenFromJs');
+}
+
+window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+        if (!adminQuickNavRef) return;
+        e.preventDefault();
+        adminQuickNavRef.invokeMethodAsync('OpenFromJs');
+    }
+});
+
 // Forces a genuine hard browser navigation (bypassing Blazor Server's "enhanced navigation", which
 // can intercept NavigationManager.NavigateTo(..., forceLoad: true) and keep the existing circuit
 // alive instead of tearing it down). Used after establishing a new Supabase session cookie

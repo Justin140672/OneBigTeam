@@ -1,0 +1,206 @@
+@* ADM-07 — permission-aware quick-navigation command palette (Ctrl+K / Cmd+K). *@
+@implements IAsyncDisposable
+@inject AppSession Session
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+@if (_caps.HasAnyAdministrativeAccess)
+{
+    <button type="button"
+            class="quick-nav-trigger"
+            @ref="_triggerButton"
+            @onclick="Open"
+            aria-label="Quick navigation"
+            title="Quick navigation (Ctrl+K)">
+        <i class="fa-solid fa-magnifying-glass"></i>
+    </button>
+
+    @if (_open)
+    {
+        <div class="quick-nav-overlay" @onclick="Close">
+            <div class="quick-nav-panel"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-label="Quick navigation"
+                 @onclick:stopPropagation="true"
+                 @onkeydown="OnKeyDown">
+                <div class="quick-nav-input-row">
+                    <i class="fa-solid fa-magnifying-glass quick-nav-input-icon"></i>
+                    <input @ref="_input"
+                           type="text"
+                           class="quick-nav-input"
+                           role="combobox"
+                           aria-expanded="true"
+                           aria-controls="quick-nav-listbox"
+                           aria-activedescendant="@ActiveOptionId"
+                           placeholder="Search administration…"
+                           autocomplete="off"
+                           value="@_term"
+                           @oninput="OnInput" />
+                </div>
+
+                <ul class="quick-nav-results" id="quick-nav-listbox" role="listbox">
+                    @if (_results.Count == 0)
+                    {
+                        <li class="quick-nav-empty">No matching pages</li>
+                    }
+                    else
+                    {
+                        @foreach (var group in _grouped)
+                        {
+                            <li class="quick-nav-group-heading" role="presentation">@group.Label</li>
+                            @foreach (var dest in group.Destinations)
+                            {
+                                var index = _results.IndexOf(dest);
+                                var isActive = index == _activeIndex;
+                                <li id="@OptionId(index)"
+                                    role="option"
+                                    aria-selected="@(isActive ? "true" : "false")"
+                                    class="quick-nav-option @(isActive ? "is-active" : "")"
+                                    @onclick="() => Navigate(dest)"
+                                    @onmouseenter="() => SetActive(index)">
+                                    <i class="@dest.IconCss quick-nav-option-icon"></i>
+                                    <span class="quick-nav-option-text">
+                                        <span class="quick-nav-option-title">@dest.Title</span>
+                                        <span class="quick-nav-option-group">@group.Label</span>
+                                    </span>
+                                </li>
+                            }
+                        }
+                    }
+                </ul>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private AdminNavCapabilities _caps = default!;
+    private bool _open;
+    private bool _shouldFocusInput;
+    private string _term = string.Empty;
+    private int _activeIndex;
+
+    private List<AdminDestination> _results = new();
+    private List<GroupBlock> _grouped = new();
+
+    private ElementReference _input;
+    private ElementReference _triggerButton;
+    private DotNetObjectReference<AdminQuickNav>? _selfRef;
+    private bool _registered;
+
+    private sealed record GroupBlock(string Label, List<AdminDestination> Destinations);
+
+    protected override void OnInitialized()
+    {
+        _caps = AdminNavCapabilities.From(Session);
+        Refresh();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _caps.HasAnyAdministrativeAccess)
+        {
+            _selfRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerAdminQuickNav", _selfRef);
+            _registered = true;
+        }
+
+        if (_open && _shouldFocusInput)
+        {
+            _shouldFocusInput = false;
+            try { await _input.FocusAsync(); } catch { }
+        }
+    }
+
+    [JSInvokable]
+    public Task OpenFromJs() => InvokeAsync(Open);
+
+    private void Open()
+    {
+        _open = true;
+        _term = string.Empty;
+        _activeIndex = 0;
+        Refresh();
+        _shouldFocusInput = true;
+        StateHasChanged();
+    }
+
+    private void Close()
+    {
+        if (!_open) return;
+        _open = false;
+        StateHasChanged();
+        _ = FocusTriggerAsync();
+    }
+
+    private async Task FocusTriggerAsync()
+    {
+        try { await _triggerButton.FocusAsync(); } catch { }
+    }
+
+    private void OnInput(Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    {
+        _term = e.Value?.ToString() ?? string.Empty;
+        _activeIndex = 0;
+        Refresh();
+    }
+
+    private void SetActive(int index) => _activeIndex = index;
+
+    private void Refresh()
+    {
+        _results = AdminNavigation.Search(_caps, Session.CompanyId, _term).ToList();
+        _grouped = _results
+            .GroupBy(d => d.Group)
+            .Select(g => new GroupBlock(AdminNavGroupInfo.Label(g.Key), g.ToList()))
+            .ToList();
+
+        if (_results.Count == 0)
+            _activeIndex = 0;
+        else if (_activeIndex >= _results.Count)
+            _activeIndex = _results.Count - 1;
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Escape":
+                Close();
+                break;
+            case "ArrowDown":
+                if (_results.Count > 0)
+                    _activeIndex = (_activeIndex + 1) % _results.Count;
+                break;
+            case "ArrowUp":
+                if (_results.Count > 0)
+                    _activeIndex = (_activeIndex - 1 + _results.Count) % _results.Count;
+                break;
+            case "Enter":
+                if (_activeIndex >= 0 && _activeIndex < _results.Count)
+                    Navigate(_results[_activeIndex]);
+                break;
+        }
+    }
+
+    private void Navigate(AdminDestination dest)
+    {
+        _open = false;
+        Navigation.NavigateTo(dest.Url);
+    }
+
+    private static string OptionId(int index) => $"quick-nav-option-{index}";
+
+    private string? ActiveOptionId =>
+        _activeIndex >= 0 && _activeIndex < _results.Count ? OptionId(_activeIndex) : null;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_registered)
+        {
+            try { await JS.InvokeVoidAsync("unregisterAdminQuickNav"); } catch { }
+        }
+        _selfRef?.Dispose();
+    }
+}

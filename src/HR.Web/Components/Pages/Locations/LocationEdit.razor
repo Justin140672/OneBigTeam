@@ -9,12 +9,9 @@
 <PageTitle>@PageTitle</PageTitle>
 
 <div class="container py-4">
-    <SfBreadcrumb Class="mb-3">
-        <BreadcrumbItems>
-            <BreadcrumbItem Text="Locations" Url="@($"/companies/{CompanyId}/locations")" />
-            <BreadcrumbItem Text="@PageTitle" />
-        </BreadcrumbItems>
-    </SfBreadcrumb>
+    <HubBreadcrumb CompanyId="CompanyId"
+                   Parent="@(("Locations", $"/companies/{CompanyId}/locations"))"
+                   CurrentPage="@PageTitle" />
 
     @if (IsLoading)
     {

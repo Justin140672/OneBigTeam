@@ -5,17 +5,26 @@
         <span class="admin-brand">One Big Team — Admin Portal</span>
         <AuthorizeView>
             <Authorized>
-                <nav class="admin-nav">
-                    <NavLink href="/" Match="NavLinkMatch.All" class="admin-nav-link">Dashboard</NavLink>
-                    <NavLink href="/customers" class="admin-nav-link">Customers</NavLink>
-                    <NavLink href="/failed-payments" class="admin-nav-link">Failed Payments</NavLink>
-                    <NavLink href="/jobs" class="admin-nav-link">Background Jobs</NavLink>
-                    <NavLink href="/system-health" class="admin-nav-link">System Health</NavLink>
-                    <NavLink href="/metrics" class="admin-nav-link">Application Metrics</NavLink>
-                    <NavLink href="/audit-log" class="admin-nav-link">Audit Log</NavLink>
-                    <NavLink href="/deletion-queue" class="admin-nav-link">Deletion Queue</NavLink>
-                    <NavLink href="/admin-users" class="admin-nav-link">Administrators</NavLink>
-                    <NavLink href="/settings" class="admin-nav-link">Platform Settings</NavLink>
+                <nav class="admin-nav" aria-label="Platform administration">
+                    <div class="admin-nav-group" role="group" aria-label="Platform operations">
+                        <span class="admin-nav-group-label">Platform operations</span>
+                        <NavLink href="/" Match="NavLinkMatch.All" class="admin-nav-link">Dashboard</NavLink>
+                        <NavLink href="/system-health" class="admin-nav-link">System Health</NavLink>
+                        <NavLink href="/metrics" class="admin-nav-link">Application Metrics</NavLink>
+                        <NavLink href="/jobs" class="admin-nav-link">Background Jobs</NavLink>
+                    </div>
+                    <div class="admin-nav-group" role="group" aria-label="Customers">
+                        <span class="admin-nav-group-label">Customers</span>
+                        <NavLink href="/customers" class="admin-nav-link">Customers</NavLink>
+                        <NavLink href="/failed-payments" class="admin-nav-link">Failed Payments</NavLink>
+                        <NavLink href="/deletion-queue" class="admin-nav-link">Deletion Queue</NavLink>
+                    </div>
+                    <div class="admin-nav-group" role="group" aria-label="Audit and security">
+                        <span class="admin-nav-group-label">Audit and security</span>
+                        <NavLink href="/audit-log" class="admin-nav-link">Audit Log</NavLink>
+                        <NavLink href="/admin-users" class="admin-nav-link">Administrators</NavLink>
+                        <NavLink href="/settings" class="admin-nav-link">Platform Settings</NavLink>
+                    </div>
                 </nav>
             </Authorized>
         </AuthorizeView>

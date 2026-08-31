@@ -1,0 +1,28 @@
+@* ADM-07 — visible breadcrumb trail for nested platform administration pages. Plain semantic
+   markup (no Syncfusion dependency in the Admin portal); the <nav aria-label> + aria-current
+   give screen-reader users the wayfinding context the flat top nav alone does not. *@
+
+<nav class="admin-breadcrumb" aria-label="Breadcrumb">
+    <ol>
+        @for (var i = 0; i < Trail.Count; i++)
+        {
+            var crumb = Trail[i];
+            var isLast = i == Trail.Count - 1;
+            <li>
+                @if (isLast || crumb.Url is null)
+                {
+                    <span aria-current="page">@crumb.Text</span>
+                }
+                else
+                {
+                    <a href="@crumb.Url">@crumb.Text</a>
+                }
+            </li>
+        }
+    </ol>
+</nav>
+
+@code {
+    /// <summary>Ordered crumbs from the root to the current page (the last item renders as plain text).</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<(string Text, string? Url)> Trail { get; set; } = [];
+}

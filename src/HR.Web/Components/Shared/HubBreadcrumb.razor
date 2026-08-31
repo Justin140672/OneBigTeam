@@ -1,10 +1,12 @@
 @* Shared 2-3 item breadcrumb for Administration-hub-linked settings screens (ADM-04). *@
+@inject NavigationManager Navigation
+
 <SfBreadcrumb Class="mb-3">
     <BreadcrumbItems>
         <BreadcrumbItem Text="Administration" Url="@($"/companies/{CompanyId}/administration")" />
         @if (Parent is { } parent)
         {
-            <BreadcrumbItem Text="@parent.Text" Url="@parent.Url" />
+            <BreadcrumbItem Text="@parent.Text" Url="@ParentUrl(parent.Url)" />
         }
         <BreadcrumbItem Text="@CurrentPage" />
     </BreadcrumbItems>
@@ -14,4 +16,22 @@
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public string CurrentPage { get; set; } = string.Empty;
     [Parameter] public (string Text, string Url)? Parent { get; set; }
+
+    // ADM-07 — when the user arrived here from a filtered list (which now passes its exact
+    // path+query as a "?returnUrl="), the "back to list" crumb should return to that filtered
+    // view rather than the bare list URL. Only an app-relative path is trusted.
+    private string ParentUrl(string fallback)
+    {
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(
+            Navigation.ToAbsoluteUri(Navigation.Uri).Query);
+
+        if (query.TryGetValue("returnUrl", out var value))
+        {
+            var returnUrl = value.ToString();
+            if (returnUrl.StartsWith('/') && !returnUrl.StartsWith("//"))
+                return returnUrl;
+        }
+
+        return fallback;
+    }
 }

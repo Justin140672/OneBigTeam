@@ -1,6 +1,7 @@
 using HR.Web.Components.Controls;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.AspNetCore.WebUtilities;
 using Syncfusion.Blazor.Grids;
 using Syncfusion.Blazor.Navigations;
 
@@ -143,7 +144,8 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
     protected virtual Task OnViewSelectedAsync(TItem item)
     {
         var url = GetViewUrl(item);
-        if (url is not null) Navigation.NavigateTo(url);
+        if (url is not null)
+            Navigation.NavigateTo(AppendReturnUrl(url, CurrentListRelativeUrlWithQuery()));
         return Task.CompletedTask;
     }
 
@@ -198,7 +200,8 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
             case "hr-add":
                 if (IsAddDisabled) break;
                 var addUrl = GetAddUrl();
-                if (addUrl is not null) Navigation.NavigateTo(addUrl);
+                if (addUrl is not null)
+                    Navigation.NavigateTo(AppendReturnUrl(addUrl, CurrentListRelativeUrlWithQuery()));
                 break;
 
             case "hr-edit":
@@ -209,7 +212,8 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                 if (args.Item.Id == "hr-edit")
                 {
                     var url = GetEditUrl(records[0]);
-                    if (url is not null) Navigation.NavigateTo(url);
+                    if (url is not null)
+                        Navigation.NavigateTo(AppendReturnUrl(url, CurrentListRelativeUrlWithQuery()));
                 }
                 else
                 {
@@ -227,6 +231,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
 
             case "hr-toggle-active":
                 ShowInactive = !ShowInactive;
+                SyncFilterStateToUrl();
                 await LoadAsync();
                 break;
 
@@ -256,10 +261,65 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
 
     private CancellationTokenSource? _searchCts;
 
+    // ADM-07 — restore the list's own filter state (search term + inactive toggle) from the URL
+    // query string on a direct hit, so a breadcrumb/back link into the exact filtered view works.
+    private bool _filterStateRestored;
+
     protected override async Task OnParametersSetAsync()
     {
+        if (!_filterStateRestored)
+        {
+            _filterStateRestored = true;
+            var query = QueryHelpers.ParseQuery(Navigation.ToAbsoluteUri(Navigation.Uri).Query);
+
+            if (query.TryGetValue("q", out var q) && !string.IsNullOrWhiteSpace(q))
+                SearchTerm = q.ToString();
+
+            if (query.TryGetValue("inactive", out var inactive) && inactive == "true")
+                ShowInactive = true;
+        }
+
         await OnBeforeLoadAsync();
         await LoadAsync();
+    }
+
+    // The list's own path with its current filter state encoded as a query string.
+    private string ListPathWithFilterQuery()
+    {
+        var path = Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath;
+        var parameters = new Dictionary<string, string?>();
+
+        if (!string.IsNullOrWhiteSpace(SearchTerm))
+            parameters["q"] = SearchTerm;
+        if (ShowInactive)
+            parameters["inactive"] = "true";
+
+        return parameters.Count == 0 ? path : QueryHelpers.AddQueryString(path, parameters);
+    }
+
+    // Push the current filter state into the browser URL in place (no navigation/history entry),
+    // but only when it actually differs — avoids a re-entrancy loop.
+    private void SyncFilterStateToUrl()
+    {
+        var target = ListPathWithFilterQuery();
+        var current = Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery;
+
+        if (!string.Equals(target, current, StringComparison.Ordinal))
+            Navigation.NavigateTo(target, replace: true);
+    }
+
+    // The current list URL (path + query), app-relative with a leading slash — passed as
+    // "?returnUrl=" so the edit/view page's Close button and breadcrumb return to this exact view.
+    private string CurrentListRelativeUrlWithQuery()
+    {
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        return relative.StartsWith('/') ? relative : "/" + relative;
+    }
+
+    private static string AppendReturnUrl(string target, string returnUrl)
+    {
+        var separator = target.Contains('?') ? '&' : '?';
+        return $"{target}{separator}returnUrl={Uri.EscapeDataString(returnUrl)}";
     }
 
     protected virtual Task OnBeforeLoadAsync() => Task.CompletedTask;
@@ -288,6 +348,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
     protected async Task OnSearchChanged(string value)
     {
         SearchTerm = value;
+        SyncFilterStateToUrl();
 
         _searchCts?.Cancel();
         _searchCts?.Dispose();
