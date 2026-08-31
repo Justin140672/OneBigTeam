@@ -11,6 +11,7 @@
 @if (_ready)
 {
     <div class="container-fluid py-4">
+        <DashboardAnnouncer Message="@_announcement" />
         <div class="dashboard-greeting mb-4">
             <h1 class="dashboard-heading">@Greeting(), @Session.FirstName</h1>
             <p class="text-muted mb-0">@DateTime.Now.ToString("dddd, d MMMM yyyy")</p>
@@ -53,9 +54,21 @@
     private int? _attentionCount;
     private int? _awayTodayCount;
 
+    // DSH-07: polite live-region text — refreshed whenever a headline count changes.
+    private string? _announcement;
+
+    private void Announce()
+    {
+        var summary = ActivitySummary();
+        _announcement = DashboardAnnouncements.Compose(
+            DashboardAnnouncements.LoadComplete("Manager dashboard"),
+            string.IsNullOrWhiteSpace(summary) ? null : summary + ".");
+    }
+
     private Task OnAlertCountsChanged(IReadOnlyDictionary<Guid, int> counts)
     {
         _alertCounts = counts;
+        Announce();
         StateHasChanged();
         return Task.CompletedTask;
     }
@@ -63,6 +76,7 @@
     private Task OnItemCountChanged(int count)
     {
         _attentionCount = count;
+        Announce();
         StateHasChanged();
         return Task.CompletedTask;
     }
@@ -70,6 +84,7 @@
     private Task OnAwayTodayChanged(int count)
     {
         _awayTodayCount = count;
+        Announce();
         StateHasChanged();
         return Task.CompletedTask;
     }

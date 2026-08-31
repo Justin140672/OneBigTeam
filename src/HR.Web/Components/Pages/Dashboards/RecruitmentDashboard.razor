@@ -16,6 +16,7 @@
 @if (_ready)
 {
     <div class="container-fluid py-4 recruitment-dashboard">
+        <DashboardAnnouncer Message="@_announcement" />
         <div class="recruitment-dashboard-header mb-3">
             <div>
                 <h1 class="dashboard-heading mb-1">Recruitment</h1>
@@ -72,33 +73,38 @@
             }
         </section>
 
-        <ul class="nav nav-tabs recruitment-dashboard-tabs mb-3" role="tablist" aria-label="Recruitment dashboard sections">
-            <li class="nav-item" role="presentation">
-                <button type="button" class="nav-link @(_tab == DashboardTab.Pipeline ? "active" : "")"
-                        role="tab" aria-selected="@(_tab == DashboardTab.Pipeline ? "true" : "false")"
-                        data-testid="recruitment-tab-pipeline" @onclick="() => SetTab(DashboardTab.Pipeline)">
-                    <i class="fa-solid fa-diagram-project me-1"></i>Pipeline
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button type="button" class="nav-link @(_tab == DashboardTab.Activity ? "active" : "")"
-                        role="tab" aria-selected="@(_tab == DashboardTab.Activity ? "true" : "false")"
-                        data-testid="recruitment-tab-activity" @onclick="() => SetTab(DashboardTab.Activity)">
-                    <i class="fa-solid fa-bell me-1"></i>Activity
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button type="button" class="nav-link @(_tab == DashboardTab.Insights ? "active" : "")"
-                        role="tab" aria-selected="@(_tab == DashboardTab.Insights ? "true" : "false")"
-                        data-testid="recruitment-tab-insights" @onclick="() => SetTab(DashboardTab.Insights)">
-                    <i class="fa-solid fa-chart-simple me-1"></i>Insights
-                </button>
-            </li>
+        @* DSH-07: "full keyboard tab behaviour" per the ticket applies to these three dashboard
+           tabs (WAI-ARIA tabs pattern: roving tabindex, Arrow/Home/End, DOM focus follows
+           selection). The Kanban board inside the Pipeline panel is explicitly out of scope. *@
+        <ul class="nav nav-tabs recruitment-dashboard-tabs mb-3" role="tablist"
+            aria-label="Recruitment dashboard sections" @onkeydown="OnTabsKeyDown">
+            @foreach (var (tab, index) in _tabs.Select((t, i) => (t, i)))
+            {
+                var t = tab;
+                var i = index;
+                var name = t.ToString().ToLowerInvariant();
+                var selected = _tab == t;
+                <li class="nav-item" role="presentation">
+                    <button type="button" class="nav-link @(selected ? "active" : "")"
+                            @ref="_tabRefs[i]"
+                            id="@($"recruitment-tab-{name}")"
+                            role="tab"
+                            aria-selected="@(selected ? "true" : "false")"
+                            aria-controls="@($"recruitment-tabpanel-{name}")"
+                            tabindex="@(selected ? "0" : "-1")"
+                            data-testid="@($"recruitment-tab-{name}")"
+                            @onclick="() => SetTab(t)">
+                        <i class="fa-solid @TabIcon(t) me-1"></i>@t.ToString()
+                    </button>
+                </li>
+            }
         </ul>
 
         @if (_tab == DashboardTab.Pipeline)
         {
-            <section class="dashboard-section" aria-label="Recruitment pipeline">
+            <section class="dashboard-section" role="tabpanel" tabindex="0"
+                     id="recruitment-tabpanel-pipeline" aria-labelledby="recruitment-tab-pipeline"
+                     aria-label="Recruitment pipeline">
                 <h2 class="dashboard-section-title">Pipeline</h2>
 
                 <div class="recruitment-dashboard-toolbar mb-3">
@@ -158,13 +164,17 @@
                 }
                 else
                 {
-                    <VacancyList CompanyId="Session.CompanyId" />
+                    <div class="dashboard-scroll-x">
+                        <VacancyList CompanyId="Session.CompanyId" />
+                    </div>
                 }
             </section>
         }
         else if (_tab == DashboardTab.Activity)
         {
-            <section class="dashboard-section" aria-label="Recruitment activity">
+            <section class="dashboard-section" role="tabpanel" tabindex="0"
+                     id="recruitment-tabpanel-activity" aria-labelledby="recruitment-tab-activity"
+                     aria-label="Recruitment activity">
                 <h2 class="dashboard-section-title">Activity</h2>
                 <div class="dashboard-detail-grid">
                     <RecruitmentSummaryWidget />
@@ -176,7 +186,9 @@
         }
         else
         {
-            <section class="dashboard-section" aria-label="Recruitment insights">
+            <section class="dashboard-section" role="tabpanel" tabindex="0"
+                     id="recruitment-tabpanel-insights" aria-labelledby="recruitment-tab-insights"
+                     aria-label="Recruitment insights">
                 <h2 class="dashboard-section-title">Insights</h2>
                 <div class="dashboard-overview-row">
                     <HiringPipelineChart />
@@ -200,6 +212,33 @@
 
     private enum DashboardTab { Pipeline, Activity, Insights }
     private DashboardTab _tab = DashboardTab.Pipeline;
+
+    // DSH-07: WAI-ARIA tabs keyboard support. Roving tabindex + Arrow/Home/End move selection
+    // and DOM focus together; the pure next-index maths lives in DashboardTabKeyboard.
+    private static readonly DashboardTab[] _tabs = [DashboardTab.Pipeline, DashboardTab.Activity, DashboardTab.Insights];
+    private readonly ElementReference[] _tabRefs = new ElementReference[3];
+    private int? _pendingFocusIndex;
+
+    // DSH-07: single polite live-region message, announced when the summary finishes loading
+    // or is retried.
+    private string? _announcement;
+
+    private static string TabIcon(DashboardTab tab) => tab switch
+    {
+        DashboardTab.Pipeline => "fa-diagram-project",
+        DashboardTab.Activity => "fa-bell",
+        _ => "fa-chart-simple",
+    };
+
+    private void OnTabsKeyDown(KeyboardEventArgs e)
+    {
+        var current = Array.IndexOf(_tabs, _tab);
+        var next = DashboardTabKeyboard.NextIndex(e.Key, current, _tabs.Length);
+        if (next is not { } n || n == current) return;
+
+        _tab = _tabs[n];
+        _pendingFocusIndex = n;
+    }
 
     // Judgement call ("remembers filters"): the Kanban board is per-vacancy (see
     // GetRecruitmentKanban's contract), so the dashboard needs a vacancy picker above it. Tab
@@ -274,6 +313,32 @@
         await Task.WhenAll(_summarySources.Select(LoadSummarySourceAsync));
         RecomputeSummary();
         _summaryLoading = false;
+        AnnounceSummary();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingFocusIndex is { } idx)
+        {
+            _pendingFocusIndex = null;
+            try { await _tabRefs[idx].FocusAsync(); } catch { }
+        }
+    }
+
+    private void AnnounceSummary()
+    {
+        var counts = new (string Label, int Count)[]
+        {
+            ("open vacancies", _openVacancies),
+            ("candidates in progress", _candidatesInProgress),
+            ("interviews requiring action", _interviewsRequiringAction),
+            ("offers awaiting response", _offersAwaitingResponse),
+        };
+
+        _announcement = DashboardAnnouncements.Compose(
+            DashboardAnnouncements.LoadComplete("Recruitment dashboard"),
+            DashboardAnnouncements.Counts(counts),
+            DashboardAnnouncements.PartialFailure(_summary.FailedSources));
     }
 
     private void RecomputeSummary() => _summary = WidgetPanelState.Summarise(
@@ -350,6 +415,7 @@
         await LoadSummarySourceAsync(name);
         RecomputeSummary();
         _retrying.Remove(name);
+        AnnounceSummary();
     }
 
     private static RecruitmentMetricDrillDownRow Row(RecruitmentMetricApplicationItem i) =>

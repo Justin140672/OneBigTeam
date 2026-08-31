@@ -56,9 +56,15 @@
                             class="team-status-tile @(t.Warning ? "team-status-tile--warning" : "") @(_openTile == t.Key ? "team-status-tile--active" : "")"
                             role="listitem"
                             aria-expanded="@(_openTile == t.Key ? "true" : "false")"
-                            aria-label="@($"{t.Count} {t.Label}. Show matching team members.")"
+                            aria-label="@($"{t.Count} {t.Label}{(t.Warning ? " (needs attention)" : "")}. Show matching team members.")"
                             @onclick="() => ToggleTile(t.Key)">
-                        <span class="team-status-value">@t.Count</span>
+                        <span class="team-status-value">
+                            @if (t.Warning)
+                            {
+                                <i class="fa-solid fa-triangle-exclamation team-status-warning-icon" aria-hidden="true"></i>
+                            }
+                            @t.Count
+                        </span>
                         <span class="team-status-label">@t.Label</span>
                     </button>
                 }

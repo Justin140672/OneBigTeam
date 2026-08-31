@@ -1611,3 +1611,139 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
 .employee-section-divider {
     border-top: 2px solid #dee2e6;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DSH-07 — dashboard accessibility & responsive behaviour
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Standard visually-hidden pattern — content stays in the accessibility tree
+   (e.g. aria-live regions) but is removed from the visual layout. */
+.hr-visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Visible keyboard focus for every actionable dashboard card / row / tab / link.
+   Consistent 2px accent outline; negative offset where a parent card clips overflow. */
+.attention-queue-item:focus-visible,
+.team-status-tile:focus-visible,
+.hbar-row--button:focus-visible,
+.widget-kpi--link:focus-visible,
+.recruitment-dashboard-tabs .nav-link:focus-visible,
+.dashboard-switcher-item:focus-visible,
+.widget-source-warning-retry:focus-visible,
+.widget-view-all:focus-visible {
+    outline: 2px solid var(--hr-color-primary);
+    outline-offset: -2px;
+    border-radius: var(--hr-radius-sm);
+}
+
+.recruitment-dashboard-tabs .nav-link:focus-visible {
+    outline-offset: 2px;
+}
+
+/* Priority pip now carries a per-severity glyph as a non-colour cue (DSH-07). */
+.priority-pip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: auto;
+    background: transparent !important;
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.priority-pip--critical { color: var(--hr-color-danger); }
+.priority-pip--high     { color: var(--hr-color-warning); }
+.priority-pip--medium   { color: var(--hr-color-warning-alt); }
+.priority-pip--low      { color: var(--hr-gray-400); opacity: 0.7; }
+
+.team-status-warning-icon {
+    color: var(--hr-color-warning, #d97706);
+    font-size: 0.8rem;
+    margin-right: 4px;
+}
+
+/* Text-alternative data tables under the two Syncfusion charts. */
+.chart-data-table {
+    width: 100%;
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+}
+
+.chart-data-table > summary {
+    cursor: pointer;
+    color: var(--hr-color-primary);
+    font-weight: 600;
+    padding: 4px 0;
+}
+
+.chart-data-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.chart-data-table caption {
+    text-align: left;
+    color: var(--hr-gray-500);
+    padding: 4px 0;
+}
+
+.chart-data-table th,
+.chart-data-table td {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--hr-gray-100);
+}
+
+/* Wide tables (Vacancy list, drill-down, chart alternatives) scroll within their
+   card instead of forcing the whole page wider on mobile. */
+.dashboard-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+}
+
+/* KPI tiles wrap on narrow viewports rather than squashing. */
+.widget-kpi-row {
+    flex-wrap: wrap;
+}
+
+/* Syncfusion chart SVGs are width:100% + fixed height; min-width:0 lets them shrink
+   inside a CSS grid track instead of setting a min-content width that overflows. */
+.dashboard-analytics-grid > *,
+.dashboard-overview-row > *,
+.dashboard-grid-3col > * {
+    min-width: 0;
+}
+
+.chart-tile .widget-body {
+    min-width: 0;
+    overflow: hidden;
+}
+
+@media (max-width: 700px) {
+    .recruitment-dashboard-header,
+    .recruitment-dashboard-actions,
+    .recruitment-dashboard-toolbar {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .recruitment-dashboard-action-btn {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .recruitment-dashboard-tabs {
+        flex-wrap: wrap;
+    }
+}

@@ -1,0 +1,9 @@
+@* Visually-hidden polite live region (DSH-07). Dashboards set Message when their data
+   finishes loading, is retried, or a headline count changes; screen readers announce it
+   without any visual change. *@
+
+<div class="hr-visually-hidden" aria-live="polite" aria-atomic="true" role="status">@Message</div>
+
+@code {
+    [Parameter] public string? Message { get; set; }
+}

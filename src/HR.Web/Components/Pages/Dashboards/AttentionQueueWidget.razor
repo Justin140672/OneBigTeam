@@ -63,7 +63,9 @@
                                 class="task-widget-item attention-queue-item @(i.IsOverdue ? "attention-queue-item--overdue" : "")"
                                 aria-label="@i.AccessibleLabel"
                                 @onclick="() => ActivateAsync(i)">
-                            <span class="priority-pip priority-pip--@i.PriorityCss"></span>
+                            <span class="priority-pip priority-pip--@i.PriorityCss" title="@i.PriorityLabel">
+                                <i class="@i.PriorityIcon" aria-hidden="true"></i>
+                            </span>
                             <div class="task-widget-content">
                                 <span class="task-widget-title">@i.Subject</span>
                                 <span class="task-widget-meta">@i.Category · @i.StatusLabel</span>
@@ -230,7 +232,25 @@
             _ => "low",
         };
 
+        // DSH-07: priority must not be conveyed by colour alone — surface the word in the
+        // accessible label and give each level a distinct glyph.
+        public string PriorityLabel => PriorityCss switch
+        {
+            "critical" => "Critical priority",
+            "high" => "High priority",
+            "medium" => "Medium priority",
+            _ => "Low priority",
+        };
+
+        public string PriorityIcon => PriorityCss switch
+        {
+            "critical" => "fa-solid fa-circle-exclamation",
+            "high" => "fa-solid fa-triangle-exclamation",
+            "medium" => "fa-solid fa-circle",
+            _ => "fa-regular fa-circle",
+        };
+
         public string AccessibleLabel =>
-            $"{Subject}, {Category}, {StatusLabel}{(DueLabel is null ? "" : $", due {DueLabel}")}. {ActionLabel}.";
+            $"{PriorityLabel}. {Subject}, {Category}, {StatusLabel}{(DueLabel is null ? "" : $", due {DueLabel}")}. {ActionLabel}.";
     }
 }

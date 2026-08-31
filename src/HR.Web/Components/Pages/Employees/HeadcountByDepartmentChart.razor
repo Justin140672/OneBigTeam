@@ -26,7 +26,8 @@
             }
             else
             {
-                <div class="hbar-chart-interactive">
+                <div class="hbar-chart-interactive" role="group"
+                     aria-label="@($"Headcount by department, {_data.Sum(d => d.Value)} active employees across {_data.Count} departments. Select a department to view its employees.")">
                     @foreach (var slice in _data)
                     {
                         var s = slice;

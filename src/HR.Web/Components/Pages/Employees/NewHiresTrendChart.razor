@@ -40,6 +40,25 @@
                         </ChartSeries>
                     </ChartSeriesCollection>
                 </SfChart>
+
+                @* DSH-07: text alternative for the Syncfusion column chart (SVG has no accessible data). *@
+                <details class="chart-data-table">
+                    <summary>View new-hire trend as a table</summary>
+                    <div class="dashboard-scroll-x">
+                        <table>
+                            <caption>New hires by month (last 6 months)</caption>
+                            <thead>
+                                <tr><th scope="col">Month</th><th scope="col">New hires</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var point in _data)
+                                {
+                                    <tr><td>@point.MonthLabel</td><td>@point.NewHireCount</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
             }
         </div>
     </div>

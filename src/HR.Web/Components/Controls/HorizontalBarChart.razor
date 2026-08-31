@@ -12,7 +12,7 @@
 else
 {
     var max = Bars.Max(b => b.Value);
-    <div class="hbar-chart" role="img" aria-label="@AriaLabel">
+    <div class="hbar-chart" role="img" aria-label="@FullAriaLabel">
         @foreach (var bar in Bars)
         {
             var pct = max <= 0 ? 0 : (double)bar.Value / max * 100;
@@ -31,6 +31,20 @@ else
     [Parameter, EditorRequired] public IReadOnlyList<HorizontalBarDatum> Bars { get; set; } = [];
     [Parameter] public string EmptyText { get; set; } = "No data available.";
     [Parameter] public string AriaLabel { get; set; } = "Chart";
+
+    /// <summary>
+    /// Optional explicit accessible summary. When not supplied (DSH-07) the component builds
+    /// one from <see cref="AriaLabel"/> plus every bar's label and value so a screen-reader
+    /// user gets the actual figures, not just the chart title.
+    /// </summary>
+    [Parameter] public string? SummaryText { get; set; }
+
+    private string FullAriaLabel =>
+        !string.IsNullOrWhiteSpace(SummaryText)
+            ? SummaryText!
+            : Bars.Count == 0
+                ? AriaLabel
+                : $"{AriaLabel}: {string.Join(", ", Bars.Select(b => $"{b.Label} {b.Value}"))}";
 
     public sealed record HorizontalBarDatum(string Label, int Value, string Color);
 }
