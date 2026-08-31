@@ -125,7 +125,94 @@ public class GetTeamTasksEndpointTests
         Assert.All(payload.Items, item => Assert.Equal("Open", item.Status));
     }
 
+    // ── DSH-01: authorization — {managerId} is not the authorization identity ──
+
+    [Fact]
+    public async Task Get_TeamTasks_Returns_Forbidden_For_Unrelated_Employee_Passing_Another_Managers_Id()
+    {
+        using var admin = await AuthenticatedClient();
+
+        var manager = await CreateEmployeeAsync(admin, "Target", "Manager");
+        var report = await CreateEmployeeAsync(admin, "Their", "Report");
+        await AssignManagerAsync(admin, report.Id, manager.Id);
+        await CreateTaskAsync("Report's private task", report.Id);
+
+        var outsider = await CreateEmployeeAsync(admin, "Nosey", "Outsider");
+        using var client = await AuthenticatedAsAsync(outsider.Id);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{manager.Id}/team-tasks");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_TeamTasks_Returns_Ok_When_Caller_Requests_Their_Own_Team()
+    {
+        using var admin = await AuthenticatedClient();
+
+        var manager = await CreateEmployeeAsync(admin, "Own", "Manager");
+        var report = await CreateEmployeeAsync(admin, "Own", "Report");
+        await AssignManagerAsync(admin, report.Id, manager.Id);
+        await CreateTaskAsync("Team task", report.Id);
+
+        using var client = await AuthenticatedAsAsync(manager.Id);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{manager.Id}/team-tasks");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        Assert.Single(payload!.Items);
+    }
+
+    [Fact]
+    public async Task Get_TeamTasks_Returns_Ok_For_Skip_Level_Manager_Of_The_Requested_Manager()
+    {
+        using var admin = await AuthenticatedClient();
+
+        var senior = await CreateEmployeeAsync(admin, "Senior", "Leader");
+        var manager = await CreateEmployeeAsync(admin, "Line", "Manager");
+        var report = await CreateEmployeeAsync(admin, "Junior", "Report");
+        await AssignManagerAsync(admin, manager.Id, senior.Id);
+        await AssignManagerAsync(admin, report.Id, manager.Id);
+        await CreateTaskAsync("Sub-team task", report.Id);
+
+        using var client = await AuthenticatedAsAsync(senior.Id);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{manager.Id}/team-tasks");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        Assert.Single(payload!.Items);
+    }
+
+    [Fact]
+    public async Task Get_TeamTasks_Returns_Forbidden_When_Route_Company_Does_Not_Match_Auth_Tenant()
+    {
+        using var admin = await AuthenticatedClient();
+        var manager = await CreateEmployeeAsync(admin, "Cross", "Tenant");
+
+        using var client = await AuthenticatedAsAsync(manager.Id);
+        var response = await client.GetAsync(
+            $"/api/companies/{Guid.NewGuid()}/employees/{manager.Id}/team-tasks");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    private async Task<HttpClient> AuthenticatedAsAsync(Guid userId, bool hrAdministrator = false)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, SeededCompanyId);
+        if (hrAdministrator)
+            await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator, SeededCompanyId);
+        return client;
+    }
 
     private async Task<HttpClient> AuthenticatedClient()
     {

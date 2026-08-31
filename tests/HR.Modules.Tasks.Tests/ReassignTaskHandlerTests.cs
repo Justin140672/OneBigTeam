@@ -4,6 +4,7 @@ using HR.Modules.Tasks.Features.ReassignTask;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using HR.Modules.Tasks.Persistence;
+using HR.Modules.Tasks.Services;
 using HR.Modules.Tasks.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,12 +14,20 @@ public class ReassignTaskHandlerTests
 {
     private static readonly DateTime FixedNow = new(2026, 6, 15, 9, 0, 0, DateTimeKind.Utc);
     private static readonly FakeClock Clock = new(FixedNow);
+    private static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");
 
     private static ReassignTaskHandler BuildHandler(
         TasksDbContext context,
         FakeAuditPublisher? audit = null,
-        FakeNotificationWriter? notif = null) =>
-        new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher());
+        FakeNotificationWriter? notif = null,
+        FakeRoleAuthorizationService? authorizationService = null,
+        FakeDirectReportsReader? directReportsReader = null) =>
+        new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher(),
+            // DSH-01: defaults to an HR-Administrator caller so tests unrelated to reassignment
+            // authorization don't need to wire up assignee/manager relationships.
+            new TasksResourceAuthorizer(
+                authorizationService ?? new FakeRoleAuthorizationService(HrAdministratorRoleId),
+                directReportsReader ?? new FakeDirectReportsReader()));
 
     private static TaskItem MakeTask(Guid companyId, Guid? assignedEmployeeId = null, Guid? assignedUserId = null)
     {
@@ -282,6 +291,98 @@ public class ReassignTaskHandlerTests
             CancellationToken.None);
 
         Assert.Empty(notif.Written);
+    }
+
+    // ── DSH-01: resource-ownership authorization ──────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Returns_Forbidden_For_Unrelated_Caller()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignee = Guid.NewGuid();
+        var unrelated = Guid.NewGuid();
+
+        var task = MakeTask(companyId, assignedEmployeeId: assignee);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new ReassignTaskRequest
+            {
+                CompanyId = companyId,
+                Id = task.Id,
+                AssignedEmployeeId = Guid.NewGuid(),
+                ActorUserId = unrelated
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("forbidden", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Manager_In_Assignees_Hierarchy()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignee = Guid.NewGuid();
+        var manager = Guid.NewGuid();
+
+        var task = MakeTask(companyId, assignedEmployeeId: assignee);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader(assignee));
+
+        var result = await handler.HandleAsync(
+            new ReassignTaskRequest
+            {
+                CompanyId = companyId,
+                Id = task.Id,
+                AssignedEmployeeId = Guid.NewGuid(),
+                ActorUserId = manager
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Forbidden_For_Unassigned_Task_When_Caller_Not_HrAdministrator()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var task = MakeTask(companyId);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(
+            context,
+            authorizationService: new FakeRoleAuthorizationService(),
+            directReportsReader: new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new ReassignTaskRequest
+            {
+                CompanyId = companyId,
+                Id = task.Id,
+                AssignedEmployeeId = Guid.NewGuid(),
+                ActorUserId = Guid.NewGuid()
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("forbidden", result.Error.Code);
     }
 
     private static TasksDbContext BuildContext()
