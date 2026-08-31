@@ -12,11 +12,19 @@
           AllowDragging="false"
           CssClass="employee-completion-dialog">
     <DialogTemplates>
-        <Header>Complete your employee profile</Header>
+        <Header>
+            <h2 class="ecd-heading">Welcome, @Session.FirstName — let's complete your profile</h2>
+        </Header>
         <Content>
-            <p class="text-muted mb-3">
-                Before you can start using the app, we need a few personal details from you.
-                This only takes a minute — you can update it later from your profile.
+            <p class="text-muted mb-2">
+                We already have some of your details. Please add the remaining information below so we can
+                finish setting up your employee account. Required fields are marked with an asterisk, and
+                you can update optional information later.
+            </p>
+            <p class="text-muted ecd-why">
+                We need this information to complete your employee record and keep your HR, payroll and
+                emergency-contact details accurate. Setup takes about 2 minutes — any optional details you
+                skip can be added later from your profile.
             </p>
 
             @if (!string.IsNullOrEmpty(GlobalError))
@@ -26,104 +34,133 @@
 
             <EditForm EditContext="_editContext">
                 <DataAnnotationsValidator />
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">First Name <span class="text-danger">*</span></label>
-                        <HrTextBox @bind-Value="Model.FirstName" Placeholder="First name" />
-                        <ValidationMessage For="@(() => Model.FirstName)" />
+
+                <section class="ecd-section" aria-labelledby="ecd-name-heading">
+                    <h3 id="ecd-name-heading" class="ecd-section-heading">Your name</h3>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <span class="form-label d-block" id="ecd-firstname-label">First Name</span>
+                            <div class="ecd-readonly" role="text" aria-labelledby="ecd-firstname-label">@Model.FirstName</div>
+                        </div>
+                        <div class="col-md-6">
+                            <span class="form-label d-block" id="ecd-lastname-label">Last Name</span>
+                            <div class="ecd-readonly" role="text" aria-labelledby="ecd-lastname-label">@Model.LastName</div>
+                        </div>
+                        <div class="col-12">
+                            <p class="text-muted ecd-note mb-0">Need to correct your name? Contact your HR administrator after setup.</p>
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Last Name <span class="text-danger">*</span></label>
-                        <HrTextBox @bind-Value="Model.LastName" Placeholder="Last name" />
-                        <ValidationMessage For="@(() => Model.LastName)" />
+                </section>
+
+                <section class="ecd-section" aria-labelledby="ecd-personal-heading">
+                    <h3 id="ecd-personal-heading" class="ecd-section-heading">Personal details</h3>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-preferredname">Preferred Name <span class="text-muted">(optional)</span></label>
+                            <HrTextBox ID="ecd-preferredname" @bind-Value="Model.PreferredName" Placeholder="Defaults to first name" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-dob">Date of Birth <span class="text-danger">*</span></label>
+                            <SfDatePicker ID="ecd-dob" TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy"
+                                          HtmlAttributes="@_ariaRequired" />
+                            <ValidationMessage For="@(() => Model.DateOfBirth)" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-nationality">Nationality <span class="text-danger">*</span></label>
+                            <SfDropDownList ID="ecd-nationality"
+                                            TValue="string"
+                                            TItem="NationalityListItem"
+                                            DataSource="@_nationalities"
+                                            @bind-Value="Model.Nationality"
+                                            Placeholder="Select nationality"
+                                            AllowFiltering="true"
+                                            HtmlAttributes="@_ariaRequired">
+                                <DropDownListFieldSettings Value="Name" Text="Name" />
+                            </SfDropDownList>
+                            <ValidationMessage For="@(() => Model.Nationality)" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-gender">Gender <span class="text-danger">*</span></label>
+                            <SfDropDownList ID="ecd-gender"
+                                            TValue="string"
+                                            TItem="string"
+                                            DataSource="@_genderOptions"
+                                            @bind-Value="Model.Gender"
+                                            Placeholder="Select gender"
+                                            HtmlAttributes="@_ariaRequired">
+                            </SfDropDownList>
+                            <ValidationMessage For="@(() => Model.Gender)" />
+                            @if (Model.Gender == "Other")
+                            {
+                                <div class="mt-2">
+                                    <label class="form-label" for="ecd-genderother">Please specify your gender <span class="text-danger">*</span></label>
+                                    <HrTextBox ID="ecd-genderother" @bind-Value="Model.GenderOther" Placeholder="Please specify" />
+                                </div>
+                            }
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Preferred Name</label>
-                        <HrTextBox @bind-Value="Model.PreferredName" Placeholder="Defaults to first name" />
+                </section>
+
+                <section class="ecd-section" aria-labelledby="ecd-contact-heading">
+                    <h3 id="ecd-contact-heading" class="ecd-section-heading">Contact details</h3>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-personalemail">Personal Email <span class="text-muted">(optional)</span></label>
+                            <HrTextBox ID="ecd-personalemail" @bind-Value="Model.PersonalEmail" Placeholder="personal@example.com" />
+                            <ValidationMessage For="@(() => Model.PersonalEmail)" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-phonenumber">Phone Number <span class="text-muted">(optional)</span></label>
+                            <HrTextBox ID="ecd-phonenumber" @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" />
+                            <ValidationMessage For="@(() => Model.PhoneNumber)" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-homephone">Home Phone <span class="text-muted">(optional)</span></label>
+                            <HrTextBox ID="ecd-homephone" @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" />
+                            <ValidationMessage For="@(() => Model.HomePhone)" />
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
-                        <SfDatePicker TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" />
-                        <ValidationMessage For="@(() => Model.DateOfBirth)" />
+                </section>
+
+                <section class="ecd-section" aria-labelledby="ecd-address-heading">
+                    <h3 id="ecd-address-heading" class="ecd-section-heading">Home address</h3>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-address1">Address Line 1 <span class="text-danger">*</span></label>
+                            <HrTextBox ID="ecd-address1" @bind-Value="Model.AddressLine1" Placeholder="Street address" HtmlAttributes="@_ariaRequired" />
+                            <ValidationMessage For="@(() => Model.AddressLine1)" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-address2">Address Line 2 <span class="text-muted">(optional)</span></label>
+                            <HrTextBox ID="ecd-address2" @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-city">City <span class="text-danger">*</span></label>
+                            <HrTextBox ID="ecd-city" @bind-Value="Model.City" Placeholder="e.g. London" HtmlAttributes="@_ariaRequired" />
+                            <ValidationMessage For="@(() => Model.City)" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-county">County <span class="text-muted">(optional)</span></label>
+                            <HrTextBox ID="ecd-county" @bind-Value="Model.County" Placeholder="e.g. Greater London" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-postcode">Postcode <span class="text-danger">*</span></label>
+                            <HrTextBox ID="ecd-postcode" @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" HtmlAttributes="@_ariaRequired" />
+                            <ValidationMessage For="@(() => Model.PostCode)" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="ecd-country">Country <span class="text-muted">(optional)</span></label>
+                            <HrTextBox ID="ecd-country" @bind-Value="Model.Country" Placeholder="e.g. United Kingdom" />
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Nationality <span class="text-danger">*</span></label>
-                        <SfDropDownList TValue="string"
-                                        TItem="NationalityListItem"
-                                        DataSource="@_nationalities"
-                                        @bind-Value="Model.Nationality"
-                                        Placeholder="Select nationality"
-                                        AllowFiltering="true">
-                            <DropDownListFieldSettings Value="Name" Text="Name" />
-                        </SfDropDownList>
-                        <ValidationMessage For="@(() => Model.Nationality)" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Gender <span class="text-danger">*</span></label>
-                        <SfDropDownList TValue="string"
-                                        TItem="string"
-                                        DataSource="@_genderOptions"
-                                        @bind-Value="Model.Gender"
-                                        Placeholder="Select gender">
-                        </SfDropDownList>
-                        <ValidationMessage For="@(() => Model.Gender)" />
-                        @if (Model.Gender == "Other")
-                        {
-                            <div class="mt-2">
-                                <HrTextBox @bind-Value="Model.GenderOther" Placeholder="Please specify" />
-                            </div>
-                        }
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Personal Email</label>
-                        <HrTextBox @bind-Value="Model.PersonalEmail" Placeholder="personal@example.com" />
-                        <ValidationMessage For="@(() => Model.PersonalEmail)" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Phone Number</label>
-                        <HrTextBox @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" />
-                        <ValidationMessage For="@(() => Model.PhoneNumber)" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Home Phone</label>
-                        <HrTextBox @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" />
-                        <ValidationMessage For="@(() => Model.HomePhone)" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Address Line 1 <span class="text-danger">*</span></label>
-                        <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" />
-                        <ValidationMessage For="@(() => Model.AddressLine1)" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Address Line 2</label>
-                        <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">City <span class="text-danger">*</span></label>
-                        <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" />
-                        <ValidationMessage For="@(() => Model.City)" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">County</label>
-                        <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Postcode <span class="text-danger">*</span></label>
-                        <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" />
-                        <ValidationMessage For="@(() => Model.PostCode)" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Country</label>
-                        <HrTextBox @bind-Value="Model.Country" Placeholder="e.g. United Kingdom" />
-                    </div>
-                </div>
+                </section>
             </EditForm>
         </Content>
         <FooterTemplate>
             <div class="d-flex justify-content-between align-items-center w-100">
                 <a href="javascript:void(0)" @onclick="LogoutAsync">Log out</a>
                 <SfButton CssClass="e-primary" OnClick="SaveAsync" Disabled="_saving">
-                    @(_saving ? "Saving…" : "Save and continue")
+                    @(_saving ? "Completing…" : "Complete setup")
                 </SfButton>
             </div>
         </FooterTemplate>
@@ -138,6 +175,8 @@
     private bool _saving;
     private string? GlobalError;
 
+    private static readonly Dictionary<string, object> _ariaRequired = new() { ["aria-required"] = "true" };
+
     private static readonly string[] _genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
     private List<NationalityListItem> _nationalities = [];
 
@@ -148,6 +187,9 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        Model.FirstName = Session.FirstName ?? string.Empty;
+        Model.LastName = Session.LastName ?? string.Empty;
+
         Model.PostcodeRegexPattern = Session.PostcodeRegex;
         Model.TelephoneRegexPattern = Session.TelephoneRegex;
         Model.MobileRegexPattern = Session.MobileRegex;

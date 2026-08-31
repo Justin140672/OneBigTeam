@@ -1,0 +1,36 @@
+.ecd-heading {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.ecd-why {
+    font-size: 0.875rem;
+}
+
+.ecd-section {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+.ecd-section:first-of-type {
+    margin-top: 0.5rem;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.ecd-section-heading {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.ecd-readonly {
+    padding: 0.375rem 0;
+    font-weight: 500;
+}
+
+.ecd-note {
+    font-size: 0.8125rem;
+}

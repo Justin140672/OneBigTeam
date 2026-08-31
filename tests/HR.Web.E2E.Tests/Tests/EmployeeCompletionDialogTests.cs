@@ -98,6 +98,54 @@ public sealed class EmployeeCompletionDialogTests(ParallelBlankPersonaFixture fi
     }
 
     [Fact]
+    public async Task CompletionDialog_Heading_ShowsPersonalisedWelcomeWithAccountFirstName()
+    {
+        var dialog = await LoginAndReachBlockedShellAsync();
+
+        // SignUpAndActivateFreshCompanyAsync registers the admin with first name "Placeholder".
+        Assert.True(await dialog.HeadingShowsWelcomeForAsync("Placeholder"),
+            $"Expected personalised welcome heading. Actual: {await dialog.HeadingTextAsync()}");
+    }
+
+    [Fact]
+    public async Task CompletionDialog_SupportingExplanatoryText_IsVisible()
+    {
+        var dialog = await LoginAndReachBlockedShellAsync();
+
+        Assert.True(await dialog.SupportingTextVisibleAsync());
+    }
+
+    [Fact]
+    public async Task CompletionDialog_FirstAndLastName_ShownReadOnlyWithAccountValues_AndNotEditable()
+    {
+        var dialog = await LoginAndReachBlockedShellAsync();
+
+        Assert.Equal("Placeholder", (await dialog.ReadOnlyFirstNameText()).Trim());
+        Assert.Equal("Admin", (await dialog.ReadOnlyLastNameText()).Trim());
+        Assert.False(await dialog.IsFirstNameEditable(), "First name must not be an editable input.");
+        Assert.False(await dialog.IsLastNameEditable(), "Last name must not be an editable input.");
+        Assert.True(await dialog.NameCorrectionNoteVisibleAsync());
+    }
+
+    [Fact]
+    public async Task CompletionDialog_SectionHeadings_ArePresent()
+    {
+        var dialog = await LoginAndReachBlockedShellAsync();
+
+        Assert.True(await dialog.HasSectionHeadingAsync("Personal details"));
+        Assert.True(await dialog.HasSectionHeadingAsync("Contact details"));
+        Assert.True(await dialog.HasSectionHeadingAsync("Home address"));
+    }
+
+    [Fact]
+    public async Task CompletionDialog_PrimaryButton_ReadsCompleteSetup()
+    {
+        var dialog = await LoginAndReachBlockedShellAsync();
+
+        Assert.True(await dialog.IsPrimaryButtonLabelledCompleteSetupAsync());
+    }
+
+    [Fact]
     public async Task CompletionDialog_CannotBeDismissed_ViaEscape()
     {
         var dialog = await LoginAndReachBlockedShellAsync();
@@ -126,8 +174,6 @@ public sealed class EmployeeCompletionDialogTests(ParallelBlankPersonaFixture fi
 
         Assert.True(await dialog.IsVisibleAsync(), "Dialog should remain open when required fields are empty.");
         Assert.True(await dialog.HasAnyValidationErrorAsync());
-        Assert.True(await dialog.HasValidationErrorAsync("First name is required"));
-        Assert.True(await dialog.HasValidationErrorAsync("Last name is required"));
         Assert.True(await dialog.HasValidationErrorAsync("Date of birth is required"));
         Assert.True(await dialog.HasValidationErrorAsync("Address line 1 is required"));
         Assert.True(await dialog.HasValidationErrorAsync("City is required"));
@@ -139,8 +185,6 @@ public sealed class EmployeeCompletionDialogTests(ParallelBlankPersonaFixture fi
     {
         var dialog = await LoginAndReachBlockedShellAsync();
 
-        await dialog.FillFirstNameAsync("Ada");
-        await dialog.FillLastNameAsync("Lovelace");
         // Exact boundary: the rule requires strictly AFTER 1900-01-01 (see EmployeeCompletionDialog's
         // DateAfter1900Attribute) — 1 Jan 1900 itself must fail.
         await dialog.FillDateOfBirthAsync("01/01/1900");
@@ -160,8 +204,6 @@ public sealed class EmployeeCompletionDialogTests(ParallelBlankPersonaFixture fi
         var dialog = await LoginAndReachBlockedShellAsync();
 
         await dialog.FillAllRequiredFieldsAsync(
-            firstName: "Ada",
-            lastName: "Lovelace",
             dobDdMMyyyy: "02/01/1990",
             nationality: "British",
             gender: "Female",
@@ -181,8 +223,6 @@ public sealed class EmployeeCompletionDialogTests(ParallelBlankPersonaFixture fi
         var dialog = await LoginAndReachBlockedShellAsync();
 
         await dialog.FillAllRequiredFieldsAsync(
-            firstName: "Ada",
-            lastName: "Lovelace",
             dobDdMMyyyy: "02/01/1990",
             nationality: "British",
             gender: "Female",
@@ -217,8 +257,6 @@ public sealed class EmployeeCompletionDialogTests(ParallelBlankPersonaFixture fi
         var dialog = await LoginAndReachBlockedShellAsync();
 
         await dialog.FillAllRequiredFieldsAsync(
-            firstName: "Ada",
-            lastName: "Lovelace",
             dobDdMMyyyy: "02/01/1990",
             nationality: "British",
             gender: "Female",

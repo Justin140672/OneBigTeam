@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -24,14 +25,45 @@ public sealed class EmployeeCompletionDialogPage(IPage page)
 
     public Task<bool> IsVisibleAsync() => Dialog.IsVisibleAsync();
 
-    public Task<bool> IsHeaderVisibleAsync() =>
-        page.GetByRole(AriaRole.Heading, new() { Name = "Complete your employee profile" }).IsVisibleAsync();
+    private ILocator Heading =>
+        page.GetByRole(AriaRole.Heading, new() { NameRegex = new Regex("let's complete your profile") });
+
+    public Task<bool> IsHeaderVisibleAsync() => Heading.IsVisibleAsync();
+
+    public Task<string> HeadingTextAsync() => Heading.InnerTextAsync();
+
+    /// <summary>The redesigned personalised welcome heading includes the account first name.</summary>
+    public Task<bool> HeadingShowsWelcomeForAsync(string firstName) =>
+        page.GetByRole(AriaRole.Heading,
+                new() { NameRegex = new Regex($"Welcome, {Regex.Escape(firstName)} — let's complete your profile") })
+            .IsVisibleAsync();
+
+    /// <summary>The supporting explanatory paragraph shown under the heading.</summary>
+    public Task<bool> SupportingTextVisibleAsync() =>
+        Dialog.GetByText("Please add the remaining information below so we can finish setting up your employee account")
+            .IsVisibleAsync();
+
+    // ── Read-only name display ─────────────────────────────────────────────────
+
+    private ILocator ReadOnlyFirstName => Dialog.Locator("[aria-labelledby='ecd-firstname-label'].ecd-readonly");
+    private ILocator ReadOnlyLastName => Dialog.Locator("[aria-labelledby='ecd-lastname-label'].ecd-readonly");
+
+    public Task<string> ReadOnlyFirstNameText() => ReadOnlyFirstName.InnerTextAsync();
+
+    public Task<string> ReadOnlyLastNameText() => ReadOnlyLastName.InnerTextAsync();
+
+    /// <summary>First name is rendered as static display text — there is no editable input for it.</summary>
+    public async Task<bool> IsFirstNameEditable() => await Dialog.GetByPlaceholder("First name").CountAsync() > 0;
+
+    public async Task<bool> IsLastNameEditable() => await Dialog.GetByPlaceholder("Last name").CountAsync() > 0;
+
+    public Task<bool> NameCorrectionNoteVisibleAsync() =>
+        Dialog.GetByText("Need to correct your name? Contact your HR administrator after setup.").IsVisibleAsync();
+
+    public Task<bool> HasSectionHeadingAsync(string text) =>
+        Dialog.GetByRole(AriaRole.Heading, new() { Name = text, Level = 3 }).IsVisibleAsync();
 
     // ── Field fill helpers ─────────────────────────────────────────────────────
-
-    public Task FillFirstNameAsync(string value) => Dialog.GetByPlaceholder("First name").FillAsync(value);
-
-    public Task FillLastNameAsync(string value) => Dialog.GetByPlaceholder("Last name").FillAsync(value);
 
     public Task FillPreferredNameAsync(string value) => Dialog.GetByPlaceholder("Defaults to first name").FillAsync(value);
 
@@ -75,12 +107,10 @@ public sealed class EmployeeCompletionDialogPage(IPage page)
     /// field should fill individually instead.
     /// </summary>
     public async Task FillAllRequiredFieldsAsync(
-        string firstName, string lastName, string dobDdMMyyyy,
+        string dobDdMMyyyy,
         string nationality, string gender,
         string addressLine1, string city, string postcode)
     {
-        await FillFirstNameAsync(firstName);
-        await FillLastNameAsync(lastName);
         await FillDateOfBirthAsync(dobDdMMyyyy);
         await SelectNationalityAsync(nationality);
         await SelectGenderAsync(gender);
@@ -92,7 +122,10 @@ public sealed class EmployeeCompletionDialogPage(IPage page)
     // ── Actions ─────────────────────────────────────────────────────────────────
 
     public Task ClickSaveAsync() =>
-        Dialog.GetByRole(AriaRole.Button, new() { Name = "Save and continue" }).ClickAsync();
+        Dialog.GetByRole(AriaRole.Button, new() { Name = "Complete setup" }).ClickAsync();
+
+    public Task<bool> IsPrimaryButtonLabelledCompleteSetupAsync() =>
+        Dialog.GetByRole(AriaRole.Button, new() { Name = "Complete setup" }).IsVisibleAsync();
 
     /// <summary>Clicks Save and waits for the dialog to close (happy-path only).</summary>
     public async Task SaveAndWaitForCloseAsync()
