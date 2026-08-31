@@ -21,6 +21,7 @@ public class AdminNavigationTests
         bool canViewReporting = false,
         bool canViewComplianceCentre = false,
         bool canViewAdminAlerts = false,
+        bool canViewGovernanceReporting = false,
         bool canManageCompany = false,
         bool canManageCompanyConfiguration = false,
         bool canManageHrSettings = false,
@@ -28,6 +29,7 @@ public class AdminNavigationTests
         bool isHrAdministrator = false) =>
         new(canReadEmployees, canManageEmployees, canManageRecruitment, canManageLeavePolicies,
             canManageSharedDocuments, canViewReporting, canViewComplianceCentre, canViewAdminAlerts,
+            canViewGovernanceReporting,
             canManageCompany, canManageCompanyConfiguration, canManageHrSettings, canViewUsers,
             isHrAdministrator);
 
@@ -37,7 +39,7 @@ public class AdminNavigationTests
     private static AdminNavCapabilities HrAdmin() =>
         Caps(canManageEmployees: true, canManageLeavePolicies: true, canManageSharedDocuments: true,
             canManageHrSettings: true, canViewReporting: true, canViewComplianceCentre: true,
-            canViewAdminAlerts: true, canViewUsers: true, isHrAdministrator: true);
+            canViewAdminAlerts: true, canViewGovernanceReporting: true, canViewUsers: true, isHrAdministrator: true);
 
     private static readonly string[] DenyListForCompanyAdmin =
     {

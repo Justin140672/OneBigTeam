@@ -105,6 +105,10 @@ public class ReportCatalogTests
     [InlineData("recruitment-pipeline-summary", "Standard")]
     [InlineData("recruitment-pipeline-report", "Standard")]
     [InlineData("vacancy-performance-report", "Standard")]
+    [InlineData("governance-user-activity", "Sensitive")]
+    [InlineData("governance-administrative-changes", "Sensitive")]
+    [InlineData("governance-compliance-status", "Sensitive")]
+    [InlineData("governance-security-events", "Sensitive")]
     public void Definition_Has_Expected_Sensitivity_Classification(string reportId, string expectedSensitivity)
     {
         var found = ReportCatalog.TryGet(reportId, out var definition);
@@ -125,7 +129,7 @@ public class ReportCatalogTests
     }
 
     [Fact]
-    public void All_Seventeen_Catalogue_Entries_Are_Covered_By_The_Sensitivity_Classification_Above()
+    public void All_Catalogue_Entries_Are_Covered_By_The_Sensitivity_Classification_Above()
     {
         // Guards against a new report being added to the catalogue without also being added to the
         // classification test above (and, per the REP-06 spec, without a deliberate Sensitive/Standard
@@ -137,6 +141,8 @@ public class ReportCatalogTests
             "document-compliance", "document-acknowledgement", "asset-assignment", "workload-actions",
             "hr-headcount-summary", "recruitment-pipeline-summary", "recruitment-pipeline-report",
             "vacancy-performance-report",
+            "governance-user-activity", "governance-administrative-changes",
+            "governance-compliance-status", "governance-security-events",
         };
 
         var actualIds = ReportCatalog.All.Select(d => d.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);

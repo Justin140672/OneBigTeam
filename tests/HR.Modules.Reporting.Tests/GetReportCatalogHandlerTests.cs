@@ -11,7 +11,7 @@ public class GetReportCatalogHandlerTests
     {
         var request = new GetReportCatalogRequest(Guid.NewGuid());
 
-        var result = await _handler.HandleAsync(request, canViewRecruitment: false, canViewHr: false, canViewEmployeeStarter: false, canViewLeaveSummary: false, canViewProbation: false, canViewOnboarding: false, canViewWorkloadActions: false, CancellationToken.None);
+        var result = await _handler.HandleAsync(request, canViewRecruitment: false, canViewHr: false, canViewEmployeeStarter: false, canViewLeaveSummary: false, canViewProbation: false, canViewOnboarding: false, canViewWorkloadActions: false, canViewGovernance: false, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Items);
@@ -22,7 +22,7 @@ public class GetReportCatalogHandlerTests
     {
         var request = new GetReportCatalogRequest(Guid.NewGuid());
 
-        var result = await _handler.HandleAsync(request, canViewRecruitment: true, canViewHr: false, canViewEmployeeStarter: false, canViewLeaveSummary: false, canViewProbation: false, canViewOnboarding: false, canViewWorkloadActions: false, CancellationToken.None);
+        var result = await _handler.HandleAsync(request, canViewRecruitment: true, canViewHr: false, canViewEmployeeStarter: false, canViewLeaveSummary: false, canViewProbation: false, canViewOnboarding: false, canViewWorkloadActions: false, canViewGovernance: false, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(3, result.Value!.Items.Count);
@@ -36,7 +36,7 @@ public class GetReportCatalogHandlerTests
     {
         var request = new GetReportCatalogRequest(Guid.NewGuid());
 
-        var result = await _handler.HandleAsync(request, canViewRecruitment: false, canViewHr: true, canViewEmployeeStarter: false, canViewLeaveSummary: false, canViewProbation: false, canViewOnboarding: false, canViewWorkloadActions: false, CancellationToken.None);
+        var result = await _handler.HandleAsync(request, canViewRecruitment: false, canViewHr: true, canViewEmployeeStarter: false, canViewLeaveSummary: false, canViewProbation: false, canViewOnboarding: false, canViewWorkloadActions: false, canViewGovernance: false, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(9, result.Value!.Items.Count);
@@ -68,6 +68,7 @@ public class GetReportCatalogHandlerTests
             canViewProbation: false,
             canViewOnboarding: false,
             canViewWorkloadActions: false,
+            canViewGovernance: false,
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -92,6 +93,7 @@ public class GetReportCatalogHandlerTests
             canViewProbation: false,
             canViewOnboarding: false,
             canViewWorkloadActions: true,
+            canViewGovernance: false,
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -105,7 +107,7 @@ public class GetReportCatalogHandlerTests
     {
         var request = new GetReportCatalogRequest(Guid.NewGuid());
 
-        var result = await _handler.HandleAsync(request, canViewRecruitment: false, canViewHr: false, canViewEmployeeStarter: false, canViewLeaveSummary: false, canViewProbation: true, canViewOnboarding: false, canViewWorkloadActions: false, CancellationToken.None);
+        var result = await _handler.HandleAsync(request, canViewRecruitment: false, canViewHr: false, canViewEmployeeStarter: false, canViewLeaveSummary: false, canViewProbation: true, canViewOnboarding: false, canViewWorkloadActions: false, canViewGovernance: false, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -118,10 +120,14 @@ public class GetReportCatalogHandlerTests
     {
         var request = new GetReportCatalogRequest(Guid.NewGuid());
 
-        var result = await _handler.HandleAsync(request, canViewRecruitment: true, canViewHr: true, canViewEmployeeStarter: true, canViewLeaveSummary: true, canViewProbation: true, canViewOnboarding: true, canViewWorkloadActions: true, CancellationToken.None);
+        var result = await _handler.HandleAsync(request, canViewRecruitment: true, canViewHr: true, canViewEmployeeStarter: true, canViewLeaveSummary: true, canViewProbation: true, canViewOnboarding: true, canViewWorkloadActions: true, canViewGovernance: true, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(17, result.Value!.Items.Count);
+        Assert.Equal(21, result.Value!.Items.Count);
+        Assert.Contains(result.Value.Items, i => i.Id == "governance-user-activity" && i.Category == "Administration");
+        Assert.Contains(result.Value.Items, i => i.Id == "governance-administrative-changes");
+        Assert.Contains(result.Value.Items, i => i.Id == "governance-compliance-status");
+        Assert.Contains(result.Value.Items, i => i.Id == "governance-security-events");
         Assert.Contains(result.Value.Items, i => i.Id == "recruitment-pipeline-summary");
         Assert.Contains(result.Value.Items, i => i.Id == "hr-headcount-summary");
         Assert.Contains(result.Value.Items, i => i.Id == "employee-directory");

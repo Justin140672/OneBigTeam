@@ -170,7 +170,12 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
 
             // admin-alerts:view — ADM-03 administrative alerts & incidents inbox. HR Administrator
             // only; Company Administrator deliberately excluded (administrative role separation).
-            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.AdministrativeAlertsView)
+            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.AdministrativeAlertsView),
+
+            // reporting:view-governance — ADM-08 administrative governance reporting hub. HR
+            // Administrator only; Company Administrator deliberately excluded (administrative role
+            // separation), same as compliance:view / admin-alerts:view.
+            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.ReportingViewGovernance)
         );
     }
 }

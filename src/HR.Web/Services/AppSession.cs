@@ -42,6 +42,8 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     public bool CanViewComplianceCentre       => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000043"));
     // ADM-03: administrative alerts & incidents inbox — HR Administrator only.
     public bool CanViewAdminAlerts            => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000044"));
+    // ADM-08: administrative governance reporting hub — HR Administrator only.
+    public bool CanViewGovernanceReporting    => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000045"));
 
     // ADM-05: shared access-denied outcome. Admin pages call this from OnBeforeLoadAsync/LoadAsync
     // instead of hand-rolling a redirect; when not allowed it bounces to the consistent

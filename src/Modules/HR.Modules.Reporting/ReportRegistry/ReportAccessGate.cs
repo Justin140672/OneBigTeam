@@ -14,4 +14,8 @@ internal enum ReportAccessGate
     Probation,
     Onboarding,
     WorkloadActions,
+
+    // ADM-08: administrative governance reporting hub. Backed by the "reporting:view-governance"
+    // policy; every governance report endpoint also requires baseline "reporting:view".
+    Governance,
 }

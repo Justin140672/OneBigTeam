@@ -106,7 +106,10 @@ internal sealed class PermissionConfiguration : IEntityTypeConfiguration<Permiss
             Permission.Create(SystemPermissions.ComplianceView, "compliance.view", seedDate),
 
             // ADM-03: administrative alerts & incidents inbox.
-            Permission.Create(SystemPermissions.AdministrativeAlertsView, "admin-alerts.view", seedDate)
+            Permission.Create(SystemPermissions.AdministrativeAlertsView, "admin-alerts.view", seedDate),
+
+            // ADM-08: administrative governance reporting hub.
+            Permission.Create(SystemPermissions.ReportingViewGovernance, "reporting.view-governance", seedDate)
         );
     }
 }

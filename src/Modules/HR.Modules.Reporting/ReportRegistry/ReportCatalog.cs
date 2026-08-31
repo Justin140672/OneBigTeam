@@ -5,6 +5,10 @@ using HR.Modules.Reporting.Features.GetDocumentComplianceReport;
 using HR.Modules.Reporting.Features.GetEmployeeDirectoryReport;
 using HR.Modules.Reporting.Features.GetEmployeeLeaverReport;
 using HR.Modules.Reporting.Features.GetEmployeeStarterReport;
+using HR.Modules.Reporting.Features.GetGovernanceAdministrativeChangesReport;
+using HR.Modules.Reporting.Features.GetGovernanceComplianceStatusReport;
+using HR.Modules.Reporting.Features.GetGovernanceSecurityEventsReport;
+using HR.Modules.Reporting.Features.GetGovernanceUserActivityReport;
 using HR.Modules.Reporting.Features.GetHrHeadcountSummaryReport;
 using HR.Modules.Reporting.Features.GetLeaveCalendarReport;
 using HR.Modules.Reporting.Features.GetLeaveSummaryReport;
@@ -123,6 +127,26 @@ internal static class ReportCatalog
             {
                 ["GroupBy"] = WorkloadActionsGroupByValues,
             }),
+
+        // ADM-08: administrative governance reporting hub. All four are Sensitive (they expose who
+        // did what, and named individuals) and gated by ReportAccessGate.Governance —
+        // "reporting:view" + "reporting:view-governance". Data comes from the central audit source
+        // and the ADM-02 compliance composition, never a competing record.
+        new("governance-user-activity", "User Activity", ReportCategory.Administration,
+            "Actions users performed across the company, from the central audit trail. Filter by actor, action, employee, status and date range.",
+            ReportAccessGate.Governance, typeof(GetGovernanceUserActivityReportRequest), ReportSensitivity.Sensitive),
+
+        new("governance-administrative-changes", "Administrative Changes", ReportCategory.Administration,
+            "Configuration, settings, role and policy changes, from the central audit trail. Filter by actor, action, status and date range.",
+            ReportAccessGate.Governance, typeof(GetGovernanceAdministrativeChangesReportRequest), ReportSensitivity.Sensitive),
+
+        new("governance-compliance-status", "Compliance Status", ReportCategory.Administration,
+            "Current compliance actions (expiring documents, missing required documents, outstanding requests, probation reviews) from the Compliance Centre. Filter by category, severity, department and due date.",
+            ReportAccessGate.Governance, typeof(GetGovernanceComplianceStatusReportRequest), ReportSensitivity.Sensitive),
+
+        new("governance-security-events", "Security Events", ReportCategory.Administration,
+            "Authentication, permission, account-status and role-assignment events, from the central audit trail. Filter by actor, action, status and date range.",
+            ReportAccessGate.Governance, typeof(GetGovernanceSecurityEventsReportRequest), ReportSensitivity.Sensitive),
     ];
 
     public static readonly IReadOnlyDictionary<string, ReportDefinition> Definitions =

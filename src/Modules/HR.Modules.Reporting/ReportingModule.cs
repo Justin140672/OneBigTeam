@@ -35,6 +35,14 @@ using HR.Modules.Reporting.Features.GetReportCatalog;
 using HR.Modules.Reporting.Features.GetReportFavourites;
 using HR.Modules.Reporting.Features.GetReportViews;
 using HR.Modules.Reporting.Features.GetComplianceCentre;
+using HR.Modules.Reporting.Features.GetGovernanceUserActivityReport;
+using HR.Modules.Reporting.Features.GetGovernanceAdministrativeChangesReport;
+using HR.Modules.Reporting.Features.GetGovernanceSecurityEventsReport;
+using HR.Modules.Reporting.Features.GetGovernanceComplianceStatusReport;
+using HR.Modules.Reporting.Features.ExportGovernanceUserActivityReport;
+using HR.Modules.Reporting.Features.ExportGovernanceAdministrativeChangesReport;
+using HR.Modules.Reporting.Features.ExportGovernanceSecurityEventsReport;
+using HR.Modules.Reporting.Features.ExportGovernanceComplianceStatusReport;
 using HR.Modules.Reporting.Jobs;
 using HR.Modules.Reporting.Features.GetSicknessReport;
 using HR.Modules.Reporting.Features.GetVacancyPerformanceReport;
@@ -225,6 +233,29 @@ public static class ReportingModule
 
         services.AddScoped<GetComplianceCentreHandler>();
         services.AddScoped<IValidator<GetComplianceCentreRequest>, GetComplianceCentreValidator>();
+
+        // ADM-08: administrative governance reporting hub. The three audit-backed reports read the
+        // central audit source via IAuditHistoryReader; the compliance-status report delegates to
+        // the ADM-02 GetComplianceCentreHandler registered above.
+        services.AddScoped<GetGovernanceUserActivityReportHandler>();
+        services.AddScoped<IValidator<GetGovernanceUserActivityReportRequest>, GetGovernanceUserActivityReportValidator>();
+        services.AddScoped<ExportGovernanceUserActivityReportHandler>();
+        services.AddScoped<IValidator<ExportGovernanceUserActivityReportRequest>, ExportGovernanceUserActivityReportValidator>();
+
+        services.AddScoped<GetGovernanceAdministrativeChangesReportHandler>();
+        services.AddScoped<IValidator<GetGovernanceAdministrativeChangesReportRequest>, GetGovernanceAdministrativeChangesReportValidator>();
+        services.AddScoped<ExportGovernanceAdministrativeChangesReportHandler>();
+        services.AddScoped<IValidator<ExportGovernanceAdministrativeChangesReportRequest>, ExportGovernanceAdministrativeChangesReportValidator>();
+
+        services.AddScoped<GetGovernanceSecurityEventsReportHandler>();
+        services.AddScoped<IValidator<GetGovernanceSecurityEventsReportRequest>, GetGovernanceSecurityEventsReportValidator>();
+        services.AddScoped<ExportGovernanceSecurityEventsReportHandler>();
+        services.AddScoped<IValidator<ExportGovernanceSecurityEventsReportRequest>, ExportGovernanceSecurityEventsReportValidator>();
+
+        services.AddScoped<GetGovernanceComplianceStatusReportHandler>();
+        services.AddScoped<IValidator<GetGovernanceComplianceStatusReportRequest>, GetGovernanceComplianceStatusReportValidator>();
+        services.AddScoped<ExportGovernanceComplianceStatusReportHandler>();
+        services.AddScoped<IValidator<ExportGovernanceComplianceStatusReportRequest>, ExportGovernanceComplianceStatusReportValidator>();
     }
 
     public static async Task MigrateReportingAsync(this IServiceProvider services)

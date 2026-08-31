@@ -64,5 +64,9 @@ internal static class PolicyCatalog
         ["compliance:view"] = SystemPermissions.ComplianceView,
         // ADM-03: administrative alerts & incidents inbox — HR Administrator only.
         ["admin-alerts:view"] = SystemPermissions.AdministrativeAlertsView,
+        // ADM-08: administrative governance reporting hub — HR Administrator only. Governance
+        // report endpoints require BOTH "reporting:view" and this policy (FastEndpoints AND
+        // semantics) so access needs baseline reporting rights plus this elevated security gate.
+        ["reporting:view-governance"] = SystemPermissions.ReportingViewGovernance,
     };
 }

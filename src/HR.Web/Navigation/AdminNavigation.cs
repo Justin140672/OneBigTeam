@@ -62,6 +62,7 @@ public sealed record AdminNavCapabilities(
     bool CanViewReporting,
     bool CanViewComplianceCentre,
     bool CanViewAdminAlerts,
+    bool CanViewGovernanceReporting,
     bool CanManageCompany,
     bool CanManageCompanyConfiguration,
     bool CanManageHrSettings,
@@ -77,6 +78,7 @@ public sealed record AdminNavCapabilities(
         session.CanViewReporting,
         session.CanViewComplianceCentre,
         session.CanViewAdminAlerts,
+        session.CanViewGovernanceReporting,
         session.CanManageCompany,
         session.CanManageCompanyConfiguration,
         session.CanManageHrSettings,
@@ -87,6 +89,7 @@ public sealed record AdminNavCapabilities(
     public bool HasAnyAdministrativeAccess =>
         CanReadEmployees || CanManageEmployees || CanManageRecruitment || CanManageLeavePolicies ||
         CanManageSharedDocuments || CanViewReporting || CanViewComplianceCentre || CanViewAdminAlerts ||
+        CanViewGovernanceReporting ||
         CanManageCompany || CanManageCompanyConfiguration || CanManageHrSettings || CanViewUsers;
 }
 
@@ -178,6 +181,9 @@ public static class AdminNavigation
             (caps.CanViewAdminAlerts, new("administrative-alerts", "Administrative Alerts", AdminNavGroup.AuditAndSecurity,
                 Co("administrative-alerts"), "fa-solid fa-triangle-exclamation",
                 ["incidents", "security alerts", "failed reports", "failed integrations", "alerts inbox"])),
+            (caps.CanViewGovernanceReporting, new("governance-reports", "Governance Reports", AdminNavGroup.AuditAndSecurity,
+                Co("reporting/governance/user-activity"), "fa-solid fa-scale-balanced",
+                ["audit", "governance", "user activity", "security events", "administrative changes", "compliance status"])),
         };
 
         return all.Where(x => x.Visible).Select(x => x.Destination)

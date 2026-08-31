@@ -99,4 +99,12 @@ internal static class SystemPermissions
     // HR Administrator only; Company Administrator deliberately excluded per the administrative
     // role separation matrix, same as compliance:view above.)
     public static readonly Guid AdministrativeAlertsView = new("00000000-0000-0000-0001-000000000044");
+
+    // ADM-08: administrative governance reporting hub (Administration/Governance report category —
+    // user activity, administrative changes, compliance status, security events). This is the
+    // elevated "security" dimension of the "explicit reporting AND security permissions" gate the
+    // ticket requires: every governance report endpoint additionally requires the baseline
+    // "reporting:view" permission. HR Administrator only; Company Administrator deliberately
+    // excluded, same as compliance:view / admin-alerts:view above.
+    public static readonly Guid ReportingViewGovernance = new("00000000-0000-0000-0001-000000000045");
 }

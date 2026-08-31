@@ -62,6 +62,28 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
     }
 
     [Fact]
+    public async Task HrAdmin_QuickNav_SurfacesGovernanceReports()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var palette = new AdminQuickNavComponent(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees");
+
+        await palette.OpenWithKeyboardAsync();
+        await palette.WaitForOpenAsync();
+
+        await palette.TypeAsync("governance");
+
+        // ADM-08 adds a "Governance Reports" destination (key "governance-reports") to the
+        // AuditAndSecurity group, gated on CanViewGovernanceReporting — visible to an HR Admin.
+        Assert.True(await palette.HasResultAsync("Governance Reports"),
+            "Expected a 'Governance Reports' quick-nav result when searching 'governance' as an HR admin");
+    }
+
+    [Fact]
     public async Task PlainEmployee_HasNoQuickNavTrigger_AndCtrlKIsInert()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

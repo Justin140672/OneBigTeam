@@ -429,6 +429,12 @@ namespace HR.Modules.Identity.Migrations
                             Id = new Guid("00000000-0000-0000-0001-000000000044"),
                             CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             Name = "admin-alerts.view"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000045"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "reporting.view-governance"
                         });
                 });
 
@@ -1013,6 +1019,11 @@ namespace HR.Modules.Identity.Migrations
                         {
                             RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
                             PermissionId = new Guid("00000000-0000-0000-0001-000000000044")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("00000000-0000-0000-0001-000000000045")
                         });
                 });
 

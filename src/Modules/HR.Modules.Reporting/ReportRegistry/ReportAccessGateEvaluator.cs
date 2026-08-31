@@ -22,6 +22,10 @@ internal static class ReportAccessGateEvaluator
         var canViewProbation = (await authorizationService.AuthorizeAsync(user, "reporting:view-probation")).Succeeded;
         var canViewOnboarding = (await authorizationService.AuthorizeAsync(user, "reporting:view-onboarding")).Succeeded;
         var canViewWorkloadActions = (await authorizationService.AuthorizeAsync(user, "reporting:view-workload-actions")).Succeeded;
+        // ADM-08: governance reports require baseline reporting access AND the elevated governance
+        // gate — mirror the endpoint's Policies("reporting:view", "reporting:view-governance").
+        var canViewGovernance = (await authorizationService.AuthorizeAsync(user, "reporting:view")).Succeeded
+            && (await authorizationService.AuthorizeAsync(user, "reporting:view-governance")).Succeeded;
 
         return new ReportAccessGates(
             canViewRecruitment,
@@ -30,6 +34,7 @@ internal static class ReportAccessGateEvaluator
             canViewLeaveSummary,
             canViewProbation,
             canViewOnboarding,
-            canViewWorkloadActions);
+            canViewWorkloadActions,
+            canViewGovernance);
     }
 }

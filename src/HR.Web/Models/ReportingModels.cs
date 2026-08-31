@@ -38,6 +38,10 @@ public static class ReportRoutes
         ["workload-actions"] = "workload-actions",
         ["recruitment-pipeline-summary"] = "recruitment-pipeline-summary",
         ["hr-headcount-summary"] = "hr-headcount-summary",
+        ["governance-user-activity"] = "governance/user-activity",
+        ["governance-administrative-changes"] = "governance/administrative-changes",
+        ["governance-compliance-status"] = "governance/compliance-status",
+        ["governance-security-events"] = "governance/security-events",
     };
 
     public static bool IsClickable(string reportId) => Map.ContainsKey(reportId);
@@ -509,6 +513,65 @@ public record ComplianceCentreSummaryModel(
     int Overdue,
     int DueSoon,
     int Informational);
+
+// ── ADM-08 Governance reporting hub ─────────────────────────────────────────
+
+// Shared shape for the three governance audit reports: User Activity,
+// Administrative Changes and Security Events. Each has an identical paged GET
+// and a Csv/Excel/Pdf export at the same path + "/export".
+public record GovernanceAuditReportFilter(
+    Guid? ActorUserId = null,
+    string? EventType = null,
+    Guid? EmployeeId = null,
+    DateOnly? FromDate = null,
+    DateOnly? ToDate = null,
+    string? Status = null,
+    int Page = 1,
+    int PageSize = 20);
+
+public record GetGovernanceAuditReportResponse(
+    List<GovernanceAuditReportRowModel> Items,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    bool IsTruncated);
+
+public record GovernanceAuditReportRowModel(
+    DateTimeOffset OccurredAt,
+    string EventType,
+    string EntityType,
+    Guid? ActorUserId,
+    string? ActorEmail,
+    Guid? EmployeeId,
+    string Status,
+    string? Summary);
+
+public record GovernanceComplianceStatusReportFilter(
+    string? Category = null,
+    string? Severity = null,
+    string? Department = null,
+    Guid? ManagerId = null,
+    DateOnly? DueDateStart = null,
+    DateOnly? DueDateEnd = null,
+    int Page = 1,
+    int PageSize = 20);
+
+public record GetGovernanceComplianceStatusReportResponse(
+    List<GovernanceComplianceStatusRowModel> Items,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    bool IsTruncated);
+
+public record GovernanceComplianceStatusRowModel(
+    Guid EmployeeId,
+    string EmployeeName,
+    string? Department,
+    string Category,
+    string CategoryLabel,
+    string Detail,
+    DateOnly? DueDate,
+    string Severity);
 
 // ── Favourites ────────────────────────────────────────────────────────────────
 

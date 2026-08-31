@@ -1,0 +1,13 @@
+using HR.Infrastructure.Abstractions;
+
+namespace HR.Modules.Reporting.Features.ExportGovernanceAdministrativeChangesReport;
+
+internal sealed record ExportGovernanceAdministrativeChangesReportRequest(
+    Guid CompanyId,
+    Guid? ActorUserId = null,
+    string? EventType = null,
+    Guid? EmployeeId = null,
+    DateOnly? FromDate = null,
+    DateOnly? ToDate = null,
+    string? Status = null,
+    ReportExportFormat Format = ReportExportFormat.Csv);

@@ -956,6 +956,158 @@ public class ReportingService(IHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
+    // ── ADM-08 Governance reporting hub ──────────────────────────────────────
+
+    public Task<(GetGovernanceAuditReportResponse? Response, string? Error)> GetGovernanceUserActivityReportAsync(
+        Guid companyId, GovernanceAuditReportFilter filter, CancellationToken cancellationToken = default)
+        => GetGovernanceAuditReportAsync(companyId, "governance/user-activity", filter, cancellationToken);
+
+    public Task<(GetGovernanceAuditReportResponse? Response, string? Error)> GetGovernanceAdministrativeChangesReportAsync(
+        Guid companyId, GovernanceAuditReportFilter filter, CancellationToken cancellationToken = default)
+        => GetGovernanceAuditReportAsync(companyId, "governance/administrative-changes", filter, cancellationToken);
+
+    public Task<(GetGovernanceAuditReportResponse? Response, string? Error)> GetGovernanceSecurityEventsReportAsync(
+        Guid companyId, GovernanceAuditReportFilter filter, CancellationToken cancellationToken = default)
+        => GetGovernanceAuditReportAsync(companyId, "governance/security-events", filter, cancellationToken);
+
+    public Task<(byte[]? Bytes, string? ContentType, string? FileName, string? Error)> ExportGovernanceUserActivityReportAsync(
+        Guid companyId, GovernanceAuditReportFilter filter, ReportExportFormat format, CancellationToken cancellationToken = default)
+        => ExportGovernanceAuditReportAsync(companyId, "governance/user-activity", filter, format, cancellationToken);
+
+    public Task<(byte[]? Bytes, string? ContentType, string? FileName, string? Error)> ExportGovernanceAdministrativeChangesReportAsync(
+        Guid companyId, GovernanceAuditReportFilter filter, ReportExportFormat format, CancellationToken cancellationToken = default)
+        => ExportGovernanceAuditReportAsync(companyId, "governance/administrative-changes", filter, format, cancellationToken);
+
+    public Task<(byte[]? Bytes, string? ContentType, string? FileName, string? Error)> ExportGovernanceSecurityEventsReportAsync(
+        Guid companyId, GovernanceAuditReportFilter filter, ReportExportFormat format, CancellationToken cancellationToken = default)
+        => ExportGovernanceAuditReportAsync(companyId, "governance/security-events", filter, format, cancellationToken);
+
+    private async Task<(GetGovernanceAuditReportResponse? Response, string? Error)> GetGovernanceAuditReportAsync(
+        Guid companyId, string resource, GovernanceAuditReportFilter filter, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var query = BuildQuery(filter);
+            var response = await Http.GetFromJsonAsync<GetGovernanceAuditReportResponse>(
+                $"api/companies/{companyId}/reporting/{resource}?{query}", HrApiJsonOptions.Default, cancellationToken);
+            return (response, null);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Forbidden)
+        {
+            return (null, "You do not have permission to view this report.");
+        }
+        catch (HttpRequestException)
+        {
+            return (null, "Failed to load the governance report.");
+        }
+    }
+
+    private async Task<(byte[]? Bytes, string? ContentType, string? FileName, string? Error)> ExportGovernanceAuditReportAsync(
+        Guid companyId, string resource, GovernanceAuditReportFilter filter, ReportExportFormat format, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var query = BuildQuery(filter);
+            query += $"&format={format}";
+
+            var response = await Http.GetAsync(
+                $"api/companies/{companyId}/reporting/{resource}/export?{query}", cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+                return (null, null, null, "Failed to export the governance report.");
+
+            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            var contentType = response.Content.Headers.ContentType?.MediaType;
+            var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"');
+
+            return (bytes, contentType, fileName, null);
+        }
+        catch
+        {
+            return (null, null, null, "Failed to export the governance report.");
+        }
+    }
+
+    private static string BuildQuery(GovernanceAuditReportFilter filter)
+    {
+        var query = HttpUtility.ParseQueryString(string.Empty);
+
+        if (filter.ActorUserId is not null) query["actorUserId"] = filter.ActorUserId.ToString();
+        if (!string.IsNullOrWhiteSpace(filter.EventType)) query["eventType"] = filter.EventType;
+        if (filter.EmployeeId is not null) query["employeeId"] = filter.EmployeeId.ToString();
+        if (filter.FromDate is not null) query["fromDate"] = filter.FromDate.Value.ToString("yyyy-MM-dd");
+        if (filter.ToDate is not null) query["toDate"] = filter.ToDate.Value.ToString("yyyy-MM-dd");
+        if (!string.IsNullOrWhiteSpace(filter.Status)) query["status"] = filter.Status;
+        query["page"] = filter.Page.ToString();
+        query["pageSize"] = filter.PageSize.ToString();
+
+        return query.ToString() ?? string.Empty;
+    }
+
+    public async Task<(GetGovernanceComplianceStatusReportResponse? Response, string? Error)> GetGovernanceComplianceStatusReportAsync(
+        Guid companyId, GovernanceComplianceStatusReportFilter filter, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = BuildQuery(filter);
+            var response = await Http.GetFromJsonAsync<GetGovernanceComplianceStatusReportResponse>(
+                $"api/companies/{companyId}/reporting/governance/compliance-status?{query}", HrApiJsonOptions.Default, cancellationToken);
+            return (response, null);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Forbidden)
+        {
+            return (null, "You do not have permission to view this report.");
+        }
+        catch (HttpRequestException)
+        {
+            return (null, "Failed to load the governance compliance status report.");
+        }
+    }
+
+    public async Task<(byte[]? Bytes, string? ContentType, string? FileName, string? Error)> ExportGovernanceComplianceStatusReportAsync(
+        Guid companyId, GovernanceComplianceStatusReportFilter filter, ReportExportFormat format, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = BuildQuery(filter);
+            query += $"&format={format}";
+
+            var response = await Http.GetAsync(
+                $"api/companies/{companyId}/reporting/governance/compliance-status/export?{query}", cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+                return (null, null, null, "Failed to export the governance compliance status report.");
+
+            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            var contentType = response.Content.Headers.ContentType?.MediaType;
+            var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"');
+
+            return (bytes, contentType, fileName, null);
+        }
+        catch
+        {
+            return (null, null, null, "Failed to export the governance compliance status report.");
+        }
+    }
+
+    private static string BuildQuery(GovernanceComplianceStatusReportFilter filter)
+    {
+        var query = HttpUtility.ParseQueryString(string.Empty);
+
+        if (!string.IsNullOrWhiteSpace(filter.Category)) query["category"] = filter.Category;
+        if (!string.IsNullOrWhiteSpace(filter.Severity)) query["severity"] = filter.Severity;
+        if (!string.IsNullOrWhiteSpace(filter.Department)) query["department"] = filter.Department;
+        if (filter.ManagerId is not null) query["managerId"] = filter.ManagerId.ToString();
+        if (filter.DueDateStart is not null) query["dueDateStart"] = filter.DueDateStart.Value.ToString("yyyy-MM-dd");
+        if (filter.DueDateEnd is not null) query["dueDateEnd"] = filter.DueDateEnd.Value.ToString("yyyy-MM-dd");
+        query["page"] = filter.Page.ToString();
+        query["pageSize"] = filter.PageSize.ToString();
+
+        return query.ToString() ?? string.Empty;
+    }
+
     // ── Favourites ────────────────────────────────────────────────────────────
 
     public async Task<GetReportFavouritesResponse?> GetReportFavouritesAsync(
