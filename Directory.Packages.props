@@ -48,17 +48,17 @@
     <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
     <PackageVersion Include="Stripe.net" Version="52.3.0" />
-    <PackageVersion Include="Syncfusion.Blazor.Buttons" Version="34.2.3" />
-    <PackageVersion Include="Syncfusion.Blazor.Calendars" Version="34.2.3" />
-    <PackageVersion Include="Syncfusion.Blazor.Charts" Version="34.2.3" />
-    <PackageVersion Include="Syncfusion.Blazor.Diagram" Version="34.2.3" />
-    <PackageVersion Include="Syncfusion.Blazor.DropDowns" Version="34.2.3" />
-    <PackageVersion Include="Syncfusion.Blazor.Grid" Version="34.2.3" />
-    <PackageVersion Include="Syncfusion.Blazor.Inputs" Version="34.2.3" />
-    <PackageVersion Include="Syncfusion.Blazor.Kanban" Version="34.2.3" />
-    <PackageVersion Include="Syncfusion.Blazor.Popups" Version="34.2.3" />
-    <PackageVersion Include="Syncfusion.Blazor.SplitButtons" Version="34.2.3" />
-    <PackageVersion Include="Syncfusion.Blazor.Themes" Version="34.2.3" />
+    <PackageVersion Include="Syncfusion.Blazor.Buttons" Version="34.2.5" />
+    <PackageVersion Include="Syncfusion.Blazor.Calendars" Version="34.2.5" />
+    <PackageVersion Include="Syncfusion.Blazor.Charts" Version="34.2.5" />
+    <PackageVersion Include="Syncfusion.Blazor.Diagram" Version="34.2.5" />
+    <PackageVersion Include="Syncfusion.Blazor.DropDowns" Version="34.2.5" />
+    <PackageVersion Include="Syncfusion.Blazor.Grid" Version="34.2.5" />
+    <PackageVersion Include="Syncfusion.Blazor.Inputs" Version="34.2.5" />
+    <PackageVersion Include="Syncfusion.Blazor.Kanban" Version="34.2.5" />
+    <PackageVersion Include="Syncfusion.Blazor.Popups" Version="34.2.5" />
+    <PackageVersion Include="Syncfusion.Blazor.SplitButtons" Version="34.2.5" />
+    <PackageVersion Include="Syncfusion.Blazor.Themes" Version="34.2.5" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
