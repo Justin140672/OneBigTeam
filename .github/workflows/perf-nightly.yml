@@ -1,0 +1,65 @@
+name: Performance (nightly)
+
+# NFR-02 automated performance & scale tests. NOT a PR gate: seeds 50 / 500 / 2000-employee
+# datasets against a Postgres testcontainer and measures p95 latency + EF command counts for a
+# representative page load, dashboard, search, CRUD op and small report. Runs on a schedule so
+# regressions are caught within a day, and on demand. See docs/performance-testing.md.
+
+on:
+  schedule:
+    - cron: "0 4 * * *"   # 04:00 UTC daily (after e2e-nightly)
+  workflow_dispatch:
+    inputs:
+      ci_multiplier:
+        description: "PERF_CI_MULTIPLIER (pass/fail budget = target * multiplier)"
+        required: false
+        default: "3.0"
+
+concurrency:
+  group: perf-nightly
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  PERF_CI_MULTIPLIER: ${{ github.event.inputs.ci_multiplier || '3.0' }}
+  PERF_RESULTS_PATH: ${{ github.workspace }}/perf-results/perf-results.json
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET (from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore (locked mode)
+        run: dotnet restore tests/HR.Integration.Tests/HR.Integration.Tests.csproj --locked-mode
+
+      - name: Build integration test project (Release)
+        run: >
+          dotnet build tests/HR.Integration.Tests/HR.Integration.Tests.csproj
+          -c Release --no-restore
+
+      - name: Run performance tests
+        run: >
+          dotnet test tests/HR.Integration.Tests/HR.Integration.Tests.csproj
+          -c Release --no-build
+          --filter "Category=Performance"
+          --logger "trx;LogFileName=perf.trx"
+          -- RunConfiguration.TestSessionTimeout=2400000
+
+      - name: Upload performance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-results
+          path: |
+            perf-results/perf-results.json
+            **/TestResults/**/*.trx
+          retention-days: 90
+          if-no-files-found: warn
