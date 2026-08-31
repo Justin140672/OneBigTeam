@@ -1,16 +1,19 @@
 @* Unified "Needs your attention" queue for the HR dashboard — combines HR tasks, pending leave
    approvals, overdue probation/return-to-work reviews and document compliance exceptions into a
    single priority-sorted list (see PRODUCT ticket "Reprioritise the HR dashboard around
-   actionable work"). All data below is aggregated client-side from services that were already
-   being called by the widgets this replaces (HrInboxWidget, LeaveRequestsWidget,
-   UpcomingProbationReviewsWidget, OverdueReturnToWorkReviewsWidget, ComplianceDocumentExpiryWidget,
-   DocumentReviewsWidget) — no new API endpoints were introduced. *@
+   actionable work").
+
+   DSH-03: every category is loaded independently through WidgetSourceLoader as a WidgetResult<T>.
+   A failed source contributes nothing — no rows, no count, no "all clear" — and instead renders a
+   compact inline <WidgetSourceWarning> with a Retry that reloads just that one source. The genuine
+   "All clear" block is now gated on WidgetPanelState.Summarise(...).ShowAllClear. *@
 @using HR.Web.Components.Pages.Tasks
 @inject TaskService TaskService
 @inject LeaveService LeaveService
 @inject ProbationService ProbationService
 @inject SicknessService SicknessService
 @inject DocumentService DocumentService
+@inject WidgetSourceLoader SourceLoader
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -38,36 +41,51 @@
             {
                 <HrLoadingIndicator Label="Loading your action queue…" />
             }
-            else if (_visibleItems.Count == 0)
+            else if (_summary.TotalFailure)
             {
-                <div class="attention-queue-all-clear">
-                    <i class="fa-solid fa-circle-check fa-lg"></i>
-                    <div>
-                        <p class="mb-0 fw-semibold">All clear</p>
-                        <p class="mb-0 text-muted">No overdue tasks, pending approvals or compliance exceptions right now.</p>
-                    </div>
-                </div>
+                <WidgetSourceWarning SourceName="Your action queue" Retrying="_retryingAll"
+                                     OnRetry="ReloadAllAsync" />
             }
             else
             {
-                @foreach (var item in _visibleItems)
+                @foreach (var source in _sourceNames.Where(s => _summary.FailedSources.Contains(s)))
                 {
-                    var i = item;
-                    <button type="button"
-                            class="task-widget-item attention-queue-item @(i.IsOverdue ? "attention-queue-item--overdue" : "")"
-                            aria-label="@i.AccessibleLabel"
-                            @onclick="() => ActivateAsync(i)">
-                        <span class="priority-pip priority-pip--@i.PriorityCss"></span>
-                        <div class="task-widget-content">
-                            <span class="task-widget-title">@i.Subject</span>
-                            <span class="task-widget-meta">@i.Category · @i.StatusLabel</span>
+                    var s = source;
+                    <WidgetSourceWarning SourceName="@s" Retrying="_retrying.Contains(s)"
+                                         OnRetry="() => RetrySourceAsync(s)" />
+                }
+
+                @if (_summary.ShowAllClear)
+                {
+                    <div class="attention-queue-all-clear">
+                        <i class="fa-solid fa-circle-check fa-lg"></i>
+                        <div>
+                            <p class="mb-0 fw-semibold">All clear</p>
+                            <p class="mb-0 text-muted">No overdue tasks, pending approvals or compliance exceptions right now.</p>
                         </div>
-                        @if (i.DueLabel is not null)
-                        {
-                            <span class="due-badge due-badge--@i.DueCss">@i.DueLabel</span>
-                        }
-                        <span class="attention-queue-action">@i.ActionLabel</span>
-                    </button>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var item in _visibleItems)
+                    {
+                        var i = item;
+                        <button type="button"
+                                class="task-widget-item attention-queue-item @(i.IsOverdue ? "attention-queue-item--overdue" : "")"
+                                aria-label="@i.AccessibleLabel"
+                                @onclick="() => ActivateAsync(i)">
+                            <span class="priority-pip priority-pip--@i.PriorityCss"></span>
+                            <div class="task-widget-content">
+                                <span class="task-widget-title">@i.Subject</span>
+                                <span class="task-widget-meta">@i.Category · @i.StatusLabel</span>
+                            </div>
+                            @if (i.DueLabel is not null)
+                            {
+                                <span class="due-badge due-badge--@i.DueCss">@i.DueLabel</span>
+                            }
+                            <span class="attention-queue-action">@i.ActionLabel</span>
+                        </button>
+                    }
                 }
             }
         </div>
@@ -80,9 +98,35 @@
 }
 
 @code {
+    private const string SrcTasks = "HR tasks";
+    private const string SrcLeave = "Leave requests";
+    private const string SrcProbation = "Probation reviews";
+    private const string SrcRtw = "Return-to-work reviews";
+    private const string SrcDocExpiry = "Document expiry";
+    private const string SrcDocReviews = "Document reviews";
+
+    private readonly string[] _sourceNames =
+        [SrcTasks, SrcLeave, SrcProbation, SrcRtw, SrcDocExpiry, SrcDocReviews];
+
+    private const string WidgetName = "Needs your attention";
+
     private bool _loading = true;
     private bool _showResolved;
+    private bool _retryingAll;
     private DateOnly _today;
+    private readonly HashSet<string> _retrying = [];
+
+    private WidgetResult<UnassignedTaskListResponse?> _tasksRes = WidgetResult<UnassignedTaskListResponse?>.Loading(SrcTasks);
+    private WidgetResult<GetRecentLeaveRequestsResponse?> _leaveRes = WidgetResult<GetRecentLeaveRequestsResponse?>.Loading(SrcLeave);
+    private WidgetResult<IReadOnlyList<UpcomingProbationReviewItem>> _probationRes = WidgetResult<IReadOnlyList<UpcomingProbationReviewItem>>.Loading(SrcProbation);
+    private WidgetResult<GetOverdueReturnToWorkReviewsResponseModel?> _rtwRes = WidgetResult<GetOverdueReturnToWorkReviewsResponseModel?>.Loading(SrcRtw);
+    private WidgetResult<GetExpiringDocumentsResponse?> _docExpiryRes = WidgetResult<GetExpiringDocumentsResponse?>.Loading(SrcDocExpiry);
+    private WidgetResult<GetSharedCompanyDocumentsDueForReviewResponse?> _docReviewsRes = WidgetResult<GetSharedCompanyDocumentsDueForReviewResponse?>.Loading(SrcDocReviews);
+
+    // Lookup only — not an actionable source. Its failure is tolerated (names fall back to "Employee").
+    private IReadOnlyDictionary<Guid, string> _employeeNames = new Dictionary<Guid, string>();
+
+    private WidgetPanelSummary _summary = WidgetPanelState.Summarise([]);
 
     private List<AttentionItem> _activeItems = [];
     private List<AttentionItem> _resolvedLeaveItems = [];
@@ -101,175 +145,204 @@
         }
 
         _today = DateOnly.FromDateTime(DateTime.UtcNow);
-        await LoadAsync();
+        await ReloadAllAsync();
         _loading = false;
     }
 
-    private async Task LoadAsync()
+    private async Task ReloadAllAsync()
     {
-        var tasksTask = TaskService.GetUnassignedTasksAsync(Session.CompanyId);
-        // Default take=10 (LeaveService.GetRecentLeaveRequestsAsync) is too easy to exceed for a
-        // company with meaningful leave-request volume — a request can age out of the "recent"
-        // window (and so never reach this widget at all, resolved or pending) well before anyone
-        // actually needs to act on or review it. Widened here specifically for the Attention Queue
-        // (not the default itself, which other callers may reasonably want to keep tighter).
-        var leaveTask = LeaveService.GetRecentLeaveRequestsAsync(Session.CompanyId, take: 50);
-        var probationTask = ProbationService.GetUpcomingReviewsAsync(Session.CompanyId);
-        var rtwTask = SicknessService.GetOverdueReturnToWorkReviewsAsync(Session.CompanyId);
-        var expiringDocsTask = DocumentService.GetExpiringDocumentsAsync(Session.CompanyId);
-        var docReviewsTask = DocumentService.GetSharedCompanyDocumentsDueForReviewAsync(Session.CompanyId);
-        var employeeNamesTask = Session.GetEmployeeNamesAsync();
+        _retryingAll = true;
 
-        await Task.WhenAll(tasksTask, leaveTask, probationTask, rtwTask, expiringDocsTask, docReviewsTask, employeeNamesTask);
+        var namesTask = LoadEmployeeNamesAsync();
+        await Task.WhenAll(_sourceNames.Select(LoadSourceValueAsync).Append(namesTask));
 
-        var tasks = (await tasksTask)?.Items ?? [];
-        var leave = (await leaveTask)?.Items ?? [];
-        var probation = await probationTask;
-        var rtw = (await rtwTask)?.Items ?? [];
-        var expiringDocs = (await expiringDocsTask)?.Items ?? [];
-        var docReviews = (await docReviewsTask)?.Items ?? [];
-        var employeeNames = await employeeNamesTask;
+        _retryingAll = false;
+        Recompute();
+    }
+
+    private async Task LoadEmployeeNamesAsync()
+    {
+        try { _employeeNames = await Session.GetEmployeeNamesAsync(); }
+        catch { /* tolerated: names fall back to "Employee" */ }
+    }
+
+    private async Task LoadSourceValueAsync(string name)
+    {
+        switch (name)
+        {
+            case SrcTasks:
+                _tasksRes = await SourceLoader.LoadAsync(WidgetName, name,
+                    () => TaskService.GetUnassignedTasksOrThrowAsync(Session.CompanyId));
+                break;
+            case SrcLeave:
+                _leaveRes = await SourceLoader.LoadAsync(WidgetName, name,
+                    () => LeaveService.GetRecentLeaveRequestsOrThrowAsync(Session.CompanyId, take: 50));
+                break;
+            case SrcProbation:
+                _probationRes = await SourceLoader.LoadAsync(WidgetName, name,
+                    () => ProbationService.GetUpcomingReviewsOrThrowAsync(Session.CompanyId));
+                break;
+            case SrcRtw:
+                _rtwRes = await SourceLoader.LoadAsync(WidgetName, name,
+                    () => SicknessService.GetOverdueReturnToWorkReviewsOrThrowAsync(Session.CompanyId));
+                break;
+            case SrcDocExpiry:
+                _docExpiryRes = await SourceLoader.LoadAsync(WidgetName, name,
+                    () => DocumentService.GetExpiringDocumentsOrThrowAsync(Session.CompanyId));
+                break;
+            case SrcDocReviews:
+                _docReviewsRes = await SourceLoader.LoadAsync(WidgetName, name,
+                    () => DocumentService.GetSharedCompanyDocumentsDueForReviewOrThrowAsync(Session.CompanyId));
+                break;
+        }
+    }
+
+    private async Task RetrySourceAsync(string name)
+    {
+        _retrying.Add(name);
+        StateHasChanged();
+        await LoadSourceValueAsync(name);
+        _retrying.Remove(name);
+        Recompute();
+    }
+
+    private void Recompute()
+    {
+        var items = new List<AttentionItem>();
+        _resolvedLeaveItems = [];
+        var outcomes = new List<WidgetSourceOutcome>();
 
         string EmployeeName(Guid employeeId) =>
-            employeeNames.TryGetValue(employeeId, out var name) ? name : "Employee";
-
-        var items = new List<AttentionItem>();
+            _employeeNames.TryGetValue(employeeId, out var name) ? name : "Employee";
 
         // HR tasks
-        foreach (var t in tasks)
+        var taskCount = 0;
+        if (_tasksRes.IsLoaded)
         {
-            var isOverdue = t.DueDate.HasValue && t.DueDate.Value < _today;
-            var urgency = t.Priority switch
+            foreach (var t in _tasksRes.Value?.Items ?? [])
             {
-                "Critical" => 0,
-                "High" => 1,
-                "Medium" => 2,
-                _ => 3,
-            };
-            var (dueLabel, dueCss) = DueBadge(t.DueDate);
-            items.Add(new AttentionItem(
-                Subject: t.Title,
-                Category: "HR task",
-                StatusLabel: t.Status,
-                DueDate: t.DueDate,
-                DueLabel: dueLabel,
-                DueCss: dueCss,
-                IsOverdue: isOverdue,
-                UrgencyRank: isOverdue ? 0 : urgency,
-                ActionLabel: "Open task",
-                IsResolved: false,
-                OnActivate: () => OpenTaskAsync(t.Id)));
+                var isOverdue = t.DueDate.HasValue && t.DueDate.Value < _today;
+                var urgency = t.Priority switch { "Critical" => 0, "High" => 1, "Medium" => 2, _ => 3 };
+                var (dueLabel, dueCss) = DueBadge(t.DueDate);
+                items.Add(new AttentionItem(
+                    Subject: t.Title, Category: "HR task", StatusLabel: t.Status,
+                    DueDate: t.DueDate, DueLabel: dueLabel, DueCss: dueCss, IsOverdue: isOverdue,
+                    UrgencyRank: isOverdue ? 0 : urgency, ActionLabel: "Open task", IsResolved: false,
+                    OnActivate: () => OpenTaskAsync(t.Id)));
+                taskCount++;
+            }
         }
+        outcomes.Add(new WidgetSourceOutcome(SrcTasks, true, _tasksRes.IsFailed, taskCount));
 
-        // Pending leave approvals (active) + resolved leave requests (opt-in only)
-        foreach (var l in leave)
+        // Leave — pending are actionable; resolved are opt-in only and do not count toward "all clear".
+        var leavePendingCount = 0;
+        if (_leaveRes.IsLoaded)
         {
-            var isPending = l.Status == "Pending";
-            var isOverdue = isPending && l.StartDate < _today;
-            var (dueLabel, dueCss) = isPending ? DueBadge(l.StartDate) : (l.Status, StatusCss(l.Status));
+            foreach (var l in _leaveRes.Value?.Items ?? [])
+            {
+                var isPending = l.Status == "Pending";
+                var isOverdue = isPending && l.StartDate < _today;
+                var (dueLabel, dueCss) = isPending ? DueBadge(l.StartDate) : (l.Status, StatusCss(l.Status));
 
-            var item = new AttentionItem(
-                Subject: l.EmployeeName,
-                Category: "Leave request",
-                StatusLabel: $"{l.LeaveTypeName} · {l.StartDate:d MMM}–{l.EndDate:d MMM}",
-                DueDate: isPending ? l.StartDate : null,
-                DueLabel: dueLabel,
-                DueCss: dueCss,
-                IsOverdue: isOverdue,
-                UrgencyRank: isOverdue ? 0 : isPending ? 1 : 3,
-                ActionLabel: isPending && l.TaskId.HasValue ? "Review request" : "View",
-                IsResolved: !isPending,
-                OnActivate: isPending && l.TaskId.HasValue
-                    ? () => OpenTaskAsync(l.TaskId!.Value)
-                    : () => Task.CompletedTask);
+                var item = new AttentionItem(
+                    Subject: l.EmployeeName, Category: "Leave request",
+                    StatusLabel: $"{l.LeaveTypeName} · {l.StartDate:d MMM}–{l.EndDate:d MMM}",
+                    DueDate: isPending ? l.StartDate : null, DueLabel: dueLabel, DueCss: dueCss,
+                    IsOverdue: isOverdue, UrgencyRank: isOverdue ? 0 : isPending ? 1 : 3,
+                    ActionLabel: isPending && l.TaskId.HasValue ? "Review request" : "View",
+                    IsResolved: !isPending,
+                    OnActivate: isPending && l.TaskId.HasValue
+                        ? () => OpenTaskAsync(l.TaskId!.Value)
+                        : () => Task.CompletedTask);
 
-            if (isPending)
-                items.Add(item);
-            else
-                _resolvedLeaveItems.Add(item);
+                if (isPending) { items.Add(item); leavePendingCount++; }
+                else _resolvedLeaveItems.Add(item);
+            }
         }
         _resolvedLeaveCount = _resolvedLeaveItems.Count;
+        outcomes.Add(new WidgetSourceOutcome(SrcLeave, true, _leaveRes.IsFailed, leavePendingCount));
 
         // Probation reviews
-        foreach (var r in probation)
+        var probationCount = 0;
+        if (_probationRes.IsLoaded)
         {
-            var isOverdue = r.DueDate < _today;
-            var (dueLabel, dueCss) = DueBadge(r.DueDate);
-            items.Add(new AttentionItem(
-                Subject: EmployeeName(r.EmployeeId),
-                Category: "Probation review",
-                StatusLabel: FormatReviewType(r.ReviewType),
-                DueDate: r.DueDate,
-                DueLabel: dueLabel,
-                DueCss: dueCss,
-                IsOverdue: isOverdue,
-                UrgencyRank: isOverdue ? 0 : r.DueDate <= _today.AddDays(7) ? 2 : 3,
-                ActionLabel: r.TaskId.HasValue ? "Open review" : "View",
-                IsResolved: false,
-                OnActivate: r.TaskId.HasValue
-                    ? () => OpenTaskAsync(r.TaskId!.Value)
-                    : () => { Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{r.EmployeeId}?tab=probation"); return Task.CompletedTask; }));
+            foreach (var r in _probationRes.Value ?? [])
+            {
+                var isOverdue = r.DueDate < _today;
+                var (dueLabel, dueCss) = DueBadge(r.DueDate);
+                items.Add(new AttentionItem(
+                    Subject: EmployeeName(r.EmployeeId), Category: "Probation review",
+                    StatusLabel: FormatReviewType(r.ReviewType), DueDate: r.DueDate,
+                    DueLabel: dueLabel, DueCss: dueCss, IsOverdue: isOverdue,
+                    UrgencyRank: isOverdue ? 0 : r.DueDate <= _today.AddDays(7) ? 2 : 3,
+                    ActionLabel: r.TaskId.HasValue ? "Open review" : "View", IsResolved: false,
+                    OnActivate: r.TaskId.HasValue
+                        ? () => OpenTaskAsync(r.TaskId!.Value)
+                        : () => { Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{r.EmployeeId}?tab=probation"); return Task.CompletedTask; }));
+                probationCount++;
+            }
         }
+        outcomes.Add(new WidgetSourceOutcome(SrcProbation, true, _probationRes.IsFailed, probationCount));
 
-        // Overdue return-to-work reviews (already overdue by definition of the endpoint)
-        foreach (var w in rtw)
+        // Overdue return-to-work reviews
+        var rtwCount = 0;
+        if (_rtwRes.IsLoaded)
         {
-            items.Add(new AttentionItem(
-                Subject: EmployeeName(w.EmployeeId),
-                Category: "Return-to-work review",
-                StatusLabel: "Overdue",
-                DueDate: w.DueDate,
-                DueLabel: "Overdue",
-                DueCss: "overdue",
-                IsOverdue: true,
-                UrgencyRank: 0,
-                ActionLabel: w.TaskId.HasValue ? "Open review" : "View",
-                IsResolved: false,
-                OnActivate: w.TaskId.HasValue
-                    ? () => OpenTaskAsync(w.TaskId!.Value)
-                    : () => { Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{w.EmployeeId}?tab=sickness"); return Task.CompletedTask; }));
+            foreach (var w in _rtwRes.Value?.Items ?? [])
+            {
+                items.Add(new AttentionItem(
+                    Subject: EmployeeName(w.EmployeeId), Category: "Return-to-work review",
+                    StatusLabel: "Overdue", DueDate: w.DueDate, DueLabel: "Overdue", DueCss: "overdue",
+                    IsOverdue: true, UrgencyRank: 0,
+                    ActionLabel: w.TaskId.HasValue ? "Open review" : "View", IsResolved: false,
+                    OnActivate: w.TaskId.HasValue
+                        ? () => OpenTaskAsync(w.TaskId!.Value)
+                        : () => { Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{w.EmployeeId}?tab=sickness"); return Task.CompletedTask; }));
+                rtwCount++;
+            }
         }
+        outcomes.Add(new WidgetSourceOutcome(SrcRtw, true, _rtwRes.IsFailed, rtwCount));
 
         // Expiring / expired employee documents
-        foreach (var d in expiringDocs)
+        var docExpiryCount = 0;
+        if (_docExpiryRes.IsLoaded)
         {
-            var isExpired = d.ExpiryStatus == DocumentExpiryStatus.Expired;
-            var (dueLabel, dueCss) = isExpired ? ("Expired", "overdue") : (d.ExpiryDate.ToString("d MMM"), "soon");
-            var url = $"/companies/{Session.CompanyId}/employees/{d.EmployeeId}?tab=documents";
-            items.Add(new AttentionItem(
-                Subject: $"{EmployeeName(d.EmployeeId)} — {d.DocumentTypeName}",
-                Category: "Document expiry",
-                StatusLabel: d.Title,
-                DueDate: d.ExpiryDate,
-                DueLabel: dueLabel,
-                DueCss: dueCss,
-                IsOverdue: isExpired,
-                UrgencyRank: isExpired ? 0 : 2,
-                ActionLabel: "View document",
-                IsResolved: false,
-                OnActivate: () => { Navigation.NavigateTo(url); return Task.CompletedTask; }));
+            foreach (var d in _docExpiryRes.Value?.Items ?? [])
+            {
+                var isExpired = d.ExpiryStatus == DocumentExpiryStatus.Expired;
+                var (dueLabel, dueCss) = isExpired ? ("Expired", "overdue") : (d.ExpiryDate.ToString("d MMM"), "soon");
+                var url = $"/companies/{Session.CompanyId}/employees/{d.EmployeeId}?tab=documents";
+                items.Add(new AttentionItem(
+                    Subject: $"{EmployeeName(d.EmployeeId)} — {d.DocumentTypeName}", Category: "Document expiry",
+                    StatusLabel: d.Title, DueDate: d.ExpiryDate, DueLabel: dueLabel, DueCss: dueCss,
+                    IsOverdue: isExpired, UrgencyRank: isExpired ? 0 : 2, ActionLabel: "View document",
+                    IsResolved: false,
+                    OnActivate: () => { Navigation.NavigateTo(url); return Task.CompletedTask; }));
+                docExpiryCount++;
+            }
         }
+        outcomes.Add(new WidgetSourceOutcome(SrcDocExpiry, true, _docExpiryRes.IsFailed, docExpiryCount));
 
         // Company documents due for review
-        foreach (var d in docReviews)
+        var docReviewCount = 0;
+        if (_docReviewsRes.IsLoaded)
         {
-            var (dueLabel, dueCss) = d.IsOverdue ? ("Overdue", "overdue") : (d.ReviewDate?.ToString("d MMM") ?? "—", "soon");
-            var url = $"/companies/{Session.CompanyId}/shared-documents/{d.Id}";
-            items.Add(new AttentionItem(
-                Subject: d.Title,
-                Category: "Document review",
-                StatusLabel: d.CategoryName,
-                DueDate: d.ReviewDate,
-                DueLabel: dueLabel,
-                DueCss: dueCss,
-                IsOverdue: d.IsOverdue,
-                UrgencyRank: d.IsOverdue ? 0 : 2,
-                ActionLabel: "Review document",
-                IsResolved: false,
-                OnActivate: () => { Navigation.NavigateTo(url); return Task.CompletedTask; }));
+            foreach (var d in _docReviewsRes.Value?.Items ?? [])
+            {
+                var (dueLabel, dueCss) = d.IsOverdue ? ("Overdue", "overdue") : (d.ReviewDate?.ToString("d MMM") ?? "—", "soon");
+                var url = $"/companies/{Session.CompanyId}/shared-documents/{d.Id}";
+                items.Add(new AttentionItem(
+                    Subject: d.Title, Category: "Document review", StatusLabel: d.CategoryName,
+                    DueDate: d.ReviewDate, DueLabel: dueLabel, DueCss: dueCss, IsOverdue: d.IsOverdue,
+                    UrgencyRank: d.IsOverdue ? 0 : 2, ActionLabel: "Review document", IsResolved: false,
+                    OnActivate: () => { Navigation.NavigateTo(url); return Task.CompletedTask; }));
+                docReviewCount++;
+            }
         }
+        outcomes.Add(new WidgetSourceOutcome(SrcDocReviews, true, _docReviewsRes.IsFailed, docReviewCount));
 
-        // Overdue first, then urgency rank, then due date (soonest first, undated last).
+        _summary = WidgetPanelState.Summarise(outcomes);
+
         _activeItems = items
             .OrderByDescending(i => i.IsOverdue)
             .ThenBy(i => i.UrgencyRank)
@@ -300,7 +373,7 @@
     private async Task CloseTaskDialogAsync()
     {
         _taskDialogOpen = false;
-        await LoadAsync();
+        await ReloadAllAsync();
     }
 
     private (string? Label, string Css) DueBadge(DateOnly? due)

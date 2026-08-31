@@ -6,19 +6,30 @@
    metric is currently at zero. *@
 @inject NavigationManager Navigation
 
-<a href="@Href" role="listitem"
-   class="widget-kpi widget-kpi--link @(IsZero ? "text-muted" : "")"
-   aria-label="@($"{Label}: {Value}")"
-   @onclick="HandleClick" @onclick:preventDefault="true">
-    <span class="widget-kpi-value">@Value</span>
-    <span class="widget-kpi-label">@Label</span>
-</a>
+@if (Failed)
+{
+    <div role="listitem" class="widget-kpi text-muted" aria-label="@($"{Label}: could not be loaded")">
+        <span class="widget-kpi-value">—</span>
+        <span class="widget-kpi-label">@Label</span>
+    </div>
+}
+else
+{
+    <a href="@Href" role="listitem"
+       class="widget-kpi widget-kpi--link @(IsZero ? "text-muted" : "")"
+       aria-label="@($"{Label}: {Value}")"
+       @onclick="HandleClick" @onclick:preventDefault="true">
+        <span class="widget-kpi-value">@Value</span>
+        <span class="widget-kpi-label">@Label</span>
+    </a>
+}
 
 @code {
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
     [Parameter] public int Value { get; set; }
     [Parameter] public string Href { get; set; } = "#";
     [Parameter] public bool Muted { get; set; }
+    [Parameter] public bool Failed { get; set; }
     [Parameter] public EventCallback OnClick { get; set; }
 
     private bool IsZero => Muted || Value == 0;

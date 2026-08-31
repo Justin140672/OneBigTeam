@@ -187,6 +187,17 @@ public sealed class SicknessService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    // DSH-03: non-swallowing siblings.
+    public Task<GetOverdueReturnToWorkReviewsResponseModel?> GetOverdueReturnToWorkReviewsOrThrowAsync(
+        Guid companyId, CancellationToken cancellationToken = default) =>
+        Http.GetFromJsonAsync<GetOverdueReturnToWorkReviewsResponseModel>(
+            $"api/companies/{companyId}/return-to-work-reviews/overdue", HrApiJsonOptions.Default, cancellationToken);
+
+    public Task<GetMissingFitNotesResponseModel?> GetMissingFitNotesOrThrowAsync(
+        Guid companyId, CancellationToken cancellationToken = default) =>
+        Http.GetFromJsonAsync<GetMissingFitNotesResponseModel>(
+            $"api/companies/{companyId}/sickness-evidence-requests/missing", HrApiJsonOptions.Default, cancellationToken);
+
     private static async Task<string> ExtractErrorAsync(
         HttpResponseMessage response, string fallback, CancellationToken cancellationToken)
     {

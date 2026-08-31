@@ -1,4 +1,6 @@
+@using HR.Web.Components.Pages.Dashboards
 @inject SicknessService SicknessService
+@inject WidgetSourceLoader SourceLoader
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -22,65 +24,74 @@
             <div class="widget-header">
                 <i class="fa-solid fa-file-medical widget-icon"></i>
                 <span class="widget-title">Missing Fit Notes</span>
-                @if (_items.Count > 0)
+                @if (_result.IsLoaded && _items.Count > 0)
                 {
                     <span class="widget-count-badge">@_items.Count</span>
                 }
             </div>
 
-            @if (_overdue > 0 || _pending > 0)
+            @if (_result.IsFailed)
             {
-                <div class="widget-stats">
-                    @if (_overdue > 0)
+                <WidgetSourceWarning SourceName="Missing fit notes" Retrying="_retrying" OnRetry="RetryAsync" />
+            }
+            else
+            {
+                @if (_overdue > 0 || _pending > 0)
+                {
+                    <div class="widget-stats">
+                        @if (_overdue > 0)
+                        {
+                            <div class="widget-stat widget-stat--danger">
+                                <i class="fa-solid fa-triangle-exclamation fa-xs"></i>
+                                <span class="widget-stat-value">@_overdue</span>
+                                <span class="widget-stat-label">overdue</span>
+                            </div>
+                        }
+                        @if (_pending > 0)
+                        {
+                            <div class="widget-stat">
+                                <span class="widget-stat-value">@_pending</span>
+                                <span class="widget-stat-label">pending</span>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="widget-body">
+                    @if (_items.Count == 0)
                     {
-                        <div class="widget-stat widget-stat--danger">
-                            <i class="fa-solid fa-triangle-exclamation fa-xs"></i>
-                            <span class="widget-stat-value">@_overdue</span>
-                            <span class="widget-stat-label">overdue</span>
+                        <div class="widget-empty">
+                            <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
+                            <p class="mb-0">No missing fit notes</p>
                         </div>
                     }
-                    @if (_pending > 0)
+                    else
                     {
-                        <div class="widget-stat">
-                            <span class="widget-stat-value">@_pending</span>
-                            <span class="widget-stat-label">pending</span>
-                        </div>
+                        @foreach (var item in _items.Take(5))
+                        {
+                            var i = item;
+                            var (dueLabel, dueCss) = DueBadge(i.DueDate, i.Status);
+                            var url = $"/companies/{Session.CompanyId}/employees/{i.EmployeeId}";
+                            <div @key="i.RequestId" class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
+                                <span class="priority-pip priority-pip--@(i.Status == "Overdue" ? "critical" : "medium")"></span>
+                                <div class="task-widget-content">
+                                    <span class="task-widget-title">@EmployeeName(i.EmployeeId)</span>
+                                    <span class="task-widget-meta">Fit note evidence</span>
+                                </div>
+                                <span class="due-badge due-badge--@dueCss">@dueLabel</span>
+                            </div>
+                        }
                     }
                 </div>
             }
-
-            <div class="widget-body">
-                @if (_items.Count == 0)
-                {
-                    <div class="widget-empty">
-                        <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
-                        <p class="mb-0">No missing fit notes</p>
-                    </div>
-                }
-                else
-                {
-                    @foreach (var item in _items.Take(5))
-                    {
-                        var i = item;
-                        var (dueLabel, dueCss) = DueBadge(i.DueDate, i.Status);
-                        var url = $"/companies/{Session.CompanyId}/employees/{i.EmployeeId}";
-                        <div @key="i.RequestId" class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
-                            <span class="priority-pip priority-pip--@(i.Status == "Overdue" ? "critical" : "medium")"></span>
-                            <div class="task-widget-content">
-                                <span class="task-widget-title">@EmployeeName(i.EmployeeId)</span>
-                                <span class="task-widget-meta">Fit note evidence</span>
-                            </div>
-                            <span class="due-badge due-badge--@dueCss">@dueLabel</span>
-                        </div>
-                    }
-                }
-            </div>
         </div>
     }
 }
 
 @code {
     private bool _loading = true;
+    private bool _retrying;
+    private WidgetResult<GetMissingFitNotesResponseModel?> _result = WidgetResult<GetMissingFitNotesResponseModel?>.Loading("Missing fit notes");
     private List<MissingFitNoteItem> _items = [];
     private IReadOnlyDictionary<Guid, string> _employeeNames = new Dictionary<Guid, string>();
     private int _overdue;
@@ -94,17 +105,28 @@
             return;
         }
 
-        var requestsTask  = SicknessService.GetMissingFitNotesAsync(Session.CompanyId);
         var employeesTask = Session.GetEmployeeNamesAsync();
+        await LoadAsync();
+        try { _employeeNames = await employeesTask; } catch { /* names fall back to "Employee" */ }
+        _loading = false;
+    }
 
-        await Task.WhenAll(requestsTask, employeesTask);
+    private async Task LoadAsync()
+    {
+        _result = await SourceLoader.LoadAsync("Missing Fit Notes", "Missing fit notes",
+            () => SicknessService.GetMissingFitNotesOrThrowAsync(Session.CompanyId));
 
-        _items = (await requestsTask)?.Items ?? [];
-        _employeeNames = await employeesTask;
-
+        _items = _result.IsLoaded ? _result.Value?.Items ?? [] : [];
         _overdue = _items.Count(i => i.Status == "Overdue");
         _pending = _items.Count(i => i.Status == "Pending");
-        _loading = false;
+    }
+
+    private async Task RetryAsync()
+    {
+        _retrying = true;
+        StateHasChanged();
+        await LoadAsync();
+        _retrying = false;
     }
 
     private string EmployeeName(Guid employeeId) =>

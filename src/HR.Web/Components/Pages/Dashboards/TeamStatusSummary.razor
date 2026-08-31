@@ -1,25 +1,16 @@
-@* Compact team-status metric strip for the redesigned Manager Dashboard. Deliberately not another
-   tall card list — a single row of small metric tiles giving an at-a-glance headcount snapshot,
-   reusing data already fetched by sibling widgets rather than adding new endpoints.
+@* Compact team-status metric strip for the redesigned Manager Dashboard. Reuses data already
+   fetched by sibling widgets rather than adding new endpoints. See PRODUCT ticket "Reorganise the
+   Team Manager Dashboard around priority actions" for full context on the proxy measures used.
 
-   Data sources / assumptions (see PRODUCT ticket "Reorganise the Team Manager Dashboard around
-   priority actions" for full context):
-   - At work / On leave / Sick: derived from EmployeeService.GetMyTeamAsync (all reports,
-     includeIndirect: true), grouped by TeamMemberItem.Status.
-   - In probation: there is no direct "current headcount in probation" endpoint, so this uses the
-     distinct employee count from ProbationService.GetUpcomingReviewsAsync as a proxy for "has an
-     active/upcoming probation review, i.e. is in probation". This is an imperfect measure — an
-     employee mid-probation with no review due soon would not be counted — called out again in the
-     redesign report.
-   - Missing fit notes: SicknessService.GetMissingFitNotesAsync count, reused as-is.
-
-   Linking: only "At work" / "On leave" / "Sick" would conceptually map to a filtered team view,
-   but EmployeeList.razor has no query-string filter support for employment/leave/sickness status
-   today, so none of these tiles link anywhere — all render as plain metric tiles rather than
-   fabricating a filter parameter that doesn't exist. *@
+   DSH-03: each source is loaded independently. A failed "In probation" / "Missing fit notes"
+   source renders a compact inline warning + retry and a "—" tile rather than a misleading 0. If
+   the team roster itself fails to load, the whole strip is replaced with a warning + retry (there
+   is nothing meaningful to show without it). *@
+@using HR.Web.Components.Pages.Dashboards
 @inject EmployeeService EmployeeService
 @inject ProbationService ProbationService
 @inject SicknessService SicknessService
+@inject WidgetSourceLoader SourceLoader
 @inject AppSession Session
 
 @if (Session.IsManager)
@@ -36,6 +27,10 @@
                 <HrLoadingIndicator Label="Loading team status…" />
             </div>
         }
+        else if (_teamRes.IsFailed)
+        {
+            <WidgetSourceWarning SourceName="Team status" Retrying="_retrying.Contains(SrcTeam)" OnRetry="() => RetryAsync(SrcTeam)" />
+        }
         else if (_teamSize == 0)
         {
             <div class="widget-empty">
@@ -45,6 +40,15 @@
         }
         else
         {
+            @if (_probationRes.IsFailed)
+            {
+                <WidgetSourceWarning SourceName="In probation" Retrying="_retrying.Contains(SrcProbation)" OnRetry="() => RetryAsync(SrcProbation)" />
+            }
+            @if (_fitNotesRes.IsFailed)
+            {
+                <WidgetSourceWarning SourceName="Missing fit notes" Retrying="_retrying.Contains(SrcFitNotes)" OnRetry="() => RetryAsync(SrcFitNotes)" />
+            }
+
             <div class="team-status-strip" role="list" aria-label="Team status summary">
                 <div class="team-status-tile" role="listitem">
                     <span class="team-status-value">@_atWork</span>
@@ -62,12 +66,12 @@
                     <span class="team-status-value">@_sick</span>
                     <span class="team-status-label">Sick</span>
                 </div>
-                <div class="team-status-tile @(_inProbation > 0 ? "team-status-tile--warning" : "")" role="listitem">
-                    <span class="team-status-value">@_inProbation</span>
+                <div class="team-status-tile @(_probationRes.IsLoaded && _inProbation > 0 ? "team-status-tile--warning" : "")" role="listitem">
+                    <span class="team-status-value">@(_probationRes.IsFailed ? "—" : _inProbation.ToString())</span>
                     <span class="team-status-label">In probation</span>
                 </div>
-                <div class="team-status-tile @(_missingFitNotes > 0 ? "team-status-tile--warning" : "")" role="listitem">
-                    <span class="team-status-value">@_missingFitNotes</span>
+                <div class="team-status-tile @(_fitNotesRes.IsLoaded && _missingFitNotes > 0 ? "team-status-tile--warning" : "")" role="listitem">
+                    <span class="team-status-value">@(_fitNotesRes.IsFailed ? "—" : _missingFitNotes.ToString())</span>
                     <span class="team-status-label">Missing fit notes</span>
                 </div>
             </div>
@@ -79,7 +83,20 @@
     // Reports the "away today" count up to ManagerDashboard for its one-line activity summary.
     [Parameter] public EventCallback<int> OnAwayTodayChanged { get; set; }
 
+    private const string SrcTeam = "Team status";
+    private const string SrcProbation = "In probation";
+    private const string SrcFitNotes = "Missing fit notes";
+    private const string WidgetName = "Team Status";
+
+    private readonly string[] _sourceNames = [SrcTeam, SrcProbation, SrcFitNotes];
+    private readonly HashSet<string> _retrying = [];
+
     private bool _loading = true;
+
+    private WidgetResult<GetMyTeamResponse?> _teamRes = WidgetResult<GetMyTeamResponse?>.Loading(SrcTeam);
+    private WidgetResult<IReadOnlyList<UpcomingProbationReviewItem>> _probationRes = WidgetResult<IReadOnlyList<UpcomingProbationReviewItem>>.Loading(SrcProbation);
+    private WidgetResult<GetMissingFitNotesResponseModel?> _fitNotesRes = WidgetResult<GetMissingFitNotesResponseModel?>.Loading(SrcFitNotes);
+
     private int _teamSize;
     private int _atWork;
     private int _onLeave;
@@ -96,27 +113,56 @@
             return;
         }
 
-        var teamTask = EmployeeService.GetMyTeamAsync(Session.CompanyId, includeIndirect: true);
-        var probationTask = ProbationService.GetUpcomingReviewsAsync(Session.CompanyId);
-        var fitNotesTask = SicknessService.GetMissingFitNotesAsync(Session.CompanyId);
+        await Task.WhenAll(_sourceNames.Select(LoadSourceAsync));
+        Recompute();
+        _loading = false;
+        await NotifyAsync();
+    }
 
-        await Task.WhenAll(teamTask, probationTask, fitNotesTask);
+    private async Task LoadSourceAsync(string name)
+    {
+        switch (name)
+        {
+            case SrcTeam:
+                _teamRes = await SourceLoader.LoadAsync(WidgetName, name,
+                    () => EmployeeService.GetMyTeamOrThrowAsync(Session.CompanyId, includeIndirect: true));
+                break;
+            case SrcProbation:
+                _probationRes = await SourceLoader.LoadAsync(WidgetName, name,
+                    () => ProbationService.GetUpcomingReviewsOrThrowAsync(Session.CompanyId));
+                break;
+            case SrcFitNotes:
+                _fitNotesRes = await SourceLoader.LoadAsync(WidgetName, name,
+                    () => SicknessService.GetMissingFitNotesOrThrowAsync(Session.CompanyId));
+                break;
+        }
+    }
 
-        var team = (await teamTask)?.Items ?? [];
-        var probation = await probationTask ?? [];
-        var fitNotes = (await fitNotesTask)?.Items ?? [];
+    private async Task RetryAsync(string name)
+    {
+        _retrying.Add(name);
+        StateHasChanged();
+        await LoadSourceAsync(name);
+        _retrying.Remove(name);
+        Recompute();
+        await NotifyAsync();
+    }
 
+    private void Recompute()
+    {
+        var team = _teamRes.IsLoaded ? _teamRes.Value?.Items ?? [] : [];
         _teamSize = team.Count;
         _sick = team.Count(m => m.Status == "Sick");
         _onLeave = team.Count(m => m.Status == "OnLeave");
         _atWork = _teamSize - _sick - _onLeave;
         _awayToday = _sick + _onLeave;
-        _inProbation = probation.Select(p => p.EmployeeId).Distinct().Count();
-        _missingFitNotes = fitNotes.Count;
+        _inProbation = _probationRes.IsLoaded ? (_probationRes.Value ?? []).Select(p => p.EmployeeId).Distinct().Count() : 0;
+        _missingFitNotes = _fitNotesRes.IsLoaded ? _fitNotesRes.Value?.Items.Count ?? 0 : 0;
+    }
 
-        _loading = false;
-
-        if (OnAwayTodayChanged.HasDelegate)
+    private async Task NotifyAsync()
+    {
+        if (OnAwayTodayChanged.HasDelegate && _teamRes.IsLoaded)
             await OnAwayTodayChanged.InvokeAsync(_awayToday);
     }
 }

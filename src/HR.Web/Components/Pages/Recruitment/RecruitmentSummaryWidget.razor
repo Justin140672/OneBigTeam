@@ -1,8 +1,10 @@
 @using HR.Infrastructure.Abstractions
 @using HR.Modules.Tasks.Contracts
+@using HR.Web.Components.Pages.Dashboards
 @inject VacancyService VacancyService
 @inject InterviewService InterviewService
 @inject TaskService TaskService
+@inject WidgetSourceLoader SourceLoader
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -31,17 +33,23 @@
                 </a>
             </div>
 
+            @foreach (var name in FailedSources())
+            {
+                var n = name;
+                <WidgetSourceWarning SourceName="@n" Retrying="_retrying.Contains(n)" OnRetry="() => RetryAsync(n)" />
+            }
+
             <div class="widget-kpi-row">
                 <div class="widget-kpi widget-kpi--link" @onclick="NavigateToVacancies">
-                    <span class="widget-kpi-value">@_openVacancies</span>
+                    <span class="widget-kpi-value">@Display(_vacanciesRes, _openVacancies)</span>
                     <span class="widget-kpi-label">Open Vacancies</span>
                 </div>
                 <div class="widget-kpi">
-                    <span class="widget-kpi-value">@_interviewsToday</span>
+                    <span class="widget-kpi-value">@Display(_interviewsRes, _interviewsToday)</span>
                     <span class="widget-kpi-label">Interviews Today</span>
                 </div>
-                <div class="widget-kpi @(_outstandingFeedbackTasks > 0 ? "widget-kpi--danger" : "")">
-                    <span class="widget-kpi-value">@_outstandingFeedbackTasks</span>
+                <div class="widget-kpi @(_feedbackRes.IsLoaded && _outstandingFeedbackTasks > 0 ? "widget-kpi--danger" : "")">
+                    <span class="widget-kpi-value">@Display(_feedbackRes, _outstandingFeedbackTasks)</span>
                     <span class="widget-kpi-label">Outstanding Feedback Tasks</span>
                 </div>
             </div>
@@ -50,7 +58,20 @@
 }
 
 @code {
+    private const string SrcVacancies = "Open vacancies";
+    private const string SrcInterviews = "Interviews today";
+    private const string SrcFeedback = "Feedback tasks";
+    private const string WidgetName = "Recruitment summary";
+
+    private readonly string[] _sourceNames = [SrcVacancies, SrcInterviews, SrcFeedback];
+    private readonly HashSet<string> _retrying = [];
+
     private bool _loading = true;
+
+    private WidgetResult<ListVacanciesResponse?> _vacanciesRes = WidgetResult<ListVacanciesResponse?>.Loading(SrcVacancies);
+    private WidgetResult<GetInterviewsTodayCountResponse?> _interviewsRes = WidgetResult<GetInterviewsTodayCountResponse?>.Loading(SrcInterviews);
+    private WidgetResult<GetOutstandingTaskCountResponse?> _feedbackRes = WidgetResult<GetOutstandingTaskCountResponse?>.Loading(SrcFeedback);
+
     private int _openVacancies;
     private int _interviewsToday;
     private int _outstandingFeedbackTasks;
@@ -63,23 +84,49 @@
             return;
         }
 
-        // "Outstanding Feedback Tasks" is gated server-side by employee:manage (HrAdministrator
-        // only) — a Recruiter-only viewer sees 0 here rather than the real count. Acceptable
-        // graceful degradation for this one KPI tile; the other two (vacancies/interviews) are
-        // scoped to recruitment:view/candidate:view and work fully for Recruiters.
-        var vacanciesTask = VacancyService.ListVacanciesAsync(Session.CompanyId, status: "Open");
-        var interviewsTask = InterviewService.GetInterviewsTodayCountAsync(Session.CompanyId);
-        var feedbackTasksTask = TaskService.GetOutstandingTaskCountAsync(
-            Session.CompanyId, TaskSource.Recruitment, TaskActionType.Complete);
-
-        await Task.WhenAll(vacanciesTask, interviewsTask, feedbackTasksTask);
-
-        _openVacancies = (await vacanciesTask)?.Items.Count ?? 0;
-        _interviewsToday = (await interviewsTask)?.Count ?? 0;
-        _outstandingFeedbackTasks = (await feedbackTasksTask)?.Count ?? 0;
-
+        await Task.WhenAll(_sourceNames.Select(LoadSourceAsync));
         _loading = false;
     }
+
+    private async Task LoadSourceAsync(string name)
+    {
+        switch (name)
+        {
+            case SrcVacancies:
+                _vacanciesRes = await SourceLoader.LoadAsync(WidgetName, name,
+                    () => VacancyService.ListVacanciesOrThrowAsync(Session.CompanyId, status: "Open"));
+                _openVacancies = _vacanciesRes.IsLoaded ? _vacanciesRes.Value?.Items.Count ?? 0 : 0;
+                break;
+            case SrcInterviews:
+                _interviewsRes = await SourceLoader.LoadAsync(WidgetName, name,
+                    () => InterviewService.GetInterviewsTodayCountOrThrowAsync(Session.CompanyId));
+                _interviewsToday = _interviewsRes.IsLoaded ? _interviewsRes.Value?.Count ?? 0 : 0;
+                break;
+            case SrcFeedback:
+                _feedbackRes = await SourceLoader.LoadAsync(WidgetName, name,
+                    () => TaskService.GetOutstandingTaskCountOrThrowAsync(
+                        Session.CompanyId, TaskSource.Recruitment, TaskActionType.Complete));
+                _outstandingFeedbackTasks = _feedbackRes.IsLoaded ? _feedbackRes.Value?.Count ?? 0 : 0;
+                break;
+        }
+    }
+
+    private async Task RetryAsync(string name)
+    {
+        _retrying.Add(name);
+        StateHasChanged();
+        await LoadSourceAsync(name);
+        _retrying.Remove(name);
+    }
+
+    private IEnumerable<string> FailedSources()
+    {
+        if (_vacanciesRes.IsFailed) yield return SrcVacancies;
+        if (_interviewsRes.IsFailed) yield return SrcInterviews;
+        if (_feedbackRes.IsFailed) yield return SrcFeedback;
+    }
+
+    private static string Display<T>(WidgetResult<T> result, int value) => result.IsFailed ? "—" : value.ToString();
 
     private void NavigateToVacancies() =>
         Navigation.NavigateTo($"/companies/{Session.CompanyId}/vacancies");

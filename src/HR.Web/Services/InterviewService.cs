@@ -20,6 +20,11 @@ public sealed class InterviewService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    // DSH-03: non-swallowing sibling of GetInterviewsTodayCountAsync.
+    public Task<GetInterviewsTodayCountResponse?> GetInterviewsTodayCountOrThrowAsync(Guid companyId) =>
+        Http.GetFromJsonAsync<GetInterviewsTodayCountResponse>(
+            $"api/companies/{companyId}/interviews/today-count", HrApiJsonOptions.Default);
+
     public async Task<GetUpcomingInterviewsResponse?> GetUpcomingInterviewsAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {

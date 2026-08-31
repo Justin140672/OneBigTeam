@@ -95,6 +95,34 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    // ── DSH-03 non-swallowing siblings ──────────────────────────────────────
+    // Duplicate the URL/GET of the matching method above but let exceptions propagate so
+    // WidgetSourceLoader can observe (and log) a genuine source failure. Do not add try/catch.
+
+    public Task<TaskListResponse?> GetTeamTasksOrThrowAsync(
+        Guid companyId, Guid managerId, int pageNumber = 1, int pageSize = 20, string? status = null, CancellationToken cancellationToken = default)
+    {
+        var qs = $"pageNumber={pageNumber}&pageSize={pageSize}";
+        if (!string.IsNullOrWhiteSpace(status)) qs += $"&status={Uri.EscapeDataString(status)}";
+        return Http.GetFromJsonAsync<TaskListResponse>(
+            $"api/companies/{companyId}/employees/{managerId}/team-tasks?{qs}", HrApiJsonOptions.Default, cancellationToken);
+    }
+
+    public Task<UnassignedTaskListResponse?> GetUnassignedTasksOrThrowAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+        Http.GetFromJsonAsync<UnassignedTaskListResponse>(
+            $"api/companies/{companyId}/tasks/unassigned", HrApiJsonOptions.Default, cancellationToken);
+
+    public Task<GetOutstandingTaskCountResponse?> GetOutstandingTaskCountOrThrowAsync(
+        Guid companyId, TaskSource? source = null, TaskActionType? actionType = null, CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>();
+        if (source is not null) query.Add($"source={source}");
+        if (actionType is not null) query.Add($"actionType={actionType}");
+        var url = $"api/companies/{companyId}/tasks/outstanding-count";
+        if (query.Count > 0) url += "?" + string.Join("&", query);
+        return Http.GetFromJsonAsync<GetOutstandingTaskCountResponse>(url, HrApiJsonOptions.Default, cancellationToken);
+    }
+
     public async Task<bool> SelfAssignTaskAsync(Guid companyId, Guid taskId, Guid employeeId, Guid userId, CancellationToken cancellationToken = default)
     {
         try

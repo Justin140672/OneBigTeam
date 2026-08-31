@@ -120,6 +120,11 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    // DSH-03: non-swallowing sibling of GetMyTeamAsync.
+    public Task<GetMyTeamResponse?> GetMyTeamOrThrowAsync(Guid companyId, bool includeIndirect) =>
+        Http.GetFromJsonAsync<GetMyTeamResponse>(
+            $"api/companies/{companyId}/employees/me/team?includeIndirect={includeIndirect}", HrApiJsonOptions.Default);
+
     public async Task<GetEmployeeResponse?> GetEmployeeAsync(Guid companyId, Guid id)
     {
         try

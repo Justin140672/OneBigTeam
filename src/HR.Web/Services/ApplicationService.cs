@@ -37,6 +37,13 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    // DSH-03: non-swallowing sibling of GetApplicationsByStatusAsync.
+    public Task<GetApplicationsByStatusResponse?> GetApplicationsByStatusOrThrowAsync(
+        Guid companyId, Guid stageId, CancellationToken cancellationToken = default) =>
+        Http.GetFromJsonAsync<GetApplicationsByStatusResponse>(
+            $"api/companies/{companyId}/recruitment/applications?stageId={stageId}",
+            HrApiJsonOptions.Default, cancellationToken);
+
     public async Task<(CreateApplicationResponse? Result, string? Error)> CreateApplicationAsync(
         Guid companyId, Guid vacancyId, Guid candidateId, string? notes,
         string? source = null, Guid? sourceExternalRecruiterId = null)

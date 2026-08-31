@@ -1,0 +1,24 @@
+@* Compact inline "this one source failed to load" row for dashboard widgets (ticket DSH-03).
+   Deliberately not a full-card takeover — the rest of the widget's successfully-loaded content
+   still renders around it. No exception detail is ever shown. *@
+
+<div class="widget-source-warning" role="alert">
+    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+    <span class="widget-source-warning-text">@SourceName couldn't be loaded</span>
+    <button type="button" class="widget-source-warning-retry" @onclick="OnRetry" disabled="@Retrying">
+        @if (Retrying)
+        {
+            <span>Retrying…</span>
+        }
+        else
+        {
+            <span>Retry</span>
+        }
+    </button>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string SourceName { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public bool Retrying { get; set; }
+}

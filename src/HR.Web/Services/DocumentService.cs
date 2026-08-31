@@ -33,6 +33,17 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
+    // DSH-03: non-swallowing siblings.
+    public Task<GetExpiringDocumentsResponse?> GetExpiringDocumentsOrThrowAsync(
+        Guid companyId, CancellationToken cancellationToken = default) =>
+        Http.GetFromJsonAsync<GetExpiringDocumentsResponse>(
+            $"api/companies/{companyId}/documents/expiring", HrApiJsonOptions.Default, cancellationToken);
+
+    public Task<GetSharedCompanyDocumentsDueForReviewResponse?> GetSharedCompanyDocumentsDueForReviewOrThrowAsync(
+        Guid companyId, CancellationToken cancellationToken = default) =>
+        Http.GetFromJsonAsync<GetSharedCompanyDocumentsDueForReviewResponse>(
+            $"api/companies/{companyId}/shared-documents/due-for-review", HrApiJsonOptions.Default, cancellationToken);
+
     public async Task<EmployeeDocumentListResponse?> ListEmployeeDocumentsAsync(
         Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
     {

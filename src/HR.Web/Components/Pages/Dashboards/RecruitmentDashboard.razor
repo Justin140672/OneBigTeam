@@ -9,6 +9,7 @@
 @inject InterviewService InterviewService
 @inject ApplicationService ApplicationService
 @inject RecruitmentStageService RecruitmentStageService
+@inject WidgetSourceLoader SourceLoader
 
 <PageTitle>Recruitment Dashboard</PageTitle>
 
@@ -46,17 +47,22 @@
             else
             {
                 <div class="widget-card">
+                    @foreach (var source in _summary.FailedSources)
+                    {
+                        var s = source;
+                        <WidgetSourceWarning SourceName="@s" Retrying="_retrying.Contains(s)" OnRetry="() => RetrySummarySourceAsync(s)" />
+                    }
                     <div class="widget-kpi-row" role="list">
-                        <RecruitmentSummaryTile Label="Open vacancies" Value="_openVacancies"
+                        <RecruitmentSummaryTile Label="Open vacancies" Value="_openVacancies" Failed="_vacanciesRes.IsFailed"
                                                  Href="@($"/companies/{Session.CompanyId}/vacancies")" />
-                        <RecruitmentSummaryTile Label="New applications" Value="_newApplications"
+                        <RecruitmentSummaryTile Label="New applications" Value="_newApplications" Failed="_pipelineRes.IsFailed"
                                                  Href="@($"/companies/{Session.CompanyId}/vacancies")" />
-                        <RecruitmentSummaryTile Label="Interviews requiring action" Value="_interviewsRequiringAction"
+                        <RecruitmentSummaryTile Label="Interviews requiring action" Value="_interviewsRequiringAction" Failed="_interviewsRes.IsFailed"
                                                  Href="#" OnClick="@(() => SetTab(DashboardTab.Activity))" />
-                        <RecruitmentSummaryTile Label="Offers awaiting response" Value="_offersAwaitingResponse"
+                        <RecruitmentSummaryTile Label="Offers awaiting response" Value="_offersAwaitingResponse" Failed="_offersRes.IsFailed"
                                                  Href="#" OnClick="@(() => SetTab(DashboardTab.Activity))" />
-                        <RecruitmentSummaryTile Label="Stale vacancies" Value="_staleVacancies"
-                                                 Href="@($"/companies/{Session.CompanyId}/vacancies")" Muted="@(_staleVacancies == 0)" />
+                        <RecruitmentSummaryTile Label="Stale vacancies" Value="_staleVacancies" Failed="_staleRes.IsFailed"
+                                                 Href="@($"/companies/{Session.CompanyId}/vacancies")" Muted="@(_staleRes.IsLoaded && _staleVacancies == 0)" />
                     </div>
                 </div>
             }
@@ -202,7 +208,28 @@
     private bool _showTerminalStages;
 
     // ── Summary row state ───────────────────────────────────────────────────
+    // DSH-03: each tile's underlying source is tracked as a WidgetResult so a failed source shows
+    // "—" + an inline retry rather than a misleading 0.
+    private const string SrcVacancies = "Open vacancies";
+    private const string SrcPipeline = "New applications";
+    private const string SrcInterviews = "Interviews requiring action";
+    private const string SrcOffers = "Offers awaiting response";
+    private const string SrcStale = "Stale vacancies";
+    private const string SummaryWidgetName = "Recruitment summary";
+
+    private readonly string[] _summarySources = [SrcVacancies, SrcPipeline, SrcInterviews, SrcOffers, SrcStale];
+    private readonly HashSet<string> _retrying = [];
+
     private bool _summaryLoading = true;
+
+    private WidgetResult<ListVacanciesResponse?> _vacanciesRes = WidgetResult<ListVacanciesResponse?>.Loading(SrcVacancies);
+    private WidgetResult<GetPipelineSummaryResponse?> _pipelineRes = WidgetResult<GetPipelineSummaryResponse?>.Loading(SrcPipeline);
+    private WidgetResult<GetInterviewsTodayCountResponse?> _interviewsRes = WidgetResult<GetInterviewsTodayCountResponse?>.Loading(SrcInterviews);
+    private WidgetResult<int> _offersRes = WidgetResult<int>.Loading(SrcOffers);
+    private WidgetResult<GetStaleVacanciesResponse?> _staleRes = WidgetResult<GetStaleVacanciesResponse?>.Loading(SrcStale);
+
+    private WidgetPanelSummary _summary = WidgetPanelState.Summarise([]);
+
     private int _openVacancies;
     private int _newApplications;
     private int _interviewsRequiringAction;
@@ -222,53 +249,82 @@
 
         _ready = true;
 
-        var vacancyResultTask = VacancyService.ListVacanciesAsync(Session.CompanyId, status: "Open");
-        var pipelineTask = VacancyService.GetPipelineSummaryAsync(Session.CompanyId);
-        var interviewsTodayTask = InterviewService.GetInterviewsTodayCountAsync(Session.CompanyId);
-        var staleTask = VacancyService.GetStaleVacanciesAsync(Session.CompanyId);
-        var stagesTask = RecruitmentStageService.ListStagesAsync(Session.CompanyId);
+        await Task.WhenAll(_summarySources.Select(LoadSummarySourceAsync));
+        RecomputeSummary();
+        _summaryLoading = false;
+    }
 
-        await Task.WhenAll(vacancyResultTask, pipelineTask, interviewsTodayTask, staleTask, stagesTask);
+    private void RecomputeSummary() => _summary = WidgetPanelState.Summarise(
+    [
+        new WidgetSourceOutcome(SrcVacancies, true, _vacanciesRes.IsFailed, _openVacancies),
+        new WidgetSourceOutcome(SrcPipeline, true, _pipelineRes.IsFailed, _newApplications),
+        new WidgetSourceOutcome(SrcInterviews, true, _interviewsRes.IsFailed, _interviewsRequiringAction),
+        new WidgetSourceOutcome(SrcOffers, true, _offersRes.IsFailed, _offersAwaitingResponse),
+        new WidgetSourceOutcome(SrcStale, true, _staleRes.IsFailed, _staleVacancies),
+    ]);
 
-        var vacancyResult = await vacancyResultTask;
-        _vacancies = vacancyResult?.Items.ToList() ?? [];
-        _selectedVacancyId = _vacancies.FirstOrDefault()?.Id;
-        _vacanciesLoading = false;
-        _openVacancies = _vacancies.Count;
-
-        // GetPipelineSummary returns the company's active, non-terminal stages in DisplayOrder
-        // (see HiringPipelineChart's identical use of this endpoint). "New applications" has no
-        // dedicated backend signal, so the closest available one is the application count sitting
-        // in the very first (entry) non-terminal stage — i.e. candidates who have applied but not
-        // yet been moved anywhere.
-        var pipeline = (await pipelineTask)?.Items ?? [];
-        _newApplications = pipeline.FirstOrDefault()?.ApplicationCount ?? 0;
-        _candidatesInProgress = pipeline.Sum(p => p.ApplicationCount);
-
-        // "Interviews requiring action" — no dedicated "needs action" flag exists on interviews, so
-        // today's scheduled interview count (the same figure RecruitmentSummaryWidget's "Interviews
-        // Today" KPI already uses) is the closest available proxy: an interview happening today is
-        // the one most likely to need a recruiter's attention right now.
-        _interviewsRequiringAction = (await interviewsTodayTask)?.Count ?? 0;
-
-        _staleVacancies = (await staleTask)?.Items.Count ?? 0;
-
-        // Mirrors OffersAwaitingResponseWidget's own derivation exactly (see that component's
-        // comments for the full rationale): the last active non-terminal stage, ordered by
-        // DisplayOrder, is the same definition OfferCandidateHandler uses server-side for "Offer".
-        var stages = (await stagesTask)?.Items ?? [];
-        var offerStageId = stages
-            .Where(s => s.IsActive && !s.IsTerminal)
-            .OrderByDescending(s => s.DisplayOrder)
-            .FirstOrDefault()?.Id;
-
-        if (offerStageId is { } offerId)
+    private async Task LoadSummarySourceAsync(string name)
+    {
+        switch (name)
         {
-            var offersResult = await ApplicationService.GetApplicationsByStatusAsync(Session.CompanyId, offerId);
-            _offersAwaitingResponse = offersResult?.Items.Count ?? 0;
+            case SrcVacancies:
+                _vacanciesRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
+                    () => VacancyService.ListVacanciesOrThrowAsync(Session.CompanyId, status: "Open"));
+                _vacancies = _vacanciesRes.IsLoaded ? _vacanciesRes.Value?.Items.ToList() ?? [] : [];
+                _selectedVacancyId ??= _vacancies.FirstOrDefault()?.Id;
+                _vacanciesLoading = false;
+                _openVacancies = _vacancies.Count;
+                break;
+
+            case SrcPipeline:
+                // "New applications" = application count in the first (entry) non-terminal stage.
+                _pipelineRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
+                    () => VacancyService.GetPipelineSummaryOrThrowAsync(Session.CompanyId));
+                var pipeline = _pipelineRes.IsLoaded ? _pipelineRes.Value?.Items ?? [] : [];
+                _newApplications = pipeline.FirstOrDefault()?.ApplicationCount ?? 0;
+                _candidatesInProgress = pipeline.Sum(p => p.ApplicationCount);
+                break;
+
+            case SrcInterviews:
+                // Today's scheduled interview count is the closest available "needs action" proxy.
+                _interviewsRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
+                    () => InterviewService.GetInterviewsTodayCountOrThrowAsync(Session.CompanyId));
+                _interviewsRequiringAction = _interviewsRes.IsLoaded ? _interviewsRes.Value?.Count ?? 0 : 0;
+                break;
+
+            case SrcStale:
+                _staleRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
+                    () => VacancyService.GetStaleVacanciesOrThrowAsync(Session.CompanyId));
+                _staleVacancies = _staleRes.IsLoaded ? _staleRes.Value?.Items.Count ?? 0 : 0;
+                break;
+
+            case SrcOffers:
+                // Mirrors OffersAwaitingResponseWidget: the last active non-terminal stage (by
+                // DisplayOrder) is the server-side definition of "Offer". Two calls, one outcome.
+                _offersRes = await SourceLoader.LoadAsync(SummaryWidgetName, name, async () =>
+                {
+                    var stages = (await RecruitmentStageService.ListStagesOrThrowAsync(Session.CompanyId))?.Items ?? [];
+                    var offerStageId = stages
+                        .Where(s => s.IsActive && !s.IsTerminal)
+                        .OrderByDescending(s => s.DisplayOrder)
+                        .FirstOrDefault()?.Id;
+                    if (offerStageId is not { } offerId) return 0;
+                    var offersResult = await ApplicationService.GetApplicationsByStatusOrThrowAsync(Session.CompanyId, offerId);
+                    return offersResult?.Items.Count ?? 0;
+                });
+                _offersAwaitingResponse = _offersRes.IsLoaded ? _offersRes.Value : 0;
+                break;
         }
 
-        _summaryLoading = false;
+    }
+
+    private async Task RetrySummarySourceAsync(string name)
+    {
+        _retrying.Add(name);
+        StateHasChanged();
+        await LoadSummarySourceAsync(name);
+        RecomputeSummary();
+        _retrying.Remove(name);
     }
 
     private string HeaderSummary() =>

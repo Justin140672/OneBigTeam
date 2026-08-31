@@ -59,6 +59,13 @@ public sealed class LeaveService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    // DSH-03: non-swallowing sibling of GetRecentLeaveRequestsAsync.
+    public Task<GetRecentLeaveRequestsResponse?> GetRecentLeaveRequestsOrThrowAsync(
+        Guid companyId, int take = 10, CancellationToken cancellationToken = default) =>
+        Http.GetFromJsonAsync<GetRecentLeaveRequestsResponse>(
+            $"api/companies/{companyId}/leave-requests/recent?take={take}",
+            HrApiJsonOptions.Default, cancellationToken);
+
     public async Task<GetLeaveRequestResponse?> GetLeaveRequestAsync(
         Guid companyId,
         Guid employeeId,

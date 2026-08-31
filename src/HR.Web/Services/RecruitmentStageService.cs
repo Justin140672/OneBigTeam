@@ -21,6 +21,11 @@ public sealed class RecruitmentStageService(IHttpClientFactory httpClientFactory
         }
     }
 
+    // DSH-03: non-swallowing sibling of ListStagesAsync.
+    public Task<ListRecruitmentStagesResponse?> ListStagesOrThrowAsync(Guid companyId) =>
+        Http.GetFromJsonAsync<ListRecruitmentStagesResponse>(
+            $"api/companies/{companyId}/recruitment-stages", HrApiJsonOptions.Default);
+
     public async Task<(CreateRecruitmentStageResponse? Result, string? Error)> CreateAsync(
         Guid companyId, CreateRecruitmentStageRequest request)
     {

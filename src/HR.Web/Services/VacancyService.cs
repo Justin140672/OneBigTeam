@@ -67,6 +67,36 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
         }
     }
 
+    // ── DSH-03 non-swallowing siblings ──────────────────────────────────────
+    public Task<ListVacanciesResponse?> ListVacanciesOrThrowAsync(
+        Guid companyId, string? status = null, Guid? positionProfileId = null, Guid? departmentId = null,
+        bool excludeClosed = false, string? search = null, int? pageSize = null)
+    {
+        var url = $"api/companies/{companyId}/vacancies";
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(status)) query.Add($"status={status}");
+        if (positionProfileId is not null) query.Add($"positionProfileId={positionProfileId}");
+        if (departmentId is not null) query.Add($"departmentId={departmentId}");
+        if (excludeClosed) query.Add("excludeClosed=true");
+        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        if (pageSize is > 0) query.Add($"pageSize={pageSize.Value}");
+        if (query.Count > 0) url += "?" + string.Join("&", query);
+        return Http.GetFromJsonAsync<ListVacanciesResponse>(url, HrApiJsonOptions.Default);
+    }
+
+    public Task<GetStaleVacanciesResponse?> GetStaleVacanciesOrThrowAsync(
+        Guid companyId, int? staleAfterDays = null, CancellationToken cancellationToken = default)
+    {
+        var url = $"api/companies/{companyId}/vacancies/stale";
+        if (staleAfterDays is not null) url += $"?staleAfterDays={staleAfterDays}";
+        return Http.GetFromJsonAsync<GetStaleVacanciesResponse>(url, HrApiJsonOptions.Default, cancellationToken);
+    }
+
+    public Task<GetPipelineSummaryResponse?> GetPipelineSummaryOrThrowAsync(
+        Guid companyId, CancellationToken cancellationToken = default) =>
+        Http.GetFromJsonAsync<GetPipelineSummaryResponse>(
+            $"api/companies/{companyId}/recruitment/pipeline-summary", HrApiJsonOptions.Default, cancellationToken);
+
     public async Task<GetVacancyResponse?> GetVacancyAsync(Guid companyId, Guid id)
     {
         try

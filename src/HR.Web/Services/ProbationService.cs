@@ -113,6 +113,15 @@ public sealed class ProbationService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    // DSH-03: non-swallowing sibling of GetUpcomingReviewsAsync.
+    public async Task<IReadOnlyList<UpcomingProbationReviewItem>> GetUpcomingReviewsOrThrowAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        var response = await Http.GetFromJsonAsync<UpcomingProbationReviewsResponse>(
+            $"api/companies/{companyId}/probation-reviews/upcoming", HrApiJsonOptions.Default, cancellationToken);
+        return response?.Items ?? [];
+    }
+
     public async Task<IReadOnlyList<ProbationReviewModel>> GetProbationReviewsAsync(
         Guid companyId,
         Guid probationRecordId,
