@@ -119,7 +119,8 @@ public class AuditHistoryIntegrationTests
 
         var entry = Assert.Single(history!.Items, i => i.Action == "Compensation record created");
         Assert.Equal("Employees", entry.Module);
-        Assert.Contains(entry.Changes, c => c.Field == "Salary" && c.After == "55000");
+        // NFR-01: the salary amount must never appear in the audit trail.
+        Assert.DoesNotContain(entry.Changes, c => c.After == "55000");
         Assert.Contains(entry.Changes, c => c.Field == "Currency" && c.After == "GBP");
     }
 

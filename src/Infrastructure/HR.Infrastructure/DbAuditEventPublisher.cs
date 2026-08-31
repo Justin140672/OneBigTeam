@@ -26,11 +26,14 @@ internal sealed class DbAuditEventPublisher(
         if (auditEvent is not IAuditEvent evt)
             return;
 
-        var pending = AuditPendingItem.From(evt);
-        context.AuditPendingItems.Add(pending);
-
         try
         {
+            // AUD-03 / AUD-04 / NFR-01: payload and actor validation happen here so a rejected
+            // event is logged and dropped without ever surfacing to (or failing) the business
+            // operation that raised it. Sensitive values must simply never be persisted.
+            var pending = AuditPendingItem.From(evt);
+            context.AuditPendingItems.Add(pending);
+
             await context.SaveChangesAsync(cancellationToken);
         }
         catch (ProhibitedAuditFieldException pex)

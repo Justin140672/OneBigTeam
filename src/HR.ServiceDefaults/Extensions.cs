@@ -60,6 +60,9 @@ public static class Extensions
             })
             .WithTracing(tracing =>
             {
+                // NFR-01: redact sensitive tag/status/exception values from every span before export.
+                tracing.AddProcessor(new SensitiveDataRedactingProcessor());
+
                 tracing.AddSource(builder.Environment.ApplicationName)
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Exclude health check requests from tracing

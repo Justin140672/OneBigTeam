@@ -48,6 +48,7 @@
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Offboarding\HR.Modules.Offboarding.csproj" />
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Support\HR.Modules.Support.csproj" />
     <ProjectReference Include="..\..\src\Infrastructure\HR.Infrastructure\HR.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\HR.ServiceDefaults\HR.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

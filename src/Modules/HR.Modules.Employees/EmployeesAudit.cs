@@ -83,9 +83,14 @@ internal sealed record CompensationRecordBulkAppliedAuditEvent(
     Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => BulkOperationId;
     string? IAuditEvent.Summary => "Compensation record created via bulk adjustment";
-    // AUD-03: Salary amounts and Reason (free-text) are prohibited — record direction only.
+    // NFR-01: Salary amounts and Reason (free-text) are prohibited — record the direction of the
+    // change (never the amount or the delta) so the audit trail still shows compensation changed.
+    private string ChangeDirection =>
+        Salary > PreviousSalary ? "Increase"
+        : Salary < PreviousSalary ? "Decrease"
+        : "NoChange";
     object? IAuditEvent.Before => null;
-    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Currency, AdjustmentMode };
+    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Currency, AdjustmentMode, Direction = ChangeDirection };
     object? IAuditEvent.Metadata => new { BulkOperationId };
 }
 

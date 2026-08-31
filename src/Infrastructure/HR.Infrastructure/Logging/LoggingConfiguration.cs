@@ -22,6 +22,8 @@ public static class LoggingConfiguration
                 .ReadFrom.Configuration(context.Configuration)
                 .ReadFrom.Services(services)
                 .Enrich.FromLogContext()
+                // NFR-01: strip sensitive values from every log event before it reaches a sink.
+                .Enrich.With(new SensitiveDataScrubbingEnricher())
                 .Enrich.WithEnvironmentName()
                 .Enrich.WithMachineName()
                 .Enrich.WithProperty("Application", context.HostingEnvironment.ApplicationName);

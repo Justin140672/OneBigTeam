@@ -1,82 +1,28 @@
 using System.Text.Json;
+using HR.SharedKernel;
 
 namespace HR.Infrastructure.Persistence;
 
 /// <summary>
-/// AUD-03: centralised sensitive-data classification and redaction.
+/// AUD-03 / NFR-01: centralised sensitive-data classification and rejection.
 ///
-/// Scans serialised audit Before/After/Metadata JSON for prohibited field names before the
-/// pending item is written. Throws <see cref="ProhibitedAuditFieldException"/> so the publisher
-/// can log a clear operational error and the offending payload is never persisted.
+/// Scans serialised audit Before/After/Metadata JSON before the pending item is written and
+/// rejects the payload if it contains either:
+/// <list type="bullet">
+/// <item><description>a prohibited field <b>name</b> (salary, NI number, bank details, password,
+/// token, secret, ...) — see <see cref="SensitiveDataScrubber.ProhibitedFieldNames"/>; or</description></item>
+/// <item><description>a string <b>value</b> that matches a sensitive pattern (NI number, IBAN,
+/// sort code, bank/card number, bearer token, JWT, bcrypt/argon hash) regardless of the field
+/// name it sits under.</description></item>
+/// </list>
 ///
-/// Publishers must fix the audit event to omit prohibited fields. Where a change must still be
-/// recorded (e.g. "salary was changed"), use a summary-only approach (no value in payload).
+/// Throws <see cref="ProhibitedAuditFieldException"/> so the publisher can log a clear
+/// operational error; the offending payload is never persisted. Publishers must fix the audit
+/// event to omit the value. Where a change must still be recorded (e.g. "salary was changed"),
+/// use a summary-only approach (direction / band, never the amount).
 /// </summary>
 internal static class AuditPayloadRedactionGuard
 {
-    /// <summary>
-    /// Field names that are prohibited in any audit payload — exact case-insensitive matches.
-    /// These are VALUE-bearing fields; boolean display-preference flags (e.g.
-    /// DisplaySalaryOnEmployeeProfile) are not prohibited by exact match.
-    /// </summary>
-    private static readonly HashSet<string> ExactProhibitedNames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        // Compensation / financial
-        "salary",
-        "previousSalary",
-        "currentSalary",
-        "salaryAmount",
-        "annualSalary",
-        "baseSalary",
-        "proposedSalary",
-        "compensation",
-        "compensationAmount",
-        // Tax / government identifiers
-        "nationalInsuranceNumber",
-        "niNumber",
-        "ni",
-        "taxCode",
-        "taxIdentifier",
-        // Banking
-        "bankAccountNumber",
-        "accountNumber",
-        "sortCode",
-        "iban",
-        "bankAccount",
-        // Authentication
-        "password",
-        "passwordHash",
-        "token",
-        "secret",
-        "refreshToken",
-        "accessToken",
-        // Personal identifiers / contact
-        "dateOfBirth",
-        "dob",
-        "personalEmail",
-        "personalPhone",
-        "personalPhoneNumber",
-        "homeAddress",
-        // Medical / sickness
-        "medicalNote",
-        "sicknessNote",
-        "diagnosisNote",
-        "diagnosisCode",
-    };
-
-    /// <summary>
-    /// Fragment patterns that are always prohibited regardless of prefix/suffix.
-    /// Only used for patterns where any compound name is sensitive
-    /// (e.g. "bankaccount" in BankAccountSortCode).
-    /// </summary>
-    private static readonly string[] ProhibitedFragments =
-    [
-        "nationalinsurance",
-        "national_insurance",
-        "bankaccount",
-        "bank_account",
-    ];
-
     public static void AssertPayloadIsSafe(string? json, string fieldName)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -91,7 +37,7 @@ internal static class AuditPayloadRedactionGuard
         {
             // If we cannot parse the JSON we cannot scan it — fail safe and reject.
             throw new ProhibitedAuditFieldException(
-                $"AUD-03: audit {fieldName} payload could not be parsed for sensitive-field validation.");
+                $"NFR-01: audit {fieldName} payload could not be parsed for sensitive-field validation.");
         }
 
         using (doc)
@@ -102,44 +48,51 @@ internal static class AuditPayloadRedactionGuard
 
     private static void CheckElement(JsonElement element, string context)
     {
-        if (element.ValueKind == JsonValueKind.Object)
+        switch (element.ValueKind)
         {
-            foreach (var property in element.EnumerateObject())
-            {
-                CheckPropertyName(property.Name, context);
-                CheckElement(property.Value, context);
-            }
-        }
-        else if (element.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in element.EnumerateArray())
-                CheckElement(item, context);
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                {
+                    CheckPropertyName(property.Name, context);
+                    CheckElement(property.Value, context);
+                }
+                break;
+
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                    CheckElement(item, context);
+                break;
+
+            case JsonValueKind.String:
+                CheckValue(element.GetString(), context);
+                break;
         }
     }
 
     private static void CheckPropertyName(string propertyName, string context)
     {
-        if (ExactProhibitedNames.Contains(propertyName))
+        if (SensitiveDataScrubber.IsProhibitedFieldName(propertyName))
         {
             throw new ProhibitedAuditFieldException(
-                $"AUD-03: prohibited field '{propertyName}' found in audit {context} payload. " +
-                $"Remove this field — use a summary-only approach for sensitive values.");
+                $"NFR-01: prohibited field '{propertyName}' found in audit {context} payload. " +
+                $"Remove this field — use a summary-only approach (direction/band, never the amount) for sensitive values.");
         }
+    }
 
-        foreach (var fragment in ProhibitedFragments)
+    private static void CheckValue(string? value, string context)
+    {
+        var match = SensitiveDataScrubber.MatchSensitiveValue(value);
+        if (match is not null)
         {
-            if (propertyName.Contains(fragment, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new ProhibitedAuditFieldException(
-                    $"AUD-03: prohibited field pattern '{fragment}' matched by '{propertyName}' in audit {context} payload. " +
-                    $"Remove this field from the audit event.");
-            }
+            throw new ProhibitedAuditFieldException(
+                $"NFR-01: audit {context} payload contains a value matching sensitive pattern '{match}'. " +
+                $"Remove the value from the audit event.");
         }
     }
 }
 
 /// <summary>
-/// Thrown by <see cref="AuditPayloadRedactionGuard"/> when a prohibited field is detected.
+/// Thrown by <see cref="AuditPayloadRedactionGuard"/> when a prohibited field or value is detected.
 /// The publisher logs this and the pending item is not persisted.
 /// </summary>
 public sealed class ProhibitedAuditFieldException(string message) : InvalidOperationException(message);
