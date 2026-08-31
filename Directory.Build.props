@@ -1,0 +1,35 @@
+<Project>
+
+  <!--
+    Repository-wide build defaults (NFR-09: reproducible and secure dependency restoration).
+  -->
+  <PropertyGroup>
+    <!-- Reproducible restore: every project gets a committed packages.lock.json. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+
+    <!-- NuGet vulnerability auditing during restore. Audit direct AND transitive packages. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <!-- Minimum severity that produces a warning: low | moderate | high | critical -->
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+
+    <!--
+      Severity threshold that BLOCKS the build.
+      NU1902 = moderate, NU1903 = high, NU1904 = critical advisories are treated as errors.
+      NU1901 (low) stays a warning and is triaged via the process in docs/dependency-management.md.
+      Approved, time-boxed exceptions are added to <NoWarn> in the affected project with a comment
+      linking the tracking issue (see docs/dependency-management.md).
+    -->
+    <WarningsAsErrors>$(WarningsAsErrors);NU1902;NU1903;NU1904</WarningsAsErrors>
+
+    <!--
+      CS8669: "nullable annotation in code without a '#nullable' context". Emitted only by
+      SDK-generated Razor .g.cs files (all 284 occurrences), never by hand-written code.
+      Suppressed repo-wide so real warnings stay visible. Revisit when the Razor SDK stops
+      emitting it. Remaining hand-written source warnings (BL0005, CS8602, CS0414, ...) are a
+      known pre-existing baseline tracked as tech-debt, outside the scope of NFR-09.
+    -->
+    <NoWarn>$(NoWarn);CS8669</NoWarn>
+  </PropertyGroup>
+
+</Project>

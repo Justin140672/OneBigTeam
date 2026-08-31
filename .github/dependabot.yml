@@ -1,0 +1,43 @@
+version: 2
+updates:
+  # .NET / NuGet dependencies. Central Package Management means every bump lands in
+  # Directory.Packages.props and Directory.Build.props.
+  - package-ecosystem: nuget
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      microsoft-aspnetcore-ef:
+        patterns:
+          - "Microsoft.EntityFrameworkCore*"
+          - "Microsoft.AspNetCore*"
+          - "Microsoft.Extensions*"
+          - "Npgsql.EntityFrameworkCore*"
+      opentelemetry:
+        patterns:
+          - "OpenTelemetry*"
+      test-tooling:
+        patterns:
+          - "xunit*"
+          - "Microsoft.NET.Test.Sdk"
+          - "coverlet*"
+          - "Testcontainers*"
+          - "Microsoft.Playwright"
+          - "Aspire.Hosting*"
+      syncfusion:
+        patterns:
+          - "Syncfusion.Blazor*"
+    # Security updates are raised immediately regardless of the weekly schedule.
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci

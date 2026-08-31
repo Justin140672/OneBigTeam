@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+jobs:
+  # ------------------------------------------------------------------
+  # Reproducible restore + dependency vulnerability gate (NFR-09).
+  # Fails on any moderate or higher advisory (direct or transitive).
+  # ------------------------------------------------------------------
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET (from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore (locked mode - fails if any packages.lock.json is stale)
+        run: dotnet restore OneBigTeam.slnx --locked-mode
+
+      - name: Vulnerability scan (transitive, fail on moderate+)
+        shell: bash
+        run: |
+          set -euo pipefail
+          report=$(dotnet list OneBigTeam.slnx package --vulnerable --include-transitive 2>&1)
+          echo "$report"
+          if echo "$report" | grep -Eiq '\b(Moderate|High|Critical)\b'; then
+            echo "::error::Vulnerable dependencies at moderate or higher severity detected. See docs/dependency-management.md."
+            exit 1
+          fi
+          echo "No moderate+ vulnerable dependencies."
+
+      - name: Deprecated / outdated report (informational only)
+        continue-on-error: true
+        run: |
+          dotnet list OneBigTeam.slnx package --deprecated
+          dotnet list OneBigTeam.slnx package --outdated
+
+  # ------------------------------------------------------------------
+  # Build + unit / module / architecture tests (no E2E, no full integration).
+  # NuGetAudit is on by default (Directory.Build.props) so NU1902/NU1903/NU1904
+  # break the build here too.
+  # ------------------------------------------------------------------
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET (from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore (locked mode)
+        run: dotnet restore OneBigTeam.slnx --locked-mode
+
+      - name: Build (Release, no restore)
+        run: dotnet build OneBigTeam.slnx -c Release --no-restore
+
+      - name: Test - architecture + unit/module projects
+        shell: bash
+        run: |
+          set -euo pipefail
+          projects=$(find tests -name '*.csproj' \
+            -not -name 'HR.Web.E2E.Tests.csproj' \
+            -not -name 'HR.Integration.Tests.csproj')
+          for p in $projects; do
+            echo "==== $p ===="
+            dotnet test "$p" -c Release --no-build
+          done

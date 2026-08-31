@@ -17,16 +17,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Syncfusion.Blazor.Buttons" Version="34.2.3" />
-    <PackageReference Include="Syncfusion.Blazor.Charts" Version="34.2.3" />
-    <PackageReference Include="Syncfusion.Blazor.Diagram" Version="34.2.3" />
-    <PackageReference Include="Syncfusion.Blazor.DropDowns" Version="34.2.3" />
-    <PackageReference Include="Syncfusion.Blazor.Grid" Version="34.2.3" />
-    <PackageReference Include="Syncfusion.Blazor.Inputs" Version="34.2.3" />
-    <PackageReference Include="Syncfusion.Blazor.Kanban" Version="34.2.3" />
-    <PackageReference Include="Syncfusion.Blazor.Popups" Version="34.2.3" />
-    <PackageReference Include="Syncfusion.Blazor.SplitButtons" Version="34.2.3" />
-    <PackageReference Include="Syncfusion.Blazor.Themes" Version="34.2.3" />
+    <PackageReference Include="Syncfusion.Blazor.Buttons" />
+    <PackageReference Include="Syncfusion.Blazor.Charts" />
+    <PackageReference Include="Syncfusion.Blazor.Diagram" />
+    <PackageReference Include="Syncfusion.Blazor.DropDowns" />
+    <PackageReference Include="Syncfusion.Blazor.Grid" />
+    <PackageReference Include="Syncfusion.Blazor.Inputs" />
+    <PackageReference Include="Syncfusion.Blazor.Kanban" />
+    <PackageReference Include="Syncfusion.Blazor.Popups" />
+    <PackageReference Include="Syncfusion.Blazor.SplitButtons" />
+    <PackageReference Include="Syncfusion.Blazor.Themes" />
   </ItemGroup>
 
   <PropertyGroup>
