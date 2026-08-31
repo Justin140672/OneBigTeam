@@ -72,6 +72,12 @@ public enum WorkloadActionUrgency
 /// <param name="Status">Free-text status label, e.g. "Pending", "Overdue".</param>
 /// <param name="DeepLinkUrl">Relative URL into the screen where the action can actually be actioned.</param>
 /// <param name="Urgency">Populated by the aggregation handler; providers may leave this at the default.</param>
+/// <param name="TaskId">
+/// The owning module's local TaskItem id for this action, when it already has one to hand in its own
+/// schema (e.g. the Tasks module's own overdue-task providers). Left null when no local task id
+/// exists — consumers fall back to <paramref name="DeepLinkUrl"/> navigation. Never populated via a
+/// cross-module join. Additive/optional (DSH-06).
+/// </param>
 public sealed record WorkloadAction(
     Guid EmployeeId,
     string EmployeeName,
@@ -82,7 +88,8 @@ public sealed record WorkloadAction(
     string? AssignedTo,
     string Status,
     string DeepLinkUrl,
-    WorkloadActionUrgency Urgency = WorkloadActionUrgency.Upcoming)
+    WorkloadActionUrgency Urgency = WorkloadActionUrgency.Upcoming,
+    Guid? TaskId = null)
 {
     public static WorkloadActionUrgency ComputeUrgency(DateOnly? dueDate, DateOnly today)
     {

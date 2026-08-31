@@ -108,6 +108,7 @@ builder.Services.AddScoped<CompanyOnboardingService>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<SupportService>();
 builder.Services.AddScoped<WidgetSourceLoader>();
+builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<AppSession>();
 builder.Services.AddScoped<AuthenticationStateProvider, AppSessionAuthStateProvider>();
 builder.Services.AddAuthentication("NoOp")

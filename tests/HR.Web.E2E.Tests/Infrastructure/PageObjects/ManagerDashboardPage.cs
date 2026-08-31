@@ -96,6 +96,48 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
     public async Task<bool> AttentionQueueIsAllClearAsync() =>
         await AttentionQueueWidget.Locator(".attention-queue-all-clear").IsVisibleAsync();
 
+    // ── DSH-06: single bounded summary fetch (GET .../dashboards/manager/summary) ──────
+    // The widget now issues one server-side summary request scoped to the manager's reporting
+    // sub-tree, maps each returned category to a WidgetSourceOutcome, and shows a single
+    // retry-all control (whole-widget "Your action queue" warning on a hard fetch failure, or
+    // one per partially-failed category — all wired to the same ReloadAllAsync).
+
+    /// <summary>The number shown in the widget's count badge (".widget-count-badge"), or 0 if not rendered.</summary>
+    public async Task<int> GetAttentionQueueCountBadgeAsync()
+    {
+        var badge = AttentionQueueWidget.Locator(".widget-count-badge").First;
+        if (!await badge.IsVisibleAsync())
+            return 0;
+        var text = (await badge.TextContentAsync())?.Trim();
+        return int.TryParse(text, out var value) ? value : 0;
+    }
+
+    /// <summary>Count of currently rendered attention-queue rows.</summary>
+    public async Task<int> GetAttentionQueueRowCountAsync()
+    {
+        await WaitForAttentionQueueLoadedAsync();
+        return await AttentionQueueWidget.Locator(".attention-queue-item").CountAsync();
+    }
+
+    /// <summary>Number of inline per-source failure warnings (".widget-source-warning") shown inside the card.</summary>
+    public async Task<int> GetAttentionQueueSourceWarningCountAsync() =>
+        await AttentionQueueWidget.Locator(".widget-source-warning").CountAsync();
+
+    /// <summary>True if an inline warning whose text contains <paramref name="sourceName"/> is visible in the card.</summary>
+    public async Task<bool> HasAttentionQueueSourceWarningAsync(string sourceName) =>
+        await AttentionQueueWidget.Locator(".widget-source-warning")
+            .Filter(new() { HasText = sourceName }).First.IsVisibleAsync();
+
+    /// <summary>Clicks the retry-all control on the first inline source warning in the card.</summary>
+    public async Task RetryAttentionQueueAllAsync() =>
+        await AttentionQueueWidget.Locator(".widget-source-warning .widget-source-warning-retry")
+            .First.ClickAsync();
+
+    /// <summary>Waits until no inline source warning remains in the card (successful retry-all).</summary>
+    public async Task WaitForAttentionQueueSourceWarningsClearedAsync() =>
+        await AttentionQueueWidget.Locator(".widget-source-warning").First
+            .WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 20_000 });
+
     /// <summary>
     /// Clicks the first attention-queue row whose text (subject or category/meta) contains
     /// <paramref name="textFragment"/>. If the row's underlying item has an open task, this opens

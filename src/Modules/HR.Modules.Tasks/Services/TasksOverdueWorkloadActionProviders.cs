@@ -63,7 +63,8 @@ internal sealed class EmployeeTasksOverdueWorkloadActionProvider(
             DueDate: t.DueDate,
             AssignedTo: dept?.EmployeeName,
             Status: "Overdue",
-            DeepLinkUrl: $"/companies/{companyId}/tasks/{t.Id}")).ToList();
+            DeepLinkUrl: $"/companies/{companyId}/tasks/{t.Id}",
+            TaskId: t.Id)).ToList();
     }
 }
 
@@ -143,7 +144,8 @@ internal sealed class ManagerTasksOverdueWorkloadActionProvider(
                 DueDate: t.DueDate,
                 AssignedTo: dept?.EmployeeName,
                 Status: "Overdue",
-                DeepLinkUrl: $"/companies/{companyId}/tasks/{t.Id}");
+                DeepLinkUrl: $"/companies/{companyId}/tasks/{t.Id}",
+                TaskId: t.Id);
         }).ToList();
     }
 }

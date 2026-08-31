@@ -194,37 +194,48 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
             .ClickAsync();
     }
 
-    /// <summary>
-    /// Returns true if the "Show resolved leave requests" checkbox toggle is present. Only rendered
-    /// once at least one resolved (Approved/Declined/Rejected) leave request exists for the company.
-    /// </summary>
-    public async Task<bool> HasShowResolvedLeaveToggleAsync() =>
-        await AttentionQueueWidget.Locator(".attention-queue-toggle").IsVisibleAsync();
+    // ── DSH-06: single bounded summary fetch (GET .../dashboards/hr/summary) ──────
+    // The "Show resolved leave requests" toggle and per-source individual retry buttons were
+    // removed — the widget now issues one server-side summary request, maps each returned
+    // category to a WidgetSourceOutcome, and shows a single retry-all control (either the
+    // whole-widget "Your action queue" WidgetSourceWarning when the fetch itself fails, or one
+    // per partially-failed category — all wired to the same ReloadAllAsync).
 
-    /// <summary>Checks (or unchecks) the "Show resolved leave requests" toggle and waits for the queue to re-render.</summary>
-    public async Task SetShowResolvedLeaveRequestsAsync(bool show)
+    /// <summary>The number shown in the widget's count badge (".widget-count-badge"), or 0 if not rendered.</summary>
+    public async Task<int> GetAttentionQueueCountBadgeAsync()
     {
-        var checkbox = AttentionQueueWidget.Locator(".attention-queue-toggle input[type='checkbox']");
-        var isChecked = await checkbox.IsCheckedAsync();
-        if (isChecked == show)
-            return;
-
-        // OnShowResolvedChanged (AttentionQueueWidget.razor) is plain synchronous C#
-        // (RefreshVisibleItems, no further data fetch), but this is still Blazor Server — running
-        // that handler and pushing the updated DOM back down still requires a real SignalR round
-        // trip. SetCheckedAsync completing only proves the click landed, not that the round trip
-        // has finished, so a caller reading row count immediately after can race a queue that
-        // hasn't actually re-rendered yet. This method's own doc comment claimed to already wait
-        // for that; it didn't. Poll the row count until it actually changes.
-        var titleLocator = AttentionQueueWidget.Locator(".attention-queue-item .task-widget-title");
-        var countBefore = await titleLocator.CountAsync();
-
-        await checkbox.SetCheckedAsync(show);
-
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (await titleLocator.CountAsync() == countBefore && DateTime.UtcNow < deadline)
-            await AttentionQueueWidget.Page.WaitForTimeoutAsync(100);
+        var badge = AttentionQueueWidget.Locator(".widget-count-badge").First;
+        if (!await badge.IsVisibleAsync())
+            return 0;
+        var text = (await badge.TextContentAsync())?.Trim();
+        return int.TryParse(text, out var value) ? value : 0;
     }
+
+    /// <summary>Count of currently rendered attention-queue rows.</summary>
+    public async Task<int> GetAttentionQueueRowCountAsync()
+    {
+        await WaitForAttentionQueueLoadedAsync();
+        return await AttentionQueueWidget.Locator(".attention-queue-item").CountAsync();
+    }
+
+    /// <summary>Number of inline per-source failure warnings (".widget-source-warning") shown inside the card.</summary>
+    public async Task<int> GetAttentionQueueSourceWarningCountAsync() =>
+        await AttentionQueueWidget.Locator(".widget-source-warning").CountAsync();
+
+    /// <summary>True if an inline warning whose text contains <paramref name="sourceName"/> is visible in the card.</summary>
+    public async Task<bool> HasAttentionQueueSourceWarningAsync(string sourceName) =>
+        await AttentionQueueWidget.Locator(".widget-source-warning")
+            .Filter(new() { HasText = sourceName }).First.IsVisibleAsync();
+
+    /// <summary>Clicks the retry-all control on the first inline source warning in the card.</summary>
+    public async Task RetryAttentionQueueAllAsync() =>
+        await AttentionQueueWidget.Locator(".widget-source-warning .widget-source-warning-retry")
+            .First.ClickAsync();
+
+    /// <summary>Waits until no inline source warning remains in the card (successful retry-all).</summary>
+    public async Task WaitForAttentionQueueSourceWarningsClearedAsync() =>
+        await AttentionQueueWidget.Locator(".widget-source-warning").First
+            .WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 20_000 });
 
     // ── Document review rows within the attention queue ──────────────────────
     // Company document reviews (formerly the standalone DocumentReviewsWidget) now render as

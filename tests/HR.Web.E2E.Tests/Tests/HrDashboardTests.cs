@@ -237,40 +237,12 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : HrFavourit
         }
     }
 
-    [Fact]
-    public async Task AttentionQueue_HidesResolvedLeaveRequestsByDefault_AndRevealsThemViaToggle()
-    {
-        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
-        var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
-        await dashboard.GoToAsync();
-
-        await dashboard.WaitForAttentionQueueLoadedAsync();
-
-        if (!await dashboard.HasShowResolvedLeaveToggleAsync())
-        {
-            // No resolved (Approved/Declined/Rejected) leave requests seeded for Acme in this
-            // run — AttentionQueueWidget only renders the toggle when _resolvedLeaveCount > 0.
-            // Noting as a gap rather than fabricating a resolved leave request via the UI, which
-            // would require driving a full leave-request-and-decision flow just for this test.
-            return;
-        }
-
-        var subjectsBefore = await dashboard.GetAttentionQueueSubjectsAsync();
-        var countBefore = subjectsBefore.Count;
-
-        await dashboard.SetShowResolvedLeaveRequestsAsync(true);
-        var subjectsAfter = await dashboard.GetAttentionQueueSubjectsAsync();
-
-        Assert.True(subjectsAfter.Count > countBefore,
-            "Expected enabling 'Show resolved leave requests' to reveal at least one additional row.");
-
-        await dashboard.SetShowResolvedLeaveRequestsAsync(false);
-        var subjectsRestored = await dashboard.GetAttentionQueueSubjectsAsync();
-        Assert.Equal(countBefore, subjectsRestored.Count);
-    }
+    // DSH-06: the "Show resolved leave requests" checkbox was removed. The widget now issues one
+    // server-side bounded summary fetch that only ever returns actionable (e.g. pending) items, so
+    // there is no resolved-item reveal path left to exercise — the former
+    // AttentionQueue_HidesResolvedLeaveRequestsByDefault_AndRevealsThemViaToggle test was deleted.
+    // Resolved-request exclusion is now covered by
+    // LeaveRequestsWidgetTaskDialogTests.ApprovedLeaveRequest_IsNotShown_OnHrAttentionQueue.
 
     [Fact]
     public async Task AttentionQueue_ShowsAllClearSummary_WhenEmpty()

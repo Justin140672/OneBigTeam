@@ -35,6 +35,9 @@ using HR.Modules.Reporting.Features.GetReportCatalog;
 using HR.Modules.Reporting.Features.GetReportFavourites;
 using HR.Modules.Reporting.Features.GetReportViews;
 using HR.Modules.Reporting.Features.GetComplianceCentre;
+using HR.Modules.Reporting.Features.DashboardSummaries;
+using HR.Modules.Reporting.Features.GetHrDashboardSummary;
+using HR.Modules.Reporting.Features.GetManagerDashboardSummary;
 using HR.Modules.Reporting.Features.GetGovernanceUserActivityReport;
 using HR.Modules.Reporting.Features.GetGovernanceAdministrativeChangesReport;
 using HR.Modules.Reporting.Features.GetGovernanceSecurityEventsReport;
@@ -233,6 +236,14 @@ public static class ReportingModule
 
         services.AddScoped<GetComplianceCentreHandler>();
         services.AddScoped<IValidator<GetComplianceCentreRequest>, GetComplianceCentreValidator>();
+
+        // DSH-06: bounded HR + Manager dashboard summary endpoints. Both fan out over every
+        // registered IWorkloadActionProvider via the shared DashboardSummaryComposer.
+        services.AddScoped<DashboardSummaryComposer>();
+        services.AddScoped<GetHrDashboardSummaryHandler>();
+        services.AddScoped<IValidator<GetHrDashboardSummaryRequest>, GetHrDashboardSummaryValidator>();
+        services.AddScoped<GetManagerDashboardSummaryHandler>();
+        services.AddScoped<IValidator<GetManagerDashboardSummaryRequest>, GetManagerDashboardSummaryValidator>();
 
         // ADM-08: administrative governance reporting hub. The three audit-backed reports read the
         // central audit source via IAuditHistoryReader; the compliance-status report delegates to
