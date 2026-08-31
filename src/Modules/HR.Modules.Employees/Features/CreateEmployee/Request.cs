@@ -29,4 +29,12 @@ internal sealed record CreateEmployeeRequest
     public string? PostCode { get; init; }
     public string? Country { get; init; }
     public bool HasSystemAccess { get; init; } = true;
+
+    /// <summary>
+    /// NFR-08: optional idempotency key set by automated provisioning flows (e.g. candidate hire).
+    /// When supplied and an employee with the same (CompanyId, SourceReference) already exists, the
+    /// handler returns that employee instead of creating a duplicate and does not re-publish
+    /// EmployeeCreated. Null for human-initiated creation.
+    /// </summary>
+    public string? SourceReference { get; init; }
 }

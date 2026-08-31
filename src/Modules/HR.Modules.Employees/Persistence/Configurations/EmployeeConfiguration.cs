@@ -90,6 +90,19 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(e => e.InitialSetupCompletedAt)
             .HasColumnName("initial_setup_completed_at");
 
+        // NFR-08: idempotency key for automated provisioning flows. Filtered unique index so the
+        // vast majority of rows (human-created employees, source_reference IS NULL) are unaffected,
+        // while a redelivered/retried upstream workflow can never insert a second employee for the
+        // same source.
+        builder.Property(e => e.SourceReference)
+            .HasColumnName("source_reference")
+            .HasMaxLength(200);
+
+        builder.HasIndex(e => new { e.CompanyId, e.SourceReference })
+            .IsUnique()
+            .HasFilter("source_reference IS NOT NULL")
+            .HasDatabaseName("ix_employees_company_id_source_reference");
+
         builder.Property(e => e.WorkingDaysOverride)
             .HasColumnName("working_days_override");
 

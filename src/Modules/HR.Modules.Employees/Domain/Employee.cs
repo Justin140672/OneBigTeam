@@ -27,6 +27,14 @@ internal sealed class Employee
     // checklist item until CompleteInitialSetup is called.
     public bool RequiresInitialSetup { get; private set; }
     public DateTimeOffset? InitialSetupCompletedAt { get; private set; }
+    // NFR-08: idempotency key for automated, multi-step provisioning flows that create an employee
+    // as a side effect of an upstream action (currently: hiring a recruitment candidate). Format is
+    // "<source>:<entity>:<id>", e.g. "recruitment:application:{applicationId}". A filtered unique
+    // index on (company_id, source_reference) guarantees that re-running the upstream workflow after
+    // a partial failure can never create a second employee (and therefore never a second
+    // EmployeeCreated integration event, onboarding plan, probation record, leave initialisation or
+    // notification) for the same source. Null for employees created directly by a human.
+    public string? SourceReference { get; private set; }
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
     public string WorkEmail { get; private set; } = string.Empty;
@@ -77,12 +85,14 @@ internal sealed class Employee
         Guid departmentId,
         Guid locationId,
         Guid positionProfileId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? sourceReference = null)
     {
         return new Employee
         {
             Id = id,
             CompanyId = companyId,
+            SourceReference = string.IsNullOrWhiteSpace(sourceReference) ? null : sourceReference.Trim(),
             FirstName = firstName,
             LastName = lastName,
             WorkEmail = workEmail,

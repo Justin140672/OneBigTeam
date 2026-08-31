@@ -127,7 +127,13 @@ internal sealed class HireCandidateHandler(
                 request.AddressLine2,
                 request.City,
                 request.County,
-                request.PostCode),
+                request.PostCode,
+                // NFR-08: hiring provisions the employee in the Employees module (its own DbContext /
+                // transaction) BEFORE this handler commits application.RecordHire + candidate.LinkToEmployee
+                // to the Recruitment schema. If the process dies between those two commits, retrying the
+                // hire would otherwise create a second employee (candidate.EmployeeId is still null).
+                // This stable key makes CreateEmployeeHandler return the already-provisioned employee.
+                SourceReference: $"recruitment:application:{application.Id}"),
             cancellationToken);
 
         if (provisioningResult.IsFailure)

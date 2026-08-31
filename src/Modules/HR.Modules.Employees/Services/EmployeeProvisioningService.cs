@@ -42,6 +42,7 @@ internal sealed class EmployeeProvisioningService(
                 City              = request.City,
                 County            = request.County,
                 PostCode          = request.PostCode,
+                SourceReference   = request.SourceReference,
             },
             cancellationToken);
 

@@ -42,6 +42,23 @@ internal sealed class CreateEmployeeHandler
         CreateEmployeeRequest request,
         CancellationToken cancellationToken)
     {
+        // NFR-08: idempotency short-circuit. Automated provisioning flows (candidate hire) supply a
+        // stable SourceReference. If the upstream workflow is retried after a partial failure, an
+        // employee for this source may already exist — return it rather than creating a duplicate,
+        // and do NOT re-publish EmployeeCreated (downstream consumers already ran for the first one).
+        if (!string.IsNullOrWhiteSpace(request.SourceReference))
+        {
+            var sourceReference = request.SourceReference.Trim();
+            var existingForSource = await _dbContext.Employees
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    e => e.CompanyId == request.CompanyId && e.SourceReference == sourceReference,
+                    cancellationToken);
+
+            if (existingForSource is not null)
+                return Result.Success(MapResponse(existingForSource));
+        }
+
         var contactRules = await _contactValidationReader.GetContactValidationRulesAsync(request.CompanyId, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(request.PostCode) &&
@@ -228,7 +245,8 @@ internal sealed class CreateEmployeeHandler
             request.DepartmentId,
             request.LocationId,
             request.PositionProfileId,
-            now);
+            now,
+            request.SourceReference);
 
         var preferredName = string.IsNullOrWhiteSpace(request.PreferredName)
             ? firstName
@@ -268,6 +286,23 @@ internal sealed class CreateEmployeeHandler
         }
         catch (DbUpdateException)
         {
+            // NFR-08: backstop for a concurrent retry of the same automated provisioning workflow —
+            // the (CompanyId, SourceReference) filtered unique index rejected this insert because a
+            // parallel run already created the employee for this source. Return that row as an
+            // idempotent success (no event re-publish) rather than a spurious conflict.
+            if (!string.IsNullOrWhiteSpace(request.SourceReference))
+            {
+                var sourceReference = request.SourceReference.Trim();
+                _dbContext.ChangeTracker.Clear();
+                var raced = await _dbContext.Employees
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(
+                        e => e.CompanyId == request.CompanyId && e.SourceReference == sourceReference,
+                        cancellationToken);
+                if (raced is not null)
+                    return Result.Success(MapResponse(raced));
+            }
+
             // Backstop for the race between the AnyAsync pre-check above and this SaveChangesAsync:
             // the (CompanyId, EmployeeNumber) unique index rejects the duplicate at the database
             // level, and we surface that as the same Conflict error the pre-check would have
@@ -280,7 +315,11 @@ internal sealed class CreateEmployeeHandler
             employee.CompanyId, employee.Id, employee.StartDate, employee.ManagerId, probationEndDate,
             employee.PositionProfileId, positionProfile?.DefaultLeavePolicyId), cancellationToken);
 
-        return Result.Success(new CreateEmployeeResponse(
+        return Result.Success(MapResponse(employee));
+    }
+
+    private static CreateEmployeeResponse MapResponse(Employee employee) =>
+        new(
             employee.Id,
             employee.CompanyId,
             employee.DepartmentId,
@@ -294,6 +333,5 @@ internal sealed class CreateEmployeeHandler
             employee.StartDate,
             employee.Status,
             employee.HasSystemAccess,
-            employee.CreatedAt));
-    }
+            employee.CreatedAt);
 }
