@@ -331,6 +331,14 @@ Recovery requirements:
 
 Recovery process should be documented.
 
+The backup and disaster recovery runbook (`docs/runbooks/backup-and-disaster-recovery.md`) defines
+the approved recovery objectives (RPO/RTO), backup ownership, schedule, retention, encryption and
+access control for the database and private file storage, the recovery procedure, reapplication of
+pending customer deletion obligations after a restore, and the restore-drill test
+(`docs/runbooks/restore-drill.md` + `scripts/nfr-04-restore-drill-validation.sql`). It also
+reconciles these controls against the DPA and Security page and lists the operator actions that
+must be completed outside the repository.
+
 ---
 
 # Cost Optimisation
