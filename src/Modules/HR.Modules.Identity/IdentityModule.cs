@@ -83,7 +83,9 @@ public static class IdentityModule
         // reachability probe against Supabase Auth's public settings endpoint (see
         // SupabaseAuthHealthCheck remarks).
         services.AddHealthChecks()
-            .AddCheck<SupabaseAuthHealthCheck>("auth");
+            // NFR-03: authentication (Supabase Auth) is a critical dependency — if it is Unhealthy
+            // no user can sign in, so the service is "not ready" (503 on /health/ready).
+            .AddCheck<SupabaseAuthHealthCheck>("auth", tags: ["ready", "critical"]);
 
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
         services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();

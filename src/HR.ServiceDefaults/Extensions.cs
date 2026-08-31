@@ -110,18 +110,16 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // Adding health checks endpoints to applications in non-development environments has security implications.
-        // See https://aka.ms/aspire/healthchecks for details before enabling these endpoints in non-development environments.
+        // NFR-03: production-safe liveness (/alive) and readiness (/health/ready) endpoints are
+        // mapped in every environment. See HealthCheckEndpoints for the security model (minimal
+        // public body, token-gated detail, critical-vs-degraded dependency classification).
+        HealthCheckEndpoints.MapLivenessAndReadiness(app);
+
+        // The original Aspire aggregate endpoint stays Development-only — it emits full per-check
+        // detail with no auth. See https://aka.ms/aspire/healthchecks.
         if (app.Environment.IsDevelopment())
         {
-            // All health checks must pass for app to be considered ready to accept traffic after starting
             app.MapHealthChecks(HealthEndpointPath);
-
-            // Only health checks tagged with the "live" tag must pass for app to be considered alive
-            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
-            {
-                Predicate = r => r.Tags.Contains("live")
-            });
         }
 
         return app;

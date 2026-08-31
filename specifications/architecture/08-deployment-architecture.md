@@ -312,12 +312,30 @@ Monitor:
 
 # Health Checks
 
-Health checks should validate:
+Health checks validate:
 
-- Database connectivity
-- Supabase availability
-- Storage availability
-- Hangfire availability
+- Database connectivity (critical)
+- Supabase Auth availability (critical)
+- Storage availability (degraded)
+- Email / Postmark availability (degraded)
+- Stripe availability (degraded)
+- Hangfire availability (degraded)
+
+Every service exposes two production endpoints in all environments (see
+`docs/runbooks/availability-and-health-monitoring.md`):
+
+- `GET /alive` — liveness. Anonymous, process-responsiveness only, no dependency probing.
+- `GET /health/ready` — readiness. Anonymous minimal body; returns 503 only when a **critical**
+  dependency is down, otherwise 200 with `Healthy`/`Degraded`. Per-check detail is gated behind the
+  `X-Health-Token` header. Health responses never disclose connection strings, credentials, hosts,
+  exceptions or internal infrastructure detail.
+
+The legacy `GET /health` aggregate endpoint remains Development-only.
+
+The 99.5% availability target (`specifications/product-specifications/31-non-functional-requirements.md`)
+is defined as a measurable monthly SLO with a documented SLI, planned-maintenance exclusions,
+error-budget policy, dashboard and alert thresholds in
+`docs/runbooks/availability-and-health-monitoring.md`.
 
 ---
 

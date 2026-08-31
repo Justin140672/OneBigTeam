@@ -52,8 +52,11 @@ public static class InfrastructureModule
         services.Configure<PostmarkOptions>(configuration.GetSection("Infrastructure:Postmark"));
         services.Configure<SupabaseProfilePhotoStorageOptions>(configuration.GetSection("Infrastructure:Supabase:ProfilePhotos"));
         services.AddHealthChecks()
-            .AddCheck<PostmarkHealthCheck>("email")
-            .AddCheck<SupabaseStorageHealthCheck>("storage");
+            // NFR-03: email (Postmark) and file storage (Supabase Storage) are degraded (optional)
+            // dependencies — losing them impairs specific features but must not take the platform
+            // offline, so they are not tagged "critical" and never cause /health/ready to 503.
+            .AddCheck<PostmarkHealthCheck>("email", tags: ["degraded"])
+            .AddCheck<SupabaseStorageHealthCheck>("storage", tags: ["degraded"]);
 
         return services;
     }
@@ -125,7 +128,9 @@ public static class InfrastructureModule
         });
 
         services.AddHealthChecks()
-            .AddCheck<HangfireHealthCheck>("hangfire", tags: ["ready"]);
+            // NFR-03: background processing is a degraded (optional) dependency for request
+            // serving — if Hangfire is down, jobs queue up but the web/API surface stays available.
+            .AddCheck<HangfireHealthCheck>("hangfire", tags: ["degraded"]);
 
         services.AddScoped<IBackgroundJobStatusReader, HangfireJobStatusReader>();
 

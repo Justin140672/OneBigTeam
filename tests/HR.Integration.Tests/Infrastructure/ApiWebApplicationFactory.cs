@@ -10,7 +10,7 @@ using Testcontainers.PostgreSql;
 
 namespace HR.Integration.Tests.Infrastructure;
 
-public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")

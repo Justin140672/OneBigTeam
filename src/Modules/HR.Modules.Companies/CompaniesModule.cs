@@ -97,8 +97,11 @@ public static class CompaniesModule
         // connectivity (see CompaniesDatabaseHealthCheck remarks), "stripe" is a live account-balance
         // reachability probe.
         services.AddHealthChecks()
-            .AddCheck<CompaniesDatabaseHealthCheck>("database")
-            .AddCheck<StripeHealthCheck>("stripe");
+            // NFR-03: the database is a critical dependency — if it is Unhealthy the service is
+            // "not ready" (503 on /health/ready). Stripe is a degraded (optional) dependency —
+            // its loss does not take the platform offline.
+            .AddCheck<CompaniesDatabaseHealthCheck>("database", tags: ["ready", "critical"])
+            .AddCheck<StripeHealthCheck>("stripe", tags: ["degraded"]);
 
         return services;
     }
