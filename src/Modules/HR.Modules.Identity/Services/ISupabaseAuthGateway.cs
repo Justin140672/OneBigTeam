@@ -77,6 +77,19 @@ internal interface ISupabaseAuthGateway
     /// session.
     /// </summary>
     Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Removes ALL enrolled MFA (multi-factor authentication) factors for the Supabase Auth user
+    /// identified by <paramref name="supabaseUserId"/>, via the GoTrue Admin API (server-only,
+    /// SECRET key): lists the user's factors
+    /// (<c>GET /auth/v1/admin/users/{user_id}/factors</c>) then deletes each one
+    /// (<c>DELETE /auth/v1/admin/users/{user_id}/factors/{factor_id}</c>). Returns the number of
+    /// factors that were removed (0 if the user had none — treated as success, the desired end
+    /// state is "no factors enrolled"). Throws <see cref="InvalidOperationException"/> if Supabase
+    /// rejects the list or any delete call; the message carries the HTTP status and response body
+    /// for diagnostics but never the API keys.
+    /// </summary>
+    Task<int> RemoveAllMfaFactorsAsync(Guid supabaseUserId, CancellationToken cancellationToken);
 }
 
 internal sealed record SupabaseSession(string AccessToken, string RefreshToken, Guid UserId, DateTimeOffset ExpiresAt);

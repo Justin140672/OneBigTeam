@@ -42,12 +42,20 @@ public sealed record AssignAdministratorRoleRequest(Guid Id, string Role);
 /// <summary>Mirrors AssignPlatformAdministratorRoleResponse.</summary>
 public sealed record AssignAdministratorRoleResponse(Guid Id, string Role);
 
+/// <summary>Mirrors ResetPlatformAdministratorMfaRequest ({ id, confirmed, reason }).</summary>
+public sealed record ResetAdministratorMfaRequest(Guid Id, bool Confirmed, string Reason);
+
 /// <summary>
-/// Mirrors ResetPlatformAdministratorMfaResponse. This action is a DELIBERATE STUB on the backend —
-/// Implemented is always false. It only records an audit event and does not perform a real MFA
-/// reset yet.
+/// Mirrors ResetPlatformAdministratorMfaResponse. Returned after a real MFA reset: every
+/// multi-factor factor for the administrator is removed from the identity provider,
+/// FactorsRemoved reports how many were removed, and NotificationDelivered indicates whether
+/// the notification email was sent.
 /// </summary>
-public sealed record ResetAdministratorMfaResponse(Guid AdministratorId, bool Implemented);
+public sealed record ResetAdministratorMfaResponse(
+    Guid AdministratorId,
+    string AdministratorEmail,
+    int FactorsRemoved,
+    bool NotificationDelivered);
 
 /// <summary>Mirrors ResetPlatformAdministratorPasswordResponse. This one is fully implemented (sends a real Supabase password-recovery email).</summary>
 public sealed record ResetAdministratorPasswordResponse(Guid Id, bool Requested);

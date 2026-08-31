@@ -340,6 +340,46 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         return new SupabaseSession(payload.AccessToken, payload.RefreshToken, userId, expiresAt);
     }
 
+    public async Task<int> RemoveAllMfaFactorsAsync(Guid supabaseUserId, CancellationToken cancellationToken)
+    {
+        // Admin API — SECRET key (server-only), same as the other /auth/v1/admin/* calls above.
+        var http = CreateClient(options.Value.SecretKey);
+
+        using var listResponse = await http.GetAsync(
+            $"/auth/v1/admin/users/{supabaseUserId}/factors", cancellationToken);
+
+        if (!listResponse.IsSuccessStatusCode)
+        {
+            var body = await listResponse.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase list-MFA-factors request failed with status {(int)listResponse.StatusCode} ({listResponse.StatusCode}). Response body: {body}");
+        }
+
+        var factors = await listResponse.Content.ReadFromJsonAsync<List<SupabaseFactor>>(JsonOptions, cancellationToken)
+                      ?? [];
+
+        var removed = 0;
+        foreach (var factor in factors)
+        {
+            if (string.IsNullOrWhiteSpace(factor.Id))
+                continue;
+
+            using var deleteResponse = await http.DeleteAsync(
+                $"/auth/v1/admin/users/{supabaseUserId}/factors/{factor.Id}", cancellationToken);
+
+            if (!deleteResponse.IsSuccessStatusCode)
+            {
+                var body = await deleteResponse.Content.ReadAsStringAsync(cancellationToken);
+                throw new InvalidOperationException(
+                    $"Supabase delete-MFA-factor request failed with status {(int)deleteResponse.StatusCode} ({deleteResponse.StatusCode}). Response body: {body}");
+            }
+
+            removed++;
+        }
+
+        return removed;
+    }
+
     public async Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken)
     {
         var http = CreateUserScopedClient(userAccessToken);
@@ -384,6 +424,12 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
     }
 
     private sealed class SupabaseInviteResponse
+    {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+    }
+
+    private sealed class SupabaseFactor
     {
         [JsonPropertyName("id")]
         public string? Id { get; set; }

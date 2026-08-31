@@ -16,10 +16,11 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// opens the AdminActionConfirmDialog titled "Assign role" — see AdminUsers.razor's
 /// OpenAssignRole/ConfirmAssignRoleSelection.
 ///
-/// Reset MFA is a deliberate stub — its warning and (on success) its message both say so
-/// explicitly (see AdminUsers.razor's DialogWarning/_actionMessage for AdminUserAction.ResetMfa) —
-/// tests assert on that wording directly so a future edit can't silently make it look like a real
-/// reset.
+/// Reset MFA performs a real identity-provider MFA reset (danger-styled, like Disable/AssignRole):
+/// its warning explains every MFA factor is removed and the user is notified by email, and its
+/// success message reports how many factor(s) were removed (see AdminUsers.razor's
+/// DialogWarning/_actionMessage for AdminUserAction.ResetMfa). The confirm button is named
+/// "Reset MFA".
 /// </summary>
 public sealed class AdminUsersPage(IPage page, string baseUrl)
 {

@@ -62,6 +62,22 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         return Task.CompletedTask;
     }
 
+    public List<Guid> MfaFactorRemovals { get; } = [];
+    public bool ShouldThrowOnRemoveMfaFactors { get; set; }
+    public int MfaFactorsRemovedToReturn { get; set; } = 2;
+
+    public Task<int> RemoveAllMfaFactorsAsync(Guid supabaseUserId, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowOnRemoveMfaFactors)
+        {
+            throw new InvalidOperationException(
+                "Supabase delete-MFA-factor request failed with status 500 (InternalServerError). Response body: {\"error\":\"simulated\"}");
+        }
+
+        MfaFactorRemovals.Add(supabaseUserId);
+        return Task.FromResult(MfaFactorsRemovedToReturn);
+    }
+
     public Task<SupabaseSession> ExchangeCodeForSessionAsync(string code, CancellationToken cancellationToken)
     {
         if (ShouldThrowOnExchange)
@@ -110,6 +126,9 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         PasswordResetRequests.Clear();
         RecoveryLinksGenerated.Clear();
         PasswordUpdates.Clear();
+        MfaFactorRemovals.Clear();
+        ShouldThrowOnRemoveMfaFactors = false;
+        MfaFactorsRemovedToReturn = 2;
         UserIdToReturn = null;
         ShouldThrowOnCreate = false;
         ShouldThrowOnExchange = false;

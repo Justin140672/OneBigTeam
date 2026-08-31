@@ -486,24 +486,32 @@ internal sealed record PlatformAdministratorPasswordResetRequestedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// Published when an MFA reset is requested for a platform administrator
-// (Features/ResetPlatformAdministratorMfa). Deliberately stubbed — see the handler's remarks —
-// so the Summary makes clear the underlying action is not yet actually wired up.
-internal sealed record PlatformAdministratorMfaResetRequestedAuditEvent(
+// ADM-06: published for every platform-administrator MFA reset attempt — success and failure alike
+// (Features/ResetPlatformAdministratorMfa). Records the requester (ActorUserId), the target
+// (EntityId/Email), the time (OccurredAt), the administrative reason and the outcome. Reason is
+// free-text and, per AUD-03, is carried in Summary only — never in the structured payload.
+internal sealed record PlatformAdministratorMfaResetAuditEvent(
     Guid AdministratorId,
     string Email,
     Guid? ActorUserId,
+    string Reason,
+    bool Succeeded,
+    int FactorsRemoved,
+    bool NotificationDelivered,
+    string? FailureReason,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
     Guid    IAuditEvent.CompanyId      => Guid.Empty;
-    string  IAuditEvent.EventType      => "platform-administrator.mfa-reset-requested";
+    string  IAuditEvent.EventType      => "platform-administrator.mfa-reset";
     string  IAuditEvent.EntityType     => "PlatformAdministrator";
     Guid    IAuditEvent.EntityId       => AdministratorId;
     Guid?   IAuditEvent.ActorUserId    => ActorUserId;
     Guid?   IAuditEvent.ActorEmployeeId => null;
     Guid?   IAuditEvent.CorrelationId  => null;
-    string? IAuditEvent.Summary        => $"MFA reset requested (not yet implemented) for platform administrator {Email}";
+    string? IAuditEvent.Summary        => Succeeded
+        ? $"Reset MFA for platform administrator {Email} ({FactorsRemoved} factor(s) removed). Reason: {Reason}"
+        : $"MFA reset FAILED for platform administrator {Email}. Reason: {Reason}";
     object? IAuditEvent.Before         => null;
     object? IAuditEvent.After          => null;
-    object? IAuditEvent.Metadata       => null;
+    object? IAuditEvent.Metadata       => new { Succeeded, FactorsRemoved, NotificationDelivered, FailureReason };
 }

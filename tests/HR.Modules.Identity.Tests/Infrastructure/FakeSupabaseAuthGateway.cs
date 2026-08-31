@@ -60,6 +60,22 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
     public Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken) =>
         Task.CompletedTask;
 
+    public List<Guid> MfaFactorRemovals { get; } = [];
+    public bool ShouldThrowOnRemoveMfaFactors { get; set; }
+    public int MfaFactorsRemovedToReturn { get; set; } = 2;
+
+    public Task<int> RemoveAllMfaFactorsAsync(Guid supabaseUserId, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowOnRemoveMfaFactors)
+        {
+            throw new InvalidOperationException(
+                "Supabase delete-MFA-factor request failed with status 500 (InternalServerError). Response body: {\"error\":\"simulated\"}");
+        }
+
+        MfaFactorRemovals.Add(supabaseUserId);
+        return Task.FromResult(MfaFactorsRemovedToReturn);
+    }
+
     public Task<SupabaseSession> ExchangeCodeForSessionAsync(string code, CancellationToken cancellationToken)
     {
         if (ShouldThrowOnExchange)

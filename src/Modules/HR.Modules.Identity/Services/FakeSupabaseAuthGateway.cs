@@ -52,6 +52,10 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
     public Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken) =>
         Task.CompletedTask;
 
+    // No real Supabase project is exercised in E2E — report "no factors were enrolled" (success).
+    public Task<int> RemoveAllMfaFactorsAsync(Guid supabaseUserId, CancellationToken cancellationToken) =>
+        Task.FromResult(0);
+
     public Task<SupabaseSession> ExchangeCodeForSessionAsync(string code, CancellationToken cancellationToken) =>
         throw new InvalidOperationException("No live Supabase project is configured for E2E testing.");
 

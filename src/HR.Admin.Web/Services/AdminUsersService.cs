@@ -79,11 +79,30 @@ public sealed class AdminUsersService(IHttpClientFactory httpClientFactory)
         PostActionAsync($"api/platform-administrators/{id}/role", new AssignAdministratorRoleRequest(id, role), cancellationToken);
 
     /// <summary>
-    /// DELIBERATE STUB on the backend — always records an audit event only and returns
-    /// Implemented: false; it does not perform a real MFA reset yet.
+    /// Performs a real MFA reset via the identity provider: removes every multi-factor factor for
+    /// the administrator. Returns the typed response, or null on any failure (403/404/409/422/400
+    /// or a transport error).
     /// </summary>
-    public Task<bool> ResetMfaAsync(Guid id, CancellationToken cancellationToken = default) =>
-        PostActionAsync($"api/platform-administrators/{id}/reset-mfa", new AdministratorIdRequest(id), cancellationToken);
+    public async Task<ResetAdministratorMfaResponse?> ResetMfaAsync(
+        Guid id, string reason, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"api/platform-administrators/{id}/reset-mfa",
+                new ResetAdministratorMfaRequest(id, true, reason),
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            return await response.Content.ReadFromJsonAsync<ResetAdministratorMfaResponse>(cancellationToken: cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
 
     /// <summary>Fully implemented — sends a real Supabase password-recovery email.</summary>
     public Task<bool> ResetPasswordAsync(Guid id, CancellationToken cancellationToken = default) =>

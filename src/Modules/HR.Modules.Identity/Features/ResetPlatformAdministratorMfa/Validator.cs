@@ -7,5 +7,15 @@ internal sealed class ResetPlatformAdministratorMfaValidator : AbstractValidator
     public ResetPlatformAdministratorMfaValidator()
     {
         RuleFor(r => r.Id).NotEmpty();
+
+        RuleFor(r => r.Confirmed)
+            .Equal(true)
+            .WithMessage("The MFA reset must be explicitly confirmed.");
+
+        RuleFor(r => r.Reason)
+            .NotEmpty()
+            .MinimumLength(5)
+            .MaximumLength(500)
+            .WithMessage("An administrative reason of between 5 and 500 characters is required.");
     }
 }

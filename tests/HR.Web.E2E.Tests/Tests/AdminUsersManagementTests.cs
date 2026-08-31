@@ -11,9 +11,10 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - Disabling then re-enabling an administrator flips its status pill both ways.
 /// - Assigning a new role via the two-step (inline role picker -> AdminActionConfirmDialog) flow
 ///   updates the Role column.
-/// - Reset MFA is a deliberate stub — its warning and success copy both say so explicitly (see
-///   AdminUsers.razor's DialogWarning/_actionMessage for AdminUserAction.ResetMfa), asserted on
-///   here so a future edit can't silently make it look like a real reset.
+/// - Reset MFA performs a real identity-provider MFA reset: its warning explains every MFA factor
+///   is removed and the user is notified by email, and its success message reports how many
+///   factor(s) were removed (0 under the E2E fake Supabase gateway) — see AdminUsers.razor's
+///   DialogWarning/_actionMessage for AdminUserAction.ResetMfa.
 /// - Reset password shows a generic success message — HR.Admin.Web has no way to inspect
 ///   Supabase's outbound recovery email in this test setup, so (matching this suite's existing
 ///   precedent for other email-triggering actions, e.g. DeletionQueueTests) only the
@@ -158,7 +159,7 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
     }
 
     [Fact]
-    public async Task ResetMfa_IsStub_WarningAndSuccessMessageSayNoRealResetPerformed()
+    public async Task ResetMfa_RemovesFactorsAndShowsSuccess()
     {
         var login = new AdminLoginPage(_page, _fixture.AdminWebBaseUrl);
         var adminUsers = new AdminUsersPage(_page, _fixture.AdminWebBaseUrl);
@@ -176,20 +177,23 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
         Assert.True(await adminUsers.ResetMfaDialog.IsVisibleAsync(),
             "Expected the Reset MFA confirmation dialog to open");
 
-        // Deliberate wording assertion: this action is a stub, and the warning must say so
-        // explicitly rather than implying a real Supabase MFA reset happens — see
-        // AdminUsers.razor's DialogWarning for AdminUserAction.ResetMfa.
+        // Wording assertion: this is a real identity-provider MFA reset now — the warning must
+        // describe removing MFA factors and email notification, and must NOT claim it's a stub.
         var warningText = await adminUsers.GetDialogWarningTextAsync(adminUsers.ResetMfaDialog) ?? "";
-        Assert.Contains("STUB", warningText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("does NOT perform a real Supabase MFA reset", warningText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("STUB", warningText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("multi-factor authentication", warningText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("notified by email", warningText, StringComparison.OrdinalIgnoreCase);
 
-        await adminUsers.FillDialogReasonAsync(adminUsers.ResetMfaDialog, "E2E: resetting MFA (stub) for administrator");
-        await adminUsers.ClickDialogConfirmAsync(adminUsers.ResetMfaDialog, "Reset MFA (stub)");
+        await adminUsers.FillDialogReasonAsync(adminUsers.ResetMfaDialog, "E2E: resetting MFA for administrator");
+        await adminUsers.ClickDialogConfirmAsync(adminUsers.ResetMfaDialog, "Reset MFA");
 
         await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 15_000 });
 
         var messageText = await adminUsers.GetActionMessageTextAsync() ?? "";
-        Assert.Contains("no real MFA reset was performed", messageText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("MFA reset for", messageText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("factor(s) removed", messageText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("stub", messageText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("no real MFA", messageText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

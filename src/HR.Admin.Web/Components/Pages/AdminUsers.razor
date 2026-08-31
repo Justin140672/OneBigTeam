@@ -178,8 +178,9 @@ else
         AdminUserAction.AssignRole =>
             $"This will change {_activeAdmin?.Email}'s role to {_pendingAssignRole}. This is a security-sensitive permission change.",
         AdminUserAction.ResetMfa =>
-            $"IMPORTANT: this is a deliberate STUB. Confirming will only record an audit event for " +
-            $"{_activeAdmin?.Email} — it does NOT perform a real Supabase MFA reset yet.",
+            $"This immediately removes every multi-factor authentication factor for {_activeAdmin?.Email} " +
+            $"from the identity provider. They will be prompted to set up MFA again on their next sign-in " +
+            $"and will be notified by email. This cannot be undone.",
         AdminUserAction.ResetPassword =>
             $"This will send a real Supabase password-recovery email to {_activeAdmin?.Email}.",
         _ => "This action will affect the administrator account.",
@@ -190,12 +191,12 @@ else
         AdminUserAction.Disable => "Disable",
         AdminUserAction.Enable => "Enable",
         AdminUserAction.AssignRole => "Assign role",
-        AdminUserAction.ResetMfa => "Reset MFA (stub)",
+        AdminUserAction.ResetMfa => "Reset MFA",
         AdminUserAction.ResetPassword => "Reset password",
         _ => "Confirm",
     };
 
-    private bool DialogIsDanger => _activeAction is AdminUserAction.Disable or AdminUserAction.AssignRole;
+    private bool DialogIsDanger => _activeAction is AdminUserAction.Disable or AdminUserAction.AssignRole or AdminUserAction.ResetMfa;
 
     protected override async Task OnInitializedAsync()
     {
@@ -283,22 +284,39 @@ else
         _actionBusy = true;
         try
         {
-            var succeeded = _activeAction switch
+            ResetAdministratorMfaResponse? mfaResult = null;
+            bool succeeded;
+            if (_activeAction == AdminUserAction.ResetMfa)
             {
-                AdminUserAction.Disable => await AdminUsersService.DisableAdministratorAsync(_activeAdmin.Id),
-                AdminUserAction.Enable => await AdminUsersService.EnableAdministratorAsync(_activeAdmin.Id),
-                AdminUserAction.AssignRole => await AdminUsersService.AssignRoleAsync(_activeAdmin.Id, _pendingAssignRole ?? _activeAdmin.Role),
-                AdminUserAction.ResetMfa => await AdminUsersService.ResetMfaAsync(_activeAdmin.Id),
-                AdminUserAction.ResetPassword => await AdminUsersService.ResetPasswordAsync(_activeAdmin.Id),
-                _ => false,
-            };
+                mfaResult = await AdminUsersService.ResetMfaAsync(_activeAdmin.Id, input.Reason);
+                succeeded = mfaResult is not null;
+            }
+            else
+            {
+                succeeded = _activeAction switch
+                {
+                    AdminUserAction.Disable => await AdminUsersService.DisableAdministratorAsync(_activeAdmin.Id),
+                    AdminUserAction.Enable => await AdminUsersService.EnableAdministratorAsync(_activeAdmin.Id),
+                    AdminUserAction.AssignRole => await AdminUsersService.AssignRoleAsync(_activeAdmin.Id, _pendingAssignRole ?? _activeAdmin.Role),
+                    AdminUserAction.ResetPassword => await AdminUsersService.ResetPasswordAsync(_activeAdmin.Id),
+                    _ => false,
+                };
+            }
 
             _actionSucceeded = succeeded;
-            _actionMessage = succeeded
-                ? _activeAction == AdminUserAction.ResetMfa
-                    ? "Audit event recorded. Reminder: no real MFA reset was performed (stub)."
-                    : $"{DialogConfirmText} completed successfully."
-                : $"{DialogConfirmText} failed. Check the administrator's current state and try again.";
+            if (!succeeded)
+            {
+                _actionMessage = $"{DialogConfirmText} failed. Check the administrator's current state and try again.";
+            }
+            else if (_activeAction == AdminUserAction.ResetMfa)
+            {
+                _actionMessage = $"MFA reset for {_activeAdmin.Email}: {mfaResult!.FactorsRemoved} factor(s) removed."
+                    + (mfaResult.NotificationDelivered ? string.Empty : " (the notification email could not be sent)");
+            }
+            else
+            {
+                _actionMessage = $"{DialogConfirmText} completed successfully.";
+            }
 
             if (succeeded)
             {
