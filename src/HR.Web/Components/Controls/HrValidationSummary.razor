@@ -1,0 +1,68 @@
+@implements IDisposable
+
+@{
+    var messages = CollectMessages();
+}
+@if (messages.Count > 0)
+{
+    <div class="hr-validation-summary" role="alert" aria-live="assertive" aria-atomic="true">
+        <p class="hr-validation-summary-heading">@Heading</p>
+        <ul class="hr-validation-summary-list">
+            @foreach (var message in messages)
+            {
+                <li>@message</li>
+            }
+        </ul>
+    </div>
+}
+
+@code {
+    [CascadingParameter] private EditContext? CurrentEditContext { get; set; }
+
+    /// <summary>
+    /// Extra error messages to display alongside (or instead of) the cascaded
+    /// <see cref="EditContext"/> messages — for forms that do manual validation
+    /// without an <c>EditForm</c>.
+    /// </summary>
+    [Parameter] public IEnumerable<string>? AdditionalErrors { get; set; }
+
+    [Parameter] public string Heading { get; set; } = "Please fix the following:";
+
+    private EditContext? _subscribed;
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_subscribed, CurrentEditContext))
+        {
+            if (_subscribed is not null)
+                _subscribed.OnValidationStateChanged -= HandleValidationStateChanged;
+
+            _subscribed = CurrentEditContext;
+
+            if (_subscribed is not null)
+                _subscribed.OnValidationStateChanged += HandleValidationStateChanged;
+        }
+    }
+
+    private List<string> CollectMessages()
+    {
+        var messages = new List<string>();
+
+        if (CurrentEditContext is not null)
+            messages.AddRange(CurrentEditContext.GetValidationMessages());
+
+        if (AdditionalErrors is not null)
+            messages.AddRange(AdditionalErrors.Where(m => !string.IsNullOrWhiteSpace(m)));
+
+        return messages;
+    }
+
+    private void HandleValidationStateChanged(object? sender, ValidationStateChangedEventArgs e)
+        => StateHasChanged();
+
+    public void Dispose()
+    {
+        if (_subscribed is not null)
+            _subscribed.OnValidationStateChanged -= HandleValidationStateChanged;
+    }
+}

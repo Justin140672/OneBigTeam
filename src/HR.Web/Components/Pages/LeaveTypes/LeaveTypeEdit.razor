@@ -32,6 +32,7 @@
 
         <EditForm EditContext="EditContext">
             <DataAnnotationsValidator />
+            <HrValidationSummary />
             <div class="row">
                 <div class="col-lg-7">
                     <div class="card mb-4">
@@ -42,7 +43,8 @@
                             <div class="row g-3">
                                 <div class="col-md-8">
                                     <label class="form-label">Name <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Annual Leave" Enabled="@(!Model.IsSystem && !IsViewMode)" />
+                                    <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Annual Leave" Enabled="@(!Model.IsSystem && !IsViewMode)"
+                                               aria-invalid="@(HasFieldError(() => Model.Name) ? "true" : null)" />
                                     @if (Model.IsSystem)
                                     {
                                         <p class="text-muted small mb-0">This is a system leave type and cannot be renamed.</p>
@@ -51,7 +53,8 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Code <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.Code" Placeholder="e.g. ANNUAL" />
+                                    <HrTextBox @bind-Value="Model.Code" Placeholder="e.g. ANNUAL"
+                                               aria-invalid="@(HasFieldError(() => Model.Code) ? "true" : null)" />
                                     <ValidationMessage For="@(() => Model.Code)" />
                                 </div>
                                 @if (IsAnnualLeave)
@@ -181,4 +184,7 @@
     }
 
     private sealed record Option(string Value, string Label);
+
+    private bool HasFieldError<T>(System.Linq.Expressions.Expression<Func<T>> accessor)
+        => EditContext.GetValidationMessages(FieldIdentifier.Create(accessor)).Any();
 }

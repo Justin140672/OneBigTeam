@@ -14,6 +14,8 @@
                 </div>
             }
 
+            <HrValidationSummary AdditionalErrors="@ValidationErrors" />
+
             @if (Balances.Count == 0)
             {
                 <p class="text-muted mb-0">No leave types are available.</p>
@@ -27,7 +29,8 @@
                                         DataSource="@Balances"
                                         Value="_leaveTypeId"
                                         ValueChanged="OnLeaveTypeChanged"
-                                        Placeholder="Select leave type">
+                                        Placeholder="Select leave type"
+                                        HtmlAttributes="@LeaveTypeHtmlAttributes">
                             <DropDownListFieldSettings Value="LeaveTypeId" Text="LeaveTypeName" />
                         </SfDropDownList>
                         @if (_leaveTypeError is not null)
@@ -195,6 +198,16 @@
     private DateOnly EndDate => DateOnly.FromDateTime(_endDateTime);
 
     private bool CanSubmit => !_submitting;
+
+    private IEnumerable<string> ValidationErrors =>
+        new[] { _leaveTypeError, _startDateError, _endDateError, _dateRangeError }
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Select(e => e!);
+
+    private Dictionary<string, object>? LeaveTypeHtmlAttributes =>
+        _leaveTypeError is not null
+            ? new Dictionary<string, object> { ["aria-invalid"] = "true" }
+            : null;
 
     protected override void OnParametersSet()
     {

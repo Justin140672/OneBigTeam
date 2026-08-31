@@ -501,6 +501,30 @@ html[data-theme="dark"] .employee-cell-name {
     box-shadow: 0 0 0 4px var(--hr-color-primary-subtle);
 }
 
+/* ── HrValidationSummary (Components/Controls) ───────────────────────
+   Shared accessible error-summary block. Colours match .alert-danger and
+   meet WCAG AA contrast against white (#842029 on #f8d7da / #fff).
+   ──────────────────────────────────────────────────────────────────── */
+.hr-validation-summary {
+    border: 1px solid #f1aeb5;
+    border-left: 4px solid #b02a37;
+    background-color: #f8d7da;
+    color: #842029;
+    border-radius: 0.375rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.hr-validation-summary-heading {
+    font-weight: 600;
+    margin: 0 0 0.25rem;
+}
+
+.hr-validation-summary-list {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
 /* ── SfMenu sidebar overrides ────────────────────────────── */
 .app-nav-menu.e-menu-wrapper {
     display: block;
