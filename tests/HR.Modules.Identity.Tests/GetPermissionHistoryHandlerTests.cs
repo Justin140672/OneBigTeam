@@ -5,116 +5,176 @@ using HR.SharedKernel;
 namespace HR.Modules.Identity.Tests;
 
 /// <summary>
-/// IAM-08: unit tests for <see cref="GetPermissionHistoryHandler"/>.
-/// Uses FakeAuditHistoryReader so no database or Docker required.
+/// IAM-08: unit tests for <see cref="GetPermissionHistoryHandler"/> — filtering, paging, and
+/// event-type inclusion against the platform audit log via <see cref="IAuditHistoryReader"/>.
 /// </summary>
 public class GetPermissionHistoryHandlerTests
 {
-    private static readonly DateTimeOffset T0 = new(2026, 1, 1, 10, 0, 0, TimeSpan.Zero);
     private static readonly Guid CompanyId = Guid.NewGuid();
 
-    private static AuditHistoryEntry MakeEntry(
+    private static GetPermissionHistoryHandler BuildHandler(
+        FakeAuditHistoryReader reader, Dictionary<Guid, string>? names = null) =>
+        new(reader, new FakeEmployeeNameReader(names));
+
+    private static AuditHistoryEntry Entry(
         string eventType,
+        DateTimeOffset occurredAt,
         Guid? actorUserId = null,
         Guid? employeeId = null,
-        DateTimeOffset? occurredAt = null,
+        Guid entityId = default,
+        string? summary = null,
         string? beforeJson = null,
         string? afterJson = null) =>
-        new(
-            OccurredAt: occurredAt ?? T0,
-            EventType: eventType,
-            EntityType: "user",
-            ActorUserId: actorUserId,
-            ActorEmployeeId: null,
-            Summary: $"Test {eventType}",
-            BeforeJson: beforeJson,
-            AfterJson: afterJson,
-            EmployeeId: employeeId,
-            CompanyId: CompanyId);
-
-    private static GetPermissionHistoryHandler BuildHandler(
-        IReadOnlyList<AuditHistoryEntry> platformEntries,
-        FakeEmployeeNameReader? nameReader = null) =>
-        new(
-            new FakeAuditHistoryReader().WithPlatformEntries(platformEntries),
-            nameReader ?? new FakeEmployeeNameReader());
+        new(occurredAt, eventType, "ApplicationUser", actorUserId, null, summary, beforeJson, afterJson, employeeId, entityId);
 
     [Fact]
-    public async Task HandleAsync_Returns_Only_Permission_Event_Types()
+    public async Task HandleAsync_Only_Includes_Permission_Related_Event_Types()
     {
-        var permissionEntry = MakeEntry("user.roles-changed");
-        var unrelatedEntry  = MakeEntry("employee.profile-updated");
+        var now = DateTimeOffset.UtcNow;
+        var reader = new FakeAuditHistoryReader().WithPlatformEntries(
+        [
+            Entry("user.roles-changed", now),
+            Entry("user.role-override-created", now),
+            Entry("user.disabled", now),
+            Entry("user.enabled", now),
+            Entry("user.permission-denied", now),
+            Entry("position.role-defaults-changed", now),
+            Entry("employee.inherited-roles-recalculated", now),
+            Entry("user.role-override-removed", now),
+            Entry("user.role-override-expired", now),
+            Entry("user.role-change-rejected", now),
+            Entry("some.unrelated.event", now),
+            Entry("user.invited", now),
+        ]);
 
-        var handler = BuildHandler([permissionEntry, unrelatedEntry]);
+        var handler = BuildHandler(reader);
 
         var result = await handler.HandleAsync(
-            new GetPermissionHistoryRequest { CompanyId = CompanyId, Page = 1, PageSize = 25 },
-            CancellationToken.None);
+            new GetPermissionHistoryRequest { CompanyId = CompanyId }, CancellationToken.None);
 
-        Assert.Equal(1, result.TotalCount);
-        Assert.Single(result.Items, i => i.EventType == "user.roles-changed");
+        Assert.Equal(10, result.TotalCount);
+        Assert.DoesNotContain(result.Items, i => i.EventType is "some.unrelated.event" or "user.invited");
     }
 
     [Fact]
-    public async Task HandleAsync_Includes_Position_Role_And_Override_Events_Alongside_Direct_Role_Changes()
+    public async Task HandleAsync_Filters_By_EmployeeId_Matching_Either_EmployeeId_Or_EntityId()
     {
-        var direct   = MakeEntry("user.roles-changed");
-        var position = MakeEntry("position.role-defaults-changed");
-        var over     = MakeEntry("user.role-override-created");
-        var unrelated= MakeEntry("leave.request-submitted");
+        var now = DateTimeOffset.UtcNow;
+        var targetEmployeeId = Guid.NewGuid();
+        var otherEmployeeId = Guid.NewGuid();
 
-        var handler = BuildHandler([direct, position, over, unrelated]);
+        var reader = new FakeAuditHistoryReader().WithPlatformEntries(
+        [
+            Entry("user.roles-changed", now, employeeId: targetEmployeeId),
+            Entry("user.role-override-created", now, entityId: targetEmployeeId),
+            Entry("user.roles-changed", now, employeeId: otherEmployeeId),
+        ]);
+
+        var handler = BuildHandler(reader);
 
         var result = await handler.HandleAsync(
-            new GetPermissionHistoryRequest { CompanyId = CompanyId, Page = 1, PageSize = 25 },
+            new GetPermissionHistoryRequest { CompanyId = CompanyId, EmployeeId = targetEmployeeId },
             CancellationToken.None);
 
-        Assert.Equal(3, result.TotalCount);
-        Assert.Contains(result.Items, i => i.EventType == "user.roles-changed");
-        Assert.Contains(result.Items, i => i.EventType == "position.role-defaults-changed");
-        Assert.Contains(result.Items, i => i.EventType == "user.role-override-created");
+        Assert.Equal(2, result.TotalCount);
+        Assert.All(result.Items, i => Assert.NotEqual(otherEmployeeId, i.TargetEmployeeId));
     }
 
     [Fact]
-    public async Task HandleAsync_Surfaces_Actor_Name_When_ActorUserId_Is_Present()
+    public async Task HandleAsync_Does_Not_Filter_By_EmployeeId_When_Not_Supplied()
     {
+        var now = DateTimeOffset.UtcNow;
+        var reader = new FakeAuditHistoryReader().WithPlatformEntries(
+        [
+            Entry("user.roles-changed", now, employeeId: Guid.NewGuid()),
+            Entry("user.roles-changed", now, employeeId: Guid.NewGuid()),
+        ]);
+
+        var handler = BuildHandler(reader);
+
+        var result = await handler.HandleAsync(
+            new GetPermissionHistoryRequest { CompanyId = CompanyId }, CancellationToken.None);
+
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Orders_Results_Newest_First()
+    {
+        var older = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var newer = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var reader = new FakeAuditHistoryReader().WithPlatformEntries(
+        [
+            Entry("user.roles-changed", older),
+            Entry("user.roles-changed", newer),
+        ]);
+
+        var handler = BuildHandler(reader);
+
+        var result = await handler.HandleAsync(
+            new GetPermissionHistoryRequest { CompanyId = CompanyId }, CancellationToken.None);
+
+        Assert.Equal(newer, result.Items[0].OccurredAt);
+        Assert.Equal(older, result.Items[1].OccurredAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Pages_The_Filtered_Results()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var entries = Enumerable.Range(0, 5)
+            .Select(i => Entry("user.roles-changed", now.AddMinutes(i)))
+            .ToList();
+        var reader = new FakeAuditHistoryReader().WithPlatformEntries(entries);
+
+        var handler = BuildHandler(reader);
+
+        var result = await handler.HandleAsync(
+            new GetPermissionHistoryRequest { CompanyId = CompanyId, Page = 2, PageSize = 2 },
+            CancellationToken.None);
+
+        Assert.Equal(5, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(2, result.Page);
+        Assert.Equal(2, result.PageSize);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Resolves_PerformedBy_Name_For_Actor_And_Falls_Back_To_System_When_No_Actor()
+    {
+        var now = DateTimeOffset.UtcNow;
         var actorId = Guid.NewGuid();
-        var entry   = MakeEntry("user.roles-changed", actorUserId: actorId);
-        var names   = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [actorId] = "Alice Admin" });
 
-        var handler = BuildHandler([entry], names);
+        var reader = new FakeAuditHistoryReader().WithPlatformEntries(
+        [
+            Entry("user.roles-changed", now, actorUserId: actorId),
+            Entry("user.role-override-expired", now, actorUserId: null),
+        ]);
+
+        var handler = BuildHandler(reader, new Dictionary<Guid, string> { [actorId] = "Jane Admin" });
 
         var result = await handler.HandleAsync(
-            new GetPermissionHistoryRequest { CompanyId = CompanyId, Page = 1, PageSize = 25 },
-            CancellationToken.None);
+            new GetPermissionHistoryRequest { CompanyId = CompanyId }, CancellationToken.None);
 
-        var item = Assert.Single(result.Items);
-        Assert.Equal("Alice Admin", item.PerformedBy);
+        Assert.Contains(result.Items, i => i.PerformedBy == "Jane Admin");
+        Assert.Contains(result.Items, i => i.PerformedBy == "System");
     }
 
     [Fact]
-    public async Task HandleAsync_Falls_Back_To_System_When_ActorUserId_Is_Null()
+    public async Task HandleAsync_Maps_Before_And_After_Json_As_PreviousAccess_And_NewAccess()
     {
-        var entry = MakeEntry("user.roles-changed", actorUserId: null);
-        var handler = BuildHandler([entry]);
+        var now = DateTimeOffset.UtcNow;
+        var reader = new FakeAuditHistoryReader().WithPlatformEntries(
+        [
+            Entry("user.roles-changed", now,
+                beforeJson: "{\"roles\":[\"Employee\"]}", afterJson: "{\"roles\":[\"HrManager\"]}"),
+        ]);
+
+        var handler = BuildHandler(reader);
 
         var result = await handler.HandleAsync(
-            new GetPermissionHistoryRequest { CompanyId = CompanyId, Page = 1, PageSize = 25 },
-            CancellationToken.None);
-
-        var item = Assert.Single(result.Items);
-        Assert.Equal("System", item.PerformedBy);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Maps_Before_And_After_Json_As_Previous_And_New_Access()
-    {
-        var entry = MakeEntry("user.roles-changed", beforeJson: "{\"roles\":[\"Employee\"]}", afterJson: "{\"roles\":[\"HrManager\"]}");
-        var handler = BuildHandler([entry]);
-
-        var result = await handler.HandleAsync(
-            new GetPermissionHistoryRequest { CompanyId = CompanyId, Page = 1, PageSize = 25 },
-            CancellationToken.None);
+            new GetPermissionHistoryRequest { CompanyId = CompanyId }, CancellationToken.None);
 
         var item = Assert.Single(result.Items);
         Assert.Equal("{\"roles\":[\"Employee\"]}", item.PreviousAccess);
@@ -122,74 +182,19 @@ public class GetPermissionHistoryHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Filters_By_EmployeeId_When_Provided()
+    public async Task HandleAsync_Falls_Back_To_EventType_When_Summary_Is_Empty()
     {
-        var target = Guid.NewGuid();
-        var other  = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var reader = new FakeAuditHistoryReader().WithPlatformEntries(
+        [
+            Entry("user.roles-changed", now, summary: string.Empty),
+        ]);
 
-        var forTarget = MakeEntry("user.roles-changed", employeeId: target);
-        var forOther  = MakeEntry("user.roles-changed", employeeId: other);
-
-        var handler = BuildHandler([forTarget, forOther]);
+        var handler = BuildHandler(reader);
 
         var result = await handler.HandleAsync(
-            new GetPermissionHistoryRequest { CompanyId = CompanyId, EmployeeId = target, Page = 1, PageSize = 25 },
-            CancellationToken.None);
+            new GetPermissionHistoryRequest { CompanyId = CompanyId }, CancellationToken.None);
 
-        Assert.Equal(1, result.TotalCount);
-        Assert.All(result.Items, i => Assert.Equal(target, i.TargetEmployeeId));
-    }
-
-    [Fact]
-    public async Task HandleAsync_Returns_Items_In_Descending_OccurredAt_Order()
-    {
-        var earlier = MakeEntry("user.roles-changed", occurredAt: T0.AddHours(-2));
-        var later   = MakeEntry("user.role-override-created", occurredAt: T0);
-
-        var handler = BuildHandler([earlier, later]);
-
-        var result = await handler.HandleAsync(
-            new GetPermissionHistoryRequest { CompanyId = CompanyId, Page = 1, PageSize = 25 },
-            CancellationToken.None);
-
-        Assert.Equal(later.OccurredAt, result.Items[0].OccurredAt);
-        Assert.Equal(earlier.OccurredAt, result.Items[1].OccurredAt);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Paginates_Results()
-    {
-        var entries = Enumerable.Range(0, 10)
-            .Select(i => MakeEntry("user.roles-changed", occurredAt: T0.AddMinutes(i)))
-            .ToList();
-
-        var handler = BuildHandler(entries);
-
-        var page1 = await handler.HandleAsync(
-            new GetPermissionHistoryRequest { CompanyId = CompanyId, Page = 1, PageSize = 5 },
-            CancellationToken.None);
-
-        var page2 = await handler.HandleAsync(
-            new GetPermissionHistoryRequest { CompanyId = CompanyId, Page = 2, PageSize = 5 },
-            CancellationToken.None);
-
-        Assert.Equal(10, page1.TotalCount);
-        Assert.Equal(5, page1.Items.Count);
-        Assert.Equal(10, page2.TotalCount);
-        Assert.Equal(5, page2.Items.Count);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Includes_Permission_Denied_Events()
-    {
-        var denialEntry = MakeEntry("user.permission-denied");
-        var handler = BuildHandler([denialEntry]);
-
-        var result = await handler.HandleAsync(
-            new GetPermissionHistoryRequest { CompanyId = CompanyId, Page = 1, PageSize = 25 },
-            CancellationToken.None);
-
-        Assert.Equal(1, result.TotalCount);
-        Assert.Single(result.Items, i => i.EventType == "user.permission-denied");
+        Assert.Equal("user.roles-changed", result.Items[0].Summary);
     }
 }

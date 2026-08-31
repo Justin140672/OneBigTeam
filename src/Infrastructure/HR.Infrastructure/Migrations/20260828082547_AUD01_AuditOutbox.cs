@@ -19,6 +19,12 @@ namespace HR.Infrastructure.Migrations
                 nullable: false,
                 defaultValue: new Guid("00000000-0000-0000-0000-000000000000"));
 
+            // Backfill existing audit_events rows with distinct identifiers before the unique
+            // index below is created; without this, pre-existing rows all share the zero GUID
+            // and the unique index creation fails on databases that already hold audit history.
+            migrationBuilder.Sql(
+                "UPDATE audit.audit_events SET event_id = gen_random_uuid() WHERE event_id = '00000000-0000-0000-0000-000000000000'");
+
             migrationBuilder.CreateTable(
                 name: "audit_pending_items",
                 schema: "audit",

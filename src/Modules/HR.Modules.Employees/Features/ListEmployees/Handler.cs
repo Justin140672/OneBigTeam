@@ -33,6 +33,7 @@ internal sealed class ListEmployeesHandler
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var search = request.Search.Trim().ToLowerInvariant();
+
             var matchingDeptIds = _dbContext.Departments
                 .Where(d => d.CompanyId == request.CompanyId && d.Name.ToLower().Contains(search))
                 .Select(d => d.Id);

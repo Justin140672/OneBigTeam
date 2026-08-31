@@ -1,14 +1,9 @@
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Features.SearchUserAccess;
 using HR.Modules.Identity.Tests.Infrastructure;
-using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// IAM-08: integration tests for <see cref="SearchUserAccessHandler"/>.
-/// Verifies filtering by role, position/inherited role, override state and expiry.
-/// </summary>
 [Collection("IdentityDatabase")]
 public class SearchUserAccessHandlerTests(IdentityDatabaseFixture fixture)
 {
@@ -18,182 +13,222 @@ public class SearchUserAccessHandlerTests(IdentityDatabaseFixture fixture)
     private SearchUserAccessHandler BuildHandler(IReadOnlyList<Guid> employeeIds) =>
         new(fixture.BuildContext(), new FakeEmployeeNameReader(), new FakeEmployeeAudienceReader(employeeIds), Clock);
 
-    // -----------------------------------------------------------------------
-    // 1. Empty company
-    // -----------------------------------------------------------------------
+    [Fact]
+    public async Task HandleAsync_Is_Scoped_To_The_Employee_Ids_Returned_By_The_Audience_Reader()
+    {
+        // The audience reader (not a CompanyId filter on the roles themselves) determines which
+        // users are in-scope for the search — a user not returned by GetAllEmployeeIdsAsync for
+        // this company must not appear, even if their role/user rows technically exist.
+        var companyId = Guid.NewGuid();
+        var inScopeUser = Guid.NewGuid();
+        var outOfScopeUser = Guid.NewGuid();
+
+        await using (var db = fixture.BuildContext())
+        {
+            db.Users.Add(ApplicationUser.Create(inScopeUser, "in-scope-search@test.com", "hash", "In", "Scope", Now));
+            db.Users.Add(ApplicationUser.Create(outOfScopeUser, "out-of-scope-search@test.com", "hash", "Out", "OfScope", Now));
+            await db.SaveChangesAsync();
+        }
+
+        var handler = BuildHandler([inScopeUser]);
+
+        var result = await handler.HandleAsync(
+            new SearchUserAccessRequest { CompanyId = companyId }, CancellationToken.None);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(inScopeUser, result.Items[0].EmployeeId);
+    }
 
     [Fact]
-    public async Task HandleAsync_Returns_Empty_When_No_Employees()
+    public async Task HandleAsync_Returns_Empty_When_Company_Has_No_Employees()
     {
         var handler = BuildHandler([]);
+
         var result = await handler.HandleAsync(
-            new SearchUserAccessRequest { CompanyId = Guid.NewGuid(), Page = 1, PageSize = 25 },
-            CancellationToken.None);
-        Assert.Equal(0, result.TotalCount);
+            new SearchUserAccessRequest { CompanyId = Guid.NewGuid() }, CancellationToken.None);
+
         Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
     }
 
-    // -----------------------------------------------------------------------
-    // 2. Filter by direct role
-    // -----------------------------------------------------------------------
-
     [Fact]
-    public async Task HandleAsync_Filters_By_Direct_RoleId()
+    public async Task HandleAsync_Filters_By_RoleId_Across_Direct_Inherited_And_Override_Sources()
     {
-        var companyId  = Guid.NewGuid();
-        var employee1  = Guid.NewGuid();
-        var employee2  = Guid.NewGuid();
-        var roleA      = Guid.NewGuid();
-        var roleB      = Guid.NewGuid();
-
-        await using (var db = fixture.BuildContext())
-        {
-            db.Users.Add(ApplicationUser.Create(employee1, "e1@test.com", "h", "Emp", "One", Now));
-            db.Users.Add(ApplicationUser.Create(employee2, "e2@test.com", "h", "Emp", "Two", Now));
-            db.Roles.Add(Role.Create(roleA, "RoleA", Now));
-            db.Roles.Add(Role.Create(roleB, "RoleB", Now));
-            db.UserRoles.Add(UserRole.Create(employee1, roleA, Now));
-            db.UserRoles.Add(UserRole.Create(employee2, roleB, Now));
-            await db.SaveChangesAsync();
-        }
-
-        var handler = BuildHandler([employee1, employee2]);
-        var result  = await handler.HandleAsync(
-            new SearchUserAccessRequest { CompanyId = companyId, RoleId = roleA, Page = 1, PageSize = 25 },
-            CancellationToken.None);
-
-        Assert.Equal(1, result.TotalCount);
-        Assert.Equal(employee1, result.Items[0].EmployeeId);
-    }
-
-    // -----------------------------------------------------------------------
-    // 3. Filter by inherited (position) role
-    // -----------------------------------------------------------------------
-
-    [Fact]
-    public async Task HandleAsync_Filters_By_Inherited_Role_Via_Position()
-    {
-        var companyId  = Guid.NewGuid();
-        var employee1  = Guid.NewGuid();
-        var employee2  = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var directUser = Guid.NewGuid();
+        var inheritedUser = Guid.NewGuid();
+        var overrideUser = Guid.NewGuid();
+        var unrelatedUser = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+        var otherRoleId = Guid.NewGuid();
         var positionId = Guid.NewGuid();
-        var roleA      = Guid.NewGuid();
-        var roleB      = Guid.NewGuid();
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employee1, "pos1@test.com", "h", "Pos", "One", Now));
-            db.Users.Add(ApplicationUser.Create(employee2, "pos2@test.com", "h", "Pos", "Two", Now));
-            db.Roles.Add(Role.Create(roleA, "PositionRole", Now));
-            db.Roles.Add(Role.Create(roleB, "OtherRole", Now));
-            db.Positions.Add(Position.Create(positionId, companyId, "Team Lead", Now));
-            db.PositionRoles.Add(PositionRole.Create(positionId, roleA, Now));
-            db.UserPositions.Add(UserPosition.Create(employee1, positionId, Now));
-            db.UserRoles.Add(UserRole.Create(employee2, roleB, Now));
+            db.Users.Add(ApplicationUser.Create(directUser, "direct@test.com", "hash", "Direct", "User", Now));
+            db.Users.Add(ApplicationUser.Create(inheritedUser, "inherited@test.com", "hash", "Inherited", "User", Now));
+            db.Users.Add(ApplicationUser.Create(overrideUser, "override@test.com", "hash", "Override", "User", Now));
+            db.Users.Add(ApplicationUser.Create(unrelatedUser, "unrelated@test.com", "hash", "Unrelated", "User", Now));
+
+            db.Roles.Add(Role.Create(roleId, $"SearchRole.{Guid.NewGuid():N}", Now));
+            db.Roles.Add(Role.Create(otherRoleId, $"OtherSearchRole.{Guid.NewGuid():N}", Now));
+            db.Positions.Add(Position.Create(positionId, companyId, "Search Position", Now));
+            db.PositionRoles.Add(PositionRole.Create(positionId, roleId, Now));
+            db.UserPositions.Add(UserPosition.Create(inheritedUser, positionId, Now));
+
+            db.UserRoles.Add(UserRole.Create(directUser, roleId, Now));
+            db.EmployeeRoleOverrides.Add(
+                EmployeeRoleOverride.Create(companyId, overrideUser, roleId, EmployeeRoleOverrideType.Grant, "Cover", null, Now));
+            db.UserRoles.Add(UserRole.Create(unrelatedUser, otherRoleId, Now));
+
             await db.SaveChangesAsync();
         }
 
-        var handler = BuildHandler([employee1, employee2]);
-        var result  = await handler.HandleAsync(
-            new SearchUserAccessRequest { CompanyId = companyId, RoleId = roleA, Page = 1, PageSize = 25 },
-            CancellationToken.None);
+        var handler = BuildHandler([directUser, inheritedUser, overrideUser, unrelatedUser]);
 
-        Assert.Equal(1, result.TotalCount);
-        Assert.Equal(employee1, result.Items[0].EmployeeId);
-        Assert.Single(result.Items[0].InheritedRoles, r => r.RoleId == roleA);
+        var result = await handler.HandleAsync(
+            new SearchUserAccessRequest { CompanyId = companyId, RoleId = roleId }, CancellationToken.None);
+
+        Assert.Equal(3, result.TotalCount);
+        Assert.DoesNotContain(result.Items, i => i.EmployeeId == unrelatedUser);
     }
 
-    // -----------------------------------------------------------------------
-    // 4. Filter by override state — HasGrantOverride
-    // -----------------------------------------------------------------------
-
     [Fact]
-    public async Task HandleAsync_Filters_By_HasGrantOverride()
+    public async Task HandleAsync_Filters_By_PositionId()
     {
-        var companyId  = Guid.NewGuid();
-        var employee1  = Guid.NewGuid();
-        var employee2  = Guid.NewGuid();
-        var roleId     = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var inPosition = Guid.NewGuid();
+        var notInPosition = Guid.NewGuid();
+        var positionId = Guid.NewGuid();
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employee1, "over1@test.com", "h", "Over", "One", Now));
-            db.Users.Add(ApplicationUser.Create(employee2, "over2@test.com", "h", "Over", "Two", Now));
-            db.Roles.Add(Role.Create(roleId, "TestRole", Now));
-            db.EmployeeRoleOverrides.Add(EmployeeRoleOverride.Create(companyId, employee1, roleId, EmployeeRoleOverrideType.Grant, "test", null, Now));
+            db.Users.Add(ApplicationUser.Create(inPosition, "inpos@test.com", "hash", "In", "Position", Now));
+            db.Users.Add(ApplicationUser.Create(notInPosition, "notinpos@test.com", "hash", "Not", "InPosition", Now));
+            db.Positions.Add(Position.Create(positionId, companyId, "Filter Position", Now));
+            db.UserPositions.Add(UserPosition.Create(inPosition, positionId, Now));
             await db.SaveChangesAsync();
         }
 
-        var handler = BuildHandler([employee1, employee2]);
-        var result  = await handler.HandleAsync(
-            new SearchUserAccessRequest { CompanyId = companyId, OverrideState = OverrideStateFilter.HasGrantOverride, Page = 1, PageSize = 25 },
-            CancellationToken.None);
+        var handler = BuildHandler([inPosition, notInPosition]);
 
-        Assert.Equal(1, result.TotalCount);
-        Assert.Equal(employee1, result.Items[0].EmployeeId);
+        var result = await handler.HandleAsync(
+            new SearchUserAccessRequest { CompanyId = companyId, PositionId = positionId }, CancellationToken.None);
+
+        Assert.Single(result.Items, i => i.EmployeeId == inPosition);
     }
 
-    // -----------------------------------------------------------------------
-    // 5. Temporary overrides approaching expiry are identifiable
-    // -----------------------------------------------------------------------
-
-    [Fact]
-    public async Task HandleAsync_Marks_Overrides_Expiring_Within_14_Days()
+    [Theory]
+    [InlineData(OverrideStateFilter.HasGrantOverride, true, false)]
+    [InlineData(OverrideStateFilter.HasDenyOverride, false, true)]
+    [InlineData(OverrideStateFilter.HasAnyOverride, true, true)]
+    internal async Task HandleAsync_Filters_By_OverrideState(
+        OverrideStateFilter filter, bool matchesGrantUser, bool matchesDenyUser)
     {
-        var companyId  = Guid.NewGuid();
-        var employeeId = Guid.NewGuid();
-        var roleId     = Guid.NewGuid();
-        var soonExpiry = Now.AddDays(7);   // within 14-day window
+        var companyId = Guid.NewGuid();
+        var grantUser = Guid.NewGuid();
+        var denyUser = Guid.NewGuid();
+        var noOverrideUser = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "expiry@test.com", "h", "Exp", "User", Now));
-            db.Roles.Add(Role.Create(roleId, "TempRole", Now));
-            db.EmployeeRoleOverrides.Add(EmployeeRoleOverride.Create(companyId, employeeId, roleId, EmployeeRoleOverrideType.Grant, "temporary", soonExpiry, Now));
+            db.Users.Add(ApplicationUser.Create(grantUser, $"grantstate-{grantUser:N}@test.com", "hash", "Grant", "User", Now));
+            db.Users.Add(ApplicationUser.Create(denyUser, $"denystate-{denyUser:N}@test.com", "hash", "Deny", "User", Now));
+            db.Users.Add(ApplicationUser.Create(noOverrideUser, $"nostate-{noOverrideUser:N}@test.com", "hash", "No", "Override", Now));
+            db.Roles.Add(Role.Create(roleId, $"OverrideStateRole.{Guid.NewGuid():N}", Now));
+            db.EmployeeRoleOverrides.Add(
+                EmployeeRoleOverride.Create(companyId, grantUser, roleId, EmployeeRoleOverrideType.Grant, "Grant", null, Now));
+            db.EmployeeRoleOverrides.Add(
+                EmployeeRoleOverride.Create(companyId, denyUser, roleId, EmployeeRoleOverrideType.Deny, "Deny", null, Now));
             await db.SaveChangesAsync();
         }
 
-        var handler = BuildHandler([employeeId]);
-        var result  = await handler.HandleAsync(
-            new SearchUserAccessRequest { CompanyId = companyId, OverrideState = OverrideStateFilter.HasExpiringOverride, Page = 1, PageSize = 25 },
-            CancellationToken.None);
+        var handler = BuildHandler([grantUser, denyUser, noOverrideUser]);
 
-        Assert.Equal(1, result.TotalCount);
-        var over = Assert.Single(result.Items[0].Overrides);
-        Assert.True(over.IsExpiringSoon);
+        var result = await handler.HandleAsync(
+            new SearchUserAccessRequest { CompanyId = companyId, OverrideState = filter }, CancellationToken.None);
+
+        Assert.Equal(matchesGrantUser, result.Items.Any(i => i.EmployeeId == grantUser));
+        Assert.Equal(matchesDenyUser, result.Items.Any(i => i.EmployeeId == denyUser));
+        Assert.DoesNotContain(result.Items, i => i.EmployeeId == noOverrideUser);
     }
 
-    // -----------------------------------------------------------------------
-    // 6. Company scoping — users from another company are not returned
-    // -----------------------------------------------------------------------
-
     [Fact]
-    public async Task HandleAsync_Is_Scoped_To_Company_Via_Audience_Reader()
+    public async Task HandleAsync_HasExpiringOverride_Matches_Only_Overrides_Expiring_Within_14_Days()
     {
-        // The audience reader controls which employee IDs are visible for the company.
-        // An employee from a different company simply won't be in the list.
-        var companyA  = Guid.NewGuid();
-        var employeeA = Guid.NewGuid();
-        var employeeB = Guid.NewGuid(); // belongs to company B — not in reader list
-        var roleId    = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var expiringSoonUser = Guid.NewGuid();
+        var expiringLaterUser = Guid.NewGuid();
+        var noExpiryUser = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeA, "a@test.com", "h", "A", "User", Now));
-            db.Users.Add(ApplicationUser.Create(employeeB, "b@test.com", "h", "B", "User", Now));
-            db.Roles.Add(Role.Create(roleId, "SomeRole", Now));
-            db.UserRoles.Add(UserRole.Create(employeeA, roleId, Now));
-            db.UserRoles.Add(UserRole.Create(employeeB, roleId, Now));
+            db.Users.Add(ApplicationUser.Create(expiringSoonUser, "soon@test.com", "hash", "Soon", "User", Now));
+            db.Users.Add(ApplicationUser.Create(expiringLaterUser, "later@test.com", "hash", "Later", "User", Now));
+            db.Users.Add(ApplicationUser.Create(noExpiryUser, "never@test.com", "hash", "Never", "User", Now));
+            db.Roles.Add(Role.Create(roleId, $"ExpiringRole.{Guid.NewGuid():N}", Now));
+            db.EmployeeRoleOverrides.Add(
+                EmployeeRoleOverride.Create(companyId, expiringSoonUser, roleId, EmployeeRoleOverrideType.Grant, "Soon", Now.AddDays(13), Now));
+            db.EmployeeRoleOverrides.Add(
+                EmployeeRoleOverride.Create(companyId, expiringLaterUser, roleId, EmployeeRoleOverrideType.Grant, "Later", Now.AddDays(15), Now));
+            db.EmployeeRoleOverrides.Add(
+                EmployeeRoleOverride.Create(companyId, noExpiryUser, roleId, EmployeeRoleOverrideType.Grant, "Never", null, Now));
             await db.SaveChangesAsync();
         }
 
-        // Only company A's employee is returned by the audience reader.
-        var handler = BuildHandler([employeeA]);
-        var result  = await handler.HandleAsync(
-            new SearchUserAccessRequest { CompanyId = companyA, RoleId = roleId, Page = 1, PageSize = 25 },
+        var handler = BuildHandler([expiringSoonUser, expiringLaterUser, noExpiryUser]);
+
+        var result = await handler.HandleAsync(
+            new SearchUserAccessRequest { CompanyId = companyId, OverrideState = OverrideStateFilter.HasExpiringOverride },
             CancellationToken.None);
 
-        Assert.Equal(1, result.TotalCount);
-        Assert.Equal(employeeA, result.Items[0].EmployeeId);
+        Assert.Single(result.Items, i => i.EmployeeId == expiringSoonUser);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Search_Matches_Name_Or_Email_Case_Insensitively()
+    {
+        var companyId = Guid.NewGuid();
+        var matchingUser = Guid.NewGuid();
+        var nonMatchingUser = Guid.NewGuid();
+
+        await using (var db = fixture.BuildContext())
+        {
+            db.Users.Add(ApplicationUser.Create(matchingUser, "ZEBRA@test.com", "hash", "Zebra", "Match", Now));
+            db.Users.Add(ApplicationUser.Create(nonMatchingUser, "other@test.com", "hash", "Other", "Person", Now));
+            await db.SaveChangesAsync();
+        }
+
+        var handler = BuildHandler([matchingUser, nonMatchingUser]);
+
+        var result = await handler.HandleAsync(
+            new SearchUserAccessRequest { CompanyId = companyId, Search = "zebra" }, CancellationToken.None);
+
+        Assert.Single(result.Items, i => i.EmployeeId == matchingUser);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Pages_The_Filtered_Results()
+    {
+        var companyId = Guid.NewGuid();
+        var ids = Enumerable.Range(0, 5).Select(_ => Guid.NewGuid()).ToList();
+
+        await using (var db = fixture.BuildContext())
+        {
+            foreach (var id in ids)
+                db.Users.Add(ApplicationUser.Create(id, $"{id:N}@test.com", "hash", "Paged", "User", Now));
+            await db.SaveChangesAsync();
+        }
+
+        var handler = BuildHandler(ids);
+
+        var result = await handler.HandleAsync(
+            new SearchUserAccessRequest { CompanyId = companyId, Page = 2, PageSize = 2 }, CancellationToken.None);
+
+        Assert.Equal(5, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(2, result.Page);
     }
 }

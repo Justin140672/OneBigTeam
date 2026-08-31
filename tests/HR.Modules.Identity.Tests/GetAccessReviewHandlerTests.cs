@@ -1,14 +1,10 @@
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Features.GetAccessReview;
 using HR.Modules.Identity.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// IAM-08: integration tests for <see cref="GetAccessReviewHandler"/>.
-/// Verifies that the access-review report correctly lists privileged users and
-/// the source of each privilege (direct, position-inherited, override).
-/// </summary>
 [Collection("IdentityDatabase")]
 public class GetAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
 {
@@ -19,193 +15,216 @@ public class GetAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
         new(fixture.BuildContext(), new FakeEmployeeNameReader(), new FakeEmployeeAudienceReader(employeeIds), Clock);
 
     [Fact]
-    public async Task HandleAsync_Returns_Empty_When_No_Employees()
+    public async Task HandleAsync_Is_Scoped_To_The_Employee_Ids_Returned_By_The_Audience_Reader()
+    {
+        // The audience reader (not a CompanyId filter on the roles themselves) is what determines
+        // which users are in-scope for the review — a user with a privileged role who isn't
+        // returned by GetAllEmployeeIdsAsync for this company must not appear.
+        var companyId = Guid.NewGuid();
+        var inScopeUser = Guid.NewGuid();
+        var outOfScopeUser = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+
+        await using (var db = fixture.BuildContext())
+        {
+            db.Users.Add(ApplicationUser.Create(inScopeUser, "in-scope@test.com", "hash", "In", "Scope", Now));
+            db.Users.Add(ApplicationUser.Create(outOfScopeUser, "out-of-scope@test.com", "hash", "Out", "OfScope", Now));
+            db.Roles.Add(Role.Create(roleId, $"ScopedRole.{Guid.NewGuid():N}", Now));
+            db.UserRoles.Add(UserRole.Create(inScopeUser, roleId, Now));
+            db.UserRoles.Add(UserRole.Create(outOfScopeUser, roleId, Now));
+            await db.SaveChangesAsync();
+        }
+
+        // Only inScopeUser is returned by the audience reader for this company.
+        var handler = BuildHandler([inScopeUser]);
+
+        var result = await handler.HandleAsync(
+            new GetAccessReviewRequest { CompanyId = companyId }, CancellationToken.None);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(inScopeUser, result.Items[0].EmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Empty_When_Company_Has_No_Employees()
     {
         var handler = BuildHandler([]);
+
         var result = await handler.HandleAsync(
-            new GetAccessReviewRequest { CompanyId = Guid.NewGuid() },
-            CancellationToken.None);
+            new GetAccessReviewRequest { CompanyId = Guid.NewGuid() }, CancellationToken.None);
+
+        Assert.Empty(result.Items);
         Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Excludes_Users_With_Only_The_Baseline_Employee_Role()
+    {
+        var companyId = Guid.NewGuid();
+        var baselineOnlyUser = Guid.NewGuid();
+
+        await using (var db = fixture.BuildContext())
+        {
+            db.Users.Add(ApplicationUser.Create(baselineOnlyUser, "baseline@test.com", "hash", "Baseline", "Only", Now));
+            db.UserRoles.Add(UserRole.Create(baselineOnlyUser, SystemRoles.Employee, Now));
+            await db.SaveChangesAsync();
+        }
+
+        var handler = BuildHandler([baselineOnlyUser]);
+
+        var result = await handler.HandleAsync(
+            new GetAccessReviewRequest { CompanyId = companyId }, CancellationToken.None);
+
         Assert.Empty(result.Items);
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_Employees_With_Only_Baseline_Employee_Role()
+    public async Task HandleAsync_Includes_A_User_With_A_Direct_Non_Baseline_Role_With_Direct_Source()
     {
-        var companyId  = Guid.NewGuid();
-        var employeeId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var privilegedUser = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "baseline@test.com", "h", "Base", "User", Now));
-            db.UserRoles.Add(UserRole.Create(employeeId, SystemRoles.Employee, Now));
+            db.Users.Add(ApplicationUser.Create(privilegedUser, "direct-priv@test.com", "hash", "Direct", "Priv", Now));
+            db.Roles.Add(Role.Create(roleId, $"AccessReviewDirectRole.{Guid.NewGuid():N}", Now));
+            db.UserRoles.Add(UserRole.Create(privilegedUser, roleId, Now));
             await db.SaveChangesAsync();
         }
 
-        var handler = BuildHandler([employeeId]);
-        var result  = await handler.HandleAsync(
-            new GetAccessReviewRequest { CompanyId = companyId },
-            CancellationToken.None);
+        var handler = BuildHandler([privilegedUser]);
 
-        Assert.Equal(0, result.TotalCount);
+        var result = await handler.HandleAsync(
+            new GetAccessReviewRequest { CompanyId = companyId }, CancellationToken.None);
+
+        var item = Assert.Single(result.Items, i => i.EmployeeId == privilegedUser);
+        var privilege = Assert.Single(item.Privileges, p => p.RoleId == roleId);
+        Assert.Equal("Direct", privilege.Source);
     }
 
     [Fact]
-    public async Task HandleAsync_Lists_User_With_Direct_Privileged_Role()
+    public async Task HandleAsync_Includes_A_User_With_A_Position_Inherited_Non_Baseline_Role_With_Position_Source()
     {
-        var companyId  = Guid.NewGuid();
-        var employeeId = Guid.NewGuid();
-        var roleId     = Guid.NewGuid();
-
-        await using (var db = fixture.BuildContext())
-        {
-            db.Users.Add(ApplicationUser.Create(employeeId, "direct@test.com", "h", "Direct", "User", Now));
-            db.Roles.Add(Role.Create(roleId, "HrManager", Now));
-            db.UserRoles.Add(UserRole.Create(employeeId, roleId, Now));
-            await db.SaveChangesAsync();
-        }
-
-        var handler = BuildHandler([employeeId]);
-        var result  = await handler.HandleAsync(
-            new GetAccessReviewRequest { CompanyId = companyId },
-            CancellationToken.None);
-
-        Assert.Equal(1, result.TotalCount);
-        var item = Assert.Single(result.Items);
-        Assert.Equal(employeeId, item.EmployeeId);
-        Assert.Single(item.Privileges, p => p.Source == "Direct" && p.RoleId == roleId);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Lists_User_With_Inherited_Role_Via_Position()
-    {
-        var companyId  = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var positionId = Guid.NewGuid();
-        var roleId     = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "pos@test.com", "h", "Pos", "User", Now));
-            db.Roles.Add(Role.Create(roleId, "TeamLead", Now));
-            db.Positions.Add(Position.Create(positionId, companyId, "Engineering Lead", Now));
+            db.Users.Add(ApplicationUser.Create(employeeId, "inherited-priv@test.com", "hash", "Inherited", "Priv", Now));
+            db.Positions.Add(Position.Create(positionId, companyId, "Access Review Position", Now));
+            db.Roles.Add(Role.Create(roleId, $"AccessReviewInheritedRole.{Guid.NewGuid():N}", Now));
             db.PositionRoles.Add(PositionRole.Create(positionId, roleId, Now));
             db.UserPositions.Add(UserPosition.Create(employeeId, positionId, Now));
             await db.SaveChangesAsync();
         }
 
         var handler = BuildHandler([employeeId]);
-        var result  = await handler.HandleAsync(
-            new GetAccessReviewRequest { CompanyId = companyId },
-            CancellationToken.None);
 
-        Assert.Equal(1, result.TotalCount);
-        var privilege = Assert.Single(result.Items[0].Privileges, p => p.RoleId == roleId);
-        Assert.StartsWith("Position:", privilege.Source);
-        Assert.Contains("Engineering Lead", privilege.Source);
+        var result = await handler.HandleAsync(
+            new GetAccessReviewRequest { CompanyId = companyId }, CancellationToken.None);
+
+        var item = Assert.Single(result.Items, i => i.EmployeeId == employeeId);
+        var privilege = Assert.Single(item.Privileges, p => p.RoleId == roleId);
+        Assert.Equal("Position:Access Review Position", privilege.Source);
     }
 
     [Fact]
-    public async Task HandleAsync_Lists_User_With_Active_Grant_Override()
+    public async Task HandleAsync_Includes_A_User_With_An_Active_Grant_Override_With_Override_Source_And_Expiry_Info()
     {
-        var companyId  = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        var roleId     = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+        var expiresAt = Now.AddDays(7);
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "override@test.com", "h", "Over", "User", Now));
-            db.Roles.Add(Role.Create(roleId, "Admin", Now));
+            db.Users.Add(ApplicationUser.Create(employeeId, "grant-priv@test.com", "hash", "Grant", "Priv", Now));
+            db.Roles.Add(Role.Create(roleId, $"AccessReviewGrantRole.{Guid.NewGuid():N}", Now));
             db.EmployeeRoleOverrides.Add(
-                EmployeeRoleOverride.Create(companyId, employeeId, roleId, EmployeeRoleOverrideType.Grant, "audited reason", null, Now));
+                EmployeeRoleOverride.Create(companyId, employeeId, roleId, EmployeeRoleOverrideType.Grant, "Cover", expiresAt, Now));
             await db.SaveChangesAsync();
         }
 
         var handler = BuildHandler([employeeId]);
-        var result  = await handler.HandleAsync(
-            new GetAccessReviewRequest { CompanyId = companyId },
-            CancellationToken.None);
 
-        Assert.Equal(1, result.TotalCount);
-        Assert.Single(result.Items[0].Privileges, p => p.Source == "Override");
-    }
+        var result = await handler.HandleAsync(
+            new GetAccessReviewRequest { CompanyId = companyId }, CancellationToken.None);
 
-    [Fact]
-    public async Task HandleAsync_Marks_Override_As_Expiring_Soon_When_Within_14_Days()
-    {
-        var companyId  = Guid.NewGuid();
-        var employeeId = Guid.NewGuid();
-        var roleId     = Guid.NewGuid();
-        var soonExpiry = Now.AddDays(7);
-
-        await using (var db = fixture.BuildContext())
-        {
-            db.Users.Add(ApplicationUser.Create(employeeId, "expiring@test.com", "h", "Exp", "User", Now));
-            db.Roles.Add(Role.Create(roleId, "TempAdmin", Now));
-            db.EmployeeRoleOverrides.Add(
-                EmployeeRoleOverride.Create(companyId, employeeId, roleId, EmployeeRoleOverrideType.Grant, "temp", soonExpiry, Now));
-            await db.SaveChangesAsync();
-        }
-
-        var handler = BuildHandler([employeeId]);
-        var result  = await handler.HandleAsync(
-            new GetAccessReviewRequest { CompanyId = companyId },
-            CancellationToken.None);
-
-        var privilege = Assert.Single(result.Items[0].Privileges);
+        var item = Assert.Single(result.Items, i => i.EmployeeId == employeeId);
+        var privilege = Assert.Single(item.Privileges, p => p.RoleId == roleId);
+        Assert.Equal("Override", privilege.Source);
+        Assert.Equal(expiresAt, privilege.OverrideExpiresAt);
         Assert.True(privilege.IsExpiringSoon);
     }
 
     [Fact]
-    public async Task HandleAsync_Does_Not_Include_Expired_Grant_Overrides()
+    public async Task HandleAsync_Excludes_A_User_Whose_Only_Grant_Override_Has_Expired()
     {
-        var companyId  = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        var roleId     = Guid.NewGuid();
-        var pastExpiry = Now.AddDays(-1); // already expired
+        var roleId = Guid.NewGuid();
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "expired@test.com", "h", "Exp", "User", Now));
-            db.Roles.Add(Role.Create(roleId, "ExpiredRole", Now));
+            db.Users.Add(ApplicationUser.Create(employeeId, "expired-priv@test.com", "hash", "Expired", "Priv", Now));
+            db.Roles.Add(Role.Create(roleId, $"AccessReviewExpiredGrantRole.{Guid.NewGuid():N}", Now));
             db.EmployeeRoleOverrides.Add(
-                EmployeeRoleOverride.Create(companyId, employeeId, roleId, EmployeeRoleOverrideType.Grant, "was temporary", pastExpiry, Now));
+                EmployeeRoleOverride.Create(companyId, employeeId, roleId, EmployeeRoleOverrideType.Grant, "Expired", Now.AddSeconds(-1), Now));
+            await db.SaveChangesAsync();
+        }
+
+        try
+        {
+            var handler = BuildHandler([employeeId]);
+
+            var result = await handler.HandleAsync(
+                new GetAccessReviewRequest { CompanyId = companyId }, CancellationToken.None);
+
+            Assert.Empty(result.Items);
+        }
+        finally
+        {
+            // This is deliberately the only override seeded anywhere in this test class with an
+            // ExpiresAt in the past — ExpireEmployeeRoleOverridesJobTests (same shared
+            // "IdentityDatabase" collection) sweeps the *entire* override table with no company
+            // filter, so a genuinely-expired row left behind here would otherwise be picked up by
+            // that job's "nothing expired" assertion. Clean up explicitly rather than relying on
+            // test execution order.
+            await using var cleanup = fixture.BuildContext();
+            var stray = await cleanup.EmployeeRoleOverrides.FirstOrDefaultAsync(o => o.UserId == employeeId && o.RoleId == roleId);
+            if (stray is not null)
+            {
+                cleanup.EmployeeRoleOverrides.Remove(stray);
+                await cleanup.SaveChangesAsync();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task HandleAsync_Excludes_A_User_Whose_Only_Override_Is_A_Deny_Override()
+    {
+        // Deny overrides don't confer privilege — only active Grant overrides do.
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+
+        await using (var db = fixture.BuildContext())
+        {
+            db.Users.Add(ApplicationUser.Create(employeeId, "deny-only@test.com", "hash", "Deny", "Only", Now));
+            db.Roles.Add(Role.Create(roleId, $"AccessReviewDenyOnlyRole.{Guid.NewGuid():N}", Now));
+            db.EmployeeRoleOverrides.Add(
+                EmployeeRoleOverride.Create(companyId, employeeId, roleId, EmployeeRoleOverrideType.Deny, "No privilege", null, Now));
             await db.SaveChangesAsync();
         }
 
         var handler = BuildHandler([employeeId]);
-        var result  = await handler.HandleAsync(
-            new GetAccessReviewRequest { CompanyId = companyId },
-            CancellationToken.None);
 
-        Assert.Equal(0, result.TotalCount);
-    }
+        var result = await handler.HandleAsync(
+            new GetAccessReviewRequest { CompanyId = companyId }, CancellationToken.None);
 
-    [Fact]
-    public async Task HandleAsync_Is_Company_Scoped_Via_Audience_Reader()
-    {
-        var companyA  = Guid.NewGuid();
-        var employeeA = Guid.NewGuid();
-        var employeeB = Guid.NewGuid();
-        var roleId    = Guid.NewGuid();
-
-        await using (var db = fixture.BuildContext())
-        {
-            db.Users.Add(ApplicationUser.Create(employeeA, "a@test.com", "h", "A", "User", Now));
-            db.Users.Add(ApplicationUser.Create(employeeB, "b@test.com", "h", "B", "User", Now));
-            db.Roles.Add(Role.Create(roleId, "Manager", Now));
-            db.UserRoles.Add(UserRole.Create(employeeA, roleId, Now));
-            db.UserRoles.Add(UserRole.Create(employeeB, roleId, Now));
-            await db.SaveChangesAsync();
-        }
-
-        // Only employee A is visible for company A.
-        var handler = BuildHandler([employeeA]);
-        var result  = await handler.HandleAsync(
-            new GetAccessReviewRequest { CompanyId = companyA },
-            CancellationToken.None);
-
-        Assert.Equal(1, result.TotalCount);
-        Assert.Equal(employeeA, result.Items[0].EmployeeId);
+        Assert.Empty(result.Items);
     }
 }
