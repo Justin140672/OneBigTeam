@@ -1,0 +1,42 @@
+@* DSH-04: generic drill-down list for a recruitment dashboard metric tile. The caller passes the
+   exact list of rows the metric endpoint returned, so the dialog can never disagree with the tile
+   count. Mirrors ApplicationsByStatusDialog's grid treatment. *@
+
+<SfDialog Visible="Visible" IsModal="true" Width="720px" ShowCloseIcon="true" CssClass="recruitment-metric-drilldown-dialog">
+    <DialogEvents Closed="HandleClosed" />
+    <DialogTemplates>
+        <Header>@Title</Header>
+        <Content>
+            @if (Rows.Count == 0)
+            {
+                <p class="text-muted mb-0">Nothing to show.</p>
+            }
+            else
+            {
+                <HrGrid TValue="RecruitmentMetricDrillDownRow"
+                        DataSource="@Rows"
+                        AllowPaging="false"
+                        AllowFiltering="false">
+                    <GridColumns>
+                        <GridColumn Field="@nameof(RecruitmentMetricDrillDownRow.Name)" HeaderText="Candidate" Width="200" />
+                        <GridColumn Field="@nameof(RecruitmentMetricDrillDownRow.VacancyTitle)" HeaderText="Vacancy" Width="200" />
+                        <GridColumn Field="@nameof(RecruitmentMetricDrillDownRow.Date)" HeaderText="@DateHeader" Width="140" Format="d" />
+                    </GridColumns>
+                </HrGrid>
+            }
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Close" OnClick="HandleClosed" />
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string DateHeader { get; set; } = "Date";
+    [Parameter] public IReadOnlyList<RecruitmentMetricDrillDownRow> Rows { get; set; } = [];
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    private Task HandleClosed() => OnClosed.InvokeAsync();
+}

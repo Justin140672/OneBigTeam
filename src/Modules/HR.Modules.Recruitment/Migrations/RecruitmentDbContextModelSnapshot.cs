@@ -461,6 +461,11 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
+                    b.Property<string>("Purpose")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("purpose");
+
                     b.Property<string>("TerminalOutcome")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -480,6 +485,8 @@ namespace HR.Modules.Recruitment.Migrations
 
                     b.HasIndex("CompanyId", "Name")
                         .IsUnique();
+
+                    b.HasIndex("CompanyId", "Purpose");
 
                     b.ToTable("recruitment_stages", "recruitment");
                 });

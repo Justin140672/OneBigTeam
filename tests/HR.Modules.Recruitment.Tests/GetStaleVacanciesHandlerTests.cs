@@ -142,6 +142,53 @@ public class GetStaleVacanciesHandlerTests
         Assert.Empty(result.Items);
     }
 
+    [Fact]
+    public async Task HandleAsync_Excludes_Vacancy_With_Recent_Interview_But_Stale_Application_Row()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Kai", "Reed", "kai.reed@example.com", null, null, Now);
+        // Application itself has not changed in 40 days...
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-40));
+        // ...but an interview is scheduled just 2 days ago — clear sign the vacancy is active.
+        var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(-2), 30, "Room 1", Now.AddDays(-40));
+
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        db.Interviews.Add(interview);
+        await db.SaveChangesAsync();
+
+        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
+        var result = await handler.HandleAsync(new GetStaleVacanciesRequest { CompanyId = companyId }, CancellationToken.None);
+
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Includes_Vacancy_Whose_Only_Interview_Was_Long_Ago()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Mara", "Voss", "mara.voss@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-40));
+        var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(-40), 30, "Room 1", Now.AddDays(-40));
+
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        db.Interviews.Add(interview);
+        await db.SaveChangesAsync();
+
+        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
+        var result = await handler.HandleAsync(new GetStaleVacanciesRequest { CompanyId = companyId }, CancellationToken.None);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(vacancy.Id, item.VacancyId);
+    }
+
     private static Vacancy OpenVacancy(Guid companyId, DateTimeOffset openedAt)
     {
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), openedAt);

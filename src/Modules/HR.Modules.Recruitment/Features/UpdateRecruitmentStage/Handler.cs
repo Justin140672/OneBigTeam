@@ -55,13 +55,13 @@ internal sealed class UpdateRecruitmentStageHandler(
         // if applications rely on it — enforced instead at deactivation time (see
         // SetRecruitmentStageActiveStatusHandler), since editing name/terminal flags without
         // deactivating does not orphan any existing Application.CurrentStageId reference.
-        var before = new RecruitmentStageAuditSnapshot(stage.Name, stage.IsTerminal, stage.TerminalOutcome);
+        var before = new RecruitmentStageAuditSnapshot(stage.Name, stage.IsTerminal, stage.TerminalOutcome, stage.Purpose);
 
         var now = clock.UtcNowOffset();
-        stage.UpdateDetails(trimmedName, request.IsTerminal, request.TerminalOutcome, now);
+        stage.UpdateDetails(trimmedName, request.IsTerminal, request.TerminalOutcome, now, request.Purpose);
         await db.SaveChangesAsync(cancellationToken);
 
-        var after = new RecruitmentStageAuditSnapshot(stage.Name, stage.IsTerminal, stage.TerminalOutcome);
+        var after = new RecruitmentStageAuditSnapshot(stage.Name, stage.IsTerminal, stage.TerminalOutcome, stage.Purpose);
 
         await auditPublisher.PublishAsync(
             new RecruitmentStageUpdatedAuditEvent(stage.CompanyId, stage.Id, before, after, now),
@@ -75,6 +75,7 @@ internal sealed class UpdateRecruitmentStageHandler(
             stage.IsActive,
             stage.IsTerminal,
             stage.TerminalOutcome,
+            stage.Purpose,
             stage.UpdatedAt));
     }
 }

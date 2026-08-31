@@ -13,6 +13,15 @@ public enum RecruitmentStageTerminalOutcome
     Rejected,
 }
 
+// DSH-04: explicit, machine-readable stage purpose. Only valid on non-terminal stages
+// (server rejects a purpose on a terminal stage). Serializes as a string. null == no metric meaning.
+public enum RecruitmentStagePurpose
+{
+    NewApplication,
+    Interview,
+    Offer,
+}
+
 public sealed record ListRecruitmentStagesResponse(IReadOnlyList<RecruitmentStageListItem> Items);
 
 public sealed record RecruitmentStageListItem(
@@ -21,14 +30,16 @@ public sealed record RecruitmentStageListItem(
     int DisplayOrder,
     bool IsActive,
     bool IsTerminal,
-    RecruitmentStageTerminalOutcome TerminalOutcome);
+    RecruitmentStageTerminalOutcome TerminalOutcome,
+    RecruitmentStagePurpose? Purpose = null);
 
 public sealed record CreateRecruitmentStageRequest(
     Guid CompanyId,
     string Name,
     int DisplayOrder,
     bool IsTerminal,
-    RecruitmentStageTerminalOutcome TerminalOutcome);
+    RecruitmentStageTerminalOutcome TerminalOutcome,
+    RecruitmentStagePurpose? Purpose = null);
 
 public sealed record CreateRecruitmentStageResponse(
     Guid Id,
@@ -46,7 +57,8 @@ public sealed record UpdateRecruitmentStageRequest(
     Guid RecruitmentStageId,
     string Name,
     bool IsTerminal,
-    RecruitmentStageTerminalOutcome TerminalOutcome);
+    RecruitmentStageTerminalOutcome TerminalOutcome,
+    RecruitmentStagePurpose? Purpose = null);
 
 public sealed record UpdateRecruitmentStageResponse(
     Guid Id,
@@ -85,6 +97,10 @@ public sealed class RecruitmentStageEditModel
     public string Name { get; set; } = string.Empty;
 
     public RecruitmentStageTerminalOutcome TerminalOutcome { get; set; } = RecruitmentStageTerminalOutcome.None;
+
+    // DSH-04: nullable — "None" in the picker maps to null. Server rejects a non-null purpose on a
+    // terminal stage, so the edit screen hides/disables the picker when IsTerminal is true.
+    public RecruitmentStagePurpose? Purpose { get; set; }
 
     public bool IsTerminal => TerminalOutcome != RecruitmentStageTerminalOutcome.None;
 }

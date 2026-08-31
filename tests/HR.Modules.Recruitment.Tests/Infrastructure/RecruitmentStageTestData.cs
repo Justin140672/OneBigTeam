@@ -16,12 +16,12 @@ internal static class RecruitmentStageTestData
     /// the given company directly into the DbContext (not saved — callers should SaveChangesAsync
     /// alongside their other seed data).
     /// </summary>
-    public static SeededStages AddDefaultStages(RecruitmentDbContext db, Guid companyId, DateTimeOffset now)
+    public static SeededStages AddDefaultStages(RecruitmentDbContext db, Guid companyId, DateTimeOffset now, bool withPurposes = true)
     {
-        var applicationReceived = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Application Received", 1, false, RecruitmentStageTerminalOutcome.None, now);
+        var applicationReceived = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Application Received", 1, false, RecruitmentStageTerminalOutcome.None, now, withPurposes ? RecruitmentStagePurpose.NewApplication : null);
         var cvReview            = RecruitmentStage.Create(Guid.NewGuid(), companyId, "CV Review",            2, false, RecruitmentStageTerminalOutcome.None, now);
-        var interview            = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Interview",            3, false, RecruitmentStageTerminalOutcome.None, now);
-        var offer                = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Offer",                4, false, RecruitmentStageTerminalOutcome.None, now);
+        var interview            = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Interview",            3, false, RecruitmentStageTerminalOutcome.None, now, withPurposes ? RecruitmentStagePurpose.Interview : null);
+        var offer                = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Offer",                4, false, RecruitmentStageTerminalOutcome.None, now, withPurposes ? RecruitmentStagePurpose.Offer : null);
         var hired                = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Hired",                5, true,  RecruitmentStageTerminalOutcome.Hired, now);
         var rejected             = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Rejected",             6, true,  RecruitmentStageTerminalOutcome.Rejected, now);
 

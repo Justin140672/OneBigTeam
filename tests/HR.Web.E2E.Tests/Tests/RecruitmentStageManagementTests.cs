@@ -149,6 +149,101 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
     }
 
     [Fact]
+    public async Task SetStagePurpose_ToOffer_ShowsInListPurposeColumn_ThenClearsBackToNone()
+    {
+        // DSH-04: a non-terminal stage gains a "Purpose" dropdown (None / New application /
+        // Interview / Offer) that tags it for the recruitment dashboard metric tiles, surfaced as a
+        // new "Purpose" column on the list.
+        var stageName = $"E2E Stage Purpose {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var stageList = new RecruitmentStageListPage(_page, _fixture.WebBaseUrl);
+        var stageEdit = new RecruitmentStageEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(MarcusEmail);
+
+        await stageList.GoToAsync(AcmeId);
+        await CleanupStrayStagesAsync(stageList);
+        await stageList.ClickNewAsync();
+        await stageEdit.FillNameAsync(stageName);
+        // Default Terminal Outcome "None" keeps the stage non-terminal so the Purpose field renders.
+        await stageEdit.SaveAsync();
+
+        try
+        {
+            // A newly created stage defaults to Purpose = None.
+            await stageList.GoToAsync(AcmeId);
+            Assert.Equal("None", await stageList.GetPurposeAsync(stageName));
+
+            // Set Purpose = Offer and confirm the list column reflects it.
+            await stageList.ClickRowLinkAsync(stageName);
+            await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+            await stageEdit.SelectPurposeAsync("Offer");
+            await stageEdit.SaveAsync();
+
+            await stageList.GoToAsync(AcmeId);
+            Assert.Equal("Offer", await stageList.GetPurposeAsync(stageName));
+
+            // Clear it back to None.
+            await stageList.ClickRowLinkAsync(stageName);
+            await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+            await stageEdit.SelectPurposeAsync("None");
+            await stageEdit.SaveAsync();
+
+            await stageList.GoToAsync(AcmeId);
+            Assert.Equal("None", await stageList.GetPurposeAsync(stageName));
+        }
+        finally
+        {
+            await stageList.GoToAsync(AcmeId);
+            await stageList.DeactivateAsync(stageName);
+        }
+    }
+
+    [Fact]
+    public async Task PurposeField_IsHiddenForTerminalStage_AndShownForNonTerminalStage()
+    {
+        var stageName = $"E2E Stage Purpose Term {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var stageList = new RecruitmentStageListPage(_page, _fixture.WebBaseUrl);
+        var stageEdit = new RecruitmentStageEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(MarcusEmail);
+
+        await stageList.GoToAsync(AcmeId);
+        await CleanupStrayStagesAsync(stageList);
+        await stageList.ClickNewAsync();
+        await stageEdit.FillNameAsync(stageName);
+        await stageEdit.SaveAsync();
+
+        try
+        {
+            await stageList.GoToAsync(AcmeId);
+            await stageList.ClickRowLinkAsync(stageName);
+            await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+
+            // Non-terminal (default "None" outcome) — Purpose field is shown.
+            Assert.True(await stageEdit.IsPurposeFieldVisibleAsync(),
+                "Expected the Purpose field to render for a non-terminal stage");
+
+            // Flip Terminal Outcome to "Hired" in the form only (not saved — the company already has
+            // an active Hired stage and UpdateRecruitmentStageHandler enforces uniqueness). The
+            // Purpose field is bound to !Model.IsTerminal and should disappear immediately.
+            await stageEdit.SelectTerminalOutcomeAsync("Hired");
+            Assert.False(await stageEdit.IsPurposeFieldVisibleAsync(),
+                "Expected the Purpose field to be hidden once the stage is marked terminal");
+        }
+        finally
+        {
+            await stageList.GoToAsync(AcmeId);
+            await stageList.DeactivateAsync(stageName);
+        }
+    }
+
+    [Fact]
     public async Task EditRecruitmentStage_NameAndTerminalOutcome_PersistAcrossReload()
     {
         var originalName = $"E2E Stage Edit {Guid.NewGuid().ToString("N")[..8]}";

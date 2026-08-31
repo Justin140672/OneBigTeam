@@ -36,6 +36,27 @@ public sealed class RecruitmentStageEditPage(IPage page, string baseUrl)
         return DropDownSelector.SelectAsync(page, scope, outcome);
     }
 
+    /// <summary>
+    /// Selects the Purpose value ("None", "New application", "Interview" or "Offer") via the shared
+    /// DropDownSelector. The Purpose field only renders for a non-terminal stage
+    /// (RecruitmentStageEdit.razor's <c>@if (!Model.IsTerminal)</c>), so set Terminal Outcome to
+    /// "None" first if needed.
+    /// </summary>
+    public Task SelectPurposeAsync(string purpose)
+    {
+        // Scope to the Purpose field group specifically — .card-body holds the Terminal Outcome
+        // combobox too, and only this .mb-3 block mentions "Purpose".
+        var scope = page.Locator(".card-body .mb-3").Filter(new() { HasText = "Purpose" });
+        return DropDownSelector.SelectAsync(page, scope, purpose);
+    }
+
+    /// <summary>
+    /// True when the Purpose field is rendered on the edit form. It is hidden entirely for a
+    /// terminal stage (Terminal Outcome = Hired/Rejected).
+    /// </summary>
+    public Task<bool> IsPurposeFieldVisibleAsync() =>
+        page.Locator("label.form-label").Filter(new() { HasText = "Purpose" }).First.IsVisibleAsync();
+
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();

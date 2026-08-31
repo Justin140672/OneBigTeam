@@ -69,6 +69,26 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         return null;
     }
 
+    /// <summary>
+    /// Reads the "Purpose" column cell for the named row. Returns "None" when the cell shows the
+    /// muted "—" placeholder, otherwise the badge label ("New application", "Interview", "Offer").
+    /// </summary>
+    public async Task<string?> GetPurposeAsync(string nameFragment)
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        var cells = Row(nameFragment).Locator(".e-rowcell");
+        var count = await cells.CountAsync();
+        for (var i = count - 1; i >= 0; i--)
+        {
+            var text = (await cells.Nth(i).TextContentAsync())?.Trim();
+            if (text is "New application" or "Interview" or "Offer")
+                return text;
+            if (text == "—")
+                return "None";
+        }
+        return null;
+    }
+
     public async Task<int?> GetDisplayOrderAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });

@@ -34,10 +34,10 @@ internal sealed class RecruitmentStageSeeder(RecruitmentDbContext db)
 
     public static IReadOnlyList<RecruitmentStage> BuildDefaultStages(Guid companyId, DateTimeOffset now) =>
     [
-        RecruitmentStage.Create(Guid.NewGuid(), companyId, "Application Received", 1, false, RecruitmentStageTerminalOutcome.None, now),
+        RecruitmentStage.Create(Guid.NewGuid(), companyId, "Application Received", 1, false, RecruitmentStageTerminalOutcome.None, now, RecruitmentStagePurpose.NewApplication),
         RecruitmentStage.Create(Guid.NewGuid(), companyId, "CV Review",            2, false, RecruitmentStageTerminalOutcome.None, now),
-        RecruitmentStage.Create(Guid.NewGuid(), companyId, "Interview",            3, false, RecruitmentStageTerminalOutcome.None, now),
-        RecruitmentStage.Create(Guid.NewGuid(), companyId, "Offer",                4, false, RecruitmentStageTerminalOutcome.None, now),
+        RecruitmentStage.Create(Guid.NewGuid(), companyId, "Interview",            3, false, RecruitmentStageTerminalOutcome.None, now, RecruitmentStagePurpose.Interview),
+        RecruitmentStage.Create(Guid.NewGuid(), companyId, "Offer",                4, false, RecruitmentStageTerminalOutcome.None, now, RecruitmentStagePurpose.Offer),
         RecruitmentStage.Create(Guid.NewGuid(), companyId, "Hired",                5, true,  RecruitmentStageTerminalOutcome.Hired, now),
         RecruitmentStage.Create(Guid.NewGuid(), companyId, "Rejected",             6, true,  RecruitmentStageTerminalOutcome.Rejected, now),
     ];

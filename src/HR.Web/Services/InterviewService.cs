@@ -25,6 +25,13 @@ public sealed class InterviewService(IHttpClientFactory httpClientFactory)
         Http.GetFromJsonAsync<GetInterviewsTodayCountResponse>(
             $"api/companies/{companyId}/interviews/today-count", HrApiJsonOptions.Default);
 
+    // DSH-04: authoritative "interviews requiring action" metric (Pending outcome, scheduled at or
+    // before end of today). Non-swallowing (DSH-03 style) for the dashboard's per-source failure UI.
+    public Task<InterviewsRequiringActionMetricResponse?> GetInterviewsRequiringActionMetricOrThrowAsync(
+        Guid companyId, CancellationToken cancellationToken = default) =>
+        Http.GetFromJsonAsync<InterviewsRequiringActionMetricResponse>(
+            $"api/companies/{companyId}/recruitment/metrics/interviews-requiring-action", HrApiJsonOptions.Default, cancellationToken);
+
     public async Task<GetUpcomingInterviewsResponse?> GetUpcomingInterviewsAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {

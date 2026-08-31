@@ -69,6 +69,63 @@ public class RecruitmentStageTests
     }
 
     [Fact]
+    public void Create_Sets_Purpose_On_NonTerminal_Stage()
+    {
+        var stage = RecruitmentStage.Create(
+            Guid.NewGuid(), Guid.NewGuid(), "Application Received", 1, false, RecruitmentStageTerminalOutcome.None, Now, RecruitmentStagePurpose.NewApplication);
+
+        Assert.Equal(RecruitmentStagePurpose.NewApplication, stage.Purpose);
+    }
+
+    [Fact]
+    public void Create_Defaults_Purpose_To_Null()
+    {
+        var stage = RecruitmentStage.Create(
+            Guid.NewGuid(), Guid.NewGuid(), "CV Review", 2, false, RecruitmentStageTerminalOutcome.None, Now);
+
+        Assert.Null(stage.Purpose);
+    }
+
+    [Fact]
+    public void Create_Forces_Purpose_Null_On_Terminal_Stage()
+    {
+        var stage = RecruitmentStage.Create(
+            Guid.NewGuid(), Guid.NewGuid(), "Hired", 5, true, RecruitmentStageTerminalOutcome.Hired, Now, RecruitmentStagePurpose.Offer);
+
+        Assert.Null(stage.Purpose);
+    }
+
+    [Fact]
+    public void UpdateDetails_Sets_Purpose_On_NonTerminal_Stage()
+    {
+        var stage = RecruitmentStage.Create(Guid.NewGuid(), Guid.NewGuid(), "Offer", 4, false, RecruitmentStageTerminalOutcome.None, Now);
+
+        stage.UpdateDetails("Offer", false, RecruitmentStageTerminalOutcome.None, Now.AddDays(1), RecruitmentStagePurpose.Offer);
+
+        Assert.Equal(RecruitmentStagePurpose.Offer, stage.Purpose);
+    }
+
+    [Fact]
+    public void UpdateDetails_Forces_Purpose_Null_When_Made_Terminal()
+    {
+        var stage = RecruitmentStage.Create(Guid.NewGuid(), Guid.NewGuid(), "Offer", 4, false, RecruitmentStageTerminalOutcome.None, Now, RecruitmentStagePurpose.Offer);
+
+        stage.UpdateDetails("Offer", true, RecruitmentStageTerminalOutcome.Hired, Now.AddDays(1), RecruitmentStagePurpose.Offer);
+
+        Assert.Null(stage.Purpose);
+    }
+
+    [Fact]
+    public void UpdateDetails_Can_Clear_Purpose_By_Passing_Null()
+    {
+        var stage = RecruitmentStage.Create(Guid.NewGuid(), Guid.NewGuid(), "Offer", 4, false, RecruitmentStageTerminalOutcome.None, Now, RecruitmentStagePurpose.Offer);
+
+        stage.UpdateDetails("Offer", false, RecruitmentStageTerminalOutcome.None, Now.AddDays(1));
+
+        Assert.Null(stage.Purpose);
+    }
+
+    [Fact]
     public void SetDisplayOrder_Updates_DisplayOrder_And_UpdatedAt()
     {
         var stage = RecruitmentStage.Create(Guid.NewGuid(), Guid.NewGuid(), "Offer", 4, false, RecruitmentStageTerminalOutcome.None, Now);

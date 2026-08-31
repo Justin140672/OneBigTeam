@@ -7,4 +7,5 @@ internal sealed record CreateRecruitmentStageRequest(
     string Name,
     int DisplayOrder,
     bool IsTerminal,
-    RecruitmentStageTerminalOutcome TerminalOutcome);
+    RecruitmentStageTerminalOutcome TerminalOutcome,
+    RecruitmentStagePurpose? Purpose = null);

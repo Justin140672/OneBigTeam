@@ -196,6 +196,23 @@ public static class RecruitmentModule
         services.AddScoped<GetUpcomingInterviewsHandler>();
         services.AddScoped<GetStaleVacanciesHandler>();
 
+        // DSH-04: authoritative recruitment dashboard metric queries (count == drill-down list).
+        services.AddScoped<Features.GetNewApplicationsMetric.GetNewApplicationsMetricHandler>();
+        services.AddScoped<IValidator<Features.GetNewApplicationsMetric.GetNewApplicationsMetricRequest>,
+            Features.GetNewApplicationsMetric.GetNewApplicationsMetricValidator>();
+
+        services.AddScoped<Features.GetCandidatesInProgressMetric.GetCandidatesInProgressMetricHandler>();
+        services.AddScoped<IValidator<Features.GetCandidatesInProgressMetric.GetCandidatesInProgressMetricRequest>,
+            Features.GetCandidatesInProgressMetric.GetCandidatesInProgressMetricValidator>();
+
+        services.AddScoped<Features.GetOffersAwaitingResponseMetric.GetOffersAwaitingResponseMetricHandler>();
+        services.AddScoped<IValidator<Features.GetOffersAwaitingResponseMetric.GetOffersAwaitingResponseMetricRequest>,
+            Features.GetOffersAwaitingResponseMetric.GetOffersAwaitingResponseMetricValidator>();
+
+        services.AddScoped<Features.GetInterviewsRequiringActionMetric.GetInterviewsRequiringActionMetricHandler>();
+        services.AddScoped<IValidator<Features.GetInterviewsRequiringActionMetric.GetInterviewsRequiringActionMetricRequest>,
+            Features.GetInterviewsRequiringActionMetric.GetInterviewsRequiringActionMetricValidator>();
+
         services.AddScoped<VacancyPositionProfileMatcher>();
 
         services.AddScoped<GetVacanciesNeedingPositionProfileReviewHandler>();

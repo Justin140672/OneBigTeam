@@ -226,4 +226,56 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
             names.Add((await t.TextContentAsync())?.Trim() ?? "");
         return names;
     }
+
+    // ── Metric tile drill-down dialog (DSH-04) ───────────────────────────────
+
+    // RecruitmentMetricDrillDownDialog.razor renders an SfDialog with
+    // CssClass="recruitment-metric-drilldown-dialog". Syncfusion copies that CssClass onto several
+    // sibling nodes (outer wrapper, the dialog itself, the close button), so scope by the dialog
+    // ROLE plus the class rather than the bare class alone — the [role='dialog'] qualifier keeps
+    // this to the single actual dialog element.
+    private ILocator DrillDownDialog => page.Locator("[role='dialog'].recruitment-metric-drilldown-dialog");
+
+    private ILocator SummaryTile(string label) =>
+        page.Locator(".widget-kpi-row[role='list'] .widget-kpi").Filter(new() { HasText = label }).First;
+
+    /// <summary>Clicks the drillable summary tile with the given label and waits for its
+    /// drill-down dialog to open.</summary>
+    public async Task OpenMetricDrillDownAsync(string label)
+    {
+        await WaitForSummaryTilesLoadedAsync();
+        await SummaryTile(label).ClickAsync();
+        await DrillDownDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Number of candidate rows shown in the currently-open drill-down dialog. The dialog renders a
+    /// "Nothing to show." paragraph instead of a grid when the metric returned no items, which this
+    /// reports as 0.
+    /// </summary>
+    public async Task<int> GetDrillDownRowCountAsync()
+    {
+        await DrillDownDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+
+        var emptyState = DrillDownDialog.Locator("p.text-muted").Filter(new() { HasText = "Nothing to show" });
+        if (await emptyState.IsVisibleAsync())
+            return 0;
+
+        await DrillDownDialog.Locator(".e-grid .e-row, .e-grid .e-emptyrow").First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
+        if (await DrillDownDialog.Locator(".e-grid .e-emptyrow").IsVisibleAsync())
+            return 0;
+
+        return await DrillDownDialog.Locator(".e-grid .e-row").CountAsync();
+    }
+
+    /// <summary>True while a metric drill-down dialog is open.</summary>
+    public Task<bool> IsMetricDrillDownOpenAsync() => DrillDownDialog.IsVisibleAsync();
+
+    public async Task CloseMetricDrillDownAsync()
+    {
+        await DrillDownDialog.GetByRole(AriaRole.Button, new() { Name = "Close" }).First.ClickAsync();
+        await DrillDownDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
 }

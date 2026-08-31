@@ -7,4 +7,5 @@ internal sealed record UpdateRecruitmentStageRequest(
     Guid RecruitmentStageId,
     string Name,
     bool IsTerminal,
-    RecruitmentStageTerminalOutcome TerminalOutcome);
+    RecruitmentStageTerminalOutcome TerminalOutcome,
+    RecruitmentStagePurpose? Purpose = null);

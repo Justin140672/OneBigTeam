@@ -1,5 +1,6 @@
 @inject ApplicationService ApplicationService
 @inject RecruitmentStageService RecruitmentStageService
+@inject VacancyService VacancyService
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -77,7 +78,7 @@
 
 @code {
     private bool _loading = true;
-    private IReadOnlyList<ApplicationByStatusItem> _offers = [];
+    private IReadOnlyList<RecruitmentMetricApplicationItem> _offers = [];
     private IReadOnlyList<ApplicationByStatusItem> _recentHires = [];
 
     protected override async Task OnInitializedAsync()
@@ -95,20 +96,12 @@
         // (there is normally exactly one, enforced by HireCandidateHandler's "no active 'Hired'
         // terminal recruitment stage configured" check).
         //
-        // "Offer" is likewise data-driven, mirroring the exact same definition OfferCandidateHandler
-        // uses server-side: the last active non-terminal stage, ordered by DisplayOrder. This avoids
-        // matching on a hardcoded stage name (which broke as soon as a company renamed/removed the
-        // default "Offer" stage) — instead it always agrees with whichever stage OfferCandidate
-        // actually moves applications into.
+        // DSH-04: "Offers awaiting response" now comes from the authoritative metric endpoint
+        // (applications across every stage carrying purpose = Offer), replacing the old
+        // last-non-terminal-stage-by-DisplayOrder inference.
         var hiredStageIds = stages.Where(s => s.TerminalOutcome == RecruitmentStageTerminalOutcome.Hired).Select(s => s.Id).ToList();
-        var offerStageId = stages
-            .Where(s => s.IsActive && !s.IsTerminal)
-            .OrderByDescending(s => s.DisplayOrder)
-            .FirstOrDefault()?.Id;
 
-        var offersTask = offerStageId is { } offerId
-            ? ApplicationService.GetApplicationsByStatusAsync(Session.CompanyId, offerId)
-            : Task.FromResult<GetApplicationsByStatusResponse?>(null);
+        var offersTask = VacancyService.GetOffersAwaitingResponseMetricAsync(Session.CompanyId);
 
         var hireTasks = hiredStageIds.Select(id => ApplicationService.GetApplicationsByStatusAsync(Session.CompanyId, id)).ToList();
 

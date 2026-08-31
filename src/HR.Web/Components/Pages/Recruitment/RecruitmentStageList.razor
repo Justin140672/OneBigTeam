@@ -65,6 +65,21 @@
                         <StatusBadge Variant="@TerminalOutcomeVariant(row.TerminalOutcome)">@row.TerminalOutcome</StatusBadge>
                     </Template>
                 </GridColumn>
+                <GridColumn HeaderText="Purpose" Width="140">
+                    <Template>
+                        @{
+                            var row = (context as RecruitmentStageListItem)!;
+                        }
+                        @if (row.Purpose is { } purpose)
+                        {
+                            <StatusBadge Variant="StatusBadgeVariant.Info">@PurposeLabel(purpose)</StatusBadge>
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </Template>
+                </GridColumn>
                 <GridColumn HeaderText="Reorder" Width="140">
                     <Template>
                         @{
@@ -191,6 +206,14 @@
     protected override string? GetAddUrl()  => $"/companies/{CompanyId}/recruitment-stages/new";
     protected override string? GetEditUrl(RecruitmentStageListItem item) => $"/companies/{CompanyId}/recruitment-stages/{item.Id}";
     protected override string? GetViewUrl(RecruitmentStageListItem item) => $"/companies/{CompanyId}/recruitment-stages/{item.Id}/view";
+
+    private static string PurposeLabel(RecruitmentStagePurpose purpose) => purpose switch
+    {
+        RecruitmentStagePurpose.NewApplication => "New application",
+        RecruitmentStagePurpose.Interview => "Interview",
+        RecruitmentStagePurpose.Offer => "Offer",
+        _ => purpose.ToString(),
+    };
 
     private static StatusBadgeVariant TerminalOutcomeVariant(RecruitmentStageTerminalOutcome outcome) => outcome switch
     {

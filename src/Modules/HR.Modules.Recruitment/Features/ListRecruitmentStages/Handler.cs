@@ -24,7 +24,8 @@ internal sealed class ListRecruitmentStagesHandler(RecruitmentDbContext db)
                 s.DisplayOrder,
                 s.IsActive,
                 s.IsTerminal,
-                s.TerminalOutcome))
+                s.TerminalOutcome,
+                s.Purpose))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new ListRecruitmentStagesResponse(items));

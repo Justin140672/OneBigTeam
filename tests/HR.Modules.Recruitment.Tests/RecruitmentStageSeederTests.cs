@@ -37,6 +37,33 @@ public class RecruitmentStageSeederTests
     }
 
     [Fact]
+    public async Task EnsureDefaultStagesSeededAsync_Assigns_Expected_Stage_Purposes()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        await new RecruitmentStageSeeder(db).EnsureDefaultStagesSeededAsync(companyId, Now, CancellationToken.None);
+
+        var stages = await db.RecruitmentStages.Where(s => s.CompanyId == companyId).ToListAsync();
+        Assert.Equal(RecruitmentStagePurpose.NewApplication, stages.Single(s => s.Name == "Application Received").Purpose);
+        Assert.Equal(RecruitmentStagePurpose.Interview, stages.Single(s => s.Name == "Interview").Purpose);
+        Assert.Equal(RecruitmentStagePurpose.Offer, stages.Single(s => s.Name == "Offer").Purpose);
+        Assert.Null(stages.Single(s => s.Name == "CV Review").Purpose);
+        Assert.Null(stages.Single(s => s.Name == "Hired").Purpose);
+        Assert.Null(stages.Single(s => s.Name == "Rejected").Purpose);
+    }
+
+    [Fact]
+    public void BuildDefaultStages_Assigns_Expected_Stage_Purposes()
+    {
+        var stages = RecruitmentStageSeeder.BuildDefaultStages(Guid.NewGuid(), Now);
+
+        Assert.Equal(RecruitmentStagePurpose.NewApplication, stages.Single(s => s.Name == "Application Received").Purpose);
+        Assert.Equal(RecruitmentStagePurpose.Interview, stages.Single(s => s.Name == "Interview").Purpose);
+        Assert.Equal(RecruitmentStagePurpose.Offer, stages.Single(s => s.Name == "Offer").Purpose);
+    }
+
+    [Fact]
     public async Task EnsureDefaultStagesSeededAsync_Is_Idempotent_Does_Not_Duplicate_Stages_On_Second_Call()
     {
         await using var db = BuildContext();

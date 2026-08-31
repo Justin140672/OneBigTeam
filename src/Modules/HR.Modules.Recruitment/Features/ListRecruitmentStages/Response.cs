@@ -10,4 +10,5 @@ internal sealed record RecruitmentStageListItem(
     int DisplayOrder,
     bool IsActive,
     bool IsTerminal,
-    RecruitmentStageTerminalOutcome TerminalOutcome);
+    RecruitmentStageTerminalOutcome TerminalOutcome,
+    RecruitmentStagePurpose? Purpose);

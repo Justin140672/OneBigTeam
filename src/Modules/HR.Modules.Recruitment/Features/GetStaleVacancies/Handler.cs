@@ -31,13 +31,32 @@ internal sealed class GetStaleVacanciesHandler(
         var vacancyIds = vacancies.Select(v => v.Id).ToList();
 
         // "Activity" = an application being created or updated (covers new applications, stage
-        // moves, interview outcomes, etc. since Application.UpdatedAt advances on every transition).
+        // moves, interview outcomes, etc. since Application.UpdatedAt advances on every transition)...
         var lastActivityByVacancy = await db.Applications
             .AsNoTracking()
             .Where(a => vacancyIds.Contains(a.VacancyId))
             .GroupBy(a => a.VacancyId)
             .Select(g => new { VacancyId = g.Key, LastActivityAt = g.Max(a => a.UpdatedAt) })
             .ToDictionaryAsync(x => x.VacancyId, x => x.LastActivityAt, cancellationToken);
+
+        // ...and also an interview being scheduled, rescheduled or resolved for one of the vacancy's
+        // applications (DSH-04 — scheduling an interview a week out is a clear sign a vacancy is *not*
+        // stale, even though the application row may not have changed).
+        var lastInterviewByVacancy = (await (
+                from i in db.Interviews.AsNoTracking()
+                join a in db.Applications.AsNoTracking() on i.ApplicationId equals a.Id
+                where vacancyIds.Contains(a.VacancyId)
+                group new { i.ScheduledAt, i.UpdatedAt } by a.VacancyId into g
+                select new
+                {
+                    VacancyId = g.Key,
+                    LastScheduledAt = g.Max(x => x.ScheduledAt),
+                    LastUpdatedAt = g.Max(x => x.UpdatedAt),
+                })
+            .ToListAsync(cancellationToken))
+            .ToDictionary(
+                x => x.VacancyId,
+                x => x.LastScheduledAt > x.LastUpdatedAt ? x.LastScheduledAt : x.LastUpdatedAt);
 
         // Batch cross-module read for effective (AdvertTitle ?? PositionProfile.Title) display titles —
         // same pattern as ListVacanciesHandler.
@@ -54,7 +73,10 @@ internal sealed class GetStaleVacanciesHandler(
         var items = vacancies
             .Select(v =>
             {
-                var lastActivityAt = lastActivityByVacancy.TryGetValue(v.Id, out var la) ? la : (DateTimeOffset?)null;
+                DateTimeOffset? lastActivityAt =
+                    lastActivityByVacancy.TryGetValue(v.Id, out var la) ? la : null;
+                if (lastInterviewByVacancy.TryGetValue(v.Id, out var li) && (lastActivityAt is null || li > lastActivityAt))
+                    lastActivityAt = li;
                 // No applications at all yet — treat the vacancy's own opening date as the baseline.
                 var referenceDate = lastActivityAt ?? (v.OpenedAt.HasValue
                     ? new DateTimeOffset(v.OpenedAt.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)

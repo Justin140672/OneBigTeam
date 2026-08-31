@@ -55,12 +55,16 @@
                     <div class="widget-kpi-row" role="list">
                         <RecruitmentSummaryTile Label="Open vacancies" Value="_openVacancies" Failed="_vacanciesRes.IsFailed"
                                                  Href="@($"/companies/{Session.CompanyId}/vacancies")" />
-                        <RecruitmentSummaryTile Label="New applications" Value="_newApplications" Failed="_pipelineRes.IsFailed"
-                                                 Href="@($"/companies/{Session.CompanyId}/vacancies")" />
+                        <RecruitmentSummaryTile Label="New applications" Value="_newApplications" Failed="_newApplicationsRes.IsFailed"
+                                                 Href="#" OnClick="@(() => OpenDrillDown(SrcPipeline))" />
+                        <RecruitmentSummaryTile Label="Candidates in progress" Value="_candidatesInProgress" Failed="_candidatesRes.IsFailed"
+                                                 Href="#" OnClick="@(() => OpenDrillDown(SrcCandidates))" />
                         <RecruitmentSummaryTile Label="Interviews requiring action" Value="_interviewsRequiringAction" Failed="_interviewsRes.IsFailed"
-                                                 Href="#" OnClick="@(() => SetTab(DashboardTab.Activity))" />
+                                                 Href="#" OnClick="@(() => OpenDrillDown(SrcInterviews))" />
                         <RecruitmentSummaryTile Label="Offers awaiting response" Value="_offersAwaitingResponse" Failed="_offersRes.IsFailed"
-                                                 Href="#" OnClick="@(() => SetTab(DashboardTab.Activity))" />
+                                                 Href="#" OnClick="@(() => OpenDrillDown(SrcOffers))"
+                                                 Muted="@(_offersRes.IsLoaded && !_offerStageConfigured)"
+                                                 Title="@(_offersRes.IsLoaded && !_offerStageConfigured ? "No offer stage configured" : null)" />
                         <RecruitmentSummaryTile Label="Stale vacancies" Value="_staleVacancies" Failed="_staleRes.IsFailed"
                                                  Href="@($"/companies/{Session.CompanyId}/vacancies")" Muted="@(_staleRes.IsLoaded && _staleVacancies == 0)" />
                     </div>
@@ -180,6 +184,12 @@
                 </div>
             </section>
         }
+
+        <RecruitmentMetricDrillDownDialog Visible="_drillDownVisible"
+                                          Title="@_drillDownTitle"
+                                          DateHeader="@_drillDownDateHeader"
+                                          Rows="_drillDownRows"
+                                          OnClosed="CloseDrillDown" />
     </div>
 }
 
@@ -212,21 +222,33 @@
     // "—" + an inline retry rather than a misleading 0.
     private const string SrcVacancies = "Open vacancies";
     private const string SrcPipeline = "New applications";
+    private const string SrcCandidates = "Candidates in progress";
     private const string SrcInterviews = "Interviews requiring action";
     private const string SrcOffers = "Offers awaiting response";
     private const string SrcStale = "Stale vacancies";
     private const string SummaryWidgetName = "Recruitment summary";
 
-    private readonly string[] _summarySources = [SrcVacancies, SrcPipeline, SrcInterviews, SrcOffers, SrcStale];
+    private readonly string[] _summarySources = [SrcVacancies, SrcPipeline, SrcCandidates, SrcInterviews, SrcOffers, SrcStale];
     private readonly HashSet<string> _retrying = [];
 
     private bool _summaryLoading = true;
 
+    // DSH-04: every recruitment-summary tile now maps to an authoritative server metric endpoint
+    // ({ count, items[] }, count == items.Count) rather than inferring meaning from stage ordering.
+    // Each endpoint is its own tracked source so one failure can't blank the whole row or the header.
     private WidgetResult<ListVacanciesResponse?> _vacanciesRes = WidgetResult<ListVacanciesResponse?>.Loading(SrcVacancies);
-    private WidgetResult<GetPipelineSummaryResponse?> _pipelineRes = WidgetResult<GetPipelineSummaryResponse?>.Loading(SrcPipeline);
-    private WidgetResult<GetInterviewsTodayCountResponse?> _interviewsRes = WidgetResult<GetInterviewsTodayCountResponse?>.Loading(SrcInterviews);
-    private WidgetResult<int> _offersRes = WidgetResult<int>.Loading(SrcOffers);
+    private WidgetResult<NewApplicationsMetricResponse?> _newApplicationsRes = WidgetResult<NewApplicationsMetricResponse?>.Loading(SrcPipeline);
+    private WidgetResult<CandidatesInProgressMetricResponse?> _candidatesRes = WidgetResult<CandidatesInProgressMetricResponse?>.Loading(SrcCandidates);
+    private WidgetResult<InterviewsRequiringActionMetricResponse?> _interviewsRes = WidgetResult<InterviewsRequiringActionMetricResponse?>.Loading(SrcInterviews);
+    private WidgetResult<OffersAwaitingResponseMetricResponse?> _offersRes = WidgetResult<OffersAwaitingResponseMetricResponse?>.Loading(SrcOffers);
     private WidgetResult<GetStaleVacanciesResponse?> _staleRes = WidgetResult<GetStaleVacanciesResponse?>.Loading(SrcStale);
+    private bool _offerStageConfigured = true;
+
+    // Drill-down dialog state — always shows exactly the items the metric endpoint returned.
+    private bool _drillDownVisible;
+    private string _drillDownTitle = string.Empty;
+    private string _drillDownDateHeader = "Applied";
+    private IReadOnlyList<RecruitmentMetricDrillDownRow> _drillDownRows = [];
 
     private WidgetPanelSummary _summary = WidgetPanelState.Summarise([]);
 
@@ -257,7 +279,8 @@
     private void RecomputeSummary() => _summary = WidgetPanelState.Summarise(
     [
         new WidgetSourceOutcome(SrcVacancies, true, _vacanciesRes.IsFailed, _openVacancies),
-        new WidgetSourceOutcome(SrcPipeline, true, _pipelineRes.IsFailed, _newApplications),
+        new WidgetSourceOutcome(SrcPipeline, true, _newApplicationsRes.IsFailed, _newApplications),
+        new WidgetSourceOutcome(SrcCandidates, true, _candidatesRes.IsFailed, _candidatesInProgress),
         new WidgetSourceOutcome(SrcInterviews, true, _interviewsRes.IsFailed, _interviewsRequiringAction),
         new WidgetSourceOutcome(SrcOffers, true, _offersRes.IsFailed, _offersAwaitingResponse),
         new WidgetSourceOutcome(SrcStale, true, _staleRes.IsFailed, _staleVacancies),
@@ -277,18 +300,26 @@
                 break;
 
             case SrcPipeline:
-                // "New applications" = application count in the first (entry) non-terminal stage.
-                _pipelineRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
-                    () => VacancyService.GetPipelineSummaryOrThrowAsync(Session.CompanyId));
-                var pipeline = _pipelineRes.IsLoaded ? _pipelineRes.Value?.Items ?? [] : [];
-                _newApplications = pipeline.FirstOrDefault()?.ApplicationCount ?? 0;
-                _candidatesInProgress = pipeline.Sum(p => p.ApplicationCount);
+                // DSH-04: authoritative "new applications" — live applications whose current stage
+                // carries purpose = NewApplication (time-based fallback server-side when none does).
+                _newApplicationsRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
+                    () => VacancyService.GetNewApplicationsMetricOrThrowAsync(Session.CompanyId));
+                _newApplications = _newApplicationsRes.IsLoaded ? _newApplicationsRes.Value?.Count ?? 0 : 0;
+                break;
+
+            case SrcCandidates:
+                // DSH-04: authoritative "candidates in progress" — live applications in any
+                // non-terminal stage. Own tracked source so a failure doesn't break the header line.
+                _candidatesRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
+                    () => VacancyService.GetCandidatesInProgressMetricOrThrowAsync(Session.CompanyId));
+                _candidatesInProgress = _candidatesRes.IsLoaded ? _candidatesRes.Value?.Count ?? 0 : 0;
                 break;
 
             case SrcInterviews:
-                // Today's scheduled interview count is the closest available "needs action" proxy.
+                // DSH-04: authoritative "interviews requiring action" — interviews with a Pending
+                // outcome scheduled at or before end of today (overdue + today's already-happened).
                 _interviewsRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
-                    () => InterviewService.GetInterviewsTodayCountOrThrowAsync(Session.CompanyId));
+                    () => InterviewService.GetInterviewsRequiringActionMetricOrThrowAsync(Session.CompanyId));
                 _interviewsRequiringAction = _interviewsRes.IsLoaded ? _interviewsRes.Value?.Count ?? 0 : 0;
                 break;
 
@@ -299,20 +330,14 @@
                 break;
 
             case SrcOffers:
-                // Mirrors OffersAwaitingResponseWidget: the last active non-terminal stage (by
-                // DisplayOrder) is the server-side definition of "Offer". Two calls, one outcome.
-                _offersRes = await SourceLoader.LoadAsync(SummaryWidgetName, name, async () =>
-                {
-                    var stages = (await RecruitmentStageService.ListStagesOrThrowAsync(Session.CompanyId))?.Items ?? [];
-                    var offerStageId = stages
-                        .Where(s => s.IsActive && !s.IsTerminal)
-                        .OrderByDescending(s => s.DisplayOrder)
-                        .FirstOrDefault()?.Id;
-                    if (offerStageId is not { } offerId) return 0;
-                    var offersResult = await ApplicationService.GetApplicationsByStatusOrThrowAsync(Session.CompanyId, offerId);
-                    return offersResult?.Items.Count ?? 0;
-                });
-                _offersAwaitingResponse = _offersRes.IsLoaded ? _offersRes.Value : 0;
+                // DSH-04: authoritative "offers awaiting response" — live applications whose current
+                // stage carries purpose = Offer (summed across every Offer-purpose stage). No
+                // order-based fallback: if no stage has that purpose the count is 0 and the tile is
+                // rendered muted with a "No offer stage configured" hint.
+                _offersRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
+                    () => VacancyService.GetOffersAwaitingResponseMetricOrThrowAsync(Session.CompanyId));
+                _offersAwaitingResponse = _offersRes.IsLoaded ? _offersRes.Value?.Count ?? 0 : 0;
+                _offerStageConfigured = !_offersRes.IsLoaded || (_offersRes.Value?.OfferStageConfigured ?? true);
                 break;
         }
 
@@ -326,6 +351,44 @@
         RecomputeSummary();
         _retrying.Remove(name);
     }
+
+    private static RecruitmentMetricDrillDownRow Row(RecruitmentMetricApplicationItem i) =>
+        new(i.CandidateName, i.VacancyTitle, i.AppliedAt.LocalDateTime);
+
+    private void OpenDrillDown(string source)
+    {
+        switch (source)
+        {
+            case SrcPipeline:
+                _drillDownTitle = SrcPipeline;
+                _drillDownDateHeader = "Applied";
+                _drillDownRows = (_newApplicationsRes.Value?.Items ?? []).Select(Row).ToList();
+                break;
+            case SrcCandidates:
+                _drillDownTitle = SrcCandidates;
+                _drillDownDateHeader = "Applied";
+                _drillDownRows = (_candidatesRes.Value?.Items ?? []).Select(Row).ToList();
+                break;
+            case SrcInterviews:
+                _drillDownTitle = SrcInterviews;
+                _drillDownDateHeader = "Scheduled";
+                _drillDownRows = (_interviewsRes.Value?.Items ?? [])
+                    .Select(i => new RecruitmentMetricDrillDownRow(i.CandidateName, i.VacancyTitle, i.ScheduledAt.LocalDateTime))
+                    .ToList();
+                break;
+            case SrcOffers:
+                _drillDownTitle = SrcOffers;
+                _drillDownDateHeader = "Applied";
+                _drillDownRows = (_offersRes.Value?.Items ?? []).Select(Row).ToList();
+                break;
+            default:
+                return;
+        }
+
+        _drillDownVisible = true;
+    }
+
+    private void CloseDrillDown() => _drillDownVisible = false;
 
     private string HeaderSummary() =>
         $"{Pluralize(_openVacancies, "open vacancy", "open vacancies")} · " +

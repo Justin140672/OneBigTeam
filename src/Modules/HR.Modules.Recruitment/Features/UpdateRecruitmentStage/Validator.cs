@@ -15,5 +15,14 @@ internal sealed class UpdateRecruitmentStageValidator : AbstractValidator<Update
 
         RuleFor(r => r.TerminalOutcome)
             .IsInEnum();
+
+        RuleFor(r => r.Purpose)
+            .IsInEnum()
+            .When(r => r.Purpose.HasValue);
+
+        RuleFor(r => r.Purpose)
+            .Null()
+            .When(r => r.IsTerminal)
+            .WithMessage("A terminal recruitment stage cannot have a purpose.");
     }
 }

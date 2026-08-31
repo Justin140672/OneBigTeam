@@ -43,6 +43,11 @@ internal sealed class RecruitmentStageConfiguration : IEntityTypeConfiguration<R
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(s => s.Purpose)
+            .HasColumnName("purpose")
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
         builder.Property(s => s.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
@@ -52,6 +57,7 @@ internal sealed class RecruitmentStageConfiguration : IEntityTypeConfiguration<R
             .IsRequired();
 
         builder.HasIndex(s => s.CompanyId);
+        builder.HasIndex(s => new { s.CompanyId, s.Purpose });
         builder.HasIndex(s => new { s.CompanyId, s.Name }).IsUnique();
         builder.HasIndex(s => new { s.CompanyId, s.DisplayOrder }).IsUnique();
     }

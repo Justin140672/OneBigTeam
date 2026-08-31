@@ -449,7 +449,8 @@ internal sealed record RecruitmentStageCreatedAuditEvent(
 internal sealed record RecruitmentStageAuditSnapshot(
     string Name,
     bool IsTerminal,
-    Domain.RecruitmentStageTerminalOutcome TerminalOutcome);
+    Domain.RecruitmentStageTerminalOutcome TerminalOutcome,
+    Domain.RecruitmentStagePurpose? Purpose);
 
 internal sealed record RecruitmentStageUpdatedAuditEvent(
     Guid CompanyId,

@@ -15,7 +15,7 @@
 }
 else
 {
-    <a href="@Href" role="listitem"
+    <a href="@Href" role="listitem" title="@Title"
        class="widget-kpi widget-kpi--link @(IsZero ? "text-muted" : "")"
        aria-label="@($"{Label}: {Value}")"
        @onclick="HandleClick" @onclick:preventDefault="true">
@@ -30,6 +30,7 @@ else
     [Parameter] public string Href { get; set; } = "#";
     [Parameter] public bool Muted { get; set; }
     [Parameter] public bool Failed { get; set; }
+    [Parameter] public string? Title { get; set; }
     [Parameter] public EventCallback OnClick { get; set; }
 
     private bool IsZero => Muted || Value == 0;

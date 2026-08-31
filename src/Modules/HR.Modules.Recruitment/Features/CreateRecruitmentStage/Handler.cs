@@ -55,7 +55,8 @@ internal sealed class CreateRecruitmentStageHandler(
             request.DisplayOrder,
             request.IsTerminal,
             request.TerminalOutcome,
-            now);
+            now,
+            request.Purpose);
 
         db.RecruitmentStages.Add(stage);
         await db.SaveChangesAsync(cancellationToken);
@@ -73,6 +74,7 @@ internal sealed class CreateRecruitmentStageHandler(
             stage.IsActive,
             stage.IsTerminal,
             stage.TerminalOutcome,
+            stage.Purpose,
             stage.CreatedAt,
             stage.UpdatedAt));
     }

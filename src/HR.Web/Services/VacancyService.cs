@@ -97,6 +97,38 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
         Http.GetFromJsonAsync<GetPipelineSummaryResponse>(
             $"api/companies/{companyId}/recruitment/pipeline-summary", HrApiJsonOptions.Default, cancellationToken);
 
+    // ── DSH-04 authoritative recruitment dashboard metrics ──────────────────
+    // Non-swallowing (DSH-03 style): let HttpRequestException surface so WidgetSourceLoader records
+    // a failed source rather than a misleading 0.
+    public Task<NewApplicationsMetricResponse?> GetNewApplicationsMetricOrThrowAsync(
+        Guid companyId, CancellationToken cancellationToken = default) =>
+        Http.GetFromJsonAsync<NewApplicationsMetricResponse>(
+            $"api/companies/{companyId}/recruitment/metrics/new-applications", HrApiJsonOptions.Default, cancellationToken);
+
+    public Task<CandidatesInProgressMetricResponse?> GetCandidatesInProgressMetricOrThrowAsync(
+        Guid companyId, CancellationToken cancellationToken = default) =>
+        Http.GetFromJsonAsync<CandidatesInProgressMetricResponse>(
+            $"api/companies/{companyId}/recruitment/metrics/candidates-in-progress", HrApiJsonOptions.Default, cancellationToken);
+
+    public Task<OffersAwaitingResponseMetricResponse?> GetOffersAwaitingResponseMetricOrThrowAsync(
+        Guid companyId, CancellationToken cancellationToken = default) =>
+        Http.GetFromJsonAsync<OffersAwaitingResponseMetricResponse>(
+            $"api/companies/{companyId}/recruitment/metrics/offers-awaiting-response", HrApiJsonOptions.Default, cancellationToken);
+
+    // Swallowing sibling for non-DSH-03 consumers (OffersAwaitingResponseWidget).
+    public async Task<OffersAwaitingResponseMetricResponse?> GetOffersAwaitingResponseMetricAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetOffersAwaitingResponseMetricOrThrowAsync(companyId, cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
     public async Task<GetVacancyResponse?> GetVacancyAsync(Guid companyId, Guid id)
     {
         try

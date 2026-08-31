@@ -58,6 +58,22 @@
                                     "Hired" and exactly one active stage must be marked "Rejected".
                                 </div>
                             </div>
+                            @if (!Model.IsTerminal)
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label">Purpose</label>
+                                    <SfDropDownList TValue="RecruitmentStagePurpose?" TItem="PurposeOption"
+                                                    DataSource="@_purposeOptions"
+                                                    @bind-Value="Model.Purpose">
+                                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                                    </SfDropDownList>
+                                    <div class="form-text">
+                                        Tags this stage as the one recruitment dashboard metrics count for
+                                        new applications, interviews or offers. Optional; more than one stage
+                                        may share a purpose. Terminal stages cannot have a purpose.
+                                    </div>
+                                </div>
+                            }
                         </div>
                     </div>
 
@@ -105,6 +121,16 @@
         new(RecruitmentStageTerminalOutcome.Rejected, "Rejected"),
     ];
 
+    // Optional dropdown — "None" (null) is an explicit, meaningful list item ("no metric meaning"),
+    // not a placeholder, so no ShowClearButton, per this codebase's dropdown convention.
+    private static readonly PurposeOption[] _purposeOptions =
+    [
+        new(null, "None"),
+        new(RecruitmentStagePurpose.NewApplication, "New application"),
+        new(RecruitmentStagePurpose.Interview, "Interview"),
+        new(RecruitmentStagePurpose.Offer, "Offer"),
+    ];
+
     protected override IEditService<RecruitmentStageEditModel, Guid> Service => RecruitmentStageService;
     protected override Guid GetCompanyId() => CompanyId;
     protected override Guid? GetId() => Id;
@@ -122,4 +148,6 @@
     }
 
     private sealed record Option(RecruitmentStageTerminalOutcome Value, string Label);
+
+    private sealed record PurposeOption(RecruitmentStagePurpose? Value, string Label);
 }

@@ -19,6 +19,13 @@ internal sealed class RecruitmentStage
     public bool IsActive { get; private set; }
     public bool IsTerminal { get; private set; }
     public RecruitmentStageTerminalOutcome TerminalOutcome { get; private set; }
+
+    /// <summary>
+    /// DSH-04: optional explicit metric role for this stage (see <see cref="RecruitmentStagePurpose"/>).
+    /// Always <c>null</c> for terminal stages.
+    /// </summary>
+    public RecruitmentStagePurpose? Purpose { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -29,7 +36,8 @@ internal sealed class RecruitmentStage
         int displayOrder,
         bool isTerminal,
         RecruitmentStageTerminalOutcome terminalOutcome,
-        DateTimeOffset now) => new()
+        DateTimeOffset now,
+        RecruitmentStagePurpose? purpose = null) => new()
     {
         Id              = id,
         CompanyId       = companyId,
@@ -38,6 +46,7 @@ internal sealed class RecruitmentStage
         IsActive        = true,
         IsTerminal      = isTerminal,
         TerminalOutcome = isTerminal ? terminalOutcome : RecruitmentStageTerminalOutcome.None,
+        Purpose         = isTerminal ? null : purpose,
         CreatedAt       = now,
         UpdatedAt       = now,
     };
@@ -46,11 +55,13 @@ internal sealed class RecruitmentStage
         string name,
         bool isTerminal,
         RecruitmentStageTerminalOutcome terminalOutcome,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        RecruitmentStagePurpose? purpose = null)
     {
         Name            = name.Trim();
         IsTerminal      = isTerminal;
         TerminalOutcome = isTerminal ? terminalOutcome : RecruitmentStageTerminalOutcome.None;
+        Purpose         = isTerminal ? null : purpose;
         UpdatedAt       = now;
     }
 

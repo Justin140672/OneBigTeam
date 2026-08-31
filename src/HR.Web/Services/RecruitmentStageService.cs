@@ -100,6 +100,7 @@ public sealed class RecruitmentStageService(IHttpClientFactory httpClientFactory
         {
             Name = existing.Name,
             TerminalOutcome = existing.TerminalOutcome,
+            Purpose = existing.Purpose,
         };
     }
 
@@ -111,7 +112,8 @@ public sealed class RecruitmentStageService(IHttpClientFactory httpClientFactory
         var existingCount = (await ListStagesAsync(companyId))?.Items.Count ?? 0;
 
         var request = new CreateRecruitmentStageRequest(
-            companyId, model.Name.Trim(), existingCount + 1, model.IsTerminal, model.TerminalOutcome);
+            companyId, model.Name.Trim(), existingCount + 1, model.IsTerminal, model.TerminalOutcome,
+            model.IsTerminal ? null : model.Purpose);
 
         var (created, error) = await CreateAsync(companyId, request);
         return (created is null ? null : model, error);
@@ -121,7 +123,8 @@ public sealed class RecruitmentStageService(IHttpClientFactory httpClientFactory
         Guid companyId, Guid id, RecruitmentStageEditModel model)
     {
         var request = new UpdateRecruitmentStageRequest(
-            companyId, id, model.Name.Trim(), model.IsTerminal, model.TerminalOutcome);
+            companyId, id, model.Name.Trim(), model.IsTerminal, model.TerminalOutcome,
+            model.IsTerminal ? null : model.Purpose);
 
         var (updated, error) = await UpdateAsync(companyId, id, request);
         return (updated is null ? null : model, error);

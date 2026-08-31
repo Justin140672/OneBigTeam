@@ -10,4 +10,5 @@ internal sealed record UpdateRecruitmentStageResponse(
     bool IsActive,
     bool IsTerminal,
     RecruitmentStageTerminalOutcome TerminalOutcome,
+    RecruitmentStagePurpose? Purpose,
     DateTimeOffset UpdatedAt);
