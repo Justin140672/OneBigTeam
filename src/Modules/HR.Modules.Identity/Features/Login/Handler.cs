@@ -38,8 +38,9 @@ internal sealed class LoginHandler(
             // response (SignInWithPasswordAsync includes the raw response body in ex.Message) is
             // logged server-side, since "invalid email or password" alone doesn't distinguish a
             // genuine bad-credentials case from an unverified gateway assumption misfiring (see
-            // the several UNVERIFIED comments elsewhere in SupabaseAuthGateway).
-            logger.LogWarning(ex, "Login failed at Supabase sign-in for {Email}", request.Email);
+            // the several UNVERIFIED comments elsewhere in SupabaseAuthGateway). SignInWithPasswordAsync
+            // now redacts tokens/links from ex.Message, and the email is masked before logging.
+            logger.LogWarning(ex, "Login failed at Supabase sign-in for {Email}", SensitiveDataScrubber.MaskEmail(request.Email));
             return Result.Failure<LoginResponse>(Error.Validation("Invalid email or password."));
         }
 
@@ -53,7 +54,7 @@ internal sealed class LoginHandler(
             // Supabase identity through with no local profile for downstream code to resolve.
             logger.LogWarning(
                 "Login succeeded at Supabase but found no matching UserProfile for {Email} (Supabase user id {SupabaseUserId})",
-                request.Email, session.UserId);
+                SensitiveDataScrubber.MaskEmail(request.Email), session.UserId);
             return Result.Failure<LoginResponse>(Error.Validation("Invalid email or password."));
         }
 
@@ -77,7 +78,7 @@ internal sealed class LoginHandler(
         {
             logger.LogWarning(
                 "Login succeeded at Supabase and resolved a UserProfile for {Email}, but the account has no roles — rejecting as invalid",
-                request.Email);
+                SensitiveDataScrubber.MaskEmail(request.Email));
             return Result.Failure<LoginResponse>(Error.Validation("Invalid email or password."));
         }
 

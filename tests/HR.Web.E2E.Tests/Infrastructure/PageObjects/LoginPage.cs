@@ -191,6 +191,27 @@ public sealed class LoginPage(IPage page, string baseUrl)
         await LoginAsync(email, password);
     }
 
+    /// <summary>
+    /// The compact legal / trust link row rendered beneath the login form
+    /// (<c>&lt;nav aria-label="Legal and policies"&gt;</c> in Login.razor). Returns the visible
+    /// link text paired with its resolved <c>href</c>, in document order.
+    /// </summary>
+    public async Task<IReadOnlyList<(string Text, string Href)>> GetLegalLinksAsync()
+    {
+        var links = page.Locator("[data-testid='login-legal'] a");
+        var count = await links.CountAsync();
+        var result = new List<(string, string)>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var link = links.Nth(i);
+            var text = (await link.InnerTextAsync()).Trim();
+            var href = await link.GetAttributeAsync("href") ?? string.Empty;
+            result.Add((text, href));
+        }
+
+        return result;
+    }
+
     public async Task SwitchPersonaAsync(string personaNameFragment)
     {
         // Dev-mode topbar persona switcher — Syncfusion SfDropDownList, see DropDownSelector.

@@ -1,84 +1,86 @@
+using Microsoft.Extensions.Hosting;
+
 namespace HR.Web.Services;
 
-// Scoped (per-Blazor-Server-circuit) holder for the real Supabase access token established by the
-// /verify-email minimal API endpoint (see Program.cs). Blazor Server's interactive circuit is a
-// long-lived SignalR connection, not a sequence of ordinary HTTP requests — IHttpContextAccessor's
-// HttpContext is only populated during the initial (pre-render / circuit-establishing) HTTP
-// request, not during subsequent interactive event handling. So the access token is read once,
-// here, from the auth cookie during that initial request and cached for the lifetime of the DI
-// scope (== the circuit), rather than re-read from IHttpContextAccessor on every hrapi call.
+// Scoped (per-Blazor-Server-circuit) holder for the real Supabase access token. The token is
+// established by a real HTTP request/response hop (/login-complete, /dev/persona-cookie — see
+// Program.cs) which sets a Secure, HttpOnly cookie; it is NEVER carried in a URL query parameter
+// (see AuthHandoffStore for why the cross-hop value is an opaque single-use code instead).
 //
-// SupabaseAuthDelegatingHandler (registered on the "hrapi" HttpClient) reads AccessToken from this
-// accessor and attaches it as a Bearer token on every outgoing request, so HR.Api's real (non-Dev)
-// JWT Bearer authentication — and SupabaseCurrentUserResolutionMiddleware downstream of it — can
-// resolve the real authenticated user. In Development, HR.Api's DevAuthHandler ignores the
-// Authorization header entirely, so this has no effect on the existing dev-persona flow.
+// Blazor Server's interactive circuit is a long-lived SignalR connection, not a sequence of
+// ordinary HTTP requests — IHttpContextAccessor.HttpContext is only populated during the initial
+// (pre-render / circuit-establishing) HTTP request, not during later interactive event handling.
+// So the cookie is read once, here, during that initial request (forced by an early middleware in
+// Program.cs) and cached for the lifetime of the DI scope (== the circuit). The post-authentication
+// hard navigation to "/" starts a brand-new circuit whose initial request carries the freshly set
+// cookie, so the new circuit caches the real token.
+//
+// SupabaseAuthDelegatingHandler (registered on the "hrapi" HttpClient) reads AccessToken from here
+// and attaches it as a Bearer token on every outgoing request.
 public sealed class SupabaseSessionAccessor(IHttpContextAccessor httpContextAccessor)
 {
     public const string CookieName = "obt_supabase_at";
 
     private string? _accessToken;
-    private bool _initializedFromUrl;
+    private bool _captured;
 
     public string? AccessToken
     {
         get
         {
-            // Confirmed via live diagnosis: Blazor Server's persistent circuit can survive a full
-            // browser navigation, keeping this SAME scoped instance alive from before any session
-            // cookie existed — IHttpContextAccessor.HttpContext is never reliably available again on
-            // that circuit afterward to re-read it. Routes.razor's Initialize(...) — driven by
-            // NavigationManager.Uri, which IS reliably available inside the circuit — is the source
-            // of truth once a real session has been established; this HttpContext-based read is only
-            // a fallback for plain-HTTP-request code paths that run before any circuit exists.
-            if (_initializedFromUrl)
+            if (_captured)
                 return _accessToken;
 
-            return httpContextAccessor.HttpContext?.Request.Cookies[CookieName];
+            var fromCookie = httpContextAccessor.HttpContext?.Request.Cookies[CookieName];
+            if (fromCookie is not null)
+            {
+                _accessToken = fromCookie;
+                _captured = true;
+            }
+
+            return _accessToken;
         }
     }
 
     /// <summary>
-    /// Sets the token from the "st" query-string parameter Routes.razor reads on arrival at "/"
-    /// (see /dev/persona-cookie and /login-complete in Program.cs) — the one value proven reliable
-    /// across this circuit's whole lifetime, unlike a cookie re-read via HttpContext.
+    /// Sets the Secure, HttpOnly Supabase access-token session cookie on the current response.
+    /// Shared by every place that establishes a real Supabase session from a minimal API endpoint
+    /// (the /login-complete real sign-in flow and /dev/persona-cookie). Blazor Server's interactive
+    /// circuit cannot set cookies mid-response, so both flows must go through a plain HTTP
+    /// request/response endpoint like this one.
     /// </summary>
-    public void Initialize(string accessToken)
-    {
-        _accessToken = accessToken;
-        _initializedFromUrl = true;
-    }
-
-    /// <summary>
-    /// Sets the HttpOnly Supabase access-token session cookie on the current response. Shared by
-    /// every place that establishes a real Supabase session from a minimal API endpoint (the
-    /// /login-complete real sign-in flow, and /dev/persona-cookie used by the dev persona switcher)
-    /// — Blazor Server's interactive circuit cannot set cookies mid-response, so both flows must go
-    /// through a plain HTTP request/response endpoint like this one. Deliberately NOT used by
-    /// /verify-email-complete — see that endpoint's remarks in Program.cs.
-    /// </summary>
-    public static void SetSessionCookie(HttpContext context, string accessToken, int expiresInSeconds)
+    public static void SetSessionCookie(HttpContext context, string accessToken, int expiresInSeconds, IHostEnvironment environment)
     {
         context.Response.Cookies.Append(CookieName, accessToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure = context.Request.IsHttps,
+            // Always Secure outside Development. In Development the site may still be plain-http
+            // localhost, where a Secure cookie would simply be dropped by the browser.
+            Secure = !environment.IsDevelopment() || context.Request.IsHttps,
+            // Lax (not Strict): the post-authentication landing is reached via a top-level GET
+            // navigation/redirect that must still carry the cookie. Lax allows that while still
+            // blocking the cookie on cross-site sub-resource and POST requests (CSRF surface).
             SameSite = SameSiteMode.Lax,
             Expires = DateTimeOffset.UtcNow.AddSeconds(expiresInSeconds),
             Path = "/",
+            IsEssential = true,
         });
     }
 
     /// <summary>
-    /// Deletes the Supabase access-token session cookie set by <see cref="SetSessionCookie"/>. Used
-    /// by the "/logout" minimal API endpoint (see Program.cs) — same "must be a real HTTP
-    /// request/response, not mid-circuit" constraint as SetSessionCookie itself.
+    /// Deletes the Supabase access-token session cookie. Used by the "/logout" minimal API endpoint
+    /// (see Program.cs). The delete options must mirror the attributes the cookie was written with
+    /// or some browsers will not clear it.
     /// </summary>
-    public static void ClearSessionCookie(HttpContext context)
+    public static void ClearSessionCookie(HttpContext context, IHostEnvironment environment)
     {
         context.Response.Cookies.Delete(CookieName, new CookieOptions
         {
+            HttpOnly = true,
+            Secure = !environment.IsDevelopment() || context.Request.IsHttps,
+            SameSite = SameSiteMode.Lax,
             Path = "/",
+            IsEssential = true,
         });
     }
 }

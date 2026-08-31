@@ -115,6 +115,39 @@
     margin-top: 8px;
 }
 
+.login-legal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-top: 28px;
+    padding-top: 18px;
+    border-top: 1px solid #e5e7eb;
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
+.login-legal a {
+    color: #6b7280;
+    text-decoration: none;
+}
+
+.login-legal a:hover {
+    text-decoration: underline;
+}
+
+.login-legal a:focus-visible {
+    outline: 2px solid #00806a;
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+@media (max-width: 480px) {
+    .login-legal {
+        font-size: 0.75rem;
+        gap: 6px 10px;
+    }
+}
+
 /* This page is deliberately light-only (the card above is hardcoded to a white background,
    never adapting to dark mode) — but the SfTextBox inputs don't know that: App.razor's
    theme-detection script runs on every page including this one and defaults to dark based on

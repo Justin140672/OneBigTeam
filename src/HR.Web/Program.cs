@@ -2,6 +2,7 @@ using HR.Web.Components;
 using HR.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Syncfusion.Blazor;
 
 // See HR.Api/Program.cs's identical call for the full rationale — raises the .NET ThreadPool's
@@ -19,6 +20,11 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options => options.DetailedErrors = builder.Environment.IsDevelopment());
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.TryAddSingleton(TimeProvider.System);
+// Process-wide, in-memory, single-use exchange store used to hand a freshly established Supabase
+// session from the interactive circuit to the real HTTP hop that sets the session cookie, WITHOUT
+// ever putting a token in a URL (security ticket: remove auth tokens from browser-visible URLs).
+builder.Services.AddSingleton<AuthHandoffStore>();
 builder.Services.AddScoped<SupabaseSessionAccessor>();
 builder.Services.AddScoped<SupportSessionState>();
 builder.Services.AddTransient<SupabaseAuthDelegatingHandler>();
@@ -169,11 +175,11 @@ app.Use(async (context, next) =>
     }
 });
 
-// Forces SupabaseSessionAccessor to read the obt_supabase_at cookie right now, while HttpContext
-// is guaranteed available (this middleware runs for every real HTTP request). Without this,
-// SupabaseSessionAccessor's lazy first-access read could happen only once Blazor Server's
-// interactive circuit has taken over (a live SignalR connection, not an HTTP request), at which
-// point HttpContext is null and the token would be cached as missing for the whole circuit.
+// Forces SupabaseSessionAccessor to capture the obt_supabase_at cookie now, while HttpContext is
+// guaranteed available (this middleware runs for every real HTTP request). Without this, the
+// scoped accessor's first read could otherwise happen only once Blazor Server's interactive
+// circuit has taken over (a live SignalR connection, not an HTTP request), at which point
+// HttpContext is null and no token would ever be attached to hrapi calls on that circuit.
 app.Use(async (context, next) =>
 {
     _ = context.RequestServices.GetRequiredService<SupabaseSessionAccessor>().AccessToken;
@@ -189,21 +195,25 @@ app.Use(async (context, next) =>
 // as a normal query string, which *does* reach the server. Keep this endpoint doing nothing else —
 // no HttpContext/cookie work happens here, since a fragment-only request has nothing to act on
 // until the follow-up request arrives.
+// The Supabase verification redirect lands here with the session in the URL *fragment*
+// (#access_token=...), which is browser-only and never sent to the server. This tiny page moves
+// that token to the server via a POST body (a hidden form field) — never a query string — so it
+// cannot leak through browser history, referrer headers, proxy logs or a screenshot.
 app.MapGet("/verify-email", () => Results.Content("""
     <!DOCTYPE html>
     <html>
     <head><title>Confirming your account…</title></head>
     <body>
+    <form id="f" method="post" action="/verify-email-complete">
+        <input type="hidden" name="access_token" id="access_token" />
+    </form>
     <script>
         var params = new URLSearchParams(window.location.hash.slice(1));
         var accessToken = params.get('access_token');
         if (accessToken) {
-            var query = new URLSearchParams({
-                access_token: accessToken,
-                refresh_token: params.get('refresh_token') || '',
-                expires_in: params.get('expires_in') || ''
-            });
-            window.location.replace('/verify-email-complete?' + query.toString());
+            document.getElementById('access_token').value = accessToken;
+            history.replaceState(null, '', '/verify-email');
+            document.getElementById('f').submit();
         } else {
             window.location.replace('/verify-email-error');
         }
@@ -226,10 +236,13 @@ app.MapGet("/verify-email", () => Results.Content("""
 // different signed-in user (e.g. a dev persona) that a Blazor Server circuit is still holding onto,
 // this hop can land the visitor in THAT other account instead of the one they just verified.
 // Requiring an explicit login here sidesteps the whole stale-session/circuit-reuse class of bug.
-app.MapGet("/verify-email-complete", async (
-    string? access_token,
+app.MapPost("/verify-email-complete", async (
+    HttpContext context,
     IHttpClientFactory httpClientFactory) =>
 {
+    var form = await context.Request.ReadFormAsync();
+    var access_token = form["access_token"].ToString();
+
     if (string.IsNullOrWhiteSpace(access_token))
     {
         return Results.Redirect("/verify-email-error");
@@ -265,44 +278,90 @@ app.MapGet("/verify-email-complete", async (
 // can show its own "this link is invalid or has expired" message with reset-password-specific
 // copy and a link back to /forgot-password, instead of reusing /verify-email-error's mismatched
 // wording.
+// Supabase's password-recovery redirect — same implicit/fragment flow as /verify-email. The
+// recovery access token arrives in the URL fragment; this page POSTs it to the server (never a
+// query string), where /reset-password-begin swaps it for an opaque single-use handoff code and
+// redirects to the reset form carrying only that code.
 app.MapGet("/reset-password", () => Results.Content("""
     <!DOCTYPE html>
     <html>
     <head><title>Confirming your request…</title></head>
     <body>
+    <form id="f" method="post" action="/reset-password-begin">
+        <input type="hidden" name="access_token" id="access_token" />
+    </form>
     <script>
         var params = new URLSearchParams(window.location.hash.slice(1));
-        var accessToken = params.get('access_token') || '';
-        window.location.replace('/reset-password-complete?access_token=' + encodeURIComponent(accessToken));
+        document.getElementById('access_token').value = params.get('access_token') || '';
+        history.replaceState(null, '', '/reset-password');
+        document.getElementById('f').submit();
     </script>
     </body>
     </html>
     """, "text/html")).AllowAnonymous();
+
+app.MapPost("/reset-password-begin", async (HttpContext context, AuthHandoffStore handoffStore) =>
+{
+    var form = await context.Request.ReadFormAsync();
+    var accessToken = form["access_token"].ToString();
+
+    if (string.IsNullOrWhiteSpace(accessToken))
+        return Results.Redirect("/reset-password-complete");
+
+    var code = handoffStore.Issue(new AuthHandoffStore.Session(accessToken, string.Empty, 3600));
+    return Results.Redirect($"/reset-password-complete?code={Uri.EscapeDataString(code)}");
+}).AllowAnonymous();
 
 // The real (non-dev-gated) counterpart to /dev/persona-cookie below, for Login.razor's genuine
 // Supabase sign-in (HR.Modules.Identity's Login feature, POST /api/login). Same constraint as
 // /verify-email-complete/dev/persona-cookie: Blazor Server's interactive circuit can't set cookies
 // mid-render, so this must be a real browser navigation reached via hardNavigate — Login.razor
 // already has the tokens by the time it calls this, having gotten them from api/login itself.
-app.MapGet("/login-complete", (HttpContext context, string accessToken, int expiresIn) =>
+app.MapGet("/login-complete", (HttpContext context, AuthHandoffStore handoffStore, IHostEnvironment environment, string? code) =>
 {
-    if (string.IsNullOrWhiteSpace(accessToken))
-        return Results.BadRequest();
+    var session = handoffStore.Redeem(code);
+    if (session is null)
+        return Results.Redirect("/login?error=session");
 
-    SupabaseSessionAccessor.SetSessionCookie(context, accessToken, expiresIn);
+    SupabaseSessionAccessor.SetSessionCookie(context, session.AccessToken, session.ExpiresInSeconds, environment);
 
-    // See /dev/persona-cookie's remarks (and Routes.razor) for why the token is also carried one
-    // hop further via the URL, not just the cookie.
-    return Results.Redirect($"/?st={Uri.EscapeDataString(accessToken)}&se={expiresIn}");
+    // Redirect to a clean URL — no token, no code, nothing to bookmark, share or leak. The fresh
+    // circuit created by this hard navigation reads the session from the cookie (see
+    // SupabaseSessionAccessor and the early middleware in this file).
+    return Results.Redirect("/");
 }).AllowAnonymous();
 
 // Clears the Supabase session cookie and returns to /login. Same "must be a real HTTP
 // request/response, not mid-circuit" constraint as /login-complete above — MainLayout.razor's
 // logout button (top bar, and the blocking first-login "Complete your employee profile" dialog)
 // must navigate here via app.js's hardNavigate, not NavigationManager.NavigateTo.
-app.MapGet("/logout", (HttpContext context) =>
+app.MapGet("/logout", async (
+    HttpContext context,
+    IHostEnvironment environment,
+    IHttpClientFactory httpClientFactory,
+    ILoggerFactory loggerFactory) =>
 {
-    SupabaseSessionAccessor.ClearSessionCookie(context);
+    // Best-effort server-side session revocation: HR.Api's POST /api/logout calls Supabase's GoTrue
+    // logout (scope=global) using the bearer the "hrapi" client attaches from the session cookie.
+    // Any failure here (network, GoTrue down, token already expired) must NOT block sign-out — the
+    // cookie is cleared regardless, so the browser session ends either way.
+    try
+    {
+        var http = httpClientFactory.CreateClient("hrapi");
+        using var response = await http.PostAsync("api/logout", content: null, context.RequestAborted);
+        if (!response.IsSuccessStatusCode)
+        {
+            loggerFactory.CreateLogger("HR.Web.Logout")
+                .LogWarning("Server-side sign-out returned {StatusCode}; clearing the cookie anyway.", (int)response.StatusCode);
+        }
+    }
+    catch (Exception ex)
+    {
+        loggerFactory.CreateLogger("HR.Web.Logout")
+            .LogWarning(ex, "Server-side sign-out call failed; clearing the cookie anyway.");
+    }
+
+    SupabaseSessionAccessor.ClearSessionCookie(context, environment);
     return Results.Redirect("/login");
 }).AllowAnonymous();
 
@@ -317,21 +376,14 @@ app.MapGet("/logout", (HttpContext context) =>
 // only set a cookie on that throwaway HttpClient, never on the user's browser.
 if (app.Environment.IsDevelopment())
 {
-    app.MapGet("/dev/persona-cookie", (HttpContext context, string accessToken, int expiresIn) =>
+    app.MapGet("/dev/persona-cookie", (HttpContext context, AuthHandoffStore handoffStore, IHostEnvironment environment, string? code) =>
     {
-        if (string.IsNullOrWhiteSpace(accessToken))
-            return Results.BadRequest();
+        var session = handoffStore.Redeem(code);
+        if (session is null)
+            return Results.Redirect("/login?error=session");
 
-        SupabaseSessionAccessor.SetSessionCookie(context, accessToken, expiresIn);
-
-        // Carries the token one hop further via the URL, not just the cookie — confirmed (via
-        // extensive live diagnosis) that Blazor Server's persistent circuit can survive a full
-        // browser navigation, keeping its own SupabaseSessionAccessor instance alive from BEFORE the
-        // cookie existed; IHttpContextAccessor.HttpContext is never available again on that circuit
-        // to re-read it. NavigationManager.Uri, unlike HttpContext, IS reliably available inside an
-        // interactive circuit — Routes.razor reads this query string on arrival and scrubs it
-        // immediately after (see its remarks).
-        return Results.Redirect($"/?st={Uri.EscapeDataString(accessToken)}&se={expiresIn}");
+        SupabaseSessionAccessor.SetSessionCookie(context, session.AccessToken, session.ExpiresInSeconds, environment);
+        return Results.Redirect("/");
     }).AllowAnonymous();
 }
 

@@ -5,6 +5,8 @@
 @inject AuthService Auth
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject IConfiguration Configuration
+@inject HR.Web.Services.AuthHandoffStore HandoffStore
 
 <PageTitle>Sign in — One Big Team</PageTitle>
 
@@ -81,9 +83,20 @@
             Login
         </SfButton>
     </EditForm>
+
+    <nav class="login-legal" aria-label="Legal and policies" data-testid="login-legal">
+        <a href="@($"{MarketingBaseUrl}/privacy-policy")">Privacy Policy</a>
+        <a href="@($"{MarketingBaseUrl}/acceptable-use-policy")">Acceptable Use</a>
+        <a href="@($"{MarketingBaseUrl}/cookie-policy")">Cookies and browser storage</a>
+        <a href="@($"{MarketingBaseUrl}/terms-of-service")">Terms of Service</a>
+        <a href="@($"{MarketingBaseUrl}/security")">Security</a>
+        <a href="@MarketingBaseUrl">Return to the One Big Team website</a>
+    </nav>
 </div>
 
 @code {
+    private string MarketingBaseUrl => HR.Web.Services.MarketingSiteUrl.Resolve(Configuration);
+
     [SupplyParameterFromQuery(Name = "verified")]
     public bool Verified { get; set; }
 
@@ -108,11 +121,13 @@
             return;
         }
 
-        // Genuine hard browser navigation via app.js's hardNavigate — see MainLayout.razor's
-        // OnPersonaSwitchAsync remarks for why NavigationManager.NavigateTo(forceLoad: true) isn't
-        // reliable enough here.
-        var query = $"accessToken={Uri.EscapeDataString(session.AccessToken)}&expiresIn={session.ExpiresIn}";
-        await JS.InvokeVoidAsync("hardNavigate", $"/login-complete?{query}");
+        // The session never touches the URL: it is stashed server-side and handed to the
+        // cookie-setting hop via an opaque, single-use code (see AuthHandoffStore). Genuine hard
+        // browser navigation via app.js's hardNavigate guarantees a fresh circuit that will read
+        // the session cookie /login-complete sets.
+        var code = HandoffStore.Issue(new AuthHandoffStore.Session(
+            session.AccessToken, session.RefreshToken, session.ExpiresIn));
+        await JS.InvokeVoidAsync("hardNavigate", $"/login-complete?code={Uri.EscapeDataString(code)}");
     }
 
     private sealed class LoginForm
