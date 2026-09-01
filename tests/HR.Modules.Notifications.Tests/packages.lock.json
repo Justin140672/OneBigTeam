@@ -269,7 +269,7 @@
           "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -307,9 +307,9 @@
       },
       "Hangfire.Core": {
         "type": "CentralTransitive",
-        "requested": "[1.8.24, )",
-        "resolved": "1.8.24",
-        "contentHash": "XhiE55abcXXw4jEe0EClnU1fainkfi7ZVINbcCB+Se6ZatfVAglLsvNc6wtTMq5aZz0tv2DuW+U5lx1R0DcWOg==",
+        "requested": "[1.8.25, )",
+        "resolved": "1.8.25",
+        "contentHash": "BxzXlHwXNrGPHJ7YfAVfeiXC+BHd6uPoyyfV+9bCJVPPGs4z0EQCW1X44Og/IUFM81ENCqAFP1r2rOkQhm4ydA==",
         "dependencies": {
           "Newtonsoft.Json": "11.0.1"
         }
