@@ -1,5 +1,6 @@
 @page "/subscription"
 @rendermode InteractiveServer
+@using HR.Web.Components.Pages.Companies
 @inject SubscriptionService SubscriptionService
 @inject NavigationManager NavigationManager
 @inject AppSession Session
@@ -92,6 +93,11 @@
                 <SfButton Disabled="@_isBusy" OnClick="ManageBillingAsync">Manage billing</SfButton>
             }
         </div>
+
+        @if (Session.CompanyId != Guid.Empty)
+        {
+            <OrganisationDataExportPanel CompanyId="Session.CompanyId" />
+        }
     }
 </div>
 

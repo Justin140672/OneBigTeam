@@ -377,6 +377,7 @@ public static class EmployeesModule
         services.AddScoped<IEmployeeDirectoryReader, EmployeeDirectoryReader>();
         services.AddScoped<IHrHeadcountSummaryReader, HrHeadcountSummaryReader>();
         services.AddScoped<IEmployeeDepartmentReader, EmployeeDepartmentReader>();
+        services.AddScoped<IEmployeeDataExportSource, EmployeeDataExportSource>();
         services.AddScoped<IEmployeeStarterReader, EmployeeStarterReader>();
         services.AddScoped<IEmployeeLeaverReader, EmployeeLeaverReader>();
         services.AddScoped<IEmployeeNameReader, EmployeeNameReader>();
@@ -414,7 +415,48 @@ public static class EmployeesModule
         await db.Database.MigrateAsync();
     }
 
-    public static async Task SeedEmployeesAsync(this IServiceProvider services)
+    /// <summary>
+    /// The deterministic Acme "arrange-data" employees seeded only for the Playwright E2E run
+    /// (see <see cref="SeedEmployeesAsync"/>'s <c>includeE2eTestPool</c> path). Exposed so the
+    /// API host can also hand these ids/names to the Onboarding module's E2E plan seeder without
+    /// re-declaring the GUID scheme. Mirrored verbatim in
+    /// tests/HR.Web.E2E.Tests/Infrastructure/SeededE2eEmployees.cs — keep the two in sync.
+    /// GUID scheme: 3E2E0000-0000-0000-0000-0000000000NN (NN = two-digit index).
+    /// </summary>
+    public static readonly IReadOnlyList<(int Index, Guid Id, string LastName, string Email, string EmployeeNumber, bool ManagedByDavidPark)> E2eTestPool =
+        BuildE2eTestPool();
+
+    private static (int, Guid, string, string, string, bool)[] BuildE2eTestPool()
+    {
+        (int Nn, string LastName, bool Mgr)[] defs =
+        {
+            (1, "SeedProfileView", false),
+            (2, "SeedTimelineA", false), (3, "SeedTimelineB", false), (4, "SeedTimelineC", false),
+            (5, "SeedLifecycleA", false), (6, "SeedLifecycleB", false),
+            (7, "SeedNoticePeriodA", false), (8, "SeedNoticePeriodB", false), (9, "SeedNoticePeriodC", false),
+            (10, "SeedListUiA", false), (11, "SeedListUiB", false), (12, "SeedListUiC", false),
+            (13, "SeedBulkA", false), (14, "SeedBulkB", false), (15, "SeedBulkC", false), (16, "SeedBulkD", false),
+            (17, "SeedBulkE", false), (18, "SeedBulkF", false), (19, "SeedBulkG", false), (20, "SeedBulkH", false),
+            (21, "SeedMgrDashA", true), (22, "SeedMgrDashB", true), (23, "SeedMgrDashC", true),
+            (24, "SeedAssetAck", false), (25, "SeedAssetReturn", false), (26, "SeedSelfServiceDoc", false),
+            (27, "SeedLeavingA", false), (28, "SeedLeavingB", false), (29, "SeedLeavingC", false), (30, "SeedLeavingD", false),
+            (31, "SeedLeavingE", false), (32, "SeedLeavingF", false), (33, "SeedLeavingG", false), (34, "SeedLeavingH", false),
+            (35, "SeedOffboardTabA", false), (36, "SeedOffboardTabB", false), (37, "SeedOffboardTabC", false), (38, "SeedOffboardTabD", false),
+            (39, "SeedOffboardConfA", false), (40, "SeedOffboardConfB", false), (41, "SeedOffboardConfC", false), (42, "SeedOffboardConfD", false),
+            (43, "SeedOnboardTabA", false), (44, "SeedOnboardTabB", false), (45, "SeedOnboardTabC", false),
+            (46, "SeedOnboardTabD", false), (47, "SeedOnboardTabE", false), (48, "SeedOnboardTabF", false),
+        };
+
+        return Array.ConvertAll(defs, d => (
+            d.Nn,
+            Guid.Parse($"3E2E0000-0000-0000-0000-0000000000{d.Nn:D2}"),
+            d.LastName,
+            $"e2e.seed{d.Nn:D2}@acme.example",
+            $"E2E-SEED-{d.Nn:D2}",
+            d.Mgr));
+    }
+
+    public static async Task SeedEmployeesAsync(this IServiceProvider services, bool includeE2eTestPool = false)
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
@@ -700,6 +742,44 @@ public static class EmployeesModule
                     EmployeeTimelineVisibility.AuthorisedInternal, now));
 
             await db.SaveChangesAsync();
+
+            // ── E2E test pool ────────────────────────────────────────────────
+            // Deterministic Acme employees consumed as *arrange* by E2E tests that need "an
+            // employee to act on" but aren't testing employee creation. Mirrored verbatim in
+            // tests/HR.Web.E2E.Tests/Infrastructure/SeededE2eEmployees.cs. Only seeded when the
+            // host runs in Development (E2E) — never in Test/Staging/Production. Each pool member
+            // gets the same starting Compensation + "Employee joined" timeline entry every other
+            // seeded employee gets (they bypass CreateEmployeeHandler/EmployeeCreatedHandler).
+            if (includeE2eTestPool)
+            {
+                var e2eDob = new DateOnly(1990, 6, 15);
+                var e2eStart = new DateOnly(2026, 3, 1);
+                var davidParkId = empSalesMgrId;
+
+                foreach (var (_, id, lastName, email, employeeNumber, managedByDavidPark) in E2eTestPool)
+                {
+                    db.Employees.Add(MakeAcme(
+                        id, "E2E", lastName, email, e2eStart,
+                        deptEngId, posQaEngId, managedByDavidPark ? davidParkId : (Guid?)null,
+                        e2eDob, "British", "Male",
+                        null, null,
+                        "1 Test Street", null, "London", "Greater London", "EC1A 1AA",
+                        employeeNumber, etPermId));
+
+                    db.Compensations.Add(Compensation.Create(
+                        Guid.NewGuid(), acmeId, id, e2eStart, SalaryType.Annual, 50000m, "GBP", 37.5m, 1m,
+                        "Starting salary", CompensationChangeReason.NewHire, empHrMgrId, now));
+
+                    db.EmployeeTimelineEntries.Add(EmployeeTimelineEntry.Create(
+                        Guid.NewGuid(), acmeId, id, e2eStart,
+                        EmployeeTimelineEventType.EmployeeJoined, EmployeeTimelineCategory.Employment,
+                        "Employee joined", "Employee joined the company.",
+                        performedByUserId: null, "Employees", sourceRecordId: null,
+                        EmployeeTimelineVisibility.AuthorisedInternal, now));
+                }
+
+                await db.SaveChangesAsync();
+            }
         }
 
         // ── Beta Corp ─────────────────────────────────────────────────────────

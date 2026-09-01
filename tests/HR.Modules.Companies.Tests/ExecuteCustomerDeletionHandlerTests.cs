@@ -147,18 +147,50 @@ public class ExecuteCustomerDeletionHandlerTests
         Assert.Equal("Countdown elapsed", auditEvent.Reason);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Organisation_Data_Export_Is_In_Progress()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, Now, trialLengthDays: 14);
+        subscription.ScheduleDeletion(Guid.NewGuid(), Now.AddDays(30), Now);
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var publisher = new CapturingAuditEventPublisher();
+        var handler = BuildHandler(
+            context,
+            new FakeCurrentUser(Guid.NewGuid(), email: "admin@example.com"),
+            BuildConfiguration("admin@example.com"),
+            publisher,
+            hasActiveExport: true);
+
+        var result = await handler.HandleAsync(
+            new ExecuteCustomerDeletionRequest { CompanyId = companyId, Reason = "Countdown elapsed" },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Empty(publisher.Published);
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Null(persisted.DeletionExecutedAt);
+    }
+
     private static ExecuteCustomerDeletionHandler BuildHandler(
         CompaniesDbContext context,
         HR.SharedKernel.ICurrentUser currentUser,
         IConfiguration configuration,
-        HR.SharedKernel.IAuditEventPublisher auditEventPublisher)
+        HR.SharedKernel.IAuditEventPublisher auditEventPublisher,
+        bool hasActiveExport = false)
     {
         return new ExecuteCustomerDeletionHandler(
             context,
             currentUser,
             configuration,
             new FakeClock(Now.UtcDateTime),
-            auditEventPublisher);
+            auditEventPublisher,
+            new FakeOrganisationDataExportStatusReader(hasActiveExport));
     }
 
     private static IConfiguration BuildConfiguration(params string[] allowedEmails)

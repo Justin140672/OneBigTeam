@@ -12,6 +12,7 @@ internal sealed class ReportingDbContext : DbContext
 
     public DbSet<ReportFavourite> ReportFavourites => Set<ReportFavourite>();
     public DbSet<SavedReportView> SavedReportViews => Set<SavedReportView>();
+    public DbSet<OrganisationDataExport> OrganisationDataExports => Set<OrganisationDataExport>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -30,6 +30,7 @@ public static class InfrastructureModule
         services.AddSingleton<IInviteLinkBuilder, ConfiguredInviteLinkBuilder>();
         services.AddScoped<IAuditEventPublisher, DbAuditEventPublisher>();
         services.AddScoped<IAuditHistoryReader, AuditHistoryReader>();
+        services.AddScoped<IAuditDataExportSource, Persistence.AuditDataExportSource>();
         services.AddScoped<AuditPendingItemPromotionJob>();
         services.AddSingleton<IRecurringJobRegistrar, AuditJobRegistrar>();
         services.AddDbContext<AuditDbContext>(options =>
@@ -43,6 +44,7 @@ public static class InfrastructureModule
         services.AddHttpClient();
         AddProfilePhotoStorageService(services, configuration);
         AddSupportAttachmentStorageService(services, configuration);
+        AddOrganisationDataExportStorage(services, configuration);
 
         QuestPDF.Settings.License = LicenseType.Community;
         services.AddScoped<IReportExporter, ReportExporter>();
@@ -88,6 +90,21 @@ public static class InfrastructureModule
         else
         {
             services.AddScoped<ISupportAttachmentStorageService, LocalSupportAttachmentStorageService>();
+        }
+    }
+
+    private static void AddOrganisationDataExportStorage(IServiceCollection services, IConfiguration configuration)
+    {
+        var supabaseSection = configuration.GetSection("Infrastructure:Supabase:OrganisationExports");
+
+        if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
+        {
+            services.Configure<SupabaseOrganisationDataExportStorageOptions>(supabaseSection);
+            services.AddHttpClient<IOrganisationDataExportStorage, SupabaseOrganisationDataExportStorage>();
+        }
+        else
+        {
+            services.AddScoped<IOrganisationDataExportStorage, LocalOrganisationDataExportStorage>();
         }
     }
 

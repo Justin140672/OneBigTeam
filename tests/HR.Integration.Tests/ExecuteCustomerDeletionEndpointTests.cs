@@ -160,5 +160,61 @@ public class ExecuteCustomerDeletionEndpointTests
         Assert.Equal(companyId, auditRecord.EntityId);
     }
 
+    [Fact]
+    public async Task Post_ExecuteDeletion_Returns_Conflict_When_Company_Is_Under_Legal_Hold()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var companyId = await SeedPendingDeletionSubscriptionAsync(now);
+        await PlaceLegalHoldAsync(companyId, now);
+
+        using var client = ClientFor(Guid.NewGuid(), AllowListedEmail);
+
+        var response = await client.PostAsJsonAsync(
+            Url(companyId), new { reason = "Countdown elapsed, executing deletion" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var persisted = await db.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Null(persisted.DeletionExecutedAt);
+        Assert.True(persisted.HasPendingDeletion);
+    }
+
+    [Fact]
+    public async Task Post_ExecuteDeletion_Succeeds_After_Legal_Hold_Lifted()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var companyId = await SeedPendingDeletionSubscriptionAsync(now);
+        await PlaceLegalHoldAsync(companyId, now);
+
+        using var client = ClientFor(Guid.NewGuid(), AllowListedEmail);
+
+        var blocked = await client.PostAsJsonAsync(Url(companyId), new { reason = "Countdown elapsed, executing deletion" });
+        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+
+        var lift = await client.PostAsJsonAsync(
+            $"/api/companies/admin/customers/{companyId}/subscription/lift-legal-hold",
+            new { reason = "Hold lifted for test" });
+        lift.EnsureSuccessStatusCode();
+
+        var response = await client.PostAsJsonAsync(Url(companyId), new { reason = "Countdown elapsed, executing deletion" });
+        response.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var persisted = await db.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.NotNull(persisted.DeletionExecutedAt);
+    }
+
+    private async Task PlaceLegalHoldAsync(Guid companyId, DateTimeOffset now)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var subscription = await db.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        subscription.PlaceLegalHold(Guid.NewGuid(), "Litigation hold for test", now);
+        await db.SaveChangesAsync();
+    }
+
     private sealed record ExecuteDeletionPayload(Guid CompanyId, DateTimeOffset DeletionExecutedAt);
 }

@@ -21,6 +21,14 @@ internal sealed class FakeDocumentStorageService : IDocumentStorageService
     public Task<Uri> GetDownloadUrlAsync(string storageKey, CancellationToken cancellationToken)
         => Task.FromResult(new Uri($"https://storage.example.com/{storageKey}"));
 
+    /// <summary>Bytes returned by <see cref="OpenReadStreamAsync"/>, keyed by storage key. Missing key => null.</summary>
+    public Dictionary<string, byte[]> Contents { get; } = [];
+
+    public Task<Stream?> OpenReadStreamAsync(string storageKey, CancellationToken cancellationToken)
+        => Task.FromResult(Contents.TryGetValue(storageKey, out var bytes)
+            ? (Stream)new MemoryStream(bytes, writable: false)
+            : null);
+
     public List<string> Deletions { get; } = [];
     public bool ThrowOnDelete { get; set; }
 

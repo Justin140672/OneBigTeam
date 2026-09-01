@@ -46,6 +46,18 @@ internal sealed class LocalDocumentStorageService(IHttpContextAccessor httpConte
         return Task.FromResult(new Uri($"{baseUrl}/api/dev/local-storage/documents/{encodedKey}"));
     }
 
+    public Task<Stream?> OpenReadStreamAsync(
+        string storageKey,
+        CancellationToken cancellationToken)
+    {
+        var fullPath = ToFullPath(storageKey);
+        if (!File.Exists(fullPath))
+            return Task.FromResult<Stream?>(null);
+
+        Stream stream = File.OpenRead(fullPath);
+        return Task.FromResult<Stream?>(stream);
+    }
+
     public Task DeleteAsync(
         string storageKey,
         CancellationToken cancellationToken)

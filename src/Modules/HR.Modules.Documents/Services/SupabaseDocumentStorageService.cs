@@ -63,6 +63,29 @@ internal sealed class SupabaseDocumentStorageService : IDocumentStorageService
             : new Uri($"{_options.SupabaseUrl.TrimEnd('/')}{signedUrl}");
     }
 
+    public async Task<Stream?> OpenReadStreamAsync(
+        string storageKey,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"{_options.SupabaseUrl}/storage/v1/object/{_options.BucketName}/{storageKey}");
+
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ServiceRoleKey);
+
+        var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            response.Dispose();
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadAsStreamAsync(cancellationToken);
+    }
+
     public async Task DeleteAsync(
         string storageKey,
         CancellationToken cancellationToken)

@@ -15,7 +15,11 @@ using HR.Modules.Notifications.Features.MarkNotificationRead;
 using HR.Modules.Notifications.Features.NotifyOnCandidateHired;
 using HR.Modules.Notifications.Features.NotifyOnEmployeeCreated;
 using HR.Modules.Notifications.Features.NotifyOnLeaveRequested;
+using HR.Modules.Notifications.Features.NotifyOnOrganisationDataExportCompleted;
+using HR.Modules.Notifications.Jobs;
 using HR.Modules.Notifications.Persistence;
+using Hangfire;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -55,7 +59,28 @@ public static class NotificationsModule
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, NotifyOnEmployeeCreatedHandler>();
         services.AddScoped<IIntegrationEventHandler<CandidateHiredIntegrationEvent>, NotifyOnCandidateHiredHandler>();
 
+        // Story 2: "your organisation data export is ready" notification for the requesting
+        // company administrator. Published by the Reporting build job via Abstractions.
+        services.AddScoped<IIntegrationEventHandler<OrganisationDataExportCompletedIntegrationEvent>, NotifyOnOrganisationDataExportCompletedHandler>();
+
+        // NFR-07: scheduled read-notification retention sweep (dry-run by default).
+        services.AddScoped<PurgeExpiredReadNotificationsJob>();
+
         return services;
+    }
+
+    /// <summary>
+    /// NFR-07: registers the daily read-notification retention sweep. Runs in dry-run mode (logs +
+    /// audits, deletes nothing) unless <c>Notifications:Retention:Enabled=true</c>.
+    /// </summary>
+    public static WebApplication UseNotificationsRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        jobManager.AddOrUpdate<PurgeExpiredReadNotificationsJob>(
+            "notifications-retention-sweep",
+            job => job.ExecuteAsync(CancellationToken.None),
+            Cron.Daily(3));
+        return app;
     }
 
     public static async Task MigrateNotificationsAsync(this IServiceProvider services)

@@ -136,6 +136,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         services.AddScoped<DeactivateLeaveTypeHandler>();
         services.AddScoped<IValidator<DeactivateLeaveTypeRequest>, DeactivateLeaveTypeValidator>();
         services.AddScoped<ILeavePolicyReader, LeavePolicyReader>();
+        services.AddScoped<HR.Infrastructure.Abstractions.ILeaveDataExportSource, Services.LeaveDataExportSource>();
         services.AddScoped<ILeavePolicyProvisioner, LeavePolicyProvisioner>();
         services.AddScoped<ILeaveTypeDefaultsProvisioner, LeaveTypeDefaultsProvisioner>();
         services.AddScoped<ILeaveImportWriter, LeaveImportWriter>();

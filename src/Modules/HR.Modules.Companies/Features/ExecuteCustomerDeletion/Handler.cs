@@ -24,7 +24,8 @@ internal sealed class ExecuteCustomerDeletionHandler(
     ICurrentUser currentUser,
     IConfiguration configuration,
     IClock clock,
-    IAuditEventPublisher auditEventPublisher)
+    IAuditEventPublisher auditEventPublisher,
+    IOrganisationDataExportStatusReader exportStatusReader)
 {
     public async Task<Result<ExecuteCustomerDeletionResponse>> HandleAsync(
         ExecuteCustomerDeletionRequest request,
@@ -43,6 +44,14 @@ internal sealed class ExecuteCustomerDeletionHandler(
         {
             return Result.Failure<ExecuteCustomerDeletionResponse>(
                 Error.NotFound($"No subscription record was found for company '{request.CompanyId}'."));
+        }
+
+        // Story 2: do not execute deletion while a full organisation data export is still being
+        // prepared for this company — the customer may still need to download it.
+        if (await exportStatusReader.HasActiveExportAsync(subscription.CompanyId, cancellationToken))
+        {
+            return Result.Failure<ExecuteCustomerDeletionResponse>(Error.Conflict(
+                "An organisation data export is currently being prepared for this company. Wait for it to finish before executing deletion."));
         }
 
         var now = clock.UtcNowOffset();

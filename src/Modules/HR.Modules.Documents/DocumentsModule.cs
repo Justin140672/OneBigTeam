@@ -290,6 +290,7 @@ public static class DocumentsModule
         services.AddScoped<ProcessDocumentExpiryNotificationsHandler>();
 
         services.AddScoped<IDocumentTypeReader, DocumentTypeReader>();
+        services.AddScoped<HR.Infrastructure.Abstractions.IDocumentDataExportManifest, Services.DocumentDataExportManifest>();
         services.AddScoped<IOutstandingDocumentRequestReader, OutstandingDocumentRequestReader>();
         services.AddScoped<IProfilePhotoReader, ProfilePhotoReader>();
         services.AddScoped<IDocumentComplianceReportReader, DocumentComplianceReportReader>();

@@ -133,6 +133,11 @@ internal static class NotificationActionRouteBuilder
             NotificationType.CandidateHired
                 => $"/companies/{companyId}/candidates/{sourceEntityId}",
 
+            // Story 2: the organisation data export panel lives on the company's subscription page
+            // (there is no customer-facing account-closure page in HR.Web today).
+            NotificationType.OrganisationDataExportReady
+                => "/subscription",
+
             _ => null,
         };
 

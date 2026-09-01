@@ -20,6 +20,14 @@ internal interface IDocumentStorageService
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Opens a server-side read stream over the stored file, or null if the object does not exist.
+    /// Used for embedding document binaries in the organisation data export.
+    /// </summary>
+    Task<Stream?> OpenReadStreamAsync(
+        string storageKey,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Permanently removes a file from storage.
     /// </summary>
     Task DeleteAsync(

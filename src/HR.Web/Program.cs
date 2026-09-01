@@ -112,6 +112,7 @@ builder.Services.AddScoped<ReportingService>();
 builder.Services.AddScoped<AdministrativeAlertsService>();
 builder.Services.AddScoped<CompanyOnboardingService>();
 builder.Services.AddScoped<SubscriptionService>();
+builder.Services.AddScoped<OrganisationDataExportService>();
 builder.Services.AddScoped<SupportService>();
 builder.Services.AddScoped<WidgetSourceLoader>();
 builder.Services.AddScoped<DashboardService>();

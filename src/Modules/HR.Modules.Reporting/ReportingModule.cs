@@ -47,6 +47,7 @@ using HR.Modules.Reporting.Features.ExportGovernanceAdministrativeChangesReport;
 using HR.Modules.Reporting.Features.ExportGovernanceSecurityEventsReport;
 using HR.Modules.Reporting.Features.ExportGovernanceComplianceStatusReport;
 using HR.Modules.Reporting.Jobs;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.Features.GetSicknessReport;
 using HR.Modules.Reporting.Features.GetVacancyPerformanceReport;
 using HR.Modules.Reporting.Features.GetWorkloadActions;
@@ -91,6 +92,12 @@ public static class ReportingModule
             "reporting-compliance-alerts",
             job => job.ExecuteAsync(),
             Cron.Daily(12));
+
+        // Story 2: daily purge of expired organisation data export archives.
+        jobManager.AddOrUpdate<Jobs.PurgeExpiredOrganisationDataExportsJob>(
+            "organisation-data-export-purge-expired",
+            job => job.ExecuteAsync(CancellationToken.None),
+            Cron.Daily());
         return app;
     }
 
@@ -101,6 +108,21 @@ public static class ReportingModule
 
         // REP-06: shared export auditing helper used by every Export*Report handler.
         services.AddScoped<ReportExportAuditor>();
+
+        // Story 2: organisation data export (account-closure export).
+        services.AddScoped<IOrganisationDataExportJobStore, Services.OrganisationDataExportJobStore>();
+        services.AddScoped<IOrganisationDataExportStatusReader, Services.OrganisationDataExportStatusReader>();
+        services.AddSingleton<OrganisationDataExportPackageBuilder>();
+        services.AddScoped<Jobs.OrganisationDataExportBuildJob>();
+        services.AddScoped<Jobs.PurgeExpiredOrganisationDataExportsJob>();
+        services.AddScoped<Features.RequestOrganisationDataExport.RequestOrganisationDataExportHandler>();
+        services.AddScoped<IValidator<Features.RequestOrganisationDataExport.RequestOrganisationDataExportRequest>, Features.RequestOrganisationDataExport.RequestOrganisationDataExportValidator>();
+        services.AddScoped<Features.GetLatestOrganisationDataExport.GetLatestOrganisationDataExportHandler>();
+        services.AddScoped<IValidator<Features.GetLatestOrganisationDataExport.GetLatestOrganisationDataExportRequest>, Features.GetLatestOrganisationDataExport.GetLatestOrganisationDataExportValidator>();
+        services.AddScoped<Features.ListOrganisationDataExports.ListOrganisationDataExportsHandler>();
+        services.AddScoped<IValidator<Features.ListOrganisationDataExports.ListOrganisationDataExportsRequest>, Features.ListOrganisationDataExports.ListOrganisationDataExportsValidator>();
+        services.AddScoped<Features.DownloadOrganisationDataExport.DownloadOrganisationDataExportHandler>();
+        services.AddScoped<IValidator<Features.DownloadOrganisationDataExport.DownloadOrganisationDataExportRequest>, Features.DownloadOrganisationDataExport.DownloadOrganisationDataExportValidator>();
 
         services.AddScoped<GetReportCatalogHandler>();
         services.AddScoped<IValidator<GetReportCatalogRequest>, GetReportCatalogValidator>();

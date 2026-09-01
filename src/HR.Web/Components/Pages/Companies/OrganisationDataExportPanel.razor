@@ -1,0 +1,215 @@
+@using HR.Web.Components.Controls
+@using HR.Web.Services
+@inject OrganisationDataExportService ExportService
+@inject IJSRuntime JS
+
+@*
+    Story 2: customer-facing organisation data export panel. Rendered inside the (already
+    InteractiveServer) Subscription page — there is no dedicated customer account-closure page in
+    HR.Web, so this is the closure-preparation surface. A Company Administrator can request a full
+    ZIP export of their organisation's data and download it for 7 days.
+*@
+
+<section class="card mt-4" aria-labelledby="org-data-export-heading">
+    <div class="card-header">
+        <h5 class="mb-0" id="org-data-export-heading">Export organisation data</h5>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">
+            Download a complete copy of your organisation's data — employee records, leave &amp;
+            sickness history, recruitment, audit information and uploaded documents. The export is
+            packaged as a ZIP of CSV files plus document folders and remains available for 7 days.
+            We recommend requesting and downloading a full data export before closing your account.
+        </p>
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@_error</div>
+        }
+        @if (_info is not null)
+        {
+            <div class="alert alert-success" role="alert">@_info</div>
+        }
+
+        @if (_loading)
+        {
+            <HrLoadingIndicator Label="Loading export status…" />
+        }
+        else
+        {
+            <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+                <SfButton IsPrimary="true" Disabled="@(_busy || IsActive(_latest?.Status))"
+                          OnClick="RequestAsync"
+                          aria-label="Request a new organisation data export">
+                    Request export
+                </SfButton>
+                <SfButton Disabled="@_busy" OnClick="RefreshAsync"
+                          aria-label="Refresh export status">
+                    Refresh
+                </SfButton>
+            </div>
+
+            @if (_latest?.Status is null)
+            {
+                <p class="mb-0">No export has been requested yet.</p>
+            }
+            else
+            {
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9">@StatusDisplay(_latest.Status)</dd>
+
+                    <dt class="col-sm-3">Requested</dt>
+                    <dd class="col-sm-9">@LocalDisplay(_latest.RequestedAt)</dd>
+
+                    @if (IsActive(_latest.Status))
+                    {
+                        <dd class="col-12 text-muted">
+                            Your export is being prepared. This can take a few minutes for a large
+                            organisation — use Refresh to check progress.
+                        </dd>
+                    }
+
+                    @if (string.Equals(_latest.Status, "Completed", StringComparison.OrdinalIgnoreCase) && _latest.Downloadable)
+                    {
+                        <dt class="col-sm-3">Available until</dt>
+                        <dd class="col-sm-9">
+                            @LocalDate(_latest.ExpiresAt) (@DaysLeft(_latest.ExpiresAt) day(s) left)
+                        </dd>
+                        <dd class="col-12">
+                            <SfButton IsPrimary="true" Disabled="@_busy"
+                                      OnClick="@(() => DownloadAsync(_latest!.ExportId!.Value))"
+                                      aria-label="Download the completed organisation data export">
+                                Download export
+                            </SfButton>
+                        </dd>
+                    }
+                    else if (string.Equals(_latest.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <dd class="col-12 text-muted">This export has expired and is no longer available.</dd>
+                    }
+                    else if (string.Equals(_latest.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <dd class="col-12 text-danger">
+                            The export could not be generated. Please request a new one.
+                        </dd>
+                    }
+                </dl>
+            }
+
+            @if (_history.Count > 0)
+            {
+                <h6 class="mt-4">Export history</h6>
+                <HrGrid TValue="OrganisationDataExportHistoryItem"
+                        DataSource="@_history"
+                        AllowPaging="true"
+                        AllowFiltering="false"
+                        AllowSorting="true">
+                    <GridPageSettings PageSize="5" />
+                    <GridColumns>
+                        <GridColumn Field="@nameof(OrganisationDataExportHistoryItem.RequestedAt)" HeaderText="Requested" Format="g" Width="160" />
+                        <GridColumn Field="@nameof(OrganisationDataExportHistoryItem.Status)" HeaderText="Status" Width="110" />
+                        <GridColumn Field="@nameof(OrganisationDataExportHistoryItem.CompletedAt)" HeaderText="Completed" Format="g" Width="160" />
+                        <GridColumn Field="@nameof(OrganisationDataExportHistoryItem.ExpiresAt)" HeaderText="Expires" Format="d" Width="120" />
+                        <GridColumn Field="@nameof(OrganisationDataExportHistoryItem.DownloadCount)" HeaderText="Downloads" Width="100" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+                    </GridColumns>
+                </HrGrid>
+            }
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+
+    /// <summary>Raised whenever the latest-export status is (re)loaded, so a host page can, e.g.,
+    /// soft-block an account-closure confirmation while an export is Pending/InProgress.</summary>
+    [Parameter] public EventCallback<OrganisationDataExportLatest?> OnLatestChanged { get; set; }
+
+    private OrganisationDataExportLatest? _latest;
+    private IReadOnlyList<OrganisationDataExportHistoryItem> _history = [];
+    private bool _loading = true;
+    private bool _busy;
+    private string? _error;
+    private string? _info;
+
+    private static bool IsActive(string? status) =>
+        string.Equals(status, "Pending", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(status, "InProgress", StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _latest = await ExportService.GetLatestAsync(CompanyId);
+        _history = await ExportService.GetHistoryAsync(CompanyId);
+        _loading = false;
+        if (OnLatestChanged.HasDelegate)
+            await OnLatestChanged.InvokeAsync(_latest);
+    }
+
+    private async Task RefreshAsync()
+    {
+        _busy = true;
+        _error = _info = null;
+        await ReloadAsync();
+        _busy = false;
+    }
+
+    private async Task RequestAsync()
+    {
+        _busy = true;
+        _error = _info = null;
+
+        var (result, error) = await ExportService.RequestAsync(CompanyId);
+        if (error is not null)
+        {
+            _error = error;
+        }
+        else
+        {
+            _info = "Export requested. It will be ready to download shortly — use Refresh to check.";
+            await ReloadAsync();
+        }
+
+        _busy = false;
+    }
+
+    private async Task DownloadAsync(Guid exportId)
+    {
+        _busy = true;
+        _error = _info = null;
+
+        var (bytes, contentType, fileName, error) = await ExportService.DownloadAsync(CompanyId, exportId);
+        if (bytes is null)
+        {
+            _error = error ?? "This export is no longer available for download.";
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("downloadFileFromBase64",
+                fileName ?? "organisation-data-export.zip",
+                contentType ?? "application/zip",
+                Convert.ToBase64String(bytes));
+            await ReloadAsync();
+        }
+
+        _busy = false;
+    }
+
+    private static string StatusDisplay(string? status) => status switch
+    {
+        null => "—",
+        "InProgress" => "In progress",
+        _ => status,
+    };
+
+    private static string LocalDisplay(DateTimeOffset? value) =>
+        value is { } v ? v.ToLocalTime().ToString("g") : "—";
+
+    private static string LocalDate(DateTimeOffset? value) =>
+        value is { } v ? v.ToLocalTime().ToString("d") : "—";
+
+    private static int DaysLeft(DateTimeOffset? expiresAt) =>
+        expiresAt is { } v ? Math.Max(0, (int)Math.Ceiling((v - DateTimeOffset.UtcNow).TotalDays)) : 0;
+}

@@ -12,6 +12,7 @@ using HR.Modules.Offboarding;
 using HR.Modules.Onboarding;
 using HR.Modules.Probation;
 using HR.Modules.Recruitment;
+using HR.Modules.Reporting;
 using HR.Modules.Sickness;
 using HR.Modules.Tasks;
 using HR.SharedKernel;
@@ -74,6 +75,7 @@ public class ServiceContainerCompositionTests
         services.AddRecruitmentModule(connectionString, configuration);
         services.AddAssetsModule(connectionString);
         services.AddSicknessModule(connectionString);
+        services.AddReportingModule(connectionString);
         services.AddInfrastructure(connectionString, configuration);
         services.AddHangfireBackgroundJobs(connectionString);
 

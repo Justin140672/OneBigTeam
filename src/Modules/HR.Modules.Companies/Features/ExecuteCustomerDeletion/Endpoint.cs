@@ -33,6 +33,14 @@ internal sealed class Endpoint(
                 return;
             }
 
+            // NFR-07: a legal hold blocking deletion is a conflict with current resource state,
+            // not a malformed request — surface it as 409 so callers can distinguish it.
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(businessError));
+                return;
+            }
+
             await Send.ResultAsync(TypedResults.BadRequest(businessError));
             return;
         }

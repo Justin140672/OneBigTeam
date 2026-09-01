@@ -83,6 +83,7 @@ public static class SicknessModule
         services.AddScoped<IEmployeesMissingFitNoteReader, EmployeesMissingFitNoteReader>();
         services.AddScoped<ISicknessCategoryDefaultsProvisioner, SicknessCategoryDefaultsProvisioner>();
         services.AddScoped<ISicknessReportReader, SicknessReportReader>();
+        services.AddScoped<HR.Infrastructure.Abstractions.ISicknessDataExportSource, Services.SicknessDataExportSource>();
         services.AddScoped<Services.SicknessResourceAuthorizer>();
     }
 
