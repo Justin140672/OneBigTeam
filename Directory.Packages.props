@@ -71,7 +71,7 @@
     advisory GHSA-5crp-9r3c-p9vr. Pinning it here forces every project to the patched 13.0.3.
   -->
   <ItemGroup>
-    <GlobalPackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <GlobalPackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
 </Project>
