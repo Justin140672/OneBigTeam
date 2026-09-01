@@ -1,39 +1,20 @@
+using HR.SharedKernel.Pricing;
+
 namespace HR.Marketing.Services;
 
+/// <summary>
+/// Marketing-site adapter over the single authoritative <see cref="SubscriptionPricingCalculator"/>
+/// (Story 4). Pricing rates are never hard-coded here — the caller supplies the current
+/// <see cref="SubscriptionPricingConfig"/> (see <see cref="SubscriptionPricingProvider"/>).
+/// </summary>
 public static class PricingCalculator
 {
-    public const decimal FirstTierRate = 2.00m;
-    public const decimal SecondTierRate = 1.75m;
-    public const decimal ThirdTierRate = 1.50m;
-    public const int FirstTierLimit = 50;
-    public const int SecondTierLimit = 150;
-    public const decimal MinimumMonthlyCharge = 20.00m;
-
-    public static PricingResult Calculate(int activeEmployees)
+    public static PricingResult Calculate(int activeEmployees, SubscriptionPricingConfig config)
     {
-        var employees = Math.Max(0, activeEmployees);
+        var breakdown = SubscriptionPricingCalculator.Calculate(activeEmployees, config);
 
-        decimal monthly;
-        if (employees <= FirstTierLimit)
-        {
-            monthly = employees * FirstTierRate;
-        }
-        else if (employees <= SecondTierLimit)
-        {
-            monthly = (FirstTierLimit * FirstTierRate) + ((employees - FirstTierLimit) * SecondTierRate);
-        }
-        else
-        {
-            monthly = (FirstTierLimit * FirstTierRate)
-                + ((SecondTierLimit - FirstTierLimit) * SecondTierRate)
-                + ((employees - SecondTierLimit) * ThirdTierRate);
-        }
-
-        if (monthly < MinimumMonthlyCharge)
-        {
-            monthly = MinimumMonthlyCharge;
-        }
-
+        var employees = breakdown.ActiveEmployeeCount;
+        var monthly = breakdown.FinalMonthlyCharge;
         var annual = monthly * 12;
         var effectivePrice = employees > 0 ? monthly / employees : 0m;
 

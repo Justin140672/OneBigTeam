@@ -71,14 +71,45 @@ function trackEvent(event, payload) {
   window.dataLayer.push({ event, ...payload });
 }
 
-const PRICING_TIERS = {
-  firstTierLimit: 50,
-  secondTierLimit: 150,
-  firstTierRate: 2.0,
-  secondTierRate: 1.75,
-  thirdTierRate: 1.5,
+// Story 4 — the progressive pricing model is now configurable and delivered to the page via
+// data-pricing-bands / data-minimum-charge on the estimator form (mirrors
+// HR.SharedKernel.Pricing.SubscriptionPricingCalculator). This is the built-in fallback used only
+// if those attributes are missing or unparseable.
+const DEFAULT_PRICING_MODEL = {
+  bands: [
+    { start: 1, end: 50, price: 2.0 },
+    { start: 51, end: 150, price: 1.75 },
+    { start: 151, end: null, price: 1.5 },
+  ],
   minimumMonthlyCharge: 20.0,
 };
+
+function readPricingModel(estimatorElement) {
+  const fallback = DEFAULT_PRICING_MODEL;
+  if (!estimatorElement) return fallback;
+
+  let bands = fallback.bands;
+  const rawBands = estimatorElement.dataset.pricingBands;
+  if (rawBands) {
+    try {
+      const parsed = JSON.parse(rawBands);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        bands = parsed.map((b) => ({
+          start: Number(b.start),
+          end: b.end === null || b.end === undefined ? null : Number(b.end),
+          price: Number(b.price),
+        }));
+      }
+    } catch {
+      bands = fallback.bands;
+    }
+  }
+
+  const rawMinimum = Number.parseFloat(estimatorElement.dataset.minimumCharge);
+  const minimumMonthlyCharge = Number.isFinite(rawMinimum) ? rawMinimum : fallback.minimumMonthlyCharge;
+
+  return { bands, minimumMonthlyCharge };
+}
 
 const currencyFormatter = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -87,19 +118,23 @@ const currencyFormatter = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 2,
 });
 
-function calculatePricing(employees) {
-  const { firstTierLimit, secondTierLimit, firstTierRate, secondTierRate, thirdTierRate, minimumMonthlyCharge } = PRICING_TIERS;
+function calculatePricing(employees, model) {
+  const { bands, minimumMonthlyCharge } = model || DEFAULT_PRICING_MODEL;
+  const count = Math.max(0, employees);
 
-  let monthly;
-  if (employees <= firstTierLimit) {
-    monthly = employees * firstTierRate;
-  } else if (employees <= secondTierLimit) {
-    monthly = firstTierLimit * firstTierRate + (employees - firstTierLimit) * secondTierRate;
-  } else {
-    monthly =
-      firstTierLimit * firstTierRate +
-      (secondTierLimit - firstTierLimit) * secondTierRate +
-      (employees - secondTierLimit) * thirdTierRate;
+  let monthly = 0;
+  for (const band of bands) {
+    let employeesInBand;
+    if (count < band.start) {
+      employeesInBand = 0;
+    } else if (band.end === null || band.end === undefined) {
+      employeesInBand = count - band.start + 1;
+    } else {
+      employeesInBand = Math.min(count, band.end) - band.start + 1;
+    }
+    if (employeesInBand > 0) {
+      monthly += employeesInBand * band.price;
+    }
   }
 
   // Mirrors PricingCalculator.Calculate on the server: capture whether the tier-based total
@@ -139,6 +174,7 @@ function parseEmployeeCount(rawValue) {
 const pricingEstimator = document.querySelector("[data-pricing-estimator]");
 
 if (pricingEstimator) {
+  const pricingModel = readPricingModel(pricingEstimator);
   const employeeCountInput = pricingEstimator.querySelector("#employee-count");
   const employeeSlider = pricingEstimator.querySelector("#employee-slider");
   const errorElement = pricingEstimator.querySelector("#employee-count-error");
@@ -191,7 +227,7 @@ if (pricingEstimator) {
   }
 
   function render(employees) {
-    const { monthly, effectivePricePerEmployee, minimumChargeApplied } = calculatePricing(employees);
+    const { monthly, effectivePricePerEmployee, minimumChargeApplied } = calculatePricing(employees, pricingModel);
     const isLargeOrganisation = employees > largeOrganisationThreshold;
 
     if (activeEmployeesElement) activeEmployeesElement.textContent = String(employees);
@@ -259,7 +295,7 @@ if (pricingEstimator) {
 
   pricingEstimator.querySelectorAll("[data-track-cta]").forEach((link) => {
     link.addEventListener("click", () => {
-      const { monthly } = calculatePricing(lastValidEmployees);
+      const { monthly } = calculatePricing(lastValidEmployees, pricingModel);
       const eventNameByCta = {
         "start-trial": "Start Free Trial Clicked",
         "contact-sales": "Contact Sales Clicked"

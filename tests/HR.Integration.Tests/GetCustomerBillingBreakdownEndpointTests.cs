@@ -113,7 +113,15 @@ public class GetCustomerBillingBreakdownEndpointTests
         Assert.True(payload.Leavers >= 0);
         Assert.Equal(payload.ActiveEmployees + payload.Leavers, payload.ChargeableEmployees);
         Assert.Equal(0m, payload.Discounts);
-        Assert.Equal((payload.ChargeableEmployees * payload.PricePerEmployee) - payload.Discounts, payload.MonthlyTotal);
+        // Story 4 — progressive pricing: the monthly total is at least the configured minimum
+        // monthly charge (£20 default), and pricePerEmployee is the effective (blended) rate.
+        Assert.True(payload.MonthlyTotal >= 20m);
+        if (payload.ChargeableEmployees > 0)
+        {
+            Assert.Equal(
+                Math.Round(payload.MonthlyTotal, 2),
+                Math.Round(payload.ChargeableEmployees * payload.PricePerEmployee, 2));
+        }
         Assert.NotNull(payload.History);
         Assert.NotEmpty(payload.History);
     }

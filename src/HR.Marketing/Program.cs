@@ -12,6 +12,8 @@ builder.Services.AddRazorComponents();
 
 builder.Services.Configure<PricingOptions>(builder.Configuration);
 builder.Services.AddSingleton<IMarketingAnalytics, LoggingMarketingAnalytics>();
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<SubscriptionPricingProvider>();
 
 // Named client for the server-side "Start free trial" signup proxy (SignUp.razor) — calls
 // HR.Api directly from the server, so the browser never needs cross-origin access to the API.

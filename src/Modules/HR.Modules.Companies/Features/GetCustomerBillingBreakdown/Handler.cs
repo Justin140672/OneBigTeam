@@ -3,6 +3,7 @@ using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
 using HR.Modules.Companies.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.Pricing;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -84,14 +85,28 @@ internal sealed class GetCustomerBillingBreakdownHandler(
         // chargeable since they haven't started, and former employees have already left and are
         // excluded from both the Active and Leaving statuses.
         var chargeableEmployees = activeEmployees + leavers;
-        var pricePerEmployee = stripeOptions.Value.MonthlyPriceGbp;
+
+        // Story 4 — the monthly charge now comes from the single authoritative configurable
+        // progressive pricing model (PlatformSettings singleton), not a flat per-employee rate.
+        // Falls back to the built-in default when the singleton has never been seeded (e.g. tests).
+        var platformSettings = await _dbContext.PlatformSettings
+            .AsNoTracking()
+            .SingleOrDefaultAsync(s => s.Id == PlatformSettings.SingletonId, cancellationToken);
+        var pricingConfig = platformSettings?.GetPricingConfig() ?? SubscriptionPricingConfig.Default;
+        var breakdown = SubscriptionPricingCalculator.Calculate(chargeableEmployees, pricingConfig);
 
         // No discount/promotional-pricing concept exists anywhere in the codebase yet (verified —
         // StripeOptions, CustomerSubscription and Company all lack one), so this is hardcoded to
         // zero rather than inventing a discount system. The API/UI must present this honestly
         // rather than imply real discount data exists.
         var discounts = 0m;
-        var monthlyTotal = (chargeableEmployees * pricePerEmployee) - discounts;
+        var monthlyTotal = breakdown.FinalMonthlyCharge - discounts;
+
+        // The snapshot/response keeps a single pricePerEmployee field for backwards compatibility;
+        // under progressive pricing it is the effective (blended) rate for this employee count.
+        var pricePerEmployee = chargeableEmployees > 0
+            ? breakdown.FinalMonthlyCharge / chargeableEmployees
+            : 0m;
 
         var computedAt = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
 

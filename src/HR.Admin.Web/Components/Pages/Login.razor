@@ -4,6 +4,7 @@
 @inject DevAuthService DevAuth
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject HR.Admin.Web.Services.AuthHandoffStore HandoffStore
 
 <PageTitle>Sign in — Admin Portal</PageTitle>
 
@@ -72,8 +73,10 @@
             return;
         }
 
-        var query = $"accessToken={Uri.EscapeDataString(session.AccessToken)}&expiresIn={session.ExpiresIn}";
-        await JS.InvokeVoidAsync("eval", $"window.location.href='/dev/persona-cookie?{query}'");
+        // The session is stashed server-side; only an opaque, single-use code travels in the URL.
+        var code = HandoffStore.Issue(new AuthHandoffStore.Session(
+            session.AccessToken, session.RefreshToken, session.ExpiresIn));
+        await JS.InvokeVoidAsync("eval", $"window.location.href='/dev/persona-cookie?code={Uri.EscapeDataString(code)}'");
     }
 
     private sealed class LoginForm

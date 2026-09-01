@@ -1,4 +1,7 @@
+using System.Text.Json;
+
 using HR.SharedKernel;
+using HR.SharedKernel.Pricing;
 
 namespace HR.Modules.Companies.Domain;
 
@@ -26,8 +29,19 @@ internal sealed class PlatformSettings
     /// <summary>Serialized <c>Dictionary&lt;string, bool&gt;</c> of feature flag name -> enabled, stored as jsonb.</summary>
     public string FeatureFlagsJson { get; private set; } = "{}";
 
+    /// <summary>
+    /// Serialized <see cref="IReadOnlyList{T}"/> of <see cref="SubscriptionPricingBand"/>, stored as
+    /// jsonb. Together with <see cref="MinimumMonthlyChargeGbp"/> this is the single authoritative
+    /// configurable pricing model (Story 4) used by marketing, customer billing and the Admin app.
+    /// </summary>
+    public string PricingBandsJson { get; private set; } = "[]";
+
+    public decimal MinimumMonthlyChargeGbp { get; private set; }
+
     public DateTimeOffset UpdatedAt { get; private set; }
     public Guid? UpdatedByUserId { get; private set; }
+
+    private static readonly JsonSerializerOptions PricingJsonOptions = new(JsonSerializerDefaults.Web);
 
     public static PlatformSettings CreateDefault(DateTimeOffset now)
     {
@@ -40,9 +54,44 @@ internal sealed class PlatformSettings
             MaintenanceModeEnabled = false,
             MaintenanceModeMessage = null,
             FeatureFlagsJson = "{}",
+            PricingBandsJson = JsonSerializer.Serialize(SubscriptionPricingConfig.Default.Bands, PricingJsonOptions),
+            MinimumMonthlyChargeGbp = SubscriptionPricingConfig.Default.MinimumMonthlyChargeGbp,
             UpdatedAt = now,
             UpdatedByUserId = null,
         };
+    }
+
+    /// <summary>Deserializes the persisted bands + minimum into a <see cref="SubscriptionPricingConfig"/>.</summary>
+    public SubscriptionPricingConfig GetPricingConfig()
+    {
+        var bands = JsonSerializer.Deserialize<List<SubscriptionPricingBand>>(
+            string.IsNullOrWhiteSpace(PricingBandsJson) ? "[]" : PricingBandsJson,
+            PricingJsonOptions) ?? [];
+
+        return bands.Count == 0
+            ? SubscriptionPricingConfig.Default
+            : new SubscriptionPricingConfig(bands, MinimumMonthlyChargeGbp);
+    }
+
+    /// <summary>
+    /// Replaces the configurable subscription pricing model. Runs <see cref="SubscriptionPricingConfig.Validate"/>
+    /// first and mutates nothing on failure.
+    /// </summary>
+    public Result UpdatePricingConfig(SubscriptionPricingConfig config, Guid? updatedByUserId, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+
+        var validation = config.Validate();
+        if (validation.IsFailure)
+        {
+            return validation;
+        }
+
+        PricingBandsJson = JsonSerializer.Serialize(config.Bands, PricingJsonOptions);
+        MinimumMonthlyChargeGbp = config.MinimumMonthlyChargeGbp;
+        UpdatedByUserId = updatedByUserId;
+        UpdatedAt = now;
+        return Result.Success();
     }
 
     public Result Update(

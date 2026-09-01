@@ -24,6 +24,13 @@
                         <NavLink href="/audit-log" class="admin-nav-link">Audit Log</NavLink>
                         <NavLink href="/admin-users" class="admin-nav-link">Administrators</NavLink>
                         <NavLink href="/settings" class="admin-nav-link">Platform Settings</NavLink>
+                        <NavLink href="/subscription-pricing" class="admin-nav-link">Subscription Pricing</NavLink>
+                    </div>
+                    <div class="admin-nav-group" role="group" aria-label="Session">
+                        <span class="admin-nav-group-label">Session</span>
+                        @* Full-page navigation (not NavLink): /logout is a minimal endpoint that
+                           revokes the Supabase session and clears the cookie server-side. *@
+                        <a href="/logout" class="admin-nav-link" data-testid="admin-sign-out">Sign out</a>
                     </div>
                 </nav>
             </Authorized>

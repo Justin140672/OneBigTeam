@@ -1,9 +1,12 @@
 using HR.Marketing.Services;
+using HR.SharedKernel.Pricing;
 
 namespace HR.Marketing.Tests;
 
 public class PricingCalculatorTests
 {
+    private static SubscriptionPricingConfig Config => SubscriptionPricingConfig.Default;
+
     [Theory]
     [InlineData(0, 20.00)]
     [InlineData(1, 20.00)]
@@ -20,7 +23,7 @@ public class PricingCalculatorTests
     [InlineData(250, 425.00)]
     public void Calculate_ReturnsExpectedMonthlyCost(int employees, decimal expectedMonthly)
     {
-        var result = PricingCalculator.Calculate(employees);
+        var result = PricingCalculator.Calculate(employees, Config);
 
         Assert.Equal(expectedMonthly, result.Monthly);
     }
@@ -36,7 +39,7 @@ public class PricingCalculatorTests
     [InlineData(250)]
     public void Calculate_AnnualCostIsTwelveTimesMonthly(int employees)
     {
-        var result = PricingCalculator.Calculate(employees);
+        var result = PricingCalculator.Calculate(employees, Config);
 
         Assert.Equal(result.Monthly * 12, result.Annual);
     }
@@ -44,7 +47,7 @@ public class PricingCalculatorTests
     [Fact]
     public void Calculate_MinimumMonthlyChargeIsEnforced()
     {
-        var result = PricingCalculator.Calculate(1);
+        var result = PricingCalculator.Calculate(1, Config);
 
         Assert.Equal(20.00m, result.Monthly);
     }
@@ -52,7 +55,7 @@ public class PricingCalculatorTests
     [Fact]
     public void Calculate_ZeroEmployeesHasZeroEffectivePrice()
     {
-        var result = PricingCalculator.Calculate(0);
+        var result = PricingCalculator.Calculate(0, Config);
 
         Assert.Equal(0m, result.EffectivePricePerEmployee);
     }
@@ -63,7 +66,7 @@ public class PricingCalculatorTests
     [InlineData(250, 1.70)]
     public void Calculate_EffectivePriceRoundsToTwoDecimalPlaces(int employees, decimal expectedEffectivePrice)
     {
-        var result = PricingCalculator.Calculate(employees);
+        var result = PricingCalculator.Calculate(employees, Config);
 
         Assert.Equal(expectedEffectivePrice, Math.Round(result.EffectivePricePerEmployee, 2));
     }
@@ -71,31 +74,33 @@ public class PricingCalculatorTests
     [Fact]
     public void Calculate_NegativeEmployeeCountIsTreatedAsZero()
     {
-        var result = PricingCalculator.Calculate(-5);
+        var result = PricingCalculator.Calculate(-5, Config);
 
         Assert.Equal(0, result.ActiveEmployees);
         Assert.Equal(20.00m, result.Monthly);
     }
 
-    /// <summary>
-    /// Regression test tying the pricing page's worked example copy (Pricing.razor: "50 x £2.00 = £100.00,
-    /// plus 25 x £1.75 = £43.75, total £143.75/month") to the actual calculation service, so the two
-    /// cannot silently drift apart if tier rates or limits change.
-    /// </summary>
     [Fact]
     public void Calculate_SeventyFiveEmployeeWorkedExampleMatchesPricingPageCopy()
     {
-        var firstBandCost = PricingCalculator.FirstTierLimit * PricingCalculator.FirstTierRate;
-        var secondBandEmployees = 75 - PricingCalculator.FirstTierLimit;
-        var secondBandCost = secondBandEmployees * PricingCalculator.SecondTierRate;
+        // 50 x £2.00 = £100.00, plus 25 x £1.75 = £43.75, total £143.75/month.
+        var result = PricingCalculator.Calculate(75, Config);
 
-        Assert.Equal(100.00m, firstBandCost);
-        Assert.Equal(25, secondBandEmployees);
-        Assert.Equal(43.75m, secondBandCost);
-
-        var result = PricingCalculator.Calculate(75);
-
-        Assert.Equal(143.75m, firstBandCost + secondBandCost);
         Assert.Equal(143.75m, result.Monthly);
+    }
+
+    [Fact]
+    public void Calculate_HonoursACustomConfig_NotHardCodedRates()
+    {
+        var custom = new SubscriptionPricingConfig(
+            new[]
+            {
+                new SubscriptionPricingBand(1, 10, 5.00m),
+                new SubscriptionPricingBand(11, null, 3.00m),
+            },
+            100.00m);
+
+        Assert.Equal(100.00m, PricingCalculator.Calculate(10, custom).Monthly); // 50 -> floored to 100
+        Assert.Equal(170.00m, PricingCalculator.Calculate(50, custom).Monthly); // 50 + 120
     }
 }

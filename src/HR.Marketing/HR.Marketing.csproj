@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\HR.ServiceDefaults\HR.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Shared\HR.SharedKernel\HR.SharedKernel.csproj" />
   </ItemGroup>
 
   <ItemGroup>

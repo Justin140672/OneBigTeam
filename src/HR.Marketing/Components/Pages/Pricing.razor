@@ -1,8 +1,11 @@
 @page "/pricing"
+@using System.Text.Json
 @using HR.Marketing.Services
+@using HR.SharedKernel.Pricing
 @using Microsoft.Extensions.Options
 @inject IOptions<PricingOptions> PricingOptionsAccessor
 @inject IMarketingAnalytics Analytics
+@inject SubscriptionPricingProvider PricingProvider
 
 <SeoHead Title="Simple HR Software Pricing | One Big Team"
          Description="Simple HR software pricing from £20 per month. Pay only for active employees, with every feature included and no setup fees."
@@ -25,21 +28,16 @@
         <div class="section-inner pricing-card-grid">
             <div class="pricing-card">
                 <p class="summary-label">Pricing Tiers</p>
-                <div class="pricing-headline">&pound;20/month minimum</div>
+                <div class="pricing-headline">@FormatCurrency(_config.MinimumMonthlyChargeGbp)/month minimum</div>
 
                 <ul class="tier-list">
-                    <li>
-                        <span>For your 1st-50th employee</span>
-                        <strong>&pound;2.00 each</strong>
-                    </li>
-                    <li>
-                        <span>For your 51st-150th employee</span>
-                        <strong>&pound;1.75 each</strong>
-                    </li>
-                    <li>
-                        <span>For each employee beyond 150</span>
-                        <strong>&pound;1.50 each</strong>
-                    </li>
+                    @foreach (var band in _config.Bands)
+                    {
+                        <li>
+                            <span>@BandLabel(band)</span>
+                            <strong>@FormatCurrency(band.PricePerEmployee) each</strong>
+                        </li>
+                    }
                 </ul>
 
                 <details class="tier-worked-example">
@@ -62,7 +60,9 @@
                   id="calculator"
                   method="get"
                   data-pricing-estimator
-                  data-large-org-threshold="@PricingOptionsAccessor.Value.LargeOrganisationThreshold">
+                  data-large-org-threshold="@PricingOptionsAccessor.Value.LargeOrganisationThreshold"
+                  data-pricing-bands="@BandsJson"
+                  data-minimum-charge="@_config.MinimumMonthlyChargeGbp">
                 <p class="summary-label">Pricing calculator</p>
                 <span class="pricing-section">Monthly price</span>
 
@@ -192,9 +192,12 @@
 
     private int DisplayEmployees;
     private string? ValidationMessage;
+    private SubscriptionPricingConfig _config = SubscriptionPricingConfig.Default;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        _config = await PricingProvider.GetAsync();
+
         var parsed = EmployeeCountInputParser.Parse(EmployeesQuery, fallback: 75);
         DisplayEmployees = EmployeesQuery is null ? 75 : parsed.Value;
         ValidationMessage = parsed.ValidationMessage;
@@ -203,9 +206,32 @@
         Analytics.TrackEmployeeCountChanged(DisplayEmployees, Result.Monthly, Cta.PrimaryLabel);
     }
 
-    private PricingResult Result => PricingCalculator.Calculate(DisplayEmployees);
+    private PricingResult Result => PricingCalculator.Calculate(DisplayEmployees, _config);
 
     private PricingCtaResult Cta => PricingCtaResolver.Resolve(DisplayEmployees, PricingOptionsAccessor.Value.LargeOrganisationThreshold);
+
+    private string BandsJson => JsonSerializer.Serialize(
+        _config.Bands.Select(b => new { start = b.StartEmployee, end = b.EndEmployee, price = b.PricePerEmployee }));
+
+    private static string BandLabel(SubscriptionPricingBand band)
+    {
+        if (band.EndEmployee is null)
+        {
+            return $"For each employee beyond {band.StartEmployee - 1}";
+        }
+
+        return band.StartEmployee == band.EndEmployee
+            ? $"For your {Ordinal(band.StartEmployee)} employee"
+            : $"For your {Ordinal(band.StartEmployee)}–{Ordinal(band.EndEmployee.Value)} employee";
+    }
+
+    private static string Ordinal(int n)
+    {
+        var suffix = (n % 100) is >= 11 and <= 13
+            ? "th"
+            : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" };
+        return $"{n}{suffix}";
+    }
 
     private static string FormatCurrency(decimal amount) => $"£{amount:0.00}";
 }

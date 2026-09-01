@@ -77,7 +77,10 @@ public class GetCustomerBillingBreakdownHandlerTests
         var value = result.Value!;
         Assert.Equal(company.Id, value.CompanyId);
         Assert.Equal(2, value.FutureStarters);
-        Assert.Equal(10m, value.PricePerEmployee);
+        // Progressive pricing (Story 4): no chargeable employees -> effective rate is 0 and the
+        // monthly total is the configured minimum monthly charge (£20 default).
+        Assert.Equal(0m, value.PricePerEmployee);
+        Assert.Equal(20m, value.MonthlyTotal);
         Assert.Equal(0m, value.Discounts);
         Assert.Single(value.History);
 
@@ -122,7 +125,10 @@ public class GetCustomerBillingBreakdownHandlerTests
         Assert.Equal(4, value.ActiveEmployees);
         Assert.Equal(4, value.Leavers);
         Assert.Equal(8, value.ChargeableEmployees);
-        Assert.Equal(200m, value.MonthlyTotal);
+        // Progressive pricing (Story 4, default config): 8 x £2.00 = £16.00 -> floored to the
+        // £20.00 minimum monthly charge. StripeOptions.MonthlyPriceGbp is no longer used.
+        Assert.Equal(20m, value.MonthlyTotal);
+        Assert.Equal(2.5m, value.PricePerEmployee);
     }
 
     [Fact]

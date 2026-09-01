@@ -1,0 +1,258 @@
+@page "/subscription-pricing"
+@using HR.SharedKernel.Pricing
+@inject SubscriptionPricingService SubscriptionPricingService
+
+<PageTitle>Subscription Pricing — Admin Portal</PageTitle>
+
+<h1>Subscription Pricing</h1>
+<p class="admin-actions-intro">
+    The single authoritative progressive per-employee pricing model. Bands must start at employee 1,
+    be contiguous (no gaps or overlaps), and the final band must be unlimited (cover all remaining
+    employees). Changes affect marketing, customer billing and this portal immediately and are
+    recorded in the audit log.
+</p>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_config is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view subscription pricing, or it couldn't be loaded.
+    </div>
+}
+else
+{
+    <section class="details-panel admin-actions-panel">
+        <h2>Pricing bands</h2>
+
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Start employee #</th>
+                    <th>End employee #</th>
+                    <th>Price per employee (GBP)</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (var i = 0; i < _bands.Count; i++)
+                {
+                    var index = i;
+                    var isLast = index == _bands.Count - 1;
+                    <tr>
+                        <td>
+                            <SfNumericTextBox TValue="int" @bind-Value="_bands[index].StartEmployee" Min="1" Format="n0" />
+                        </td>
+                        <td>
+                            @if (isLast)
+                            {
+                                <span>Unlimited</span>
+                            }
+                            else
+                            {
+                                <SfNumericTextBox TValue="int" @bind-Value="_bands[index].EndEmployeeValue" Min="1" Format="n0" />
+                            }
+                        </td>
+                        <td>
+                            <SfNumericTextBox TValue="decimal" @bind-Value="_bands[index].PricePerEmployee" Min="0" Format="c2" />
+                        </td>
+                        <td>
+                            <SfButton CssClass="e-danger" Disabled="_bands.Count <= 1" OnClick="@(() => RemoveBand(index))">Remove</SfButton>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="admin-actions-buttons">
+            <SfButton OnClick="AddBand">+ Add band</SfButton>
+        </div>
+
+        <div class="admin-action-field">
+            <label for="minimum-monthly-charge">Minimum monthly charge (GBP) <span class="text-danger">*</span></label>
+            <SfNumericTextBox TValue="decimal" @bind-Value="_minimumMonthlyChargeGbp" Min="0" Format="c2"
+                              HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "minimum-monthly-charge" })" />
+        </div>
+    </section>
+
+    <section class="details-panel">
+        <h2>Live preview</h2>
+        <div class="admin-action-field">
+            <label for="preview-count">Sample active employee count</label>
+            <SfNumericTextBox TValue="int" @bind-Value="_previewCount" Min="0" Format="n0"
+                              HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "preview-count" })" />
+        </div>
+        <p><strong>Estimated monthly charge: @PreviewCharge().ToString("c2")</strong></p>
+        @if (_clientValidationError is not null)
+        {
+            <p class="admin-action-error">@_clientValidationError</p>
+        }
+    </section>
+
+    @if (_saveErrors is { Count: > 0 })
+    {
+        <ul class="admin-action-error">
+            @foreach (var error in _saveErrors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    }
+
+    @if (_saveSucceeded)
+    {
+        <p class="admin-action-success">Subscription pricing saved successfully.</p>
+    }
+
+    <div class="admin-actions-buttons">
+        <SfButton IsPrimary="true" Disabled="_saving" OnClick="SaveAsync">Save changes</SfButton>
+    </div>
+}
+
+@code {
+    private SubscriptionPricingConfigModel? _config;
+    private bool _loading = true;
+
+    private List<BandRow> _bands = [];
+    private decimal _minimumMonthlyChargeGbp;
+    private int _previewCount = 75;
+
+    private bool _saving;
+    private bool _saveSucceeded;
+    private List<string>? _saveErrors;
+    private string? _clientValidationError;
+
+    private sealed class BandRow
+    {
+        public int StartEmployee { get; set; }
+        public int? EndEmployee { get; set; }
+
+        // Syncfusion SfNumericTextBox<int> can't bind a nullable; this shim maps 0 <-> null.
+        public int EndEmployeeValue
+        {
+            get => EndEmployee ?? 0;
+            set => EndEmployee = value <= 0 ? null : value;
+        }
+
+        public decimal PricePerEmployee { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _config = await SubscriptionPricingService.GetConfigOrNullAsync();
+        if (_config is not null)
+        {
+            LoadFrom(_config);
+        }
+        _loading = false;
+    }
+
+    private void LoadFrom(SubscriptionPricingConfigModel config)
+    {
+        _bands = config.Bands
+            .Select(b => new BandRow { StartEmployee = b.StartEmployee, EndEmployee = b.EndEmployee, PricePerEmployee = b.PricePerEmployee })
+            .ToList();
+        _minimumMonthlyChargeGbp = config.MinimumMonthlyChargeGbp;
+        // Enforce that only the final band is unlimited for the editor's shape.
+        for (var i = 0; i < _bands.Count - 1; i++)
+        {
+            _bands[i].EndEmployee ??= _bands[i].StartEmployee;
+        }
+        if (_bands.Count > 0)
+        {
+            _bands[^1].EndEmployee = null;
+        }
+    }
+
+    private void AddBand()
+    {
+        var previousEnd = _bands.Count >= 2 ? _bands[^2].EndEmployee ?? _bands[^2].StartEmployee : _bands.Count == 1 ? _bands[0].StartEmployee : 0;
+        // Insert a bounded band just before the final unlimited band.
+        var newStart = previousEnd + 1;
+        var newBand = new BandRow { StartEmployee = newStart, EndEmployee = newStart + 49, PricePerEmployee = 1.50m };
+        if (_bands.Count == 0)
+        {
+            _bands.Add(new BandRow { StartEmployee = 1, EndEmployee = null, PricePerEmployee = 2.00m });
+            return;
+        }
+        _bands.Insert(_bands.Count - 1, newBand);
+    }
+
+    private void RemoveBand(int index)
+    {
+        if (_bands.Count <= 1)
+        {
+            return;
+        }
+        _bands.RemoveAt(index);
+        if (_bands.Count > 0)
+        {
+            _bands[^1].EndEmployee = null;
+        }
+    }
+
+    private SubscriptionPricingConfig BuildConfig()
+    {
+        var bands = _bands
+            .Select((b, i) => new SubscriptionPricingBand(
+                b.StartEmployee,
+                i == _bands.Count - 1 ? null : b.EndEmployee,
+                b.PricePerEmployee))
+            .ToList();
+        return new SubscriptionPricingConfig(bands, _minimumMonthlyChargeGbp);
+    }
+
+    private decimal PreviewCharge()
+    {
+        try
+        {
+            return SubscriptionPricingCalculator.Calculate(_previewCount, BuildConfig()).FinalMonthlyCharge;
+        }
+        catch
+        {
+            return 0m;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saveSucceeded = false;
+        _saveErrors = null;
+        _clientValidationError = null;
+
+        var config = BuildConfig();
+        var validation = config.Validate();
+        if (validation.IsFailure)
+        {
+            _clientValidationError = validation.Error.Message;
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var request = new UpdateSubscriptionPricingConfigRequest(
+                config.Bands.Select(b => new SubscriptionPricingBandModel(b.StartEmployee, b.EndEmployee, b.PricePerEmployee)).ToList(),
+                config.MinimumMonthlyChargeGbp);
+
+            var result = await SubscriptionPricingService.UpdateConfigAsync(request);
+
+            if (result.Config is not null)
+            {
+                _saveSucceeded = true;
+                _config = result.Config;
+                LoadFrom(result.Config);
+            }
+            else
+            {
+                _saveErrors = result.Errors?.ToList() ?? ["Could not save subscription pricing."];
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

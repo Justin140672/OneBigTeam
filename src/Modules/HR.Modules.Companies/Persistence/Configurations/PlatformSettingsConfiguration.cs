@@ -48,6 +48,18 @@ internal sealed class PlatformSettingsConfiguration : IEntityTypeConfiguration<P
             .IsRequired()
             .HasDefaultValue("{}");
 
+        builder.Property(s => s.PricingBandsJson)
+            .HasColumnName("pricing_bands_json")
+            .HasColumnType("jsonb")
+            .IsRequired()
+            .HasDefaultValue("[]");
+
+        builder.Property(s => s.MinimumMonthlyChargeGbp)
+            .HasColumnName("minimum_monthly_charge_gbp")
+            .HasPrecision(10, 2)
+            .IsRequired()
+            .HasDefaultValue(0m);
+
         builder.Property(s => s.UpdatedAt)
             .HasColumnName("updated_at")
             .IsRequired();

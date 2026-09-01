@@ -20,6 +20,8 @@ using HR.Modules.Companies.Features.GetCustomerBillingHistory;
 using HR.Modules.Companies.Features.GetCustomerDashboard;
 using HR.Modules.Companies.Features.GetCustomerDetails;
 using HR.Modules.Companies.Features.GetDeletionQueue;
+using HR.Modules.Companies.Features.PlaceCompanyLegalHold;
+using HR.Modules.Companies.Features.LiftCompanyLegalHold;
 using HR.Modules.Companies.Features.GetEmployeeRenumberSideEffectStatus;
 using HR.Modules.Companies.Features.RetryEmployeeRenumberSideEffect;
 using HR.Modules.Companies.Features.GetCustomerSupportView;
@@ -53,6 +55,9 @@ using HR.Modules.Companies.Features.GetApplicationMetrics;
 using HR.Modules.Companies.Features.GetAuditLog;
 using HR.Modules.Companies.Features.GetPlatformSettings;
 using HR.Modules.Companies.Features.UpdatePlatformSettings;
+using HR.Modules.Companies.Features.GetSubscriptionPricingConfig;
+using HR.Modules.Companies.Features.UpdateSubscriptionPricingConfig;
+using HR.Modules.Companies.Features.GetPublicSubscriptionPricing;
 using HR.Modules.Companies.Persistence;
 using HR.Modules.Companies.Services;
 using HR.Modules.Companies.Services.OnboardingTasks;
@@ -359,6 +364,15 @@ public static class CompaniesModule
         services.AddScoped<IValidator<ExecuteCustomerDeletionRequest>, ExecuteCustomerDeletionValidator>();
         services.AddScoped<GetDeletionQueueHandler>();
 
+        // NFR-07 legal hold — a platform administrator can suspend all retention deletion for a
+        // company (litigation hold / investigation / dispute) and lift it later. Enforced by
+        // ILegalHoldStatusReader in the retention/purge handlers and jobs across other modules.
+        services.AddScoped<PlaceCompanyLegalHoldHandler>();
+        services.AddScoped<IValidator<PlaceCompanyLegalHoldRequest>, PlaceCompanyLegalHoldValidator>();
+        services.AddScoped<LiftCompanyLegalHoldHandler>();
+        services.AddScoped<IValidator<LiftCompanyLegalHoldRequest>, LiftCompanyLegalHoldValidator>();
+        services.AddScoped<ILegalHoldStatusReader, LegalHoldStatusReader>();
+
         // Admin Portal "Login As Customer" support sessions (Support epic) — company-scoped,
         // time-boxed, single-use, revocable, audited access grants for platform administrators.
         services.AddScoped<GenerateSupportSessionHandler>();
@@ -397,5 +411,16 @@ public static class CompaniesModule
         services.AddScoped<IValidator<GetPlatformSettingsRequest>, GetPlatformSettingsValidator>();
         services.AddScoped<UpdatePlatformSettingsHandler>();
         services.AddScoped<IValidator<UpdatePlatformSettingsRequest>, UpdatePlatformSettingsValidator>();
+
+        // Story 4 — configurable progressive subscription pricing. The single authoritative model
+        // (bands + minimum monthly charge) lives on the PlatformSettings singleton and is consumed
+        // by marketing, customer billing and the Admin app. GET/PUT are platform-admin only; the
+        // public feed is anonymous (marketing site).
+        services.AddScoped<GetSubscriptionPricingConfigHandler>();
+        services.AddScoped<IValidator<GetSubscriptionPricingConfigRequest>, GetSubscriptionPricingConfigValidator>();
+        services.AddScoped<UpdateSubscriptionPricingConfigHandler>();
+        services.AddScoped<IValidator<UpdateSubscriptionPricingConfigRequest>, UpdateSubscriptionPricingConfigValidator>();
+        services.AddScoped<GetPublicSubscriptionPricingHandler>();
+        services.AddScoped<IValidator<GetPublicSubscriptionPricingRequest>, GetPublicSubscriptionPricingValidator>();
     }
 }
