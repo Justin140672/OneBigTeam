@@ -21,7 +21,7 @@ internal sealed class LoggingPasswordResetEmailSender(ILogger<LoggingPasswordRes
 
         logger.LogInformation(
             "PASSWORD RESET EMAIL (stub) To={ToEmail} Name={RecipientName} Browser={Browser} OS={OperatingSystem} ActionUrl=(redacted)",
-            toEmail,
+            SensitiveDataScrubber.MaskEmail(toEmail),
             recipientName ?? "(none)",
             ua.BrowserName,
             ua.OperatingSystem);

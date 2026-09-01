@@ -148,5 +148,41 @@ internal static class EmployeeReferenceDataSeeder
             managerId,
         };
 
+    /// <summary>
+    /// Puts the company into Manual employee-number mode via the real HR settings endpoint.
+    /// The employee-number mode defaults to Automatic (see CompanyEmployeeNumberSettingsReader),
+    /// under which PUT .../employment rejects any change to an employee's system-generated number.
+    /// Tests that set or correct an explicit employee number must opt into Manual mode first.
+    /// </summary>
+    public static async Task SetEmployeeNumberModeManualAsync(HttpClient client, Guid companyId)
+    {
+        // HR settings carry an optimistic-concurrency Version. This helper may be called more than
+        // once per company (e.g. once per seeded employee), so walk the version forward until the
+        // PUT is accepted. A persistent 409 means the mode is already Manual from an earlier call.
+        for (var version = 0; version < 10; version++)
+        {
+            var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
+            {
+                id = companyId,
+                workingDays = 31,
+                hoursPerDay = 7.5,
+                leaveYearStartMonth = 1,
+                defaultHolidayAllowance = 25,
+                probationMonths = 6,
+                employeeNumberMode = "Manual",
+                employeeNumberPrefix = (string?)null,
+                nextEmployeeNumber = 1,
+                employeeNumberMinimumLength = 1,
+                version
+            });
+
+            if (response.IsSuccessStatusCode)
+                return;
+
+            if (response.StatusCode != System.Net.HttpStatusCode.Conflict)
+                response.EnsureSuccessStatusCode();
+        }
+    }
+
     private sealed record IdPayload(Guid Id);
 }

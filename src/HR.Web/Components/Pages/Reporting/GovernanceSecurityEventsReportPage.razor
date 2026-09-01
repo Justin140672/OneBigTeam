@@ -23,6 +23,14 @@
 
     private bool _allowed;
 
-    protected override void OnParametersSet()
-        => _allowed = AppSession.GuardAccess(Navigation, Session.CanViewGovernanceReporting);
+    protected override async Task OnParametersSetAsync()
+    {
+        // Capabilities are only meaningful once the session has loaded — never evaluate the guard
+        // (and never bounce to /access-denied) against a half-initialised session.
+        await Session.InitialiseAsync();
+        if (!Session.IsLoaded)
+            return;
+
+        _allowed = AppSession.GuardAccess(Navigation, Session.CanViewGovernanceReporting);
+    }
 }

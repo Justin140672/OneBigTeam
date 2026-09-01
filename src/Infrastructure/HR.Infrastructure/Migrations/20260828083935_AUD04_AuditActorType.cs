@@ -10,29 +10,24 @@ namespace HR.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AlterColumn<int>(
+            // The column was never introduced by an earlier migration (no AddColumn/CreateTable
+            // for it exists in the audit migration history), so add it here rather than alter it.
+            migrationBuilder.AddColumn<int>(
                 name: "actor_type",
                 schema: "audit",
                 table: "audit_events",
                 type: "integer",
                 nullable: false,
-                oldClrType: typeof(int),
-                oldType: "integer",
-                oldDefaultValue: 0);
+                defaultValue: 0);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AlterColumn<int>(
+            migrationBuilder.DropColumn(
                 name: "actor_type",
                 schema: "audit",
-                table: "audit_events",
-                type: "integer",
-                nullable: false,
-                defaultValue: 0,
-                oldClrType: typeof(int),
-                oldType: "integer");
+                table: "audit_events");
         }
     }
 }

@@ -42,6 +42,17 @@ internal sealed class UpdateCompanySettingsHandler
 		}
 
 		var now = _clock.UtcNowOffset();
+
+		// SET-03: explicit optimistic-concurrency pre-check. The EF concurrency token on
+		// CompanySettings.Version still guards the genuine write race, but when the version the
+		// client submitted is already stale on read we can return a clean 409 here rather than
+		// relying on the shape of the exception a batched 0-row UPDATE throws.
+		if (company.Settings is not null && company.Settings.Version != request.Version)
+		{
+			return Result.Failure<UpdateCompanySettingsResponse>(
+				Error.Conflict("Company settings were changed by someone else. Reload the latest settings and try again."));
+		}
+
 		var previousSettings = company.Settings is null
 			? null
 			: new CompanySettingsAuditSnapshot(

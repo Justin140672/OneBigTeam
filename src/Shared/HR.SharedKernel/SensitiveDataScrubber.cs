@@ -69,10 +69,16 @@ public static class SensitiveDataScrubber
         ("NationalInsuranceNumber", new Regex(
             @"\b[A-Z]{2}\s?\d{2}\s?\d{2}\s?\d{2}\s?[A-D]\b",
             RegexOptions.IgnoreCase | RegexOptions.Compiled)),
-        // IBAN (2 letter country + 2 check digits + up to 30 alnum).
+        // IBAN (2 letter country + 2 check digits + up to 30 alnum). Case-sensitive (uppercase)
+        // deliberately: real-world IBANs are always written/stored in uppercase, and matching
+        // case-insensitively made this trip on ordinary lowercase-hex GUID fragments embedded in
+        // names/emails/slugs (e.g. "Policy-cb0754f9d9ab..." from Guid.NewGuid():N) — "cb" + "07"
+        // + 11-30 more hex chars satisfies [A-Z]{2}\d{2}[A-Z0-9]{11,30} case-insensitively even
+        // though it's nowhere near an IBAN. A lowercase IBAN pasted into a payload is vanishingly
+        // rare in practice and not worth the false-positive rate this caused.
         ("Iban", new Regex(
             @"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled)),
+            RegexOptions.Compiled)),
         // UK sort code 12-34-56.
         ("SortCode", new Regex(@"\b\d{2}-\d{2}-\d{2}\b", RegexOptions.Compiled)),
         // Bank account / payment card number: 12-19 consecutive digits.
@@ -118,6 +124,15 @@ public static class SensitiveDataScrubber
         if (string.IsNullOrWhiteSpace(value))
             return null;
 
+        // A value that is exactly a GUID is never a bank account / card / NI number / token —
+        // but a GUID's 12-hex final segment (or an all-zero seeded id like
+        // 00000000-0000-0000-0000-000000000001) trivially trips the "12-19 consecutive digits"
+        // BankOrCardNumber pattern. Audit payloads and structured logs are full of GUID entity
+        // ids, so treat a standalone GUID as non-sensitive rather than over-matching it.
+        var trimmed = value.Trim();
+        if (Guid.TryParse(trimmed, out _))
+            return null;
+
         foreach (var (name, pattern) in ValuePatterns)
         {
             if (pattern.IsMatch(value))
@@ -128,6 +143,27 @@ public static class SensitiveDataScrubber
     }
 
     public static bool ContainsSensitiveValue(string? value) => MatchSensitiveValue(value) is not null;
+
+    /// <summary>
+    /// Masks an email address for logging: keeps up to the first two characters of the local part
+    /// and the full domain (e.g. <c>ja***@example.com</c>). Returns <see cref="Redacted"/> when the
+    /// value is null/blank or not a recognisable <c>local@domain</c> address.
+    /// </summary>
+    public static string MaskEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return Redacted;
+
+        var trimmed = email.Trim();
+        var at = trimmed.IndexOf('@');
+        if (at <= 0 || at == trimmed.Length - 1)
+            return Redacted;
+
+        var local = trimmed[..at];
+        var domain = trimmed[(at + 1)..];
+        var visible = local.Length <= 2 ? local[..1] : local[..2];
+        return $"{visible}***@{domain}";
+    }
 
     /// <summary>Replaces every sensitive-looking token in <paramref name="text"/> with <see cref="Redacted"/>.</summary>
     public static string ScrubText(string? text)

@@ -56,6 +56,10 @@ public class SensitiveDataScrubberTests
 
     [Theory]
     [InlineData("3f2504e0-4f89-11d3-9a0c-0305e82c3301")] // GUID
+    [InlineData("00000000-0000-0000-0000-000000000001")] // seeded GUID — 12-digit final segment must not trip BankOrCardNumber
+    [InlineData("12345678-1234-1234-1234-123456789012")] // GUID whose final segment is all digits
+    [InlineData("Policy-cb0754f9d9ab40079b70a858434dac74")] // lowercase :N GUID embedded in a name — must not trip Iban
+    [InlineData("audit.tester.bf825b7f8baf4c0890f23225a2d8a0f9@example.com")] // lowercase :N GUID embedded in an email
     [InlineData("Annual")]
     [InlineData("EMP-0001")]
     [InlineData("123")]                                  // short number

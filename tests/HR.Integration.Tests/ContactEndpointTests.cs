@@ -12,17 +12,21 @@ namespace HR.Integration.Tests;
 /// configured" test instead uses the shared <see cref="ApiWebApplicationFactory"/>, whose default
 /// appsettings.json intentionally leaves that setting blank.
 /// </summary>
+// Part of the "Integration" collection so ApiWebApplicationFactory's shared Postgres container is
+// started (and its connection string exported) before ContactApiWebApplicationFactory builds its
+// host — the latter no longer runs a container of its own.
+[Collection("Integration")]
 public sealed class ContactEndpointTests : IAsyncLifetime
 {
     private readonly ContactApiWebApplicationFactory _factory = new();
 
-    async Task IAsyncLifetime.InitializeAsync() => await ((IAsyncLifetime)_factory).InitializeAsync();
+    // The shared collection fixture (injected here only to force the collection ordering) has
+    // already started the Postgres container and set ConnectionStrings__hr by the time this runs.
+    public ContactEndpointTests(ApiWebApplicationFactory _) { }
 
-    async Task IAsyncLifetime.DisposeAsync()
-    {
-        await ((IAsyncLifetime)_factory).DisposeAsync();
-        await _factory.DisposeAsync();
-    }
+    Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
+
+    async Task IAsyncLifetime.DisposeAsync() => await _factory.DisposeAsync();
 
     private static object ValidContactRequest(
         string name = "Ada Lovelace",

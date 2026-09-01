@@ -6,45 +6,28 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Testcontainers.PostgreSql;
 
 namespace HR.Integration.Tests.Infrastructure;
 
 /// <summary>
-/// Standalone (non-shared, not collection-fixtured) variant of <see cref="ApiWebApplicationFactory"/>
-/// used solely by ContactEndpointTests. The shared <see cref="ApiWebApplicationFactory"/> boots with
-/// the default appsettings.json, where Marketing:ContactForm:RecipientEmail is intentionally blank
-/// (see 503 test) — this factory overrides that setting to a configured test recipient so the
-/// happy-path/validation/honeypot tests can exercise the "recipient is configured" branch. Spins up
-/// its own Postgres container per test class instance for the same reason
-/// NonDevelopmentApiWebApplicationFactory does: it can't reuse ApiWebApplicationFactory's shared
-/// instance, since configuration is fixed at host build time.
+/// Config-only variant of <see cref="ApiWebApplicationFactory"/> used by ContactEndpointTests.
+/// The shared factory boots with the default appsettings.json where
+/// Marketing:ContactForm:RecipientEmail is intentionally blank (see the 503 test); this factory
+/// overrides that setting so the happy-path/validation/honeypot tests can exercise the
+/// "recipient is configured" branch, and keeps its own <see cref="FakeEmailSender"/> so its
+/// Assert.Single/Assert.Empty email assertions stay isolated from the rest of the suite.
+///
+/// It no longer starts its own Postgres container: ContactEndpointTests is part of the
+/// "Integration" collection, so <see cref="ApiWebApplicationFactory"/>'s shared, already-migrated
+/// container is up (and its connection string exported to ConnectionStrings__hr) before this
+/// factory builds its host. The contact form endpoint writes no tenant data, so sharing that
+/// database is safe.
 /// </summary>
-public sealed class ContactApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public sealed class ContactApiWebApplicationFactory : WebApplicationFactory<Program>
 {
     public const string RecipientEmail = "contact-test-recipient@example.com";
 
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
-        .WithDatabase("hr_integration_contact")
-        .WithUsername("postgres")
-        .WithPassword("postgres")
-        .Build();
-
     public FakeEmailSender EmailSender { get; } = new FakeEmailSender();
-
-    async Task IAsyncLifetime.InitializeAsync()
-    {
-        await _postgres.StartAsync();
-
-        Environment.SetEnvironmentVariable("ConnectionStrings__hr", _postgres.GetConnectionString());
-    }
-
-    async Task IAsyncLifetime.DisposeAsync()
-    {
-        Environment.SetEnvironmentVariable("ConnectionStrings__hr", null);
-        await _postgres.DisposeAsync();
-    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

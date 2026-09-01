@@ -66,7 +66,18 @@ internal sealed class CustomerSubscriptionConfiguration : IEntityTypeConfigurati
         builder.Property(s => s.DeletionExecutedAt)
             .HasColumnName("deletion_executed_at");
 
+        builder.Property(s => s.LegalHoldPlacedAt)
+            .HasColumnName("legal_hold_placed_at");
+
+        builder.Property(s => s.LegalHoldPlacedBy)
+            .HasColumnName("legal_hold_placed_by");
+
+        builder.Property(s => s.LegalHoldReason)
+            .HasColumnName("legal_hold_reason")
+            .HasMaxLength(1000);
+
         builder.Ignore(s => s.HasPendingDeletion);
+        builder.Ignore(s => s.IsUnderLegalHold);
 
         builder.Property(s => s.CreatedAt)
             .HasColumnName("created_at")

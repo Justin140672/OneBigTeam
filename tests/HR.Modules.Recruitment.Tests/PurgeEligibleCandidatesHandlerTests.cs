@@ -198,11 +198,36 @@ public class PurgeEligibleCandidatesHandlerTests
         Assert.Equal(1, shortRetentionResult.Value!.PurgedCount);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_And_Purges_Nothing_When_Company_Is_Under_Legal_Hold()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var oldEnough = Now.AddDays(-731);
+        var candidate = CreateCandidateUpdatedAt(companyId, oldEnough);
+        db.Candidates.Add(candidate);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var result = await handler(db, auditPublisher: auditPublisher, legalHoldStatusReader: new FakeLegalHoldStatusReader(companyId)).HandleAsync(
+            new PurgeEligibleCandidatesRequest { CompanyId = companyId },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
+
+        var saved = await db.Candidates.SingleAsync();
+        Assert.Null(saved.PurgedAt);
+    }
+
     private static PurgeEligibleCandidatesHandler handler(
         RecruitmentDbContext db,
         FakeCompanyRecruitmentSettingsReader? recruitmentSettingsReader = null,
-        FakeAuditPublisher? auditPublisher = null) =>
-        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher(), recruitmentSettingsReader ?? new FakeCompanyRecruitmentSettingsReader());
+        FakeAuditPublisher? auditPublisher = null,
+        FakeLegalHoldStatusReader? legalHoldStatusReader = null) =>
+        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher(), recruitmentSettingsReader ?? new FakeCompanyRecruitmentSettingsReader(), legalHoldStatusReader ?? new FakeLegalHoldStatusReader());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

@@ -79,6 +79,16 @@ internal interface ISupabaseAuthGateway
     Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Revokes the Supabase session(s) for the user identified by <paramref name="userAccessToken"/>
+    /// — the access token from this app's session cookie. Calls GoTrue's user-scoped
+    /// <c>POST /auth/v1/logout?scope=global</c>, which invalidates every refresh token for that user
+    /// (all devices/sessions), so a signed-out session can never be silently refreshed. Throws
+    /// <see cref="InvalidOperationException"/> on a non-success response; the message carries the
+    /// HTTP status and a redacted body only, never the access token.
+    /// </summary>
+    Task SignOutAsync(string userAccessToken, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Removes ALL enrolled MFA (multi-factor authentication) factors for the Supabase Auth user
     /// identified by <paramref name="supabaseUserId"/>, via the GoTrue Admin API (server-only,
     /// SECRET key): lists the user's factors

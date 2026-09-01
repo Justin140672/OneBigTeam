@@ -20,13 +20,21 @@ internal sealed class PurgeEligibleCandidatesHandler(
     RecruitmentDbContext db,
     IClock clock,
     IAuditEventPublisher auditPublisher,
-    ICompanyRecruitmentSettingsReader recruitmentSettingsReader)
+    ICompanyRecruitmentSettingsReader recruitmentSettingsReader,
+    ILegalHoldStatusReader legalHoldStatusReader)
 {
     public async Task<Result<PurgeEligibleCandidatesResponse>> HandleAsync(
         PurgeEligibleCandidatesRequest request,
         Guid purgedBy,
         CancellationToken cancellationToken)
     {
+        // NFR-07: a company under legal hold is exempt from all retention deletion until lifted.
+        if (await legalHoldStatusReader.IsUnderLegalHoldAsync(request.CompanyId, cancellationToken))
+        {
+            return Result.Failure<PurgeEligibleCandidatesResponse>(Error.Conflict(
+                "This company is under a legal hold. Candidate purge is suspended until the hold is lifted."));
+        }
+
         var now = clock.UtcNowOffset();
         var settings = await recruitmentSettingsReader.GetRecruitmentSettingsAsync(request.CompanyId, cancellationToken);
         var cutoff = now.AddDays(-settings.CandidateRetentionDays);

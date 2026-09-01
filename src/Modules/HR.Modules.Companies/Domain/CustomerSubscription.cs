@@ -46,6 +46,22 @@ internal sealed class CustomerSubscription
     public DateTimeOffset? DeletionExecutedAt { get; private set; }
 
     /// <summary>
+    /// NFR-07 legal hold. A non-null <see cref="LegalHoldPlacedAt"/> means this company's data must
+    /// be preserved (litigation hold, regulatory investigation, dispute) and every automated or
+    /// operator-triggered retention deletion path must skip it — enforced by
+    /// <see cref="ILegalHoldStatusReader"/> in the retention/purge handlers and jobs, and by
+    /// <see cref="ExecuteDeletion"/> refusing to run while a hold is in place. A minimal flag on the
+    /// platform-owned subscription record rather than a new table: a hold is company-wide and
+    /// coarse-grained by design (per the NFR-07 "minimal legal_hold concept" scope). Deliberately
+    /// persisted columns, matching the deletion-overlay convention above.
+    /// </summary>
+    public DateTimeOffset? LegalHoldPlacedAt { get; private set; }
+    public Guid? LegalHoldPlacedBy { get; private set; }
+    public string? LegalHoldReason { get; private set; }
+
+    public bool IsUnderLegalHold => LegalHoldPlacedAt is not null;
+
+    /// <summary>
     /// True while a deletion countdown is active and not yet cancelled or executed — the set of
     /// companies the /deletion-queue page and the dashboard's "pending permanent deletions" stat
     /// both count as pending.
@@ -268,12 +284,52 @@ internal sealed class CustomerSubscription
     /// irreversible, cross-module cascade that deserves its own dedicated story and review, not a
     /// side effect bolted onto this one.
     /// </summary>
+    /// <summary>
+    /// NFR-07: places a company-wide legal hold. Idempotent-ish — re-placing an existing hold
+    /// refreshes the reason/actor/date rather than failing, so an operator can update the reason as
+    /// a matter develops. While a hold is in place, retention deletion (automated jobs and the
+    /// operator purge endpoints) skips this company and <see cref="ExecuteDeletion"/> is blocked.
+    /// </summary>
+    public Result PlaceLegalHold(Guid? placedByUserId, string reason, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            return Result.Failure(Error.Validation("A legal hold requires a reason."));
+
+        LegalHoldPlacedAt = now;
+        LegalHoldPlacedBy = placedByUserId;
+        LegalHoldReason = reason.Trim();
+        UpdatedAt = now;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// NFR-07: lifts an active legal hold, allowing normal retention processing to resume for this
+    /// company. The reason/actor are cleared; the audit trail retains the history.
+    /// </summary>
+    public Result LiftLegalHold(DateTimeOffset now)
+    {
+        if (!IsUnderLegalHold)
+            return Result.Failure(Error.Validation("This company is not currently under a legal hold."));
+
+        LegalHoldPlacedAt = null;
+        LegalHoldPlacedBy = null;
+        LegalHoldReason = null;
+        UpdatedAt = now;
+        return Result.Success();
+    }
+
     public Result ExecuteDeletion(DateTimeOffset now)
     {
         if (!HasPendingDeletion)
         {
             return Result.Failure(Error.Validation(
                 "This company does not have a pending deletion to execute."));
+        }
+
+        if (IsUnderLegalHold)
+        {
+            return Result.Failure(Error.Conflict(
+                "This company is under a legal hold. Lift the legal hold before executing deletion."));
         }
 
         DeletionExecutedAt = now;

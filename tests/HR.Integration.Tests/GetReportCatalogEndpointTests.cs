@@ -192,9 +192,14 @@ public class GetReportCatalogEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<CatalogPayload>();
         Assert.NotNull(payload);
-        // Full Hr-category catalog (phases 1-4) plus workload-actions: 14 entries total once the
-        // 3 Recruitment-only entries are excluded from the full 17-entry catalog.
-        Assert.Equal(14, payload!.Items.Count);
+        // Full Hr-category catalog (phases 1-4) plus workload-actions (14 entries) plus the 4
+        // ADM-08 governance reports (HrAdministrator holds reporting:view-governance), once the
+        // 3 Recruitment-only entries are excluded from the full 21-entry catalog.
+        Assert.Equal(18, payload!.Items.Count);
+        Assert.Contains(payload.Items, i => i.Id == "governance-user-activity" && i.Category == "Administration");
+        Assert.Contains(payload.Items, i => i.Id == "governance-administrative-changes" && i.Category == "Administration");
+        Assert.Contains(payload.Items, i => i.Id == "governance-compliance-status" && i.Category == "Administration");
+        Assert.Contains(payload.Items, i => i.Id == "governance-security-events" && i.Category == "Administration");
         Assert.Contains(payload.Items, i => i.Id == "hr-headcount-summary" && i.Category == "Hr");
         Assert.Contains(payload.Items, i => i.Id == "employee-directory" && i.Category == "Hr");
         Assert.Contains(payload.Items, i => i.Id == "employee-starters" && i.Category == "Hr");
@@ -228,9 +233,14 @@ public class GetReportCatalogEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<CatalogPayload>();
         Assert.NotNull(payload);
-        // Recruiter + HrAdministrator together satisfy every category flag: the full 17-entry
-        // catalog (all Recruitment + all Hr, including phase-4 and OBT-721 workload-actions).
-        Assert.Equal(17, payload!.Items.Count);
+        // Recruiter + HrAdministrator together satisfy every category flag: the full 21-entry
+        // catalog (all Recruitment + all Hr, including phase-4 and OBT-721 workload-actions, plus
+        // the 4 ADM-08 governance reports via HrAdministrator's reporting:view-governance).
+        Assert.Equal(21, payload!.Items.Count);
+        Assert.Contains(payload.Items, i => i.Id == "governance-user-activity");
+        Assert.Contains(payload.Items, i => i.Id == "governance-administrative-changes");
+        Assert.Contains(payload.Items, i => i.Id == "governance-compliance-status");
+        Assert.Contains(payload.Items, i => i.Id == "governance-security-events");
         Assert.Contains(payload.Items, i => i.Id == "workload-actions");
         Assert.Contains(payload.Items, i => i.Id == "recruitment-pipeline-summary");
         Assert.Contains(payload.Items, i => i.Id == "hr-headcount-summary");

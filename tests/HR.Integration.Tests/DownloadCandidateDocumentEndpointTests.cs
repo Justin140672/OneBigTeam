@@ -1,0 +1,110 @@
+using System.Net;
+using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
+using Microsoft.AspNetCore.Mvc.Testing;
+
+namespace HR.Integration.Tests;
+
+/// <summary>
+/// Postgres integration coverage for GET /candidates/{c}/documents/{d}/download. See
+/// DownloadCandidateDocumentHandlerTests in HR.Modules.Recruitment.Tests for the unit-level
+/// equivalent. Covers: anonymous 401, wrong-role 403, happy 302 redirect to a storage URL,
+/// unknown document 404, cross-company 404.
+/// </summary>
+[Collection("Integration")]
+public class DownloadCandidateDocumentEndpointTests
+{
+    private readonly ApiWebApplicationFactory _factory;
+    private static readonly Guid RecruiterUser = new("cc0000cb-0000-0000-0000-000000000001");
+    private static readonly Guid PlainEmployeeUser = new("cc0000cb-0000-0000-0000-000000000002");
+    private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
+
+    public DownloadCandidateDocumentEndpointTests(ApiWebApplicationFactory factory)
+    {
+        _factory = factory;
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, RecruiterUser, SystemRoles.Recruiter);
+            await TestRoleSeeder.AssignRoleAsync(factory, PlainEmployeeUser, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
+    }
+
+    private HttpClient NoRedirectClient(Guid userId, Guid companyId)
+    {
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
+    }
+
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
+    {
+        var client = NoRedirectClient(userId, companyId);
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
+        return client;
+    }
+
+    private static string Url(Guid companyId, Guid candidateId, Guid documentId) =>
+        $"/api/companies/{companyId}/candidates/{candidateId}/documents/{documentId}/download";
+
+    [Fact]
+    public async Task Get_Download_Returns_Unauthorized_For_Anonymous_Request()
+    {
+        using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var response = await client.GetAsync(Url(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_Download_Returns_Forbidden_For_Plain_Employee()
+    {
+        var companyId = Guid.NewGuid();
+        var candidateId = await RecruitmentTestSeeder.SeedCandidateAsync(_factory, companyId, Now);
+        var documentId = await RecruitmentTestSeeder.SeedCandidateDocumentAsync(_factory, companyId, candidateId, Now);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
+
+        var response = await client.GetAsync(Url(companyId, candidateId, documentId));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_Download_Returns_Redirect_For_Known_Document()
+    {
+        var companyId = Guid.NewGuid();
+        var candidateId = await RecruitmentTestSeeder.SeedCandidateAsync(_factory, companyId, Now);
+        var documentId = await RecruitmentTestSeeder.SeedCandidateDocumentAsync(_factory, companyId, candidateId, Now);
+        using var client = await ClientAs(RecruiterUser, companyId);
+
+        var response = await client.GetAsync(Url(companyId, candidateId, documentId));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.NotNull(response.Headers.Location);
+    }
+
+    [Fact]
+    public async Task Get_Download_Returns_NotFound_For_Unknown_Document()
+    {
+        var companyId = Guid.NewGuid();
+        var candidateId = await RecruitmentTestSeeder.SeedCandidateAsync(_factory, companyId, Now);
+        using var client = await ClientAs(RecruiterUser, companyId);
+
+        var response = await client.GetAsync(Url(companyId, candidateId, Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_Download_Returns_NotFound_For_Document_In_Different_Company()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var candidateId = await RecruitmentTestSeeder.SeedCandidateAsync(_factory, companyA, Now);
+        var documentId = await RecruitmentTestSeeder.SeedCandidateDocumentAsync(_factory, companyA, candidateId, Now);
+        using var clientB = await ClientAs(RecruiterUser, companyB);
+
+        var response = await clientB.GetAsync(Url(companyB, candidateId, documentId));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+}

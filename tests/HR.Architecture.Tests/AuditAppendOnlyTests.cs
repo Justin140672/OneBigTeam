@@ -97,6 +97,38 @@ public class AuditAppendOnlyTests
         }
     }
 
+    [Fact]
+    public async Task SaveChangesAsync_Does_Not_Throw_AUD02_When_AuditPendingItem_Is_Modified()
+    {
+        // AuditPendingItem is a mutable staging table by design — the promotion job legitimately
+        // transitions its Status (MarkProcessing → MarkCommitted/MarkFailed). The append-only guard
+        // is scoped to committed AuditEvent rows and must not block this.
+        await using var ctx = BuildContext();
+        var entry = ctx.AuditPendingItems.Add(AuditPendingItem.From(new FakeAuditEvent()));
+
+        entry.State = EntityState.Modified;
+
+        var ex = await Record.ExceptionAsync(() => ctx.SaveChangesAsync());
+
+        if (ex is InvalidOperationException ioe)
+            Assert.DoesNotContain("AUD-02", ioe.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SaveChanges_Does_Not_Throw_AUD02_When_AuditPendingItem_Is_Deleted()
+    {
+        // A committed/failed pending item may legitimately be pruned from the staging table.
+        using var ctx = BuildContext();
+        var entry = ctx.AuditPendingItems.Add(AuditPendingItem.From(new FakeAuditEvent()));
+
+        entry.State = EntityState.Deleted;
+
+        var ex = Record.Exception(() => ctx.SaveChanges());
+
+        if (ex is InvalidOperationException ioe)
+            Assert.DoesNotContain("AUD-02", ioe.Message, StringComparison.Ordinal);
+    }
+
     private static AuditEvent BuildMinimalAuditEvent() =>
         AuditEvent.From(new FakeAuditEvent());
 }

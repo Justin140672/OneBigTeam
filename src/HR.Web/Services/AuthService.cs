@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using HR.SharedKernel;
 using Microsoft.Extensions.Logging;
 
 namespace HR.Web.Services;
@@ -32,7 +33,7 @@ public sealed class AuthService(IHttpClientFactory httpClientFactory, ILogger<Au
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to log in {Email}", email);
+            logger.LogWarning(ex, "Failed to log in {Email}", SensitiveDataScrubber.MaskEmail(email));
             return (null, "Something went wrong. Please try again.");
         }
     }

@@ -29,6 +29,8 @@ public static class AccessibilityScan
     /// </summary>
     public static async Task AssertNoSeriousViolationsAsync(IPage page, string context)
     {
+        await WaitForGridsToSettleAsync(page);
+
         AxeResult results = await page.RunAxe(new AxeRunOptions
         {
             RunOnly = new RunOnlyOptions
@@ -55,6 +57,35 @@ public static class AccessibilityScan
         Assert.True(blocking.Count == 0,
             $"axe-core reported {blocking.Count} serious/critical WCAG violation(s) during \"{context}\":\n" +
             string.Join("\n", detail));
+    }
+
+    /// <summary>
+    /// Syncfusion's <c>.e-grid</c> renders its <c>role="grid"</c>/<c>treegrid</c> container before the
+    /// row group is populated. Scanning during that window makes axe's <c>aria-required-children</c>
+    /// rule (correctly) flag the grid as missing its required <c>row</c>/<c>rowgroup</c> children —
+    /// a transient state, not a real defect. Wait for every grid on the page to resolve to either
+    /// real data rows or Syncfusion's explicit empty-row placeholder before handing off to axe.
+    /// </summary>
+    private static async Task WaitForGridsToSettleAsync(IPage page)
+    {
+        var gridCount = await page.Locator(".e-grid").CountAsync();
+        for (var i = 0; i < gridCount; i++)
+        {
+            var grid = page.Locator(".e-grid").Nth(i);
+            try
+            {
+                await grid.Locator(".e-row, .e-emptyrow").First
+                    .WaitForAsync(new LocatorWaitForOptions
+                    {
+                        State = WaitForSelectorState.Attached,
+                        Timeout = 10_000,
+                    });
+            }
+            catch (TimeoutException)
+            {
+                // Grid never rendered a row group — let the scan run and report it as a real finding.
+            }
+        }
     }
 
     /// <summary>

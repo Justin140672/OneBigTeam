@@ -30,6 +30,7 @@
     --hr-gray-900: #111827;
     --hr-gray-800: #1f2937;
     --hr-gray-700: #374151;
+    --hr-gray-600: #4b5563;
     --hr-gray-500: #6b7280;
     --hr-gray-400: #9ca3af;
     --hr-gray-300: #d1d5db;
@@ -592,12 +593,31 @@ h1 {
     line-height: 1.2;
 }
 
-html[data-theme="dark"] h1 {
+/* h2/h3 carry no accent bar, but need the same explicit colour as h1: several ancestor rules set
+   `color: var(--hr-gray-900)`, which on the dark shell surface (also gray-900) fails WCAG AA. */
+h2,
+h3 {
+    color: var(--hr-gray-900);
+}
+
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3 {
     color: var(--hr-gray-50);
 }
 
 h1:focus {
     outline: none;
+}
+
+/* Syncfusion grid/kanban header count badge (.e-header-title > .e-item-count). The theme default
+   is a light gray that only clears ~2.5:1 on the white header — bump to an AA-safe neutral. */
+.e-item-count {
+    color: var(--hr-gray-600);
+}
+
+html[data-theme="dark"] .e-item-count {
+    color: var(--hr-gray-300);
 }
 
 .valid.modified:not([type=checkbox]) {
@@ -946,7 +966,9 @@ html[data-theme="dark"] .card-header {
 .task-widget-meta {
     display: block;
     font-size: 0.75rem;
-    color: var(--hr-gray-400);
+    /* WCAG AA: --hr-gray-400 (#9ca3af) is only ~2.5:1 on white. --hr-gray-500 (#6b7280)
+       is ~4.8:1, and stays >=4.5:1 over the faint red tint of .attention-queue-item--overdue. */
+    color: var(--hr-gray-500);
     margin-top: 1px;
 }
 
@@ -971,7 +993,9 @@ html[data-theme="dark"] .card-header {
 
 .dashboard-overview-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    /* min(320px, 100%) so a viewport narrower than the 320px track (mobile, 375px and below)
+       shrinks the column instead of overflowing the page horizontally. */
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
     gap: 1.25rem;
     margin-bottom: 2rem;
 }
@@ -1185,7 +1209,8 @@ html[data-theme="dark"] .card-header {
 
 .dashboard-detail-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    /* See .dashboard-overview-row — min(320px, 100%) prevents horizontal overflow below 320px. */
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
     gap: 1.25rem;
 }
 
@@ -1382,7 +1407,8 @@ html[data-theme="dark"] .task-widget-title {
 }
 
 html[data-theme="dark"] .task-widget-meta {
-    color: var(--hr-gray-500);
+    /* --hr-gray-500 (#6b7280) is ~2.8:1 on the dark card surface; --hr-gray-300 (#d1d5db) is ~9:1. */
+    color: var(--hr-gray-300);
 }
 
 html[data-theme="dark"] .due-badge--overdue  { background: rgba(220,38,38,0.18);  color: var(--hr-color-danger); }

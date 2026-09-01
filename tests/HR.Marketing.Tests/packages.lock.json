@@ -398,14 +398,15 @@
       "hr.marketing": {
         "type": "Project",
         "dependencies": {
-          "HR.ServiceDefaults": "[1.0.0, )",
+          "HR.ServiceDefaults": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Markdig": "[1.3.2, )"
         }
       },
       "hr.servicedefaults": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Microsoft.Extensions.Http.Resilience": "[10.9.0, )",
           "Microsoft.Extensions.ServiceDiscovery": "[10.9.0, )",
           "OpenTelemetry.Exporter.OpenTelemetryProtocol": "[1.17.0, )",

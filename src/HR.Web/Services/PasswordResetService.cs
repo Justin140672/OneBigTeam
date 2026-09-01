@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using HR.SharedKernel;
 using Microsoft.Extensions.Logging;
 
 namespace HR.Web.Services;
@@ -23,7 +24,7 @@ public sealed class PasswordResetService(IHttpClientFactory httpClientFactory, I
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to request password reset for {Email}", email);
+            logger.LogWarning(ex, "Failed to request password reset for {Email}", SensitiveDataScrubber.MaskEmail(email));
             return false;
         }
     }

@@ -381,6 +381,9 @@ public class UpdateEmploymentDetailsEndpointTests
     private static async Task<EmployeeRef> CreateEmployeeAsync(HttpClient client, Guid companyId)
     {
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+        // These tests set/correct an explicit employee number via PUT .../employment, which is only
+        // permitted in Manual employee-number mode (the default is Automatic).
+        await EmployeeReferenceDataSeeder.SetEmployeeNumberModeManualAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",

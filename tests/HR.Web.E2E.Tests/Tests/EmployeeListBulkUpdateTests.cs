@@ -23,48 +23,17 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
     private const string LauraEmail = "laura.bennett@acme.example";
 
     /// <summary>
-    /// Creates a brand-new employee (unique last name/email/employee number) with an initial,
-    /// open-ended compensation record effective well in the past, so it's this employee's single
-    /// "current" record when the bulk update dialog looks it up. Mirrors
-    /// BulkCompensationUpdateTests.CreateEmployeeWithCompensationAsync.
+    /// Returns a dedicated pre-seeded pool employee (SeededE2eEmployees.ListBulkUpdate[slot]).
+    /// Every pool member already has a single open-ended "current" compensation record of £50,000
+    /// effective 2026-03-01 — the same starting state the old
+    /// create-employee-then-add-compensation flow produced (the <paramref name="initialSalary"/>
+    /// parameter is therefore ignored; all pool members start at £50,000). Each of these tests
+    /// applies a real, persisted bulk adjustment to its employee, so callers pass a distinct slot.
     /// </summary>
-    private async Task<(string LastName, Guid EmployeeId)> CreateEmployeeWithCompensationAsync(
-        EmployeeListPage empList, EmployeeEditPage empEdit, string uniqueSuffix, decimal initialSalary)
+    private static (string LastName, Guid EmployeeId) CreateEmployeeWithCompensationAsync(int slot)
     {
-        var lastName = $"BulkListComp{uniqueSuffix}";
-        var workEmail = $"e2e.bulklistcomp{uniqueSuffix}@acme.example";
-        var employeeNumber = $"E2E-BLC-{uniqueSuffix}";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
-        await empEdit.FillEmployeeNumberAsync(employeeNumber);
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
-        await empEdit.SaveNewEmployeeAsync();
-
-        // Matches the guid directly rather than splitting on the trailing "/view" segment
-        // (EmployeeList.razor's row link/OnRecordClick lands on the view route).
-        await empList.ClickEmployeeAsync(lastName);
-        var employeeId = Guid.Parse(System.Text.RegularExpressions.Regex.Match(
-            _page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})").Groups[1].Value);
-
-        await empEdit.OpenCompensationTabAsync();
-        await empEdit.ClickAddCompensationAsync();
-        await empEdit.FillAddCompensationEffectiveFromAsync("01/01/2020");
-        await empEdit.SelectAddCompensationSalaryTypeAsync("Annual");
-        await empEdit.FillAddCompensationSalaryAsync(initialSalary.ToString("0"));
-        await empEdit.FillAddCompensationCurrencyAsync("GBP");
-        await empEdit.SubmitAddCompensationDialogAsync();
-
-        return (lastName, employeeId);
+        var seeded = SeededE2eEmployees.ListBulkUpdate[slot];
+        return (seeded.LastName, seeded.EmployeeId);
     }
 
     [Fact]
@@ -72,13 +41,11 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
-        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var unique = Guid.NewGuid().ToString("N")[..8];
-        var (lastName, _) = await CreateEmployeeWithCompensationAsync(empList, empEdit, unique, initialSalary: 50_000);
+        var (lastName, _) = CreateEmployeeWithCompensationAsync(slot: 0);
 
         await empList.GoToAsync(AcmeId);
         await empList.SearchAsync(lastName);
@@ -103,16 +70,13 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var unique = Guid.NewGuid().ToString("N")[..8];
-        var (firstLastName, firstId) =
-            await CreateEmployeeWithCompensationAsync(empList, empEdit, $"{unique}A", initialSalary: 50_000);
-        var (secondLastName, secondId) =
-            await CreateEmployeeWithCompensationAsync(empList, empEdit, $"{unique}B", initialSalary: 80_000);
+        // Two dedicated pool employees, both starting at £50,000, sharing the "SeedBulk" prefix so
+        // a single search surfaces both rows for multi-selection.
+        var (firstLastName, firstId) = CreateEmployeeWithCompensationAsync(slot: 0);
+        var (secondLastName, secondId) = CreateEmployeeWithCompensationAsync(slot: 1);
 
-        // Both new employees share the "BulkListComp{unique}" prefix, so a single search surfaces
-        // both rows for multi-selection.
         await empList.GoToAsync(AcmeId);
-        await empList.SearchAsync($"BulkListComp{unique}");
+        await empList.SearchAsync("SeedBulk");
 
         await empList.CheckEmployeeRowAsync(firstLastName);
         await empList.CheckEmployeeRowAsync(secondLastName);
@@ -137,7 +101,7 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         Assert.Equal(2, await dialog.GetPreviewRowCountAsync());
 
         Assert.Equal(55_000m, await dialog.GetProposedSalaryAsync(firstLastName));
-        Assert.Equal(88_000m, await dialog.GetProposedSalaryAsync(secondLastName));
+        Assert.Equal(55_000m, await dialog.GetProposedSalaryAsync(secondLastName));
 
         await dialog.ConfirmApplyAsync();
 
@@ -154,14 +118,14 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await empEdit.GoToAsync(AcmeId, secondId);
         await empEdit.OpenCompensationTabAsync();
         var secondSalaryText = await empEdit.GetCompensationFieldTextAsync("compensation-salary");
-        Assert.Contains(88_000m.ToString("N2"), secondSalaryText);
+        Assert.Contains(55_000m.ToString("N2"), secondSalaryText);
     }
 
     [Theory]
-    [InlineData("Fixed Amount Increase", "5000", 55_000)]
-    [InlineData("Set Salary Directly", "60000", 60_000)]
+    [InlineData("Fixed Amount Increase", "5000", 55_000, 2)]
+    [InlineData("Set Salary Directly", "60000", 60_000, 3)]
     public async Task BulkUpdate_ForEachAdjustmentMode_UpdatesEmployeeSalary(
-        string modeLabel, string adjustmentValue, decimal expectedSalary)
+        string modeLabel, string adjustmentValue, decimal expectedSalary, int poolSlot)
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
@@ -171,8 +135,7 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var unique = Guid.NewGuid().ToString("N")[..8];
-        var (lastName, employeeId) = await CreateEmployeeWithCompensationAsync(empList, empEdit, unique, initialSalary: 50_000);
+        var (lastName, employeeId) = CreateEmployeeWithCompensationAsync(poolSlot);
 
         await empList.GoToAsync(AcmeId);
         await empList.SearchAsync(lastName);
@@ -215,8 +178,7 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var unique = Guid.NewGuid().ToString("N")[..8];
-        var (lastName, employeeId) = await CreateEmployeeWithCompensationAsync(empList, empEdit, unique, initialSalary: 50_000);
+        var (lastName, employeeId) = CreateEmployeeWithCompensationAsync(slot: 4);
 
         await empList.GoToAsync(AcmeId);
         await empList.SearchAsync(lastName);
@@ -335,18 +297,13 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await login.LoginAsync(LauraEmail);
 
         var unique = Guid.NewGuid().ToString("N")[..8];
-        var (_, employeeId) = await CreateEmployeeWithCompensationAsync(empList, empEdit, unique, 50000);
+        var seeded = SeededE2eEmployees.ListBulkUpdate[5];
+        var employeeId = seeded.EmployeeId;
 
-        // Acme's Employee Number Mode is shared, mutable company state — other test classes
-        // (HrSettingsPageTests, BackfillEmployeeNumbersTests) flip it between Manual and
-        // Automatic via the UI, so it can't be assumed here. CreateEmployeeWithCompensationAsync's
-        // FillEmployeeNumberAsync is a documented no-op in Automatic mode (see its own doc
-        // comment), in which case the employee's real number is one the backend generated, not
-        // the local `E2E-BLC-{unique}` string. Read the actually-assigned number back from the
-        // page instead of assuming it matches what was typed, so this test passes regardless of
-        // the ambient mode.
-        var assignedEmployeeNumber = (await empEdit.GetEmployeeNumberHeaderTextAsync())?.TrimStart('#')
-            ?? $"E2E-BLC-{unique}";
+        // The pool employee was seeded directly with a fixed employee number regardless of Acme's
+        // (shared, mutable) Employee Number Mode, so — unlike a UI-created hire — it is always
+        // exactly this string.
+        var assignedEmployeeNumber = seeded.EmployeeNumber;
 
         var tempFile = Path.Combine(Path.GetTempPath(), $"compensation-import-list-{unique}.xlsx");
         try

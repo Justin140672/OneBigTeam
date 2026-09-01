@@ -281,8 +281,14 @@ public class EmergencyContactsEndpointTests
         Assert.Equal("Father", updatedList.Contacts[0].Relationship);
         Assert.Equal("robert@example.com", updatedList.Contacts[0].Email);
 
-        // HR admin GET should also see it
-        var adminResponse = await client.GetAsync(
+        // HR admin GET should also see it — the non-"/me" route is gated by employee:read, which a
+        // plain employee (which `client` acts as) does not hold, so use an HR-admin client.
+        using var adminClient = _factory.CreateClient();
+        adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, EcUser4.ToString());
+        adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, EcUser4, SystemRoles.HrAdministrator, companyId);
+
+        var adminResponse = await adminClient.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/emergency-contacts");
         Assert.Equal(HttpStatusCode.OK, adminResponse.StatusCode);
 

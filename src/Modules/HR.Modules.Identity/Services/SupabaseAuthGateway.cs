@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using HR.SharedKernel;
 using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Identity.Services;
@@ -10,13 +11,59 @@ namespace HR.Modules.Identity.Services;
 // Supabase's Auth Admin API over raw HTTP (there is no first-party .NET SDK equivalent to
 // Stripe.net used here). This is a genuinely new, live, untested-against-real-Supabase code path —
 // every request/response shape below is a best-effort reading of Supabase's documented Auth API
-// conventions and is explicitly flagged as unverified where relevant. Errors are surfaced with the
-// raw response body rather than swallowed, since silent failures here would be much harder to
-// diagnose than a clear exception during initial end-to-end testing.
+// conventions and is explicitly flagged as unverified where relevant. Errors are surfaced with a
+// redacted description of the response (status plus a small allow-list of non-sensitive
+// diagnostic fields) rather than the raw body: Supabase token, recovery-link and password
+// endpoints echo access tokens, refresh tokens and single-use action links in both success and
+// error payloads, and these exception messages are logged by callers (see LoginHandler).
 internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, IOptions<SupabaseAuthOptions> options)
     : ISupabaseAuthGateway
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    // Non-sensitive fields that are safe to echo from a Supabase error body. Everything else
+    // (tokens, hashed_token, action_link, user objects, ...) is dropped.
+    private static readonly HashSet<string> SafeErrorFields = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "error", "error_description", "error_code", "code", "msg", "message",
+    };
+
+    /// <summary>
+    /// Builds a log- and exception-safe description of a failed Supabase response. Never returns
+    /// tokens or action links; retained diagnostic values are still run through the shared
+    /// sensitive-value scrubber as defence in depth.
+    /// </summary>
+    private static string Describe(string? rawBody)
+    {
+        if (string.IsNullOrWhiteSpace(rawBody))
+            return "response body: (none)";
+
+        try
+        {
+            using var doc = JsonDocument.Parse(rawBody);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                var parts = new List<string>();
+                foreach (var property in doc.RootElement.EnumerateObject())
+                {
+                    if (property.Value.ValueKind is not (JsonValueKind.String or JsonValueKind.Number))
+                        continue;
+                    if (!SafeErrorFields.Contains(property.Name))
+                        continue;
+                    parts.Add($"{property.Name}={SensitiveDataScrubber.ScrubText(property.Value.ToString())}");
+                }
+
+                if (parts.Count > 0)
+                    return $"response detail: {string.Join(", ", parts)}";
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON — fall through to the generic redaction.
+        }
+
+        return "response body: (redacted)";
+    }
 
     public async Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken)
     {
@@ -59,7 +106,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
             }
 
             throw new InvalidOperationException(
-                $"Supabase admin create-user request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+                $"Supabase admin create-user request failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
         }
 
         var payload = await response.Content.ReadFromJsonAsync<SupabaseInviteResponse>(JsonOptions, cancellationToken);
@@ -67,7 +114,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase admin create-user response did not contain a parseable user id. Response body: {body}");
+                $"Supabase admin create-user response did not contain a parseable user id. {Describe(body)}");
         }
 
         // The admin create call above never sends an email itself — /auth/v1/resend is what
@@ -98,7 +145,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase resend-verification request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+                $"Supabase resend-verification request failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
         }
     }
 
@@ -120,7 +167,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase password-recovery request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+                $"Supabase password-recovery request failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
         }
     }
 
@@ -146,7 +193,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase generate-recovery-link request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+                $"Supabase generate-recovery-link request failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
         }
 
         var payload = await response.Content.ReadFromJsonAsync<SupabaseGenerateLinkResponse>(JsonOptions, cancellationToken);
@@ -154,7 +201,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase generate-recovery-link response did not contain an action_link. Response body: {body}");
+                $"Supabase generate-recovery-link response did not contain an action_link. {Describe(body)}");
         }
 
         return payload.ActionLink;
@@ -186,7 +233,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase PKCE code exchange failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+                $"Supabase PKCE code exchange failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
         }
 
         var payload = await response.Content.ReadFromJsonAsync<SupabaseTokenResponse>(JsonOptions, cancellationToken);
@@ -195,7 +242,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase PKCE code exchange response was missing expected fields. Response body: {body}");
+                $"Supabase PKCE code exchange response was missing expected fields. {Describe(body)}");
         }
 
         var expiresAt = DateTimeOffset.UtcNow.AddSeconds(payload.ExpiresIn ?? 3600);
@@ -230,7 +277,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
             {
                 var createdBody = await response.Content.ReadAsStringAsync(cancellationToken);
                 throw new InvalidOperationException(
-                    $"Supabase admin create-user response did not contain a parseable user id. Response body: {createdBody}");
+                    $"Supabase admin create-user response did not contain a parseable user id. {Describe(createdBody)}");
             }
 
             return createdId;
@@ -252,7 +299,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         if (!isAlreadyExists)
         {
             throw new InvalidOperationException(
-                $"Supabase admin create-user request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+                $"Supabase admin create-user request failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
         }
 
         // The create call above returns nothing usable on a duplicate, but callers need the SAME
@@ -296,7 +343,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
             }
 
             throw new InvalidOperationException(
-                $"Supabase admin create-user request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+                $"Supabase admin create-user request failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
         }
 
         var payload = await response.Content.ReadFromJsonAsync<SupabaseInviteResponse>(JsonOptions, cancellationToken);
@@ -304,7 +351,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase admin create-user response did not contain a parseable user id. Response body: {body}");
+                $"Supabase admin create-user response did not contain a parseable user id. {Describe(body)}");
         }
 
         return userId;
@@ -324,7 +371,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase password-grant sign-in failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+                $"Supabase password-grant sign-in failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
         }
 
         var payload = await response.Content.ReadFromJsonAsync<SupabaseTokenResponse>(JsonOptions, cancellationToken);
@@ -333,7 +380,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase password-grant sign-in response was missing expected fields. Response body: {body}");
+                $"Supabase password-grant sign-in response was missing expected fields. {Describe(body)}");
         }
 
         var expiresAt = DateTimeOffset.UtcNow.AddSeconds(payload.ExpiresIn ?? 3600);
@@ -352,7 +399,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await listResponse.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase list-MFA-factors request failed with status {(int)listResponse.StatusCode} ({listResponse.StatusCode}). Response body: {body}");
+                $"Supabase list-MFA-factors request failed with status {(int)listResponse.StatusCode} ({listResponse.StatusCode}). {Describe(body)}");
         }
 
         var factors = await listResponse.Content.ReadFromJsonAsync<List<SupabaseFactor>>(JsonOptions, cancellationToken)
@@ -371,13 +418,34 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
             {
                 var body = await deleteResponse.Content.ReadAsStringAsync(cancellationToken);
                 throw new InvalidOperationException(
-                    $"Supabase delete-MFA-factor request failed with status {(int)deleteResponse.StatusCode} ({deleteResponse.StatusCode}). Response body: {body}");
+                    $"Supabase delete-MFA-factor request failed with status {(int)deleteResponse.StatusCode} ({deleteResponse.StatusCode}). {Describe(body)}");
             }
 
             removed++;
         }
 
         return removed;
+    }
+
+    public async Task SignOutAsync(string userAccessToken, CancellationToken cancellationToken)
+    {
+        // scope=global: revoke every refresh token for this user, not just the current session.
+        // HR.Web holds only the access token (no refresh token), so a precise single-session
+        // revoke isn't available to it anyway — and for a security-hygiene sign-out, guaranteeing
+        // the session cannot be refreshed anywhere is the safer outcome.
+        var http = CreateUserScopedClient(userAccessToken);
+
+        using var response = await http.PostAsync("/auth/v1/logout?scope=global", content: null, cancellationToken);
+
+        // GoTrue returns 204 on success. A 401 here just means the token was already
+        // expired/invalid — the session is effectively gone already; the caller treats any failure
+        // as non-fatal, but we still surface it so it can be logged (without the token).
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase sign-out request failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
+        }
     }
 
     public async Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken)
@@ -392,7 +460,7 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Supabase update-password request failed with status {(int)response.StatusCode} ({response.StatusCode}). Response body: {body}");
+                $"Supabase update-password request failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
         }
     }
 

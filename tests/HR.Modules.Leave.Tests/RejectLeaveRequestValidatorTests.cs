@@ -40,12 +40,13 @@ public class RejectLeaveRequestValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_ReviewedByEmployeeId_Is_Empty()
+    public void Validate_Passes_When_ReviewedByEmployeeId_Is_Empty()
     {
+        // ReviewedByEmployeeId is server-supplied (the endpoint overwrites it with the
+        // authenticated caller before authorization), so an empty value must not be rejected here.
         var v = new RejectLeaveRequestValidator();
         var result = v.Validate(ValidRequest() with { ReviewedByEmployeeId = Guid.Empty });
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(RejectLeaveRequestRequest.ReviewedByEmployeeId));
+        Assert.True(result.IsValid);
     }
 
     [Fact]

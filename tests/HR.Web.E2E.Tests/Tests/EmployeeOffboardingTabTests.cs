@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
@@ -30,43 +30,18 @@ public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) :
     private const string LauraEmail = "laura.bennett@acme.example";
 
     /// <summary>
-    /// Creates a brand-new employee via the standard New Employee form and returns their id,
-    /// captured from the URL after navigating back into their profile from the employee list.
-    /// Caller must already be logged in as an HR administrator. The employee has no assigned
-    /// assets and no offboarding plan yet.
+    /// Returns a dedicated pre-seeded pool employee (SeededE2eEmployees.OffboardingTab[slot]) — a
+    /// "QA Engineer" with no assigned assets and no offboarding plan, exactly as the old New
+    /// Employee form flow produced. Each test that starts a leaving process (and so an offboarding
+    /// plan) takes a distinct slot. Leaves the caller on the employee's edit page.
     /// </summary>
     private async Task<Guid> CreateEmployeeAsync(
-        EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
+        EmployeeListPage empList, EmployeeEditPage empEdit, int slot)
     {
-        var unique    = Guid.NewGuid().ToString("N")[..8];
-        var lastName  = $"Offboard{suffix}{unique}";
-        var workEmail = $"e2e.offboard.{suffix.ToLowerInvariant()}{unique}@acme.example";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
-
-        // Employee Number, Employment Type, Department, Location and Position Profile are all
-        // mandatory now. Selecting "QA Engineer" (seeded with Engineering / London
-        // Office attached) pre-populates Department and Location in one step — same pattern as
-        // CreateEmployeeTests.cs.
-        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
-
-        await empEdit.SaveNewEmployeeAsync();
-
-        await empList.ClickEmployeeAsync(lastName);
-
-        var match = Regex.Match(_page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
-        return Guid.Parse(match.Groups[1].Value);
+        _ = empList;
+        var seeded = SeededE2eEmployees.OffboardingTab[slot];
+        await empEdit.GoToAsync(AcmeId, seeded.EmployeeId);
+        return seeded.EmployeeId;
     }
 
     /// <summary>
@@ -121,7 +96,7 @@ public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Hidden");
+        await CreateEmployeeAsync(empList, empEdit, slot: 0);
 
         Assert.False(
             await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
@@ -144,7 +119,7 @@ public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var employeeId = await CreateEmployeeAsync(empList, empEdit, "Create");
+        var employeeId = await CreateEmployeeAsync(empList, empEdit, slot: 1);
 
         // Offboarding no longer has a manual trigger — it's only ever started as a side effect of
         // confirming the Start Leaving Process wizard (StartLeavingProcessHandler calls
@@ -186,7 +161,7 @@ public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) :
         // should generate exactly 5 tasks: 1 HR document-review task + 4 fixed manager
         // exit-checklist tasks (see StartOffboardingHandler.CreateDocumentReviewTaskAsync /
         // CreateManagerExitChecklistAsync).
-        await CreateEmployeeAsync(empList, empEdit, "Tasks");
+        await CreateEmployeeAsync(empList, empEdit, slot: 2);
 
         await StartLeavingProcessViaWizardAsync(startDialog, "15/09/2026", "Resignation");
 

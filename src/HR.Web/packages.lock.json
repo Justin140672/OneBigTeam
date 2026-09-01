@@ -2,6 +2,16 @@
   "version": 2,
   "dependencies": {
     "net10.0": {
+      "HtmlSanitizer": {
+        "type": "Direct",
+        "requested": "[9.2.1039, )",
+        "resolved": "9.2.1039",
+        "contentHash": "PKxy1hYknAij8YlHCC2a9GSqzUd4bh3IvY+abJBvOH1FKcZpbyafEHtdFcXQBt12Y7hNPkNEOP6Qa7uKNSs/yA==",
+        "dependencies": {
+          "AngleSharp": "1.7.2",
+          "AngleSharp.Css": "1.0.2"
+        }
+      },
       "Microsoft.AspNetCore.App.Internal.Assets": {
         "type": "Direct",
         "requested": "[10.0.11, )",
@@ -141,6 +151,19 @@
         "requested": "[34.2.3, )",
         "resolved": "34.2.3",
         "contentHash": "AE3RAJwXZzRxTTF8O4ydBlCDgiKQRcMZyUUkDvrGn/tvNZE27hgN9+m90IfxnP/ZpmMIKSSfE4sXIL0hIz/JZg=="
+      },
+      "AngleSharp": {
+        "type": "Transitive",
+        "resolved": "1.7.2",
+        "contentHash": "r1rb5Qo/0KPzmP0nbSiXPDVfh4Ctu0B+y1RyyUq73g4sgAmEW7q10RDyTq2ZsILwtO9O2LAvMrUles7eD4zz1g=="
+      },
+      "AngleSharp.Css": {
+        "type": "Transitive",
+        "resolved": "1.0.2",
+        "contentHash": "XeBxh0h/73+MWFsGfeMwiK7xbzAK3YeHFdUIrMH1P90amIrDFD/vUDIrPlF3CixqaMH5MRIUvT6Ux+2zvhJ3SA==",
+        "dependencies": {
+          "AngleSharp": "[1.5.0, 2.0.0)"
+        }
       },
       "Microsoft.Extensions.AmbientMetadata.Application": {
         "type": "Transitive",
@@ -335,33 +358,33 @@
       "hr.infrastructure.abstractions": {
         "type": "Project",
         "dependencies": {
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.modules.companies.contracts": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.modules.employees.contracts": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.modules.tasks.contracts": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.servicedefaults": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Microsoft.Extensions.Http.Resilience": "[10.9.0, )",
           "Microsoft.Extensions.ServiceDiscovery": "[10.9.0, )",
           "OpenTelemetry.Exporter.OpenTelemetryProtocol": "[1.17.0, )",

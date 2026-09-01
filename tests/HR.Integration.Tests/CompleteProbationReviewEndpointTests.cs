@@ -453,7 +453,9 @@ public class CompleteProbationReviewEndpointTests
 
     /// <summary>
     /// PROB-05: extension end date must move strictly forward relative to the record's current
-    /// expected end date. Record's ExpectedEndDate is 2026-09-01 (see CreateRecordAndReview).
+    /// expected end date — and the domain rule (400) must be the one that rejects it, not the
+    /// request validator's separate "must be in the future" rule. Uses a future expected end date
+    /// so the submitted value clears the validator and reaches the domain check.
     /// </summary>
     [Fact]
     public async Task Post_Complete_Returns_BadRequest_When_NewExpectedEndDate_Not_After_Current_ExpectedEndDate()
@@ -464,7 +466,9 @@ public class CompleteProbationReviewEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, User13, SystemRoles.HrAdministrator, companyId);
 
-        var (recordId, reviewId) = await CreateRecordAndReview(client, companyId, "FinalDecision");
+        var currentExpectedEndDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(3);
+        var (recordId, reviewId) = await CreateRecordAndReview(
+            client, companyId, "FinalDecision", expectedEndDate: currentExpectedEndDate.ToString("yyyy-MM-dd"));
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{recordId}/reviews/{reviewId}/complete",
@@ -474,8 +478,8 @@ public class CompleteProbationReviewEndpointTests
                 probationRecordId = recordId,
                 reviewId,
                 outcome = "Extend",
-                decisionDate = "2026-07-15",
-                newExpectedEndDate = "2026-09-01", // equal to the record's current ExpectedEndDate
+                decisionDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"),
+                newExpectedEndDate = currentExpectedEndDate.ToString("yyyy-MM-dd"), // equal to the record's current ExpectedEndDate
                 extensionReason = "Needs more time."
             });
 
@@ -483,7 +487,7 @@ public class CompleteProbationReviewEndpointTests
 
         var record = await GetRecord(client, companyId, recordId);
         Assert.Equal("Active", record.Status);
-        Assert.Equal(new DateOnly(2026, 9, 1), record.ExpectedEndDate);
+        Assert.Equal(currentExpectedEndDate, record.ExpectedEndDate);
     }
 
     /// <summary>
@@ -524,7 +528,8 @@ public class CompleteProbationReviewEndpointTests
         HttpClient client,
         Guid companyId,
         string reviewType,
-        Guid? employeeId = null)
+        Guid? employeeId = null,
+        string expectedEndDate = "2026-09-01")
     {
         var recordResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
         {
@@ -532,7 +537,7 @@ public class CompleteProbationReviewEndpointTests
             employeeId = employeeId ?? Guid.NewGuid(),
             managerEmployeeId = Guid.NewGuid(),
             startDate = "2026-06-01",
-            expectedEndDate = "2026-09-01"
+            expectedEndDate
         });
         recordResponse.EnsureSuccessStatusCode();
         var record = await recordResponse.Content.ReadFromJsonAsync<RecordPayload>();

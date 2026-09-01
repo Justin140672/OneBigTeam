@@ -93,12 +93,17 @@ public class UpdateEmployeeProfileHandlerTests
         Assert.Equal(employee.Id, auditEvent.EntityId);
         Assert.Equal(actorId, auditEvent.ActorEmployeeId);
 
-        var before = Assert.IsType<EmployeeProfileSnapshot>(auditEvent.Before);
-        var after = Assert.IsType<EmployeeProfileSnapshot>(auditEvent.After);
-        Assert.Equal("Alice", before.FirstName);
-        Assert.Equal("Female", before.Gender);
-        Assert.Equal("Alicia", after.FirstName);
-        Assert.Equal("Male", after.Gender);
+        // NFR-01: the audit event projects Before/After to a non-sensitive subset (no PersonalEmail
+        // or DateOfBirth) so AuditPayloadRedactionGuard passes them unchanged — assert on the
+        // serialised payload the audit trail actually persists.
+        var beforeJson = System.Text.Json.JsonSerializer.Serialize(auditEvent.Before);
+        var afterJson = System.Text.Json.JsonSerializer.Serialize(auditEvent.After);
+        Assert.Contains("\"FirstName\":\"Alice\"", beforeJson);
+        Assert.Contains("\"Gender\":\"Female\"", beforeJson);
+        Assert.Contains("\"FirstName\":\"Alicia\"", afterJson);
+        Assert.Contains("\"Gender\":\"Male\"", afterJson);
+        Assert.DoesNotContain("PersonalEmail", afterJson);
+        Assert.DoesNotContain("DateOfBirth", afterJson);
     }
 
     [Fact]

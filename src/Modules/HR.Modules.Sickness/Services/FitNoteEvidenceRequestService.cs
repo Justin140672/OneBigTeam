@@ -1,6 +1,7 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Persistence;
+using HR.Modules.Tasks.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,7 +28,8 @@ namespace HR.Modules.Sickness.Services;
 internal sealed class FitNoteEvidenceRequestService(
     SicknessDbContext db,
     IIntegrationEventPublisher eventPublisher,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    ITaskRescheduler taskRescheduler)
 {
     internal static readonly Guid SystemActorId = Guid.Empty;
     private const int DueDateDaysFromNow = 7;
@@ -44,7 +46,12 @@ internal sealed class FitNoteEvidenceRequestService(
         int fitNoteRequiredAfterDays,
         DateOnly evaluationDate,
         DateTimeOffset now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        // Set only when evaluationDate is the absence's authoritative (closed) end date rather
+        // than "today". An existing pending request created while the record was still open is
+        // anchored on the day it was raised; once the real end date is known, its deadline (and
+        // the linked Upload task) is corrected to endDate + 7.
+        bool evaluationDateIsFinal = false)
     {
         // Received or waived evidence permanently suppresses further requests for this record.
         if (record.EvidenceStatus == SicknessEvidenceStatus.Received ||
@@ -54,12 +61,31 @@ internal sealed class FitNoteEvidenceRequestService(
         if (!FitNoteEvaluator.IsThresholdReached(record.StartDate, evaluationDate, fitNoteRequiredAfterDays))
             return false;
 
-        var hasLiveRequest = await db.SicknessEvidenceRequests.AnyAsync(
-            e => e.SicknessRecordId == record.Id && e.Status != SicknessEvidenceRequestStatus.Cancelled,
-            cancellationToken);
+        var existingRequest = await db.SicknessEvidenceRequests
+            .SingleOrDefaultAsync(
+                e => e.SicknessRecordId == record.Id && e.Status != SicknessEvidenceRequestStatus.Cancelled,
+                cancellationToken);
 
-        if (hasLiveRequest)
+        if (existingRequest is not null)
+        {
+            if (evaluationDateIsFinal)
+            {
+                var correctedDueDate = evaluationDate.AddDays(DueDateDaysFromNow);
+                if (existingRequest.Reschedule(correctedDueDate, now))
+                {
+                    await db.SaveChangesAsync(cancellationToken);
+                    await taskRescheduler.RescheduleManyBySourceEntitiesAsync(
+                        record.CompanyId,
+                        [existingRequest.Id],
+                        TaskSource.Sickness,
+                        TaskActionType.Upload,
+                        correctedDueDate,
+                        cancellationToken);
+                }
+            }
+
             return false;
+        }
 
         var dueDate = evaluationDate.AddDays(DueDateDaysFromNow);
 

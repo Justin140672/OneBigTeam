@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -61,20 +62,17 @@ public class DevActivateCompanyEndpointTests
     [Fact]
     public async Task Post_DevActivateCompany_Returns_NotFound_Outside_Development()
     {
-        await using var factory = new NonDevelopmentApiWebApplicationFactory();
-        await ((IAsyncLifetime)factory).InitializeAsync();
-        try
-        {
-            using var client = factory.CreateClient();
+        // Reuse the shared collection's already-migrated Postgres container rather than spinning
+        // up a dedicated one — only the hosting environment needs to differ. WithWebHostBuilder
+        // composes on top of ApiWebApplicationFactory's ConfigureWebHost (TestAuthHandler, fakes).
+        using var productionFactory = _factory.WithWebHostBuilder(builder =>
+            builder.UseEnvironment("Production"));
 
-            var response = await client.PostAsJsonAsync("/api/dev/activate-company", new { companyId = Guid.NewGuid() });
+        using var client = productionFactory.CreateClient();
 
-            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        }
-        finally
-        {
-            await ((IAsyncLifetime)factory).DisposeAsync();
-        }
+        var response = await client.PostAsJsonAsync("/api/dev/activate-company", new { companyId = Guid.NewGuid() });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     private sealed record SignUpPayload(Guid UserId, Guid CompanyId, string Email, string FirstName, string LastName);

@@ -15,9 +15,11 @@ internal sealed class AuditDbContext(DbContextOptions<AuditDbContext> options) :
     }
 
     /// <summary>
-    /// AUD-02: audit records are append-only. Any attempt to update or delete an existing
-    /// audit row through this context is rejected — corrective information must be represented
-    /// by a new audit event, not by mutating history.
+    /// AUD-02: committed audit records (<see cref="AuditEvent"/>) are append-only. Any attempt to
+    /// update or delete an existing <see cref="AuditEvent"/> row through this context is rejected —
+    /// corrective information must be represented by a new audit event, not by mutating history.
+    /// <see cref="AuditPendingItem"/> is a mutable staging table by design (the promotion job
+    /// transitions its Status), so it is deliberately not covered by the guard.
     /// </summary>
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -33,7 +35,7 @@ internal sealed class AuditDbContext(DbContextOptions<AuditDbContext> options) :
 
     private void EnforceAppendOnly()
     {
-        foreach (var entry in ChangeTracker.Entries())
+        foreach (var entry in ChangeTracker.Entries<AuditEvent>())
         {
             if (entry.State is EntityState.Modified or EntityState.Deleted)
             {

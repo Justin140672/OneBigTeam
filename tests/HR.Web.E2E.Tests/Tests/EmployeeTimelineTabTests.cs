@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
@@ -48,15 +47,15 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, startDateDdMmYyyy: "01/01/2020");
+        await CreateEmployeeAsync(empList, empEdit, slot: 0);
 
-        // ── The employee's only entry so far is "Employee joined", dated by the start date ──
+        // ── The employee's only entry so far is "Employee joined", dated by the seeded start date ──
         await timeline.OpenAsync();
 
         var textsBeforeNote = await timeline.GetEntryTextsAsync();
         Assert.Single(textsBeforeNote);
         Assert.Contains("Employee joined", textsBeforeNote[0]);
-        Assert.Contains("1 Jan 2020", textsBeforeNote[0]);
+        Assert.Contains("1 Mar 2026", textsBeforeNote[0]);
         // No performer is recorded for the "Employee joined" event — should fall back to "System".
         Assert.Contains("System", textsBeforeNote[0]);
 
@@ -89,7 +88,7 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var (employeeId, _) = await CreateEmployeeAsync(empList, empEdit, startDateDdMmYyyy: "01/01/2020");
+        var (employeeId, _) = await CreateEmployeeAsync(empList, empEdit, slot: 1);
 
         // Page size is 20 (see EmployeeTimelineTab.razor's PageSize const). 22 HR notes plus the
         // one pre-existing "Employee joined" entry give 23 total — 20 on the first page, 3 more
@@ -139,16 +138,16 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, startDateDdMmYyyy: "01/01/2020");
+        await CreateEmployeeAsync(empList, empEdit, slot: 2);
 
         await empEdit.OpenPromotionHistoryTabAsync();
         await wizard.OpenAsync();
-        // "QA Engineer" (not "Senior Software Engineer") — submitting this promotion permanently
-        // occupies the target profile, and many Recruitment E2E tests depend on "Senior Software
-        // Engineer" remaining selectable in VacancyDetail's "New Vacancy" Position Profile dropdown
-        // (which excludes profiles held by any active employee). "QA Engineer" is a seeded profile
-        // dedicated to tests like this one — see EmployeesModule's dev seed and CreateEmployeeTests.
-        await wizard.SelectNewPositionProfileAsync("QA Engineer");
+        // The pool employee's current profile is already "QA Engineer", so promote to a different
+        // profile. "Software Engineer" is already occupied (Tom Williams) so it's already excluded
+        // from VacancyDetail's "New Vacancy" Position Profile dropdown — adding this employee to it
+        // changes nothing for the Recruitment E2E tests. "Senior Software Engineer" must stay free
+        // for those tests, so it is deliberately not used here.
+        await wizard.SelectNewPositionProfileAsync("Software Engineer");
         // A few days ahead of "today" — future enough to be after the run date, near enough not
         // to require guessing far into the future. See EmployeePromotionTabTests for the same
         // one-week-ahead convention used elsewhere in this suite.
@@ -232,37 +231,19 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
     /// entry is "Employee joined" (dated <paramref name="startDateDdMmYyyy"/>), regardless of what
     /// other E2E tests have done to shared seeded employees elsewhere in the suite.
     /// </summary>
+    // Each of the three timeline scenarios below gets its own dedicated pre-seeded pool employee
+    // (SeededE2eEmployees.Timeline[slot]) rather than paying the full New Employee form. A pool
+    // member's only pre-existing timeline entry is "Employee joined" dated 2026-03-01 (its seeded
+    // StartDate) — a NotStarted onboarding plan writes no timeline entry — so the "exactly one
+    // entry to start" guarantee the old fresh-employee flow gave still holds. Each test mutates its
+    // own employee (adds notes / a promotion), hence one distinct row (slot) per test.
     private async Task<(Guid Id, string LastName)> CreateEmployeeAsync(
-        EmployeeListPage empList, EmployeeEditPage empEdit, string startDateDdMmYyyy)
+        EmployeeListPage empList, EmployeeEditPage empEdit, int slot)
     {
-        var unique = Guid.NewGuid().ToString("N")[..8];
-        var lastName = $"Timeline{unique}";
-        var workEmail = $"e2e.timeline{unique}@acme.example";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync(startDateDdMmYyyy);
-        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "Software Engineer");
-
-        await empEdit.SaveNewEmployeeAsync();
-
-        await empList.SearchAsync(lastName);
-        await empList.ClickEmployeeAsync(lastName);
-
-        var match = Regex.Match(_page.Url, "/employees/([0-9a-fA-F-]{36})");
-        Assert.True(match.Success, $"Could not parse the new employee's id from URL '{_page.Url}'");
-        var id = Guid.Parse(match.Groups[1].Value);
-
-        return (id, lastName);
+        _ = empList;
+        var seeded = SeededE2eEmployees.Timeline[slot];
+        await empEdit.GoToAsync(AcmeId, seeded.EmployeeId);
+        return (seeded.EmployeeId, seeded.LastName);
     }
 
     /// <summary>

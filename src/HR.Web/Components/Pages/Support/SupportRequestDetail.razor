@@ -113,7 +113,7 @@
                                             <span class="fw-semibold">@(response.IsStaffResponse ? "Support Team" : "You")</span>
                                             <span class="text-muted small">@response.CreatedAt.ToLocalTime().ToString("g")</span>
                                         </div>
-                                        <div class="support-thread-body">@((MarkupString)response.BodyHtml)</div>
+                                        <div class="support-thread-body">@((MarkupString)SupportHtmlSanitizer.Sanitize(response.BodyHtml))</div>
                                         @if (response.Attachments.Count > 0)
                                         {
                                             <ul class="list-unstyled mb-0 mt-2">

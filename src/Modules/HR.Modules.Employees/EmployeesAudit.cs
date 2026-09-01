@@ -337,9 +337,28 @@ internal sealed record EmployeeProfileUpdatedAuditEvent(
     Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => CorrelationId;
     string? IAuditEvent.Summary => "Employee profile updated";
-    object? IAuditEvent.Before => Before;
-    object? IAuditEvent.After => After;
+    // NFR-01: PersonalEmail and DateOfBirth are prohibited audit fields — project only the
+    // non-sensitive, diff-able profile fields into the before/after snapshots so
+    // AuditPayloadRedactionGuard passes the payload through unchanged.
+    object? IAuditEvent.Before => ProjectProfile(Before);
+    object? IAuditEvent.After => ProjectProfile(After);
     object? IAuditEvent.Metadata => null;
+
+    private static object ProjectProfile(EmployeeProfileSnapshot s) => new
+    {
+        s.FirstName,
+        s.LastName,
+        s.WorkEmail,
+        s.StartDate,
+        s.PreferredName,
+        s.Nationality,
+        s.Gender,
+        s.GenderOther,
+        s.DepartmentId,
+        s.PositionProfileId,
+        s.LocationId,
+        s.HasSystemAccess,
+    };
 }
 
 internal sealed record EmploymentDetailsSnapshot(
@@ -408,9 +427,23 @@ internal sealed record ContactDetailsUpdatedAuditEvent(
     Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Employee contact details updated";
-    object? IAuditEvent.Before => Before;
-    object? IAuditEvent.After => After;
+    // NFR-01: PersonalEmail is a prohibited audit field — project only the non-sensitive address
+    // and phone fields so AuditPayloadRedactionGuard passes the payload through unchanged.
+    object? IAuditEvent.Before => ProjectContact(Before);
+    object? IAuditEvent.After => ProjectContact(After);
     object? IAuditEvent.Metadata => null;
+
+    private static object? ProjectContact(ContactDetailsSnapshot? s) => s is null ? null : new
+    {
+        s.PhoneNumber,
+        s.HomePhone,
+        s.AddressLine1,
+        s.AddressLine2,
+        s.City,
+        s.County,
+        s.PostCode,
+        s.Country,
+    };
 }
 
 internal sealed record PositionProfileSnapshot(

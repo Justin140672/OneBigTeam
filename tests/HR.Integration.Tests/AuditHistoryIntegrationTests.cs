@@ -258,6 +258,8 @@ public class AuditHistoryIntegrationTests
         using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+        // The employment PUT below sets an explicit employee number, only allowed in Manual mode.
+        await EmployeeReferenceDataSeeder.SetEmployeeNumberModeManualAsync(hrAdminClient, companyId);
         var correlationId = Guid.NewGuid();
 
         var profileResp = await hrAdminClient.PutAsJsonAsync(

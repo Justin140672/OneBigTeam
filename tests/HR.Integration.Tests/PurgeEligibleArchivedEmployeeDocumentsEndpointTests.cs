@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Companies.Domain;
+using HR.Modules.Companies.Persistence;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Identity.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -78,6 +80,60 @@ public class PurgeEligibleArchivedEmployeeDocumentsEndpointTests
             var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
             Assert.False(await db.EmployeeDocuments.AnyAsync(x => x.Id == eligible.EmployeeDocumentId));
             Assert.True(await db.EmployeeDocuments.AnyAsync(x => x.Id == tooRecent.EmployeeDocumentId));
+        }
+    }
+
+    [Fact]
+    public async Task Returns_Conflict_And_Deletes_Nothing_When_Company_Is_Under_Legal_Hold()
+    {
+        var employeeId = Guid.NewGuid();
+        using var hrClient = await HrAdminClient();
+
+        var eligible = await UploadAndDelete(hrClient, employeeId, "Held Archived Doc");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
+            var ed = await db.EmployeeDocuments.SingleAsync(x => x.Id == eligible.EmployeeDocumentId);
+            ed.Archive(HrAdmin, "backdated for purge test", DateTimeOffset.UtcNow.AddDays(-120));
+            await db.SaveChangesAsync();
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var companiesDb = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+            var now = DateTimeOffset.UtcNow;
+            var subscription = await companiesDb.CustomerSubscriptions
+                .SingleOrDefaultAsync(s => s.CompanyId == AcmeCompanyId);
+            if (subscription is null)
+            {
+                subscription = CustomerSubscription.StartTrial(AcmeCompanyId, now, trialLengthDays: 14);
+                companiesDb.CustomerSubscriptions.Add(subscription);
+            }
+
+            subscription.PlaceLegalHold(HrAdmin, "Litigation hold for purge test", now);
+            await companiesDb.SaveChangesAsync();
+        }
+
+        try
+        {
+            using var adminClient = await CompanyAdminClient();
+            var response = await adminClient.PostAsync(
+                $"/api/companies/{AcmeCompanyId}/documents/archived/purge-eligible", EmptyJson());
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
+            Assert.True(await db.EmployeeDocuments.AnyAsync(x => x.Id == eligible.EmployeeDocumentId));
+        }
+        finally
+        {
+            // Restore state so the shared Acme company is not left under hold for other tests.
+            using var scope = _factory.Services.CreateScope();
+            var companiesDb = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+            var subscription = await companiesDb.CustomerSubscriptions.SingleAsync(s => s.CompanyId == AcmeCompanyId);
+            subscription.LiftLegalHold(DateTimeOffset.UtcNow);
+            await companiesDb.SaveChangesAsync();
         }
     }
 

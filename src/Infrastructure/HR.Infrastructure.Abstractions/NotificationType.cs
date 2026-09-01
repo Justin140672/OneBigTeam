@@ -61,4 +61,9 @@ public enum NotificationType
     // call site can adopt WriteTemplatedAsync without also having to add template plumbing.
     EmployeeCreated                                = 43,
     CandidateHired                                 = 44,
+
+    // Story 2: raised when a company administrator's organisation data export ZIP has finished
+    // building and is available to download (see OrganisationDataExportCompletedIntegrationEvent /
+    // NotifyOnOrganisationDataExportCompletedHandler). In-app only.
+    OrganisationDataExportReady                    = 45,
 }

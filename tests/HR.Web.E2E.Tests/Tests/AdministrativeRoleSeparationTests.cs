@@ -202,7 +202,18 @@ public sealed class AdministrativeRoleSeparationHrAdminTests(HrAdminPersonaFixtu
 
         var navText = (await navMenu.TextContentAsync())?.Trim() ?? "";
         Assert.Contains("People", navText);
-        Assert.Contains("User Administration", navText);
+
+        // "User Administration" lives inside the "People and users" submenu (MainLayout.razor).
+        // Syncfusion's SfMenu doesn't just CSS-hide submenu items — it doesn't render them into the
+        // DOM at all until the parent item is expanded, and the popup may portal elsewhere in the
+        // DOM rather than staying nested inside ".app-nav-menu" (see OrganisationChartTests for the
+        // same pattern) — so expand it first and search the whole page for the result.
+        await navMenu.GetByText("People and users", new() { Exact = true }).ClickAsync();
+
+        var userAdministrationLink = _page.GetByText("User Administration", new() { Exact = true });
+        await userAdministrationLink.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        Assert.True(await userAdministrationLink.IsVisibleAsync(),
+            "Expected a 'User Administration' nav item to be visible to an HR Administrator after expanding People and users");
     }
 }
 

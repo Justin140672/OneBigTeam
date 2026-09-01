@@ -30,7 +30,8 @@ public class FitNoteEvidenceRequestServiceTests
         FakeAuditEventPublisher? auditPublisher = null) =>
         new(db,
             eventPublisher ?? new FakeIntegrationEventPublisher(),
-            auditPublisher ?? new FakeAuditEventPublisher());
+            auditPublisher ?? new FakeAuditEventPublisher(),
+            new FakeTaskRescheduler());
 
     private static SicknessRecord CreateRecord(
         Guid companyId,

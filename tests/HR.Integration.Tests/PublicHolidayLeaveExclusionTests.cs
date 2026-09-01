@@ -125,7 +125,7 @@ public class PublicHolidayLeaveExclusionTests
             hoursPerDay = 8.0,
             leaveYearStartMonth = 1,
             defaultHolidayAllowance = 25,
-            probationMonths = 0,
+            probationMonths = 6,
             excludePublicHolidaysFromLeave = excludePublicHolidays
         });
         settingsResp.EnsureSuccessStatusCode();

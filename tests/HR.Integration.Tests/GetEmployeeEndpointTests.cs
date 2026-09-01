@@ -665,6 +665,8 @@ public class GetEmployeeEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser1, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+        // The PUT below sets an explicit employee number, only allowed in Manual mode.
+        await EmployeeReferenceDataSeeder.SetEmployeeNumberModeManualAsync(client, companyId);
 
         var createResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",

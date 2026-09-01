@@ -34,52 +34,19 @@ public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(HrAdminPerson
     /// name, leaving the caller positioned on that employee's editable (not "/view") profile
     /// page.
     /// </summary>
+    // Uses a dedicated pre-seeded pool employee (SeededE2eEmployees.NoticePeriodOverride[slot])
+    // instead of the full New Employee form. Pool members are assigned "QA Engineer" which — like
+    // "Software Engineer" — has no notice period override of its own, so an employee with no
+    // override of its own still resolves straight through to the company default ("1 Months").
+    // Each test mutates its own employee's notice period, so each takes a distinct slot. Leaves the
+    // caller on the editable (not "/view") profile route.
     private async Task<(Guid EmployeeId, string LastName)> CreateEmployeeAsync(
-        EmployeeListPage empList, EmployeeEditPage empEdit)
+        EmployeeListPage empList, EmployeeEditPage empEdit, int slot)
     {
-        var unique    = Guid.NewGuid().ToString("N")[..8];
-        var lastName  = $"NoticeE2E{unique}";
-        var workEmail = $"e2e.notice{unique}@acme.example";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
-        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        // "Software Engineer" is seeded with both Department (Engineering) and Location
-        // (London Office) attached, satisfying those required fields in one step (same
-        // reasoning as CreateEmployeeTests' "QA Engineer" selections), and has
-        // no notice period override of its own.
-        await empEdit.SelectDropdownAsync("Position Profile", "Software Engineer");
-
-        await empEdit.SaveNewEmployeeAsync();
-
-        // Matches the guid directly rather than splitting on the trailing "/view" segment
-        // (EmployeeList.razor's row link/OnRecordClick lands on the view route).
-        await empList.ClickEmployeeAsync(lastName);
-        var employeeId = Guid.Parse(System.Text.RegularExpressions.Regex.Match(
-            _page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})").Groups[1].Value);
-
-        // ClickEmployeeAsync lands on the read-only "/view" route (EmployeeList.razor's row
-        // link/OnRecordClick), where EditPageBase.IsViewMode is true and every field on the
-        // Employment tab is rendered with Enabled="@(!IsViewMode)" — including the notice period
-        // override's checkbox, Unit dropdown, and Length numeric field. Syncfusion's checkbox and
-        // dropdown don't set a native "disabled" attribute for that state (only a CSS/aria one),
-        // so Playwright can still force those through — but SfNumericTextBox genuinely does render
-        // a real disabled input, which then never becomes enabled no matter how long a caller
-        // waits, since it's correctly reflecting view mode rather than racing anything. Navigate
-        // to the edit route (GoToAsync, no "/view" suffix — unlike ClickEmployeeAsync) so every
-        // caller of this helper actually lands in edit mode.
-        await empEdit.GoToAsync(companyId: AcmeId, employeeId: employeeId);
-
-        return (employeeId, lastName);
+        _ = empList;
+        var seeded = SeededE2eEmployees.NoticePeriodOverride[slot];
+        await empEdit.GoToAsync(companyId: AcmeId, employeeId: seeded.EmployeeId);
+        return (seeded.EmployeeId, seeded.LastName);
     }
 
     [Fact]
@@ -92,9 +59,7 @@ public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(HrAdminPerson
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // ClickEmployeeAsync (inside CreateEmployeeAsync) already lands on this employee's
-        // edit page (Details tab) — no need to navigate there again.
-        var (employeeId, _) = await CreateEmployeeAsync(empList, empEdit);
+        var (employeeId, _) = await CreateEmployeeAsync(empList, empEdit, slot: 0);
         await empEdit.OpenEmploymentTabAsync();
 
         Assert.False(await empEdit.IsOverrideNoticePeriodCheckedAsync(),
@@ -118,7 +83,7 @@ public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(HrAdminPerson
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var (employeeId, _) = await CreateEmployeeAsync(empList, empEdit);
+        var (employeeId, _) = await CreateEmployeeAsync(empList, empEdit, slot: 1);
         await empEdit.OpenEmploymentTabAsync();
 
         await empEdit.SetOverrideNoticePeriodAsync(true);
@@ -151,7 +116,7 @@ public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(HrAdminPerson
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var (employeeId, _) = await CreateEmployeeAsync(empList, empEdit);
+        var (employeeId, _) = await CreateEmployeeAsync(empList, empEdit, slot: 2);
 
         // Set an override first, so there's something to turn off.
         await empEdit.OpenEmploymentTabAsync();

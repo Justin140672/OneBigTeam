@@ -302,7 +302,13 @@ catch (Exception exception)
 try
 {
 	await app.Services.MigrateEmployeesAsync();
-	await app.Services.SeedEmployeesAsync();
+	// The E2E arrange-data pool is only ever wanted for the Playwright E2E run (E2E_TESTING=true,
+	// the same flag that swaps in the fake Supabase/JWKS plumbing). It must NOT land in the
+	// integration test DB (WebApplicationFactory<Program> also runs as Development) nor in any
+	// real environment.
+	var seedE2eTestPool = string.Equals(
+		Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
+	await app.Services.SeedEmployeesAsync(includeE2eTestPool: seedE2eTestPool);
 	employeesMigrationStatus = "succeeded";
 	employeesMigrationCheckedAt = DateTimeOffset.UtcNow;
 }
@@ -422,6 +428,18 @@ catch (Exception exception)
 try
 {
 	await app.Services.MigrateOnboardingAsync();
+	if (string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase))
+	{
+		// E2E-only: every E2E arrange-data pool employee (EmployeesModule.E2eTestPool) gets a
+		// NotStarted onboarding plan + the 3 default checklist tasks — mirroring what
+		// EmployeeCreatedHandler produces for a UI-created employee, which these seeded rows
+		// replace. All Acme, StartDate 2026-03-01.
+		var acmeCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+		var onboardingPoolStart = new DateOnly(2026, 3, 1);
+		await app.Services.SeedE2eOnboardingPlansAsync(
+			HR.Modules.Employees.EmployeesModule.E2eTestPool.Select(p => (
+				acmeCompanyId, p.Id, onboardingPoolStart, $"E2E {p.LastName}")));
+	}
 	onboardingMigrationStatus = "succeeded";
 	onboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
 }
@@ -760,6 +778,7 @@ app.UseOffboardingRecurringJobs();
 app.UseDocumentsRecurringJobs();
 app.UseLeaveRecurringJobs();
 app.UseReportingRecurringJobs();
+app.UseNotificationsRecurringJobs();
 app.UseLoggingMiddleware();
 app.UseRouting();
 app.UseRateLimiter();

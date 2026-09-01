@@ -56,7 +56,7 @@ public class GetOffboardingStatusEndpointTests
         using var client = await AdminClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
-        await StartOffboardingAsync(client, companyId, employeeId, new DateOnly(2026, 8, 1), "Resigned.");
+        await StartOffboardingAsync(client, companyId, employeeId, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30), "Resigned.");
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/offboarding-status");
@@ -75,7 +75,7 @@ public class GetOffboardingStatusEndpointTests
         using var client = await AdminClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
-        await StartOffboardingAsync(client, companyId, employeeId, new DateOnly(2026, 8, 1), "Resigned.");
+        await StartOffboardingAsync(client, companyId, employeeId, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30), "Resigned.");
 
         // No manager and no assets were set, so StartOffboardingHandler generates exactly 5
         // tasks — 1 HR document-review task (always unassigned) + 4 manager exit-checklist

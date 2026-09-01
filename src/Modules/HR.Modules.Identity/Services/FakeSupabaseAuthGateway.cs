@@ -52,6 +52,9 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
     public Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken) =>
         Task.CompletedTask;
 
+    public Task SignOutAsync(string userAccessToken, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
+
     // No real Supabase project is exercised in E2E — report "no factors were enrolled" (success).
     public Task<int> RemoveAllMfaFactorsAsync(Guid supabaseUserId, CancellationToken cancellationToken) =>
         Task.FromResult(0);

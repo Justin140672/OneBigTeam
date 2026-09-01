@@ -37,7 +37,8 @@ public class FitNoteRequestJobTests
             new FitNoteEvidenceRequestService(
                 db,
                 integrationPublisher ?? new FakeIntegrationEventPublisher(),
-                auditPublisher ?? new FakeAuditEventPublisher()),
+                auditPublisher ?? new FakeAuditEventPublisher(),
+                new FakeTaskRescheduler()),
             new FakeClock(FixedUtcNow));
 
     private static async Task<Guid> SeedCategory(SicknessDbContext db, Guid companyId)

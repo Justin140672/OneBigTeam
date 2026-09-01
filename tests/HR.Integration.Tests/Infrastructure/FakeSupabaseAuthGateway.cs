@@ -23,6 +23,11 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
     public bool ShouldThrowOnExchange { get; set; }
     public bool ShouldThrowOnSignIn { get; set; }
 
+    // Simulates Supabase rejecting a recovery access token (expired / already used / tampered):
+    // UpdatePasswordAsync surfaces any non-success Supabase response as an InvalidOperationException,
+    // which ResetPasswordHandler maps to a generic validation failure rather than a 500.
+    public bool ShouldThrowOnUpdatePassword { get; set; }
+
     public List<(string Email, string Password)> EnsuredDevUsers { get; } = [];
     public List<(string Email, string Password)> SignedInUsers { get; } = [];
     public List<(string Email, string Password)> ConfirmedUsersCreated { get; } = [];
@@ -58,7 +63,31 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
 
     public Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken)
     {
+        if (ShouldThrowOnUpdatePassword)
+        {
+            throw new InvalidOperationException(
+                $"Supabase /auth/v1/user request failed with status 401 (Unauthorized). Response body: {{\"error\":\"invalid token: {userAccessToken}\"}}");
+        }
+
         PasswordUpdates.Add((userAccessToken, newPassword));
+        return Task.CompletedTask;
+    }
+
+    public List<string> SignOutCalls { get; } = [];
+
+    // Simulates GoTrue rejecting the sign-out (e.g. token already expired). The /logout journey must
+    // still complete: the caller swallows this and clears the cookie regardless.
+    public bool ShouldThrowOnSignOut { get; set; }
+
+    public Task SignOutAsync(string userAccessToken, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowOnSignOut)
+        {
+            throw new InvalidOperationException(
+                "Supabase sign-out request failed with status 401 (Unauthorized). response body: (redacted)");
+        }
+
+        SignOutCalls.Add(userAccessToken);
         return Task.CompletedTask;
     }
 
@@ -126,6 +155,8 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         PasswordResetRequests.Clear();
         RecoveryLinksGenerated.Clear();
         PasswordUpdates.Clear();
+        SignOutCalls.Clear();
+        ShouldThrowOnSignOut = false;
         MfaFactorRemovals.Clear();
         ShouldThrowOnRemoveMfaFactors = false;
         MfaFactorsRemovedToReturn = 2;
@@ -133,6 +164,7 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         ShouldThrowOnCreate = false;
         ShouldThrowOnExchange = false;
         ShouldThrowOnSignIn = false;
+        ShouldThrowOnUpdatePassword = false;
         EnsuredDevUsers.Clear();
         SignedInUsers.Clear();
         ConfirmedUsersCreated.Clear();

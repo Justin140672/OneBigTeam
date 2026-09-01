@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
@@ -81,36 +80,14 @@ public sealed class AssetReturnTaskTests(EmployeePersonaFixture fixture) : Supab
     }
 
     /// <summary>
-    /// Creates a brand-new employee via the standard New Employee form and returns their id and
-    /// work email, captured from the URL after navigating back into their profile from the
-    /// employee list. Caller must already be logged in as an HR administrator.
+    /// Returns the dedicated pre-seeded pool employee for this class (SeededE2eEmployees.AssetReturn).
+    /// Its Employee row exists but has no Supabase login until <see cref="EnsureEmployeeLoginAsync"/>
+    /// provisions one at runtime.
     /// </summary>
-    private async Task<(Guid EmployeeId, string Email, string LastName)> CreateEmployeeAsync(
-        EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
+    private static (Guid EmployeeId, string Email, string LastName) CreateEmployeeAsync()
     {
-        var unique    = Guid.NewGuid().ToString("N")[..8];
-        var lastName  = $"AssetReturn{suffix}{unique}";
-        var workEmail = $"e2e.assetreturn.{suffix.ToLowerInvariant()}{unique}@acme.example";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
-        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
-
-        await empEdit.SaveNewEmployeeAsync();
-        await empList.ClickEmployeeAsync(lastName);
-
-        var match = Regex.Match(_page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
-        return (Guid.Parse(match.Groups[1].Value), workEmail, lastName);
+        var seeded = SeededE2eEmployees.AssetReturn;
+        return (seeded.EmployeeId, seeded.Email, seeded.LastName);
     }
 
     /// <summary>
@@ -163,19 +140,17 @@ public sealed class AssetReturnTaskTests(EmployeePersonaFixture fixture) : Supab
     public async Task AssetReturnTask_ConfirmReturn_CompletesTask()
     {
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
-        var empList   = new EmployeeListPage(_page, _fixture.WebBaseUrl);
-        var empEdit   = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
         var empAdmin  = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
         var assetEdit = new AssetEditPage(_page, _fixture.WebBaseUrl);
         var taskView  = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
-        // Arrange (as HR admin): a fresh employee and a fresh available asset (avoids contending
-        // with the single shared seeded ASSET-0003 that other tests permanently consume), then
-        // assign it — which auto-creates the "Acknowledge receipt of asset" task.
+        // Arrange (as HR admin): the dedicated pool employee and a fresh available asset (avoids
+        // contending with the single shared seeded ASSET-0003 that other tests permanently
+        // consume), then assign it — which auto-creates the "Acknowledge receipt of asset" task.
         await login.GoToAsync();
         await login.LoginAsync(HrAdminEmail);
 
-        var (employeeId, email, lastName) = await CreateEmployeeAsync(empList, empEdit, "Ret");
+        var (employeeId, email, lastName) = CreateEmployeeAsync();
 
         var assetNumber = $"E2E-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
         var assetName   = $"E2E Return Asset {Guid.NewGuid().ToString("N")[..8]}";

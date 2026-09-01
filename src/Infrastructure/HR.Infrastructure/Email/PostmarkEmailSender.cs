@@ -42,11 +42,37 @@ internal sealed class PostmarkEmailSender : IEmailSender
 
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Content.ReadAsStringAsync(ct);
+            // Log only Postmark's own error code/message, never the full response body or the
+            // htmlBody we sent — transactional email bodies carry single-use tokens and secure
+            // action links.
+            var (errorCode, message) = await ReadPostmarkErrorAsync(response, ct);
             _logger.LogWarning(
-                "Postmark email send failed. To={ToEmail} StatusCode={StatusCode} Body={Body}",
-                toEmail, (int)response.StatusCode, body);
+                "Postmark email send failed. To={ToEmail} StatusCode={StatusCode} PostmarkErrorCode={PostmarkErrorCode} PostmarkMessage={PostmarkMessage}",
+                SensitiveDataScrubber.MaskEmail(toEmail), (int)response.StatusCode, errorCode, message);
             response.EnsureSuccessStatusCode();
+        }
+    }
+
+    private static async Task<(int? ErrorCode, string Message)> ReadPostmarkErrorAsync(
+        HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            var raw = await response.Content.ReadAsStringAsync(ct);
+            if (string.IsNullOrWhiteSpace(raw))
+                return (null, "(no response body)");
+
+            using var doc = System.Text.Json.JsonDocument.Parse(raw);
+            var root = doc.RootElement;
+            int? code = root.TryGetProperty("ErrorCode", out var c) && c.TryGetInt32(out var ci) ? ci : null;
+            var msg = root.TryGetProperty("Message", out var m) && m.ValueKind == System.Text.Json.JsonValueKind.String
+                ? SensitiveDataScrubber.ScrubText(m.GetString())
+                : "(no message)";
+            return (code, msg);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return (null, "(unparseable response body)");
         }
     }
 }

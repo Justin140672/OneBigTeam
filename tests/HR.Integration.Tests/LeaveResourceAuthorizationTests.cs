@@ -327,7 +327,7 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
         var employee = await CreateEmployeeAsync();
         await AssignPolicyAsync(employee);
         using var employeeClient = await AuthenticatedClient(employee);
-        var leaveRequestId = await SubmitAsync(employeeClient, employee, "2026-09-12", "2026-09-12");
+        var leaveRequestId = await SubmitAsync(employeeClient, employee, "2026-09-25", "2026-09-25");
 
         using var hrClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
 
@@ -345,7 +345,7 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
         var peer = await CreateEmployeeAsync();
 
         using var employeeClient = await AuthenticatedClient(employee);
-        var leaveRequestId = await SubmitAsync(employeeClient, employee, "2026-09-13", "2026-09-13");
+        var leaveRequestId = await SubmitAsync(employeeClient, employee, "2026-09-28", "2026-09-28");
 
         using var peerClient = await AuthenticatedClient(peer);
 
@@ -578,7 +578,7 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
             await AssignManagerAsync(setupClient, employee, manager);
         }
 
-        using var managerClient = await AuthenticatedClient(manager);
+        using var managerClient = await AuthenticatedClient(manager, manager: true);
 
         var response = await managerClient.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee}/leave-requests/{leaveRequestId}/approve",
@@ -649,7 +649,7 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
         await AssignPolicyAsync(employee);
 
         using var employeeClient = await AuthenticatedClient(employee);
-        var leaveRequestId = await SubmitAsync(employeeClient, employee, "2026-09-19", "2026-09-19");
+        var leaveRequestId = await SubmitAsync(employeeClient, employee, "2026-09-29", "2026-09-29");
 
         var crossCompanyCaller = Guid.NewGuid();
         using var crossClient = factory.CreateClient();
@@ -676,14 +676,14 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
         var impersonationTarget = Guid.NewGuid();
 
         using var employeeClient = await AuthenticatedClient(employee);
-        var leaveRequestId = await SubmitAsync(employeeClient, employee, "2026-09-20", "2026-09-20");
+        var leaveRequestId = await SubmitAsync(employeeClient, employee, "2026-09-30", "2026-09-30");
 
         using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
         {
             await AssignManagerAsync(setupClient, employee, manager);
         }
 
-        using var managerClient = await AuthenticatedClient(manager);
+        using var managerClient = await AuthenticatedClient(manager, manager: true);
 
         var response = await managerClient.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee}/leave-requests/{leaveRequestId}/approve",
@@ -729,7 +729,7 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
             await AssignManagerAsync(setupClient, employee, manager);
         }
 
-        using var managerClient = await AuthenticatedClient(manager);
+        using var managerClient = await AuthenticatedClient(manager, manager: true);
 
         var response = await managerClient.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee}/leave-requests/{leaveRequestId}/reject",
@@ -789,7 +789,7 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
             await AssignManagerAsync(setupClient, employee, manager);
         }
 
-        using var managerClient = await AuthenticatedClient(manager);
+        using var managerClient = await AuthenticatedClient(manager, manager: true);
 
         var response = await managerClient.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee}/leave-requests/{leaveRequestId}/reject",

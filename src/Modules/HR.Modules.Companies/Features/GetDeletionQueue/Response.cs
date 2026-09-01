@@ -13,4 +13,6 @@ internal sealed record DeletionQueueItemDto(
     string CompanyName,
     DateTimeOffset ScheduledAt,
     DateTimeOffset? CancelledAt,
-    DateTimeOffset? ExecutedAt);
+    DateTimeOffset? ExecutedAt,
+    DateTimeOffset? LegalHoldPlacedAt,
+    string? LegalHoldReason);

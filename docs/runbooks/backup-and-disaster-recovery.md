@@ -218,7 +218,9 @@ instructions must be reapplied **before** the service returns to ordinary use.
 
 1. From the restored `CustomerSubscription` data, list every company where:
    - `DeletionExecutedAt` is not null, **or**
-   - `HasPendingDeletion` is true (`DeletionScheduledAt` set, not cancelled, not executed).
+   - `HasPendingDeletion` is true (`DeletionScheduledAt` set, not cancelled, not executed), **or**
+   - `LegalHoldPlacedAt` is not null (NFR-07 legal hold — retention deletion must stay suspended
+     for this tenant).
    The validation script includes this query.
 2. Cross-check against the **out-of-band deletion register** (`docs/compliance` process) — the
    authoritative list of deletion obligations, because it survives a DB rollback. Any obligation in
@@ -229,7 +231,19 @@ instructions must be reapplied **before** the service returns to ordinary use.
    re-verified against every module schema, Supabase private objects, and auth profiles.
 4. For each pending-deletion company: confirm `DeletionScheduledAt` survived; if the countdown
    date passed during the outage, re-evaluate and re-schedule or execute per the register.
-5. Record per-company reapplication outcome; a second authorised person verifies before ordinary
+5. **Legal holds (NFR-07).** For each company with `LegalHoldPlacedAt` set in the restored data,
+   cross-check the out-of-band register: any hold in the register but missing from the restored DB
+   must be re-placed via `PlaceCompanyLegalHold` before ordinary use resumes. A restore can also
+   *resurrect* a lifted hold — if the register shows a hold was lifted after the restore point,
+   re-lift it. Scheduled retention processing (`PurgeExpiredReadNotificationsJob` and the
+   operator purge endpoints) automatically re-reads `ILegalHoldStatusReader` on its next run and
+   will re-skip held companies, so no job reconfiguration is needed — but the hold rows themselves
+   must be correct first.
+6. **Scheduled retention resumption.** `PurgeExpiredReadNotificationsJob` resumes on its normal
+   daily schedule after redeploy. Confirm `Notifications:Retention:Enabled` is still set as
+   intended (dry-run vs. live) in the restored service configuration; a restore of an older config
+   could silently re-enable or disable live deletion.
+7. Record per-company reapplication outcome; a second authorised person verifies before ordinary
    access is restored.
 
 ### 5.6 Close-out
@@ -292,6 +306,7 @@ Because production cannot be restored on demand from this repository, NFR-04 is 
 | 12 | `data-protection-operations.md` launch gate | "database backup retention and restoration are tested" | Sections 2, 5, 6 | **Documented**; test evidence pending |
 | 13 | `data-protection-operations.md` launch gate | "any advertised independent file backup is implemented and tested" | Section 3 | **Gap** — same as #3 |
 | 14 | `deployment-architecture.md` Disaster Recovery AC 9 | "Recovery procedures are documented" | This runbook | **Met** (documentation); execution pending |
+| 15 | DPA §10 / Privacy Policy "Retention" (NFR-07) | Deletion instructions and legal holds "that remain applicable will be reapplied" after a restore | §5.5 steps 1–6 + `docs/compliance/data-retention-inventory.md` | **Documented**; depends on G4 register capturing legal holds |
 
 ### Open gaps requiring action (not resolvable in-repo)
 
@@ -301,6 +316,11 @@ Because production cannot be restored on demand from this repository, NFR-04 is 
 - **G2:** Recovery objectives and retention figures are **proposed, not signed off**.
 - **G3:** No production restore exercise has been performed; 6-monthly schedule not yet established.
 - **G4:** Out-of-band deletion obligations register (needed for DPA §10 reapplication after
-  restore) must be created/confirmed by operations.
+  restore) must be created/confirmed by operations. **NFR-07 update:** the register must now also
+  capture **legal holds** (company, reason, placed/lifted dates) so §5.5 step 5 can reconcile them
+  after a restore — the in-DB `customer_subscriptions.legal_hold_*` columns are the working store
+  but do not survive a rollback. The data-retention inventory
+  (`docs/compliance/data-retention-inventory.md`) is the reference for which data classes carry a
+  deletion obligation.
 - **G5:** MFA/least-privilege enforcement and backup-system audit-log export on Supabase, Railway,
   Cloudflare, Stripe and Postmark must be verified by an operator.

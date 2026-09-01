@@ -19,9 +19,17 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
+    // Search/filter/selection tests only need "a row that matches my search" — they use the shared
+    // read-only pool employee SeededE2eEmployees.ListUi[0] ("E2E SeedListUiA") rather than paying
+    // the full New Employee form. None of them mutate the row (grid selection is client-side).
+    // The one test that genuinely needs an employee bearing a specific, freshly-created long
+    // Position Profile title still creates one via the full form (positionProfile != null).
     private async Task<string> CreateEmployeeAsync(
         EmployeeListPage empList, EmployeeEditPage empEdit, string uniqueSuffix, string? positionProfile = null)
     {
+        if (positionProfile is null)
+            return SeededE2eEmployees.ListUi[0].LastName;
+
         var lastName = $"UiListE2E{uniqueSuffix}";
         var workEmail = $"e2e.uilist{uniqueSuffix}@acme.example";
 
@@ -37,7 +45,7 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empEdit.FillStartDateAsync("01/03/2026");
         await empEdit.FillEmployeeNumberAsync($"E2E-UIL-{uniqueSuffix}");
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", positionProfile ?? "QA Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", positionProfile);
         await empEdit.SaveNewEmployeeAsync();
 
         return lastName;
@@ -230,17 +238,16 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
-        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var unique = Guid.NewGuid().ToString("N")[..8];
-        var firstLastName = await CreateEmployeeAsync(empList, empEdit, $"{unique}A");
-        var secondLastName = await CreateEmployeeAsync(empList, empEdit, $"{unique}B");
+        // Two dedicated read-only pool employees sharing the "SeedListUi" prefix.
+        var firstLastName = SeededE2eEmployees.ListUi[0].LastName;
+        var secondLastName = SeededE2eEmployees.ListUi[1].LastName;
 
         await empList.GoToAsync(AcmeId);
-        await empList.SearchAsync($"UiListE2E{unique}");
+        await empList.SearchAsync("SeedListUi");
 
         await empList.CheckEmployeeRowAsync(firstLastName);
         await empList.CheckEmployeeRowAsync(secondLastName);

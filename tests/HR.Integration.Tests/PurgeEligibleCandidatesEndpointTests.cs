@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Companies.Domain;
+using HR.Modules.Companies.Persistence;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
@@ -128,6 +130,36 @@ public class PurgeEligibleCandidatesEndpointTests
         Assert.NotNull(eligible.PurgedAt);
         Assert.Null(recent.PurgedAt);
         Assert.Equal("Olivia", recent.FirstName);
+    }
+
+    [Fact]
+    public async Task Post_PurgeEligible_Returns_Conflict_And_Purges_Nothing_When_Company_Is_Under_Legal_Hold()
+    {
+        var companyId = Guid.NewGuid();
+        var candidateId = await SeedEligibleCandidateAsync(companyId);
+
+        // ClientAs -> SyncCompanyAsync -> EnsureActiveSubscriptionAsync creates the Company and its
+        // CustomerSubscription, so the legal hold is applied to that existing row afterwards (adding
+        // a second subscription would violate the customer_subscriptions PK / companies FK).
+        using var client = await ClientAs(CompanyAdminUser, companyId);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var companiesDb = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+            var subscription = await companiesDb.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+            subscription.PlaceLegalHold(Guid.NewGuid(), "Litigation hold for purge test", DateTimeOffset.UtcNow);
+            await companiesDb.SaveChangesAsync();
+        }
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/candidates/purge-eligible", new { });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var db = verifyScope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+        var saved = await db.Candidates.SingleAsync(c => c.Id == candidateId);
+        Assert.Null(saved.PurgedAt);
+        Assert.Equal("Emma", saved.FirstName);
     }
 
     private sealed record PurgeEligiblePayload(int PurgedCount);

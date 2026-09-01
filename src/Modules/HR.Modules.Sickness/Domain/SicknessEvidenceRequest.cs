@@ -58,4 +58,25 @@ internal sealed class SicknessEvidenceRequest
         Status = SicknessEvidenceRequestStatus.Overdue;
         UpdatedAt = now;
     }
+
+    /// <summary>
+    /// SICK-01: re-anchors the fit-note deadline once the absence's authoritative end date is
+    /// known (i.e. when the record is closed). Only meaningful while the request is still Pending
+    /// or Overdue — a fulfilled/cancelled request keeps its history.
+    /// </summary>
+    public bool Reschedule(DateOnly newDueDate, DateTimeOffset now)
+    {
+        if (Status != SicknessEvidenceRequestStatus.Pending &&
+            Status != SicknessEvidenceRequestStatus.Overdue)
+            return false;
+
+        if (DueDate == newDueDate)
+            return false;
+
+        DueDate = newDueDate;
+        if (Status == SicknessEvidenceRequestStatus.Overdue && newDueDate >= DateOnly.FromDateTime(now.UtcDateTime))
+            Status = SicknessEvidenceRequestStatus.Pending;
+        UpdatedAt = now;
+        return true;
+    }
 }

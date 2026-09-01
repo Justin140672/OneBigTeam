@@ -57,8 +57,36 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         return Task.FromResult(RecoveryLinkToReturn);
     }
 
-    public Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken) =>
-        Task.CompletedTask;
+    public bool ShouldThrowOnUpdatePassword { get; set; }
+
+    /// <summary>
+    /// Simulates the raw Supabase /auth/v1/user error message a real gateway failure would carry —
+    /// deliberately token-shaped so tests can prove it never reaches a log or an API response.
+    /// </summary>
+    public string UpdatePasswordErrorMessage { get; set; } =
+        "Supabase update-password request failed with status 401 (Unauthorized). " +
+        "response detail: access_token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abc123signature";
+
+    public Task UpdatePasswordAsync(string userAccessToken, string newPassword, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowOnUpdatePassword)
+            throw new InvalidOperationException(UpdatePasswordErrorMessage);
+
+        return Task.CompletedTask;
+    }
+
+    public List<string> SignOutCalls { get; } = [];
+    public bool ShouldThrowOnSignOut { get; set; }
+
+    public Task SignOutAsync(string userAccessToken, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowOnSignOut)
+            throw new InvalidOperationException(
+                "Supabase sign-out request failed with status 500 (InternalServerError). response body: (redacted)");
+
+        SignOutCalls.Add(userAccessToken);
+        return Task.CompletedTask;
+    }
 
     public List<Guid> MfaFactorRemovals { get; } = [];
     public bool ShouldThrowOnRemoveMfaFactors { get; set; }

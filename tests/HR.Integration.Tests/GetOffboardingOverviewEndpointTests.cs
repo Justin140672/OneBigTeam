@@ -66,7 +66,10 @@ public class GetOffboardingOverviewEndpointTests
         var assetId = await CreateAssetAsync(client, companyId, categoryId, $"OB-{Guid.NewGuid():N}");
         await AssignAssetAsync(client, companyId, assetId, employeeId);
 
-        var lastWorkingDay = new DateOnly(2026, 8, 1);
+        // Future date: a past last-working-day is treated as a backdated departure, which reroutes
+        // the asset-return task to HR reconciliation and waives the access-revocation checklist
+        // item, changing the task shape this test asserts.
+        var lastWorkingDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
         await StartOffboardingAsync(client, companyId, employeeId, lastWorkingDay, "Resigned.");
 
         // Complete the employee's asset-return task so we exercise a Completed status

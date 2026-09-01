@@ -84,7 +84,7 @@ internal sealed class PostmarkInvitationEmailSender : IInvitationEmailSender
                 _logger.LogWarning(
                     "Postmark invitation email send failed. StatusCode={StatusCode} To={ToEmail}",
                     (int)response.StatusCode,
-                    toEmail);
+                    SensitiveDataScrubber.MaskEmail(toEmail));
                 return false;
             }
 
@@ -94,7 +94,7 @@ internal sealed class PostmarkInvitationEmailSender : IInvitationEmailSender
         {
             _logger.LogWarning(ex,
                 "Postmark invitation email request failed. To={ToEmail}",
-                toEmail);
+                SensitiveDataScrubber.MaskEmail(toEmail));
             return false;
         }
     }

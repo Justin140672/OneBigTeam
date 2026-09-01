@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
@@ -64,36 +63,20 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
         await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
     }
 
+    // Uses a dedicated pre-seeded pool employee instead of the full New Employee form. Each pool
+    // member already has a NotStarted onboarding plan (so the Onboarding tab is visible, exactly
+    // as for a freshly-created employee), no manager (so no probation record) and no offboarding
+    // plan — the same starting state the old form-creation flow produced. Both consuming tests
+    // start a leaving process on their employee, so each gets its own dedicated row.
     private async Task<Guid> CreateEmployeeAsync(
         EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
     {
-        var unique    = Guid.NewGuid().ToString("N")[..8];
-        var lastName  = $"Lifecycle{suffix}{unique}";
-        var workEmail = $"e2e.lifecycle.{suffix.ToLowerInvariant()}{unique}@acme.example";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
-
-        // Employee Number, Employment Type, Department, Location and Position Profile are all
-        // mandatory. Selecting "QA Engineer" (seeded with Engineering / London
-        // Office attached) pre-populates Department and Location in one step.
-        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
-
-        await empEdit.SaveNewEmployeeAsync();
-        await empList.ClickEmployeeAsync(lastName);
-
-        var match = Regex.Match(_page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
-        return Guid.Parse(match.Groups[1].Value);
+        _ = empList;
+        var seeded = suffix == "Multi"
+            ? SeededE2eEmployees.LifecycleTabVisibility[0]
+            : SeededE2eEmployees.LifecycleTabVisibility[1];
+        await empEdit.GoToAsync(AcmeId, seeded.EmployeeId);
+        return seeded.EmployeeId;
     }
 
     [Fact]

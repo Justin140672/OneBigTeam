@@ -13,8 +13,11 @@ public sealed class ResetPasswordPage(IPage page, string baseUrl)
     public Task GoToWithoutTokenAsync() =>
         page.GotoAsync($"{baseUrl}/reset-password");
 
-    public Task GoToCompleteWithTokenAsync(string accessToken) =>
-        page.GotoAsync($"{baseUrl}/reset-password-complete?access_token={Uri.EscapeDataString(accessToken)}");
+    // The recovery token is no longer accepted in the URL — the completion page takes an opaque
+    // single-use handoff code instead (see AuthHandoffStore). Passing an arbitrary value here
+    // exercises the "invalid / expired link" path, which is all this environment can reach.
+    public Task GoToCompleteWithTokenAsync(string handoffCode) =>
+        page.GotoAsync($"{baseUrl}/reset-password-complete?code={Uri.EscapeDataString(handoffCode)}");
 
     public Task<bool> IsInvalidLinkMessageVisibleAsync() =>
         page.GetByText("This password reset link is no longer valid. Please request a new one.").IsVisibleAsync();

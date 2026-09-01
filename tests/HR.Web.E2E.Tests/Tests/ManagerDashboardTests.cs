@@ -37,59 +37,15 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
     private const string TomEmail   = "tom.williams@acme.example";
 
     /// <summary>
-    /// Creates a brand-new employee via the standard New Employee form, then assigns David Park
-    /// as their manager via the Employment tab (the New Employee form itself has no Manager
-    /// field). Returns the new employee's id and last name. Caller must already be logged in as
-    /// David.
+    /// Returns a dedicated pre-seeded pool employee (SeededE2eEmployees.ManagerDashboard[0]) that
+    /// is already assigned David Park as manager in the seed, and already has a NotStarted
+    /// onboarding plan whose three default checklist tasks are unassigned (so they sit in the HR
+    /// Inbox) — the exact starting state the old create-then-assign-manager flow produced.
     /// </summary>
-    private async Task<(Guid EmployeeId, string LastName)> CreateEmployeeReportingToDavidAsync(
-        EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
+    private static (Guid EmployeeId, string LastName) CreateEmployeeReportingToDavidAsync()
     {
-        var unique    = Guid.NewGuid().ToString("N")[..8];
-        var lastName  = $"Team{suffix}{unique}";
-        var workEmail = $"e2e.team.{suffix.ToLowerInvariant()}{unique}@acme.example";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
-
-        // Employee Number, Employment Type, Department, Location and Position Profile are all
-        // mandatory. Selecting "QA Engineer" (seeded with Engineering / London
-        // Office attached) pre-populates Department and Location in one step.
-        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
-
-        await empEdit.SaveNewEmployeeAsync();
-        await empList.ClickEmployeeAsync(lastName);
-
-        var match = Regex.Match(_page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
-        var employeeId = Guid.Parse(match.Groups[1].Value);
-
-        await empEdit.OpenEmploymentTabAsync();
-        await empEdit.SelectManagerAsync("David Park");
-        await empEdit.ClickSaveChangesAsync();
-
-        // ClickSaveChangesAsync redirects to the employee list on success (EmployeeEdit.razor's
-        // SaveCoreAsync always sets _redirectUrl to the list, even for an existing-employee
-        // update) — that alone doesn't prove the manager assignment actually persisted server-side,
-        // only that the save request didn't visibly error. Reload the employee fresh and re-read
-        // the Manager field from the database-backed value, not the client-side selection made
-        // moments ago, to catch a persistence failure here rather than as a confusing downstream
-        // symptom (e.g. the employee silently missing from David's dashboard widgets).
-        await empEdit.GoToAsync(AcmeId, employeeId);
-        await empEdit.OpenEmploymentTabAsync();
-        var savedManager = await empEdit.GetSelectedManagerTextAsync();
-        Assert.Equal("David Park", savedManager);
-
-        return (employeeId, lastName);
+        var seeded = SeededE2eEmployees.ManagerDashboard[0];
+        return (seeded.EmployeeId, seeded.LastName);
     }
 
     [Fact]
@@ -270,7 +226,8 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
 
         // ── Step 1: create a new employee — auto-creates an onboarding plan with three
         // default checklist tasks, all unassigned (see method remarks above). ──────────────
-        var (employeeId, lastName) = await CreateEmployeeReportingToDavidAsync(empList, empEdit, "Complete");
+        _ = empList;
+        var (employeeId, lastName) = CreateEmployeeReportingToDavidAsync();
 
         // ── Step 2: claim one of the new employee's unassigned onboarding tasks from the
         // HR Inbox — this assigns it to David, making it appear in his own Tasks tab. ──────

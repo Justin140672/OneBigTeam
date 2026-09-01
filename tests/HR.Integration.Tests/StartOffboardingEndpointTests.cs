@@ -140,9 +140,12 @@ public class StartOffboardingEndpointTests
         using var client = await AdminClient(companyId);
         var employeeId = await CreateEmployeeAsync(client, companyId);
 
+        // Future last-working-day: a backdated (past) departure reroutes some tasks to HR
+        // reconciliation instead of leaving them unassigned, which would break the assertion below.
+        var lastWorkingDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30).ToString("yyyy-MM-dd");
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/offboarding/start",
-            new { companyId, employeeId, lastWorkingDay = "2026-08-01", notes = "Resigned." });
+            new { companyId, employeeId, lastWorkingDay, notes = "Resigned." });
         response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<OffboardingPlanPayload>();
         Assert.NotNull(payload);

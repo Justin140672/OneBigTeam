@@ -53,32 +53,16 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
         }
     }
 
+    // All three tests share one dedicated pre-seeded pool employee — none ever confirms the
+    // wizard, so nothing about the employee is mutated (see class remarks). GetSharedEmployeeAsync
+    // still handles landing the browser on its "/view" route.
     private async Task<Guid> CreateEmployeeAsync(EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
     {
-        var unique = Guid.NewGuid().ToString("N")[..8];
-        var lastName = $"Offboard{suffix}{unique}";
-        var workEmail = $"e2e.offboardconfirm.{suffix.ToLowerInvariant()}{unique}@acme.example";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
-        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
-
-        await empEdit.SaveNewEmployeeAsync();
-        await empList.ClickEmployeeAsync(lastName);
-
-        var match = System.Text.RegularExpressions.Regex.Match(
-            _page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
-        return Guid.Parse(match.Groups[1].Value);
+        _ = empList;
+        _ = suffix;
+        var id = SeededE2eEmployees.OffboardingConfirmation[0].EmployeeId;
+        await empEdit.GoToViewAsync(AcmeId, id);
+        return id;
     }
 
     [Fact]

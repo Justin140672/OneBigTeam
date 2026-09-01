@@ -36,7 +36,9 @@ internal sealed class GetDeletionQueueHandler(
                     company.Name,
                     subscription.DeletionScheduledAt!.Value,
                     subscription.DeletionCancelledAt,
-                    subscription.DeletionExecutedAt))
+                    subscription.DeletionExecutedAt,
+                    subscription.LegalHoldPlacedAt,
+                    subscription.LegalHoldReason))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new GetDeletionQueueResponse(items));

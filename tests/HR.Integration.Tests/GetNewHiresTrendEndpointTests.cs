@@ -19,7 +19,7 @@ public class GetNewHiresTrendEndpointTests
     {
         _factory = factory;
 
-        TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.Employee)
+        TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator)
             .GetAwaiter().GetResult();
     }
 
@@ -28,7 +28,7 @@ public class GetNewHiresTrendEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -48,7 +48,7 @@ public class GetNewHiresTrendEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.Empty.ToString());
-        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, Guid.Empty);
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, Guid.Empty);
 
         var response = await client.GetAsync($"/api/companies/{Guid.Empty}/employees/new-hires-trend");
 

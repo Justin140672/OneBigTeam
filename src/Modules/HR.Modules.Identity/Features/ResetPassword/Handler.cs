@@ -17,12 +17,15 @@ internal sealed class ResetPasswordHandler(ISupabaseAuthGateway supabaseAuthGate
         {
             await supabaseAuthGateway.UpdatePasswordAsync(request.AccessToken, request.NewPassword, cancellationToken);
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException)
         {
             // Most likely cause: the recovery token has expired or was already used — surfaced as
             // a validation error rather than a 500, since it's a normal/expected user-facing
-            // outcome ("this link is invalid or has expired"), not a server fault.
-            return Result.Failure<ResetPasswordResponse>(Error.Validation(ex.Message));
+            // outcome ("this link is invalid or has expired"), not a server fault. The gateway
+            // exception message is deliberately not forwarded: Supabase's /auth/v1/user error body
+            // can echo the caller's access token and other credentials.
+            return Result.Failure<ResetPasswordResponse>(
+                Error.Validation("This link is invalid or has expired. Please request a new password reset email."));
         }
 
         return Result.Success(new ResetPasswordResponse(true));

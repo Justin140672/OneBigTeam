@@ -88,7 +88,8 @@
 .overview-dl dt {
     font-size: 0.78rem;
     font-weight: 500;
-    color: #9ca3af;
+    /* #9ca3af is only ~2.5:1 on white — fails WCAG AA. #6b7280 is ~4.8:1. */
+    color: #6b7280;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     white-space: nowrap;
@@ -386,6 +387,11 @@ html[data-theme="dark"] .skeleton-card {
 html[data-theme="dark"] .overview-card-header,
 html[data-theme="dark"] .upcoming-leave-item {
     border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .overview-dl dt {
+    /* #6b7280 is ~2.9:1 on the dark card surface; --hr-gray-300 clears AA comfortably. */
+    color: var(--hr-gray-300);
 }
 
 html[data-theme="dark"] .overview-card-title,

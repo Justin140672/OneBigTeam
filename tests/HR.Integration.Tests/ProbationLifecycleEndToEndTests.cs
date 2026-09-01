@@ -71,12 +71,23 @@ public class ProbationLifecycleEndToEndTests
         Assert.Contains(reviews, r => r.ReviewType == "HrReview"       && r.Status == "Pending");
         Assert.Contains(reviews, r => r.ReviewType == "FinalDecision"  && r.Status == "Pending");
 
-        // ── Step 4: Verify three tasks were created for the manager ───────────
+        // ── Step 4: Verify review tasks were created and routed correctly ─────
+        // PROB-04: ManagerCheckIn and FinalDecision go to the employee's manager; HrReview goes
+        // to the HR queue (here, the acting HR administrator), never to the manager.
         var managerTasks = await GetEmployeeTasksAsync(client, companyId, managerId);
         var probationTasks = managerTasks
             .Where(t => t.Source == "Probation" && t.ActionType == "Review")
             .ToList();
-        Assert.Equal(3, probationTasks.Count);
+        Assert.Equal(2, probationTasks.Count);
+
+        var hrTasks = await GetEmployeeTasksAsync(client, companyId, AdminUser);
+        var hrProbationTasks = hrTasks
+            .Where(t => t.Source == "Probation" && t.ActionType == "Review")
+            .ToList();
+        Assert.Single(hrProbationTasks);
+        Assert.Equal(
+            reviews.Single(r => r.ReviewType == "HrReview").Id,
+            hrProbationTasks[0].SourceEntityId);
 
         // ── Step 5: Complete ManagerCheckIn task ──────────────────────────────
         var checkInTask = probationTasks
@@ -90,8 +101,8 @@ public class ProbationLifecycleEndToEndTests
         var checkInAfter = await GetReviewAsync(client, companyId, record.Id, checkInReview.Id);
         Assert.Equal("Completed", checkInAfter.Status);
 
-        // ── Step 6: Complete HrReview task ────────────────────────────────────
-        var hrReviewTask = probationTasks
+        // ── Step 6: Complete HrReview task (HR-queue assigned, not the manager) ─
+        var hrReviewTask = hrProbationTasks
             .Single(t => reviews.Any(r => r.ReviewType == "HrReview" && r.Id == t.SourceEntityId));
         var hrResp = await client.PostAsync(
             $"/api/companies/{companyId}/tasks/{hrReviewTask.Id}/complete",

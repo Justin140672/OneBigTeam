@@ -1,7 +1,9 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Documents.Features.PurgeEligibleArchivedEmployeeDocuments;
 
@@ -23,7 +25,9 @@ internal sealed class PurgeEligibleArchivedEmployeeDocumentsHandler(
     DocumentsDbContext db,
     IDocumentStorageService storage,
     IClock clock,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    ILegalHoldStatusReader legalHoldStatusReader,
+    ILogger<PurgeEligibleArchivedEmployeeDocumentsHandler> logger)
 {
     // DOC-04: no existing company-settings mechanism in this module covers document retention, so
     // a fixed default is used, matching the ticket's suggested fallback. Documented here rather
@@ -35,6 +39,14 @@ internal sealed class PurgeEligibleArchivedEmployeeDocumentsHandler(
         Guid purgedBy,
         CancellationToken cancellationToken)
     {
+        // NFR-07: a company under legal hold is exempt from all retention deletion until the hold
+        // is lifted. Fail closed — never destroy data for a held company.
+        if (await legalHoldStatusReader.IsUnderLegalHoldAsync(request.CompanyId, cancellationToken))
+        {
+            return Result.Failure<PurgeEligibleArchivedEmployeeDocumentsResponse>(Error.Conflict(
+                "This company is under a legal hold. Document purge is suspended until the hold is lifted."));
+        }
+
         var now = clock.UtcNowOffset();
         var cutoff = now.AddDays(-MinimumRetentionDays);
 
@@ -79,8 +91,23 @@ internal sealed class PurgeEligibleArchivedEmployeeDocumentsHandler(
                 purgedBy,
                 now), cancellationToken);
 
+            // NFR-07 / NFR-08 storage-orphan finding: the DB row is already gone (committed above).
+            // If the blob delete fails we must not fail the whole purge or lose visibility of the
+            // orphan — log the exact storage key so an operator can remove it out of band. A re-run
+            // of the purge will not revisit this key because its DB row no longer exists.
             if (storageKeyToDelete is not null)
-                await storage.DeleteAsync(storageKeyToDelete, cancellationToken);
+            {
+                try
+                {
+                    await storage.DeleteAsync(storageKeyToDelete, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex,
+                        "Retention purge deleted document {DocumentId} for company {CompanyId} but failed to delete its stored file {StorageKey}. Manual storage cleanup required.",
+                        row.d.Id, request.CompanyId, storageKeyToDelete);
+                }
+            }
 
             purgedCount++;
         }

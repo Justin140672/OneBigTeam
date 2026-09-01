@@ -106,10 +106,21 @@ public class AmendLeavingProcessOffboardingSyncTests
     private static async Task<Guid> CompleteEmployeeTaskAsync(
         HttpClient client, Guid companyId, Guid employeeId, string titleContains)
     {
+        // Offboarding tasks generated for an employee with no manager (and the always-HR
+        // document-review task) are unassigned, so they surface via the unassigned-tasks inbox
+        // rather than the employee's own task list.
         var listResp = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/tasks");
         listResp.EnsureSuccessStatusCode();
         var payload = await listResp.Content.ReadFromJsonAsync<EmployeeTasksPayload>();
-        var task = payload!.Items.Single(t => t.Title.Contains(titleContains));
+        var task = payload!.Items.FirstOrDefault(t => t.Title.Contains(titleContains));
+
+        if (task is null)
+        {
+            var unassignedResp = await client.GetAsync($"/api/companies/{companyId}/tasks/unassigned");
+            unassignedResp.EnsureSuccessStatusCode();
+            var unassigned = await unassignedResp.Content.ReadFromJsonAsync<EmployeeTasksPayload>();
+            task = unassigned!.Items.Single(t => t.Title.Contains(titleContains));
+        }
 
         var completeResp = await client.PostAsync(
             $"/api/companies/{companyId}/tasks/{task.Id}/complete",

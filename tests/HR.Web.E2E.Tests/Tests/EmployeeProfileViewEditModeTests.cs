@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
@@ -64,32 +63,18 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         }
     }
 
+    // Uses a dedicated pre-seeded pool employee (SeededE2eEmployees.ProfileViewEditMode) instead of
+    // paying the full New Employee form. Every test in this class only ever needs "some existing
+    // employee open in view mode"; the one test that saves an edit does so to a freshly-generated
+    // Preferred Name value that later assertions read back dynamically, so sharing one row is safe.
     private async Task<(Guid EmployeeId, string LastName)> CreateEmployeeAsync(
         EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
     {
-        var unique = Guid.NewGuid().ToString("N")[..8];
-        var lastName = $"ProfileMode{suffix}{unique}";
-        var workEmail = $"e2e.profilemode.{suffix.ToLowerInvariant()}{unique}@acme.example";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
-        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
-
-        await empEdit.SaveNewEmployeeAsync();
-        await empList.ClickEmployeeAsync(lastName);
-
-        var match = Regex.Match(_page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
-        return (Guid.Parse(match.Groups[1].Value), lastName);
+        _ = empList;
+        _ = suffix;
+        var seeded = SeededE2eEmployees.ProfileViewEditMode;
+        await empEdit.GoToViewAsync(AcmeId, seeded.EmployeeId);
+        return (seeded.EmployeeId, seeded.LastName);
     }
 
     // ── View mode ────────────────────────────────────────────────────────────────

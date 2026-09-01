@@ -668,4 +668,151 @@ public class CustomerSubscriptionTests
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
     }
+
+    // ---- NFR-07 legal hold ----
+
+    [Fact]
+    public void IsUnderLegalHold_Is_False_By_Default()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+
+        Assert.False(subscription.IsUnderLegalHold);
+        Assert.Null(subscription.LegalHoldPlacedAt);
+        Assert.Null(subscription.LegalHoldPlacedBy);
+        Assert.Null(subscription.LegalHoldReason);
+    }
+
+    [Fact]
+    public void PlaceLegalHold_Succeeds_And_Sets_Fields()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+        var actor = Guid.NewGuid();
+        var placeAt = Now.AddDays(1);
+
+        var result = subscription.PlaceLegalHold(actor, "  Litigation hold - case 1234  ", placeAt);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(subscription.IsUnderLegalHold);
+        Assert.Equal(placeAt, subscription.LegalHoldPlacedAt);
+        Assert.Equal(actor, subscription.LegalHoldPlacedBy);
+        Assert.Equal("Litigation hold - case 1234", subscription.LegalHoldReason);
+        Assert.Equal(placeAt, subscription.UpdatedAt);
+    }
+
+    [Fact]
+    public void PlaceLegalHold_Accepts_Null_Actor()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+
+        var result = subscription.PlaceLegalHold(null, "Regulatory investigation", Now);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(subscription.LegalHoldPlacedBy);
+        Assert.True(subscription.IsUnderLegalHold);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void PlaceLegalHold_Fails_When_Reason_Is_Blank(string? reason)
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+
+        var result = subscription.PlaceLegalHold(Guid.NewGuid(), reason!, Now);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.False(subscription.IsUnderLegalHold);
+    }
+
+    [Fact]
+    public void PlaceLegalHold_When_Already_Held_Refreshes_Reason_Actor_And_Date()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+        var firstActor = Guid.NewGuid();
+        subscription.PlaceLegalHold(firstActor, "Initial reason", Now.AddDays(1));
+
+        var secondActor = Guid.NewGuid();
+        var refreshAt = Now.AddDays(5);
+        var result = subscription.PlaceLegalHold(secondActor, "Updated reason as matter developed", refreshAt);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(refreshAt, subscription.LegalHoldPlacedAt);
+        Assert.Equal(secondActor, subscription.LegalHoldPlacedBy);
+        Assert.Equal("Updated reason as matter developed", subscription.LegalHoldReason);
+    }
+
+    [Fact]
+    public void LiftLegalHold_Succeeds_And_Clears_Fields()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+        subscription.PlaceLegalHold(Guid.NewGuid(), "Litigation hold", Now.AddDays(1));
+        var liftAt = Now.AddDays(10);
+
+        var result = subscription.LiftLegalHold(liftAt);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(subscription.IsUnderLegalHold);
+        Assert.Null(subscription.LegalHoldPlacedAt);
+        Assert.Null(subscription.LegalHoldPlacedBy);
+        Assert.Null(subscription.LegalHoldReason);
+        Assert.Equal(liftAt, subscription.UpdatedAt);
+    }
+
+    [Fact]
+    public void LiftLegalHold_Fails_When_Not_Currently_Held()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+
+        var result = subscription.LiftLegalHold(Now);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public void LiftLegalHold_Fails_When_Called_Twice()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+        subscription.PlaceLegalHold(Guid.NewGuid(), "Litigation hold", Now);
+        subscription.LiftLegalHold(Now.AddDays(1));
+
+        var result = subscription.LiftLegalHold(Now.AddDays(2));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public void ExecuteDeletion_Returns_Conflict_When_Under_Legal_Hold_Even_With_Pending_Deletion()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+        subscription.ScheduleDeletion(Guid.NewGuid(), Now.AddDays(30), Now);
+        subscription.PlaceLegalHold(Guid.NewGuid(), "Litigation hold blocks deletion", Now.AddDays(1));
+
+        var result = subscription.ExecuteDeletion(Now.AddDays(2));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Null(subscription.DeletionExecutedAt);
+        Assert.True(subscription.HasPendingDeletion);
+    }
+
+    [Fact]
+    public void ExecuteDeletion_Succeeds_After_LegalHold_Lifted()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+        subscription.ScheduleDeletion(Guid.NewGuid(), Now.AddDays(30), Now);
+        subscription.PlaceLegalHold(Guid.NewGuid(), "Litigation hold", Now.AddDays(1));
+        subscription.LiftLegalHold(Now.AddDays(2));
+        var executeAt = Now.AddDays(3);
+
+        var result = subscription.ExecuteDeletion(executeAt);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(executeAt, subscription.DeletionExecutedAt);
+        Assert.True(subscription.AdminForcedReadOnly);
+    }
 }

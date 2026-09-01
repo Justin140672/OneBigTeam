@@ -224,6 +224,13 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
                 await dbContext.Database.ExecuteSqlInterpolatedAsync(
                     $"SELECT id FROM offboarding.offboarding_plans WHERE id = {plan.Id} FOR UPDATE",
                     cancellationToken);
+
+                // OFF-07: the lock above serialises concurrent completions, but this `plan` entity
+                // was materialised before we acquired the lock. Reload it so Status and
+                // FinalReviewTaskCreatedAt reflect whatever a concurrent completion committed while
+                // we were blocked — otherwise the stale in-memory Status lets the second request
+                // independently "complete" the plan again and claim a duplicate HR review task.
+                await dbContext.Entry(plan).ReloadAsync(cancellationToken);
             }
 
             outcome = await ApplyPlanCompletionAsync(plan, cancellationToken);

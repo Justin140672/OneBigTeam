@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using HR.Infrastructure.Abstractions;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Leave.Domain;
@@ -52,6 +53,15 @@ public class LeavingDateChangeRecalculatesLeaveBalanceEndpointTests
         using var client = await AuthenticatedClient(companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
+        // A real company gets its default leave types (incl. "ANNUAL") provisioned during
+        // self-service signup (CompanyDefaultDataSeeder); this test bootstraps the company
+        // directly, so do the same one step explicitly.
+        using (var seedScope = _factory.Services.CreateScope())
+        {
+            await seedScope.ServiceProvider.GetRequiredService<ILeaveTypeDefaultsProvisioner>()
+                .EnsureDefaultLeaveTypesAsync(companyId, default);
+        }
 
         // Start date well before the current calendar year so the entitlement window's lower bound
         // is always the policy year start, not the employee's start date — isolating the leaving

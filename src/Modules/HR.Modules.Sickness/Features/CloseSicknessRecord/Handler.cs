@@ -128,7 +128,8 @@ internal sealed class CloseSicknessRecordHandler(
         // FitNoteRequestJob last ran) gets its evidence request immediately rather than waiting for
         // the next job run.
         await fitNoteEvidenceRequestService.RequestIfEligibleAsync(
-            record, sicknessSettings.FitNoteRequiredAfterDays, request.EndDate, now, cancellationToken);
+            record, sicknessSettings.FitNoteRequiredAfterDays, request.EndDate, now, cancellationToken,
+            evaluationDateIsFinal: true);
 
         await auditPublisher.PublishAsync(new SicknessClosedAuditEvent(
             record.CompanyId,

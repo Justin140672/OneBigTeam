@@ -17,7 +17,7 @@
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="@Title" />
     <meta name="twitter:description" content="@Description" />
-    @if (!string.IsNullOrWhiteSpace(StructuredDataJson))
+    @if (RenderedStructuredDataJson is not null)
     {
         <script type="application/ld+json">@((MarkupString)RenderedStructuredDataJson)</script>
     }
@@ -40,7 +40,11 @@
         }
     }
 
-    private string RenderedStructuredDataJson => StructuredDataJson!
-        .Replace("__SITE_URL__", new Uri(Navigation.BaseUri).AbsoluteUri.TrimEnd('/'), StringComparison.Ordinal)
-        .Replace("__CANONICAL_URL__", CanonicalUrl, StringComparison.Ordinal);
+    private string? RenderedStructuredDataJson => HR.Marketing.Seo.StructuredDataScript.Build(
+        StructuredDataJson,
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["__SITE_URL__"] = new Uri(Navigation.BaseUri).AbsoluteUri.TrimEnd('/'),
+            ["__CANONICAL_URL__"] = CanonicalUrl,
+        });
 }

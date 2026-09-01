@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
@@ -27,42 +27,20 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
     private const string LauraEmail = "laura.bennett@acme.example";
 
     /// <summary>
-    /// Creates a brand-new employee via the standard New Employee form and returns their id,
-    /// captured from the URL after navigating back into their profile from the employee list.
-    /// Caller must already be logged in as an HR administrator.
+    /// Returns a dedicated pre-seeded pool employee (SeededE2eEmployees.OnboardingTab[slot]) that
+    /// already has a NotStarted onboarding plan with the three default checklist tasks (all
+    /// unassigned, sitting in the HR Inbox) — exactly what CreateEmployee + EmployeeCreatedHandler
+    /// produce for a manager-less UI-created hire. The six read-only tests share slot 0; the one
+    /// test that completes every task (moving the plan to Completed) takes slot 1. Leaves the
+    /// caller on the employee's edit page.
     /// </summary>
     private async Task<(Guid EmployeeId, string LastName)> CreateEmployeeWithFreshOnboardingPlanAsync(
-        EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
+        EmployeeListPage empList, EmployeeEditPage empEdit, int slot)
     {
-        var unique    = Guid.NewGuid().ToString("N")[..8];
-        var lastName  = $"Onboard{suffix}{unique}";
-        var workEmail = $"e2e.onboard.{suffix.ToLowerInvariant()}{unique}@acme.example";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
-
-        // Employee Number, Employment Type, Department, Location and Position Profile are all
-        // mandatory now. Selecting "QA Engineer" (seeded with Engineering / London
-        // Office attached) pre-populates Department and Location in one step — same pattern as
-        // CreateEmployeeTests.cs.
-        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
-
-        await empEdit.SaveNewEmployeeAsync();
-
-        await empList.ClickEmployeeAsync(lastName);
-
-        var match = Regex.Match(_page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
-        return (Guid.Parse(match.Groups[1].Value), lastName);
+        _ = empList;
+        var seeded = SeededE2eEmployees.OnboardingTab[slot];
+        await empEdit.GoToAsync(AcmeId, seeded.EmployeeId);
+        return (seeded.EmployeeId, seeded.LastName);
     }
 
     [Fact]
@@ -75,7 +53,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, "Vis");
+        await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 0);
 
         Assert.True(
             await _page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).IsVisibleAsync(),
@@ -92,7 +70,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, "Prog");
+        await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 0);
         await empEdit.OpenOnboardingTabAsync();
 
         Assert.True(await empEdit.HasOnboardingProgressPanelAsync(),
@@ -109,7 +87,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, "Chk");
+        await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 0);
         await empEdit.OpenOnboardingTabAsync();
 
         Assert.True(await empEdit.HasOnboardingChecklistAsync(),
@@ -126,7 +104,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, "Time");
+        await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 0);
         await empEdit.OpenOnboardingTabAsync();
 
         Assert.True(await empEdit.HasOnboardingTimelineAsync(),
@@ -143,7 +121,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, "Status");
+        await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 0);
         await empEdit.OpenOnboardingTabAsync();
 
         var status = await empEdit.GetOnboardingStatusBadgeTextAsync();
@@ -168,7 +146,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var (employeeId, lastName) = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, "Hide");
+        var (employeeId, lastName) = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 1);
 
         Assert.True(
             await _page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).IsVisibleAsync(),
@@ -246,7 +224,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var (employeeId, _) = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, "Deep");
+        var (employeeId, _) = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 0);
 
         // EmployeeEdit.razor's LoadAsync maps "?tab=onboarding" to tab index 11 (the last tab).
         await empEdit.GoToAsync(AcmeId, employeeId, "tab=onboarding");

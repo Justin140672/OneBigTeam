@@ -13,8 +13,11 @@ public class ResetPlatformAdministratorPasswordHandlerTests(IdentityDatabaseFixt
     private static readonly IConfiguration EmptyConfiguration = new ConfigurationBuilder().Build();
 
     private ResetPlatformAdministratorPasswordHandler BuildHandler(
-        FakeSupabaseAuthGateway gateway, FakeAuditEventPublisher auditPublisher) =>
-        new(fixture.BuildContext(), gateway, EmptyConfiguration, Clock, auditPublisher);
+        FakeSupabaseAuthGateway gateway,
+        FakeAuditEventPublisher auditPublisher,
+        FakePasswordResetEmailSender? emailSender = null) =>
+        new(fixture.BuildContext(), gateway, emailSender ?? new FakePasswordResetEmailSender(),
+            EmptyConfiguration, Clock, auditPublisher);
 
     private async Task<string> SeedOwnerAsync()
     {
@@ -64,13 +67,17 @@ public class ResetPlatformAdministratorPasswordHandlerTests(IdentityDatabaseFixt
     }
 
     [Fact]
-    public async Task HandleAsync_Requests_Password_Reset_And_Publishes_Audit_Event_On_Happy_Path()
+    public async Task HandleAsync_Generates_Recovery_Link_Sends_Branded_Email_And_Audits_On_Happy_Path()
     {
         var ownerEmail = await SeedOwnerAsync();
         var (targetId, targetEmail) = await SeedTargetAsync();
-        var gateway = new FakeSupabaseAuthGateway();
+        var gateway = new FakeSupabaseAuthGateway
+        {
+            RecoveryLinkToReturn = "https://proj.supabase.co/auth/v1/verify?token=single-use&type=recovery",
+        };
+        var emailSender = new FakePasswordResetEmailSender();
         var auditPublisher = new FakeAuditEventPublisher();
-        var handler = BuildHandler(gateway, auditPublisher);
+        var handler = BuildHandler(gateway, auditPublisher, emailSender);
         var currentUser = new FakeCurrentUser(Guid.NewGuid(), ownerEmail);
 
         var result = await handler.HandleAsync(
@@ -79,9 +86,16 @@ public class ResetPlatformAdministratorPasswordHandlerTests(IdentityDatabaseFixt
         Assert.True(result.IsSuccess);
         Assert.True(result.Value.Requested);
 
-        var request = Assert.Single(gateway.PasswordResetRequests);
-        Assert.Equal(targetEmail, request.Email);
-        Assert.EndsWith("/reset-password", request.RedirectTo);
+        // No longer the client-facing /auth/v1/recover path.
+        Assert.Empty(gateway.PasswordResetRequests);
+
+        var generated = Assert.Single(gateway.RecoveryLinksGenerated);
+        Assert.Equal(targetEmail, generated.Email);
+        Assert.EndsWith("/reset-password", generated.RedirectTo);
+
+        var sent = Assert.Single(emailSender.Sent);
+        Assert.Equal(targetEmail, sent.ToEmail);
+        Assert.Equal("https://proj.supabase.co/auth/v1/verify?token=single-use&type=recovery", sent.ActionUrl);
 
         Assert.Single(auditPublisher.PublishedEvents, e => e is PlatformAdministratorPasswordResetRequestedAuditEvent);
     }

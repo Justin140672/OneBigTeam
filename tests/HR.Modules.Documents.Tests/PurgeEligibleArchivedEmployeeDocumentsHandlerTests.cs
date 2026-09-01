@@ -3,6 +3,7 @@ using HR.Modules.Documents.Features.PurgeEligibleArchivedEmployeeDocuments;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Documents.Tests;
 
@@ -19,11 +20,14 @@ public class PurgeEligibleArchivedEmployeeDocumentsHandlerTests
     private static PurgeEligibleArchivedEmployeeDocumentsHandler BuildHandler(
         DocumentsDbContext db,
         FakeDocumentStorageService? storage = null,
-        FakeAuditPublisher? auditPublisher = null) =>
+        FakeAuditPublisher? auditPublisher = null,
+        FakeLegalHoldStatusReader? legalHoldStatusReader = null) =>
         new(db,
             storage ?? new FakeDocumentStorageService(),
             new FakeClock(FixedUtcNow),
-            auditPublisher ?? new FakeAuditPublisher());
+            auditPublisher ?? new FakeAuditPublisher(),
+            legalHoldStatusReader ?? new FakeLegalHoldStatusReader(),
+            NullLogger<PurgeEligibleArchivedEmployeeDocumentsHandler>.Instance);
 
     private static async Task<(Document doc, EmployeeDocument empDoc)> SeedArchived(
         DocumentsDbContext db,
@@ -223,5 +227,52 @@ public class PurgeEligibleArchivedEmployeeDocumentsHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(0, result.Value!.PurgedCount);
         Assert.Empty(storage.Deletions);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_And_Deletes_Nothing_When_Company_Is_Under_Legal_Hold()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var archivedAt = Now.AddDays(-PurgeEligibleArchivedEmployeeDocumentsHandler.MinimumRetentionDays);
+        var (doc, empDoc) = await SeedArchived(db, companyId, employeeId, archivedAt, "key/held.pdf");
+        var storage = new FakeDocumentStorageService();
+        var audit = new FakeAuditPublisher();
+        var handler = BuildHandler(db, storage, audit, new FakeLegalHoldStatusReader(companyId));
+
+        var result = await handler.HandleAsync(
+            new PurgeEligibleArchivedEmployeeDocumentsRequest { CompanyId = companyId },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.True(await db.EmployeeDocuments.AnyAsync(ed => ed.Id == empDoc.Id));
+        Assert.True(await db.Documents.AnyAsync(d => d.Id == doc.Id));
+        Assert.Empty(storage.Deletions);
+        Assert.Empty(audit.Published);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Still_Purges_Row_When_Storage_Delete_Throws()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var archivedAt = Now.AddDays(-PurgeEligibleArchivedEmployeeDocumentsHandler.MinimumRetentionDays);
+        var (doc, empDoc) = await SeedArchived(db, companyId, employeeId, archivedAt, "key/storage-fails.pdf");
+        var storage = new FakeDocumentStorageService { ThrowOnDelete = true };
+        var handler = BuildHandler(db, storage);
+
+        var result = await handler.HandleAsync(
+            new PurgeEligibleArchivedEmployeeDocumentsRequest { CompanyId = companyId },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.PurgedCount);
+        Assert.False(await db.EmployeeDocuments.AnyAsync(ed => ed.Id == empDoc.Id));
+        Assert.False(await db.Documents.AnyAsync(d => d.Id == doc.Id));
     }
 }

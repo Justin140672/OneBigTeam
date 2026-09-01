@@ -24,15 +24,19 @@ public sealed class RequestLoggingMiddleware(
 
     public async Task InvokeAsync(HttpContext context)
     {
-        var path = context.Request.Path.Value ?? "/";
+        var rawPath = context.Request.Path.Value ?? "/";
 
-        if (SkippedPaths.Contains(path))
+        if (SkippedPaths.Contains(rawPath))
         {
             await next(context);
             return;
         }
 
-        var method = context.Request.Method;
+        // User-controlled values (path, method) are sanitised before they reach any log
+        // sink so CR/LF cannot forge log lines (CWE-117). The query string is intentionally
+        // never logged as it can carry secrets/PII.
+        var path = LogValueSanitizer.Sanitize(rawPath);
+        var method = LogValueSanitizer.Sanitize(context.Request.Method);
         var sw = Stopwatch.StartNew();
 
         logger.LogInformation("HTTP {Method} {Path} started", method, path);
@@ -43,9 +47,9 @@ public sealed class RequestLoggingMiddleware(
             sw.Stop();
 
             var statusCode = context.Response.StatusCode;
-            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var companyId = context.GetRouteValue("companyId")?.ToString();
-            var employeeId = context.GetRouteValue("employeeId")?.ToString();
+            var userId = Clean(context.User.FindFirstValue(ClaimTypes.NameIdentifier));
+            var companyId = Clean(context.GetRouteValue("companyId")?.ToString());
+            var employeeId = Clean(context.GetRouteValue("employeeId")?.ToString());
 
             using var userContext = PushUserContext(userId, companyId, employeeId);
 
@@ -65,6 +69,9 @@ public sealed class RequestLoggingMiddleware(
         logger.LogError(ex, "HTTP {Method} {Path} failed after {ElapsedMs}ms", method, path, elapsedMs);
         return false;
     }
+
+    private static string? Clean(string? value)
+        => string.IsNullOrEmpty(value) ? null : LogValueSanitizer.Sanitize(value);
 
     private static IDisposable PushUserContext(string? userId, string? companyId, string? employeeId)
     {

@@ -58,7 +58,8 @@ public class RecordSicknessHandlerTests
             new FitNoteEvidenceRequestService(
                 db,
                 eventPublisher ?? new FakeIntegrationEventPublisher(),
-                resolvedAuditPublisher));
+                resolvedAuditPublisher,
+                new FakeTaskRescheduler()));
     }
 
     [Fact]

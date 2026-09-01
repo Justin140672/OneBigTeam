@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
@@ -30,37 +29,18 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
+    // Uses a dedicated pre-seeded pool employee (SeededE2eEmployees.LeavingProcess[slot]) — a
+    // "QA Engineer" with no leaving process and a company-default effective notice period, exactly
+    // as the old New Employee form flow produced. Tests that actually start/amend/cancel a leaving
+    // process take a distinct slot; the read-only / validation-only tests (which never confirm the
+    // wizard) share slot 0. Leaves the caller on the employee's edit page.
     private async Task<Guid> CreateEmployeeAsync(
-        EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
+        EmployeeListPage empList, EmployeeEditPage empEdit, int slot)
     {
-        var unique    = Guid.NewGuid().ToString("N")[..8];
-        var lastName  = $"Leaving{suffix}{unique}";
-        var workEmail = $"e2e.leaving.{suffix.ToLowerInvariant()}{unique}@acme.example";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
-
-        // Employee Number, Employment Type, Department, Location and Position Profile are all
-        // mandatory. Selecting "QA Engineer" (seeded with Engineering / London
-        // Office attached) pre-populates Department and Location in one step — same pattern as
-        // EmployeeOffboardingTabTests.cs.
-        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
-
-        await empEdit.SaveNewEmployeeAsync();
-        await empList.ClickEmployeeAsync(lastName);
-
-        var match = Regex.Match(_page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
-        return Guid.Parse(match.Groups[1].Value);
+        _ = empList;
+        var seeded = SeededE2eEmployees.LeavingProcess[slot];
+        await empEdit.GoToAsync(AcmeId, seeded.EmployeeId);
+        return seeded.EmployeeId;
     }
 
     private readonly record struct LeavingWizardResult(string ResignationSummary, string LeavingSummary, string ReasonLabel);
@@ -130,7 +110,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Hidden");
+        await CreateEmployeeAsync(empList, empEdit, slot: 0);
 
         Assert.False(await leavingTab.IsTabVisibleAsync(),
             "Expected no 'Leaving' tab for an employee with no leaving process");
@@ -151,7 +131,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Create");
+        await CreateEmployeeAsync(empList, empEdit, slot: 1);
 
         await StartLeavingProcessViaWizardAsync(dialog, "01/09/2026", "Resignation");
 
@@ -173,7 +153,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var employeeId = await CreateEmployeeAsync(empList, empEdit, "Reload");
+        var employeeId = await CreateEmployeeAsync(empList, empEdit, slot: 2);
 
         var result = await StartLeavingProcessViaWizardAsync(dialog, "15/10/2026", "End of Contract");
 
@@ -209,7 +189,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Valid");
+        await CreateEmployeeAsync(empList, empEdit, slot: 0);
 
         await dialog.OpenAsync();
         await dialog.FillResignationReceivedDateAsync("01/09/2026");
@@ -246,7 +226,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "NoLastWorkingDay");
+        await CreateEmployeeAsync(empList, empEdit, slot: 0);
 
         await dialog.OpenAsync();
         await dialog.FillResignationReceivedDateAsync("01/09/2026");
@@ -292,7 +272,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Amend");
+        await CreateEmployeeAsync(empList, empEdit, slot: 3);
 
         var started = await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
 
@@ -352,7 +332,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "AmendInvalid");
+        await CreateEmployeeAsync(empList, empEdit, slot: 4);
 
         await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
 
@@ -386,7 +366,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Cancel");
+        await CreateEmployeeAsync(empList, empEdit, slot: 5);
 
         await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
 
@@ -428,7 +408,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "CancelInvalid");
+        await CreateEmployeeAsync(empList, empEdit, slot: 6);
 
         await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
 

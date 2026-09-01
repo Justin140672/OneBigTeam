@@ -40,12 +40,14 @@ public class ApproveLeaveRequestValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_ReviewedByEmployeeId_Is_Empty()
+    public void Validate_Passes_When_ReviewedByEmployeeId_Is_Empty()
     {
+        // ReviewedByEmployeeId is not client input — the endpoint overwrites it with the
+        // authenticated caller before authorization — so the validator must not reject an empty
+        // value (doing so pre-empted the resource-authorization check).
         var v = new ApproveLeaveRequestValidator();
         var result = v.Validate(ValidRequest() with { ReviewedByEmployeeId = Guid.Empty });
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(ApproveLeaveRequestRequest.ReviewedByEmployeeId));
+        Assert.True(result.IsValid);
     }
 
     [Fact]

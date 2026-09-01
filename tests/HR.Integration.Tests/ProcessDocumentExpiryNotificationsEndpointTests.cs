@@ -83,7 +83,10 @@ public class ProcessDocumentExpiryNotificationsEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<NotifPayload>();
-        Assert.Equal(1, payload!.ExpiringSoonCount);
+        // SET-07: ExpiringSoonCount is the number of reminder-stage notifications fired across the
+        // company's configured schedule (default 90/30/7), not a count of distinct documents. A
+        // document expiring in 10 days has crossed both the 90-day and 30-day stages → 2.
+        Assert.Equal(2, payload!.ExpiringSoonCount);
         Assert.Equal(1, payload.ExpiredCount);
     }
 
@@ -91,7 +94,9 @@ public class ProcessDocumentExpiryNotificationsEndpointTests
     public async Task Ignores_Documents_With_ExpiryDate_Beyond_Threshold()
     {
         var (companyId, docTypeId, client) = await SetupAsync();
-        await UploadDocAsync(client, companyId, docTypeId, Guid.NewGuid(), Today.AddDays(31));
+        // SET-07: the widest configured reminder stage is 90 days (default schedule), so a document
+        // must expire beyond that to fire nothing.
+        await UploadDocAsync(client, companyId, docTypeId, Guid.NewGuid(), Today.AddDays(120));
 
         var response = await client.PostAsJsonAsync(NotifUrl(companyId), new { });
         var payload  = await response.Content.ReadFromJsonAsync<NotifPayload>();
@@ -130,7 +135,9 @@ public class ProcessDocumentExpiryNotificationsEndpointTests
         var response = await client.PostAsJsonAsync(NotifUrl(companyId), new { });
         var payload  = await response.Content.ReadFromJsonAsync<NotifPayload>();
 
-        Assert.Equal(2, payload!.ExpiringSoonCount);
+        // SET-07: stage notifications across the default 90/30/7 schedule — the +5d doc crosses all
+        // three stages (3), the +25d doc crosses the 90- and 30-day stages (2) → 5 reminders total.
+        Assert.Equal(5, payload!.ExpiringSoonCount);
         Assert.Equal(2, payload.ExpiredCount);
     }
 

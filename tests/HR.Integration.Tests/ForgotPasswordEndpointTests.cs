@@ -99,4 +99,34 @@ public class ForgotPasswordEndpointTests
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
+
+    // Security ticket "Remove authentication tokens from browser-visible URLs": an expired, already
+    // used or tampered recovery token must be rejected safely — a generic 400 validation message,
+    // never a 500, and the response must not echo the supplied token back.
+    [Fact]
+    public async Task Post_ResetPassword_Rejects_Expired_Or_Tampered_Recovery_Token_Safely()
+    {
+        _factory.SupabaseAuthGateway.Reset();
+        _factory.SupabaseAuthGateway.ShouldThrowOnUpdatePassword = true;
+
+        using var client = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+        });
+
+        var response = await client.PostAsJsonAsync("/api/reset-password", new
+        {
+            AccessToken = "tampered-or-expired-token-value",
+            NewPassword = "N3w-Passw0rd!",
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Null(response.Headers.Location);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("tampered-or-expired-token-value", body);
+        Assert.Contains("invalid or has expired", body);
+
+        _factory.SupabaseAuthGateway.Reset();
+    }
 }

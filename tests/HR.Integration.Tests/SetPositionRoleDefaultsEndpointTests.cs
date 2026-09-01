@@ -9,7 +9,6 @@ namespace HR.Integration.Tests;
 public class SetPositionRoleDefaultsEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
-    private static readonly Guid HrAdminUser = new("eeeeeeee-0000-0000-0000-000000000006");
 
     public SetPositionRoleDefaultsEndpointTests(ApiWebApplicationFactory factory)
     {
@@ -19,7 +18,11 @@ public class SetPositionRoleDefaultsEndpointTests
     private async Task<HttpClient> AuthenticatedClient(Guid companyId, Guid? userId = null, Guid? role = null)
     {
         var client = _factory.CreateClient();
-        var effectiveUserId = userId ?? HrAdminUser;
+        // A fresh actor per call by default: HrAdminUser is a fixed guid and effective roles are
+        // resolved suite-wide (UserRoles/UserPositions are not company-scoped), so reusing it let
+        // role/position grants from other test files leak in and defeat the role-administration
+        // guard this class asserts.
+        var effectiveUserId = userId ?? Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, effectiveUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, effectiveUserId, role ?? SystemRoles.HrAdministrator, companyId);

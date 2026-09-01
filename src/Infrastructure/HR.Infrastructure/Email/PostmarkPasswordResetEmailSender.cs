@@ -75,7 +75,7 @@ internal sealed class PostmarkPasswordResetEmailSender : IPasswordResetEmailSend
                 _logger.LogWarning(
                     "Postmark password-reset email send failed. StatusCode={StatusCode} To={ToEmail}",
                     (int)response.StatusCode,
-                    toEmail);
+                    SensitiveDataScrubber.MaskEmail(toEmail));
                 return false;
             }
 
@@ -85,7 +85,7 @@ internal sealed class PostmarkPasswordResetEmailSender : IPasswordResetEmailSend
         {
             _logger.LogWarning(ex,
                 "Postmark password-reset email request failed. To={ToEmail}",
-                toEmail);
+                SensitiveDataScrubber.MaskEmail(toEmail));
             return false;
         }
     }

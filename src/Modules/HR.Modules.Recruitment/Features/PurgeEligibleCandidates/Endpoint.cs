@@ -34,6 +34,16 @@ internal sealed class Endpoint(PurgeEligibleCandidatesHandler handler, ICurrentU
         }
 
         var result = await handler.HandleAsync(request, purgedBy, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            var businessError = new { error = result.Error.Message };
+            await Send.ResultAsync(result.Error.Code == "conflict"
+                ? TypedResults.Conflict(businessError)
+                : TypedResults.BadRequest(businessError));
+            return;
+        }
+
         await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

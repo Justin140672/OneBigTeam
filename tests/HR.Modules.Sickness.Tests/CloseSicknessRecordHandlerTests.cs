@@ -75,7 +75,7 @@ public class CloseSicknessRecordHandlerTests
             new FakePublicHolidayReader(publicHolidays),
             resolvedAuditPublisher,
             resolvedEventPublisher,
-            new FitNoteEvidenceRequestService(db, resolvedEventPublisher, resolvedAuditPublisher));
+            new FitNoteEvidenceRequestService(db, resolvedEventPublisher, resolvedAuditPublisher, new FakeTaskRescheduler()));
     }
 
     private static async Task<SicknessRecord> SeedOpenRecordWithEvidenceStatus(

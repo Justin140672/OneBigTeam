@@ -166,6 +166,9 @@ public static class IdentityModule
 
         services.AddScoped<ResetPasswordHandler>();
         services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordValidator>();
+
+        services.AddScoped<Features.Logout.LogoutHandler>();
+
         services.AddScoped<VerifyEmailHandler>();
 
         // Admin User Management (Admin Portal "administrator management" screen).
