@@ -18,7 +18,7 @@ public class CreateBillingPortalSessionEndpointTests
     public CreateBillingPortalSessionEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.CompanyAdministrator))
             .GetAwaiter().GetResult();
         _factory.StripeGateway.Reset();
     }
@@ -28,7 +28,7 @@ public class CreateBillingPortalSessionEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId, ensureActiveSubscription);
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.CompanyAdministrator, companyId, ensureActiveSubscription);
         return client;
     }
 

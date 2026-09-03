@@ -1,0 +1,61 @@
+@typeparam TValue
+@inherits AccessibleFieldBase<TValue>
+@using Syncfusion.Blazor.Calendars
+
+@* Accessible date field. Wraps SfDatePicker. The visible <label> is associated via for/id and
+   the input carries aria-label / aria-labelledby / aria-required / aria-invalid /
+   aria-describedby. Min/Max forwarded through @attributes to satisfy the generic typed params. *@
+
+<div class="@WrapperClass">
+    <label id="@LabelId" for="@FieldId" class="@LabelClass">
+        @Label
+        @if (Required)
+        {
+            <span class="text-danger">&nbsp;*</span>
+        }
+    </label>
+
+    <SfDatePicker TValue="TValue"
+                  Value="@Value"
+                  ValueChanged="@(EventCallback.Factory.Create<TValue>(this, OnValueChanged))"
+                  ValueExpression="@ValueExpression"
+                  Placeholder="@Placeholder"
+                  Format="@Format"
+                  Enabled="@(!Disabled)"
+                  Readonly="@ReadOnly"
+                  HtmlAttributes="@BuildInputAttributes()"
+                  @attributes="Passthrough" />
+
+    @if (HasHelp)
+    {
+        <div id="@HelpId" class="form-text">@HelpText</div>
+    }
+    @if (ValueExpression is not null)
+    {
+        <div id="@ErrorId">
+            <ValidationMessage For="@ValueExpression" class="@ValidationClass" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string? Format { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public DateTime? Min { get; set; }
+    [Parameter] public DateTime? Max { get; set; }
+
+    private Dictionary<string, object> Passthrough
+    {
+        get
+        {
+            var d = new Dictionary<string, object>();
+            if (Min is not null) d["Min"] = Min.Value;
+            if (Max is not null) d["Max"] = Max.Value;
+            return d;
+        }
+    }
+
+    private Task OnValueChanged(TValue value) => NotifyValueChanged(value);
+}

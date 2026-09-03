@@ -1,17 +1,18 @@
-@* ADM-07 — permission-aware quick-navigation command palette (Ctrl+K / Cmd+K). *@
+@* HR-only employee search palette (Ctrl+K / Cmd+K). Renders only for HR administrators. *@
 @implements IAsyncDisposable
 @inject AppSession Session
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject EmployeeService Employees
 
-@if (_caps.HasAnyAdministrativeAccess)
+@if (Session.IsHrAdministrator)
 {
     <button type="button"
             class="quick-nav-trigger"
             @ref="_triggerButton"
             @onclick="Open"
-            aria-label="Quick navigation"
-            title="Quick navigation (Ctrl+K)">
+            aria-label="Search employees"
+            title="Search employees (Ctrl+K)">
         <i class="fa-solid fa-magnifying-glass"></i>
     </button>
 
@@ -21,7 +22,7 @@
             <div class="quick-nav-panel"
                  role="dialog"
                  aria-modal="true"
-                 aria-label="Quick navigation"
+                 aria-label="Search employees"
                  @onclick:stopPropagation="true"
                  @onkeydown="OnKeyDown">
                 <div class="quick-nav-input-row">
@@ -33,39 +34,58 @@
                            aria-expanded="true"
                            aria-controls="quick-nav-listbox"
                            aria-activedescendant="@ActiveOptionId"
-                           placeholder="Search administration…"
+                           placeholder="Search employees..."
                            autocomplete="off"
                            value="@_term"
                            @oninput="OnInput" />
                 </div>
 
+                <label class="quick-nav-leavers-toggle">
+                    <input type="checkbox"
+                           checked="@_includeLeavers"
+                           @onchange="OnIncludeLeaversChanged" />
+                    <span>Include leavers / archived employees</span>
+                </label>
+
                 <ul class="quick-nav-results" id="quick-nav-listbox" role="listbox">
-                    @if (_results.Count == 0)
+                    @if (_loading)
                     {
-                        <li class="quick-nav-empty">No matching pages</li>
+                        <li class="quick-nav-empty">Searching…</li>
+                    }
+                    else if (_results.Count == 0)
+                    {
+                        <li class="quick-nav-empty">
+                            @(string.IsNullOrWhiteSpace(_term) ? "Start typing to search employees" : "No matching employees")
+                        </li>
                     }
                     else
                     {
-                        @foreach (var group in _grouped)
+                        @for (var i = 0; i < _results.Count; i++)
                         {
-                            <li class="quick-nav-group-heading" role="presentation">@group.Label</li>
-                            @foreach (var dest in group.Destinations)
-                            {
-                                var index = _results.IndexOf(dest);
-                                var isActive = index == _activeIndex;
-                                <li id="@OptionId(index)"
-                                    role="option"
-                                    aria-selected="@(isActive ? "true" : "false")"
-                                    class="quick-nav-option @(isActive ? "is-active" : "")"
-                                    @onclick="() => Navigate(dest)"
-                                    @onmouseenter="() => SetActive(index)">
-                                    <i class="@dest.IconCss quick-nav-option-icon"></i>
-                                    <span class="quick-nav-option-text">
-                                        <span class="quick-nav-option-title">@dest.Title</span>
-                                        <span class="quick-nav-option-group">@group.Label</span>
+                            var index = i;
+                            var item = _results[index];
+                            var isActive = index == _activeIndex;
+                            <li id="@OptionId(index)"
+                                role="option"
+                                aria-selected="@(isActive ? "true" : "false")"
+                                class="quick-nav-option @(isActive ? "is-active" : "")"
+                                @onclick="() => Navigate(item)"
+                                @onmouseenter="() => SetActive(index)">
+                                <i class="fa-solid fa-user quick-nav-option-icon"></i>
+                                <span class="quick-nav-option-text">
+                                    <span class="quick-nav-option-title">
+                                        @item.FullName
+                                        @if (!string.IsNullOrWhiteSpace(item.EmployeeNumber))
+                                        {
+                                            <span class="quick-nav-option-group">@item.EmployeeNumber</span>
+                                        }
                                     </span>
-                                </li>
-                            }
+                                    @if (PositionDepartment(item) is { Length: > 0 } sub)
+                                    {
+                                        <span class="quick-nav-option-group">@sub</span>
+                                    }
+                                </span>
+                            </li>
                         }
                     }
                 </ul>
@@ -75,45 +95,35 @@
 }
 
 @code {
-    private AdminNavCapabilities _caps = default!;
     private bool _open;
     private bool _shouldFocusInput;
     private string _term = string.Empty;
+    private bool _includeLeavers;
     private int _activeIndex;
+    private bool _loading;
 
-    private List<AdminDestination> _results = new();
-    private List<GroupBlock> _grouped = new();
+    private List<EmployeeDirectorySearchItem> _results = new();
+
+    private CancellationTokenSource? _debounceCts;
 
     private ElementReference _input;
     private ElementReference _triggerButton;
     private DotNetObjectReference<AdminQuickNav>? _selfRef;
     private bool _registered;
 
-    private sealed record GroupBlock(string Label, List<AdminDestination> Destinations);
-
     protected override async Task OnInitializedAsync()
     {
         // On a cold circuit this component's OnInitialized can run before MainLayout's
-        // Session.InitialiseAsync() await has completed — reading Session here then gave an empty
-        // AdminNavCapabilities (no admin access), so the Ctrl+K trigger never rendered for the
-        // whole page lifetime. Await the (idempotent, de-duped) load ourselves, and also re-render
-        // if the session changes later.
+        // Session.InitialiseAsync() await has completed, so re-render if the session changes later.
         Session.Changed += OnSessionChanged;
         await Session.InitialiseAsync();
-        _caps = AdminNavCapabilities.From(Session);
-        Refresh();
     }
 
-    private void OnSessionChanged()
-    {
-        _caps = AdminNavCapabilities.From(Session);
-        Refresh();
-        InvokeAsync(StateHasChanged);
-    }
+    private void OnSessionChanged() => InvokeAsync(StateHasChanged);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && _caps.HasAnyAdministrativeAccess)
+        if (firstRender && Session.IsHrAdministrator)
         {
             _selfRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("registerAdminQuickNav", _selfRef);
@@ -134,8 +144,10 @@
     {
         _open = true;
         _term = string.Empty;
+        _includeLeavers = false;
         _activeIndex = 0;
-        Refresh();
+        _results = new();
+        _loading = false;
         _shouldFocusInput = true;
         StateHasChanged();
     }
@@ -144,6 +156,7 @@
     {
         if (!_open) return;
         _open = false;
+        _debounceCts?.Cancel();
         StateHasChanged();
         _ = FocusTriggerAsync();
     }
@@ -157,23 +170,54 @@
     {
         _term = e.Value?.ToString() ?? string.Empty;
         _activeIndex = 0;
-        Refresh();
+        QueueSearch();
+    }
+
+    private void OnIncludeLeaversChanged(Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    {
+        _includeLeavers = e.Value is true || (e.Value?.ToString() == "true");
+        _activeIndex = 0;
+        QueueSearch();
     }
 
     private void SetActive(int index) => _activeIndex = index;
 
-    private void Refresh()
+    private void QueueSearch()
     {
-        _results = AdminNavigation.Search(_caps, Session.CompanyId, _term).ToList();
-        _grouped = _results
-            .GroupBy(d => d.Group)
-            .Select(g => new GroupBlock(AdminNavGroupInfo.Label(g.Key), g.ToList()))
-            .ToList();
+        _debounceCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _debounceCts = cts;
 
-        if (_results.Count == 0)
-            _activeIndex = 0;
-        else if (_activeIndex >= _results.Count)
-            _activeIndex = _results.Count - 1;
+        if (string.IsNullOrWhiteSpace(_term))
+        {
+            _loading = false;
+            _results = new();
+            StateHasChanged();
+            return;
+        }
+
+        _loading = true;
+        StateHasChanged();
+
+        _ = RunSearchAsync(_term, _includeLeavers, cts.Token);
+    }
+
+    private async Task RunSearchAsync(string term, bool includeLeavers, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(250, ct);
+            var response = await Employees.SearchEmployeeDirectoryAsync(Session.CompanyId, term, includeLeavers, ct: ct);
+            if (ct.IsCancellationRequested) return;
+
+            _results = response?.Items?.ToList() ?? new();
+            if (_activeIndex >= _results.Count)
+                _activeIndex = Math.Max(0, _results.Count - 1);
+            _loading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (TaskCanceledException) { }
+        catch (OperationCanceledException) { }
     }
 
     private void OnKeyDown(KeyboardEventArgs e)
@@ -198,10 +242,18 @@
         }
     }
 
-    private void Navigate(AdminDestination dest)
+    private void Navigate(EmployeeDirectorySearchItem item)
     {
         _open = false;
-        Navigation.NavigateTo(dest.Url);
+        _debounceCts?.Cancel();
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{item.Id}/profile");
+    }
+
+    private static string? PositionDepartment(EmployeeDirectorySearchItem item)
+    {
+        var parts = new[] { item.PositionProfileTitle, item.DepartmentName }
+            .Where(p => !string.IsNullOrWhiteSpace(p));
+        return string.Join(" • ", parts);
     }
 
     private static string OptionId(int index) => $"quick-nav-option-{index}";
@@ -212,6 +264,7 @@
     public async ValueTask DisposeAsync()
     {
         Session.Changed -= OnSessionChanged;
+        _debounceCts?.Cancel();
 
         if (_registered)
         {

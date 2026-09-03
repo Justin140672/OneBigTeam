@@ -5,6 +5,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+
+    <!--
+      NFR-09 exemption: this project references HR.AppHost, which pulls the Aspire SDK's
+      RID-specific implicit packages (see the note in HR.AppHost.csproj). That makes a
+      Windows-generated packages.lock.json fail locked-mode restore on the Linux CI runner
+      (NU1004). It is a test project and ships nothing, so it opts out too.
+    -->
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>

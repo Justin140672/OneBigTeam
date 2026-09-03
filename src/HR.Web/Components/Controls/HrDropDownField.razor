@@ -1,0 +1,53 @@
+@typeparam TValue
+@typeparam TItem
+@inherits AccessibleFieldBase<TValue>
+@using Syncfusion.Blazor.DropDowns
+
+@* Accessible foreign-key / enum selector. Wraps SfDropDownList with AllowFiltering on by default.
+   Never renders a clear button (house rule) — for an optional selector, pass a datasource that
+   already contains an explicit "None" item. The visible <label> is associated via for/id and the
+   input carries aria-label / aria-labelledby / aria-required / aria-invalid / aria-describedby. *@
+
+<div class="@WrapperClass">
+    <label id="@LabelId" for="@FieldId" class="@LabelClass">
+        @Label
+        @if (Required)
+        {
+            <span class="text-danger">&nbsp;*</span>
+        }
+    </label>
+
+    <SfDropDownList TValue="TValue" TItem="TItem"
+                    DataSource="@DataSource"
+                    Value="@Value"
+                    ValueChanged="@(EventCallback.Factory.Create<TValue>(this, OnValueChanged))"
+                    ValueExpression="@ValueExpression"
+                    Placeholder="@Placeholder"
+                    AllowFiltering="@AllowFiltering"
+                    Enabled="@(!Disabled)"
+                    HtmlAttributes="@BuildInputAttributes()">
+        <DropDownListFieldSettings Value="@ValueField" Text="@TextField" />
+    </SfDropDownList>
+
+    @if (HasHelp)
+    {
+        <div id="@HelpId" class="form-text">@HelpText</div>
+    }
+    @if (ValueExpression is not null)
+    {
+        <div id="@ErrorId">
+            <ValidationMessage For="@ValueExpression" class="@ValidationClass" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IEnumerable<TItem>? DataSource { get; set; }
+    [Parameter] public string? ValueField { get; set; }
+    [Parameter] public string? TextField { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public bool AllowFiltering { get; set; } = true;
+    [Parameter] public bool Disabled { get; set; }
+
+    private Task OnValueChanged(TValue value) => NotifyValueChanged(value);
+}

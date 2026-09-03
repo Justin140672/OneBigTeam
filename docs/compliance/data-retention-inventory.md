@@ -99,8 +99,10 @@ with **no deleted content** recorded:
 | `EmployeeDocumentPurgedAuditEvent` (pre-existing) | company, document id, type, archived date, actor | file contents |
 | `CandidatesPurgedAuditEvent` (pre-existing) | company, candidate ids, actor | candidate personal data |
 
-Job failures raise an **administrative alert** (`AdministrativeAlertCategory.Compliance`) into the
-ADM-03 alerts inbox, and structured error logs, so administrators get failure visibility.
+Job failures raise an **administrative alert** (`AdministrativeAlertCategory.Compliance`) via the
+internal `IAdministrativeAlertWriter` operational trail, and structured error logs, so failures
+remain observable to operations/support. (The former customer-facing "Audit and security"
+alerts inbox screen was removed; the write side is retained as an internal-only trail.)
 
 ---
 

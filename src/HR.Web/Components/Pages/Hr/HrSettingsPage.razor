@@ -50,44 +50,33 @@
                                             </div>
                                         </div>
                                         <div class="col-md-3">
-                                            <label class="form-label">Hours Per Day</label>
-                                            <SfNumericTextBox TValue="decimal" @bind-Value="Model.HoursPerDay"
-                                                              ShowSpinButton="false"
-                                                              Min="0.5m" Max="24m" Step="0.5m" />
-                                            <ValidationMessage For="@(() => Model.HoursPerDay)" />
+                                            <HrNumericField TValue="decimal" Label="Hours Per Day" @bind-Value="Model.HoursPerDay"
+                                                            Min="0.5m" Max="24m" Step="0.5" />
                                         </div>
                                         <div class="col-md-3">
-                                            <label class="form-label">Leave Year Start Month</label>
-                                            <SfDropDownList TValue="int" TItem="MonthItem"
-                                                            @bind-Value="Model.LeaveYearStartMonth"
-                                                            DataSource="@Months">
-                                                <DropDownListFieldSettings Value="Number" Text="Name" />
-                                            </SfDropDownList>
-                                            <div class="form-text">The month each employee's annual leave allowance resets.</div>
+                                            <HrDropDownField TValue="int" TItem="MonthItem" Label="Leave Year Start Month"
+                                                             AllowFiltering="false"
+                                                             @bind-Value="Model.LeaveYearStartMonth"
+                                                             DataSource="@Months" ValueField="Number" TextField="Name"
+                                                             HelpText="The month each employee's annual leave allowance resets." />
                                         </div>
                                         <div class="col-md-3">
-                                            <label class="form-label">Default Holiday Allowance (days)</label>
-                                            <SfNumericTextBox TValue="decimal" @bind-Value="Model.DefaultHolidayAllowance"
-                                                              ShowSpinButton="false"
-                                                              Min="0" Max="365" />
-                                            <ValidationMessage For="@(() => Model.DefaultHolidayAllowance)" />
+                                            <HrNumericField TValue="decimal" Label="Default Holiday Allowance (days)"
+                                                            @bind-Value="Model.DefaultHolidayAllowance" Min="0m" Max="365m" />
                                         </div>
                                         <div class="col-md-3">
-                                            <label class="form-label">Probation Months</label>
-                                            <SfNumericTextBox TValue="int" @bind-Value="Model.ProbationMonths"
-                                                              ShowSpinButton="false"
-                                                              Min="0" Max="24" />
-                                            <ValidationMessage For="@(() => Model.ProbationMonths)" />
+                                            <HrNumericField TValue="int" Label="Probation Months"
+                                                            @bind-Value="Model.ProbationMonths" Min="0" Max="24" />
                                         </div>
                                         <div class="col-12">
-                                            <SfCheckBox TChecked="bool" Label="Exclude public holidays from leave"
-                                                        Checked="@Model.ExcludePublicHolidaysFromLeave"
-                                                        CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromLeave = v)" />
+                                            <HrCheckBoxField Label="Exclude public holidays from leave"
+                                                             Checked="@Model.ExcludePublicHolidaysFromLeave"
+                                                             CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromLeave = v)" />
                                         </div>
                                         <div class="col-12">
-                                            <SfCheckBox TChecked="bool" Label="Display salary to employees on their profile"
-                                                        Checked="@Model.DisplaySalaryOnEmployeeProfile"
-                                                        CheckedChanged="@((bool v) => Model.DisplaySalaryOnEmployeeProfile = v)" />
+                                            <HrCheckBoxField Label="Display salary to employees on their profile"
+                                                             Checked="@Model.DisplaySalaryOnEmployeeProfile"
+                                                             CheckedChanged="@((bool v) => Model.DisplaySalaryOnEmployeeProfile = v)" />
                                         </div>
                                     </div>
                                 </div>
@@ -104,23 +93,17 @@
                                 <div class="card-body">
                                     <div class="row g-4">
                                         <div class="col-12">
-                                            <SfCheckBox TChecked="bool" Label="Exclude public holidays from sickness"
-                                                        Checked="@Model.ExcludePublicHolidaysFromSickness"
-                                                        CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromSickness = v)" />
+                                            <HrCheckBoxField Label="Exclude public holidays from sickness"
+                                                             Checked="@Model.ExcludePublicHolidaysFromSickness"
+                                                             CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromSickness = v)" />
                                         </div>
                                         <div class="col-md-4">
-                                            <label class="form-label">Fit Note Required After (Calendar Days)</label>
-                                            <SfNumericTextBox TValue="int" @bind-Value="Model.FitNoteRequiredAfterDays"
-                                                              ShowSpinButton="false"
-                                                              Min="1" />
-                                            <ValidationMessage For="@(() => Model.FitNoteRequiredAfterDays)" />
+                                            <HrNumericField TValue="int" Label="Fit Note Required After (Calendar Days)"
+                                                            @bind-Value="Model.FitNoteRequiredAfterDays" Min="1" />
                                         </div>
                                         <div class="col-md-4">
-                                            <label class="form-label">Return-to-Work Review Required After (Working Days)</label>
-                                            <SfNumericTextBox TValue="int" @bind-Value="Model.ReturnToWorkRequiredAfterDays"
-                                                              ShowSpinButton="false"
-                                                              Min="1" />
-                                            <ValidationMessage For="@(() => Model.ReturnToWorkRequiredAfterDays)" />
+                                            <HrNumericField TValue="int" Label="Return-to-Work Review Required After (Working Days)"
+                                                            @bind-Value="Model.ReturnToWorkRequiredAfterDays" Min="1" />
                                         </div>
                                     </div>
                                 </div>
@@ -137,25 +120,17 @@
                                 <div class="card-body">
                                     <div class="row g-4">
                                         <div class="col-12">
-                                            <label class="form-label">Default Acknowledgement Statement</label>
-                                            <HrTextBox @bind-Value="Model.DefaultAcknowledgementStatement"
-                                                       Placeholder="I confirm that I have read and understood this document."
-                                                       Multiline="true"
-                                                       Maxlength="2000" />
-                                            <div class="form-text">
-                                                Shown to employees by default when a shared document requires acknowledgement and no
-                                                document-specific statement is set. Plain text only — line breaks are preserved but no
-                                                formatting/markup.
-                                            </div>
+                                            <HrTextField Label="Default Acknowledgement Statement"
+                                                         @bind-Value="Model.DefaultAcknowledgementStatement"
+                                                         Placeholder="I confirm that I have read and understood this document."
+                                                         Multiline="true"
+                                                         Maxlength="2000"
+                                                         HelpText="Shown to employees by default when a shared document requires acknowledgement and no document-specific statement is set. Plain text only — line breaks are preserved but no formatting/markup." />
                                             <div class="text-muted small text-end">@(Model.DefaultAcknowledgementStatement?.Length ?? 0) / 2000</div>
-                                            <ValidationMessage For="@(() => Model.DefaultAcknowledgementStatement)" />
                                         </div>
                                         <div class="col-md-4">
-                                            <label class="form-label">Acknowledgement Reminder Interval (days)</label>
-                                            <SfNumericTextBox TValue="int" @bind-Value="Model.AcknowledgementReminderIntervalDays"
-                                                              ShowSpinButton="false"
-                                                              Min="1" />
-                                            <ValidationMessage For="@(() => Model.AcknowledgementReminderIntervalDays)" />
+                                            <HrNumericField TValue="int" Label="Acknowledgement Reminder Interval (days)"
+                                                            @bind-Value="Model.AcknowledgementReminderIntervalDays" Min="1" />
                                         </div>
                                     </div>
                                 </div>
@@ -172,36 +147,29 @@
                                 <div class="card-body">
                                     <div class="row g-4">
                                         <div class="col-md-4">
-                                            <label class="form-label">Default Notice Period <span class="text-danger">*</span></label>
-                                            <SfDropDownList TValue="string" TItem="NoticePeriodPresetItem"
-                                                            Value="_selectedNoticePeriodPreset"
-                                                            ValueChanged="@OnNoticePeriodPresetChanged"
-                                                            DataSource="@NoticePeriodPresets">
-                                                <DropDownListFieldSettings Value="Value" Text="Label" />
-                                            </SfDropDownList>
+                                            <HrDropDownField TValue="string" TItem="NoticePeriodPresetItem"
+                                                             Label="Default Notice Period" Required="true" AllowFiltering="false"
+                                                             Value="_selectedNoticePeriodPreset"
+                                                             ValueChanged="@OnNoticePeriodPresetChanged"
+                                                             DataSource="@NoticePeriodPresets" ValueField="Value" TextField="Label" />
                                         </div>
                                         @if (_selectedNoticePeriodPreset == CustomPresetValue)
                                         {
                                             <div class="col-md-4">
-                                                <label class="form-label">Unit <span class="text-danger">*</span></label>
-                                                <SfDropDownList TValue="NoticePeriodUnit" TItem="NoticePeriodUnitOption"
-                                                                @bind-Value="Model.NoticePeriodUnit"
-                                                                DataSource="@NoticePeriodUnitOptions">
-                                                    <DropDownListFieldSettings Value="Value" Text="Label" />
-                                                </SfDropDownList>
+                                                <HrDropDownField TValue="NoticePeriodUnit" TItem="NoticePeriodUnitOption"
+                                                                 Label="Unit" Required="true" AllowFiltering="false"
+                                                                 @bind-Value="Model.NoticePeriodUnit"
+                                                                 DataSource="@NoticePeriodUnitOptions" ValueField="Value" TextField="Label" />
                                             </div>
                                             <div class="col-md-4">
-                                                <label class="form-label">Length</label>
-                                                <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
-                                                                  ShowSpinButton="false"
-                                                                  Min="1" />
-                                                <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
+                                                <HrNumericField TValue="int" Label="Length"
+                                                                @bind-Value="Model.NoticePeriodLength" Min="1" />
                                             </div>
                                         }
                                         <div class="col-12">
-                                            <SfCheckBox TChecked="bool" Label="Automatically disable system access on the employee's leaving date"
-                                                        Checked="@Model.AutoDisableAccessOnLeavingDate"
-                                                        CheckedChanged="@((bool v) => Model.AutoDisableAccessOnLeavingDate = v)" />
+                                            <HrCheckBoxField Label="Automatically disable system access on the employee's leaving date"
+                                                             Checked="@Model.AutoDisableAccessOnLeavingDate"
+                                                             CheckedChanged="@((bool v) => Model.AutoDisableAccessOnLeavingDate = v)" />
                                         </div>
                                     </div>
                                 </div>
@@ -218,36 +186,24 @@
                                 <div class="card-body">
                                     <div class="row g-4">
                                         <div class="col-md-4">
-                                            <label class="form-label">Numbering Mode</label>
-                                            <SfDropDownList TValue="EmployeeNumberMode" TItem="EmployeeNumberModeOption"
-                                                            @bind-Value="Model.EmployeeNumberMode"
-                                                            DataSource="@EmployeeNumberModeOptions">
-                                                <DropDownListFieldSettings Value="Value" Text="Label" />
-                                            </SfDropDownList>
+                                            <HrDropDownField TValue="EmployeeNumberMode" TItem="EmployeeNumberModeOption"
+                                                             Label="Numbering Mode" AllowFiltering="false"
+                                                             @bind-Value="Model.EmployeeNumberMode"
+                                                             DataSource="@EmployeeNumberModeOptions" ValueField="Value" TextField="Label" />
                                         </div>
                                         @if (Model.EmployeeNumberMode == EmployeeNumberMode.Automatic)
                                         {
                                             <div class="col-md-4">
-                                                <label class="form-label">Prefix</label>
-                                                <HrTextBox @bind-Value="Model.EmployeeNumberPrefix" Placeholder="Prefix (e.g. EMP-)" />
-                                                <div class="form-text">
-                                                    Changing the prefix only affects employee numbers assigned in the future —
-                                                    existing employees' numbers are never changed retroactively.
-                                                </div>
+                                                <HrTextField Label="Prefix" @bind-Value="Model.EmployeeNumberPrefix" Placeholder="Prefix (e.g. EMP-)"
+                                                             HelpText="Changing the prefix only affects employee numbers assigned in the future — existing employees' numbers are never changed retroactively." />
                                             </div>
                                             <div class="col-md-4">
-                                                <label class="form-label">Next Number</label>
-                                                <SfNumericTextBox TValue="int" @bind-Value="Model.NextEmployeeNumber"
-                                                                  ShowSpinButton="false"
-                                                                  Min="1" />
-                                                <ValidationMessage For="@(() => Model.NextEmployeeNumber)" />
+                                                <HrNumericField TValue="int" Label="Next Number"
+                                                                @bind-Value="Model.NextEmployeeNumber" Min="1" />
                                             </div>
                                             <div class="col-md-4">
-                                                <label class="form-label">Minimum Numeric Length</label>
-                                                <SfNumericTextBox TValue="int" @bind-Value="Model.EmployeeNumberMinimumLength"
-                                                                  ShowSpinButton="false"
-                                                                  Min="1" Max="10" />
-                                                <ValidationMessage For="@(() => Model.EmployeeNumberMinimumLength)" />
+                                                <HrNumericField TValue="int" Label="Minimum Numeric Length"
+                                                                @bind-Value="Model.EmployeeNumberMinimumLength" Min="1" Max="10" />
                                             </div>
                                             <div class="col-12">
                                                 <p class="text-muted mb-0">Preview: <strong>@PreviewEmployeeNumber</strong></p>
@@ -268,32 +224,23 @@
                                 <div class="card-body">
                                     <div class="row g-4">
                                         <div class="col-md-4">
-                                            <label class="form-label">Numbering Mode</label>
-                                            <SfDropDownList TValue="AssetNumberMode" TItem="AssetNumberModeOption"
-                                                            @bind-Value="Model.AssetNumberMode"
-                                                            DataSource="@AssetNumberModeOptions">
-                                                <DropDownListFieldSettings Value="Value" Text="Label" />
-                                            </SfDropDownList>
+                                            <HrDropDownField TValue="AssetNumberMode" TItem="AssetNumberModeOption"
+                                                             Label="Numbering Mode" AllowFiltering="false"
+                                                             @bind-Value="Model.AssetNumberMode"
+                                                             DataSource="@AssetNumberModeOptions" ValueField="Value" TextField="Label" />
                                         </div>
                                         @if (Model.AssetNumberMode == AssetNumberMode.Automatic)
                                         {
                                             <div class="col-md-4">
-                                                <label class="form-label">Prefix</label>
-                                                <HrTextBox @bind-Value="Model.AssetNumberPrefix" Placeholder="Prefix (e.g. AST-)" />
+                                                <HrTextField Label="Prefix" @bind-Value="Model.AssetNumberPrefix" Placeholder="Prefix (e.g. AST-)" />
                                             </div>
                                             <div class="col-md-4">
-                                                <label class="form-label">Next Number</label>
-                                                <SfNumericTextBox TValue="int" @bind-Value="Model.NextAssetNumber"
-                                                                  ShowSpinButton="false"
-                                                                  Min="1" />
-                                                <ValidationMessage For="@(() => Model.NextAssetNumber)" />
+                                                <HrNumericField TValue="int" Label="Next Number"
+                                                                @bind-Value="Model.NextAssetNumber" Min="1" />
                                             </div>
                                             <div class="col-md-4">
-                                                <label class="form-label">Minimum Numeric Length</label>
-                                                <SfNumericTextBox TValue="int" @bind-Value="Model.AssetNumberMinimumLength"
-                                                                  ShowSpinButton="false"
-                                                                  Min="1" Max="10" />
-                                                <ValidationMessage For="@(() => Model.AssetNumberMinimumLength)" />
+                                                <HrNumericField TValue="int" Label="Minimum Numeric Length"
+                                                                @bind-Value="Model.AssetNumberMinimumLength" Min="1" Max="10" />
                                             </div>
                                             <div class="col-12">
                                                 <p class="text-muted mb-0">Preview: <strong>@PreviewAssetNumber</strong></p>

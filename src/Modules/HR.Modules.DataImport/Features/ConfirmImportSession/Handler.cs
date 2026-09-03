@@ -43,7 +43,15 @@ internal sealed class ConfirmImportSessionHandler(
                 Error.NotFound($"Import session '{request.ImportSessionId}' was not found."));
         }
 
-        if (session.Status is not (ImportStatus.Validated or ImportStatus.CompletedWithErrors))
+        // A session is confirmable when it has been validated, or when a previous confirm
+        // attempt failed outright without creating a single employee (SuccessfulRows == 0) —
+        // that case is a legitimate "fix the data and retry" flow. Once any employee has been
+        // created for the session, re-confirming is a conflict: the created rows are not
+        // reprocessed, so a retry would only ever add duplicate-failure noise.
+        var confirmable = session.Status == ImportStatus.Validated
+            || (session.Status == ImportStatus.CompletedWithErrors && session.SuccessfulRows == 0);
+
+        if (!confirmable)
         {
             return Result.Failure<ConfirmImportSessionResponse>(
                 Error.Conflict($"Import session '{request.ImportSessionId}' is not in a confirmable state (status: {session.Status})."));

@@ -87,6 +87,6 @@ public class MissingRequiredEmployeeDocumentsWorkloadActionProviderTests
         Assert.Equal("Missing Required Employee Documents", action.ActionCategory);
         Assert.Equal("Missing", action.Status);
         Assert.Null(action.DueDate);
-        Assert.Equal($"/companies/{companyId}/employees/{employeeId}/documents", action.DeepLinkUrl);
+        Assert.Equal($"/companies/{companyId}/employees/{employeeId}?tab=documents", action.DeepLinkUrl);
     }
 }

@@ -72,6 +72,6 @@ public class AssetsAwaitingReturnWorkloadActionProviderTests
         Assert.Equal("Assets Awaiting Return", action.ActionCategory);
         Assert.Equal("Assigned - Not Yet Returned", action.Status);
         Assert.Null(action.DueDate);
-        Assert.Equal($"/companies/{companyId}/assets/assignments/{assignmentId}/view", action.DeepLinkUrl);
+        Assert.Equal($"/companies/{companyId}/employees/{employeeId}?tab=assets", action.DeepLinkUrl);
     }
 }

@@ -1,9 +1,10 @@
-@* Shared 2-3 item breadcrumb for Administration-hub-linked settings screens (ADM-04). *@
+@* Shared breadcrumb for settings/detail screens. The former "Administration" root crumb was
+   removed with the Administration Home hub — the trail now starts at the parent list (or the
+   current page when there is no parent). *@
 @inject NavigationManager Navigation
 
 <SfBreadcrumb Class="mb-3">
     <BreadcrumbItems>
-        <BreadcrumbItem Text="Administration" Url="@($"/companies/{CompanyId}/administration")" />
         @if (Parent is { } parent)
         {
             <BreadcrumbItem Text="@parent.Text" Url="@ParentUrl(parent.Url)" />

@@ -24,29 +24,4 @@ public class ReportCatalogAccessGateTests
         Assert.True(ReportCatalog.TryGet("workload-actions", out var definition));
         Assert.Equal(ReportCategory.Hr, definition.Category);
     }
-
-    // ── ADM-08 governance reporting hub ────────────────────────────────────
-
-    [Theory]
-    [InlineData("governance-user-activity")]
-    [InlineData("governance-administrative-changes")]
-    [InlineData("governance-security-events")]
-    [InlineData("governance-compliance-status")]
-    public void Governance_Entries_Use_The_Governance_AccessGate_And_Administration_Category(string reportId)
-    {
-        Assert.True(ReportCatalog.TryGet(reportId, out var definition));
-        Assert.Equal(ReportAccessGate.Governance, definition.AccessGate);
-        Assert.Equal(ReportCategory.Administration, definition.Category);
-    }
-
-    [Theory]
-    [InlineData("governance-user-activity")]
-    [InlineData("governance-administrative-changes")]
-    [InlineData("governance-security-events")]
-    [InlineData("governance-compliance-status")]
-    public void Governance_Entries_Are_Marked_Sensitive(string reportId)
-    {
-        Assert.True(ReportCatalog.TryGet(reportId, out var definition));
-        Assert.Equal(ReportSensitivity.Sensitive, definition.Sensitivity);
-    }
 }

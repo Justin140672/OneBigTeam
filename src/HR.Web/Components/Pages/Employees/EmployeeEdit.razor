@@ -382,8 +382,16 @@
             <div class="alert alert-danger mb-3">@GlobalError</div>
         }
 
-        <SfTab @bind-SelectedItem="_activeTabIndex">
+        <div class="employee-profile-tabs">
+        <SfTab @bind-SelectedItem="GroupTab" CssClass="employee-profile-groups">
             <TabItems>
+
+                <TabItem>
+                    <ChildContent><TabHeader Text="Overview" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="employee-profile-section-wrap" role="region" aria-label="Overview sub-sections">
+                        <SfTab @bind-SelectedItem="OverviewTab" CssClass="employee-profile-sections mt-2">
+                            <TabItems>
 
                 <TabItem>
                     <ChildContent><TabHeader Text="Details" /></ChildContent>
@@ -507,11 +515,9 @@
 
                                     <hr class="my-4 employee-section-divider" />
 
-                                    <!-- Users & Access: structurally separated from personal-information cards above
-                                         (own heading + divider) rather than a new top-level tab, since this page's
-                                         SfTab indices are computed by hand from a fixed tab count elsewhere in this
-                                         file (see the index-math comments near _activeTabIndex below) and adding a
-                                         tab here would require re-deriving every one of those constants. -->
+                                    <!-- Users & Access: kept within the Details sub-section (own heading + divider)
+                                         rather than promoted to its own section, so it stays next to the personal
+                                         information it relates to. -->
                                     <h6 class="text-muted text-uppercase small mb-2">Users &amp; Access</h6>
                                     <div class="card mb-4">
                                         <div class="card-header">
@@ -563,88 +569,137 @@
                     </ContentTemplate>
                 </TabItem>
 
-                <TabItem>
-                    <ChildContent><TabHeader Text="Employment" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeEmploymentTab @ref="_employmentTab" CompanyId="CompanyId" EmployeeId="Id!.Value" IsViewMode="IsViewMode" />
+                            </TabItems>
+                        </SfTab>
                         </div>
                     </ContentTemplate>
                 </TabItem>
 
                 <TabItem>
-                    <ChildContent><TabHeader Text="Compensation History" /></ChildContent>
+                    <ChildContent><TabHeader Text="Career &amp; Pay" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeCompensationTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                        <div class="employee-profile-section-wrap" role="region" aria-label="Career and Pay sub-sections">
+                        <SfTab @bind-SelectedItem="CareerPayTab" CssClass="employee-profile-sections mt-2">
+                            <TabItems>
+                                <TabItem>
+                                    <ChildContent><TabHeader Text="Compensation History" /></ChildContent>
+                                    <ContentTemplate>
+                                        <div class="mt-4">
+                                            <EmployeeCompensationTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                                        </div>
+                                    </ContentTemplate>
+                                </TabItem>
+                                <TabItem>
+                                    <ChildContent><TabHeader Text="Promotion History" /></ChildContent>
+                                    <ContentTemplate>
+                                        <div class="mt-4">
+                                            <EmployeePromotionHistoryTab CompanyId="CompanyId" EmployeeId="Id!.Value"
+                                                                          CurrentPositionProfileTitle="@CurrentPositionProfileTitle" />
+                                        </div>
+                                    </ContentTemplate>
+                                </TabItem>
+                            </TabItems>
+                        </SfTab>
                         </div>
                     </ContentTemplate>
                 </TabItem>
 
                 <TabItem>
-                    <ChildContent><TabHeader Text="Promotion History" /></ChildContent>
+                    <ChildContent><TabHeader Text="Time Off" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeePromotionHistoryTab CompanyId="CompanyId" EmployeeId="Id!.Value"
-                                                          CurrentPositionProfileTitle="@CurrentPositionProfileTitle" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
-
-                @if (_showProbationTab)
-                {
-                    <TabItem>
-                        <ChildContent><TabHeader Text="Probation" /></ChildContent>
-                        <ContentTemplate>
-                            <div class="mt-4">
-                                <EmployeeProbationTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                            </div>
-                        </ContentTemplate>
-                    </TabItem>
-                }
-
-                <TabItem>
-                    <ChildContent><TabHeader Text="Emergency Contacts" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeEmergencyContactsTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
-
-                <TabItem>
-                    <ChildContent><TabHeader Text="Leave" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeLeaveTab CompanyId="CompanyId"
-                                              EmployeeId="Id!.Value" />
+                        <div class="employee-profile-section-wrap" role="region" aria-label="Time Off sub-sections">
+                        <SfTab @bind-SelectedItem="TimeOffTab" CssClass="employee-profile-sections mt-2">
+                            <TabItems>
+                                <TabItem>
+                                    <ChildContent><TabHeader Text="Leave" /></ChildContent>
+                                    <ContentTemplate>
+                                        <div class="mt-4">
+                                            <EmployeeLeaveTab CompanyId="CompanyId"
+                                                              EmployeeId="Id!.Value" />
+                                        </div>
+                                    </ContentTemplate>
+                                </TabItem>
+                                <TabItem>
+                                    <ChildContent><TabHeader Text="Sickness" /></ChildContent>
+                                    <ContentTemplate>
+                                        <div class="mt-4">
+                                            <EmployeeSicknessTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                                        </div>
+                                    </ContentTemplate>
+                                </TabItem>
+                            </TabItems>
+                        </SfTab>
                         </div>
                     </ContentTemplate>
                 </TabItem>
 
                 <TabItem>
-                    <ChildContent><TabHeader Text="Sickness" /></ChildContent>
+                    <ChildContent><TabHeader Text="Tasks &amp; Records" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeSicknessTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
-
-                <TabItem>
-                    <ChildContent><TabHeader Text="Tasks" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeTasksTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
-
-                <TabItem>
-                    <ChildContent><TabHeader Text="Documents" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeDocumentsTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                        <div class="employee-profile-section-wrap" role="region" aria-label="Tasks and Records sub-sections">
+                        <SfTab @bind-SelectedItem="TasksRecordsTab" CssClass="employee-profile-sections mt-2">
+                            <TabItems>
+                                <TabItem>
+                                    <ChildContent><TabHeader Text="Tasks" /></ChildContent>
+                                    <ContentTemplate>
+                                        <div class="mt-4">
+                                            <EmployeeTasksTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                                        </div>
+                                    </ContentTemplate>
+                                </TabItem>
+                                <TabItem>
+                                    <ChildContent><TabHeader Text="Documents" /></ChildContent>
+                                    <ContentTemplate>
+                                        <div class="mt-4">
+                                            <EmployeeDocumentsTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                                        </div>
+                                    </ContentTemplate>
+                                </TabItem>
+                                <TabItem>
+                                    <ChildContent><TabHeader Text="Acknowledgement History" /></ChildContent>
+                                    <ContentTemplate>
+                                        <div class="mt-4">
+                                            <EmployeeAcknowledgementHistoryTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                                        </div>
+                                    </ContentTemplate>
+                                </TabItem>
+                                @if (_showOnboardingTab)
+                                {
+                                    <TabItem>
+                                        <ChildContent><TabHeader Text="Onboarding" /></ChildContent>
+                                        <ContentTemplate>
+                                            <div class="mt-4">
+                                                <EmployeeOnboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                                            </div>
+                                        </ContentTemplate>
+                                    </TabItem>
+                                }
+                                @if (_showOffboardingTab)
+                                {
+                                    <TabItem>
+                                        <ChildContent><TabHeader Text="Offboarding" /></ChildContent>
+                                        <ContentTemplate>
+                                            <div class="mt-4">
+                                                <EmployeeOffboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                                            </div>
+                                        </ContentTemplate>
+                                    </TabItem>
+                                }
+                                @if (_showLeavingTab)
+                                {
+                                    <TabItem>
+                                        <ChildContent><TabHeader Text="Leaving" /></ChildContent>
+                                        <ContentTemplate>
+                                            <div class="mt-4">
+                                                <EmployeeLeavingTab CompanyId="CompanyId" EmployeeId="Id!.Value"
+                                                                     OnAmendRequested="OpenAmendLeavingProcessDialog"
+                                                                     OnCancelRequested="OpenCancelLeavingProcessDialog" />
+                                            </div>
+                                        </ContentTemplate>
+                                    </TabItem>
+                                }
+                            </TabItems>
+                        </SfTab>
                         </div>
                     </ContentTemplate>
                 </TabItem>
@@ -652,99 +707,62 @@
                 <TabItem>
                     <ChildContent><TabHeader Text="Assets" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4">
+                        <div class="mt-4" role="region" aria-label="Assets">
                             <EmployeeAssetsTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
                         </div>
                     </ContentTemplate>
                 </TabItem>
 
                 <TabItem>
-                    <ChildContent><TabHeader Text="Acknowledgement History" /></ChildContent>
+                    <ChildContent><TabHeader Text="Activity" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeAcknowledgementHistoryTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                        <div class="employee-profile-section-wrap" role="region" aria-label="Activity sub-sections">
+                        <SfTab @bind-SelectedItem="ActivityTab" CssClass="employee-profile-sections mt-2">
+                            <TabItems>
+                                <TabItem>
+                                    <ChildContent><TabHeader Text="Timeline" /></ChildContent>
+                                    <ContentTemplate>
+                                        <div class="mt-4">
+                                            <EmployeeTimelineTab CompanyId="CompanyId" EmployeeId="Id!.Value"
+                                                                  OnNavigateToPromotions="@(() => GoToSection(EmployeeProfileSection.Promotions))"
+                                                                  OnNavigateToCompensation="@(() => GoToSection(EmployeeProfileSection.Compensation))"
+                                                                  OnNavigateToProbation="@(() => GoToSection(EmployeeProfileSection.Probation))"
+                                                                  OnNavigateToOnboarding="@(() => GoToSection(EmployeeProfileSection.Onboarding))"
+                                                                  OnNavigateToDocuments="@(() => GoToSection(EmployeeProfileSection.Documents))"
+                                                                  OnNavigateToAcknowledgements="@(() => GoToSection(EmployeeProfileSection.Acknowledgements))"
+                                                                  OnNavigateToOffboarding="@(() => GoToSection(EmployeeProfileSection.Offboarding))"
+                                                                  OnNavigateToNotes="@(() => GoToSection(EmployeeProfileSection.Notes))" />
+                                        </div>
+                                    </ContentTemplate>
+                                </TabItem>
+                                @if (Session.IsHrAdministrator)
+                                {
+                                    <TabItem>
+                                        <ChildContent><TabHeader Text="Notes" /></ChildContent>
+                                        <ContentTemplate>
+                                            <div class="mt-4">
+                                                <EmployeeNotesTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                                            </div>
+                                        </ContentTemplate>
+                                    </TabItem>
+                                }
+                                <TabItem>
+                                    <ChildContent><TabHeader Text="Audit" /></ChildContent>
+                                    <ContentTemplate>
+                                        <div class="mt-4">
+                                            <EmployeeAuditHistoryTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                                        </div>
+                                    </ContentTemplate>
+                                </TabItem>
+                            </TabItems>
+                        </SfTab>
                         </div>
                     </ContentTemplate>
                 </TabItem>
-
-                <TabItem>
-                    <ChildContent><TabHeader Text="Audit" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeAuditHistoryTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
-
-                <TabItem>
-                    <ChildContent><TabHeader Text="Timeline" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeTimelineTab CompanyId="CompanyId" EmployeeId="Id!.Value"
-                                                  OnNavigateToPromotions="@(() => _activeTabIndex = 3)"
-                                                  OnNavigateToCompensation="@(() => _activeTabIndex = 2)"
-                                                  OnNavigateToProbation="@(() => { if (_showProbationTab) _activeTabIndex = 4; })"
-                                                  OnNavigateToOnboarding="@(() => { if (_showOnboardingTab) _activeTabIndex = OnboardingTabIndex; })"
-                                                  OnNavigateToDocuments="@(() => _activeTabIndex = 9 + ProbationOffset)"
-                                                  OnNavigateToAcknowledgements="@(() => _activeTabIndex = 11 + ProbationOffset)"
-                                                  OnNavigateToOffboarding="@(() => { if (_showOffboardingTab) _activeTabIndex = OffboardingTabIndex; })"
-                                                  OnNavigateToNotes="@(() => { if (Session.IsHrAdministrator) _activeTabIndex = NotesTabIndex; })" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
-
-                @if (_showOnboardingTab)
-                {
-                    <TabItem>
-                        <ChildContent><TabHeader Text="Onboarding" /></ChildContent>
-                        <ContentTemplate>
-                            <div class="mt-4">
-                                <EmployeeOnboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                            </div>
-                        </ContentTemplate>
-                    </TabItem>
-                }
-
-                @if (_showOffboardingTab)
-                {
-                    <TabItem>
-                        <ChildContent><TabHeader Text="Offboarding" /></ChildContent>
-                        <ContentTemplate>
-                            <div class="mt-4">
-                                <EmployeeOffboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                            </div>
-                        </ContentTemplate>
-                    </TabItem>
-                }
-
-                @if (_showLeavingTab)
-                {
-                    <TabItem>
-                        <ChildContent><TabHeader Text="Leaving" /></ChildContent>
-                        <ContentTemplate>
-                            <div class="mt-4">
-                                <EmployeeLeavingTab CompanyId="CompanyId" EmployeeId="Id!.Value"
-                                                     OnAmendRequested="OpenAmendLeavingProcessDialog"
-                                                     OnCancelRequested="OpenCancelLeavingProcessDialog" />
-                            </div>
-                        </ContentTemplate>
-                    </TabItem>
-                }
-
-                @if (Session.IsHrAdministrator)
-                {
-                    <TabItem>
-                        <ChildContent><TabHeader Text="Notes" /></ChildContent>
-                        <ContentTemplate>
-                            <div class="mt-4">
-                                <EmployeeNotesTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                            </div>
-                        </ContentTemplate>
-                    </TabItem>
-                }
 
             </TabItems>
         </SfTab>
+        </div>
 
         @if (!string.IsNullOrEmpty(_saveSuccessMessage))
         {
@@ -891,59 +909,119 @@
     private string? _selectedProfileLeavePolicyName;
 
     private EmployeeEmploymentTab? _employmentTab;
-    private int _activeTabIndex;
 
-    // Remembers which tab was last active for this employee (per browser, via localStorage — see
-    // app.js's setLastEmployeeTab/getLastEmployeeTab) so reopening the same employee's edit/view
-    // lands back on the same tab. An explicit "?tab=" query param (deep links from elsewhere, e.g.
-    // "?tab=leave") always takes priority and is never overridden by the stored value.
+    // Two-level navigation state. The screen is organised into 6 top-level groups
+    // (EmployeeProfileGroup) each with one or more sub-sections (EmployeeProfileSection).
+    // Selection is tracked purely by the section enum — the owning group is always derivable
+    // from it via EmployeeProfileNavigation.GroupOf — so there is no hand-computed positional
+    // index math any more. The outer/inner SfTab controls are bound to *derived* integer
+    // indices (see GroupTab / OverviewTab etc. below) computed from the list of currently
+    // visible sections, never from fixed constants.
+    private EmployeeProfileSection _activeSection = EmployeeProfileSection.Details;
+
+    private EmployeeProfileGroup ActiveGroup => EmployeeProfileNavigation.GroupOf(_activeSection);
+
+    // Remembers which section was last active for this employee (per browser, via localStorage —
+    // see app.js's setLastEmployeeTab/getLastEmployeeTab; the stored integer is now (int)section,
+    // a stable enum value rather than a positional tab index). An explicit "?tab=" query param
+    // (deep links from elsewhere, e.g. "?tab=leave") always takes priority and is never
+    // overridden by the stored value.
     private bool _hadTabQueryParam;
     private bool _restoredTabFromStorage;
-    private int _lastPersistedTabIndex = -1;
+    private int _lastPersistedSectionValue = -1;
 
-    // Probation only gets a tab while an active record exists (Active/ReviewDue/Extended) —
-    // hidden once Passed/Failed, or when the employee never had a record at all. Since Probation
-    // sits above every other conditional/fixed tab in this markup, hiding it shifts every
-    // subsequent tab's index down by one.
+    // Conditional-section visibility flags, populated from the employee profile response
+    // (GetEmployeeHandler is the single source of truth for these lifecycle rules).
     private bool _showProbationTab;
-    private int ProbationOffset => _showProbationTab ? 0 : -1;
-
-    // Leave is always rendered (not conditional like Probation/Onboarding/Offboarding), but its
-    // own index still shifts by ProbationOffset since it sits after Probation in this markup.
-    private int LeaveTabIndex => 6 + ProbationOffset;
-
-    // Onboarding only gets a tab once a plan exists, and loses it again once that plan is
-    // Completed — completed history remains visible via the Audit tab instead (see
-    // OnboardingPlanCompletedAuditEvent). Offboarding's tab index shifts whenever Onboarding's (or
-    // Probation's) tab isn't rendered, since Syncfusion's SfTab indexes by however many <TabItem>
-    // elements actually render, not by their position in this markup.
-    //
-    // Counted directly from the markup above (Details, Employment, Compensation, Promotion
-    // History, [Probation], Emergency Contacts, Leave, Sickness, Tasks, Documents, Assets,
-    // Acknowledgement History, Audit, Timeline = 13 always-rendered tabs before Onboarding, plus 1
-    // more when Probation renders), not trusted from any older constant — this file has picked up
-    // tabs (e.g. Promotion History, Timeline) since these indices were last set, so re-derive them
-    // from the actual <TabItem> count rather than assuming the previous numbers still held.
     private bool _showOnboardingTab;
-    private int OnboardingTabIndex => 14 + ProbationOffset;
-    private int OffboardingTabIndex => (_showOnboardingTab ? 15 : 14) + ProbationOffset;
-
-    // Offboarding only gets a tab once a plan has been started, and loses it again once that
-    // plan is Completed/Cancelled — completed history remains visible via the Audit tab instead
-    // (see OffboardingPlanCompletedAuditEvent). It sits directly before Leaving in this markup, so
-    // its own visibility still needs to be accounted for by LeavingTabIndex below, but nothing
-    // after Leaving depends on it.
     private bool _showOffboardingTab;
-
-    // Leaving only gets a tab once a leaving process has been started for this employee (i.e.
-    // Employee.Status has moved to "Leaving" — see GetEmployeeHandler.ShowLeavingTab). It's the
-    // last tab in this markup, immediately after Offboarding, so its index is simply
-    // OffboardingTabIndex plus one more slot if Offboarding itself is currently rendered.
     private bool _showLeavingTab;
-    private int LeavingTabIndex => OffboardingTabIndex + (_showOffboardingTab ? 1 : 0);
 
-    // Notes (HR-only) is the very last tab, rendered after Leaving when Leaving itself is shown.
-    private int NotesTabIndex => LeavingTabIndex + (_showLeavingTab ? 1 : 0);
+    private bool SectionVisible(EmployeeProfileSection s) => s switch
+    {
+        EmployeeProfileSection.Probation => _showProbationTab,
+        EmployeeProfileSection.Onboarding => _showOnboardingTab,
+        EmployeeProfileSection.Offboarding => _showOffboardingTab,
+        EmployeeProfileSection.Leaving => _showLeavingTab,
+        EmployeeProfileSection.Notes => Session.IsHrAdministrator,
+        _ => true
+    };
+
+    private List<EmployeeProfileSection> VisibleSections(EmployeeProfileGroup g) =>
+        EmployeeProfileNavigation.All
+            .Where(d => d.Group == g && SectionVisible(d.Section))
+            .Select(d => d.Section)
+            .ToList();
+
+    // Outer strip index. GroupOrder matches the EmployeeProfileGroup enum order and every group
+    // always has at least one always-visible section, so this is just the group's ordinal, but
+    // resolved through the list so it stays correct if that ever changes.
+    private int GroupTab
+    {
+        get => Math.Max(0, EmployeeProfileNavigation.GroupOrder.IndexOf(ActiveGroup));
+        set
+        {
+            var groups = EmployeeProfileNavigation.GroupOrder;
+            if (value < 0 || value >= groups.Count) return;
+            var g = groups[value];
+            if (g == ActiveGroup) return;
+            _activeSection = VisibleSections(g).First();
+            PersistSection();
+        }
+    }
+
+    private int SectionIndex(EmployeeProfileGroup g)
+    {
+        var i = VisibleSections(g).IndexOf(_activeSection);
+        return i < 0 ? 0 : i;
+    }
+
+    private void SetSection(EmployeeProfileGroup g, int value)
+    {
+        var sections = VisibleSections(g);
+        if (value < 0 || value >= sections.Count) return;
+        var s = sections[value];
+        if (s == _activeSection) return;
+        _activeSection = s;
+        PersistSection();
+    }
+
+    // One bound property per group's inner SfTab. Only the currently-selected group's inner
+    // SfTab is rendered (SfTab loads content on demand), so only that group's setter fires.
+    private int OverviewTab { get => SectionIndex(EmployeeProfileGroup.Overview); set => SetSection(EmployeeProfileGroup.Overview, value); }
+    private int CareerPayTab { get => SectionIndex(EmployeeProfileGroup.CareerPay); set => SetSection(EmployeeProfileGroup.CareerPay, value); }
+    private int TimeOffTab { get => SectionIndex(EmployeeProfileGroup.TimeOff); set => SetSection(EmployeeProfileGroup.TimeOff, value); }
+    private int TasksRecordsTab { get => SectionIndex(EmployeeProfileGroup.TasksRecords); set => SetSection(EmployeeProfileGroup.TasksRecords, value); }
+    private int ActivityTab { get => SectionIndex(EmployeeProfileGroup.Activity); set => SetSection(EmployeeProfileGroup.Activity, value); }
+
+    // Used by the Timeline sub-navigation callbacks to jump straight to another section
+    // (possibly in another group). A no-op if the target section isn't currently visible,
+    // matching the previous behaviour of the guarded index assignments.
+    private void GoToSection(EmployeeProfileSection s)
+    {
+        if (!SectionVisible(s)) return;
+        _activeSection = s;
+        PersistSection();
+        StateHasChanged();
+    }
+
+    private void PersistSection() => _ = PersistSectionAsync();
+
+    private async Task PersistSectionAsync()
+    {
+        if (IsNew || Id is null) return;
+        var v = (int)_activeSection;
+        if (v == _lastPersistedSectionValue) return;
+        _lastPersistedSectionValue = v;
+        try
+        {
+            await JS.InvokeVoidAsync("setLastEmployeeTab", Id, v);
+        }
+        catch
+        {
+            // ignore — a failed write should never break navigation.
+        }
+    }
 
     private EmployeeNumberMode _companyEmployeeNumberMode = EmployeeNumberMode.Manual;
 
@@ -1050,39 +1128,31 @@
             Model.ManagerId = Guid.Empty;
         }
 
-        // Parsed after _showProbationTab/_showOnboardingTab/_showOffboardingTab are known, since
-        // every later tab's index depends on whether those actually rendered above it.
+        // Parsed after the _show*Tab flags are known so a deep link to a currently-hidden section
+        // (e.g. "?tab=leaving" before a leaving process exists) can fall back to Details, matching
+        // the old positional switch's "=> 0" behaviour. EmployeeProfileNavigation.ParseTab keeps
+        // every legacy "?tab=" value working (probation/leave/sickness/documents/onboarding/
+        // offboarding/leaving/timeline) and additionally accepts the per-section key for any
+        // other section, so "?tab=documents" still lands on Tasks & Records > Documents.
         var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
         if (query.TryGetValue("tab", out var tab))
         {
-            _hadTabQueryParam = true;
-            var tabValue = tab.ToString();
-
-            _activeTabIndex = tabValue switch
+            var parsed = EmployeeProfileNavigation.ParseTab(tab.ToString());
+            if (parsed is { } section)
             {
-                "probation" => _showProbationTab ? 4 : 0,
-                "leave" => LeaveTabIndex,
-                // NOT-04: deep-link targets for notification action URLs that land on this page's
-                // Sickness/Documents tabs (see NotificationActionRouteBuilder) — same index math as
-                // the always-rendered tabs above, shifted by ProbationOffset like every other tab
-                // after Probation's conditional slot.
-                "sickness" => 7 + ProbationOffset,
-                "documents" => 9 + ProbationOffset,
-                "onboarding" => _showOnboardingTab ? OnboardingTabIndex : 0,
-                "offboarding" => OffboardingTabIndex,
-                "leaving" => _showLeavingTab ? LeavingTabIndex : 0,
-                "timeline" => 13 + ProbationOffset,
-                _ => 0
-            };
+                _hadTabQueryParam = true;
+                _activeSection = SectionVisible(section) ? section : EmployeeProfileSection.Details;
+            }
         }
 
         BuildMoreActionsItems();
     }
 
-    // Restores the last-active tab from localStorage on first render (JS interop isn't available
-    // until after the first render), unless an explicit "?tab=" deep link already set it above.
-    // Once restored (or once there's nothing to restore), subsequent renders just persist whatever
-    // tab the user is currently on.
+    // Restores the last-active section from localStorage on first render (JS interop isn't
+    // available until after the first render), unless an explicit "?tab=" deep link already set
+    // it above. The stored integer is (int)EmployeeProfileSection; an unknown or now-hidden value
+    // is ignored. Once restored (or once there's nothing to restore), subsequent renders just
+    // persist whatever section the user is currently on.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
@@ -1094,31 +1164,35 @@
             _restoredTabFromStorage = true;
             try
             {
-                var storedTab = await JS.InvokeAsync<int?>("getLastEmployeeTab", Id);
-                if (storedTab is { } idx && idx != _activeTabIndex)
+                var stored = await JS.InvokeAsync<int?>("getLastEmployeeTab", Id);
+                if (stored is { } v
+                    && Enum.IsDefined(typeof(EmployeeProfileSection), v)
+                    && (EmployeeProfileSection)v is var section
+                    && SectionVisible(section)
+                    && section != _activeSection)
                 {
-                    _activeTabIndex = idx;
-                    _lastPersistedTabIndex = idx;
+                    _activeSection = section;
+                    _lastPersistedSectionValue = v;
                     StateHasChanged();
                     return;
                 }
             }
             catch
             {
-                // ignore — storage unavailable, just keep the default/query-derived tab.
+                // ignore — storage unavailable, just keep the default/query-derived section.
             }
         }
 
-        if (_activeTabIndex != _lastPersistedTabIndex)
+        if ((int)_activeSection != _lastPersistedSectionValue)
         {
-            _lastPersistedTabIndex = _activeTabIndex;
+            _lastPersistedSectionValue = (int)_activeSection;
             try
             {
-                await JS.InvokeVoidAsync("setLastEmployeeTab", Id, _activeTabIndex);
+                await JS.InvokeVoidAsync("setLastEmployeeTab", Id, (int)_activeSection);
             }
             catch
             {
-                // ignore — a failed write should never break tab navigation.
+                // ignore — a failed write should never break navigation.
             }
         }
     }

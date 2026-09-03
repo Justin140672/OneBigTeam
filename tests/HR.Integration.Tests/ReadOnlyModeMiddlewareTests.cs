@@ -29,8 +29,14 @@ public class ReadOnlyModeMiddlewareTests
     public ReadOnlyModeMiddlewareTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        // HR Administrator can create asset categories (employee:manage); Company Administrator
+        // additionally holds subscription:manage (its sole holder after migration
+        // RestrictSubscriptionToCompanyAdministrator) — both are needed across the tests below.
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.CompanyAdministrator);
+        }).GetAwaiter().GetResult();
         _factory.StripeGateway.Reset();
     }
 
@@ -40,6 +46,7 @@ public class ReadOnlyModeMiddlewareTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.CompanyAdministrator, companyId);
         return client;
     }
 
@@ -88,8 +95,11 @@ public class ReadOnlyModeMiddlewareTests
         using var client = await AdminClient(companyId);
 
         // subscription-details (policy subscription:manage) rather than subscription-status
-        // (policy role:employee) — AdminUserId is only seeded with the HrAdministrator role here,
-        // which satisfies subscription:manage but not role:employee.
+        // (policy role:employee) — AdminUserId here holds HrAdministrator + CompanyAdministrator
+        // but not the Employee role. CompanyAdministrator carries subscription:manage (its sole
+        // holder after migration RestrictSubscriptionToCompanyAdministrator); neither role
+        // satisfies the role-identity check role:employee. Proves the read-only middleware lets a
+        // GET through regardless.
         var response = await client.GetAsync("/api/companies/subscription-details");
 
         response.EnsureSuccessStatusCode();

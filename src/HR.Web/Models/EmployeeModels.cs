@@ -39,6 +39,22 @@ public record EmployeeListItemModel(
     public string FullName => $"{FirstName} {LastName}";
 }
 
+// ── DIRECTORY SEARCH (top-bar employee search) ────────────────────────────────
+
+public record EmployeeDirectorySearchResponse(IReadOnlyList<EmployeeDirectorySearchItem> Items);
+
+public record EmployeeDirectorySearchItem(
+    Guid Id,
+    string FirstName,
+    string LastName,
+    string? EmployeeNumber,
+    string? PositionProfileTitle,
+    string? DepartmentName,
+    string Status)
+{
+    public string FullName => $"{FirstName} {LastName}";
+}
+
 // ── GET ───────────────────────────────────────────────────────────────────────
 
 public record GetEmployeeResponse(

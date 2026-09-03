@@ -285,13 +285,11 @@ else
     // sections inside the sidebar are independently role-gated so combined roles (e.g. an
     // HR Administrator who is also a Manager or Recruiter) merge without duplicates.
     //
-    // A Company Administrator with no other role also gets no sidebar — their whole job is
-    // company profile/settings, reachable directly from the Company Settings page (their landing
-    // screen, see AppSession.LandingUrl), so a full nav menu is unnecessary surface area.
-    // CanManageCompany is deliberately excluded here; if they also hold a role that grants
-    // CanManageEmployees/IsHrAdministrator the sidebar still shows (with the Company item already
-    // gated in below). User Administration is HR-Administrator-only, not reachable by
-    // CanManageCompany alone.
+    // A Company Administrator gets a minimal sidebar too: the "Company administration" section
+    // (Company Profile & Addresses, Subscription & Billing) plus the Support Requests item below.
+    // Those two screens are the whole Company-Administrator job and both are role-gated on
+    // CanManageCompany, so a CompanyAdmin-only user still needs a way to reach Subscription &
+    // Billing after the generic "Company" nav bucket and Administration Home hub were removed.
     //
     // A plain Manager never gets a sidebar — their dashboard is "home", and Reports are reached
     // via the Reports section on that dashboard (see ManagerDashboard.razor's TeamReportsWidget),
@@ -300,7 +298,7 @@ else
     // The persistent sidebar belongs only to the two roles with multi-page administrative
     // workflows. Company administrators, managers and employees use their landing page and
     // contextual links instead of receiving an application-wide navigation rail.
-    private bool ShowSidebar => Session.IsHrAdministrator || Session.IsRecruiter;
+    private bool ShowSidebar => Session.IsHrAdministrator || Session.IsRecruiter || Session.CanManageCompany;
 
     // Recruiters have a compact task-based navigation. Administrative category menus are for
     // users who also hold an HR, manager, or company-administration role.
@@ -324,25 +322,22 @@ else
 
     private sealed record PersonaOption(string UserId, string DisplayName);
 
-    // ADM-07 — the seven canonical administrative sections, permission-filtered by the shared
+    // ADM-07 — the canonical administrative sections, permission-filtered by the shared
     // AdminNavigation helper. Replaces the old flat block of hand-maintained admin MenuItems.
     private IReadOnlyList<AdminNavSection> _adminSections = [];
 
     private static string SectionIcon(AdminNavGroup group) => group switch
     {
         AdminNavGroup.PeopleAndUsers => "fa-solid fa-users",
-        AdminNavGroup.Company => "fa-solid fa-building",
+        AdminNavGroup.CompanyAdministration => "fa-solid fa-building",
         AdminNavGroup.HrConfiguration => "fa-solid fa-sliders",
-        AdminNavGroup.Compliance => "fa-solid fa-shield-halved",
         AdminNavGroup.Reports => "fa-solid fa-chart-column",
-        AdminNavGroup.AuditAndSecurity => "fa-solid fa-triangle-exclamation",
         AdminNavGroup.PlatformOperations => "fa-solid fa-server",
         _ => "fa-solid fa-gears",
     };
 
     private readonly Dictionary<string, string> _menuItems = new()
     {
-        ["AdministrationHub"] = "/",
         ["Employees"] = "/",
         ["Departments"] = "/",
         ["LocationTypes"] = "/",
@@ -365,9 +360,6 @@ else
         ["ExternalRecruiters"] = "/",
         ["RecruitmentStages"] = "/",
         ["Reporting"] = "/",
-        ["ComplianceCentre"] = "/",
-        ["AdministrativeAlerts"] = "/",
-        ["Company"] = "/",
         ["HrSettings"] = "/",
         ["UserAdministration"] = "/",
         ["SupportQueue"] = "/",
@@ -381,7 +373,6 @@ else
 
         var companyId = Session.CompanyId;
         _adminSections = AdminNavigation.Sections(AdminNavCapabilities.From(Session), companyId);
-        _menuItems["AdministrationHub"] = $"/companies/{companyId}/administration";
         _menuItems["Employees"] = $"/companies/{companyId}/employees";
         _menuItems["Departments"] = $"/companies/{companyId}/departments";
         _menuItems["LocationTypes"] = $"/companies/{companyId}/location-types";
@@ -404,9 +395,6 @@ else
         _menuItems["ExternalRecruiters"] = $"/companies/{companyId}/external-recruiters";
         _menuItems["RecruitmentStages"] = $"/companies/{companyId}/recruitment-stages";
         _menuItems["Reporting"] = $"/companies/{companyId}/reporting";
-        _menuItems["ComplianceCentre"] = $"/companies/{companyId}/reporting/compliance-centre";
-        _menuItems["AdministrativeAlerts"] = $"/companies/{companyId}/administrative-alerts";
-        _menuItems["Company"] = $"/companies/{companyId}/edit";
         _menuItems["HrSettings"] = $"/companies/{companyId}/hr-settings";
         _menuItems["UserAdministration"] = $"/companies/{companyId}/user-administration";
         _menuItems["SupportQueue"] = $"/companies/{companyId}/support/admin/queue";
@@ -638,28 +626,7 @@ else
     // Top-bar title reacts to the current route rather than just the user's role, so it stays
     // accurate as users move between their role dashboard(s) and the Company screen. Recomputed
     // on every render; refreshed on client-side navigation via LocationChanged below.
-    private string CurrentPageTitle => GetPageTitle(NavigationManager.Uri, Session.CanManageEmployees);
-
-    private static string GetPageTitle(string uri, bool canManageEmployees)
-    {
-        var path = new Uri(uri).AbsolutePath.Trim('/').ToLowerInvariant();
-        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-
-        return path switch
-        {
-            "dashboard/hr" => "HR Dashboard",
-            "dashboard/recruitment" => "Recruitment Dashboard",
-            "dashboard/manager" => "Manager Dashboard",
-            // Company edit/view routes are "/companies/{id}/edit" or "/companies/{id}/view" —
-            // exactly 3 segments, unlike every other companies/{id}/{resource}/... route.
-            _ when segments.Length == 3 && segments[0] == "companies" && (segments[2] == "edit" || segments[2] == "view") => "Company",
-            _ when segments.Length >= 1 && segments[^1] == "administration" => "Administration",
-            // Every other admin subpage (Employees, Departments, Vacancies, Leave Types, etc.) keeps
-            // the pre-dashboards generic "Dashboard" title for CanManageEmployees users; everyone else
-            // (a plain Employee browsing their own linked pages) sees "My Profile".
-            _ => canManageEmployees ? "Dashboard" : "My Profile",
-        };
-    }
+    private string CurrentPageTitle => PageTitleResolver.Resolve(NavigationManager.Uri);
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
         => InvokeAsync(StateHasChanged);

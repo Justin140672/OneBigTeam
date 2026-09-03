@@ -206,6 +206,10 @@ public static class EmployeesModule
         services.AddScoped<ListEmployeesHandler>();
         services.AddScoped<IValidator<ListEmployeesRequest>, ListEmployeesValidator>();
 
+        services.AddScoped<Features.SearchEmployeeDirectory.SearchEmployeeDirectoryHandler>();
+        services.AddScoped<IValidator<Features.SearchEmployeeDirectory.SearchEmployeeDirectoryRequest>,
+            Features.SearchEmployeeDirectory.SearchEmployeeDirectoryValidator>();
+
         services.AddScoped<GetOrganisationChartHandler>();
 
         services.AddScoped<GetHeadcountSummaryHandler>();

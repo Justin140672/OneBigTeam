@@ -94,8 +94,9 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.OnboardingManage),
             RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.OnboardingManage),
 
-            // subscription:manage — HR or Company Administrator.
-            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.SubscriptionManage),
+            // subscription:manage — Company Administrator only. Subscription & billing is a company-
+            // ownership function, not an HR one; HR Administrator's grant was removed by migration
+            // RestrictSubscriptionToCompanyAdministrator (see 30-administrative-role-separation-matrix.md).
             RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.SubscriptionManage),
 
             // leave:manage — HR Administrator only.
@@ -166,16 +167,7 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
 
             // compliance:view — ADM-02 consolidated Compliance Centre. HR Administrator only;
             // Company Administrator is deliberately excluded (administrative role separation).
-            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.ComplianceView),
-
-            // admin-alerts:view — ADM-03 administrative alerts & incidents inbox. HR Administrator
-            // only; Company Administrator deliberately excluded (administrative role separation).
-            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.AdministrativeAlertsView),
-
-            // reporting:view-governance — ADM-08 administrative governance reporting hub. HR
-            // Administrator only; Company Administrator deliberately excluded (administrative role
-            // separation), same as compliance:view / admin-alerts:view.
-            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.ReportingViewGovernance)
+            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.ComplianceView)
         );
     }
 }

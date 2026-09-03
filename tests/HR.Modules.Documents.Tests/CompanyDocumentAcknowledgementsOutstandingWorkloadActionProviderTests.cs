@@ -72,6 +72,6 @@ public class CompanyDocumentAcknowledgementsOutstandingWorkloadActionProviderTes
         Assert.Equal("Company Document Acknowledgements Outstanding", action.ActionCategory);
         Assert.Equal("Not Acknowledged", action.Status);
         Assert.Null(action.DueDate);
-        Assert.Equal($"/companies/{companyId}/documents/shared/{docId}/view", action.DeepLinkUrl);
+        Assert.Equal($"/companies/{companyId}/shared-documents/{docId}/acknowledgement-progress", action.DeepLinkUrl);
     }
 }

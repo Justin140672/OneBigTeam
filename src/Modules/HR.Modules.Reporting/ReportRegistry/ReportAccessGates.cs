@@ -12,10 +12,7 @@ internal readonly record struct ReportAccessGates(
     bool CanViewLeaveSummary,
     bool CanViewProbation,
     bool CanViewOnboarding,
-    bool CanViewWorkloadActions,
-    // ADM-08. Defaulted so existing call sites that predate the governance report family keep
-    // compiling; the report catalogue endpoint always supplies it explicitly.
-    bool CanViewGovernance = false)
+    bool CanViewWorkloadActions)
 {
     public bool IsAuthorized(ReportAccessGate gate) => gate switch
     {
@@ -26,7 +23,6 @@ internal readonly record struct ReportAccessGates(
         ReportAccessGate.Probation => CanViewProbation,
         ReportAccessGate.Onboarding => CanViewOnboarding,
         ReportAccessGate.WorkloadActions => CanViewWorkloadActions,
-        ReportAccessGate.Governance => CanViewGovernance,
         _ => false,
     };
 }

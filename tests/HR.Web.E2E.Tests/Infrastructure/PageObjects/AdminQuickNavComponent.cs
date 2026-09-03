@@ -1,22 +1,31 @@
+using HR.Web.E2E.Tests.Infrastructure;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 /// <summary>
-/// ADM-07 — the permission-aware quick-navigation palette (Ctrl+K). Locators are role/aria based
-/// per the E2E locator conventions: the trigger button, the palette dialog and each result option.
+/// The HR-only Employee Search palette (Ctrl+K), rendered in the top bar only for HR
+/// administrators (see AdminQuickNav.razor's <c>@if (Session.IsHrAdministrator)</c>). Locators are
+/// role/aria based per the E2E locator conventions: the trigger button, the palette dialog and
+/// each result option (an employee row).
 /// </summary>
 public sealed class AdminQuickNavComponent(IPage page)
 {
-    public ILocator Trigger => page.GetByRole(AriaRole.Button, new() { Name = "Quick navigation" });
+    public ILocator Trigger => page.GetByRole(AriaRole.Button, new() { Name = "Search employees" });
 
     public ILocator Dialog => page.GetByRole(AriaRole.Dialog);
 
+    public ILocator Input => Dialog.GetByRole(AriaRole.Combobox);
+
+    public ILocator IncludeLeaversCheckbox => Dialog.GetByRole(AriaRole.Checkbox);
+
     public ILocator Options => page.GetByRole(AriaRole.Option);
 
+    public ILocator NoMatchesMessage => Dialog.GetByText("No matching employees");
+
     /// <summary>
-    /// Presses Ctrl+K exactly once. Used by the "Ctrl+K is inert for a plain employee" test, which
-    /// deliberately needs a single press that is expected to do nothing. Tests that expect the
+    /// Presses Ctrl+K exactly once. Used by the "Ctrl+K is inert for a non-HR user" tests, which
+    /// deliberately need a single press that is expected to do nothing. Tests that expect the
     /// palette to actually open should use <see cref="OpenAsync"/> instead.
     /// </summary>
     public async Task OpenWithKeyboardAsync()
@@ -50,7 +59,7 @@ public sealed class AdminQuickNavComponent(IPage page)
         }
 
         throw new TimeoutException(
-            "Quick-nav palette did not open after repeated Ctrl+K presses, despite the trigger being visible.");
+            "Employee search palette did not open after repeated Ctrl+K presses, despite the trigger being visible.");
     }
 
     public async Task<bool> IsOpenAsync() =>
@@ -61,15 +70,41 @@ public sealed class AdminQuickNavComponent(IPage page)
         await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
-    public async Task TypeAsync(string term)
+    /// <summary>Types (replacing) the search term. The component debounces the query ~250 ms.</summary>
+    public async Task SearchAsync(string term)
     {
-        await Dialog.GetByRole(AriaRole.Textbox).FillAsync(term);
+        await Input.FillAsync(term);
     }
 
-    public async Task<bool> HasResultAsync(string label)
+    /// <summary>Ticks / unticks the "Include leavers / archived employees" checkbox, re-running the query.</summary>
+    public async Task SetIncludeLeaversAsync(bool included)
     {
-        var option = Options.Filter(new() { HasText = label }).First;
-        return await option.WaitUntilVisibleAsync();
+        await IncludeLeaversCheckbox.SetCheckedAsync(included);
+    }
+
+    /// <summary>All result rows whose visible text contains <paramref name="text"/> (name, employee number, position…).</summary>
+    public ILocator ResultsContaining(string text) => Options.Filter(new() { HasText = text });
+
+    /// <summary>
+    /// Waits for the debounced query to settle — either at least one result row or the explicit
+    /// "No matching employees" empty state is shown.
+    /// </summary>
+    public async Task WaitForResultsSettledAsync(int timeoutMs = 10_000)
+    {
+        await Options.First.Or(NoMatchesMessage).WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = timeoutMs });
+    }
+
+    public async Task<bool> HasResultAsync(string text, int timeoutMs = 10_000)
+    {
+        return await ResultsContaining(text).First.WaitUntilVisibleAsync(timeoutMs);
+    }
+
+    /// <summary>Asserts that, once the query has settled, no result row matches <paramref name="text"/>.</summary>
+    public async Task AssertNoResultAsync(string text, int timeoutMs = 10_000)
+    {
+        await WaitForResultsSettledAsync(timeoutMs);
+        await Assertions.Expect(ResultsContaining(text)).ToHaveCountAsync(0, new() { Timeout = timeoutMs });
     }
 
     public async Task ActivateFirstResultAsync()
@@ -78,9 +113,9 @@ public sealed class AdminQuickNavComponent(IPage page)
         await page.Keyboard.PressAsync("Enter");
     }
 
-    public async Task ClickResultAsync(string label)
+    public async Task ClickResultAsync(string text)
     {
-        await Options.Filter(new() { HasText = label }).First.ClickAsync();
+        await ResultsContaining(text).First.ClickAsync();
     }
 
     public async Task PressEscapeAsync()

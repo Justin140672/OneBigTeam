@@ -17,6 +17,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>399b7d2d-4287-4dc0-8b1c-483251b0b5ab</UserSecretsId>
+
+    <!--
+      NFR-09 exemption: the Aspire.AppHost.Sdk injects RID-specific implicit package
+      references (Aspire.Dashboard.Sdk.<rid>, Aspire.Hosting.Orchestration.<rid>) chosen
+      from the build host's OS. A packages.lock.json generated on Windows dev machines then
+      fails locked-mode restore on the Linux CI runner (NU1004). This project is a
+      development-time orchestration host only and ships nothing, so it opts out of the lock
+      file. All deployed projects (HR.Api, HR.Web, HR.Marketing, HR.Admin.Web, every module)
+      keep theirs and remain covered by the reproducible-restore gate.
+    -->
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
   </PropertyGroup>
 
 </Project>

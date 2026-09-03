@@ -66,7 +66,7 @@ internal sealed class EmployeeAccountsAwaitingInvitationWorkloadActionProvider(
                 DueDate: DateOnly.FromDateTime(invite.ExpiresAt.UtcDateTime),
                 AssignedTo: null,
                 Status: expired ? "Invitation Expired" : "Pending Invitation",
-                DeepLinkUrl: $"/companies/{companyId}/users");
+                DeepLinkUrl: $"/companies/{companyId}/user-administration/{invite.EmployeeId}");
         }).ToList();
     }
 }

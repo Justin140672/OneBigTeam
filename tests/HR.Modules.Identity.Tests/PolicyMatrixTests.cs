@@ -36,7 +36,7 @@ public class PolicyMatrixTests(IdentityDatabaseFixture fixture)
         ["users:manage"] = [SystemRoles.HrAdministrator],
         ["onboarding:view"] = [SystemRoles.HrAdministrator, SystemRoles.CompanyAdministrator],
         ["onboarding:manage"] = [SystemRoles.HrAdministrator, SystemRoles.CompanyAdministrator],
-        ["subscription:manage"] = [SystemRoles.HrAdministrator, SystemRoles.CompanyAdministrator],
+        ["subscription:manage"] = [SystemRoles.CompanyAdministrator],
         ["leave:request"] = [SystemRoles.Employee, SystemRoles.Manager, SystemRoles.HrAdministrator],
         ["leave:approve"] = [SystemRoles.Manager, SystemRoles.HrAdministrator],
         ["leave:manage"] = [SystemRoles.HrAdministrator],
@@ -63,8 +63,6 @@ public class PolicyMatrixTests(IdentityDatabaseFixture fixture)
         ["reporting:view-onboarding"] = [SystemRoles.HrAdministrator, SystemRoles.Manager],
         ["reporting:view-workload-actions"] = [SystemRoles.HrAdministrator, SystemRoles.Manager],
         ["compliance:view"] = [SystemRoles.HrAdministrator],
-        ["admin-alerts:view"] = [SystemRoles.HrAdministrator],
-        ["reporting:view-governance"] = [SystemRoles.HrAdministrator],
     };
 
     private static readonly IReadOnlyDictionary<Guid, string> RoleNames = new Dictionary<Guid, string>

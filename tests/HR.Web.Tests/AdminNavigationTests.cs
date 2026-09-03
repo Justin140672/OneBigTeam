@@ -3,10 +3,17 @@ using HR.Web.Navigation;
 namespace HR.Web.Tests;
 
 /// <summary>
-/// ADM-07 — <see cref="AdminNavigation"/> is the single permission-scoped source of truth for
-/// administrative destinations (sidebar groups + quick-nav palette). These tests pin the
-/// visibility filtering and quick-search ranking per persona without bUnit. Persona capability
-/// sets mirror the ADM-05 role-separation matrix.
+/// ADM-07 / ADM (nav simplification) — <see cref="AdminNavigation"/> is the single
+/// permission-scoped source of truth for administrative sidebar destinations. These tests pin the
+/// visibility filtering per persona without bUnit. Persona capability sets mirror the ADM-05
+/// role-separation matrix (specifications/product-specifications/30-administrative-role-separation-matrix.md).
+///
+/// Post-simplification expectations:
+///  - No "Compliance Centre" destination for any persona (page stays reachable by direct URL only).
+///  - No "Administration Home" hub destination for any persona.
+///  - No generic "Company" group — Company-Administrator items live in "Company administration".
+///  - "Subscription &amp; Billing" is Company-Administrator-only (CanManageCompany); an HR-Admin-only
+///    persona never sees it; a combined HR + Company Admin persona does.
 /// </summary>
 public class AdminNavigationTests
 {
@@ -19,32 +26,30 @@ public class AdminNavigationTests
         bool canManageLeavePolicies = false,
         bool canManageSharedDocuments = false,
         bool canViewReporting = false,
-        bool canViewComplianceCentre = false,
-        bool canViewAdminAlerts = false,
-        bool canViewGovernanceReporting = false,
         bool canManageCompany = false,
         bool canManageCompanyConfiguration = false,
         bool canManageHrSettings = false,
-        bool canViewUsers = false,
-        bool isHrAdministrator = false) =>
+        bool canViewUsers = false) =>
         new(canReadEmployees, canManageEmployees, canManageRecruitment, canManageLeavePolicies,
-            canManageSharedDocuments, canViewReporting, canViewComplianceCentre, canViewAdminAlerts,
-            canViewGovernanceReporting,
-            canManageCompany, canManageCompanyConfiguration, canManageHrSettings, canViewUsers,
-            isHrAdministrator);
+            canManageSharedDocuments, canViewReporting,
+            canManageCompany, canManageCompanyConfiguration, canManageHrSettings, canViewUsers);
 
     private static AdminNavCapabilities CompanyAdminAlone() =>
         Caps(canManageCompany: true, canManageCompanyConfiguration: true);
 
     private static AdminNavCapabilities HrAdmin() =>
         Caps(canManageEmployees: true, canManageLeavePolicies: true, canManageSharedDocuments: true,
-            canManageHrSettings: true, canViewReporting: true, canViewComplianceCentre: true,
-            canViewAdminAlerts: true, canViewGovernanceReporting: true, canViewUsers: true, isHrAdministrator: true);
+            canManageHrSettings: true, canViewReporting: true, canViewUsers: true);
+
+    private static AdminNavCapabilities HrPlusCompanyAdmin() =>
+        Caps(canManageEmployees: true, canManageLeavePolicies: true, canManageSharedDocuments: true,
+            canManageHrSettings: true, canViewReporting: true, canViewUsers: true,
+            canManageCompany: true, canManageCompanyConfiguration: true);
 
     private static readonly string[] DenyListForCompanyAdmin =
     {
         "Employees", "User Administration", "Leave Policies", "Compliance Centre",
-        "Reporting", "Administrative Alerts", "HR Settings",
+        "Reporting", "HR Settings", "Administration Home", "Support Requests",
     };
 
     [Fact]
@@ -60,8 +65,6 @@ public class AdminNavigationTests
     [InlineData("canManageLeavePolicies")]
     [InlineData("canManageSharedDocuments")]
     [InlineData("canViewReporting")]
-    [InlineData("canViewComplianceCentre")]
-    [InlineData("canViewAdminAlerts")]
     [InlineData("canManageCompany")]
     [InlineData("canManageCompanyConfiguration")]
     [InlineData("canManageHrSettings")]
@@ -76,8 +79,6 @@ public class AdminNavigationTests
             "canManageLeavePolicies" => Caps(canManageLeavePolicies: true),
             "canManageSharedDocuments" => Caps(canManageSharedDocuments: true),
             "canViewReporting" => Caps(canViewReporting: true),
-            "canViewComplianceCentre" => Caps(canViewComplianceCentre: true),
-            "canViewAdminAlerts" => Caps(canViewAdminAlerts: true),
             "canManageCompany" => Caps(canManageCompany: true),
             "canManageCompanyConfiguration" => Caps(canManageCompanyConfiguration: true),
             "canManageHrSettings" => Caps(canManageHrSettings: true),
@@ -95,44 +96,67 @@ public class AdminNavigationTests
     }
 
     [Fact]
-    public void CompanyAdministratorAlone_SeesOnlyCompanyGroupDestinations()
+    public void NoPersona_EverSees_ComplianceCentre_Or_AdministrationHome()
+    {
+        foreach (var caps in new[] { CompanyAdminAlone(), HrAdmin(), HrPlusCompanyAdmin() })
+        {
+            var titles = AdminNavigation.Build(caps, CompanyId).Select(d => d.Title).ToList();
+            Assert.DoesNotContain("Compliance Centre", titles);
+            Assert.DoesNotContain("Administration Home", titles);
+        }
+    }
+
+    [Fact]
+    public void NoGroup_IsLabelled_Company_Or_Compliance()
+    {
+        var labels = AdminNavigation.Sections(HrPlusCompanyAdmin(), CompanyId).Select(s => s.Label).ToList();
+        Assert.DoesNotContain("Company", labels);
+        Assert.DoesNotContain("Compliance", labels);
+    }
+
+    [Fact]
+    public void CompanyAdministratorAlone_SeesOnlyCompanyAdministrationDestinations()
     {
         var destinations = AdminNavigation.Build(CompanyAdminAlone(), CompanyId);
 
         Assert.NotEmpty(destinations);
-        Assert.All(destinations, d => Assert.Equal(AdminNavGroup.Company, d.Group));
+        Assert.All(destinations, d => Assert.Equal(AdminNavGroup.CompanyAdministration, d.Group));
 
         var titles = destinations.Select(d => d.Title).ToList();
         Assert.Contains("Company Profile & Addresses", titles);
-        Assert.Contains("Administration Home", titles);
         Assert.Contains("Subscription & Billing", titles);
 
-        // ADM-05 deny list: no HR / people / compliance / reporting / audit surface leaks in.
         foreach (var denied in DenyListForCompanyAdmin)
             Assert.DoesNotContain(denied, titles);
     }
 
     [Fact]
-    public void CompanyAdministratorAlone_Sections_ContainOnlyCompanyGroup()
+    public void CompanyAdministratorAlone_Sections_ContainOnlyCompanyAdministrationGroup()
     {
         var sections = AdminNavigation.Sections(CompanyAdminAlone(), CompanyId);
 
         var section = Assert.Single(sections);
-        Assert.Equal(AdminNavGroup.Company, section.Group);
-        Assert.Equal("Company", section.Label);
-        Assert.All(section.Destinations, d => Assert.Equal(AdminNavGroup.Company, d.Group));
+        Assert.Equal(AdminNavGroup.CompanyAdministration, section.Group);
+        Assert.Equal("Company administration", section.Label);
     }
 
     [Fact]
-    public void HrAdministrator_SeesPeopleHrComplianceReportsAndAuditSections()
+    public void Subscription_IsCompanyAdministratorOnly()
+    {
+        Assert.Contains(AdminNavigation.Build(CompanyAdminAlone(), CompanyId), d => d.Key == "subscription");
+        Assert.DoesNotContain(AdminNavigation.Build(HrAdmin(), CompanyId), d => d.Key == "subscription");
+        Assert.Contains(AdminNavigation.Build(HrPlusCompanyAdmin(), CompanyId), d => d.Key == "subscription");
+    }
+
+    [Fact]
+    public void HrAdministrator_SeesPeopleHrAndReportsSections_ButNotComplianceOrCompany()
     {
         var groups = AdminNavigation.Sections(HrAdmin(), CompanyId).Select(s => s.Group).ToList();
 
         Assert.Contains(AdminNavGroup.PeopleAndUsers, groups);
         Assert.Contains(AdminNavGroup.HrConfiguration, groups);
-        Assert.Contains(AdminNavGroup.Compliance, groups);
         Assert.Contains(AdminNavGroup.Reports, groups);
-        Assert.Contains(AdminNavGroup.AuditAndSecurity, groups);
+        Assert.DoesNotContain(AdminNavGroup.CompanyAdministration, groups);
     }
 
     [Fact]
@@ -149,7 +173,7 @@ public class AdminNavigationTests
     [Fact]
     public void Sections_AreInEnumOrder_AndLabelsMatchGroupInfo()
     {
-        var sections = AdminNavigation.Sections(HrAdmin(), CompanyId);
+        var sections = AdminNavigation.Sections(HrPlusCompanyAdmin(), CompanyId);
 
         var groupOrder = sections.Select(s => (int)s.Group).ToList();
         Assert.Equal(groupOrder.OrderBy(x => x).ToList(), groupOrder);
@@ -158,60 +182,9 @@ public class AdminNavigationTests
     }
 
     [Fact]
-    public void Search_CompanyAdministratorAlone_CannotFindUnreachablePages()
-    {
-        var caps = CompanyAdminAlone();
-
-        Assert.Empty(AdminNavigation.Search(caps, CompanyId, "employees"));
-        Assert.Empty(AdminNavigation.Search(caps, CompanyId, "compliance"));
-        Assert.Empty(AdminNavigation.Search(caps, CompanyId, "leave"));
-    }
-
-    [Fact]
-    public void Search_HrAdministrator_FindsLeaveDestinations()
-    {
-        var results = AdminNavigation.Search(HrAdmin(), CompanyId, "leave");
-
-        Assert.Contains(results, d => d.Title == "Leave Policies");
-        Assert.Contains(results, d => d.Title == "Leave Types");
-    }
-
-    [Fact]
-    public void Search_RanksExactTitleMatchFirst()
-    {
-        var results = AdminNavigation.Search(HrAdmin(), CompanyId, "employees");
-
-        Assert.Equal("Employees", results[0].Title);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void Search_BlankTerm_ReturnsVisibleListCappedAtLimit(string? term)
-    {
-        var caps = HrAdmin();
-        var expected = AdminNavigation.Build(caps, CompanyId).Take(12).Select(d => d.Key).ToList();
-
-        var actual = AdminNavigation.Search(caps, CompanyId, term).Select(d => d.Key).ToList();
-
-        Assert.Equal(expected, actual);
-    }
-
-    [Fact]
-    public void Search_NeverReturnsMoreThanLimit()
-    {
-        var caps = HrAdmin();
-
-        Assert.True(AdminNavigation.Search(caps, CompanyId, null, limit: 3).Count <= 3);
-        Assert.True(AdminNavigation.Search(caps, CompanyId, "e", limit: 2).Count <= 2);
-        Assert.True(AdminNavigation.Search(caps, CompanyId, null).Count <= 12);
-    }
-
-    [Fact]
     public void Build_EveryUrlContainsCompanyId_ExceptFixedSubscriptionPath()
     {
-        var destinations = AdminNavigation.Build(HrAdmin(), CompanyId);
+        var destinations = AdminNavigation.Build(HrPlusCompanyAdmin(), CompanyId);
 
         Assert.All(destinations, d =>
         {
@@ -222,17 +195,5 @@ public class AdminNavigationTests
         });
 
         Assert.All(destinations, d => Assert.StartsWith("/", d.Url));
-    }
-
-    [Fact]
-    public void Search_MatchesOnKeywords()
-    {
-        Assert.Contains(
-            AdminNavigation.Search(HrAdmin(), CompanyId, "bank holidays"),
-            d => d.Title == "Public Holidays");
-
-        Assert.Contains(
-            AdminNavigation.Search(Caps(canViewUsers: true), CompanyId, "permissions"),
-            d => d.Title == "User Administration");
     }
 }

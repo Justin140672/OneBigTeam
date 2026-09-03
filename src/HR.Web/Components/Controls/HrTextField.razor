@@ -1,0 +1,58 @@
+@inherits AccessibleFieldBase<string>
+@using Syncfusion.Blazor.Inputs
+
+@*
+    Accessible single-line / multiline / password text field. Wraps HrTextBox so all of its
+    behaviour notes still hold: FloatLabelType.Never by default (native `placeholder` attribute,
+    so Playwright GetByPlaceholder keeps working), and per-keystroke value commit. The visible
+    <label> is associated to the input via for/id AND the input gets aria-label / aria-labelledby,
+    so it now has a real accessible name. Placeholder is kept ALONGSIDE the label, never as a
+    substitute for it.
+*@
+
+<div class="@WrapperClass">
+    <label id="@LabelId" for="@FieldId" class="@LabelClass">
+        @Label
+        @if (Required)
+        {
+            <span class="text-danger">&nbsp;*</span>
+        }
+    </label>
+
+    <HrTextBox Value="@Value"
+               ValueChanged="@(EventCallback.Factory.Create<string>(this, OnValueChanged))"
+               ValueExpression="@ValueExpression"
+               Placeholder="@Placeholder"
+               Multiline="@Multiline"
+               Type="@Type"
+               ReadOnly="@ReadOnly"
+               Enabled="@(!Disabled)"
+               Maxlength="@(Maxlength ?? -1)"
+               Input="@Input"
+               HtmlAttributes="@BuildInputAttributes()" />
+
+    @if (HasHelp)
+    {
+        <div id="@HelpId" class="form-text">@HelpText</div>
+    }
+    @if (ValueExpression is not null)
+    {
+        <div id="@ErrorId">
+            <ValidationMessage For="@ValueExpression" class="@ValidationClass" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public bool Multiline { get; set; }
+    [Parameter] public InputType Type { get; set; } = InputType.Text;
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public int? Maxlength { get; set; }
+
+    /// <summary>Optional per-keystroke hook (e.g. clearing an error banner on Login).</summary>
+    [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.InputEventArgs> Input { get; set; }
+
+    private Task OnValueChanged(string value) => NotifyValueChanged(value);
+}

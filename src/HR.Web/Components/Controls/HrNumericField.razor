@@ -1,0 +1,67 @@
+@typeparam TValue
+@inherits AccessibleFieldBase<TValue>
+@using Syncfusion.Blazor.Inputs
+
+@* Accessible numeric field. Wraps SfNumericTextBox; spin buttons off by default to match the
+   app-wide house style. The visible <label> is associated via for/id and the input carries
+   aria-label / aria-labelledby / aria-required / aria-invalid / aria-describedby.
+   Min/Max/Step/Format are forwarded through @attributes so the generic TValue type on
+   SfNumericTextBox's own typed Min/Max parameters is satisfied without a compile-time cast. *@
+
+<div class="@WrapperClass">
+    <label id="@LabelId" for="@FieldId" class="@LabelClass">
+        @Label
+        @if (Required)
+        {
+            <span class="text-danger">&nbsp;*</span>
+        }
+    </label>
+
+    <SfNumericTextBox TValue="TValue"
+                      Value="@Value"
+                      ValueChanged="@(EventCallback.Factory.Create<TValue>(this, OnValueChanged))"
+                      ValueExpression="@ValueExpression"
+                      ShowSpinButton="@ShowSpinButton"
+                      Placeholder="@Placeholder"
+                      Enabled="@(!Disabled)"
+                      Readonly="@ReadOnly"
+                      HtmlAttributes="@BuildInputAttributes()"
+                      @attributes="Passthrough" />
+
+    @if (HasHelp)
+    {
+        <div id="@HelpId" class="form-text">@HelpText</div>
+    }
+    @if (ValueExpression is not null)
+    {
+        <div id="@ErrorId">
+            <ValidationMessage For="@ValueExpression" class="@ValidationClass" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool ShowSpinButton { get; set; }
+    [Parameter] public TValue? Min { get; set; }
+    [Parameter] public TValue? Max { get; set; }
+    [Parameter] public double? Step { get; set; }
+    [Parameter] public string? Format { get; set; }
+
+    private Dictionary<string, object> Passthrough
+    {
+        get
+        {
+            var d = new Dictionary<string, object>();
+            if (Min is not null) d["Min"] = Min;
+            if (Max is not null) d["Max"] = Max;
+            if (Step is not null) d["Step"] = Step;
+            if (Format is not null) d["Format"] = Format;
+            return d;
+        }
+    }
+
+    private Task OnValueChanged(TValue value) => NotifyValueChanged(value);
+}

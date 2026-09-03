@@ -49,7 +49,7 @@ internal sealed class CompanyDocumentAcknowledgementsOutstandingWorkloadActionPr
                 DueDate: null,
                 AssignedTo: null,
                 Status: "Not Acknowledged",
-                DeepLinkUrl: $"/companies/{companyId}/documents/shared/{item.SharedCompanyDocumentId}/view");
+                DeepLinkUrl: $"/companies/{companyId}/shared-documents/{item.SharedCompanyDocumentId}/acknowledgement-progress");
         }).ToList();
     }
 }

@@ -37,6 +37,25 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<EmployeeDirectorySearchResponse?> SearchEmployeeDirectoryAsync(
+        Guid companyId, string? term, bool includeLeavers, int limit = 20, CancellationToken ct = default)
+    {
+        var query = HttpUtility.ParseQueryString(string.Empty);
+        if (!string.IsNullOrWhiteSpace(term)) query["term"] = term;
+        query["includeLeavers"] = includeLeavers ? "true" : "false";
+        query["limit"] = limit.ToString();
+
+        try
+        {
+            return await Http.GetFromJsonAsync<EmployeeDirectorySearchResponse>(
+                $"api/companies/{companyId}/employees/directory-search?{query}", HrApiJsonOptions.Default, ct);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
     public async Task<GetHeadcountSummaryResponse?> GetHeadcountSummaryAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {

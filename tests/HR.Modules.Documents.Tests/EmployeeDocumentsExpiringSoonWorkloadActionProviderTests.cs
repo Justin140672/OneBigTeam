@@ -89,6 +89,6 @@ public class EmployeeDocumentsExpiringSoonWorkloadActionProviderTests
         Assert.Equal(expectedActionType, action.ActionType);
         Assert.Equal("Employee Documents Expiring Soon", action.ActionCategory);
         Assert.Equal("Expiring Soon", action.Status);
-        Assert.Equal($"/companies/{companyId}/employees/{employeeId}/documents", action.DeepLinkUrl);
+        Assert.Equal($"/companies/{companyId}/employees/{employeeId}?tab=documents", action.DeepLinkUrl);
     }
 }

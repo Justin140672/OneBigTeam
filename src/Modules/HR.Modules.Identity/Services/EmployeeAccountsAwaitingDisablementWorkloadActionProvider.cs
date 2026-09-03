@@ -76,7 +76,7 @@ internal sealed class EmployeeAccountsAwaitingDisablementWorkloadActionProvider(
                 DueDate: item.LastWorkingDay,
                 AssignedTo: null,
                 Status: "Access Not Yet Disabled",
-                DeepLinkUrl: $"/companies/{companyId}/users");
+                DeepLinkUrl: $"/companies/{companyId}/user-administration/{item.EmployeeId}");
         }).ToList();
     }
 }

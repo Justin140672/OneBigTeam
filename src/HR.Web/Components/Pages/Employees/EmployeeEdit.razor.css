@@ -1,0 +1,9 @@
+/* Visually distinguish the inner (sub-section) tab strip from the outer (group) strip so the
+   selected group AND the selected sub-section are both clearly readable at a glance. */
+.employee-profile-section-wrap ::deep .e-tab-header {
+    background-color: var(--bs-tertiary-bg, #f5f5f5);
+}
+
+.employee-profile-section-wrap ::deep .e-tab-header .e-toolbar-item .e-tab-text {
+    font-size: 0.9rem;
+}

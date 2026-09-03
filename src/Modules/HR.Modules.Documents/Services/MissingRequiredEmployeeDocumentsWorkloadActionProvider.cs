@@ -54,7 +54,7 @@ internal sealed class MissingRequiredEmployeeDocumentsWorkloadActionProvider(
                     DueDate: null,
                     AssignedTo: null,
                     Status: "Missing",
-                    DeepLinkUrl: $"/companies/{companyId}/employees/{item.EmployeeId}/documents"));
+                    DeepLinkUrl: $"/companies/{companyId}/employees/{item.EmployeeId}?tab=documents"));
             }
         }
 

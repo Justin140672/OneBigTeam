@@ -122,7 +122,8 @@ public class EmployeeAccountsAwaitingInvitationWorkloadActionProviderTests
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
-        context.UserInvites.Add(UserInvite.Create(Guid.NewGuid(), companyId, "a@example.com", DateTimeOffset.UtcNow));
+        var employeeId = Guid.NewGuid();
+        context.UserInvites.Add(UserInvite.Create(employeeId, companyId, "a@example.com", DateTimeOffset.UtcNow));
         await context.SaveChangesAsync();
 
         var provider = new EmployeeAccountsAwaitingInvitationWorkloadActionProvider(
@@ -132,6 +133,6 @@ public class EmployeeAccountsAwaitingInvitationWorkloadActionProviderTests
 
         var action = Assert.Single(result);
         Assert.Equal("Employee Accounts Awaiting Invitation", action.ActionCategory);
-        Assert.Equal($"/companies/{companyId}/users", action.DeepLinkUrl);
+        Assert.Equal($"/companies/{companyId}/user-administration/{employeeId}", action.DeepLinkUrl);
     }
 }

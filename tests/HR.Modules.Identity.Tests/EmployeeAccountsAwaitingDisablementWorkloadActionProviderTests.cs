@@ -151,6 +151,6 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         Assert.Equal("Employee Accounts Awaiting Disablement", action.ActionCategory);
         Assert.Equal("Access Not Yet Disabled", action.Status);
         Assert.Equal(lastWorkingDay, action.DueDate);
-        Assert.Equal($"/companies/{companyId}/users", action.DeepLinkUrl);
+        Assert.Equal($"/companies/{companyId}/user-administration/{employeeId}", action.DeepLinkUrl);
     }
 }

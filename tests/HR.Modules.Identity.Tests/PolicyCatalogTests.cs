@@ -13,7 +13,7 @@ public class PolicyCatalogTests
     [Fact]
     public void Has_Exactly_The_Expected_Number_Of_Policies()
     {
-        Assert.Equal(38, PolicyCatalog.PermissionPolicies.Count);
+        Assert.Equal(36, PolicyCatalog.PermissionPolicies.Count);
     }
 
     [Fact]

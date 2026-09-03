@@ -35,15 +35,10 @@
                             <h5 class="mb-0">Template Details</h5>
                         </div>
                         <div class="card-body @(IsViewMode ? "view-mode" : "")">
-                            <div class="mb-3">
-                                <label class="form-label">Name <span class="text-danger">*</span></label>
-                                <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Standard Engineering Onboarding" />
-                                <ValidationMessage For="@(() => Model.Name)" />
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Description</label>
-                                <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
-                            </div>
+                            <HrTextField Label="Name" Required="true"
+                                         @bind-Value="Model.Name" Placeholder="e.g. Standard Engineering Onboarding" />
+                            <HrTextField Label="Description"
+                                         @bind-Value="Model.Description" Placeholder="Optional description" />
                         </div>
                     </div>
 
@@ -61,69 +56,95 @@
                             }
                         </div>
                         <div class="card-body">
+                            <div class="hr-visually-hidden" aria-live="polite" aria-atomic="true" role="status">@_reorderAnnouncement</div>
                             @if (Model.Tasks.Count == 0)
                             {
                                 <p class="text-muted small mb-0">No tasks configured for this template yet.</p>
                             }
                             else
                             {
-                                @for (var i = 0; i < Model.Tasks.Count; i++)
-                                {
-                                    var index = i;
-                                    var task = Model.Tasks[index];
-                                    <div class="border rounded p-3 mb-3">
-                                        <div class="d-flex align-items-stretch gap-2 task-row">
-                                            <div class="flex-grow-1">
-                                                <div class="row g-2">
-                                                    <div class="col-md-8">
-                                                        <label class="form-label small">Title <span class="text-danger">*</span></label>
-                                                        <HrTextBox @bind-Value="task.Title" Placeholder="Task title" />
+                                <ul class="task-list list-unstyled mb-0">
+                                    @for (var i = 0; i < Model.Tasks.Count; i++)
+                                    {
+                                        var index = i;
+                                        var task = Model.Tasks[index];
+                                        var expanded = ReferenceEquals(_expandedTask, task);
+                                        var panelId = $"onboarding-task-panel-{index}";
+                                        var titleText = string.IsNullOrWhiteSpace(task.Title) ? "Untitled task" : task.Title;
+                                        <li class="task-item @(expanded ? "expanded" : "")">
+                                            <div class="task-summary">
+                                                <button type="button" class="task-disclosure" aria-expanded="@expanded"
+                                                        aria-controls="@panelId" @onclick="() => ToggleExpand(task)">
+                                                    <i class="fa-solid fa-chevron-right task-chevron"></i>
+                                                    <span class="task-title-text">@titleText</span>
+                                                    <span class="task-meta">@DueLabel(task)</span>
+                                                    <span class="task-meta">@AssigneeLabel(task.AssignTo)</span>
+                                                    <span class="task-meta task-priority">@task.Priority</span>
+                                                </button>
+                                                @if (!IsViewMode)
+                                                {
+                                                    <div class="task-move-controls">
+                                                        <button type="button" class="task-icon-btn" @ref="_upRefs[index]"
+                                                                aria-label="@($"Move '{titleText}' up")" disabled="@(index == 0)"
+                                                                @onclick="() => MoveUp(index)">
+                                                            <i class="fa-solid fa-arrow-up"></i>
+                                                        </button>
+                                                        <button type="button" class="task-icon-btn" @ref="_downRefs[index]"
+                                                                aria-label="@($"Move '{titleText}' down")" disabled="@(index == Model.Tasks.Count - 1)"
+                                                                @onclick="() => MoveDown(index)">
+                                                            <i class="fa-solid fa-arrow-down"></i>
+                                                        </button>
+                                                        <label class="task-position">
+                                                            <span class="hr-visually-hidden">Position for @titleText</span>
+                                                            <input type="number" class="form-control form-control-sm task-position-input"
+                                                                   min="1" max="@Model.Tasks.Count" value="@(index + 1)"
+                                                                   @onchange="e => MoveToPosition(index, e.Value?.ToString())" />
+                                                        </label>
+                                                        <span class="task-position-of">of @Model.Tasks.Count</span>
+                                                        <button type="button" class="task-icon-btn task-icon-btn-danger"
+                                                                aria-label="@($"Remove '{titleText}'")" @onclick="() => RemoveTask(index)">
+                                                            <i class="fa-solid fa-trash"></i>
+                                                        </button>
                                                     </div>
-                                                    <div class="col-md-4">
-                                                        <label class="form-label small">Due Days After Start</label>
-                                                        <SfNumericTextBox TValue="int" @bind-Value="task.DueDaysAfterStart" Min="0" ShowSpinButton="false" />
-                                                    </div>
-                                                </div>
-                                                <div class="row g-2 mt-1">
-                                                    <div class="col-md-8">
-                                                        <label class="form-label small">Description</label>
-                                                        <HrTextBox @bind-Value="task.Description" Placeholder="Optional description" />
-                                                    </div>
-                                                    <div class="col-md-2">
-                                                        <label class="form-label small">Priority</label>
-                                                        <SfDropDownList TValue="string" TItem="OptionChoice"
-                                                                        DataSource="@PriorityOptions"
-                                                                        @bind-Value="task.Priority">
-                                                            <DropDownListFieldSettings Value="Value" Text="Label" />
-                                                        </SfDropDownList>
-                                                    </div>
-                                                    <div class="col-md-2">
-                                                        <label class="form-label small">Assign To</label>
-                                                        <SfDropDownList TValue="string" TItem="OptionChoice"
-                                                                        DataSource="@AssignToOptions"
-                                                                        @bind-Value="task.AssignTo">
-                                                            <DropDownListFieldSettings Value="Value" Text="Label" />
-                                                        </SfDropDownList>
-                                                    </div>
-                                                </div>
+                                                }
                                             </div>
-                                            @if (!IsViewMode)
+                                            @if (expanded)
                                             {
-                                                <div class="task-row-actions">
-                                                    <SfButton CssClass="e-outline task-row-action-btn" Disabled="@(index == 0)" OnClick="@(() => MoveUp(index))" title="Move up">
-                                                        <i class="fa-solid fa-arrow-up"></i>
-                                                    </SfButton>
-                                                    <SfButton CssClass="e-outline task-row-action-btn" Disabled="@(index == Model.Tasks.Count - 1)" OnClick="@(() => MoveDown(index))" title="Move down">
-                                                        <i class="fa-solid fa-arrow-down"></i>
-                                                    </SfButton>
-                                                    <SfButton CssClass="e-danger e-outline task-row-action-btn" OnClick="@(() => RemoveTask(index))" title="Remove">
-                                                        <i class="fa-solid fa-trash"></i>
-                                                    </SfButton>
+                                                <div class="task-panel @(IsViewMode ? "view-mode" : "")" id="@panelId"
+                                                     role="region" aria-label="@($"Edit task: {titleText}")">
+                                                    <div class="row g-2">
+                                                        <div class="col-md-8">
+                                                            <HrTextField Label="Title" Required="true" LabelClass="form-label small"
+                                                                         @bind-Value="task.Title" Placeholder="Task title" />
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <HrNumericField TValue="int" Label="Due Days After Start" LabelClass="form-label small"
+                                                                            @bind-Value="task.DueDaysAfterStart" Min="0" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="row g-2 mt-1">
+                                                        <div class="col-md-8">
+                                                            <HrTextField Label="Description" LabelClass="form-label small"
+                                                                         @bind-Value="task.Description" Placeholder="Optional description" />
+                                                        </div>
+                                                        <div class="col-md-2">
+                                                            <HrDropDownField TValue="string" TItem="OptionChoice" Label="Priority"
+                                                                             LabelClass="form-label small" AllowFiltering="false"
+                                                                             DataSource="@PriorityOptions" ValueField="Value" TextField="Label"
+                                                                             @bind-Value="task.Priority" />
+                                                        </div>
+                                                        <div class="col-md-2">
+                                                            <HrDropDownField TValue="string" TItem="OptionChoice" Label="Assign To"
+                                                                             LabelClass="form-label small" AllowFiltering="false"
+                                                                             DataSource="@AssignToOptions" ValueField="Value" TextField="Label"
+                                                                             @bind-Value="task.AssignTo" />
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             }
-                                        </div>
-                                    </div>
-                                }
+                                        </li>
+                                    }
+                                </ul>
                             }
                         </div>
                     </div>
@@ -206,16 +227,36 @@
         }
     }
 
+    private readonly Dictionary<int, ElementReference> _upRefs = new();
+    private readonly Dictionary<int, ElementReference> _downRefs = new();
+    private OnboardingTemplateTaskEditModel? _expandedTask;
+    private string? _reorderAnnouncement;
+    private int? _pendingFocusIndex;
+
+    private void ToggleExpand(OnboardingTemplateTaskEditModel task)
+        => _expandedTask = ReferenceEquals(_expandedTask, task) ? null : task;
+
+    private static string DueLabel(OnboardingTemplateTaskEditModel t)
+        => t.DueDaysAfterStart == 0
+            ? "Due on start date"
+            : $"Due {t.DueDaysAfterStart} day{(t.DueDaysAfterStart == 1 ? "" : "s")} after start";
+
+    private static string AssigneeLabel(string value)
+        => AssignToOptions.FirstOrDefault(o => o.Value == value)?.Label ?? value;
+
+    private static string TitleOf(OnboardingTemplateTaskEditModel t)
+        => string.IsNullOrWhiteSpace(t.Title) ? "Untitled task" : t.Title;
+
     private void AddTask()
     {
-        Model.Tasks.Add(new OnboardingTemplateTaskEditModel
-        {
-            DisplayOrder = Model.Tasks.Count,
-        });
+        var task = new OnboardingTemplateTaskEditModel { DisplayOrder = Model.Tasks.Count };
+        Model.Tasks.Add(task);
+        _expandedTask = task;
     }
 
     private void RemoveTask(int index)
     {
+        if (ReferenceEquals(_expandedTask, Model.Tasks[index])) _expandedTask = null;
         Model.Tasks.RemoveAt(index);
         RenumberTasks();
     }
@@ -225,6 +266,7 @@
         if (index <= 0) return;
         (Model.Tasks[index - 1], Model.Tasks[index]) = (Model.Tasks[index], Model.Tasks[index - 1]);
         RenumberTasks();
+        AfterMove(index - 1);
     }
 
     private void MoveDown(int index)
@@ -232,6 +274,41 @@
         if (index >= Model.Tasks.Count - 1) return;
         (Model.Tasks[index + 1], Model.Tasks[index]) = (Model.Tasks[index], Model.Tasks[index + 1]);
         RenumberTasks();
+        AfterMove(index + 1);
+    }
+
+    private void MoveToPosition(int index, string? raw)
+    {
+        if (!int.TryParse(raw, out var oneBased)) return;
+        var target = Math.Clamp(oneBased - 1, 0, Model.Tasks.Count - 1);
+        if (target == index) return;
+        var task = Model.Tasks[index];
+        Model.Tasks.RemoveAt(index);
+        Model.Tasks.Insert(target, task);
+        RenumberTasks();
+        AfterMove(target);
+    }
+
+    private void AfterMove(int newIndex)
+    {
+        _reorderAnnouncement =
+            $"Moved '{TitleOf(Model.Tasks[newIndex])}' to position {newIndex + 1} of {Model.Tasks.Count}";
+        _pendingFocusIndex = newIndex;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingFocusIndex is int idx)
+        {
+            _pendingFocusIndex = null;
+            // First task has "Move up" disabled, last has "Move down" disabled — focus the
+            // button that's still operable so repeated presses keep working.
+            var refs = idx == 0 ? _downRefs : _upRefs;
+            if (refs.TryGetValue(idx, out var el))
+            {
+                try { await el.FocusAsync(); } catch { /* element gone after a later render */ }
+            }
+        }
     }
 
     private void RenumberTasks()

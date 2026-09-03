@@ -1801,3 +1801,19 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
         flex-wrap: wrap;
     }
 }
+
+/* Shared accessible form-field wrappers (Hr*Field in Components/Controls). These are a
+   cross-cutting form primitive used by many unrelated edit screens, so the base spacing lives
+   here rather than in one page's isolated CSS. */
+.hr-field {
+    margin-bottom: 1rem;
+}
+
+.hr-field:last-child {
+    margin-bottom: 0;
+}
+
+.hr-field .e-input-group,
+.hr-field .e-control-wrapper {
+    width: 100%;
+}

@@ -3,18 +3,22 @@ using HR.Web.Services;
 namespace HR.Web.Navigation;
 
 /// <summary>
-/// ADM-07 — the seven canonical administrative navigation groups. The same ordered set backs
-/// both the sidebar's Administration grouping and the permission-aware quick-navigation palette,
-/// so a destination can never appear in one and not the other.
+/// ADM-07 — the canonical administrative navigation groups. The same ordered set backs the
+/// sidebar's Administration grouping.
+///
+/// ADM (nav simplification) — the generic "Compliance" group was removed (its only destination,
+/// the Compliance Centre, is no longer in navigation; the page stays reachable by direct URL and
+/// remains API-protected). The generic "Company" group was replaced by
+/// <see cref="CompanyAdministration"/>, a role-specific section only a Company Administrator
+/// populates (Company Profile, Subscription &amp; Billing) — there is no longer a generic
+/// company/administration landing bucket, and the Administration Home hub is no longer in nav.
 /// </summary>
 public enum AdminNavGroup
 {
     PeopleAndUsers = 0,
-    Company = 1,
+    CompanyAdministration = 1,
     HrConfiguration = 2,
-    Compliance = 3,
     Reports = 4,
-    AuditAndSecurity = 5,
     PlatformOperations = 6,
 }
 
@@ -23,11 +27,9 @@ public static class AdminNavGroupInfo
     public static string Label(AdminNavGroup group) => group switch
     {
         AdminNavGroup.PeopleAndUsers => "People and users",
-        AdminNavGroup.Company => "Company",
+        AdminNavGroup.CompanyAdministration => "Company administration",
         AdminNavGroup.HrConfiguration => "HR configuration",
-        AdminNavGroup.Compliance => "Compliance",
         AdminNavGroup.Reports => "Reports",
-        AdminNavGroup.AuditAndSecurity => "Audit and security",
         AdminNavGroup.PlatformOperations => "Platform operations",
         _ => group.ToString(),
     };
@@ -46,9 +48,8 @@ public sealed record AdminDestination(
 public sealed record AdminNavSection(AdminNavGroup Group, string Label, IReadOnlyList<AdminDestination> Destinations);
 
 /// <summary>
-/// Capability flags the administrative navigation depends on. Kept as a plain value (mirroring
-/// <see cref="HR.Web.Components.Pages.Administration.HubCapabilities"/>) so the visibility and
-/// quick-search filtering can be unit-tested without bUnit or an <see cref="AppSession"/> round trip.
+/// Capability flags the administrative navigation depends on. Kept as a plain value so the
+/// visibility filtering can be unit-tested without bUnit or an <see cref="AppSession"/> round trip.
 /// Every flag is permission-derived on <see cref="AppSession"/> — the authoritative UI gate per the
 /// ADM-05 administrative role separation matrix. UI hiding is a usability layer only; the API is the
 /// enforcement boundary.
@@ -60,14 +61,10 @@ public sealed record AdminNavCapabilities(
     bool CanManageLeavePolicies,
     bool CanManageSharedDocuments,
     bool CanViewReporting,
-    bool CanViewComplianceCentre,
-    bool CanViewAdminAlerts,
-    bool CanViewGovernanceReporting,
     bool CanManageCompany,
     bool CanManageCompanyConfiguration,
     bool CanManageHrSettings,
-    bool CanViewUsers,
-    bool IsHrAdministrator)
+    bool CanViewUsers)
 {
     public static AdminNavCapabilities From(AppSession session) => new(
         session.CanReadEmployees,
@@ -76,20 +73,15 @@ public sealed record AdminNavCapabilities(
         session.CanManageLeavePolicies,
         session.CanManageSharedDocuments,
         session.CanViewReporting,
-        session.CanViewComplianceCentre,
-        session.CanViewAdminAlerts,
-        session.CanViewGovernanceReporting,
         session.CanManageCompany,
         session.CanManageCompanyConfiguration,
         session.CanManageHrSettings,
-        session.CanViewUsers,
-        session.IsHrAdministrator);
+        session.CanViewUsers);
 
     /// <summary>True when the user can reach at least one administrative destination.</summary>
     public bool HasAnyAdministrativeAccess =>
         CanReadEmployees || CanManageEmployees || CanManageRecruitment || CanManageLeavePolicies ||
-        CanManageSharedDocuments || CanViewReporting || CanViewComplianceCentre || CanViewAdminAlerts ||
-        CanViewGovernanceReporting ||
+        CanManageSharedDocuments || CanViewReporting ||
         CanManageCompany || CanManageCompanyConfiguration || CanManageHrSettings || CanViewUsers;
 }
 
@@ -113,8 +105,6 @@ public static class AdminNavigation
             // ---- People and users ----
             (caps.CanReadEmployees || caps.CanManageEmployees, new("employees", "Employees", AdminNavGroup.PeopleAndUsers,
                 Co("employees"), "fa-solid fa-users", ["people", "staff", "directory", "colleagues", "team"])),
-            (caps.CanManageEmployees, new("position-profiles", "Position Profiles", AdminNavGroup.PeopleAndUsers,
-                Co("position-profiles"), "fa-solid fa-id-badge", ["jobs", "roles", "titles", "positions"])),
             (caps.CanManageEmployees, new("departments", "Departments", AdminNavGroup.PeopleAndUsers,
                 Co("departments"), "fa-solid fa-sitemap", ["teams", "org", "structure", "division"])),
             (caps.CanManageEmployees, new("locations", "Locations", AdminNavGroup.PeopleAndUsers,
@@ -134,19 +124,25 @@ public static class AdminNavigation
             (caps.CanManageEmployees, new("asset-categories", "Asset Categories", AdminNavGroup.PeopleAndUsers,
                 Co("asset-categories"), "fa-solid fa-boxes-stacked", ["equipment groups", "asset types"])),
 
-            // ---- Company ----
-            (caps.CanManageCompanyConfiguration || caps.CanManageCompany, new("company-profile", "Company Profile & Addresses", AdminNavGroup.Company,
+            // ---- Company administration (Company Administrator only) ----
+            // ADM (nav simplification): the generic "Company" bucket, its Administration Home hub
+            // link and the duplicate Support Requests entry (still rendered by MainLayout's own
+            // dedicated block) were removed. Company Profile stays for whoever holds company:manage;
+            // Subscription & Billing is Company-Administrator-only (see 30-administrative-role-
+            // separation-matrix.md) — CanManageCompany is true iff the user holds the
+            // CompanyAdministrator role, and the API enforces the same via subscription:manage.
+            (caps.CanManageCompanyConfiguration || caps.CanManageCompany, new("company-profile", "Company Profile & Addresses", AdminNavGroup.CompanyAdministration,
                 Co("edit"), "fa-solid fa-building", ["company", "legal name", "branding", "addresses", "registered office"])),
-            (caps.CanManageHrSettings || caps.CanManageEmployees || caps.CanManageLeavePolicies || caps.CanManageRecruitment
-                || caps.CanManageSharedDocuments || caps.CanManageCompany || caps.CanManageCompanyConfiguration,
-                new("administration-hub", "Administration Home", AdminNavGroup.Company,
-                Co("administration"), "fa-solid fa-gears", ["admin", "settings", "configuration", "hub"])),
-            (caps.CanManageCompany || caps.IsHrAdministrator, new("subscription", "Subscription & Billing", AdminNavGroup.Company,
+            (caps.CanManageCompany, new("subscription", "Subscription & Billing", AdminNavGroup.CompanyAdministration,
                 "/subscription", "fa-solid fa-credit-card", ["plan", "invoices", "payment", "billing"])),
-            (caps.IsHrAdministrator || caps.CanManageCompany, new("support-queue", "Support Requests", AdminNavGroup.Company,
-                Co("support/admin/queue"), "fa-solid fa-headset", ["tickets", "help", "feedback", "support queue"])),
 
             // ---- HR configuration ----
+            // Position Profiles lives here (not People and users): it is job-role configuration —
+            // titles, permission sets, required documents/assets, onboarding template and notice
+            // defaults — consumed when setting an employee up, not a people directory screen. The
+            // breadcrumb on the Position Profile pages says "HR configuration" to match.
+            (caps.CanManageEmployees, new("position-profiles", "Position Profiles", AdminNavGroup.HrConfiguration,
+                Co("position-profiles"), "fa-solid fa-id-badge", ["jobs", "roles", "titles", "positions"])),
             (caps.CanManageHrSettings, new("hr-settings", "HR Settings", AdminNavGroup.HrConfiguration,
                 Co("hr-settings"), "fa-solid fa-sliders", ["leave year", "probation", "salary display", "reminders", "numbering"])),
             (caps.CanManageEmployees, new("leave-types", "Leave Types", AdminNavGroup.HrConfiguration,
@@ -168,22 +164,9 @@ public static class AdminNavigation
             (caps.CanManageRecruitment, new("external-recruiters", "External Recruiters", AdminNavGroup.HrConfiguration,
                 Co("external-recruiters"), "fa-solid fa-people-arrows", ["agencies", "recruitment partners"])),
 
-            // ---- Compliance ----
-            (caps.CanViewComplianceCentre, new("compliance-centre", "Compliance Centre", AdminNavGroup.Compliance,
-                Co("reporting/compliance-centre"), "fa-solid fa-shield-halved",
-                ["expiring visas", "certifications", "missing documents", "probation reviews due", "right to work"])),
-
             // ---- Reports ----
             (caps.CanViewReporting, new("reporting", "Reporting", AdminNavGroup.Reports,
                 Co("reporting"), "fa-solid fa-chart-column", ["reports", "analytics", "saved views", "exports"])),
-
-            // ---- Audit and security ----
-            (caps.CanViewAdminAlerts, new("administrative-alerts", "Administrative Alerts", AdminNavGroup.AuditAndSecurity,
-                Co("administrative-alerts"), "fa-solid fa-triangle-exclamation",
-                ["incidents", "security alerts", "failed reports", "failed integrations", "alerts inbox"])),
-            (caps.CanViewGovernanceReporting, new("governance-reports", "Governance Reports", AdminNavGroup.AuditAndSecurity,
-                Co("reporting/governance/user-activity"), "fa-solid fa-scale-balanced",
-                ["audit", "governance", "user activity", "security events", "administrative changes", "compliance status"])),
         };
 
         return all.Where(x => x.Visible).Select(x => x.Destination)
@@ -198,40 +181,4 @@ public static class AdminNavigation
             .OrderBy(g => (int)g.Key)
             .Select(g => new AdminNavSection(g.Key, AdminNavGroupInfo.Label(g.Key), g.ToList()))
             .ToList();
-
-    /// <summary>
-    /// Quick-navigation search. Filters <see cref="Build"/> — which is already permission-scoped —
-    /// so a destination the user cannot reach can never appear in the results (ADM-07). A
-    /// blank/whitespace term returns every visible destination (the palette's initial listing).
-    /// Matches on title, group label and keywords, case-insensitively; a title match ranks first,
-    /// then a title prefix, then keyword/group matches, preserving group order within each rank.
-    /// </summary>
-    public static IReadOnlyList<AdminDestination> Search(
-        AdminNavCapabilities caps, Guid companyId, string? term, int limit = 12)
-    {
-        var visible = Build(caps, companyId);
-        if (string.IsNullOrWhiteSpace(term))
-            return visible.Take(limit).ToList();
-
-        var t = term.Trim();
-
-        int Rank(AdminDestination d)
-        {
-            if (d.Title.Equals(t, StringComparison.OrdinalIgnoreCase)) return 0;
-            if (d.Title.StartsWith(t, StringComparison.OrdinalIgnoreCase)) return 1;
-            if (d.Title.Contains(t, StringComparison.OrdinalIgnoreCase)) return 2;
-            if (AdminNavGroupInfo.Label(d.Group).Contains(t, StringComparison.OrdinalIgnoreCase)) return 3;
-            if (d.Keywords.Any(k => k.Contains(t, StringComparison.OrdinalIgnoreCase))) return 4;
-            return int.MaxValue;
-        }
-
-        return visible
-            .Select(d => (Destination: d, Rank: Rank(d)))
-            .Where(x => x.Rank != int.MaxValue)
-            .OrderBy(x => x.Rank)
-            .ThenBy(x => (int)x.Destination.Group)
-            .Select(x => x.Destination)
-            .Take(limit)
-            .ToList();
-    }
 }

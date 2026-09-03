@@ -68,6 +68,12 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# NFR-09 exemption: these projects opt out of packages.lock.json because the Aspire SDK
+# injects RID-specific implicit packages that break locked-mode restore on Linux CI when
+# the lock file is generated on Windows. Ignore any file a stray local restore re-creates.
+src/HR.AppHost/packages.lock.json
+tests/HR.Web.E2E.Tests/packages.lock.json
+
 # Tye
 .tye/
 

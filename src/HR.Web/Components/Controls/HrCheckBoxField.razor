@@ -1,0 +1,41 @@
+@inherits AccessibleFieldBase<bool>
+@using Syncfusion.Blazor.Buttons
+
+@* Accessible checkbox. Wraps SfCheckBox. SfCheckBox renders its own associated <label> from the
+   Label parameter; this wrapper additionally guarantees an explicit aria-label, links optional
+   help text via aria-describedby, and exposes required/invalid state. *@
+
+<div class="@($"{WrapperClass} hr-field-check")">
+    <SfCheckBox TChecked="bool"
+                Label="@Label"
+                Checked="@Value"
+                CheckedChanged="@(EventCallback.Factory.Create<bool>(this, OnCheckedChanged))"
+                Disabled="@Disabled"
+                HtmlAttributes="@BuildInputAttributes()" />
+
+    @if (HasHelp)
+    {
+        <div id="@HelpId" class="form-text">@HelpText</div>
+    }
+    @if (ValueExpression is not null)
+    {
+        <div id="@ErrorId">
+            <ValidationMessage For="@ValueExpression" class="@ValidationClass" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public bool Disabled { get; set; }
+
+    /// <summary>Alias for Value so call sites can keep the familiar Checked/CheckedChanged surface.</summary>
+    [Parameter] public bool Checked { get => Value; set => Value = value; }
+    [Parameter] public EventCallback<bool> CheckedChanged { get; set; }
+
+    private async Task OnCheckedChanged(bool value)
+    {
+        Value = value;
+        if (CheckedChanged.HasDelegate) await CheckedChanged.InvokeAsync(value);
+        if (ValueChanged.HasDelegate) await ValueChanged.InvokeAsync(value);
+    }
+}

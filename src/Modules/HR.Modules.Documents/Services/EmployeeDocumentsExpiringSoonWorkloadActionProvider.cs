@@ -54,7 +54,7 @@ internal sealed class EmployeeDocumentsExpiringSoonWorkloadActionProvider(
                 DueDate: null,
                 AssignedTo: null,
                 Status: "Expiring Soon",
-                DeepLinkUrl: $"/companies/{companyId}/employees/{item.EmployeeId}/documents");
+                DeepLinkUrl: $"/companies/{companyId}/employees/{item.EmployeeId}?tab=documents");
         }).ToList();
     }
 }

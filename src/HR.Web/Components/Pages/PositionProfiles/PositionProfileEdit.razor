@@ -41,39 +41,16 @@
                         <div class="card mb-4">
                             <div class="card-header"><h5 class="mb-0">Position Profile Details</h5></div>
                             <div class="card-body">
-                                <div class="mb-3">
-                                    <label class="form-label">Title <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.Title" Placeholder="e.g. Senior Software Engineer" />
-                                    <ValidationMessage For="@(() => Model.Title)" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Description</label>
-                                    <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Department <span class="text-danger">*</span></label>
-                                    <SfDropDownList TValue="Guid?"
-                                                    TItem="DepartmentListItemModel"
-                                                    DataSource="@_departments"
-                                                    @bind-Value="Model.DepartmentId"
-                                                    Placeholder="Select department"
-                                                    AllowFiltering="true">
-                                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                                    </SfDropDownList>
-                                    <ValidationMessage For="@(() => Model.DepartmentId)" />
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Location <span class="text-danger">*</span></label>
-                                    <SfDropDownList TValue="Guid?"
-                                                    TItem="LocationListItemModel"
-                                                    DataSource="@_locations"
-                                                    @bind-Value="Model.LocationId"
-                                                    Placeholder="Select location"
-                                                    AllowFiltering="true">
-                                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                                    </SfDropDownList>
-                                    <ValidationMessage For="@(() => Model.LocationId)" />
-                                </div>
+                                <HrTextField Label="Title" Required="true" @bind-Value="Model.Title"
+                                             Placeholder="e.g. Senior Software Engineer" />
+                                <HrTextField Label="Description" @bind-Value="Model.Description"
+                                             Placeholder="Optional description" />
+                                <HrDropDownField TValue="Guid?" TItem="DepartmentListItemModel" Label="Department" Required="true"
+                                                 DataSource="@_departments" ValueField="Id" TextField="Name"
+                                                 @bind-Value="Model.DepartmentId" Placeholder="Select department" />
+                                <HrDropDownField TValue="Guid?" TItem="LocationListItemModel" Label="Location" Required="true"
+                                                 DataSource="@_locations" ValueField="Id" TextField="Name"
+                                                 @bind-Value="Model.LocationId" Placeholder="Select location" />
                             </div>
                         </div>
 
@@ -108,39 +85,16 @@
                                             <div class="card mb-4">
                                                 <div class="card-header"><h5 class="mb-0">Position Profile Details</h5></div>
                                                 <div class="card-body @(IsViewMode ? "view-mode" : "")">
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Title <span class="text-danger">*</span></label>
-                                                        <HrTextBox @bind-Value="Model.Title" Placeholder="e.g. Senior Software Engineer" />
-                                                        <ValidationMessage For="@(() => Model.Title)" />
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Description</label>
-                                                        <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Department <span class="text-danger">*</span></label>
-                                                        <SfDropDownList TValue="Guid?"
-                                                                        TItem="DepartmentListItemModel"
-                                                                        DataSource="@_departments"
-                                                                        @bind-Value="Model.DepartmentId"
-                                                                        Placeholder="Select department"
-                                                                        AllowFiltering="true">
-                                                            <DropDownListFieldSettings Value="Id" Text="Name" />
-                                                        </SfDropDownList>
-                                                        <ValidationMessage For="@(() => Model.DepartmentId)" />
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Location <span class="text-danger">*</span></label>
-                                                        <SfDropDownList TValue="Guid?"
-                                                                        TItem="LocationListItemModel"
-                                                                        DataSource="@_locations"
-                                                                        @bind-Value="Model.LocationId"
-                                                                        Placeholder="Select location"
-                                                                        AllowFiltering="true">
-                                                            <DropDownListFieldSettings Value="Id" Text="Name" />
-                                                        </SfDropDownList>
-                                                        <ValidationMessage For="@(() => Model.LocationId)" />
-                                                    </div>
+                                                    <HrTextField Label="Title" Required="true" @bind-Value="Model.Title"
+                                                                 Placeholder="e.g. Senior Software Engineer" />
+                                                    <HrTextField Label="Description" @bind-Value="Model.Description"
+                                                                 Placeholder="Optional description" />
+                                                    <HrDropDownField TValue="Guid?" TItem="DepartmentListItemModel" Label="Department" Required="true"
+                                                                     DataSource="@_departments" ValueField="Id" TextField="Name"
+                                                                     @bind-Value="Model.DepartmentId" Placeholder="Select department" />
+                                                    <HrDropDownField TValue="Guid?" TItem="LocationListItemModel" Label="Location" Required="true"
+                                                                     DataSource="@_locations" ValueField="Id" TextField="Name"
+                                                                     @bind-Value="Model.LocationId" Placeholder="Select location" />
                                                 </div>
                                             </div>
 
@@ -409,54 +363,37 @@
             <h5 class="mb-0">Defaults</h5>
         </div>
         <div class="card-body @(IsViewMode ? "view-mode" : "")">
+            <HrNumericField TValue="int?" Label="Probation Months Override" @bind-Value="Model.ProbationMonthsOverride"
+                            Min="1" Max="24" Placeholder="Use company default" />
             <div class="mb-3">
-                <label class="form-label">Probation Months Override</label>
-                <SfNumericTextBox TValue="int?" @bind-Value="Model.ProbationMonthsOverride" Min="1" Max="24" ShowSpinButton="false" Placeholder="Use company default" />
-                <ValidationMessage For="@(() => Model.ProbationMonthsOverride)" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Salary Range <span class="text-muted small">(guidance only)</span></label>
-                <div class="row g-2">
+                <label class="form-label" id="pp-salary-range-label">Salary Range <span class="text-muted small">(guidance only)</span></label>
+                <div class="row g-2" role="group" aria-labelledby="pp-salary-range-label">
                     <div class="col-4">
-                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMin" Placeholder="Min" ShowSpinButton="false" Format="0" />
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMin" Placeholder="Min" ShowSpinButton="false" Format="0"
+                                          HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Salary range minimum" })" />
                     </div>
                     <div class="col-4">
-                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMax" Placeholder="Max" ShowSpinButton="false" Format="0" />
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMax" Placeholder="Max" ShowSpinButton="false" Format="0"
+                                          HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Salary range maximum" })" />
                     </div>
                     <div class="col-4">
                         <SfDropDownList TValue="string" TItem="AddCompensationDialog.SalaryTypeChoice"
                                         DataSource="@AddCompensationDialog.SalaryTypeOptions"
                                         @bind-Value="Model.SalaryType"
-                                        Placeholder="Type">
+                                        Placeholder="Type"
+                                        HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Salary type" })">
                             <DropDownListFieldSettings Value="Value" Text="Label" />
                         </SfDropDownList>
                     </div>
                 </div>
                 <ValidationMessage For="@(() => Model.SalaryMax)" />
             </div>
-            <div class="mb-3">
-                <label class="form-label">Default Leave Policy <span class="text-danger">*</span></label>
-                <SfDropDownList TValue="Guid?"
-                                TItem="LeavePolicyListItemModel"
-                                DataSource="@_leavePolicies"
-                                @bind-Value="Model.DefaultLeavePolicyId"
-                                Placeholder="Select leave policy"
-                                AllowFiltering="true">
-                    <DropDownListFieldSettings Value="Id" Text="Name" />
-                </SfDropDownList>
-                <ValidationMessage For="@(() => Model.DefaultLeavePolicyId)" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Onboarding Template</label>
-                <SfDropDownList TValue="Guid?"
-                                TItem="OnboardingTemplateListItemModel"
-                                DataSource="@_onboardingTemplates"
-                                @bind-Value="Model.OnboardingTemplateId"
-                                Placeholder="None"
-                                AllowFiltering="true">
-                    <DropDownListFieldSettings Value="Id" Text="Name" />
-                </SfDropDownList>
-            </div>
+            <HrDropDownField TValue="Guid?" TItem="LeavePolicyListItemModel" Label="Default Leave Policy" Required="true"
+                             DataSource="@_leavePolicies" ValueField="Id" TextField="Name"
+                             @bind-Value="Model.DefaultLeavePolicyId" Placeholder="Select leave policy" />
+            <HrDropDownField TValue="Guid?" TItem="OnboardingTemplateListItemModel" Label="Onboarding Template"
+                             DataSource="@_onboardingTemplates" ValueField="Id" TextField="Name"
+                             @bind-Value="Model.OnboardingTemplateId" Placeholder="None" />
             <div class="mb-3">
                 <SfCheckBox TChecked="bool"
                             Label="Use company working pattern"
@@ -477,11 +414,8 @@
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Hours Per Day</label>
-                            <SfNumericTextBox TValue="decimal" @bind-Value="Model.HoursPerDay"
-                                              ShowSpinButton="false"
-                                              Min="0.5m" Max="24m" Step="0.5m" />
-                            <ValidationMessage For="@(() => Model.HoursPerDay)" />
+                            <HrNumericField TValue="decimal" Label="Hours Per Day" @bind-Value="Model.HoursPerDay"
+                                            Min="0.5m" Max="24m" Step="0.5" />
                         </div>
                     </div>
                 }
@@ -495,20 +429,13 @@
                 {
                     <div class="row g-3 mt-2">
                         <div class="col-md-4">
-                            <label class="form-label">Length</label>
-                            <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
-                                              ShowSpinButton="false"
-                                              Min="1" />
-                            <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
+                            <HrNumericField TValue="int" Label="Length" @bind-Value="Model.NoticePeriodLength" Min="1" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Unit</label>
-                            <SfDropDownList TValue="NoticePeriodUnit" TItem="NoticePeriodUnitChoice"
-                                            DataSource="@NoticePeriodUnitOptions"
-                                            @bind-Value="Model.NoticePeriodUnit"
-                                            Placeholder="Unit">
-                                <DropDownListFieldSettings Value="Value" Text="Label" />
-                            </SfDropDownList>
+                            <HrDropDownField TValue="NoticePeriodUnit" TItem="NoticePeriodUnitChoice" Label="Unit"
+                                             AllowFiltering="false"
+                                             DataSource="@NoticePeriodUnitOptions" ValueField="Value" TextField="Label"
+                                             @bind-Value="Model.NoticePeriodUnit" Placeholder="Unit" />
                         </div>
                     </div>
                 }

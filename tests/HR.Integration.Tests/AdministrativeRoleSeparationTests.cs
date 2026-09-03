@@ -503,37 +503,6 @@ public class AdministrativeRoleSeparationTests
     }
 
     // ---------------------------------------------------------------------
-    // Administrative alerts inbox  (admin-alerts:view)
-    // GET /api/companies/{companyId}/administrative-alerts
-    // ---------------------------------------------------------------------
-
-    [Theory]
-    [InlineData(Employee)]
-    [InlineData(Manager)]
-    [InlineData(Recruiter)]
-    [InlineData(CompanyAdmin)]
-    public async Task AdministrativeAlerts_IsForbidden_ForEveryRoleExceptHrAdministrator(string roleKey)
-    {
-        var companyId = Guid.NewGuid();
-        using var client = await ClientFor(roleKey, companyId);
-
-        var response = await client.GetAsync($"/api/companies/{companyId}/administrative-alerts");
-
-        AssertForbidden(response);
-    }
-
-    [Fact]
-    public async Task AdministrativeAlerts_IsAllowed_ForHrAdministrator()
-    {
-        var companyId = Guid.NewGuid();
-        using var client = await ClientFor(HrAdmin, companyId);
-
-        var response = await client.GetAsync($"/api/companies/{companyId}/administrative-alerts");
-
-        AssertReachedHandler(response);
-    }
-
-    // ---------------------------------------------------------------------
     // Anonymous (no auth header) -> 401 across a sample of protected endpoints
     // ---------------------------------------------------------------------
 
@@ -598,6 +567,57 @@ public class AdministrativeRoleSeparationTests
         var response = await client.GetAsync("/api/company-onboarding/checklist");
 
         AssertReachedHandler(response);
+    }
+
+    // ---------------------------------------------------------------------
+    // Subscription & billing  (subscription:manage)
+    // POST /api/companies/subscription/cancel
+    // ADM-05 / RestrictSubscriptionToCompanyAdministrator: subscription & billing is a company-
+    // ownership function. Company Administrator is the ONLY role that holds subscription:manage;
+    // HR Administrator's historical grant was removed by migration
+    // RestrictSubscriptionToCompanyAdministrator.
+    // ---------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(Employee)]
+    [InlineData(Manager)]
+    [InlineData(Recruiter)]
+    [InlineData(HrAdmin)]
+    public async Task CancelSubscription_IsForbidden_ForEveryRoleExceptCompanyAdministrator(string roleKey)
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientFor(roleKey, companyId);
+
+        var response = await client.PostAsync("/api/companies/subscription/cancel", content: null);
+
+        AssertForbidden(response);
+    }
+
+    [Theory]
+    [InlineData(CompanyAdmin)]
+    [InlineData(CompanyAdminPlusHrAdmin)]
+    public async Task CancelSubscription_PassesAuthorization_ForCompanyAdministrator(string roleKey)
+    {
+        var companyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, "ADM-05 Subscription");
+        using var client = await ClientFor(roleKey, companyId);
+
+        // A 400/404/409 business outcome (no active paid subscription to cancel) is fine here —
+        // what matters is the request is NOT rejected as 401/403 by the authorization layer.
+        var response = await client.PostAsync("/api/companies/subscription/cancel", content: null);
+
+        AssertReachedHandler(response);
+    }
+
+    [Fact]
+    public async Task SubscriptionDetails_IsForbidden_ForHrAdministrator_ButAllowed_ForCompanyAdministrator()
+    {
+        var companyId = Guid.NewGuid();
+
+        using var hrAdminClient = await ClientFor(HrAdmin, companyId);
+        AssertForbidden(await hrAdminClient.GetAsync("/api/companies/subscription-details"));
+
+        using var companyAdminClient = await ClientFor(CompanyAdmin, companyId);
+        AssertReachedHandler(await companyAdminClient.GetAsync("/api/companies/subscription-details"));
     }
 
     [Fact]

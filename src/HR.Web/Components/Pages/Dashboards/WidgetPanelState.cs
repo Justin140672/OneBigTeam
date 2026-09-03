@@ -24,8 +24,8 @@ public sealed record WidgetPanelSummary(
 
 /// <summary>
 /// Pure, DI-free state logic for a dashboard widget panel (the DSH-03 analogue of
-/// AdministrationHubCategories / ManagerAttentionQueueOrdering). Distinguishes a source failure
-/// from a genuine empty result so widgets stop showing a misleading "all clear" / zero.
+/// ManagerAttentionQueueOrdering). Distinguishes a source failure from a genuine empty result so
+/// widgets stop showing a misleading "all clear" / zero.
 /// </summary>
 public static class WidgetPanelState
 {

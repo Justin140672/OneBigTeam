@@ -1,0 +1,13 @@
+.user-account-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.user-account-cell ::deep .user-account-actions-btn {
+    min-width: 0;
+    padding: 0.15rem 0.35rem;
+    flex: 0 0 auto;
+}

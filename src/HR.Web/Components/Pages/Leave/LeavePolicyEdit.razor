@@ -10,7 +10,6 @@
 <div class="container py-4">
     <SfBreadcrumb Class="mb-3">
         <BreadcrumbItems>
-            <BreadcrumbItem Text="Administration" Url="@($"/companies/{CompanyId}/administration")" />
             <BreadcrumbItem Text="Leave Policies" Url="@($"/companies/{CompanyId}/leave-policies")" />
             <BreadcrumbItem Text="@PageTitle" />
         </BreadcrumbItems>
@@ -40,22 +39,12 @@
                             <h5 class="mb-0">Leave Policy Details</h5>
                         </div>
                         <div class="card-body @(IsViewMode ? "view-mode" : "")">
-                            <div class="mb-3">
-                                <label class="form-label">Name <span class="text-danger">*</span></label>
-                                <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Standard Policy"
-                                           aria-invalid="@(HasFieldError(() => Model.Name) ? "true" : null)" />
-                                <ValidationMessage For="@(() => Model.Name)" />
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Description</label>
-                                <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Carry Over Days <span class="text-danger">*</span></label>
-                                <SfNumericTextBox TValue="int" @bind-Value="Model.CarryOverDays"
-                                                 Min="0" Step="1" ShowSpinButton="false" />
-                                <ValidationMessage For="@(() => Model.CarryOverDays)" />
-                            </div>
+                            <HrTextField Label="Name" Required="true"
+                                         @bind-Value="Model.Name" Placeholder="e.g. Standard Policy" />
+                            <HrTextField Label="Description"
+                                         @bind-Value="Model.Description" Placeholder="Optional description" />
+                            <HrNumericField TValue="int" Label="Carry Over Days" Required="true"
+                                            @bind-Value="Model.CarryOverDays" Min="0" Step="1" />
                             <div class="mb-3">
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="allowNegativeBalance"
@@ -114,7 +103,4 @@
     protected override Guid? GetId() => Id;
 
     protected override string? ListUrl => $"/companies/{CompanyId}/leave-policies";
-
-    private bool HasFieldError<T>(System.Linq.Expressions.Expression<Func<T>> accessor)
-        => EditContext.GetValidationMessages(FieldIdentifier.Create(accessor)).Any();
 }

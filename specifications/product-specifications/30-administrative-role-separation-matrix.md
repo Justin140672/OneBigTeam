@@ -45,7 +45,7 @@ Legend: Y = full access · S = scoped (hierarchy / self / function) · — = den
 | Administrative area | Backing policy (permission) | Employee | Manager | Recruiter | HR Admin | Company Admin (alone) |
 |---|---|---|---|---|---|---|
 | Company profile / branding / company settings | `company:manage` (`company.edit`) | — | — | — | — | **Y** |
-| Subscription / billing | `subscription:manage` | — | — | — | Y | **Y** |
+| Subscription / billing | `subscription:manage` | — | — | — | — | **Y** |
 | Getting-started / onboarding checklist | `onboarding:view` / `onboarding:manage` | — | — | — | Y | **Y** |
 | Support requests queue | `support:manage` | — | — | — | Y | **Y** |
 | HR settings (leave year, probation, salary display, reminders, recruitment settings) | `hr-settings:manage` | — | — | — | Y | **—** |
@@ -66,7 +66,6 @@ Legend: Y = full access · S = scoped (hierarchy / self / function) · — = den
 | Recruitment — candidate GDPR purge (destructive) | `role:company-administrator` | — | — | — | — | **Y** (governance exception — see below) |
 | HR reports | `reporting:view-hr` | — | — | — | Y | **—** |
 | Compliance Centre (consolidated: expiring visas/certifications, missing & requested documents, probation reviews due/overdue) | `compliance:view` | — | — | — | Y | **—** |
-| Administrative alerts & incidents inbox (ADM-03: compliance alerts, failed report generation, failed integrations / external-service delivery, security alerts; acknowledge / resolve) | `admin-alerts:view` | — | — | — | Y | **—** |
 | Recruitment reports | `reporting:view-recruitment` | — | — | Y | — | **—** |
 | Leave / probation / onboarding / workload reports | `reporting:view-*` | — | S | — | Y | **—** |
 | Reporting catalogue / saved views / favourites | `reporting:view` | — | Y | Y | Y | **—** |
@@ -95,7 +94,6 @@ outcome in the UI, category hidden in navigation) for all of:
 - Leave administration and approval
 - Sickness administration
 - Compliance Centre (`compliance:view`)
-- Administrative alerts & incidents inbox (`admin-alerts:view`)
 - Employee documents administration
 
 They retain: company profile/branding/settings, subscription/billing, onboarding checklist,

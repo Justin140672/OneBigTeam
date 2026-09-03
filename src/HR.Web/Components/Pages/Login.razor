@@ -42,25 +42,24 @@
             </div>
         }
 
-        <div class="login-field">
-            <label class="login-label">Email</label>
-            <HrTextBox @bind-Value="_form.Email"
-                       Placeholder="you@example.com"
-                       Type="InputType.Email"
-                       Input="@(() => _error = null)" />
-            <ValidationMessage For="() => _form.Email" class="login-validation" />
-        </div>
+        <HrTextField Label="Email"
+                     Placeholder="you@example.com"
+                     Type="InputType.Email"
+                     @bind-Value="_form.Email"
+                     Input="@(() => _error = null)"
+                     FieldClass="login-field" LabelClass="login-label" ValidationClass="login-validation" />
 
         <div class="login-field">
             <div class="login-password-row">
-                <label class="login-label">Password</label>
+                <label class="login-label" id="login-password-label" for="login-password">Password</label>
                 <a href="/forgot-password" class="login-forgot-link" data-testid="forgot-password-link">Forgot password?</a>
             </div>
             <div class="login-password-field">
                 <HrTextBox @bind-Value="_form.Password"
                            Placeholder="••••••••"
                            Type="@(_showPassword ? InputType.Text : InputType.Password)"
-                           Input="@(() => _error = null)" />
+                           Input="@(() => _error = null)"
+                           HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "login-password", ["aria-labelledby"] = "login-password-label", ["aria-label"] = "Password", ["aria-required"] = "true" })" />
                 <button type="button"
                         class="login-password-toggle"
                         aria-pressed="@_showPassword.ToString().ToLowerInvariant()"

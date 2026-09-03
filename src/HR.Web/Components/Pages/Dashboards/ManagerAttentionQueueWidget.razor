@@ -58,23 +58,39 @@
                     @foreach (var item in _items)
                     {
                         var i = item;
-                        <button type="button"
-                                class="task-widget-item attention-queue-item @(i.IsOverdue ? "attention-queue-item--overdue" : "")"
-                                aria-label="@i.AccessibleLabel"
-                                @onclick="() => ActivateAsync(i)">
-                            <span class="priority-pip priority-pip--@i.PriorityCss" title="@i.PriorityLabel">
-                                <i class="@i.PriorityIcon" aria-hidden="true"></i>
-                            </span>
-                            <div class="task-widget-content">
-                                <span class="task-widget-title">@i.Subject</span>
-                                <span class="task-widget-meta">@i.Category · @i.StatusLabel</span>
+                        @if (i.HasTarget)
+                        {
+                            <button type="button"
+                                    class="task-widget-item attention-queue-item @(i.IsOverdue ? "attention-queue-item--overdue" : "")"
+                                    aria-label="@i.AccessibleLabel"
+                                    @onclick="() => ActivateAsync(i)">
+                                <span class="priority-pip priority-pip--@i.PriorityCss" title="@i.PriorityLabel">
+                                    <i class="@i.PriorityIcon" aria-hidden="true"></i>
+                                </span>
+                                <div class="task-widget-content">
+                                    <span class="task-widget-title">@i.Subject</span>
+                                    <span class="task-widget-meta">@i.Category · @i.StatusLabel</span>
+                                </div>
+                                @if (i.DueLabel is not null)
+                                {
+                                    <span class="due-badge due-badge--@i.DueCss">@i.DueLabel</span>
+                                }
+                                <span class="attention-queue-action">@i.ActionLabel</span>
+                            </button>
+                        }
+                        else
+                        {
+                            <div class="task-widget-item attention-queue-item attention-queue-item--stale"
+                                 aria-label="@i.AccessibleLabel">
+                                <span class="priority-pip priority-pip--@i.PriorityCss" title="@i.PriorityLabel">
+                                    <i class="@i.PriorityIcon" aria-hidden="true"></i>
+                                </span>
+                                <div class="task-widget-content">
+                                    <span class="task-widget-title">@i.Subject</span>
+                                    <span class="task-widget-meta text-muted">This item can no longer be opened — it may have been completed or removed.</span>
+                                </div>
                             </div>
-                            @if (i.DueLabel is not null)
-                            {
-                                <span class="due-badge due-badge--@i.DueCss">@i.DueLabel</span>
-                            }
-                            <span class="attention-queue-action">@i.ActionLabel</span>
-                        </button>
+                        }
                     }
                 }
             }
@@ -178,7 +194,8 @@
                     DueCss: it.IsOverdue ? "overdue" : dueCss,
                     IsOverdue: it.IsOverdue,
                     UrgencyRank: it.IsOverdue ? 0 : it.UrgencyRank,
-                    ActionLabel: it.TaskId is not null ? "Open task" : "View",
+                    TaskId: it.TaskId,
+                    DeepLinkUrl: it.DeepLinkUrl,
                     OnActivate: BuildActivate(it)));
                 CountFor(it.EmployeeId);
             }
@@ -202,7 +219,47 @@
         if (it.TaskId is not null)
             return () => OpenTaskAsync(it.TaskId.Value);
 
-        return () => { Navigation.NavigateTo(it.DeepLinkUrl); return Task.CompletedTask; };
+        return () =>
+        {
+            // Guard: never navigate to a missing/blank target (stale item). We cannot detect a
+            // server-side 404 before navigating — this only covers absent deep links.
+            if (!string.IsNullOrWhiteSpace(it.DeepLinkUrl))
+                Navigation.NavigateTo(it.DeepLinkUrl);
+            return Task.CompletedTask;
+        };
+    }
+
+    /// <summary>
+    /// Resolves the visible action label for an attention row. One naming convention is used:
+    /// "&lt;verb&gt; &lt;destination noun&gt;" (e.g. "View employee", "View document",
+    /// "Review user account", "View acknowledgement progress"). A row backed by a task always
+    /// opens the task dialog, so it is always "Open task"; otherwise the destination is derived
+    /// from the corrected deep-link URL, falling back to the category, so the label always
+    /// describes where the row actually goes.
+    /// </summary>
+    private static string ResolveActionLabel(Guid? taskId, string? deepLinkUrl, string category)
+    {
+        if (taskId is not null)
+            return "Open task";
+
+        var url = deepLinkUrl?.ToLowerInvariant() ?? string.Empty;
+        if (url.Contains("acknowledge"))
+            return "View acknowledgement progress";
+        if (url.Contains("/documents") || url.Contains("/document/"))
+            return "View document";
+        if (url.Contains("/user-administration") || url.Contains("/users") || url.Contains("/user-accounts") || url.Contains("/accounts"))
+            return "Review user account";
+        if (url.Contains("/employees") || url.Contains("/employee/"))
+            return "View employee";
+
+        return (category ?? string.Empty).ToLowerInvariant() switch
+        {
+            var c when c.Contains("acknowledg") => "View acknowledgement progress",
+            var c when c.Contains("document") => "View document",
+            var c when c.Contains("account") || c.Contains("access") => "Review user account",
+            var c when c.Contains("employee") || c.Contains("compliance") || c.Contains("wellbeing") => "View employee",
+            _ => "View details",
+        };
     }
 
     private async Task ActivateAsync(AttentionItem item) => await item.OnActivate();
@@ -245,9 +302,15 @@
         string DueCss,
         bool IsOverdue,
         int UrgencyRank,
-        string ActionLabel,
+        Guid? TaskId,
+        string? DeepLinkUrl,
         Func<Task> OnActivate)
     {
+        /// <summary>An item is actionable only if it opens a task or has a non-blank deep link.</summary>
+        public bool HasTarget => TaskId is not null || !string.IsNullOrWhiteSpace(DeepLinkUrl);
+
+        public string ActionLabel => ResolveActionLabel(TaskId, DeepLinkUrl, Category);
+
         public string PriorityCss => IsOverdue ? "critical" : UrgencyRank switch
         {
             1 => "high",
@@ -274,6 +337,9 @@
         };
 
         public string AccessibleLabel =>
-            $"{PriorityLabel}. {Subject}, {Category}, {StatusLabel}{(DueLabel is null ? "" : $", due {DueLabel}")}. {ActionLabel}.";
+            $"{PriorityLabel}. {Subject}, {Category}, {StatusLabel}{(DueLabel is null ? "" : $", due {DueLabel}")}. " +
+            (HasTarget
+                ? $"{ActionLabel}."
+                : "This item can no longer be opened — it may have been completed or removed.");
     }
 }

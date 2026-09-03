@@ -4,6 +4,7 @@
 @using HR.SharedKernel
 @using HR.Web.Services
 @using HR.Web.Components.Pages.Users
+@using Syncfusion.Blazor.SplitButtons
 @inject EmployeeService EmployeeService
 @inject DepartmentService DepartmentService
 @inject UserService UserService
@@ -147,8 +148,8 @@
             <GridSelectionSettings Type="Syncfusion.Blazor.Grids.SelectionType.Multiple" Mode="Syncfusion.Blazor.Grids.SelectionMode.Row"></GridSelectionSettings>
             <GridPageSettings PageSize="20" />
             <GridColumns>
-                <GridColumn Type="Syncfusion.Blazor.Grids.ColumnType.CheckBox" Width="50"></GridColumn>
-                <GridColumn Field="@nameof(EmployeeListItemModel.LastName)" HeaderText="Employee" Width="260" AllowFiltering="false">
+                <GridColumn Type="Syncfusion.Blazor.Grids.ColumnType.CheckBox" Width="50" IsFrozen="true"></GridColumn>
+                <GridColumn Field="@nameof(EmployeeListItemModel.LastName)" HeaderText="Employee" Width="260" AllowFiltering="false" IsFrozen="true">
                     <Template>
                         @{
                             var row = (context as EmployeeListItemModel)!;
@@ -170,7 +171,6 @@
                 <GridColumn Field="@nameof(EmployeeListItemModel.LocationName)" HeaderText="Location" Width="150" />
                 <GridColumn Field="@nameof(EmployeeListItemModel.PositionProfileTitle)" HeaderText="Position" Width="180" />
                 <GridColumn Field="@nameof(EmployeeListItemModel.ManagerFullName)" HeaderText="Manager" Width="150" />
-                <GridColumn Field="@nameof(EmployeeListItemModel.StartDate)" HeaderText="Start Date" Width="120" Format="d" />
                 <GridColumn Field="@nameof(EmployeeListItemModel.Status)" HeaderText="Status" Width="120">
                     <Template>
                         @{
@@ -179,21 +179,29 @@
                         }
                     </Template>
                 </GridColumn>
-                <GridColumn Field="@nameof(EmployeeListItemModel.UserAccountStatus)" HeaderText="User Account" Width="180">
+                <GridColumn Field="@nameof(EmployeeListItemModel.UserAccountStatus)" HeaderText="User Account" Width="200" AllowFiltering="false">
                     <Template>
                         @{
                             var row = (context as EmployeeListItemModel)!;
-                            var (icon, cssClass, label) = UserAccountStatusDisplay(row.UserAccountStatus);
-                            <span class="user-account-status-label @cssClass">
-                                <i class="@icon me-1"></i>@label
-                            </span>
-                            @if (row.UserAccountStatus == "No User")
-                            {
-                                <a href="javascript:void(0)" class="ms-2" @onclick="@(() => OnInviteUserClicked(row))" @onclick:stopPropagation="true">&nbsp;Invite User</a>
-                            }
+                            var (icon, cssClass, label) = AccountStateDisplay(row.UserAccountStatus);
                         }
+                        <div class="user-account-cell" @onclick:stopPropagation="true">
+                            <span class="user-account-status-label @cssClass">
+                                <i class="@icon me-1" aria-hidden="true"></i>@label
+                            </span>
+                            @if (_canManageUserAccounts && AccountMenuItems(row).Count > 0)
+                            {
+                                <SfDropDownButton Items="@AccountMenuItems(row)"
+                                                  IconCss="fa-solid fa-ellipsis-vertical"
+                                                  CssClass="e-flat e-caret-hide user-account-actions-btn"
+                                                  aria-label="@($"Account actions for {row.FullName}")">
+                                    <DropDownButtonEvents ItemSelected="@(args => HandleAccountMenuAsync(row, args))" />
+                                </SfDropDownButton>
+                            }
+                        </div>
                     </Template>
                 </GridColumn>
+                <GridColumn Field="@nameof(EmployeeListItemModel.StartDate)" HeaderText="Start Date" Width="120" Format="d" Visible="false" />
             </GridColumns>
         </HrGrid>
 
@@ -218,6 +226,15 @@
                               OnCancelled="HandleInviteUserDialogCancelled"
                               OnCompleted="HandleInviteUserDialogCompleted" />
         }
+
+        <HrConfirmDialog Visible="_showDisableConfirm"
+                         Title="Disable access"
+                         Message="@($"Disable sign-in access for {_disableRow?.FullName}? You'll be taken to their account page to confirm and complete this.")"
+                         ConfirmText="Continue"
+                         CancelText="Cancel"
+                         DangerConfirm="true"
+                         OnConfirmed="ConfirmDisableAsync"
+                         OnCancelled="@(() => { _showDisableConfirm = false; _disableRow = null; })" />
     }
 </div>
 
@@ -230,6 +247,10 @@
     private List<EmployeeListItemModel> _bulkUpdateEmployees = [];
     private string? _actionError;
     private string? _actionSuccess;
+
+    private bool _canManageUserAccounts;
+    private bool _showDisableConfirm;
+    private EmployeeListItemModel? _disableRow;
 
     private bool _showInviteUserDialog;
     private Guid? _inviteEmployeeId;
@@ -276,6 +297,7 @@
             return;
         }
         _canCreateEmployee = await UserService.HasPermissionAsync(SystemPermissions.EmployeeCreate);
+        _canManageUserAccounts = Session.CanManageUsers;
 
         if (_departments.Count == 0)
         {
@@ -530,17 +552,88 @@
         _                => "bg-light text-dark"
     };
 
-    // (icon css class, text css class, label) — mirrors StatusBadgeClass above but for the
-    // "User Account" column, which renders an icon + text instead of a badge.
-    private static (string Icon, string CssClass, string Label) UserAccountStatusDisplay(string status) => status switch
+    // (icon css class, text css class, label) — maps the raw UserAccountStatus strings to the
+    // three canonical account-state labels ("Active", "Invited", "No account"), surfacing an
+    // expired invitation distinctly as "Invite expired" and a deactivated account as "Disabled".
+    private static (string Icon, string CssClass, string Label) AccountStateDisplay(string status) => status switch
     {
         "Active"              => ("fa-solid fa-circle-check", "text-success", "Active"),
         "Disabled"            => ("fa-solid fa-ban", "text-danger", "Disabled"),
-        "Pending Invitation"  => ("fa-solid fa-clock", "text-warning", "Pending Invitation"),
-        "Invitation Expired"  => ("fa-solid fa-clock", "text-warning", "Invitation Expired"),
-        "No User"             => ("fa-solid fa-circle-minus", "text-secondary", "No User"),
-        _                     => ("fa-solid fa-circle-question", "text-muted", status)
+        "Pending Invitation"  => ("fa-solid fa-clock", "text-warning", "Invited"),
+        "Invitation Expired"  => ("fa-solid fa-triangle-exclamation", "text-warning", "Invite expired"),
+        "No User"             => ("fa-solid fa-circle-minus", "text-secondary", "No account"),
+        _                     => ("fa-solid fa-circle-minus", "text-secondary", "No account")
     };
+
+    private static string AccountStateCategory(string status) => status switch
+    {
+        "Active"             => "active",
+        "Disabled"           => "disabled",
+        "Pending Invitation" => "invited",
+        "Invitation Expired" => "expired",
+        _                    => "none"
+    };
+
+    // Per-row account actions offered by the "User Account" column menu. Actions that need
+    // identifiers the list API does not return (invite id for resend, user id for disable) route
+    // the admin to the user-administration detail page where those operations live.
+    private List<DropDownMenuItem> AccountMenuItems(EmployeeListItemModel row)
+    {
+        var items = new List<DropDownMenuItem>();
+        switch (AccountStateCategory(row.UserAccountStatus))
+        {
+            case "none":
+                items.Add(new() { Id = "invite", Text = "Invite", IconCss = "fa-solid fa-paper-plane" });
+                break;
+            case "invited":
+            case "expired":
+                items.Add(new() { Id = "resend", Text = "Resend invite", IconCss = "fa-solid fa-paper-plane" });
+                items.Add(new() { Id = "view", Text = "View account", IconCss = "fa-solid fa-up-right-from-square" });
+                break;
+            case "active":
+                items.Add(new() { Id = "view", Text = "View account", IconCss = "fa-solid fa-up-right-from-square" });
+                items.Add(new() { Id = "disable", Text = "Disable access", IconCss = "fa-solid fa-ban" });
+                break;
+            case "disabled":
+                items.Add(new() { Id = "view", Text = "View account", IconCss = "fa-solid fa-up-right-from-square" });
+                break;
+        }
+        return items;
+    }
+
+    private string UserDetailUrl(EmployeeListItemModel row) =>
+        $"/companies/{CompanyId}/user-administration/{row.Id}";
+
+    private Task HandleAccountMenuAsync(EmployeeListItemModel row, MenuEventArgs args)
+    {
+        switch (args.Item?.Id)
+        {
+            case "invite":
+                OnInviteUserClicked(row);
+                break;
+            case "resend":
+            case "view":
+                Navigation.NavigateTo(UserDetailUrl(row));
+                break;
+            case "disable":
+                _actionError = null;
+                _actionSuccess = null;
+                _disableRow = row;
+                _showDisableConfirm = true;
+                break;
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task ConfirmDisableAsync()
+    {
+        _showDisableConfirm = false;
+        var row = _disableRow;
+        _disableRow = null;
+        if (row is not null)
+            Navigation.NavigateTo(UserDetailUrl(row));
+        return Task.CompletedTask;
+    }
 
     private void OnInviteUserClicked(EmployeeListItemModel row)
     {

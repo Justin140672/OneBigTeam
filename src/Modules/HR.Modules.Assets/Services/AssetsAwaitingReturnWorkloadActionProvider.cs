@@ -54,7 +54,7 @@ internal sealed class AssetsAwaitingReturnWorkloadActionProvider(
                 DueDate: null,
                 AssignedTo: null,
                 Status: "Assigned - Not Yet Returned",
-                DeepLinkUrl: $"/companies/{companyId}/assets/assignments/{item.AssetAssignmentId}/view");
+                DeepLinkUrl: $"/companies/{companyId}/employees/{item.EmployeeId}?tab=assets");
         }).ToList();
     }
 }

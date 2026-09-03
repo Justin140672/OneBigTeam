@@ -114,6 +114,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // ADM (Subscription & Billing restriction): Company-Administrator-only, enforced server-side
+        // too — the subscription:manage API policy no longer grants HR Administrator (see
+        // 30-administrative-role-separation-matrix.md). CanManageCompany is true iff the user holds
+        // the CompanyAdministrator role. Bail before any load if the guard redirects.
+        await Session.InitialiseAsync();
+        if (!AppSession.GuardAccess(NavigationManager, Session.CanManageCompany))
+            return;
+
         var statusTask = SubscriptionService.GetStatusAsync();
         var detailsTask = SubscriptionService.GetDetailsAsync();
 

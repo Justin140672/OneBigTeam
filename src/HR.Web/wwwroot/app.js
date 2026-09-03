@@ -179,6 +179,45 @@ function getRecentClientErrors(max) {
     } catch { return []; }
 }
 
+// Syncfusion's grid filter bar renders bare <input> elements with no accessible name, so a
+// screen-reader user tabbing the filter row just hears "edit text" with no idea which column it
+// filters. There is no Blazor-side parameter that puts an aria-label on the filter input, so we
+// label them from the DOM: match each filter cell to its header cell via Syncfusion's shared
+// e-mappinguid and copy the visible header text. A MutationObserver reapplies this as grids
+// render / re-render / page (Blazor Server streams the grid in after first paint).
+function hrLabelGridFilterInputs(root) {
+    const scope = root || document;
+    scope.querySelectorAll('.e-grid .e-filterbarcell input').forEach((input) => {
+        if (input.getAttribute('aria-label')) return;
+        const cell = input.closest('.e-filterbarcell');
+        const grid = input.closest('.e-grid');
+        if (!cell || !grid) return;
+        let label = '';
+        const uid = cell.getAttribute('e-mappinguid');
+        if (uid) {
+            const th = grid.querySelector('.e-headercell[e-mappinguid="' + uid + '"] .e-headertext');
+            if (th) label = th.textContent.trim();
+        }
+        if (!label) label = input.getAttribute('placeholder') || 'Column';
+        input.setAttribute('aria-label', label + ' filter');
+    });
+    scope.querySelectorAll('.e-excelfilter .e-searchinput, .e-checkboxfilter .e-searchinput').forEach((i) => {
+        if (!i.getAttribute('aria-label')) i.setAttribute('aria-label', 'Search filter values');
+    });
+}
+
+(function observeGridFilterInputs() {
+    if (!window.MutationObserver) return;
+    const run = () => { try { hrLabelGridFilterInputs(document); } catch { } };
+    const obs = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+            if (m.addedNodes && m.addedNodes.length) { run(); return; }
+        }
+    });
+    obs.observe(document.documentElement, { childList: true, subtree: true });
+    run();
+})();
+
 function downloadFileFromBase64(fileName, contentType, base64Content) {
     const link = document.createElement('a');
     link.href = `data:${contentType};base64,${base64Content}`;
