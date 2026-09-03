@@ -105,7 +105,7 @@ Potential integrations:
 Potential features:
 
 - Configurable **Apps** area within My Profile for external employee services
-- Company-configured integration cards for services such as benefits, staff recognition, wellbeing, payroll and learning
+- Company-configured integration cards for services such as benefits, staff recognition, wellbeing and learning
 - Optional dedicated profile tabs for high-priority integrations without requiring application code changes
 - Configurable integration name, icon, display order, eligibility and launch behaviour
 - Support for secure external links, single sign-on and embedded experiences where the provider permits embedding
@@ -256,7 +256,7 @@ Potential future integrations:
 
 - Benefits providers
 - Staff recognition platforms
-- Payroll systems
+- Accounting systems
 - Accounting systems
 - Identity providers
 - HR marketplaces

@@ -353,7 +353,7 @@ internal sealed class StartOffboardingHandler(
             $"Conduct exit interview — {employeeName}",
             $"Revoke system access and accounts — {employeeName}",
             $"Arrange handover and knowledge transfer — {employeeName}",
-            $"Notify IT and Payroll of employee exit — {employeeName}",
+            $"Notify IT and Finance of employee exit — {employeeName}",
         ];
 
         foreach (var title in checklistTitles)

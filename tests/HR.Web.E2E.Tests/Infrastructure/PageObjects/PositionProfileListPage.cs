@@ -11,15 +11,26 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/position-profiles");
+        // With prerender disabled the page is blank until the interactive circuit connects — gate
+        // on the authenticated shell first so the render budget isn't partly consumed by circuit
+        // establishment on a cold shared E2E app.
+        await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid, .spinner-border, .alert-danger",
-            new() { Timeout = 20_000 });
+            new() { Timeout = 30_000 });
         await page.WaitForSpinnerToClearAsync();
+        // Don't return while the grid is still mounting — the toolbar "Add" button the callers
+        // click next only renders once the grid component itself has rendered.
+        await page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow, .alert-danger",
+            new() { Timeout = 30_000 });
     }
 
     public async Task ClickNewPositionProfileAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/position-profiles/new", new() { Timeout = 30_000 });
+        // WaitUntil=Commit, not the default Load: a Blazor interactive navigation may never
+        // re-fire the target document's "load" event.
+        await page.WaitForURLAsync("**/position-profiles/new**",
+            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
     }
 
     public Task<bool> HasPositionProfileAsync(string titleFragment) =>

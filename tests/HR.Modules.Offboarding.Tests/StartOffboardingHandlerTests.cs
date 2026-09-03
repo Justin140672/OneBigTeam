@@ -314,7 +314,7 @@ public class StartOffboardingHandlerTests
         Assert.Contains(managerTasks, t => t.Title.Contains("Conduct exit interview"));
         Assert.Contains(managerTasks, t => t.Title.Contains("Revoke system access"));
         Assert.Contains(managerTasks, t => t.Title.Contains("Arrange handover"));
-        Assert.Contains(managerTasks, t => t.Title.Contains("Notify IT and Payroll"));
+        Assert.Contains(managerTasks, t => t.Title.Contains("Notify IT and Finance"));
 
         var managerCalls = harness.TaskCreator.Created
             .Where(c => c.AssignedEmployeeId == managerId)
@@ -339,7 +339,7 @@ public class StartOffboardingHandlerTests
 
         var managerCalls = harness.TaskCreator.Created
             .Where(c => c.Title.Contains("exit interview") || c.Title.Contains("system access")
-                || c.Title.Contains("handover") || c.Title.Contains("IT and Payroll"))
+                || c.Title.Contains("handover") || c.Title.Contains("IT and Finance"))
             .ToList();
         Assert.Equal(4, managerCalls.Count);
         Assert.All(managerCalls, c =>

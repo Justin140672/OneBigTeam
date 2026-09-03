@@ -17,7 +17,7 @@ Primary actors, per role:
 - **HR Administrator** — manages employees, recruitment, documents, policies, and compliance.
 - **Company Administrator** — manages company profile, settings and branding. This role does not grant HR or employee-management access.
 - **Recruiter** — manages vacancies, candidates, and interview workflow.
-- **Finance User** — may view compensation/payroll-related exports if authorised.
+- **Finance User** — may view authorised compensation exports.
 
 Target customers are small and medium-sized businesses (roughly 50–2,000 employees per company) — growing teams without mature HR systems, and companies moving off spreadsheets who need better visibility of employees, documents, and workflows.
 
@@ -29,7 +29,7 @@ Success means: a company can set itself up; HR can create and manage employees; 
 
 ## Positioning
 
-Simple enough for SMEs, structured enough for growing businesses, secure enough for sensitive HR data, flexible enough for future expansion — practical HR without the complexity of enterprise HR suites. The product is not trying to be a payroll system, a performance-management suite, or an enterprise HRIS; it solves real day-to-day HR administration and compliance problems for companies currently getting by on spreadsheets.
+Simple enough for SMEs, structured enough for growing businesses, secure enough for sensitive HR data, flexible enough for future expansion — practical HR without the complexity of enterprise HR suites. The product is not trying to be a performance-management suite or an enterprise HRIS; it solves real day-to-day HR administration and compliance problems for companies currently getting by on spreadsheets.
 
 ## Operating Context
 
@@ -45,7 +45,7 @@ Simple enough for SMEs, structured enough for growing businesses, secure enough 
 
 In scope for MVP: company setup, employee records, departments and position profiles, position-based permissions, Supabase Auth integration, leave management, sickness management, recruitment pipeline, task/workflow system, document management, notifications, reporting/exports, audit/activity history, search, role-aware dashboards, admin experience and in-app support. These capabilities are implemented; remaining work is defect remediation, security hardening and operational readiness rather than another core feature module.
 
-Explicitly out of scope for MVP: payroll processing, benefits administration, advanced performance reviews, a public recruitment portal, a mobile app, external integrations (incl. Slack/Teams), multi-language support, white-label domains, advanced analytics, AI assistant features.
+Explicitly out of scope for MVP: pay processing, benefits administration, advanced performance reviews, a public recruitment portal, a mobile app, external integrations (incl. Slack/Teams), multi-language support, white-label domains, advanced analytics, AI assistant features.
 
 Performance targets: page/dashboard load < 2s, search results < 500ms, standard CRUD actions < 1s and small reports < 10s. A separately approved large report may use asynchronous generation when measurement shows the synchronous model is unsafe. Target availability is 99.5%.
 

@@ -66,6 +66,9 @@ public sealed class SidebarNavigationTests(ParallelBlankPersonaFixture fixture)
         // Renamed from "Recruitment Settings" — see MainLayout.razor's menu item text (item 29).
         Assert.True(await sidebar.HasTopLevelMenuItemAsync("Recruitment Stages"));
         Assert.True(await sidebar.HasTopLevelMenuItemAsync("Reporting"));
+        Assert.False(await sidebar.HasTopLevelMenuItemAsync("People and users"));
+        Assert.False(await sidebar.HasTopLevelMenuItemAsync("Company"));
+        Assert.False(await sidebar.HasTopLevelMenuItemAsync("HR configuration"));
     }
 
     [Fact]
@@ -108,5 +111,18 @@ public sealed class SidebarNavigationTests(ParallelBlankPersonaFixture fixture)
         // comment in MainLayout.razor).
         Assert.False(await sidebar.IsSidebarVisibleAsync(),
             "Expected a Manager-only persona to not see a sidebar");
+    }
+
+    [Fact]
+    public async Task EmployeeOnly_DoesNotSeeSidebar()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var sidebar = new SidebarPage(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync("tom.williams@acme.example");
+
+        Assert.False(await sidebar.IsSidebarVisibleAsync(),
+            "Expected an Employee-only persona to not see a sidebar");
     }
 }

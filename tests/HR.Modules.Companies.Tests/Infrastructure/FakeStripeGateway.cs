@@ -14,6 +14,21 @@ internal sealed class FakeStripeGateway : IStripeGateway
 
     public Exception? ExceptionToThrowOnConstructEvent { get; set; }
 
+    /// <summary>Simulates a Stripe API timeout / rejected request on the write/read calls below.</summary>
+    public Exception? ExceptionToThrowOnCheckout { get; set; }
+
+    public Exception? ExceptionToThrowOnCancel { get; set; }
+
+    public Exception? ExceptionToThrowOnResume { get; set; }
+
+    public Exception? ExceptionToThrowOnBillingPortal { get; set; }
+
+    public Exception? ExceptionToThrowOnListInvoices { get; set; }
+
+    public int CancelCallCount { get; private set; }
+
+    public int ResumeCallCount { get; private set; }
+
     public Guid? LastCompanyId { get; private set; }
 
     public string? LastCustomerEmail { get; private set; }
@@ -31,6 +46,9 @@ internal sealed class FakeStripeGateway : IStripeGateway
         LastCompanyId = companyId;
         LastCustomerEmail = customerEmail;
         LastExistingStripeCustomerId = existingStripeCustomerId;
+
+        if (ExceptionToThrowOnCheckout is not null)
+            return Task.FromException<string>(ExceptionToThrowOnCheckout);
 
         return Task.FromResult(CheckoutUrlToReturn);
     }
@@ -56,20 +74,28 @@ internal sealed class FakeStripeGateway : IStripeGateway
 
     public Task CancelSubscriptionAsync(string stripeSubscriptionId, bool atPeriodEnd, CancellationToken cancellationToken)
     {
+        CancelCallCount++;
         LastCancelledStripeSubscriptionId = stripeSubscriptionId;
         LastCancelAtPeriodEnd = atPeriodEnd;
+        if (ExceptionToThrowOnCancel is not null)
+            return Task.FromException(ExceptionToThrowOnCancel);
         return Task.CompletedTask;
     }
 
     public Task ResumeSubscriptionAsync(string stripeSubscriptionId, CancellationToken cancellationToken)
     {
+        ResumeCallCount++;
         LastResumedStripeSubscriptionId = stripeSubscriptionId;
+        if (ExceptionToThrowOnResume is not null)
+            return Task.FromException(ExceptionToThrowOnResume);
         return Task.CompletedTask;
     }
 
     public Task<string> CreateBillingPortalSessionAsync(string stripeCustomerId, string returnUrl, CancellationToken cancellationToken)
     {
         LastBillingPortalStripeCustomerId = stripeCustomerId;
+        if (ExceptionToThrowOnBillingPortal is not null)
+            return Task.FromException<string>(ExceptionToThrowOnBillingPortal);
         return Task.FromResult(PortalUrlToReturn);
     }
 
@@ -80,6 +106,8 @@ internal sealed class FakeStripeGateway : IStripeGateway
     public Task<IReadOnlyList<StripeInvoiceSummary>> ListInvoicesAsync(string stripeCustomerId, CancellationToken cancellationToken)
     {
         LastListInvoicesStripeCustomerId = stripeCustomerId;
+        if (ExceptionToThrowOnListInvoices is not null)
+            return Task.FromException<IReadOnlyList<StripeInvoiceSummary>>(ExceptionToThrowOnListInvoices);
         return Task.FromResult(InvoicesToReturn);
     }
 

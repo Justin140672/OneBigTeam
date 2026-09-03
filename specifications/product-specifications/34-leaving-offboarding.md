@@ -173,7 +173,7 @@ Each template item defines:
 
 - stable item identifier and version;
 - title and description;
-- owner type: Employee, Manager, HR, Finance/Payroll, IT/Access, named employee or named role;
+- owner type: Employee, Manager, HR, Finance, IT/Access, named employee or named role;
 - due-date offset relative to last working day or leaving date;
 - mandatory or optional classification;
 - linked action type and source module where applicable;
@@ -186,7 +186,7 @@ The system baseline template contains:
 | Return each assigned asset | Employee, overseen by HR | Mandatory | Assets confirms Returned, Lost or authorised write-off |
 | Review outstanding employee document requests and retention | HR | Mandatory | Documents/HR confirmation |
 | Revoke system and third-party access | IT/Access, falling back to HR | Mandatory | Identity confirms product access action; external access is attested |
-| Notify payroll of final employment facts and leave balance | Finance/Payroll, falling back to HR | Mandatory | Acknowledgement/hand-off only |
+| Notify Finance of final employment facts and leave balance | Finance, falling back to HR | Mandatory | Acknowledgement/hand-off only |
 | Reassign direct reports and approval responsibilities | Manager, falling back to HR | Mandatory when reports/responsibilities exist |
 | Handover and knowledge transfer | Manager, falling back to HR | Mandatory |
 | Exit interview | Manager | Optional |
@@ -209,7 +209,7 @@ The Tasks module owns task presentation, assignment, reminders and its task stat
 | Product account and permissions | Identity/Permissions | Disables product access at finalisation when configured and removes operational scopes; preserves identity/audit linkage. |
 | External/system access attestation | Offboarding task owner | Records confirmation only; no claim of automated external revocation without an integration. |
 | Leave entitlement and requests | Leave | Calculates final-date proration, resolves future requests and supplies a final balance statement. |
-| Payroll | External/out of scope | Receives an auditable hand-off; One Big Team does not calculate pay, tax, deductions or settlement. |
+| Finance | External hand-off | Receives an auditable hand-off; One Big Team does not calculate pay, tax, deductions or settlement. |
 | Notifications | Notifications | Owns delivery and delivery history; business modules own recipient and trigger decisions. |
 | Reports | Reporting | Reads purpose-specific contracts; never writes operational records. |
 | Audit and timeline | Audit/Employees | Audit is immutable technical/business evidence; employee timeline is a curated lifecycle view. |
@@ -292,7 +292,7 @@ When a process starts or its leaving date changes, Leave shall provide a provisi
 
 Requests wholly after the leaving date are cancelled by the system with an audit reason and the requester/approver notified. A request spanning the leaving date is shortened to the leaving date and recalculated; if the leave model cannot safely split it, it is moved to HR review and does not block departure. Requests on or before the leaving date retain their normal state and approval rules.
 
-At finalisation, Leave freezes a final balance statement using facts effective on the leaving date. The value is supplied to the payroll hand-off and reporting. One Big Team does not decide whether a positive balance is paid or a negative balance is deducted; HR/Payroll records the external outcome. Cancelling before departure removes the provisional leaver proration and restores affected future requests where safe; otherwise it creates an HR review item with an audit trail.
+At finalisation, Leave freezes a final balance statement using facts effective on the leaving date. The value is supplied to the Finance hand-off and reporting. One Big Team does not decide whether a positive balance is paid or a negative balance is deducted; HR or Finance records the external outcome. Cancelling before departure removes the provisional leaver proration and restores affected future requests where safe; otherwise it creates an HR review item with an audit trail.
 
 ## Finalisation and incomplete offboarding
 
@@ -358,7 +358,7 @@ Required audit events are:
 - backdating confirmed;
 - offboarding plan created, started, completed and cancelled;
 - obligation created, assigned, reassigned, completed, waived and cancelled;
-- asset/document/access/leave/payroll hand-off requested, succeeded and failed;
+- asset/document/access/leave/Finance hand-off requested, succeeded and failed;
 - employment finalised and access enabled/disabled;
 - recovery retry attempted, succeeded or exhausted.
 
@@ -376,7 +376,7 @@ Reporting definitions:
 | Offboarding complete | Every mandatory obligation is `Completed` or `Waived`; optional open items do not block. |
 | Overdue after departure | Former employee with an `InProgress` plan containing at least one mandatory open obligation. |
 | Outstanding assets | Active asset assignments whose return outcome is unresolved, regardless of task state. |
-| Final leave balance | Frozen balance supplied by Leave at finalisation, not a payroll settlement amount. |
+| Final leave balance | Frozen balance supplied by Leave at finalisation, not a settlement calculation. |
 
 Cancelled attempts are excluded from default leaver/offboarding metrics but are available to authorised audit/history views. Report filters and exports use the same tenant and permission rules as interactive views.
 
@@ -444,7 +444,7 @@ Each criterion below is independently automatable. Tests should use the identifi
 - **OFF-AC-015** Given a selected template version, then its items are snapshotted and later template edits do not change the plan.
 - **OFF-AC-016** Given assigned assets, then exactly one mandatory return obligation is created per active assignment and completion follows Assets source truth.
 - **OFF-AC-017** Given no assigned assets, then no asset-return obligation is fabricated.
-- **OFF-AC-018** Given document, access, payroll, reassignment and handover needs, then the baseline mandatory obligations are created with explicit owners/fallbacks.
+- **OFF-AC-018** Given document, access, Finance, reassignment and handover needs, then the baseline mandatory obligations are created with explicit owners/fallbacks.
 - **OFF-AC-019** Given an optional open item and all mandatory items satisfied, then the plan can complete.
 - **OFF-AC-020** Given a mandatory open item, then plan completion is rejected; when HR waives it with a reason, completion may proceed.
 - **OFF-AC-021** Given an inactive/missing owner or leaver-owned item at access removal, then ownership moves to HR and the obligation is not omitted.
@@ -462,7 +462,7 @@ Each criterion below is independently automatable. Tests should use the identifi
 - **OFF-AC-030** Given incomplete mandatory obligations at departure, then employment completes, the plan remains in progress/overdue, employee work moves to HR and high-priority escalation is created.
 - **OFF-AC-031** Given all mandatory obligations satisfied before departure, then the plan completes but employment remains `Leaving` until the leaving date.
 - **OFF-AC-032** Given auto-disable enabled, then access is disabled at finalisation without deleting identity/history; when disabled, only deliberately granted former-employee permissions remain.
-- **OFF-AC-033** Given finalisation, then Leave freezes the final balance and payroll receives a hand-off without the product calculating settlement.
+- **OFF-AC-033** Given finalisation, then Leave freezes the final balance and Finance receives a hand-off without the product calculating settlement.
 
 ### Visibility, audit, reporting and recovery
 
@@ -490,5 +490,5 @@ The following interpretations are explicitly obsolete:
 - restoring every cancelled leaver to `Active` instead of their captured prior state;
 - recalculating the stored notice snapshot after an explicit date amendment;
 - allowing former manager hierarchy to preserve operational access after departure;
-- treating a final leave balance as a payroll settlement calculation;
+- treating a final leave balance as a settlement calculation;
 - relying on at-most-once delivery or best-effort no-op behaviour for cross-module consistency.

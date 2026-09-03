@@ -16,16 +16,36 @@ public sealed class EmploymentTypeEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
-    public async Task FillNameAsync(string name)
-    {
-        await page.GetByPlaceholder("e.g. Permanent, Contractor").FillAsync(name);
-        await page.Keyboard.PressAsync("Tab");
-    }
+    public Task FillNameAsync(string name) =>
+        FillTextBoxAsync("e.g. Permanent, Contractor", name);
 
-    public async Task FillDescriptionAsync(string description)
+    public Task FillDescriptionAsync(string description) =>
+        FillTextBoxAsync("Optional description", description);
+
+    // This page is @rendermode InteractiveServer: straight after ClickNewAsync the SignalR circuit
+    // may not have wired up the SfTextBox's oninput handler yet, so a one-shot FillAsync sets the
+    // DOM value but Blazor never binds it — Save then posts an empty Name, validation blocks the
+    // navigation, and the caller's WaitForURL times out. Wait for the field, type character by
+    // character (each keystroke raises its own input event once the circuit is live), then verify
+    // the value actually committed and retype once if it didn't.
+    private async Task FillTextBoxAsync(string placeholder, string value)
     {
-        await page.GetByPlaceholder("Optional description").FillAsync(description);
-        await page.Keyboard.PressAsync("Tab");
+        var input = page.GetByPlaceholder(placeholder);
+        await input.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            await input.ClickAsync();
+            await page.Keyboard.PressAsync("Control+A");
+            await page.Keyboard.PressAsync("Delete");
+            await input.PressSequentiallyAsync(value, new() { Delay = 20 });
+            await page.Keyboard.PressAsync("Tab");
+
+            if (await input.InputValueAsync() == value)
+                return;
+
+            await page.WaitForTimeoutAsync(250);
+        }
     }
 
     public async Task SaveAsync()

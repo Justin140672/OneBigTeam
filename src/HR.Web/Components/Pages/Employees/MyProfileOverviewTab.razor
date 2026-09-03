@@ -364,21 +364,35 @@ else
             ? CompensationService.GetCurrentCompensationAsync(CompanyId, EmployeeId)
             : Task.FromResult<CurrentCompensationModel?>(null);
 
-        await Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask, probationTask, onboardingTask, holidaysTask, compensationTask);
+        // A single failing call among these nine (a 403 on a self-service endpoint, a transient
+        // error) must NOT pin the whole profile on its loading skeleton forever — read each
+        // result defensively so the page renders with whatever loaded. Without this, one faulted
+        // task propagated out of OnParametersSetAsync, _loading stayed true, and both real users
+        // and every MyProfilePage E2E test saw the skeleton until timeout.
+        try
+        {
+            await Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask, probationTask, onboardingTask, holidaysTask, compensationTask);
+        }
+        catch
+        {
+            // Individual results are salvaged below.
+        }
 
-        _employee = await employeeTask;
-        _probationStatus = await probationTask;
-        _onboardingStatus = await onboardingTask;
-        _currentCompensation = await compensationTask;
-        _publicHolidays = (await holidaysTask)?.Items.Select(h => h.Date).ToList() ?? [];
+        static T? Result<T>(Task<T?> t) => t.IsCompletedSuccessfully ? t.Result : default;
 
-        ApplyLeaveData(await balanceTask, await requestsTask);
+        _employee = Result(employeeTask);
+        _probationStatus = Result(probationTask);
+        _onboardingStatus = Result(onboardingTask);
+        _currentCompensation = Result(compensationTask);
+        _publicHolidays = Result(holidaysTask)?.Items.Select(h => h.Date).ToList() ?? [];
 
-        var tasks = await tasksTask;
+        ApplyLeaveData(Result(balanceTask), Result(requestsTask));
+
+        var tasks = Result(tasksTask);
         if (tasks is not null)
             _openTaskCount = tasks.Items.Count(t => t.Status is "Open" or "InProgress");
 
-        ApplySicknessData(await sicknessTask);
+        ApplySicknessData(Result(sicknessTask));
 
         _loading = false;
     }

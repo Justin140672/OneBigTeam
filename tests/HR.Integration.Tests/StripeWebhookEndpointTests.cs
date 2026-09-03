@@ -130,6 +130,52 @@ public class StripeWebhookEndpointTests
     }
 
     [Fact]
+    public async Task Post_StripeWebhook_Invalid_Signature_Is_Rejected_Before_Any_State_Change()
+    {
+        var companyId = await SeedCompanyWithSubscriptionAsync("cus_sig_test", "sub_sig_test");
+        _factory.StripeGateway.ExceptionToThrowOnConstructEvent = new StripeException("Invalid signature.");
+        // Also arm an event: if processing were (wrongly) reached it would activate/cancel the row.
+        _factory.StripeGateway.WebhookEventToReturn = new StripeWebhookEvent(
+            "customer.subscription.deleted", "cus_sig_test", "sub_sig_test", null, null, null, "canceled", null);
+
+        using var client = _factory.CreateClient();
+        var response = await client.SendAsync(BuildRequest("{}", "t=1,v1=invalid"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var persisted = await verifyDb.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Equal(SubscriptionStatus.Active, persisted.Status);
+        Assert.False(persisted.CancelAtPeriodEnd);
+    }
+
+    [Fact]
+    public async Task Post_StripeWebhook_Duplicate_Delivery_Applies_Business_Change_At_Most_Once()
+    {
+        var companyId = await SeedCompanyWithSubscriptionAsync("cus_dup_test", "sub_dup_test");
+
+        _factory.StripeGateway.WebhookEventToReturn = new StripeWebhookEvent(
+            "customer.subscription.deleted", "cus_dup_test", "sub_dup_test", null,
+            CurrentPeriodEnd: DateTimeOffset.UtcNow.AddDays(10), CancelAtPeriodEnd: null,
+            StripeStatus: "canceled", PriceId: null);
+
+        using var client = _factory.CreateClient();
+        for (var i = 0; i < 3; i++)
+        {
+            var response = await client.SendAsync(BuildRequest("{}", "t=1,v1=fake"));
+            response.EnsureSuccessStatusCode();
+        }
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var rows = await verifyDb.CustomerSubscriptions.Where(s => s.CompanyId == companyId).ToListAsync();
+        var persisted = Assert.Single(rows);
+        Assert.Equal(SubscriptionStatus.Canceled, persisted.Status);
+        Assert.True(persisted.CancelAtPeriodEnd);
+    }
+
+    [Fact]
     public async Task Post_StripeWebhook_SubscriptionUpdated_Updates_Matched_Subscription()
     {
         var companyId = await SeedCompanyWithSubscriptionAsync("cus_update_test", "sub_update_test");

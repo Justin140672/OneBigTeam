@@ -44,7 +44,7 @@
 
         <div class="login-field">
             <label class="login-label">Email</label>
-            <SfTextBox @bind-Value="_form.Email"
+            <HrTextBox @bind-Value="_form.Email"
                        Placeholder="you@example.com"
                        Type="InputType.Email"
                        Input="@(() => _error = null)" />
@@ -57,7 +57,7 @@
                 <a href="/forgot-password" class="login-forgot-link" data-testid="forgot-password-link">Forgot password?</a>
             </div>
             <div class="login-password-field">
-                <SfTextBox @bind-Value="_form.Password"
+                <HrTextBox @bind-Value="_form.Password"
                            Placeholder="••••••••"
                            Type="@(_showPassword ? InputType.Text : InputType.Password)"
                            Input="@(() => _error = null)" />

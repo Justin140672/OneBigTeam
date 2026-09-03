@@ -72,17 +72,24 @@ else
                                 <MenuItem Text="Candidates" IconCss="fa-solid fa-user-tie" Url="@_menuItems["Candidates"]" />
                                 <MenuItem Text="Recruiters" IconCss="fa-solid fa-people-arrows" Url="@_menuItems["ExternalRecruiters"]" />
                                 <MenuItem Text="Recruitment Stages" IconCss="fa-solid fa-gear" Url="@_menuItems["RecruitmentStages"]" />
+                                @if (IsRecruiterOnly && Session.CanViewReporting)
+                                {
+                                    <MenuItem Text="Reporting" IconCss="fa-solid fa-chart-column" Url="@_menuItems["Reporting"]" />
+                                }
                             }
-                            @foreach (var section in _adminSections)
+                            @if (!IsRecruiterOnly)
                             {
-                                <MenuItem Text="@section.Label" IconCss="@SectionIcon(section.Group)">
-                                    <MenuItems>
-                                        @foreach (var dest in section.Destinations)
-                                        {
-                                            <MenuItem Text="@dest.Title" IconCss="@dest.IconCss" Url="@dest.Url" />
-                                        }
-                                    </MenuItems>
-                                </MenuItem>
+                                @foreach (var section in _adminSections)
+                                {
+                                    <MenuItem Text="@section.Label" IconCss="@SectionIcon(section.Group)">
+                                        <MenuItems>
+                                            @foreach (var dest in section.Destinations)
+                                            {
+                                                <MenuItem Text="@dest.Title" IconCss="@dest.IconCss" Url="@dest.Url" />
+                                            }
+                                        </MenuItems>
+                                    </MenuItem>
+                                }
                             }
                             @if (Session.IsHrAdministrator || Session.CanManageCompany)
                             {
@@ -290,9 +297,16 @@ else
     // via the Reports section on that dashboard (see ManagerDashboard.razor's TeamReportsWidget),
     // not via sidebar navigation. A plain Recruiter still gets a sidebar since their workflow
     // (Vacancies, Candidates, etc.) has no dashboard-embedded equivalent for those sections.
-    private bool ShowSidebar =>
-        Session.CanManageEmployees || Session.CanReadEmployees || Session.CanManageRecruitment
-        || Session.CanViewUsers || Session.CanManageHrSettings;
+    // The persistent sidebar belongs only to the two roles with multi-page administrative
+    // workflows. Company administrators, managers and employees use their landing page and
+    // contextual links instead of receiving an application-wide navigation rail.
+    private bool ShowSidebar => Session.IsHrAdministrator || Session.IsRecruiter;
+
+    // Recruiters have a compact task-based navigation. Administrative category menus are for
+    // users who also hold an HR, manager, or company-administration role.
+    private bool IsRecruiterOnly =>
+        Session.IsRecruiter && !Session.IsHrAdministrator && !Session.IsManager
+        && !Session.CanManageCompany;
 
     private int _unreadCount;
     private List<NotificationDto> _notifications = [];

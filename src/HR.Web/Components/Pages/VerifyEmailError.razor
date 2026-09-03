@@ -23,7 +23,7 @@
 
         <div class="login-field">
             <label class="login-label">Email</label>
-            <SfTextBox @bind-Value="_form.Email"
+            <HrTextBox @bind-Value="_form.Email"
                        Placeholder="you@example.com"
                        Type="InputType.Email" />
             <ValidationMessage For="() => _form.Email" class="login-validation" />

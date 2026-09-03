@@ -14,7 +14,13 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task GoToNewAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/vacancies/new");
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        // With prerender disabled the page is blank until the interactive circuit connects. Gate
+        // on the shell, then on the form's own title field (a page-specific signal) rather than
+        // "span[role='combobox']", which also matches chrome outside this form and can be
+        // satisfied before the form has actually rendered.
+        await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 30_000 });
+        await page.GetByPlaceholder("e.g. Senior Software Engineer")
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
     }
 
     public async Task GoToAsync(Guid companyId, Guid vacancyId)

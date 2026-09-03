@@ -8,6 +8,18 @@
         "resolved": "10.0.1",
         "contentHash": "27jXSV/0DbVqF5jDrAxuQFZ9oaz6gmG03p8ttxAFk+X0M4woFYj7MoWDLCna5EGLb0CE6OE7X6ZH3Wt5smTtaA=="
       },
+      "FastEndpoints": {
+        "type": "Direct",
+        "requested": "[8.2.0, )",
+        "resolved": "8.2.0",
+        "contentHash": "NfsC7v8YDmZtBjWYs88+ef1/vnL+qGcw8FigGyNzJD8IVAG9ZSmtIKyLJu95BZjfAMwcGcjo+3qXsyC9L7SLlA==",
+        "dependencies": {
+          "FastEndpoints.Attributes": "8.2.0",
+          "FastEndpoints.JobQueues": "8.2.0",
+          "FastEndpoints.Messaging": "8.2.0",
+          "FluentValidation": "12.1.1"
+        }
+      },
       "Microsoft.EntityFrameworkCore": {
         "type": "Direct",
         "requested": "[10.0.11, )",
@@ -753,8 +765,8 @@
         "type": "Project",
         "dependencies": {
           "ClosedXML": "[0.105.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.AspNetCore": "[1.8.24, )",
           "Hangfire.PostgreSql": "[1.21.1, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
@@ -768,9 +780,9 @@
       "hr.infrastructure.abstractions": {
         "type": "Project",
         "dependencies": {
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.modules.assets": {
@@ -778,11 +790,11 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Companies.Contracts": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -793,10 +805,10 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Companies.Contracts": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
@@ -806,7 +818,7 @@
       "hr.modules.companies.contracts": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.modules.companyonboarding": {
@@ -814,8 +826,8 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -826,10 +838,10 @@
           "ClosedXML": "[0.105.1, )",
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Companies.Contracts": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -839,11 +851,11 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Companies.Contracts": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -855,11 +867,11 @@
           "ClosedXML": "[0.105.1, )",
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Companies.Contracts": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -868,7 +880,7 @@
       "hr.modules.employees.contracts": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.modules.identity": {
@@ -876,10 +888,10 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Companies.Contracts": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.11, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
@@ -891,11 +903,11 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Companies.Contracts": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -906,9 +918,9 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -919,11 +931,11 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Companies.Contracts": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -934,11 +946,11 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Companies.Contracts": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -949,11 +961,11 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Companies.Contracts": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -964,10 +976,10 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -978,10 +990,10 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Companies.Contracts": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -992,11 +1004,11 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Companies.Contracts": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -1007,8 +1019,8 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -1019,10 +1031,10 @@
         "dependencies": {
           "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[1.0.0, )",
-          "HR.Modules.Employees.Contracts": "[1.0.0, )",
-          "HR.Modules.Tasks.Contracts": "[1.0.0, )",
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
+          "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -1030,13 +1042,13 @@
       "hr.modules.tasks.contracts": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )"
+          "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
       "hr.servicedefaults": {
         "type": "Project",
         "dependencies": {
-          "HR.SharedKernel": "[1.0.0, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Microsoft.Extensions.Http.Resilience": "[10.9.0, )",
           "Microsoft.Extensions.ServiceDiscovery": "[10.9.0, )",
           "OpenTelemetry.Exporter.OpenTelemetryProtocol": "[1.17.0, )",
@@ -1064,18 +1076,6 @@
           "ExcelNumberFormat": "1.1.0",
           "RBush.Signed": "4.0.0",
           "SixLabors.Fonts": "[1.0.0, 3.0.0)"
-        }
-      },
-      "FastEndpoints": {
-        "type": "CentralTransitive",
-        "requested": "[8.2.0, )",
-        "resolved": "8.2.0",
-        "contentHash": "NfsC7v8YDmZtBjWYs88+ef1/vnL+qGcw8FigGyNzJD8IVAG9ZSmtIKyLJu95BZjfAMwcGcjo+3qXsyC9L7SLlA==",
-        "dependencies": {
-          "FastEndpoints.Attributes": "8.2.0",
-          "FastEndpoints.JobQueues": "8.2.0",
-          "FastEndpoints.Messaging": "8.2.0",
-          "FluentValidation": "12.1.1"
         }
       },
       "FluentValidation": {

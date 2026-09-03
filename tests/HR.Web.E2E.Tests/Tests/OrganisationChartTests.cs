@@ -195,6 +195,91 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
             "Expected the Employment Status filter to have been removed — the chart always shows Active employees only");
     }
 
+    /// <summary>
+    /// Typing a matching employee name into the chart's Search box (OrganisationChart.razor's
+    /// OnSearchChanged) must highlight that employee's card via the same _focusEmployeeId mechanism
+    /// the "View Organisation Chart" deep link uses — and must NOT surface the "no match" message.
+    /// </summary>
+    [Fact]
+    public async Task Search_ByName_HighlightsMatchingCard_AndShowsNoNotFoundMessage()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/organisation-chart");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        await _page.Locator(".org-chart-card").First.WaitForAsync(new() { Timeout = 15_000 });
+
+        var search = _page.GetByPlaceholder("Search by name or employee number");
+        await search.FillAsync("Laura Bennett");
+        // HrTextBox (SfTextBox) only raises ValueChanged on blur/change, not on "input".
+        await search.PressAsync("Enter");
+
+        var lauraCard = _page.Locator(".org-chart-card").Filter(new() { HasText = "Laura Bennett" });
+        await Assertions.Expect(lauraCard.First).ToHaveClassAsync(
+            new Regex("org-chart-card-highlighted"), new() { Timeout = 10_000 });
+
+        Assert.False(await _page.GetByText("No employee found matching").IsVisibleAsync(),
+            "Expected no 'no match' message when the search term matches a seeded employee");
+    }
+
+    /// <summary>
+    /// A search term that matches no employee must surface OrganisationChart.razor's
+    /// _searchNotFound message and leave no card highlighted — the empty-result state.
+    /// </summary>
+    [Fact]
+    public async Task Search_WithNoMatch_ShowsNotFoundMessage_AndHighlightsNothing()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/organisation-chart");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        await _page.Locator(".org-chart-card").First.WaitForAsync(new() { Timeout = 15_000 });
+
+        var search = _page.GetByPlaceholder("Search by name or employee number");
+        await search.FillAsync("Zzz No Such Person 9999");
+        await search.PressAsync("Enter");
+
+        await Assertions.Expect(_page.GetByText("No employee found matching"))
+            .ToBeVisibleAsync(new() { Timeout = 10_000 });
+
+        Assert.Equal(0, await _page.Locator(".org-chart-card-highlighted").CountAsync());
+    }
+
+    /// <summary>
+    /// Clearing the search box after a no-match must clear the _searchNotFound message
+    /// (OnSearchChanged's whitespace/empty branch) — no stale error text left behind.
+    /// </summary>
+    [Fact]
+    public async Task Search_Cleared_RemovesNotFoundMessage()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/organisation-chart");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        await _page.Locator(".org-chart-card").First.WaitForAsync(new() { Timeout = 15_000 });
+
+        var search = _page.GetByPlaceholder("Search by name or employee number");
+        await search.FillAsync("Zzz No Such Person 9999");
+        await search.PressAsync("Enter");
+        await Assertions.Expect(_page.GetByText("No employee found matching"))
+            .ToBeVisibleAsync(new() { Timeout = 10_000 });
+
+        await search.FillAsync(string.Empty);
+        await search.PressAsync("Enter");
+
+        await Assertions.Expect(_page.GetByText("No employee found matching"))
+            .ToBeHiddenAsync(new() { Timeout = 10_000 });
+    }
+
     [Fact]
     public async Task PlainEmployee_IsRedirectedAway_FromOrganisationChartPage()
     {

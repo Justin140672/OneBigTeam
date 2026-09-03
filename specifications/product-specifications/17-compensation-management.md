@@ -4,7 +4,7 @@
 
 The Compensation Management capability records employee salary and compensation history.
 
-It is not a payroll engine.
+It does not calculate pay, tax, deductions or statutory submissions.
 
 Compensation data is highly sensitive and requires strict permission controls and audit redaction.
 
@@ -61,11 +61,11 @@ Compensation visibility is:
 
 Managers may view compensation for their complete subordinate hierarchy only when `DisplaySalaryOnEmployeeProfile` is enabled.
 
-This should remain separate from payroll-sensitive data.
+This should remain separate from bank, tax and payment-sensitive data.
 
 ---
 
-## Payroll Sensitive Data
+## Payment-Sensitive Data
 
 Bank details, NI numbers and tax references are not compensation.
 
@@ -126,4 +126,4 @@ Sensitive reports require elevated permissions and audit entries.
 4. Permissions restrict access.
 5. Sensitive values are redacted in audit.
 6. Reporting is supported.
-7. Compensation is separate from payroll-sensitive data.
+7. Compensation is separate from bank, tax and payment-sensitive data.

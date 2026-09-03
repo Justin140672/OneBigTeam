@@ -95,4 +95,54 @@ public sealed class DocumentComplianceReportTests(HrAdminPersonaFixture fixture)
         var fileInfo = new FileInfo(downloadPath!);
         Assert.True(fileInfo.Exists && fileInfo.Length > 0, "Expected the exported CSV file to be non-empty");
     }
+
+    /// <summary>
+    /// Selecting "Excel" from the shared ExportMenu (ExportMenu.razor's SfDropDownButton) must
+    /// invoke the Syncfusion export action — observed here as a non-empty .xlsx download event.
+    /// </summary>
+    [Fact]
+    public async Task ExportExcel_TriggersNonEmptyFileDownload()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var report = new DocumentComplianceReportPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await report.GoToAsync(AcmeId);
+
+        var download = await report.ExportAsync("Excel");
+
+        Assert.NotNull(download.SuggestedFilename);
+        Assert.Contains(".xls", download.SuggestedFilename, StringComparison.OrdinalIgnoreCase);
+
+        var downloadPath = await download.PathAsync();
+        Assert.NotNull(downloadPath);
+        Assert.True(new FileInfo(downloadPath!).Length > 0, "Expected the exported Excel file to be non-empty");
+    }
+
+    /// <summary>
+    /// Selecting "PDF" from the shared ExportMenu must invoke the Syncfusion export action —
+    /// observed here as a non-empty .pdf download event.
+    /// </summary>
+    [Fact]
+    public async Task ExportPdf_TriggersNonEmptyFileDownload()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var report = new DocumentComplianceReportPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await report.GoToAsync(AcmeId);
+
+        var download = await report.ExportAsync("PDF");
+
+        Assert.NotNull(download.SuggestedFilename);
+        Assert.Contains(".pdf", download.SuggestedFilename, StringComparison.OrdinalIgnoreCase);
+
+        var downloadPath = await download.PathAsync();
+        Assert.NotNull(downloadPath);
+        Assert.True(new FileInfo(downloadPath!).Length > 0, "Expected the exported PDF file to be non-empty");
+    }
 }

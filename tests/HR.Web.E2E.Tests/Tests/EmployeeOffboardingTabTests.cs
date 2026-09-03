@@ -189,7 +189,7 @@ public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) :
             await offboarding.HasChecklistTaskAsync("Arrange handover and knowledge transfer"),
             "Expected the fixed handover task to appear in the checklist");
         Assert.True(
-            await offboarding.HasChecklistTaskAsync("Notify IT and Payroll of employee exit"),
-            "Expected the fixed IT/Payroll notification task to appear in the checklist");
+            await offboarding.HasChecklistTaskAsync("Notify IT and Finance of employee exit"),
+            "Expected the fixed IT/Finance notification task to appear in the checklist");
     }
 }

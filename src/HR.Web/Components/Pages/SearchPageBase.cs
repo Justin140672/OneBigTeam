@@ -335,14 +335,31 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
         StateHasChanged();
 
         var search = string.IsNullOrWhiteSpace(SearchTerm) ? null : SearchTerm;
-        var result = await FetchItemsAsync(search);
 
-        if (result is null)
+        // FetchItemsAsync overrides generally translate an HttpRequestException into a null return
+        // (→ Error below), but a non-HttpRequestException (a timeout / TaskCanceledException, a
+        // deserialization error) would otherwise propagate out of here and out of
+        // OnParametersSetAsync, leaving IsLoading stuck true — the grid then shows its loading
+        // spinner forever instead of rows, an empty row, or the error alert. Every list page in
+        // the app derives from this base, so that one gap is a broad "the page just never
+        // finishes loading" failure mode. Fail into the visible Error state instead.
+        try
+        {
+            var result = await FetchItemsAsync(search);
+
+            if (result is null)
+                Error = LoadErrorMessage;
+            else
+                Items = result;
+        }
+        catch (Exception)
+        {
             Error = LoadErrorMessage;
-        else
-            Items = result;
-
-        IsLoading = false;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     protected async Task OnSearchChanged(string value)

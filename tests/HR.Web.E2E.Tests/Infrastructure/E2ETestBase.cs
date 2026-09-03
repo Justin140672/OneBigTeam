@@ -15,12 +15,29 @@ public abstract class E2ETestBase(IPersonaFixture fixture) : IAsyncLifetime
     protected          IBrowserContext _context = null!;
     protected          IPage           _page    = null!;
 
+    // Rolling diagnostic buffers — dumped alongside the screenshot in DisposeAsync when the
+    // authenticated shell never rendered, so a failing run says WHY (an api/me 401/403/500, a
+    // JS error) without a re-run.
+    private readonly List<string> _consoleErrors = new();
+    private readonly List<string> _failedResponses = new();
+
     public virtual async Task InitializeAsync()
     {
         _context = _fixture.AuthenticatedContextOptions is { } options
             ? await _fixture.Browser.NewContextAsync(options)
             : await _fixture.Browser.NewContextAsync();
         _page = await _context.NewPageAsync();
+
+        _page.Console += (_, msg) =>
+        {
+            if (msg.Type is "error" or "warning")
+                _consoleErrors.Add($"[{msg.Type}] {msg.Text}");
+        };
+        _page.Response += (_, res) =>
+        {
+            if (res.Status >= 400)
+                _failedResponses.Add($"{res.Status} {res.Request.Method} {res.Url}");
+        };
 
         // Sensible defaults: actions wait up to 30 s, navigation up to 30 s.
         // Individual waits can still override with an explicit Timeout option.
@@ -33,6 +50,27 @@ public abstract class E2ETestBase(IPersonaFixture fixture) : IAsyncLifetime
 
     public virtual async Task DisposeAsync()
     {
+        // Diagnostic capture: if the authenticated shell never rendered, something upstream of the
+        // test's own assertions went wrong (login/session/circuit) — dump a screenshot + the live
+        // DOM + console so a failing run can be diagnosed without re-running interactively. Written
+        // to bin/.../diag/. Best-effort; never let it affect teardown.
+        try
+        {
+            if (!await _page.Locator(".app-shell").IsVisibleAsync())
+            {
+                var dir = Path.Combine(AppContext.BaseDirectory, "diag");
+                Directory.CreateDirectory(dir);
+                var stamp = $"{DateTime.UtcNow:HHmmss_fff}_{Guid.NewGuid().ToString("N")[..6]}";
+                await _page.ScreenshotAsync(new() { Path = Path.Combine(dir, $"{stamp}.png"), FullPage = true });
+                var failed = _failedResponses.Count > 0 ? string.Join("\n", _failedResponses) : "(none)";
+                var console = _consoleErrors.Count > 0 ? string.Join("\n", _consoleErrors) : "(none)";
+                await File.WriteAllTextAsync(
+                    Path.Combine(dir, $"{stamp}.html"),
+                    $"URL: {_page.Url}\n\n=== FAILED RESPONSES (>=400) ===\n{failed}\n\n=== CONSOLE ERRORS/WARNINGS ===\n{console}\n\n=== DOM ===\n{await _page.ContentAsync()}");
+            }
+        }
+        catch { /* diagnostics only */ }
+
         // Navigate away before closing so that any Blazor error boundary or faulted circuit
         // is torn down cleanly on the server side, preventing its error UI from bleeding into
         // the next test's fresh context via a reconnecting circuit.
@@ -66,6 +104,24 @@ public abstract class E2ETestBase(IPersonaFixture fixture) : IAsyncLifetime
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
         while (_page.Url.Contains(urlFragment) && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(250);
+        }
+    }
+
+    /// <summary>
+    /// Polls the current page URL until <paramref name="predicate"/> is satisfied, or the timeout
+    /// elapses. Same rationale as <see cref="WaitForUrlToStopContainingAsync"/> (a client-side
+    /// NavigateTo redirect fired from a route guard once the interactive circuit connects is not
+    /// visible to WaitForLoadStateAsync/NetworkIdle) but for redirect targets that can't be
+    /// expressed as a plain "no longer contains X" — e.g. a redirect to the user's own profile,
+    /// whose URL still contains the list route as a path prefix. Does not throw on timeout: the
+    /// caller asserts on the resulting <see cref="IPage.Url"/> afterwards for a clear message.
+    /// </summary>
+    protected async Task WaitForUrlAsync(Func<string, bool> predicate, int timeoutMs = 20_000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (!predicate(_page.Url) && DateTime.UtcNow < deadline)
         {
             await Task.Delay(250);
         }

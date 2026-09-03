@@ -6,7 +6,7 @@ public class GenerateSupportSessionValidatorTests
 {
     private static GenerateSupportSessionRequest ValidRequest() => new(
         Guid.NewGuid(),
-        "Investigating a customer-reported issue with payroll export.");
+        "Investigating a customer-reported issue with compensation export.");
 
     [Fact]
     public void Validate_Passes_For_Valid_Request()

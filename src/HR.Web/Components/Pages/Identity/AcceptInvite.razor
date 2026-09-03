@@ -38,7 +38,7 @@
             <div class="login-field">
                 <label class="login-label">Password</label>
                 <div class="login-password-field">
-                    <SfTextBox @bind-Value="_model.Password"
+                    <HrTextBox @bind-Value="_model.Password"
                                Placeholder="Choose a password"
                                Type="@(_showPassword ? InputType.Text : InputType.Password)"
                                Input="@(() => _error = null)" />
@@ -55,7 +55,7 @@
 
             <div class="login-field">
                 <label class="login-label">Confirm password</label>
-                <SfTextBox @bind-Value="_model.Confirm"
+                <HrTextBox @bind-Value="_model.Confirm"
                            Placeholder="Repeat password"
                            Type="@(_showPassword ? InputType.Text : InputType.Password)"
                            Input="@(() => _error = null)" />

@@ -99,9 +99,12 @@ public sealed class AccessibilityScanJourneyTests(HrAdminPersonaFixture fixture)
         var leaveTypes = new LeaveTypeListPage(_page, _fixture.WebBaseUrl);
         await leaveTypes.GoToAsync(AcmeId);
 
-        // Select the first data row and open the deactivate confirmation (HrConfirmDialog) — then
-        // scan with the dialog visible. We deliberately do NOT confirm, so no state changes.
-        await _page.Locator(".e-grid .e-row").First.ClickAsync();
+        // Select a non-system leave type and open the deactivate confirmation (HrConfirmDialog) —
+        // then scan with the dialog visible. We deliberately do NOT confirm, so no state changes.
+        // The first row is "Annual Leave", a system type whose Deactivate action short-circuits to
+        // an inline error and never opens the dialog (see LeaveTypeList.ConfigureToolbar), so target
+        // "Unpaid Leave" explicitly instead.
+        await _page.Locator(".e-grid .e-row").Filter(new() { HasText = "Unpaid Leave" }).First.ClickAsync();
         var deactivate = _page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
         await deactivate.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await deactivate.ClickAsync();
@@ -140,11 +143,28 @@ public sealed class AccessibilityScanJourneyTests(HrAdminPersonaFixture fixture)
 
         await AccessibilityScan.AssertNoSeriousViolationsAsync(_page, "sickness report");
     }
+}
+
+/// <summary>
+/// NFR-05: the Recruitment Pipeline report is gated by the Recruiter-only
+/// "reporting:view-recruitment" policy (deliberately non-overlapping with HrAdministrator — see
+/// <see cref="RecruitmentPipelineReportTests"/>), so its accessibility journey runs under the
+/// Recruiter persona rather than the HR-administrator fixture the rest of
+/// <see cref="AccessibilityScanJourneyTests"/> uses.
+/// </summary>
+public sealed class RecruitmentAccessibilityScanJourneyTests(RecruiterPersonaFixture fixture)
+    : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
+{
+    private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter
 
     [Fact]
     public async Task RecruitmentPipelineReport_HasNoSeriousViolations()
     {
-        await LoginAsync();
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        await login.GoToAsync();
+        await login.LoginAsync(MarcusEmail);
+
         var report = new RecruitmentPipelineReportPage(_page, _fixture.WebBaseUrl);
         await report.GoToAsync(AcmeId);
 

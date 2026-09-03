@@ -66,7 +66,7 @@ public class GenerateSupportSessionEndpointTests
 
         var response = await client.PostAsJsonAsync(
             Url(Guid.NewGuid()),
-            new { reason = "Investigating a customer-reported issue with payroll export." });
+            new { reason = "Investigating a customer-reported issue with compensation export." });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -78,7 +78,7 @@ public class GenerateSupportSessionEndpointTests
 
         var response = await client.PostAsJsonAsync(
             Url(Guid.NewGuid()),
-            new { reason = "Investigating a customer-reported issue with payroll export." });
+            new { reason = "Investigating a customer-reported issue with compensation export." });
 
         // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
         // is Forbidden (403), not Unauthorized (401).
@@ -92,7 +92,7 @@ public class GenerateSupportSessionEndpointTests
 
         var response = await client.PostAsJsonAsync(
             Url(Guid.NewGuid()),
-            new { reason = "Investigating a customer-reported issue with payroll export." });
+            new { reason = "Investigating a customer-reported issue with compensation export." });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -127,7 +127,7 @@ public class GenerateSupportSessionEndpointTests
 
         var response = await client.PostAsJsonAsync(
             Url(companyId),
-            new { reason = "Investigating a customer-reported issue with payroll export." });
+            new { reason = "Investigating a customer-reported issue with compensation export." });
         response.EnsureSuccessStatusCode();
 
         var payload = await response.Content.ReadFromJsonAsync<GenerateSupportSessionPayload>();

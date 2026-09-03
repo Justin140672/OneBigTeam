@@ -51,7 +51,15 @@ var connectionString = builder.Configuration.GetConnectionString("hr")
 // bottleneck: a higher ceiling and a small warm floor so connections don't need to be established
 // from scratch on every burst. Harmless for a normal single-app-instance deployment against its own
 // dedicated Postgres — this isn't shared across unrelated services.
-connectionString += ";Maximum Pool Size=300;Minimum Pool Size=10";
+var isE2ETestingRun = string.Equals(
+	Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
+// Under the E2E run this one api instance is shared across up to 15 concurrent Playwright circuits,
+// so give the pool a higher ceiling and a warmer floor (the AppHost lifts Postgres' own
+// max_connections to 500 to stay clear of this). A normal deployment keeps the more conservative
+// 300/10 — plenty for a single app against its own dedicated Postgres.
+connectionString += isE2ETestingRun
+	? ";Maximum Pool Size=400;Minimum Pool Size=30"
+	: ";Maximum Pool Size=300;Minimum Pool Size=10";
 
 builder.Services.AddCompaniesModule(connectionString, builder.Configuration);
 builder.Services.AddCompanyOnboardingModule(connectionString);

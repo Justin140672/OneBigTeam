@@ -73,9 +73,9 @@ Asynchronous report generation, stored generated-report files, report history, s
 
 If a demonstrated large-report requirement cannot meet the normal response target, it may introduce a bounded Hangfire job and private Supabase Storage object. That work requires an explicit feature decision covering retention, idempotency, authorization at download time, failure visibility and cleanup.
 
-## Payroll boundary
+## Pay-processing boundary
 
-Reporting may export employee or compensation information for authorised operational use. It does not calculate payroll, tax, deductions or statutory payroll submissions.
+Reporting may export employee or compensation information for authorised operational use. It does not calculate pay, tax or deductions and does not create statutory submissions.
 
 ## Performance
 

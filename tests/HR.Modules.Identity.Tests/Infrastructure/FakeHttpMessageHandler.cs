@@ -20,6 +20,14 @@ internal sealed class FakeHttpMessageHandler : HttpMessageHandler
     public HttpStatusCode StatusCodeToReturn { get; set; } = HttpStatusCode.OK;
     public string ResponseBodyToReturn { get; set; } = "{}";
 
+    /// <summary>When set, the handler awaits this delay (observing the CancellationToken) before
+    /// responding — used to exercise timeout/cancellation behaviour.</summary>
+    public TimeSpan? Delay { get; set; }
+
+    /// <summary>When set, the handler throws this instead of returning a response — used to
+    /// simulate a transport-level failure (e.g. <see cref="HttpRequestException"/>).</summary>
+    public Exception? ExceptionToThrow { get; set; }
+
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
@@ -28,6 +36,12 @@ internal sealed class FakeHttpMessageHandler : HttpMessageHandler
             ? null
             : await request.Content.ReadAsStringAsync(cancellationToken);
         Requests.Add((request, LastRequestBody));
+
+        if (Delay is { } delay)
+            await Task.Delay(delay, cancellationToken);
+
+        if (ExceptionToThrow is not null)
+            throw ExceptionToThrow;
 
         return new HttpResponseMessage(StatusCodeToReturn)
         {

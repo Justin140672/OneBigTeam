@@ -28,8 +28,7 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees");
 
-        await palette.OpenWithKeyboardAsync();
-        await palette.WaitForOpenAsync();
+        await palette.OpenAsync();
 
         await palette.TypeAsync("leave");
         Assert.True(await palette.HasResultAsync("Leave Policies"),
@@ -52,8 +51,7 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees");
 
-        await palette.OpenWithKeyboardAsync();
-        await palette.WaitForOpenAsync();
+        await palette.OpenAsync();
 
         await palette.TypeAsync("compliance");
 
@@ -72,8 +70,7 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees");
 
-        await palette.OpenWithKeyboardAsync();
-        await palette.WaitForOpenAsync();
+        await palette.OpenAsync();
 
         await palette.TypeAsync("governance");
 
@@ -113,8 +110,7 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees");
 
-        await palette.OpenWithKeyboardAsync();
-        await palette.WaitForOpenAsync();
+        await palette.OpenAsync();
 
         await palette.PressEscapeAsync();
 

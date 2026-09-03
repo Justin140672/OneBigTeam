@@ -91,10 +91,24 @@
 
     private sealed record GroupBlock(string Label, List<AdminDestination> Destinations);
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
+    {
+        // On a cold circuit this component's OnInitialized can run before MainLayout's
+        // Session.InitialiseAsync() await has completed — reading Session here then gave an empty
+        // AdminNavCapabilities (no admin access), so the Ctrl+K trigger never rendered for the
+        // whole page lifetime. Await the (idempotent, de-duped) load ourselves, and also re-render
+        // if the session changes later.
+        Session.Changed += OnSessionChanged;
+        await Session.InitialiseAsync();
+        _caps = AdminNavCapabilities.From(Session);
+        Refresh();
+    }
+
+    private void OnSessionChanged()
     {
         _caps = AdminNavCapabilities.From(Session);
         Refresh();
+        InvokeAsync(StateHasChanged);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -197,6 +211,8 @@
 
     public async ValueTask DisposeAsync()
     {
+        Session.Changed -= OnSessionChanged;
+
         if (_registered)
         {
             try { await JS.InvokeVoidAsync("unregisterAdminQuickNav"); } catch { }

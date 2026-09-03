@@ -59,7 +59,7 @@ The system shall:
 | HR Administrator | Manages employees, recruitment, documents, policies and compliance |
 | Company Administrator | Manages company profile, settings and branding; does not receive HR access from this role |
 | Recruiter | Manages vacancies, candidates and interview workflow |
-| Finance User | May view compensation or payroll-related exports if authorised |
+| Finance User | May view authorised compensation exports |
 
 The initial company creator is deliberately assigned both Company Administrator and HR Administrator. This is an explicit first-account exception, not an implication between the roles.
 
@@ -92,7 +92,7 @@ The MVP includes:
 
 The MVP does not include:
 
-- Payroll processing
+- Pay processing
 - Benefits administration
 - Advanced performance reviews
 - Public recruitment portal

@@ -68,16 +68,29 @@ public static class AccessibilityScan
     /// </summary>
     private static async Task WaitForGridsToSettleAsync(IPage page)
     {
+        try
+        {
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            // Background polling / SignalR keeps the connection busy — fall through to the per-grid wait.
+        }
+
         var gridCount = await page.Locator(".e-grid").CountAsync();
         for (var i = 0; i < gridCount; i++)
         {
             var grid = page.Locator(".e-grid").Nth(i);
             try
             {
-                await grid.Locator(".e-row, .e-emptyrow").First
+                // Wait for a row *inside the content table* specifically (the header also renders
+                // <tr> elements). SearchPageBase-backed grids render the container first and load
+                // their rows over a second async round trip, so the row must be visible — not merely
+                // attached — before axe's aria-required-children rule will see the grid as complete.
+                await grid.Locator(".e-gridcontent .e-row, .e-gridcontent .e-emptyrow").First
                     .WaitForAsync(new LocatorWaitForOptions
                     {
-                        State = WaitForSelectorState.Attached,
+                        State = WaitForSelectorState.Visible,
                         Timeout = 10_000,
                     });
             }
@@ -86,6 +99,10 @@ public static class AccessibilityScan
                 // Grid never rendered a row group — let the scan run and report it as a real finding.
             }
         }
+
+        // Let any in-flight row re-render (data swap after the initial empty paint) commit before axe reads the DOM.
+        if (gridCount > 0)
+            await page.WaitForTimeoutAsync(500);
     }
 
     /// <summary>

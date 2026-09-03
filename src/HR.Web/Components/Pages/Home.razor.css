@@ -19,6 +19,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--hr-gray-400);
+    /* gray-600 (not gray-400) — small bold uppercase label must clear WCAG AA 4.5:1. */
+    color: var(--hr-gray-600);
     margin-bottom: 1rem;
 }

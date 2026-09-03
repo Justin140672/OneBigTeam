@@ -110,10 +110,24 @@ public abstract class EditPageBase : ComponentBase, IDisposable
         GlobalError = null;
         SuccessMsg = null;
 
-        await LoadAsync();
-        CaptureBaseline();
-
-        IsLoading = false;
+        // A throw out of LoadAsync (or a page's OnLoadedAsync hook fetching picker data) would
+        // otherwise propagate out of OnParametersSetAsync and leave IsLoading pinned true — the
+        // edit page then shows its loading spinner forever instead of the form or an error.
+        // Every edit page in the app derives from this base.
+        try
+        {
+            await LoadAsync();
+            CaptureBaseline();
+        }
+        catch (Exception ex)
+        {
+            GlobalError = "Failed to load. Please try again.";
+            System.Diagnostics.Debug.WriteLine(ex);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     protected virtual Task LoadAsync() => Task.CompletedTask;

@@ -163,18 +163,58 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     public string? PrimaryLogoUrl { get; private set; }
     public string? SmallLogoUrl { get; private set; }
 
+    // Raised once the session has finished loading (or after a load attempt). Components that read
+    // session-derived state during their own OnInitialized — which can run before MainLayout's
+    // InitialiseAsync() await has completed on a cold circuit — subscribe to this to re-render with
+    // the real values instead of the empty defaults (see AdminQuickNav).
+    public event Action? Changed;
+
+    // De-dupes concurrent callers (MainLayout and any component that awaits InitialiseAsync in its
+    // own lifecycle) onto a single in-flight load. The Blazor circuit is single-threaded, so no
+    // lock is needed. Cleared if the attempt didn't actually complete, so a transient api/me
+    // failure can still be retried by the next caller.
+    private Task? _inFlight;
+
     public async Task InitialiseAsync()
     {
         if (IsLoaded) return;
 
-        MeResponse? me;
+        _inFlight ??= InitialiseCoreAsync();
         try
         {
-            me = await Http.GetFromJsonAsync<MeResponse>("api/me", HrApiJsonOptions.Default);
+            await _inFlight;
         }
-        catch (HttpRequestException)
+        finally
         {
-            return;
+            if (!IsLoaded) _inFlight = null;
+        }
+
+        Changed?.Invoke();
+    }
+
+    private async Task InitialiseCoreAsync()
+    {
+        if (IsLoaded) return;
+
+        // api/me establishes identity + tenant + permissions — nothing else about the session
+        // matters if this fails. On a freshly-established circuit the bearer token can occasionally
+        // not be attached to the very first outgoing call (the cookie-capture middleware races the
+        // circuit's first render), which 401s and would otherwise pin MainLayout on "Loading…"
+        // forever. Retry a few times, and swallow ANY failure (not just HttpRequestException — a
+        // JsonException from an unexpected non-JSON body, a timeout) so init ends cleanly rather
+        // than throwing out into the circuit.
+        MeResponse? me = null;
+        for (var attempt = 1; attempt <= 4 && me is null; attempt++)
+        {
+            try
+            {
+                me = await Http.GetFromJsonAsync<MeResponse>("api/me", HrApiJsonOptions.Default);
+            }
+            catch
+            {
+                if (attempt < 4)
+                    await Task.Delay(400 * attempt);
+            }
         }
 
         if (me is null) return;
@@ -188,28 +228,41 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
         IsManager = me.IsManager;
         IsRecruiter = me.IsRecruiter;
 
-        var companyTask    = GetCompanyOrNullAsync(me.CompanyId);
-        var settingsTask   = GetCompanySettingsOrNullAsync(me.CompanyId);
-        var hrSettingsTask = GetHrSettingsOrNullAsync(me.CompanyId);
-        var employeeTask   = GetEmployeeOrNullAsync(me.CompanyId);
+        // Identity + permissions are the only session state the app shell and every page's
+        // permission guard actually need to render correctly. Mark the session loaded now, so a
+        // slow or failing *secondary* enrichment call (branding, settings, onboarding checklist,
+        // subscription status — several of which are HR-admin-only) can never leave MainLayout
+        // stuck on its "Loading…" gate and, with it, every route guard inert. The enrichment below
+        // is best-effort and its failures were already meant to be swallowed (see each
+        // *OrNullAsync helper) — widened here so a non-HttpRequestException (a timeout /
+        // TaskCanceledException, a serialization error) can't take session init down either.
+        IsLoaded = true;
 
-        // Only HR Administrators / Company Administrators are granted the onboarding:view policy;
-        // everyone else gets a 403, so skip the call entirely rather than let it noisily fail.
-        var onboardingTask = me.IsHrAdministrator || me.CanManageCompany
-            ? GetOnboardingChecklistOrNullAsync()
-            : Task.FromResult<GetCompanyOnboardingChecklistResponse?>(null);
-        var subscriptionTask = GetSubscriptionStatusOrNullAsync();
+        try
+        {
+            var companyTask    = GetCompanyOrNullAsync(me.CompanyId);
+            var settingsTask   = GetCompanySettingsOrNullAsync(me.CompanyId);
+            var hrSettingsTask = GetHrSettingsOrNullAsync(me.CompanyId);
+            var employeeTask   = GetEmployeeOrNullAsync(me.CompanyId);
 
-        await Task.WhenAll(companyTask, settingsTask, hrSettingsTask, employeeTask, onboardingTask, subscriptionTask);
+            // Only HR Administrators / Company Administrators are granted the onboarding:view
+            // policy; everyone else gets a 403, so skip the call entirely rather than let it
+            // noisily fail.
+            var onboardingTask = me.IsHrAdministrator || me.CanManageCompany
+                ? GetOnboardingChecklistOrNullAsync()
+                : Task.FromResult<GetCompanyOnboardingChecklistResponse?>(null);
+            var subscriptionTask = GetSubscriptionStatusOrNullAsync();
 
-        var company      = await companyTask;
-        var settings     = await settingsTask;
-        var hrSettings   = await hrSettingsTask;
-        var employee     = await employeeTask;
-        var onboarding   = await onboardingTask;
-        var subscription = await subscriptionTask;
+            await Task.WhenAll(companyTask, settingsTask, hrSettingsTask, employeeTask, onboardingTask, subscriptionTask);
 
-        ShowGettingStarted = onboarding is not null && !onboarding.IsHidden && !onboarding.IsDismissedEarly;
+            var company      = await companyTask;
+            var settings     = await settingsTask;
+            var hrSettings   = await hrSettingsTask;
+            var employee     = await employeeTask;
+            var onboarding   = await onboardingTask;
+            var subscription = await subscriptionTask;
+
+            ShowGettingStarted = onboarding is not null && !onboarding.IsHidden && !onboarding.IsDismissedEarly;
 
         if (subscription is not null)
         {
@@ -255,9 +308,14 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
             HoursPerDayOverride = employee.HoursPerDayOverride;
             ProfileImageUrl     = employee.ProfileImageUrl;
             RequiresInitialEmployeeSetup = employee.RequiresInitialSetup;
+            }
         }
-
-        IsLoaded = true;
+        catch
+        {
+            // Best-effort enrichment only — identity + permissions (assigned above, before this
+            // block) are already live and IsLoaded is already true. Never let a secondary call
+            // failing block or unwind session initialisation.
+        }
     }
 
     // A signed-in user isn't always linked to an Employee record (e.g. a Company Administrator

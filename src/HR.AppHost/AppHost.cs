@@ -23,6 +23,18 @@ if (!isE2ETesting)
 {
 	postgres = postgres.WithDataVolume();
 }
+else
+{
+	// The E2E suite runs one shared Postgres behind one shared api instance while up to 15 xUnit
+	// threads drive concurrent Playwright circuits. HR.Api raises its Npgsql pool ceiling to 400
+	// under E2E (see its Program.cs), and Hangfire + migrations add more on top — all of which is
+	// capped by the container's own server-side limit. Postgres' stock max_connections=100 is well
+	// below that, so a burst hits "sorry, too many clients already" and surfaces as the generic
+	// 20s Playwright locator timeouts this infrastructure keeps fighting. Lift the server ceiling
+	// clear of the client pool. (Only max_connections — raising shared_buffers would need the
+	// container's /dev/shm bumped too, and the stock 128MB is fine for ~500 idle-ish sessions.)
+	postgres = postgres.WithArgs("-c", "max_connections=500");
+}
 
 var hrDatabase = postgres.AddDatabase("hr");
 

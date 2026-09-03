@@ -65,7 +65,20 @@ public sealed class EmployeeCompletionDialogPage(IPage page)
 
     // ── Field fill helpers ─────────────────────────────────────────────────────
 
-    public Task FillPreferredNameAsync(string value) => Dialog.GetByPlaceholder("Defaults to first name").FillAsync(value);
+    // HrTextBox (SfTextBox) only raises ValueChanged — and therefore only pushes the typed text
+    // into the EditForm model that submit-time validation reads — on the "change"/blur event, NOT
+    // on FillAsync's raw "input" event. Without an explicit blur after each fill the dialog
+    // submits with those fields still empty (looks like "nothing was typed"), so every text field
+    // here goes through this helper. (Nationality/Gender are SfDropDownList — handled separately;
+    // Date of Birth has its own Escape-to-commit dance below.)
+    private async Task FillFieldAsync(string placeholder, string value)
+    {
+        var field = Dialog.GetByPlaceholder(placeholder);
+        await field.FillAsync(value);
+        await field.BlurAsync();
+    }
+
+    public Task FillPreferredNameAsync(string value) => FillFieldAsync("Defaults to first name", value);
 
     public async Task FillDateOfBirthAsync(string ddMMyyyy)
     {
@@ -81,25 +94,25 @@ public sealed class EmployeeCompletionDialogPage(IPage page)
     public Task SelectGenderAsync(string text) =>
         DropDownSelector.SelectAsync(page, FieldGroup("Gender"), text);
 
-    public Task FillGenderOtherAsync(string value) => Dialog.GetByPlaceholder("Please specify").FillAsync(value);
+    public Task FillGenderOtherAsync(string value) => FillFieldAsync("Please specify", value);
 
-    public Task FillPersonalEmailAsync(string value) => Dialog.GetByPlaceholder("personal@example.com").FillAsync(value);
+    public Task FillPersonalEmailAsync(string value) => FillFieldAsync("personal@example.com", value);
 
-    public Task FillPhoneNumberAsync(string value) => Dialog.GetByPlaceholder("e.g. 07700 900000").FillAsync(value);
+    public Task FillPhoneNumberAsync(string value) => FillFieldAsync("e.g. 07700 900000", value);
 
-    public Task FillHomePhoneAsync(string value) => Dialog.GetByPlaceholder("e.g. 01234 567890").FillAsync(value);
+    public Task FillHomePhoneAsync(string value) => FillFieldAsync("e.g. 01234 567890", value);
 
-    public Task FillAddressLine1Async(string value) => Dialog.GetByPlaceholder("Street address").FillAsync(value);
+    public Task FillAddressLine1Async(string value) => FillFieldAsync("Street address", value);
 
-    public Task FillAddressLine2Async(string value) => Dialog.GetByPlaceholder("Apartment, suite, etc.").FillAsync(value);
+    public Task FillAddressLine2Async(string value) => FillFieldAsync("Apartment, suite, etc.", value);
 
-    public Task FillCityAsync(string value) => Dialog.GetByPlaceholder("e.g. London").FillAsync(value);
+    public Task FillCityAsync(string value) => FillFieldAsync("e.g. London", value);
 
-    public Task FillCountyAsync(string value) => Dialog.GetByPlaceholder("e.g. Greater London").FillAsync(value);
+    public Task FillCountyAsync(string value) => FillFieldAsync("e.g. Greater London", value);
 
-    public Task FillPostcodeAsync(string value) => Dialog.GetByPlaceholder("e.g. SW1A 1AA").FillAsync(value);
+    public Task FillPostcodeAsync(string value) => FillFieldAsync("e.g. SW1A 1AA", value);
 
-    public Task FillCountryAsync(string value) => Dialog.GetByPlaceholder("e.g. United Kingdom").FillAsync(value);
+    public Task FillCountryAsync(string value) => FillFieldAsync("e.g. United Kingdom", value);
 
     /// <summary>
     /// Fills every required field with valid values (plus a fixed Nationality/Gender selection),

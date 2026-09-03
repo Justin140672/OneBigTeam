@@ -22,21 +22,21 @@
                         <h6 class="text-uppercase text-muted small mb-3">@EnumDisplay.Humanize(addr.Type)</h6>
                         <div class="row g-3">
                             <div class="col-12">
-                                <SfTextBox @bind-Value="addr.Line1" Placeholder="Line 1" />
+                                <HrTextBox @bind-Value="addr.Line1" Placeholder="Line 1" />
                                 <ValidationMessage For="@(() => addr.Line1)" />
                             </div>
                             <div class="col-12">
-                                <SfTextBox @bind-Value="addr.Line2" Placeholder="Line 2" />
+                                <HrTextBox @bind-Value="addr.Line2" Placeholder="Line 2" />
                             </div>
                             <div class="col-md-6">
-                                <SfTextBox @bind-Value="addr.City" Placeholder="City" />
+                                <HrTextBox @bind-Value="addr.City" Placeholder="City" />
                                 <ValidationMessage For="@(() => addr.City)" />
                             </div>
                             <div class="col-md-6">
-                                <SfTextBox @bind-Value="addr.Region" Placeholder="County" />
+                                <HrTextBox @bind-Value="addr.Region" Placeholder="County" />
                             </div>
                             <div class="col-md-6">
-                                <SfTextBox @bind-Value="addr.PostalCode" Placeholder="Postal Code" />
+                                <HrTextBox @bind-Value="addr.PostalCode" Placeholder="Postal Code" />
                                 <ValidationMessage For="@(() => addr.PostalCode)" />
                             </div>
                             @* Country Code deliberately not shown — UK-only customers for now (same

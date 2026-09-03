@@ -44,7 +44,7 @@ public class ListUsersHandlerTests(IdentityDatabaseFixture fixture)
         var positionReader = new FakePositionProfileReader(
             summaries: new Dictionary<Guid, PositionProfileSummary>
             {
-                [positionProfileId] = new PositionProfileSummary(positionProfileId, "Payroll Clerk", null, null, true, null, null),
+                [positionProfileId] = new PositionProfileSummary(positionProfileId, "Finance Assistant", null, null, true, null, null),
             });
 
         var result = await BuildHandler(audienceReader, positionReader).HandleAsync(Request(companyId), CancellationToken.None);
@@ -53,7 +53,7 @@ public class ListUsersHandlerTests(IdentityDatabaseFixture fixture)
         var row = Assert.Single(result.Value.Items);
         Assert.Equal(employeeId, row.EmployeeId);
         Assert.Equal(positionProfileId, row.PositionProfileId);
-        Assert.Equal("Payroll Clerk", row.PositionTitle);
+        Assert.Equal("Finance Assistant", row.PositionTitle);
     }
 
     [Fact]

@@ -121,7 +121,12 @@ public sealed class UnauthorizedAccessTests(EmployeePersonaFixture fixture) : Ro
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // The redirect is a client-side NavigateTo from the employee-list route guard, which only
+        // runs once the interactive circuit connects — NetworkIdle goes quiet before that. Tom is
+        // redirected to his own profile, whose URL still contains "/employees/" as a path prefix,
+        // so poll until the URL no longer ends with the bare list route.
+        await WaitForUrlAsync(u =>
+            !u.TrimEnd('/').EndsWith($"/companies/{AcmeId}/employees", StringComparison.OrdinalIgnoreCase));
 
         // Tom is now redirected to his own profile (which itself lives under an "/employees/"
         // path segment), not the dashboard — so check he's off the bare list route specifically,
@@ -141,9 +146,12 @@ public sealed class UnauthorizedAccessTests(EmployeePersonaFixture fixture) : Ro
         await login.LoginAsync(TomEmail);
 
         // ── Step 2: Sidebar nav items (People, Leave, HR) must be hidden ──────
+        // The nav is permission-gated on AppSession, which populates a beat after ".app-shell"
+        // first renders (LoginAsync returns as soon as the shell is visible). Use Playwright's
+        // auto-retrying assertion rather than a single IsVisibleAsync() snapshot so we don't
+        // observe the brief pre-permission render window.
         var navMenu = _page.Locator(".app-nav-menu");
-        Assert.False(await navMenu.IsVisibleAsync(),
-            "Tom (Employee) should not see the admin navigation menu in the sidebar");
+        await Assertions.Expect(navMenu).ToBeHiddenAsync(new() { Timeout = 10_000 });
     }
 
 

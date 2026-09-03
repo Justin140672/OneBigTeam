@@ -171,7 +171,7 @@
             }
             <div class="mb-3">
                 <label class="form-label">Notes (optional)</label>
-                <SfTextBox @bind-Value="_addNotes" Multiline="true" Rows="2" />
+                <HrTextBox @bind-Value="_addNotes" Multiline="true" Rows="2" />
             </div>
             @if (_dialogError is not null)
             {
@@ -216,7 +216,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Location</label>
-                    <SfTextBox @bind-Value="_scheduleModel.Location" Placeholder="e.g. Remote" />
+                    <HrTextBox @bind-Value="_scheduleModel.Location" Placeholder="e.g. Remote" />
                 </div>
             </EditForm>
             @if (_dialogError is not null)
@@ -236,7 +236,7 @@
         <Content>
             <div class="mb-3">
                 <label class="form-label">Reason (optional)</label>
-                <SfTextBox @bind-Value="_rejectionReason" Multiline="true" Rows="2" />
+                <HrTextBox @bind-Value="_rejectionReason" Multiline="true" Rows="2" />
             </div>
             @if (_dialogError is not null)
             {
@@ -276,7 +276,7 @@
                     @if (_gender == "Other")
                     {
                         <div class="mt-2">
-                            <SfTextBox @bind-Value="_genderOther" Placeholder="Please specify" />
+                            <HrTextBox @bind-Value="_genderOther" Placeholder="Please specify" />
                         </div>
                     }
                 </div>
@@ -291,7 +291,7 @@
                 {
                     <div class="col-md-6">
                         <label class="form-label">Employee Number <span class="text-danger">*</span></label>
-                        <SfTextBox @bind-Value="_employeeNumber" Placeholder="e.g. EMP-001" />
+                        <HrTextBox @bind-Value="_employeeNumber" Placeholder="e.g. EMP-001" />
                     </div>
                 }
                 <div class="col-md-6">

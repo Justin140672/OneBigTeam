@@ -186,7 +186,7 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
             "Conduct exit interview",
             "Revoke system access and accounts",
             "Arrange handover and knowledge transfer",
-            "Notify IT and Payroll of employee exit",
+            "Notify IT and Finance of employee exit",
         ];
 
         foreach (var fragment in taskFragments)

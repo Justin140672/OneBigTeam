@@ -85,7 +85,7 @@ Static test-to-code inspection indicates comparatively dense handler/domain cove
 | Dashboards | Employees land on their profile; Company Administrators without operational roles land in company administration; Manager, HR and Recruitment dashboards are the next ticket; multi-role users receive a combined/prioritised dashboard | Product-owner confirmation 2026-07-11; recent dashboard/UI commits | Product spec 30 mandates dashboards for all roles | High | No — resolved |
 | Reporting | Syncfusion grid exports are implemented in individual screens; formal reporting is a separate, upcoming workstream | Product-owner confirmation 2026-07-11 | Specs 01, 23, 32 do not distinguish implemented grid export from upcoming formal reporting clearly | High | No — resolved |
 | Outbox | Not required for v1; workflows must still be transactional/idempotent where needed | Product-owner confirmation 2026-07-11; no outbox implementation exists | Architecture 01/04/05/07/10 mandates it | High | No — resolved supersession |
-| Payroll | Outside scope | Supplied constraint; product spec 01 | Reporting spec includes “payroll-ready” exports; compensation spec distinguishes these from payroll engine | Medium | Clarify exports only |
+| Pay processing | Outside scope | Supplied constraint; product spec 01 | Reporting supports authorised compensation exports only | Medium | Keep processing outside the product |
 | Integrations | Supabase auth/db/storage, Hangfire, Postmark; no Redis | Supplied constraints; project packages/code | Product spec 01 says “external integrations” out of MVP while architecture specifies them | High | Documentation cleanup |
 
 ## 7. Specification conflicts and confirmed product decisions

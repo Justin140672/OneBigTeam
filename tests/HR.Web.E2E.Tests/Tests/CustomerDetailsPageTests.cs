@@ -247,7 +247,7 @@ public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : R
         await details.GoToAsync(AcmeId);
 
         await details.ClickLoginAsCustomerAsync();
-        await details.FillLoginAsCustomerReasonAsync("Investigating a customer-reported payroll export bug");
+        await details.FillLoginAsCustomerReasonAsync("Investigating a customer-reported compensation export bug");
         await details.ClickLoginAsCustomerConfirmAsync();
 
         await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 15_000 });

@@ -16,6 +16,9 @@ public sealed class SavedReportViewsTests(HrAdminPersonaFixture fixture) : RoleE
 
     private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
 
+    // Seeded plain-Employee persona — has no access to company reporting at all.
+    private const string TomEmail = "tom.williams@acme.example";
+
     private static string UniqueViewName(string prefix) => $"{prefix} {Guid.NewGuid():N}"[..30];
 
     /// <summary>
@@ -186,5 +189,52 @@ public sealed class SavedReportViewsTests(HrAdminPersonaFixture fixture) : RoleE
 
         var options = await report.GetSavedViewOptionTextsAsync();
         Assert.DoesNotContain(viewName, options);
+    }
+
+    /// <summary>
+    /// Saving a named view must produce exactly ONE view with that name — the Save dialog closes on
+    /// success (SaveViewDialog waits for Hidden), so a fast double-submit can't re-fire, but this
+    /// pins that guarantee: the "Saved Views" dropdown ends up with a single matching option, not
+    /// two. Duplicate-click prevention, expressed as "single resulting record".
+    /// </summary>
+    [Fact]
+    public async Task SaveCurrentFiltersAsNewView_ProducesExactlyOneMatchingView()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var report = new EmployeeDirectoryReportPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await report.GoToAsync(AcmeId);
+
+        var viewName = UniqueViewName("Once");
+        await report.SaveCurrentFiltersAsNewViewAsync(viewName);
+
+        Assert.Null(await report.GetSavedViewErrorAsync());
+
+        var options = await report.GetSavedViewOptionTextsAsync();
+        Assert.Equal(1, options.Count(o => o == viewName || o == $"{viewName} (Default)"));
+    }
+
+    /// <summary>
+    /// A plain Employee has no access to company reporting — navigating straight to a report route
+    /// must not land them on the report (and therefore never exposes the shared "Saved Views"
+    /// filter-panel section). They're redirected away rather than shown the grid.
+    /// </summary>
+    [Fact]
+    public async Task PlainEmployee_CannotReachReport_OrSavedViews()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/reporting/employee-directory");
+        await WaitForUrlToStopContainingAsync("/reporting/employee-directory");
+
+        Assert.DoesNotContain("/reporting/employee-directory", _page.Url);
+        Assert.False(await _page.Locator(".report-filter-toolbar button").IsVisibleAsync(),
+            "The Saved Views / filter-panel toolbar must never render for a plain employee");
     }
 }

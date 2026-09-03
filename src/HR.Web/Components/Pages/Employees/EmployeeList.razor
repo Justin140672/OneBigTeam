@@ -270,7 +270,7 @@
 
     protected override async Task OnBeforeLoadAsync()
     {
-        if (!Session.CanReadEmployees)
+        if (!Session.CanManageEmployees)
         {
             Navigation.NavigateTo("/access-denied", replace: true);
             return;

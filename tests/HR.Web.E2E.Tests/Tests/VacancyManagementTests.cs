@@ -312,7 +312,10 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : CrossUser
         await login.LoginAsync(tomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/vacancies");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // The guard is a client-side NavigateTo fired from VacancyList.razor's OnBeforeLoadAsync,
+        // which only runs once the interactive circuit has connected — NetworkIdle (a plain HTTP
+        // signal) routinely goes quiet before that. Poll the URL until the redirect actually lands.
+        await WaitForUrlToStopContainingAsync("/vacancies");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/vacancies"),
@@ -335,7 +338,10 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : CrossUser
         await login.LoginAsync(lauraEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/vacancies");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        // The guard is a client-side NavigateTo fired from VacancyList.razor's OnBeforeLoadAsync,
+        // which only runs once the interactive circuit has connected — NetworkIdle (a plain HTTP
+        // signal) routinely goes quiet before that. Poll the URL until the redirect actually lands.
+        await WaitForUrlToStopContainingAsync("/vacancies");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/vacancies"),

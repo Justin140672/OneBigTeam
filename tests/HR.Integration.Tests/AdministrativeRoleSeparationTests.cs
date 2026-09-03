@@ -101,14 +101,16 @@ public class AdministrativeRoleSeparationTests
             $"Expected the request to pass authorization (not 401/403) but got {(int)response.StatusCode} {response.StatusCode}");
 
     // ---------------------------------------------------------------------
-    // Employee administration - list  (employee:read)
+    // Employee administration - list  (employee:manage)
     // GET /api/companies/{companyId}/employees
     // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
+    [InlineData(Manager)]
+    [InlineData(Recruiter)]
     [InlineData(CompanyAdmin)]
-    public async Task EmployeeList_IsForbidden_ForRolesWithoutEmployeeRead(string roleKey)
+    public async Task EmployeeList_IsForbidden_ForRolesWithoutEmployeeManage(string roleKey)
     {
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(roleKey, companyId);
@@ -119,11 +121,9 @@ public class AdministrativeRoleSeparationTests
     }
 
     [Theory]
-    [InlineData(Manager)]
-    [InlineData(Recruiter)]
     [InlineData(HrAdmin)]
     [InlineData(CompanyAdminPlusHrAdmin)]
-    public async Task EmployeeList_IsAllowed_ForRolesWithEmployeeRead(string roleKey)
+    public async Task EmployeeList_IsAllowed_ForRolesWithEmployeeManage(string roleKey)
     {
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(roleKey, companyId);

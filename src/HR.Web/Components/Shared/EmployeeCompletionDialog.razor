@@ -22,8 +22,7 @@
                 you can update optional information later.
             </p>
             <p class="text-muted ecd-why">
-                We need this information to complete your employee record and keep your HR, payroll and
-                emergency-contact details accurate. Setup takes about 2 minutes — any optional details you
+                We need this information to complete your employee record and keep your HR details accurate. Setup takes about 2 minutes — any optional details you
                 skip can be added later from your profile.
             </p>
 
@@ -194,8 +193,19 @@
         Model.TelephoneRegexPattern = Session.TelephoneRegex;
         Model.MobileRegexPattern = Session.MobileRegex;
 
-        var natResult = await EmployeeService.ListNationalitiesAsync();
-        _nationalities = natResult?.Items.ToList() ?? [];
+        // Best-effort: this dialog blocks the entire app shell (MainLayout renders ONLY this when
+        // Session.RequiresInitialEmployeeSetup is true), so a transient failure fetching the
+        // nationality list must not throw out of OnParametersSetAsync and take the dialog's whole
+        // render down — the field just falls back to an empty list.
+        try
+        {
+            var natResult = await EmployeeService.ListNationalitiesAsync();
+            _nationalities = natResult?.Items.ToList() ?? [];
+        }
+        catch
+        {
+            _nationalities = [];
+        }
     }
 
     private async Task SaveAsync()

@@ -89,7 +89,7 @@ Each party will protect the other's confidential information using reasonable ca
 
 Each party warrants that it has authority to enter into the agreement. One Big Team warrants that it will provide the service with reasonable care and skill.
 
-The Customer remains responsible for employment decisions, legal compliance and verifying outputs, reports and configurations. The service does not provide legal, tax, payroll, medical or professional HR advice. Except as expressly stated and to the fullest extent permitted by law, implied warranties and conditions are excluded.
+The Customer remains responsible for employment decisions, legal compliance and verifying outputs, reports and configurations. The service does not provide legal, tax, accounting, medical or professional HR advice. Except as expressly stated and to the fullest extent permitted by law, implied warranties and conditions are excluded.
 
 ## 15. Liability
 

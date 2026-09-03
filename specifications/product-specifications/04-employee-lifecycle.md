@@ -114,7 +114,7 @@ Cannot:
 Can:
 - view detailed employee records for direct and indirect reports beneath them
 
-Salary visibility for that hierarchy is controlled by `DisplaySalaryOnEmployeeProfile`. Bank, tax and payroll-sensitive fields remain separately protected.
+Salary visibility for that hierarchy is controlled by `DisplaySalaryOnEmployeeProfile`. Bank, tax and payment-sensitive fields remain separately protected.
 
 ### HR Admin
 May view and manage employee records company-wide and always has salary access. Destructive or specialised operations may still require their own permission.

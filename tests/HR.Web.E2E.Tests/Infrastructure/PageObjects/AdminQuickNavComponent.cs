@@ -14,9 +14,43 @@ public sealed class AdminQuickNavComponent(IPage page)
 
     public ILocator Options => page.GetByRole(AriaRole.Option);
 
+    /// <summary>
+    /// Presses Ctrl+K exactly once. Used by the "Ctrl+K is inert for a plain employee" test, which
+    /// deliberately needs a single press that is expected to do nothing. Tests that expect the
+    /// palette to actually open should use <see cref="OpenAsync"/> instead.
+    /// </summary>
     public async Task OpenWithKeyboardAsync()
     {
         await page.Keyboard.PressAsync("Control+k");
+    }
+
+    /// <summary>
+    /// Opens the palette robustly. app.js's global Ctrl+K keydown listener only forwards to the
+    /// component once its first interactive render has registered a DotNetObjectReference
+    /// (registerAdminQuickNav) — a press that lands before that is silently dropped with no retry.
+    /// So wait for the trigger button to render (the same OnAfterRenderAsync(firstRender) that
+    /// registers the handler) and re-press Ctrl+K until the dialog appears.
+    /// </summary>
+    public async Task OpenAsync()
+    {
+        await Trigger.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+
+        for (var attempt = 0; attempt < 15; attempt++)
+        {
+            await page.Keyboard.PressAsync("Control+k");
+            try
+            {
+                await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 1_000 });
+                return;
+            }
+            catch (TimeoutException)
+            {
+                // The DotNet handler isn't live yet — press again on the next tick.
+            }
+        }
+
+        throw new TimeoutException(
+            "Quick-nav palette did not open after repeated Ctrl+K presses, despite the trigger being visible.");
     }
 
     public async Task<bool> IsOpenAsync() =>

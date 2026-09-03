@@ -35,8 +35,52 @@ public sealed class SharedDocumentCompleteReviewTests(HrAdminPersonaFixture fixt
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string HrEmail = "laura.bennett@acme.example";
+    private const string TomEmail = "tom.williams@acme.example"; // plain Employee — no document management access
     private const string MarcusDiallo = "Marcus Diallo";
     private const string PolicyCategory = "Policy";
+
+    /// <summary>
+    /// A plain Employee cannot manage shared company documents — navigating straight to a shared
+    /// document's detail route must not present them the "Review Document" action (they're either
+    /// redirected away or the management affordances never render). Role visibility for a
+    /// prohibited persona, paired with the HrAdministrator visibility check above.
+    /// </summary>
+    [Fact]
+    public async Task PlainEmployee_DoesNotSeeReviewDocumentAction()
+    {
+        var login  = new LoginPage(_page, _fixture.WebBaseUrl);
+        var detail = new SharedDocumentDetailPage(_page, _fixture.WebBaseUrl);
+
+        // Create a document as HR first so there's a real detail route to target.
+        await login.GoToAsync();
+        await login.LoginAsync(HrEmail);
+
+        var title    = $"Test Policy {Guid.NewGuid():N}";
+        var tempFile = Path.Combine(Path.GetTempPath(), $"shared-doc-{Guid.NewGuid():N}.pdf");
+        try
+        {
+            await UploadDocumentAsync(title, tempFile);
+            var documentId = await GetUploadedDocumentIdAsync(title);
+
+            // Now switch to the plain employee and try to reach the same document.
+            await login.GoToAsync();
+            await login.LoginAsync(TomEmail);
+
+            await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/shared-documents/{documentId}");
+            await WaitForUrlToStopContainingAsync($"/shared-documents/{documentId}");
+
+            if (_page.Url.Contains($"/shared-documents/{documentId}"))
+            {
+                // Not redirected — then at least the management action must be absent.
+                Assert.False(await detail.IsReviewButtonVisibleAsync(),
+                    "The Review Document action must not be visible to a plain employee");
+            }
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
 
     [Fact]
     public async Task LoadDetailPage_ShowsReviewDocumentButtonForHrAdministrator()

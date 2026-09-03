@@ -37,7 +37,12 @@ internal static class PersonaLoginCache
     // timeouts this cache exists to avoid — just moved from "every test" to "every distinct persona,
     // all at once" instead of spread across the whole run. Gating real logins to a small number in
     // flight lets them queue and land one after another instead of stampeding.
-    private static readonly SemaphoreSlim _realLoginGate = new(3, 3);
+    // Raised 3 -> 6 alongside the Postgres/Npgsql capacity bumps (AppHost max_connections=500,
+    // HR.Api pool ceiling 400 under E2E): the gate exists to stop the run-start login stampede from
+    // overwhelming the shared app, not to hold logins to a trickle. With the DB no longer the
+    // bottleneck, 6 concurrent bootstrap logins clear the ~15-persona backlog roughly twice as fast
+    // without re-introducing the app-shell timeouts this cap was added to prevent.
+    private static readonly SemaphoreSlim _realLoginGate = new(6, 6);
 
     public static Task<BrowserNewContextOptions> GetOrLoginAsync(AppFixture app, string personaEmail) =>
         GetOrLoginAsync(app.Browser, app.WebBaseUrl, personaEmail);
@@ -195,7 +200,10 @@ internal static class PersonaLoginCache
         await page.GotoAsync($"{baseUrl}/");
         try
         {
-            await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 10_000 });
+            // ".employee-completion-dialog" too: a brand-new company's initial admin
+            // (RequiresInitialSetup) is never shown ".app-shell" — MainLayout renders only the
+            // blocking completion dialog. Either means the cached session applied successfully.
+            await page.WaitForSelectorAsync(".app-shell, .employee-completion-dialog", new() { Timeout = 10_000 });
             return true;
         }
         catch (TimeoutException)

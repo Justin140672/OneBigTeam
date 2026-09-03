@@ -12,7 +12,7 @@ This document records current product decisions that supersede conflicting older
 - The leaving date is the inclusive final date of employment; the last working day is the final day work is expected and may be earlier.
 - Employment finalises on the leaving date even if offboarding is incomplete. Mandatory unresolved obligations remain open, transfer to an available owner or HR queue, and escalate after departure.
 - Resignation, redundancy, dismissal, retirement, end of contract, mutual agreement and other routes use the same controlled lifecycle, audit and recovery rules.
-- Payroll processing remains outside scope. Leave supplies a final balance statement and the product records an auditable payroll hand-off.
+- Pay processing remains outside scope. Leave supplies a final balance statement and the product records an auditable hand-off to Finance.
 
 ## Roles and employee access
 
@@ -37,7 +37,7 @@ This document records current product decisions that supersede conflicting older
 - Employees may view their own salary when `DisplaySalaryOnEmployeeProfile` is enabled.
 - Managers may view salary for employees beneath them in the complete reporting hierarchy when `DisplaySalaryOnEmployeeProfile` is enabled.
 - Company Administrators without HR Administrator and Recruiters without an additional authorised role do not receive salary access.
-- Bank details, National Insurance numbers, tax data and payroll credentials are separate from salary visibility and remain outside this rule.
+- Bank details, National Insurance numbers, tax data and payment credentials are separate from salary visibility and remain outside this rule.
 
 ## Employee creation and onboarding
 
@@ -69,7 +69,7 @@ This document records current product decisions that supersede conflicting older
 - The Reporting module and formal report catalogue are implemented.
 - Current formal reports are live, permission-scoped report views with filters, grouping, saved views, favourites and supported server export endpoints.
 - Asynchronous generation, stored report files, scheduled reports and report subscriptions are not general MVP requirements. They may be introduced later for a demonstrated large-report requirement.
-- Reporting remains separate from payroll. Payroll processing is outside product scope.
+- Reporting may expose authorised compensation facts but must not perform pay calculations or statutory submissions.
 
 ## Events and outbox
 
@@ -99,7 +99,7 @@ This document records current product decisions that supersede conflicting older
 
 ## Product scope
 
-- Payroll processing is outside scope.
+- Pay processing is outside scope.
 - Redis is not currently required.
 - Supabase provides authentication, database and storage capabilities.
 - Hangfire is used for background jobs and Postmark for email.

@@ -277,7 +277,10 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
         // icon and its accessible name really is exactly "Save", so scope this click to the
         // toolbar's containing element instead of the button's accessible name to sidestep the
         // icon-name quirk entirely (also naturally avoids any ambiguity with that dialog button).
-        await page.Locator(".report-filter-toolbar button").ClickAsync();
+        // The "Save" trigger is the only button in the toolbar carrying the e-save icon span
+        // (ReportFilterPanel.razor line 28) — scope to it directly so the click is unambiguous even
+        // when a saved view is selected and the Rename/Set Default/Delete buttons are also present.
+        await page.Locator(".report-filter-toolbar button:has(span.e-save)").ClickAsync();
         await SaveViewDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 

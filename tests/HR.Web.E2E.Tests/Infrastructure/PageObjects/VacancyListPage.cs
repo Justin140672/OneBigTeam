@@ -17,7 +17,11 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/vacancies");
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 20_000 });
+        // With prerender disabled the page is blank until the interactive circuit connects — gate
+        // on the authenticated shell first so the 20s grid-render budget isn't partly consumed by
+        // circuit establishment on a cold shared E2E app.
+        await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 30_000 });
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 30_000 });
     }
 
     /// <summary>
@@ -45,7 +49,14 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
     public async Task ClickNewVacancyAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/vacancies/new", new() { Timeout = 30_000 });
+        // Trailing "**" so the glob still matches when the list page appends "?returnUrl=..." to
+        // the create route (SearchPageBase.AppendReturnUrl). WaitUntil=Commit, not the default
+        // Load: a Blazor interactive navigation may never re-fire the document "load" event. Then
+        // wait for the create form itself before callers start filling fields.
+        await page.WaitForURLAsync("**/vacancies/new**",
+            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
+        await page.GetByPlaceholder("e.g. Senior Software Engineer")
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
     }
 
     /// <summary>

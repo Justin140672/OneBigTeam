@@ -16,13 +16,20 @@ public sealed class CandidateListPage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/candidates");
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 20_000 });
+        // With prerender disabled the page is blank until the interactive circuit connects — gate
+        // on the authenticated shell first so the grid-render budget isn't partly consumed by
+        // circuit establishment on a cold shared E2E app.
+        await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 30_000 });
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 30_000 });
     }
 
     public async Task ClickNewCandidateAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/candidates/new", new() { Timeout = 30_000 });
+        // WaitUntil=Commit, not the default Load: a Blazor interactive navigation may never
+        // re-fire the target document's "load" event.
+        await page.WaitForURLAsync("**/candidates/new**",
+            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
     }
 
     public async Task<bool> HasCandidateAsync(string nameFragment)

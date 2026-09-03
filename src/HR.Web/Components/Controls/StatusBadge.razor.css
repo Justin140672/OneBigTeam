@@ -6,7 +6,9 @@
 
 .status-badge--success {
     background-color: rgba(22, 163, 74, 0.12) !important;
-    color: var(--hr-color-success) !important;
+    /* Darker than --hr-color-success (#16a34a, ~3:1 on this tint) so the small bold badge
+       text clears WCAG AA 4.5:1 — see AccessibilityScanJourneyTests. */
+    color: #15653a !important;
 }
 
 .status-badge--secondary {
@@ -16,12 +18,14 @@
 
 .status-badge--warning {
     background-color: rgba(249, 115, 22, 0.12) !important;
-    color: var(--hr-color-warning) !important;
+    /* Darker than --hr-color-warning (#f97316, ~2.9:1 on this tint) for WCAG AA 4.5:1. */
+    color: #9a3412 !important;
 }
 
 .status-badge--danger {
     background-color: rgba(220, 38, 38, 0.12) !important;
-    color: var(--hr-color-danger) !important;
+    /* Darker than --hr-color-danger (#dc2626, ~4:1 on this tint) for WCAG AA 4.5:1. */
+    color: #b91c1c !important;
 }
 
 .status-badge--info {

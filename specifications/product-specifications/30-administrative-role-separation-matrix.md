@@ -5,7 +5,7 @@
 This document is the authoritative role-access matrix for every administrative screen and
 action in the HR platform. It exists to enforce **administrative role separation**: the
 *Company Administrator* role is a company-configuration role only and must never, on its own,
-reach HR, employee, payroll, recruitment, leave, sickness or document administration.
+reach HR, employee, recruitment, leave, sickness or document administration.
 
 The matrix is derived from — and kept honest by — three code artefacts that are the real
 source of truth:
@@ -49,9 +49,10 @@ Legend: Y = full access · S = scoped (hierarchy / self / function) · — = den
 | Getting-started / onboarding checklist | `onboarding:view` / `onboarding:manage` | — | — | — | Y | **Y** |
 | Support requests queue | `support:manage` | — | — | — | Y | **Y** |
 | HR settings (leave year, probation, salary display, reminders, recruitment settings) | `hr-settings:manage` | — | — | — | Y | **—** |
-| Employee administration — list / analytics / offboarding | `employee:read` | — | S | S | Y | **—** |
+| Employee directory — list | `employee:manage` | — | — | — | Y | **—** |
+| Employee analytics / scoped workflow summaries | `employee:read` | — | S | — | Y | **—** |
 | Employee administration — create / edit / promote / manager assignment / notes / leaving process | `employee:manage` (`employee.edit`) | — | — | — | Y | **—** |
-| Employee detail record (single) | `role:employee` + handler scope | Self | S (reports) | — | Y | Self only |
+| Employee detail record (single) | `role:employee` + handler scope | Self | Self | Self | Y | Self only |
 | Salary / compensation (view + edit + bulk + import) | `employee:manage` | — | — | — | Y | **—** |
 | Data import (org structure + employees) | `employee:manage` | — | — | — | Y | **—** |
 | User & role administration (invite, roles, overrides, position defaults, access review) | `users:view` / `users:manage` | — | — | — | Y | **—** |
@@ -120,8 +121,11 @@ recruitment data. Flagged here as a known, reviewed exception.
 2. **UI page guards:** admin pages check the corresponding capability on `AppSession`
    (permission-derived, e.g. `CanViewUsers`, `CanManageHrSettings`, `CanViewReporting`,
    `CanManageRecruitment`) in `OnBeforeLoadAsync` and redirect to `/access-denied` on failure.
-3. **Navigation:** `MainLayout` renders each sidebar category and action only when the
-   matching capability is present.
+3. **Navigation:** the persistent `MainLayout` sidebar is available only to HR Administrators
+   and Recruiters. Recruiter destinations are all top-level and must not expose the grouped
+   `People and users`, `Company`, or `HR configuration` sections. Company Administrator-only,
+   Manager-only and Employee-only users receive no sidebar. Within the two permitted sidebars,
+   each action is still rendered only when its matching capability is present.
 4. **Access-denied outcome:** direct navigation to a disallowed route yields a consistent
    `/access-denied` page rather than a silent bounce or a broken screen.
 

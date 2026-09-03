@@ -14,6 +14,13 @@ public sealed class LoginPage(IPage page, string baseUrl)
     // referenceable from this project).
     private const string DevPersonaPassword = "Dev-Only-Password-1!";
 
+    // "Successfully authenticated" signal. Normally the app shell — but a brand-new company's
+    // initial admin (RequiresInitialSetup = true) is deliberately NEVER shown the shell:
+    // MainLayout.razor renders ONLY the blocking EmployeeCompletionDialog for them. Treating that
+    // as a valid post-login state lets EmployeeCompletionDialogTests' fresh-signup logins succeed
+    // instead of timing out 5× waiting for a shell that will never appear.
+    private const string AuthenticatedSelector = ".app-shell, .employee-completion-dialog";
+
     public async Task GoToAsync()
     {
         await page.GotoAsync($"{baseUrl}/login");
@@ -26,7 +33,7 @@ public sealed class LoginPage(IPage page, string baseUrl)
         while (true)
         {
             if (await page.Locator("[placeholder='you@example.com']").IsVisibleAsync()) return;
-            if (await page.Locator(".app-shell").IsVisibleAsync()) return;
+            if (await page.Locator(AuthenticatedSelector).First.IsVisibleAsync()) return;
             if (DateTime.UtcNow > deadline)
                 throw new TimeoutException("Timed out waiting for the login form or app shell after navigating to /login.");
             await Task.Delay(100);
@@ -44,7 +51,7 @@ public sealed class LoginPage(IPage page, string baseUrl)
     /// </summary>
     public async Task LoginAsync(string email, string password = DevPersonaPassword)
     {
-        if (await page.Locator(".app-shell").IsVisibleAsync())
+        if (await page.Locator(AuthenticatedSelector).First.IsVisibleAsync())
         {
             // Already authenticated — either a role fixture's storageState landed us straight on
             // the shell, or an earlier LoginAsync call in this same test already logged in. If it's
@@ -101,7 +108,7 @@ public sealed class LoginPage(IPage page, string baseUrl)
     /// </summary>
     internal async Task RealFormLoginAsync(string email, string password = DevPersonaPassword)
     {
-        if (await page.Locator(".app-shell").IsVisibleAsync())
+        if (await page.Locator(AuthenticatedSelector).First.IsVisibleAsync())
         {
             await page.Context.ClearCookiesAsync();
             await page.GotoAsync($"{baseUrl}/login");
@@ -130,7 +137,7 @@ public sealed class LoginPage(IPage page, string baseUrl)
         var deadline = DateTime.UtcNow.AddSeconds(45);
         while (true)
         {
-            if (await page.Locator(".app-shell").IsVisibleAsync()) return;
+            if (await page.Locator(AuthenticatedSelector).First.IsVisibleAsync()) return;
 
             var errorLocator = page.Locator(".login-error");
             if (await errorLocator.IsVisibleAsync())
