@@ -15,6 +15,25 @@
     --hr-color-primary-active: #134e4a;
     --hr-color-primary-subtle: rgba(15, 118, 110, 0.12);
 
+    /* Interaction-state tokens for primary controls (buttons, tabs, pills, links, checkboxes).
+       These are the single authoritative names every primary control should reference instead of
+       ad-hoc hex values or one-off page overrides — see docs/frontend/design-tokens.md.
+         - default   : var(--hr-color-primary)
+         - hover     : var(--hr-color-primary-hover)
+         - active    : var(--hr-color-primary-active)   (mouse-down/pressed)
+         - focus     : var(--hr-focus-ring-*)            (keyboard focus-visible ring)
+         - disabled  : var(--hr-color-primary-disabled-*)
+         - loading   : var(--hr-color-primary-loading-*) (busy/in-flight state) */
+    --hr-color-primary-disabled-bg: #9dbfbc;
+    --hr-color-primary-disabled-border: #9dbfbc;
+    --hr-color-primary-disabled-fg: #f3f4f6;
+    --hr-color-primary-loading-bg: var(--hr-color-primary-hover);
+    --hr-color-primary-loading-fg: #ffffff;
+    --hr-focus-ring-color: var(--hr-color-primary-subtle);
+    --hr-focus-ring-width: 4px;
+    --hr-focus-outline-color: var(--hr-color-primary);
+    --hr-focus-outline-width: 2px;
+
     /* Secondary accent — the cyan-teal from the logo mark's circles (distinct from the
        green-leaning primary teal above, sampled at #1bb4cc). That raw value is only ~2.5:1
        against white — well under the 4.5:1 AA text/UI threshold — so, same as primary,
@@ -94,6 +113,13 @@ html[data-theme="dark"] {
     --hr-color-danger: #f87171;
     --hr-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.4);
     --hr-shadow-md: 0 8px 20px rgba(0, 0, 0, 0.35);
+
+    /* Interaction-state tokens, dark-mode variants (see :root above for the full list). */
+    --hr-color-primary-disabled-bg: #2a4b48;
+    --hr-color-primary-disabled-border: #2a4b48;
+    --hr-color-primary-disabled-fg: #8b96a0;
+    --hr-color-primary-loading-bg: var(--hr-color-primary-hover);
+    --hr-color-primary-loading-fg: #0b1220;
 }
 
 html, body {
@@ -133,6 +159,68 @@ html, body {
 .e-css.e-btn.e-primary.e-active {
     background: var(--hr-color-primary-active);
     border-color: var(--hr-color-primary-active);
+}
+
+/* Disabled state must read as visually distinct from the enabled default (not just a slightly
+   duller teal) so users can tell "can't click this yet" from "click this". */
+.e-btn.e-primary:disabled,
+.e-css.e-btn.e-primary:disabled,
+.e-btn.e-primary.e-disabled,
+.e-css.e-btn.e-primary.e-disabled {
+    background: var(--hr-color-primary-disabled-bg);
+    border-color: var(--hr-color-primary-disabled-border);
+    color: var(--hr-color-primary-disabled-fg);
+    opacity: 1;
+}
+
+/* Loading/busy state — e.g. Login's SfButton while a submit is in flight (Disabled="@_busy" plus
+   an inline spinner). Kept visually closer to the enabled control than the disabled state above,
+   since a loading control isn't "unavailable", it's "already working". */
+.e-btn.e-primary:disabled:has(.spinner-border),
+.e-css.e-btn.e-primary:disabled:has(.spinner-border) {
+    background: var(--hr-color-primary-loading-bg);
+    border-color: var(--hr-color-primary-loading-bg);
+    color: var(--hr-color-primary-loading-fg);
+}
+
+/* Bootstrap's compiled .btn-primary bakes hover/active/disabled colors as literal hex values on
+   --bs-btn-hover-bg/--bs-btn-active-bg/--bs-btn-disabled-bg (NOT derived from the --bs-primary
+   custom property at runtime), so overriding --bs-primary above never reaches these states. This
+   resets those component-local variables back onto our own tokens for every plain Bootstrap
+   .btn-primary (AccessDenied's "Go to home", GettingStarted/OnboardingTaskCard's task links). */
+.btn-primary {
+    --bs-btn-bg: var(--hr-color-primary);
+    --bs-btn-border-color: var(--hr-color-primary);
+    --bs-btn-hover-bg: var(--hr-color-primary-hover);
+    --bs-btn-hover-border-color: var(--hr-color-primary-hover);
+    --bs-btn-active-bg: var(--hr-color-primary-active);
+    --bs-btn-active-border-color: var(--hr-color-primary-active);
+    --bs-btn-disabled-bg: var(--hr-color-primary-disabled-bg);
+    --bs-btn-disabled-border-color: var(--hr-color-primary-disabled-border);
+    --bs-btn-disabled-color: var(--hr-color-primary-disabled-fg);
+    --bs-btn-focus-shadow-rgb: var(--hr-color-primary-rgb);
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--hr-color-primary);
+    --bs-btn-border-color: var(--hr-color-primary);
+    --bs-btn-hover-bg: var(--hr-color-primary);
+    --bs-btn-hover-border-color: var(--hr-color-primary);
+    --bs-btn-active-bg: var(--hr-color-primary-active);
+    --bs-btn-active-border-color: var(--hr-color-primary-active);
+    --bs-btn-disabled-color: var(--hr-color-primary-disabled-bg);
+    --bs-btn-disabled-border-color: var(--hr-color-primary-disabled-border);
+    --bs-btn-focus-shadow-rgb: var(--hr-color-primary-rgb);
+}
+
+/* Visible keyboard-focus ring for every plain Bootstrap button/link across the app — matches the
+   Syncfusion e-primary focus treatment above instead of Bootstrap's default blue focus shadow.
+   :focus-visible (not :focus) so mouse clicks don't show the ring, only keyboard/AT navigation. */
+.btn:focus-visible,
+.btn-close:focus-visible,
+a:focus-visible {
+    outline: var(--hr-focus-outline-width) solid var(--hr-focus-outline-color);
+    outline-offset: 2px;
 }
 
 /* Syncfusion's e-success button variant (e.g. the "Save" button on the "Save current filters as

@@ -15,9 +15,9 @@
 }
 
 .org-chart-card.org-chart-card-highlighted {
-    border-color: var(--bs-primary, #0d6efd);
+    border-color: var(--hr-color-primary);
     border-width: 2px;
-    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+    box-shadow: 0 0 0 3px var(--hr-color-primary-subtle);
 }
 
 .org-chart-avatar {
