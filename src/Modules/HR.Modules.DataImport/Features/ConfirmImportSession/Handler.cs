@@ -63,6 +63,28 @@ internal sealed class ConfirmImportSessionHandler(
                 Error.Conflict($"Import session '{request.ImportSessionId}' is not in a confirmable state (status: {session.Status})."));
         }
 
+        // Re-confirming a session that already finished with errors is only meaningful as a retry of
+        // valid rows that a previous attempt did not turn into an employee (a transient failure, or
+        // the "fix the data and retry" flow). If every valid row was already created, a second
+        // confirm would just re-run manager resolution and re-stamp the session — reject it as a
+        // conflict so a double-submit cannot be mistaken for fresh progress. (This is done before
+        // ClaimForConfirmation so the early return does not strand the session in Processing.)
+        if (session.Status == ImportStatus.CompletedWithErrors)
+        {
+            var hasRetryableRows = await db.ImportStagingEmployees.AnyAsync(
+                s => s.ImportSessionId == session.Id
+                    && s.CompanyId == request.CompanyId
+                    && s.IsValid
+                    && s.CreatedEmployeeId == null,
+                cancellationToken);
+
+            if (!hasRetryableRows)
+            {
+                return Result.Failure<ConfirmImportSessionResponse>(
+                    Error.Conflict($"Import session '{request.ImportSessionId}' has already been confirmed; there are no remaining rows to retry."));
+            }
+        }
+
         // Atomically claim the session before doing any work. The xmin concurrency token means a
         // second simultaneous confirmation loses this save and is rejected with a conflict.
         session.ClaimForConfirmation(now);

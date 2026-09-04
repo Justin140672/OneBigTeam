@@ -487,7 +487,7 @@ else
         // explicit merge-in after `employee` loads for why the currently-assigned profile is
         // never silently missing just because it falls outside this first page.
         var profileTask    = PositionProfileService.ListPositionProfilesAsync(CompanyId, pageSize: 100);
-        var empListTask    = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
+        var empListTask    = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
         var probationTask  = ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
         var empTypesTask   = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
         var compensationTask = CompensationService.GetCurrentCompensationAsync(CompanyId, EmployeeId);
@@ -559,7 +559,7 @@ else
     {
         args.PreventDefaultAction = true;
         var requestId = ++_managerFilterRequestId;
-        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
             .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")

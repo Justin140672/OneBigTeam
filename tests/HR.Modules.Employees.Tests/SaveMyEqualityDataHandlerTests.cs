@@ -14,7 +14,7 @@ public class SaveMyEqualityDataHandlerTests
 
     private static SaveMyEqualityDataRequest Request(Guid companyId, Guid employeeId) => new(
         companyId, employeeId,
-        null, null, null, null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null, null, null, null, null);
 
     [Fact]
     public async Task Creates_Row_When_None_Exists()
@@ -126,6 +126,49 @@ public class SaveMyEqualityDataHandlerTests
         await using var db2 = BuildContext(dbName);
         var row = await db2.EmployeeEqualityData.AsNoTracking().SingleAsync();
         Assert.Equal(nameof(EthnicGroup.White), row.EthnicGroup);
+    }
+
+    [Fact]
+    public async Task CaringResponsibilities_Round_Trips_Persisted_And_Returned_In_Response()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var save = await new SaveMyEqualityDataHandler(db, new FakeClock(Now), new FakeAuditPublisher())
+            .HandleAsync(
+                Request(companyId, employeeId) with { CaringResponsibilities = CaringResponsibilities.Yes },
+                CancellationToken.None);
+
+        Assert.True(save.IsSuccess);
+        Assert.Equal(CaringResponsibilities.Yes, save.Value!.CaringResponsibilities);
+
+        var row = await db.EmployeeEqualityData.AsNoTracking().SingleAsync();
+        Assert.Equal(nameof(CaringResponsibilities.Yes), row.CaringResponsibilities);
+
+        var get = await new GetMyEqualityDataHandler(db)
+            .HandleAsync(new GetMyEqualityDataRequest(companyId, employeeId), CancellationToken.None);
+        Assert.Equal(CaringResponsibilities.Yes, get.Value!.CaringResponsibilities);
+    }
+
+    [Fact]
+    public async Task CaringResponsibilitiesProvided_Is_True_In_Audit_Only_When_Supplied()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var withoutPublisher = new FakeAuditPublisher();
+        await new SaveMyEqualityDataHandler(db, new FakeClock(Now), withoutPublisher)
+            .HandleAsync(Request(companyId, employeeId) with { EthnicGroup = EthnicGroup.White }, CancellationToken.None);
+        var without = Assert.IsType<EqualityDataUpdatedAuditEvent>(Assert.Single(withoutPublisher.Published));
+        Assert.False(without.CaringResponsibilitiesProvided);
+
+        var withPublisher = new FakeAuditPublisher();
+        await new SaveMyEqualityDataHandler(db, new FakeClock(Later), withPublisher)
+            .HandleAsync(Request(companyId, employeeId) with { CaringResponsibilities = CaringResponsibilities.No }, CancellationToken.None);
+        var with = Assert.IsType<EqualityDataUpdatedAuditEvent>(Assert.Single(withPublisher.Published));
+        Assert.True(with.CaringResponsibilitiesProvided);
     }
 
     private static EmployeesDbContext BuildContext(string? dbName = null)

@@ -19,7 +19,8 @@ public class GetReportViewsHandlerTests
         CanViewLeaveSummary: false,
         CanViewProbation: false,
         CanViewOnboarding: false,
-        CanViewWorkloadActions: false);
+        CanViewWorkloadActions: false,
+        CanViewEqualityDiversity: false);
 
     [Fact]
     public async Task HandleAsync_Returns_Empty_When_No_Views_Saved()
@@ -101,7 +102,8 @@ public class GetReportViewsHandlerTests
             CanViewLeaveSummary: false,
             CanViewProbation: false,
             CanViewOnboarding: false,
-            CanViewWorkloadActions: false);
+            CanViewWorkloadActions: false,
+            CanViewEqualityDiversity: false);
 
         var handler = new GetReportViewsHandler(db);
         var result = await handler.HandleAsync(

@@ -280,12 +280,12 @@
         var departmentsTask      = DepartmentService.ListDepartmentsAsync(CompanyId);
         var locationsTask        = LocationService.ListLocationsAsync(CompanyId);
         var positionProfilesTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
-        var employeesTask        = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 500);
+        var employeesTask        = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 500);
         // A separate, bounded first page for the review-owner picker — kept independent of the
         // audience "Selected Employees" list above (which intentionally loads up to 500 for that
         // multiselect), since the review owner picker follows the bounded-page + server-side-filter
         // pattern used by EmployeeEmploymentTab's manager picker instead.
-        var reviewOwnersTask     = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
+        var reviewOwnersTask     = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
 
         await Task.WhenAll(categoriesTask, departmentsTask, locationsTask, positionProfilesTask, employeesTask, reviewOwnersTask);
 
@@ -317,7 +317,7 @@
     {
         args.PreventDefaultAction = true;
         var requestId = ++_reviewOwnerFilterRequestId;
-        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _reviewOwnerFilterRequestId) return;
         _reviewOwnerOptions = (result?.Items ?? [])
             .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))

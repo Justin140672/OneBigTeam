@@ -38,6 +38,7 @@ internal sealed class Endpoint(
             gates.CanViewProbation,
             gates.CanViewOnboarding,
             gates.CanViewWorkloadActions,
+            gates.CanViewEqualityDiversity,
             cancellationToken);
 
         await Send.ResultAsync(TypedResults.Ok(result.Value!));

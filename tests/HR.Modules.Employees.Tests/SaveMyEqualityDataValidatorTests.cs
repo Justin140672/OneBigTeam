@@ -20,7 +20,8 @@ public class SaveMyEqualityDataValidatorTests
         SexualOrientation: null,
         SexualOrientationSelfDescribed: null,
         ReligionOrBelief: null,
-        ReligionOrBeliefSelfDescribed: null);
+        ReligionOrBeliefSelfDescribed: null,
+        CaringResponsibilities: null);
 
     // ── Happy paths ────────────────────────────────────────────────────────────
 
@@ -89,6 +90,20 @@ public class SaveMyEqualityDataValidatorTests
         var request = Valid() with { EthnicGroup = (EthnicGroup)(-1) };
         Assert.False(Validator.Validate(request).IsValid);
     }
+
+    // ── Caring responsibilities ───────────────────────────────────────────────
+
+    [Fact]
+    public void Passes_When_CaringResponsibilities_Is_Null()
+        => Assert.True(Validator.Validate(Valid() with { CaringResponsibilities = null }).IsValid);
+
+    [Fact]
+    public void Passes_When_CaringResponsibilities_Is_A_Valid_Enum_Value()
+        => Assert.True(Validator.Validate(Valid() with { CaringResponsibilities = CaringResponsibilities.Yes }).IsValid);
+
+    [Fact]
+    public void Fails_When_CaringResponsibilities_Enum_Is_Out_Of_Range()
+        => Assert.False(Validator.Validate(Valid() with { CaringResponsibilities = (CaringResponsibilities)999 }).IsValid);
 
     // ── Self-described: required-when branch ───────────────────────────────────
 

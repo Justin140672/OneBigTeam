@@ -18,6 +18,7 @@ internal sealed record EqualityDataUpdatedAuditEvent(
     bool DisabilityStatusProvided,
     bool SexualOrientationProvided,
     bool ReligionOrBeliefProvided,
+    bool CaringResponsibilitiesProvided,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
     string IAuditEvent.EventType => "employee.equality_data.updated";
@@ -38,7 +39,8 @@ internal sealed record EqualityDataUpdatedAuditEvent(
         EthnicGroupProvided,
         DisabilityStatusProvided,
         SexualOrientationProvided,
-        ReligionOrBeliefProvided
+        ReligionOrBeliefProvided,
+        CaringResponsibilitiesProvided
     };
     object? IAuditEvent.Metadata => null;
 }

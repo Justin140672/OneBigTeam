@@ -31,6 +31,7 @@ public class EqualityDataAuditEventTests
             DisabilityStatusProvided: true,
             SexualOrientationProvided: true,
             ReligionOrBeliefProvided: true,
+            CaringResponsibilitiesProvided: true,
             OccurredAt: DateTimeOffset.UtcNow);
 
         AssertNoAnswerValues(evt);
@@ -43,6 +44,8 @@ public class EqualityDataAuditEventTests
         var after = JsonSerializer.Serialize(evt.After);
         Assert.Contains("Provided", after);
         Assert.Contains("Created", after);
+        // The caring-responsibilities presence flag is included — and still value-free.
+        Assert.Contains("CaringResponsibilitiesProvided", after);
     }
 
     [Fact]
@@ -51,7 +54,7 @@ public class EqualityDataAuditEventTests
         IAuditEvent evt = new EqualityDataUpdatedAuditEvent(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
             Created: false,
-            false, false, false, false, false, false,
+            false, false, false, false, false, false, false,
             DateTimeOffset.UtcNow);
 
         Assert.Equal("Equality monitoring data updated", evt.Summary);
@@ -90,6 +93,7 @@ public class EqualityDataAuditEventTests
             DisabilityStatusProvided: true,
             SexualOrientationProvided: true,
             ReligionOrBeliefProvided: true,
+            CaringResponsibilitiesProvided: true,
             OccurredAt: DateTimeOffset.UtcNow);
 
         // Serialize Before/After/Metadata exactly as AuditPendingItem.From does.
@@ -116,7 +120,7 @@ public class EqualityDataAuditEventTests
     {
         IAuditEvent evt = new EqualityDataUpdatedAuditEvent(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), created,
-            true, true, true, true, true, true, DateTimeOffset.UtcNow);
+            true, true, true, true, true, true, true, DateTimeOffset.UtcNow);
 
         Assert.Equal(expected, evt.Summary);
     }
@@ -136,7 +140,7 @@ public class EqualityDataAuditEventTests
         var employeeId = Guid.NewGuid();
         IAuditEvent evt = new EqualityDataUpdatedAuditEvent(
             Guid.NewGuid(), employeeId, Guid.NewGuid(), true,
-            true, true, true, true, true, true, DateTimeOffset.UtcNow);
+            true, true, true, true, true, true, true, DateTimeOffset.UtcNow);
 
         Assert.Equal(employeeId, evt.EmployeeId);
         Assert.Equal(employeeId, evt.ActorEmployeeId);

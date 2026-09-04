@@ -103,10 +103,12 @@ using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.Modules.Employees.Services.OnboardingTasks;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Employees.Features.GetEqualityDiversityReport;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Modules.Employees;
@@ -115,9 +117,16 @@ public static class EmployeesModule
 {
     public static IServiceCollection AddEmployeesModule(
         this IServiceCollection services,
-        string connectionString)
+        string connectionString,
+        IConfiguration? configuration = null)
     {
         AddFeatureServices(services);
+
+        if (configuration is not null)
+        {
+            services.Configure<EqualityDiversityReportOptions>(
+                configuration.GetSection(EqualityDiversityReportOptions.SectionName));
+        }
 
         services.AddDbContext<EmployeesDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
@@ -262,6 +271,9 @@ public static class EmployeesModule
         services.AddScoped<IValidator<SaveMyEqualityDataRequest>, SaveMyEqualityDataValidator>();
         services.AddScoped<DeleteMyEqualityDataHandler>();
         services.AddScoped<IValidator<DeleteMyEqualityDataRequest>, DeleteMyEqualityDataValidator>();
+
+        services.AddScoped<GetEqualityDiversityReportHandler>();
+        services.AddScoped<IValidator<GetEqualityDiversityReportRequest>, GetEqualityDiversityReportValidator>();
 
         services.AddScoped<GetCurrentCompensationHandler>();
         services.AddScoped<GetCompensationHistoryHandler>();

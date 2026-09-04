@@ -21,7 +21,7 @@ public class DeleteMyEqualityDataHandlerTests
         await new SaveMyEqualityDataHandler(db, new FakeClock(Now), new FakeAuditPublisher())
             .HandleAsync(
                 new SaveMyEqualityDataRequest(companyId, employeeId,
-                    GenderIdentity.Man, null, null, null, null, null, null, null, null, null, null),
+                    GenderIdentity.Man, null, null, null, null, null, null, null, null, null, null, null),
                 CancellationToken.None);
 
         var publisher = new FakeAuditPublisher();
@@ -58,7 +58,7 @@ public class DeleteMyEqualityDataHandlerTests
         await new SaveMyEqualityDataHandler(db, new FakeClock(Now), new FakeAuditPublisher())
             .HandleAsync(
                 new SaveMyEqualityDataRequest(companyId, employeeId,
-                    GenderIdentity.Man, null, null, null, null, null, null, null, null, null, null),
+                    GenderIdentity.Man, null, null, null, null, null, null, null, null, null, null, null),
                 CancellationToken.None);
 
         var first = await new DeleteMyEqualityDataHandler(db, new FakeClock(Now), new FakeAuditPublisher())

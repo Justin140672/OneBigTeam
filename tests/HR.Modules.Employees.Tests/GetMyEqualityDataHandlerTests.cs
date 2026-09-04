@@ -41,7 +41,8 @@ public class GetMyEqualityDataHandlerTests
                     EthnicGroup.SelfDescribed, "Cornish",
                     DisabilityStatus.Yes, "Chronic fatigue",
                     SexualOrientation.Bisexual, null,
-                    ReligionOrBelief.NoReligion, null),
+                    ReligionOrBelief.NoReligion, null,
+                    CaringResponsibilities.Yes),
                 CancellationToken.None);
 
         var result = await new GetMyEqualityDataHandler(db)
@@ -58,6 +59,7 @@ public class GetMyEqualityDataHandlerTests
         Assert.Equal("Chronic fatigue", v.DisabilityImpact);
         Assert.Equal(SexualOrientation.Bisexual, v.SexualOrientation);
         Assert.Equal(ReligionOrBelief.NoReligion, v.ReligionOrBelief);
+        Assert.Equal(CaringResponsibilities.Yes, v.CaringResponsibilities);
         Assert.Equal(new DateTimeOffset(Now), v.CreatedAt);
     }
 
@@ -70,7 +72,7 @@ public class GetMyEqualityDataHandlerTests
         await new SaveMyEqualityDataHandler(db, new FakeClock(Now), new FakeAuditPublisher())
             .HandleAsync(
                 new SaveMyEqualityDataRequest(companyId, Guid.NewGuid(),
-                    GenderIdentity.Man, null, null, null, null, null, null, null, null, null, null),
+                    GenderIdentity.Man, null, null, null, null, null, null, null, null, null, null, null),
                 CancellationToken.None);
 
         var result = await new GetMyEqualityDataHandler(db)

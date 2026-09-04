@@ -8,7 +8,7 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// (src/HR.Web/Components/Pages/Employees/MyProfileEqualityDiversityTab.razor).
 ///
 /// Field groups each carry a data-testid: my-profile-equality-{gender|marital|ethnicgroup|
-/// disability|orientation|religion}. Save button data-testid=my-profile-equality-save; success
+/// disability|orientation|religion|caring}. Save button data-testid=my-profile-equality-save; success
 /// banner data-testid=my-profile-equality-success. "Clear my answers" goes through a native
 /// window.confirm — register a page Dialog handler (see AcceptConfirmDialogs) before calling
 /// <see cref="ClearAnswersAsync"/>.
@@ -21,6 +21,7 @@ public sealed class EqualityDiversityTab(IPage page)
     public const string DisabilityField  = "my-profile-equality-disability";
     public const string OrientationField = "my-profile-equality-orientation";
     public const string ReligionField    = "my-profile-equality-religion";
+    public const string CaringField      = "my-profile-equality-caring";
 
     public const string ClearConfirmText =
         "Clear all of your equality and diversity answers? This cannot be undone.";

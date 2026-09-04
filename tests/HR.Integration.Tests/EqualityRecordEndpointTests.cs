@@ -142,6 +142,38 @@ public class EqualityRecordEndpointTests
         Assert.NotEqual("White", rawEthnicGroup);
     }
 
+    // ── PUT caring responsibilities (Ticket 6A) ───────────────────────────────
+
+    [Fact]
+    public async Task Put_Persists_CaringResponsibilities_As_Ciphertext_And_Get_Returns_It()
+    {
+        var (client, companyId, employeeId) = await EmployeeAsync();
+
+        var put = await client.PutAsJsonAsync(Route(companyId, employeeId), new
+        {
+            ethnicGroup = "White",
+            caringResponsibilities = "Yes"
+        });
+        Assert.Equal(HttpStatusCode.OK, put.StatusCode);
+
+        var saved = await put.Content.ReadFromJsonAsync<EqualityPayload>();
+        Assert.Equal("Yes", saved!.CaringResponsibilities);
+
+        var fetched = await (await client.GetAsync(Route(companyId, employeeId)))
+            .Content.ReadFromJsonAsync<EqualityPayload>();
+        Assert.Equal("Yes", fetched!.CaringResponsibilities);
+
+        var raw = await ReadRawColumnAsync(companyId, employeeId, "caring_responsibilities");
+        Assert.StartsWith("OBTENC1:", raw);
+        Assert.NotEqual("Yes", raw);
+
+        // The audit trail still carries no answer values.
+        var (events, rawJson) = await ReadEqualityAuditAsync(companyId, employeeId);
+        Assert.Single(events);
+        foreach (var forbidden in new[] { "Yes", "White", "OBTENC1:" })
+            Assert.DoesNotContain(forbidden, rawJson, StringComparison.Ordinal);
+    }
+
     // ── PUT update in place ───────────────────────────────────────────────────
 
     [Fact]
@@ -372,6 +404,7 @@ public class EqualityRecordEndpointTests
         string? SexualOrientationSelfDescribed,
         string? ReligionOrBelief,
         string? ReligionOrBeliefSelfDescribed,
+        string? CaringResponsibilities,
         DateTimeOffset? CreatedAt,
         DateTimeOffset? UpdatedAt);
 }

@@ -122,7 +122,7 @@
         var departmentsTask      = DepartmentService.ListDepartmentsAsync(CompanyId);
         var locationsTask        = LocationService.ListLocationsAsync(CompanyId);
         var positionProfilesTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
-        var employeesTask        = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 500);
+        var employeesTask        = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 500);
 
         await Task.WhenAll(departmentsTask, locationsTask, positionProfilesTask, employeesTask);
 

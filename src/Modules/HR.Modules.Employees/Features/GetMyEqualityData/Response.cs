@@ -15,5 +15,6 @@ internal sealed record GetMyEqualityDataResponse(
     string? SexualOrientationSelfDescribed,
     ReligionOrBelief? ReligionOrBelief,
     string? ReligionOrBeliefSelfDescribed,
+    CaringResponsibilities? CaringResponsibilities,
     DateTimeOffset? CreatedAt,
     DateTimeOffset? UpdatedAt);

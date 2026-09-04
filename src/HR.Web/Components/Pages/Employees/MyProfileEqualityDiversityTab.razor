@@ -139,6 +139,14 @@ else
                     </div>
                 }
 
+                <div class="ed-field-group" data-testid="my-profile-equality-caring">
+                    <label class="ed-label">Do you have caring responsibilities?</label>
+                    <SfDropDownList TValue="YesNoChoice" TItem="EqualityFieldOption<YesNoChoice>"
+                                    DataSource="_yesNoOptions" @bind-Value="_model.CaringResponsibilities">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+
                 <div class="ed-form-footer">
                     <SfButton Disabled="@_saving" OnClick="ClearAnswersAsync">
                         Clear my answers
@@ -260,6 +268,7 @@ else
         _model.SexualOrientationSelfDescribed = r.SexualOrientationSelfDescribed;
         _model.ReligionOrBelief = r.ReligionOrBelief ?? ReligionOrBeliefChoice.NotSpecified;
         _model.ReligionOrBeliefSelfDescribed = r.ReligionOrBeliefSelfDescribed;
+        _model.CaringResponsibilities = r.CaringResponsibilities ?? YesNoChoice.NotSpecified;
     }
 
     private static T? Nullify<T>(T value) where T : struct, Enum =>
@@ -290,7 +299,8 @@ else
             Nullify(_model.SexualOrientation),
             TextFor(_model.SexualOrientation, SexualOrientationChoice.SelfDescribed, _model.SexualOrientationSelfDescribed),
             Nullify(_model.ReligionOrBelief),
-            TextFor(_model.ReligionOrBelief, ReligionOrBeliefChoice.SelfDescribed, _model.ReligionOrBeliefSelfDescribed));
+            TextFor(_model.ReligionOrBelief, ReligionOrBeliefChoice.SelfDescribed, _model.ReligionOrBeliefSelfDescribed),
+            Nullify(_model.CaringResponsibilities));
 
         var (success, error) = await EmployeeService.SaveMyEqualityRecordAsync(CompanyId, EmployeeId, request);
 
@@ -347,6 +357,7 @@ else
         public string? SexualOrientationSelfDescribed { get; set; }
         public ReligionOrBeliefChoice ReligionOrBelief { get; set; }
         public string? ReligionOrBeliefSelfDescribed { get; set; }
+        public YesNoChoice CaringResponsibilities { get; set; }
 
         public void Reset()
         {
@@ -361,6 +372,7 @@ else
             SexualOrientationSelfDescribed = null;
             ReligionOrBelief = ReligionOrBeliefChoice.NotSpecified;
             ReligionOrBeliefSelfDescribed = null;
+            CaringResponsibilities = YesNoChoice.NotSpecified;
         }
     }
 }

@@ -94,6 +94,13 @@ internal static class SystemPermissions
     // deliberately not granted to Company Administrator per the administrative role separation matrix)
     public static readonly Guid ComplianceView = new("00000000-0000-0000-0001-000000000043");
 
+    // reporting:view-equality — Ticket 6: anonymous aggregate Equality & Diversity workforce
+    // statistics. HR Administrator only. This is a reporting/analytics gate over aggregate numbers
+    // and is deliberately NOT a route to any individual's equality answers (see
+    // src/Modules/HR.Modules.Employees/Features/GetEqualityDiversityReport and the ADR at
+    // src/Modules/HR.Modules.Employees/Docs).
+    public static readonly Guid ReportingViewEquality = new("00000000-0000-0000-0001-000000000046");
+
     // NOTE: ids ...044 (admin-alerts.view) and ...045 (reporting.view-governance) were removed
     // when the customer-facing "Audit and security" area (Administrative Alerts inbox + Governance
     // Reports) was deleted. Their permission and role_permission rows are dropped by migration

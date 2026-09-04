@@ -38,6 +38,7 @@ public static class ReportRoutes
         ["workload-actions"] = "workload-actions",
         ["recruitment-pipeline-summary"] = "recruitment-pipeline-summary",
         ["hr-headcount-summary"] = "hr-headcount-summary",
+        ["equality-diversity"] = "equality-diversity",
         ["governance-user-activity"] = "governance/user-activity",
         ["governance-administrative-changes"] = "governance/administrative-changes",
         ["governance-compliance-status"] = "governance/compliance-status",

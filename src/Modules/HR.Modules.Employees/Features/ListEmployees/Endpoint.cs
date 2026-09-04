@@ -9,13 +9,13 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees");
-        // ADM-05: employee administration list — Manager / Recruiter / HR Administrator only.
-        // A plain Employee or a Company-Administrator-only user must not enumerate the workforce.
-        // "employee:read" is exactly Manager/Recruiter/HrAdministrator (CompanyAdministrator does
-        // NOT hold it — see RolePermissionConfiguration). "employee:manage" is HR-Administrator-only
-        // and locked Manager/Recruiter out of every employee-list screen (e.g. the vacancy
-        // hiring-manager picker).
-        Policies("employee:read");
+        // ADM-05: the employee administration list (the full EmployeeList grid with account status,
+        // audit columns, etc.) is HR Administrator only — "employee:manage". A plain Employee, a
+        // Manager, a Recruiter, or a Company-Administrator-only user must not enumerate the whole
+        // workforce here. Screens that only need a name/id picker (e.g. the vacancy hiring-manager
+        // dropdown) use the lighter "employee:read"-gated /employees/selectable endpoint instead
+        // (see ListSelectableEmployeesEndpoint).
+        Policies("employee:manage");
     }
 
     public override async Task HandleAsync(

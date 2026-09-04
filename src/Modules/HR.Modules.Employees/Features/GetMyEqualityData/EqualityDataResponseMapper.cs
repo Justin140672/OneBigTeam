@@ -5,7 +5,7 @@ namespace HR.Modules.Employees.Features.GetMyEqualityData;
 internal static class EqualityDataResponseMapper
 {
     public static GetMyEqualityDataResponse Empty()
-        => new(false, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        => new(false, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     public static GetMyEqualityDataResponse FromEntity(EmployeeEqualityData record)
         => new(
@@ -21,6 +21,7 @@ internal static class EqualityDataResponseMapper
             record.SexualOrientationSelfDescribed,
             EqualityEnumMapping.FromStored<ReligionOrBelief>(record.ReligionOrBelief),
             record.ReligionOrBeliefSelfDescribed,
+            EqualityEnumMapping.FromStored<CaringResponsibilities>(record.CaringResponsibilities),
             record.CreatedAt,
             record.UpdatedAt);
 }

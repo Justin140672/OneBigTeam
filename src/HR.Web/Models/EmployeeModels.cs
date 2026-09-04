@@ -513,6 +513,7 @@ public sealed record GetMyEqualityDataResponse(
     string? SexualOrientationSelfDescribed,
     ReligionOrBeliefChoice? ReligionOrBelief,
     string? ReligionOrBeliefSelfDescribed,
+    YesNoChoice? CaringResponsibilities,
     DateTimeOffset? CreatedAt,
     DateTimeOffset? UpdatedAt);
 
@@ -529,9 +530,29 @@ public sealed record SaveMyEqualityDataRequest(
     SexualOrientationChoice? SexualOrientation,
     string? SexualOrientationSelfDescribed,
     ReligionOrBeliefChoice? ReligionOrBelief,
-    string? ReligionOrBeliefSelfDescribed);
+    string? ReligionOrBeliefSelfDescribed,
+    YesNoChoice? CaringResponsibilities);
 
 public sealed record EqualityFieldOption<T>(T Value, string Label);
+
+// ── EQUALITY & DIVERSITY: ANONYMOUS AGGREGATE REPORT ────────────────────────────
+// Counts and percentages only — never employee identifiers or row-level data.
+
+public sealed record GetEqualityDiversityReportResponse(
+    int TotalEmployees,
+    int MinimumGroupSize,
+    IReadOnlyList<EqualityReportDimensionModel> Dimensions);
+
+public sealed record EqualityReportDimensionModel(
+    string Key,
+    string Name,
+    IReadOnlyList<EqualityReportRowModel> Rows);
+
+public sealed record EqualityReportRowModel(
+    string Value,
+    int Count,
+    decimal Percentage,
+    bool Suppressed);
 
 // ── DASHBOARD: HEADCOUNT SUMMARY ────────────────────────────────────────────────
 

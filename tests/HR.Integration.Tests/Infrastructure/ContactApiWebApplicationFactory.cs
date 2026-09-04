@@ -36,6 +36,14 @@ public sealed class ContactApiWebApplicationFactory : WebApplicationFactory<Prog
             configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Marketing:ContactForm:RecipientEmail"] = RecipientEmail,
+                // This factory does not derive from ApiWebApplicationFactory, so it does not inherit
+                // the sensitive-data encryption keys that factory injects. Without them the
+                // ISensitiveDataProtector singleton throws on first resolution — which happens when
+                // EmployeesDbContext is constructed during startup migrations, leaving the API in
+                // "health endpoints only" mode and every /api/contact request answered with 404.
+                // A fixed throwaway AES-256 key (32 zero bytes, base64), matching ApiWebApplicationFactory.
+                ["Infrastructure:SensitiveDataProtection:ActiveKeyId"] = "test",
+                ["Infrastructure:SensitiveDataProtection:Keys:test"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                 // This test class makes many requests against one in-memory TestServer, all sharing
                 // a single per-IP partition on Program.cs's real "contact-form" rate limiter (5 / 5
                 // min in production) — widen it here so validation/happy-path tests don't trip it.

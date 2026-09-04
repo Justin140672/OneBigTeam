@@ -25,6 +25,7 @@ internal sealed class EmployeeEqualityData
     public string? SexualOrientationSelfDescribed { get; private set; }
     public string? ReligionOrBelief { get; private set; }
     public string? ReligionOrBeliefSelfDescribed { get; private set; }
+    public string? CaringResponsibilities { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -44,6 +45,7 @@ internal sealed class EmployeeEqualityData
         string? sexualOrientationSelfDescribed,
         string? religionOrBelief,
         string? religionOrBeliefSelfDescribed,
+        string? caringResponsibilities,
         DateTimeOffset now)
     {
         return new EmployeeEqualityData
@@ -62,6 +64,7 @@ internal sealed class EmployeeEqualityData
             SexualOrientationSelfDescribed = sexualOrientationSelfDescribed,
             ReligionOrBelief = religionOrBelief,
             ReligionOrBeliefSelfDescribed = religionOrBeliefSelfDescribed,
+            CaringResponsibilities = caringResponsibilities,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -79,6 +82,7 @@ internal sealed class EmployeeEqualityData
         string? sexualOrientationSelfDescribed,
         string? religionOrBelief,
         string? religionOrBeliefSelfDescribed,
+        string? caringResponsibilities,
         DateTimeOffset now)
     {
         GenderIdentity = genderIdentity;
@@ -92,6 +96,7 @@ internal sealed class EmployeeEqualityData
         SexualOrientationSelfDescribed = sexualOrientationSelfDescribed;
         ReligionOrBelief = religionOrBelief;
         ReligionOrBeliefSelfDescribed = religionOrBeliefSelfDescribed;
+        CaringResponsibilities = caringResponsibilities;
         UpdatedAt = now;
     }
 }

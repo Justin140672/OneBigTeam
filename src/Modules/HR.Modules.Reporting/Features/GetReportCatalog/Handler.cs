@@ -17,6 +17,7 @@ internal sealed class GetReportCatalogHandler
         bool canViewProbation,
         bool canViewOnboarding,
         bool canViewWorkloadActions,
+        bool canViewEqualityDiversity,
         CancellationToken cancellationToken)
     {
         var gates = new ReportAccessGates(
@@ -26,7 +27,8 @@ internal sealed class GetReportCatalogHandler
             canViewLeaveSummary,
             canViewProbation,
             canViewOnboarding,
-            canViewWorkloadActions);
+            canViewWorkloadActions,
+            canViewEqualityDiversity);
 
         var items = ReportCatalog.All
             .Where(definition => gates.IsAuthorized(definition.AccessGate))

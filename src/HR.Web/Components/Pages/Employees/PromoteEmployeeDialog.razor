@@ -284,7 +284,7 @@
         // an occupied position isn't supported by this wizard (that's a manager/location change,
         // not a promotion). Approximated via a company-wide employee listing since there is no
         // dedicated "vacant position profiles" endpoint.
-        var allEmployeesResult = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 1000);
+        var allEmployeesResult = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 1000);
         var occupiedPositionProfileIds = (allEmployeesResult?.Items ?? [])
             .Where(e => e.Id != EmployeeId && e.Status != "FormerEmployee" && e.PositionProfileId.HasValue)
             .Select(e => e.PositionProfileId!.Value)
@@ -301,7 +301,7 @@
             .Prepend(new LocationOption(Guid.Empty, "Not assigned"))
             .ToList();
 
-        var managerResult = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
+        var managerResult = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
         _managerOptions = (managerResult?.Items ?? [])
             .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
@@ -334,7 +334,7 @@
     {
         args.PreventDefaultAction = true;
         var requestId = ++_managerFilterRequestId;
-        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
             .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")

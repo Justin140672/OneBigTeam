@@ -192,10 +192,11 @@ public class GetReportCatalogEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<CatalogPayload>();
         Assert.NotNull(payload);
-        // Full Hr-category catalog (phases 1-4) plus workload-actions (14 entries), once the
-        // 3 Recruitment-only entries are excluded from the full 17-entry catalog.
-        Assert.Equal(14, payload!.Items.Count);
+        // Full Hr-category catalog (phases 1-4) plus workload-actions and equality-diversity
+        // (15 entries), once the 3 Recruitment-only entries are excluded from the full catalog.
+        Assert.Equal(15, payload!.Items.Count);
         Assert.Contains(payload.Items, i => i.Id == "hr-headcount-summary" && i.Category == "Hr");
+        Assert.Contains(payload.Items, i => i.Id == "equality-diversity" && i.Category == "Hr");
         Assert.Contains(payload.Items, i => i.Id == "employee-directory" && i.Category == "Hr");
         Assert.Contains(payload.Items, i => i.Id == "employee-starters" && i.Category == "Hr");
         Assert.Contains(payload.Items, i => i.Id == "employee-leavers" && i.Category == "Hr");
@@ -228,10 +229,11 @@ public class GetReportCatalogEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<CatalogPayload>();
         Assert.NotNull(payload);
-        // Recruiter + HrAdministrator together satisfy every category flag: the full 17-entry
-        // catalog (all Recruitment + all Hr, including phase-4 and OBT-721 workload-actions).
-        Assert.Equal(17, payload!.Items.Count);
+        // Recruiter + HrAdministrator together satisfy every category flag: the full 18-entry
+        // catalog (all Recruitment + all Hr, including workload-actions and equality-diversity).
+        Assert.Equal(18, payload!.Items.Count);
         Assert.Contains(payload.Items, i => i.Id == "workload-actions");
+        Assert.Contains(payload.Items, i => i.Id == "equality-diversity");
         Assert.Contains(payload.Items, i => i.Id == "recruitment-pipeline-summary");
         Assert.Contains(payload.Items, i => i.Id == "hr-headcount-summary");
         Assert.Contains(payload.Items, i => i.Id == "employee-directory");

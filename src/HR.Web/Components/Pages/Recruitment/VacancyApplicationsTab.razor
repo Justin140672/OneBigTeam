@@ -673,7 +673,7 @@
 
         if (_employees.Count == 0)
         {
-            var result = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
+            var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 200);
             _employees = result?.Items.ToList() ?? [];
         }
 
@@ -804,7 +804,7 @@
 
         var vacancyTask = VacancyService.GetVacancyAsync(CompanyId, VacancyId);
         var employmentTypeTask = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
-        var managerTask = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
+        var managerTask = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
 
         await Task.WhenAll(vacancyTask, employmentTypeTask, managerTask);
 
@@ -914,7 +914,7 @@
     private async Task OnHireManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
         args.PreventDefaultAction = true;
-        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         _hireManagerOptions = (result?.Items ?? [])
             .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))

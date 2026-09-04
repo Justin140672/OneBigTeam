@@ -28,6 +28,7 @@ internal sealed class SaveMyEqualityDataHandler(
         var sexualOrientationSelfDescribed = Trim(request.SexualOrientationSelfDescribed);
         var religionOrBelief = EqualityEnumMapping.ToStored(request.ReligionOrBelief);
         var religionOrBeliefSelfDescribed = Trim(request.ReligionOrBeliefSelfDescribed);
+        var caringResponsibilities = EqualityEnumMapping.ToStored(request.CaringResponsibilities);
 
         var record = await db.EmployeeEqualityData
             .FirstOrDefaultAsync(
@@ -53,6 +54,7 @@ internal sealed class SaveMyEqualityDataHandler(
                 sexualOrientationSelfDescribed,
                 religionOrBelief,
                 religionOrBeliefSelfDescribed,
+                caringResponsibilities,
                 now);
             db.EmployeeEqualityData.Add(record);
         }
@@ -70,6 +72,7 @@ internal sealed class SaveMyEqualityDataHandler(
                 sexualOrientationSelfDescribed,
                 religionOrBelief,
                 religionOrBeliefSelfDescribed,
+                caringResponsibilities,
                 now);
         }
 
@@ -86,6 +89,7 @@ internal sealed class SaveMyEqualityDataHandler(
             disabilityStatus is not null,
             sexualOrientation is not null,
             religionOrBelief is not null,
+            caringResponsibilities is not null,
             now), cancellationToken);
 
         return Result.Success(EqualityDataResponseMapper.FromEntity(record));

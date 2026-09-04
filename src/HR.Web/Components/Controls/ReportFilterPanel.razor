@@ -267,7 +267,7 @@
         var locationsTask = LocationService.ListLocationsAsync(CompanyId);
         var positionProfilesTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
         var employmentTypesTask = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
-        var employeesTask = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
+        var employeesTask = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
 
         await Task.WhenAll(departmentsTask, locationsTask, positionProfilesTask, employmentTypesTask, employeesTask);
 
@@ -438,7 +438,7 @@
     {
         args.PreventDefaultAction = true;
         var requestId = ++_managerFilterRequestId;
-        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))

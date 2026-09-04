@@ -102,6 +102,7 @@ public class ReportCatalogTests
     [InlineData("asset-assignment", "Sensitive")]
     [InlineData("workload-actions", "Sensitive")]
     [InlineData("hr-headcount-summary", "Sensitive")]
+    [InlineData("equality-diversity", "Standard")]
     [InlineData("recruitment-pipeline-summary", "Standard")]
     [InlineData("recruitment-pipeline-report", "Standard")]
     [InlineData("vacancy-performance-report", "Standard")]
@@ -136,7 +137,7 @@ public class ReportCatalogTests
             "sickness-report", "probation-report", "onboarding-progress", "offboarding-progress",
             "document-compliance", "document-acknowledgement", "asset-assignment", "workload-actions",
             "hr-headcount-summary", "recruitment-pipeline-summary", "recruitment-pipeline-report",
-            "vacancy-performance-report",
+            "vacancy-performance-report", "equality-diversity",
         };
 
         var actualIds = ReportCatalog.All.Select(d => d.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);

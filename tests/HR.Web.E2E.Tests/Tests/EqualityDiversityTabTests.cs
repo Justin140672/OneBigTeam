@@ -66,6 +66,7 @@ public sealed class EqualityDiversityTabTests(EmployeePersonaFixture fixture)
         await ed.SelectAsync(EqualityDiversityTab.DisabilityField, "No");
         await ed.SelectAsync(EqualityDiversityTab.OrientationField, "Heterosexual or straight");
         await ed.SelectAsync(EqualityDiversityTab.ReligionField, "No religion");
+        await ed.SelectAsync(EqualityDiversityTab.CaringField, "Yes");
 
         await ed.SaveAsync();
 
@@ -80,6 +81,7 @@ public sealed class EqualityDiversityTabTests(EmployeePersonaFixture fixture)
         Assert.Equal("Man", await ed.GetSelectedValueAsync(EqualityDiversityTab.GenderField));
         Assert.Equal("White", await ed.GetSelectedValueAsync(EqualityDiversityTab.EthnicGroupField));
         Assert.Equal("No religion", await ed.GetSelectedValueAsync(EqualityDiversityTab.ReligionField));
+        Assert.Equal("Yes", await ed.GetSelectedValueAsync(EqualityDiversityTab.CaringField));
     }
 
     [Fact]

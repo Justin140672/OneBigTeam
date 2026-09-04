@@ -316,7 +316,7 @@
         if (!AppSession.GuardAccess(Navigation, Session.CanViewReporting))
             return;
 
-        var employeesTask = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
+        var employeesTask = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
         var locationsTask = LocationService.ListLocationsAsync(CompanyId);
         await LoadAsync();
         var employeeItems = (await employeesTask)?.Items ?? [];
@@ -475,7 +475,7 @@
     {
         args.PreventDefaultAction = true;
         var requestId = ++_employeeFilterRequestId;
-        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _employeeFilterRequestId) return;
         _employeeOptions = (result?.Items ?? [])
             .Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}"))
@@ -490,7 +490,7 @@
     {
         args.PreventDefaultAction = true;
         var requestId = ++_managerFilterRequestId;
-        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
             .Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}"))

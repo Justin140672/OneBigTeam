@@ -66,6 +66,7 @@ internal sealed class EmployeesDbContext : DbContext
         entity.Property(x => x.SexualOrientationSelfDescribed).HasConversion(converter);
         entity.Property(x => x.ReligionOrBelief).HasConversion(converter);
         entity.Property(x => x.ReligionOrBeliefSelfDescribed).HasConversion(converter);
+        entity.Property(x => x.CaringResponsibilities).HasConversion(converter);
 #pragma warning restore CS8620
     }
 

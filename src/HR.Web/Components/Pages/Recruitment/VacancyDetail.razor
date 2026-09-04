@@ -210,7 +210,7 @@
         var deptResult = await DepartmentService.ListDepartmentsAsync(CompanyId);
         _departments = deptResult?.Items ?? [];
 
-        var empResult = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
+        var empResult = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 200);
         _employees = empResult?.Items.ToList() ?? [];
 
         var locationResult = await LocationService.ListLocationsAsync(CompanyId);

@@ -23,6 +23,25 @@ public class ReportingService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<(GetEqualityDiversityReportResponse? Response, string? Error)> GetEqualityDiversityReportAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<GetEqualityDiversityReportResponse>(
+                $"api/companies/{companyId}/reporting/equality-diversity", HrApiJsonOptions.Default, cancellationToken);
+            return (response, null);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Forbidden)
+        {
+            return (null, "You do not have permission to view equality and diversity reporting.");
+        }
+        catch (HttpRequestException)
+        {
+            return (null, "Failed to load the equality and diversity report.");
+        }
+    }
+
     public async Task<GetEmployeeDirectoryReportResponse?> GetEmployeeDirectoryReportAsync(
         Guid companyId, EmployeeDirectoryReportFilter filter, CancellationToken cancellationToken = default)
     {

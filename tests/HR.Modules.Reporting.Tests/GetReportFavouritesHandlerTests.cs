@@ -17,7 +17,8 @@ public class GetReportFavouritesHandlerTests
         CanViewLeaveSummary: false,
         CanViewProbation: false,
         CanViewOnboarding: false,
-        CanViewWorkloadActions: false);
+        CanViewWorkloadActions: false,
+        CanViewEqualityDiversity: false);
 
     private static readonly ReportAccessGates NoAccessGates = new(
         CanViewRecruitment: false,
@@ -26,7 +27,8 @@ public class GetReportFavouritesHandlerTests
         CanViewLeaveSummary: false,
         CanViewProbation: false,
         CanViewOnboarding: false,
-        CanViewWorkloadActions: false);
+        CanViewWorkloadActions: false,
+        CanViewEqualityDiversity: false);
 
     [Fact]
     public async Task HandleAsync_Returns_Empty_When_None_Favourited()
@@ -76,7 +78,7 @@ public class GetReportFavouritesHandlerTests
 
         // Even with every gate granted, a favourite for a report id that isn't in the catalogue at
         // all must still be silently omitted rather than erroring.
-        var fullAccessGates = new ReportAccessGates(true, true, true, true, true, true, true);
+        var fullAccessGates = new ReportAccessGates(true, true, true, true, true, true, true, true);
 
         var result = await handler.HandleAsync(
             new GetReportFavouritesRequest(companyId), userId, fullAccessGates, CancellationToken.None);

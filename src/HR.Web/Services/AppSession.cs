@@ -37,6 +37,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     public bool CanViewReporting              => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000034"));
     public bool CanViewHrReports              => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000036"));
     public bool CanViewRecruitmentReports     => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000035"));
+    public bool CanViewEqualityReports        => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000046"));
     public bool CanManageSharedDocuments      => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000030"));
 
     // ADM-05: shared access-denied outcome. Admin pages call this from OnBeforeLoadAsync/LoadAsync
@@ -415,7 +416,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
 
     private async Task<IReadOnlyDictionary<Guid, string>> LoadEmployeeNamesAsync()
     {
-        var employees = (await employeeService.ListEmployeesAsync(CompanyId, pageSize: 200))?.Items ?? [];
+        var employees = (await employeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 200))?.Items ?? [];
         return employees.ToDictionary(e => e.Id, e => $"{e.FirstName} {e.LastName}");
     }
 

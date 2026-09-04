@@ -99,6 +99,7 @@ internal sealed class PermissionConfiguration : IEntityTypeConfiguration<Permiss
             Permission.Create(SystemPermissions.ReportingViewProbation,      "reporting.view-probation",        seedDate),
             Permission.Create(SystemPermissions.ReportingViewOnboarding,     "reporting.view-onboarding",       seedDate),
             Permission.Create(SystemPermissions.ReportingViewWorkloadActions,"reporting.view-workload-actions", seedDate),
+            Permission.Create(SystemPermissions.ReportingViewEquality,       "reporting.view-equality",         seedDate),
 
             Permission.Create(SystemPermissions.SupportManage, "support.manage", seedDate),
 

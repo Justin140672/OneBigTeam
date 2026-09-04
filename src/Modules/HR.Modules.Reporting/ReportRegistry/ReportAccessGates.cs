@@ -12,7 +12,8 @@ internal readonly record struct ReportAccessGates(
     bool CanViewLeaveSummary,
     bool CanViewProbation,
     bool CanViewOnboarding,
-    bool CanViewWorkloadActions)
+    bool CanViewWorkloadActions,
+    bool CanViewEqualityDiversity)
 {
     public bool IsAuthorized(ReportAccessGate gate) => gate switch
     {
@@ -23,6 +24,7 @@ internal readonly record struct ReportAccessGates(
         ReportAccessGate.Probation => CanViewProbation,
         ReportAccessGate.Onboarding => CanViewOnboarding,
         ReportAccessGate.WorkloadActions => CanViewWorkloadActions,
+        ReportAccessGate.EqualityDiversity => CanViewEqualityDiversity,
         _ => false,
     };
 }

@@ -36,6 +36,7 @@ internal sealed class EmployeeEqualityDataConfiguration : IEntityTypeConfigurati
         builder.Property(x => x.SexualOrientationSelfDescribed).HasColumnName("sexual_orientation_self_described").HasColumnType("text");
         builder.Property(x => x.ReligionOrBelief).HasColumnName("religion_or_belief").HasColumnType("text");
         builder.Property(x => x.ReligionOrBeliefSelfDescribed).HasColumnName("religion_or_belief_self_described").HasColumnType("text");
+        builder.Property(x => x.CaringResponsibilities).HasColumnName("caring_responsibilities").HasColumnType("text");
 
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();

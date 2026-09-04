@@ -453,6 +453,10 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("CaringResponsibilities")
+                        .HasColumnType("text")
+                        .HasColumnName("caring_responsibilities");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");

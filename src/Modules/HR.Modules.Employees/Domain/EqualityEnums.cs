@@ -38,6 +38,14 @@ internal enum DisabilityStatus
     PreferNotToSay
 }
 
+internal enum CaringResponsibilities
+{
+    NotSpecified = 0,
+    Yes,
+    No,
+    PreferNotToSay
+}
+
 internal enum SexualOrientation
 {
     NotSpecified = 0,

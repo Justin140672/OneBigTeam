@@ -62,6 +62,8 @@ public class PolicyMatrixTests(IdentityDatabaseFixture fixture)
         ["reporting:view-probation"] = [SystemRoles.HrAdministrator, SystemRoles.Manager],
         ["reporting:view-onboarding"] = [SystemRoles.HrAdministrator, SystemRoles.Manager],
         ["reporting:view-workload-actions"] = [SystemRoles.HrAdministrator, SystemRoles.Manager],
+        // Ticket 6B: anonymous equality & diversity report — HR Administrator only.
+        ["reporting:view-equality"] = [SystemRoles.HrAdministrator],
         ["compliance:view"] = [SystemRoles.HrAdministrator],
     };
 

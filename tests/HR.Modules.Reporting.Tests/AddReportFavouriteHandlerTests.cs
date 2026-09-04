@@ -19,7 +19,8 @@ public class AddReportFavouriteHandlerTests
         CanViewLeaveSummary: false,
         CanViewProbation: false,
         CanViewOnboarding: false,
-        CanViewWorkloadActions: false);
+        CanViewWorkloadActions: false,
+        CanViewEqualityDiversity: false);
 
     private static readonly ReportAccessGates UnauthorizedGates = new(
         CanViewRecruitment: false,
@@ -28,7 +29,8 @@ public class AddReportFavouriteHandlerTests
         CanViewLeaveSummary: false,
         CanViewProbation: false,
         CanViewOnboarding: false,
-        CanViewWorkloadActions: false);
+        CanViewWorkloadActions: false,
+        CanViewEqualityDiversity: false);
 
     [Fact]
     public async Task HandleAsync_Fails_Validation_For_Unknown_Report_Id_And_Persists_Nothing()

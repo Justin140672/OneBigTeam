@@ -67,7 +67,7 @@
             _loadedDepartmentId = DepartmentId;
             _loadedForUnassigned = isUnassigned;
             _loading = true;
-            var result = await EmployeeService.ListEmployeesAsync(CompanyId, departmentId: DepartmentId, pageSize: 100);
+            var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, departmentId: DepartmentId, pageSize: 100);
             _employees = result?.Items ?? [];
             _loading = false;
         }

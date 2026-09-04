@@ -134,6 +134,41 @@ public class AdministrativeRoleSeparationTests
     }
 
     // ---------------------------------------------------------------------
+    // Employee selection list  (employee:read)
+    // GET /api/companies/{companyId}/employees/selectable
+    // The lightweight name/id picker projection — Manager / Recruiter / HR Administrator may
+    // reach it (dropdowns such as the vacancy hiring-manager picker), but a plain Employee or a
+    // Company-Administrator-only user may not.
+    // ---------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(Manager)]
+    [InlineData(Recruiter)]
+    [InlineData(HrAdmin)]
+    public async Task SelectableEmployeeList_IsAllowed_ForRolesWithEmployeeRead(string roleKey)
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientFor(roleKey, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/employees/selectable");
+
+        AssertReachedHandler(response);
+    }
+
+    [Theory]
+    [InlineData(Employee)]
+    [InlineData(CompanyAdmin)]
+    public async Task SelectableEmployeeList_IsForbidden_ForRolesWithoutEmployeeRead(string roleKey)
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientFor(roleKey, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/employees/selectable");
+
+        AssertForbidden(response);
+    }
+
+    // ---------------------------------------------------------------------
     // Workforce analytics  (employee:read)
     // GET /api/companies/{companyId}/employees/headcount-summary
     // ---------------------------------------------------------------------

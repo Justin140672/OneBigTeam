@@ -22,6 +22,7 @@ internal static class ReportAccessGateEvaluator
         var canViewProbation = (await authorizationService.AuthorizeAsync(user, "reporting:view-probation")).Succeeded;
         var canViewOnboarding = (await authorizationService.AuthorizeAsync(user, "reporting:view-onboarding")).Succeeded;
         var canViewWorkloadActions = (await authorizationService.AuthorizeAsync(user, "reporting:view-workload-actions")).Succeeded;
+        var canViewEqualityDiversity = (await authorizationService.AuthorizeAsync(user, "reporting:view-equality")).Succeeded;
 
         return new ReportAccessGates(
             canViewRecruitment,
@@ -30,6 +31,7 @@ internal static class ReportAccessGateEvaluator
             canViewLeaveSummary,
             canViewProbation,
             canViewOnboarding,
-            canViewWorkloadActions);
+            canViewWorkloadActions,
+            canViewEqualityDiversity);
     }
 }

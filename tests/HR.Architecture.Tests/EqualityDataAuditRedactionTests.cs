@@ -27,10 +27,10 @@ public class EqualityDataAuditRedactionTests
     {
         yield return [new EqualityDataUpdatedAuditEvent(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            Created: true, true, true, true, true, true, true, DateTimeOffset.UtcNow)];
+            Created: true, true, true, true, true, true, true, true, DateTimeOffset.UtcNow)];
         yield return [new EqualityDataUpdatedAuditEvent(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            Created: false, false, false, false, false, false, false, DateTimeOffset.UtcNow)];
+            Created: false, false, false, false, false, false, false, false, DateTimeOffset.UtcNow)];
         yield return [new EqualityDataDeletedAuditEvent(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow)];
     }

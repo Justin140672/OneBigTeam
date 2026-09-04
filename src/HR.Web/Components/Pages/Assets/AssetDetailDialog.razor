@@ -296,7 +296,7 @@
         _selectedEmployeeId = null;
         _assignNotes = null;
         _dialogError = null;
-        var result = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 200);
         _employees = result?.Items ?? [];
         _showAssignDialog = true;
     }

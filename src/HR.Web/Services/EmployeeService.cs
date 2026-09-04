@@ -7,7 +7,12 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
-    public async Task<ListEmployeesResponse?> ListEmployeesAsync(
+    /// <summary>
+    /// The full employee administration list (EmployeeList grid). API-gated to "employee:manage"
+    /// (HR Administrator only). Non-HR-admin pickers must call
+    /// <see cref="ListSelectableEmployeesAsync"/> instead.
+    /// </summary>
+    public Task<ListEmployeesResponse?> ListEmployeesAsync(
         Guid companyId,
         string? search = null,
         int pageNumber = 1,
@@ -16,6 +21,34 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         string? status = null,
         Guid? managerId = null,
         Guid? locationId = null)
+        => GetEmployeeListAsync("employees", companyId, search, pageNumber, pageSize, departmentId, status, managerId, locationId);
+
+    /// <summary>
+    /// The read-only "pick a person" projection, API-gated to "employee:read" (Manager / Recruiter /
+    /// HR Administrator). Same response shape as <see cref="ListEmployeesAsync"/>; use this for
+    /// dropdown/combobox pickers where the caller may be a Manager or Recruiter.
+    /// </summary>
+    public Task<ListEmployeesResponse?> ListSelectableEmployeesAsync(
+        Guid companyId,
+        string? search = null,
+        int pageNumber = 1,
+        int pageSize = 20,
+        Guid? departmentId = null,
+        string? status = null,
+        Guid? managerId = null,
+        Guid? locationId = null)
+        => GetEmployeeListAsync("employees/selectable", companyId, search, pageNumber, pageSize, departmentId, status, managerId, locationId);
+
+    private async Task<ListEmployeesResponse?> GetEmployeeListAsync(
+        string resource,
+        Guid companyId,
+        string? search,
+        int pageNumber,
+        int pageSize,
+        Guid? departmentId,
+        string? status,
+        Guid? managerId,
+        Guid? locationId)
     {
         var query = HttpUtility.ParseQueryString(string.Empty);
         if (!string.IsNullOrWhiteSpace(search)) query["search"] = search;
@@ -29,7 +62,7 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<ListEmployeesResponse>(
-                $"api/companies/{companyId}/employees?{query}", HrApiJsonOptions.Default);
+                $"api/companies/{companyId}/{resource}?{query}", HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
         {

@@ -116,6 +116,13 @@ internal static class ReportCatalog
             "Assets assigned to employees including serial number, assigned date and return status.",
             ReportAccessGate.Hr, typeof(GetAssetAssignmentReportRequest), ReportSensitivity.Sensitive),
 
+        // Standard: anonymous workforce aggregates only — counts and percentages, no named
+        // individuals, no drill-through. Gated on the dedicated reporting:view-equality permission
+        // rather than ReportAccessGate.Hr so general HR reporting access never exposes it.
+        new("equality-diversity", "Equality & Diversity Report", ReportCategory.Hr,
+            "Anonymous workforce equality statistics by gender, age band, ethnicity, disability, sexual orientation, religion or belief and caring responsibilities, with small groups suppressed.",
+            ReportAccessGate.EqualityDiversity, typeof(EqualityDiversityReportCatalogRequest), ReportSensitivity.Standard),
+
         new("workload-actions", "Workload & HR Actions Report", ReportCategory.Hr,
             "Consolidated outstanding people-related actions across leave, sickness, probation, onboarding, offboarding, documents, assets, identity, recruitment and tasks, scoped to what the caller is permitted to see.",
             ReportAccessGate.WorkloadActions, typeof(GetWorkloadActionsRequest), ReportSensitivity.Sensitive,

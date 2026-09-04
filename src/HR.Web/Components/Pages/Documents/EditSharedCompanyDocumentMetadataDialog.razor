@@ -155,7 +155,7 @@
         // A first page (browsable without typing anything) — same pattern as
         // EmployeeEmploymentTab's manager picker. The rest of the company is reached by typing,
         // see OnReviewOwnerFilteringAsync, so this page doesn't need to be exhaustive.
-        _reviewOwnerOptions = ((await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50))?.Items ?? [])
+        _reviewOwnerOptions = ((await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50))?.Items ?? [])
             .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .ToList();
 
@@ -199,7 +199,7 @@
     {
         args.PreventDefaultAction = true;
         var requestId = ++_reviewOwnerFilterRequestId;
-        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _reviewOwnerFilterRequestId) return;
         _reviewOwnerOptions = (result?.Items ?? [])
             .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))

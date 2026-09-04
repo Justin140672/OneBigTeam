@@ -1147,7 +1147,7 @@
             _companyEmployeeNumberMode = hrSettings?.EmployeeNumberMode ?? EmployeeNumberMode.Manual;
             Model.EmployeeNumberAutoAssigned = _companyEmployeeNumberMode == EmployeeNumberMode.Automatic;
 
-            var managerResult = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
+            var managerResult = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
             _managerOptions = (managerResult?.Items ?? [])
                 .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
                 .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
@@ -1287,7 +1287,7 @@
     {
         args.PreventDefaultAction = true;
         var requestId = ++_managerFilterRequestId;
-        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
             .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")

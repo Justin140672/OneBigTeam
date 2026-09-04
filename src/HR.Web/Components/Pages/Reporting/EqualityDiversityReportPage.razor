@@ -1,0 +1,103 @@
+@page "/companies/{CompanyId:guid}/reporting/equality-diversity"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject AppSession Session
+@using HR.Web.Components.Controls
+@using HR.Web.Models
+@using HR.Web.Services
+@inject ReportingService ReportingService
+
+<PageTitle>Equality &amp; Diversity Report</PageTitle>
+
+<div class="container-fluid py-4" data-testid="equality-diversity-report">
+    <h1 class="mb-1">Equality &amp; Diversity</h1>
+    <p class="text-muted mb-3">
+        Anonymous workforce equality statistics. Figures are aggregated counts and percentages only —
+        no individual answers are shown, and groups smaller than the suppression threshold are
+        collapsed into a &ldquo;Not reported&rdquo; row.
+    </p>
+
+    @if (_isLoading)
+    {
+        <HrLoadingIndicator Label="Loading equality and diversity statistics…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else if (_report is not null)
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card"><div class="card-body">
+                    <div class="text-muted small">Employees in scope</div>
+                    <div class="fs-4" data-testid="equality-total">@_report.TotalEmployees</div>
+                </div></div>
+            </div>
+            <div class="col-md-3">
+                <div class="card"><div class="card-body">
+                    <div class="text-muted small">Suppression threshold</div>
+                    <div class="fs-4">&lt; @_report.MinimumGroupSize</div>
+                </div></div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            @foreach (var dimension in _report.Dimensions)
+            {
+                <div class="col-lg-6">
+                    <div class="card h-100" data-testid="@($"equality-dimension-{dimension.Key}")">
+                        <div class="card-header fw-semibold">@dimension.Name</div>
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr><th>Response</th><th class="text-end">Count</th><th class="text-end">%</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in dimension.Rows)
+                                {
+                                    <tr class="@(row.Suppressed ? "text-muted fst-italic" : null)">
+                                        <td>@row.Value</td>
+                                        <td class="text-end">@row.Count</td>
+                                        <td class="text-end">@row.Percentage.ToString("0.0")%</td>
+                                    </tr>
+                                }
+                                @if (dimension.Rows.Count == 0)
+                                {
+                                    <tr><td colspan="3" class="text-muted">No data</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private GetEqualityDiversityReportResponse? _report;
+    private bool _isLoading = true;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!AppSession.GuardAccess(Navigation, Session.CanViewEqualityReports))
+            return;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+
+        var (response, error) = await ReportingService.GetEqualityDiversityReportAsync(CompanyId);
+        _report = response;
+        _error = response is null ? (error ?? "Failed to load the equality and diversity report.") : null;
+
+        _isLoading = false;
+    }
+}

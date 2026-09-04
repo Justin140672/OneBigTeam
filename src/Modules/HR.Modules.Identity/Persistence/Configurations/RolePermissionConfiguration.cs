@@ -160,6 +160,10 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.ReportingViewWorkloadActions),
             RolePermission.Create(SystemRoles.Manager, SystemPermissions.ReportingViewWorkloadActions),
 
+            // reporting:view-equality — Ticket 6: anonymous aggregate Equality & Diversity report.
+            // HR Administrator only; deliberately not Manager/Recruiter/Company Administrator.
+            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.ReportingViewEquality),
+
             // support:manage — HR or Company Administrator (closest existing approximation; no
             // dedicated "platform staff" role exists yet — see IdentityModule comment).
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.SupportManage),

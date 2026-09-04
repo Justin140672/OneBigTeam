@@ -19,7 +19,8 @@ public class SaveReportViewHandlerTests
         CanViewLeaveSummary: false,
         CanViewProbation: false,
         CanViewOnboarding: false,
-        CanViewWorkloadActions: false);
+        CanViewWorkloadActions: false,
+        CanViewEqualityDiversity: false);
 
     [Fact]
     public async Task HandleAsync_Creates_SavedReportView()

@@ -19,6 +19,7 @@ internal sealed class SaveMyEqualityDataValidator : AbstractValidator<SaveMyEqua
         RuleFor(r => r.DisabilityStatus).IsInEnum().When(r => r.DisabilityStatus.HasValue);
         RuleFor(r => r.SexualOrientation).IsInEnum().When(r => r.SexualOrientation.HasValue);
         RuleFor(r => r.ReligionOrBelief).IsInEnum().When(r => r.ReligionOrBelief.HasValue);
+        RuleFor(r => r.CaringResponsibilities).IsInEnum().When(r => r.CaringResponsibilities.HasValue);
 
         RuleFor(r => r.GenderIdentitySelfDescribed).MaximumLength(SelfDescribedMaxLength);
         RuleFor(r => r.EthnicGroupSelfDescribed).MaximumLength(SelfDescribedMaxLength);

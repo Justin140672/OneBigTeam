@@ -15,4 +15,5 @@ internal sealed record SaveMyEqualityDataRequest(
     SexualOrientation? SexualOrientation,
     string? SexualOrientationSelfDescribed,
     ReligionOrBelief? ReligionOrBelief,
-    string? ReligionOrBeliefSelfDescribed);
+    string? ReligionOrBeliefSelfDescribed,
+    CaringResponsibilities? CaringResponsibilities);
