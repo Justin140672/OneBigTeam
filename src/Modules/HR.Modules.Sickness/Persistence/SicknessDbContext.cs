@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Persistence;
 
-internal sealed class SicknessDbContext : DbContext
+internal class SicknessDbContext : DbContext
 {
     public SicknessDbContext(DbContextOptions<SicknessDbContext> options)
         : base(options)

@@ -30,7 +30,7 @@ public class NotifyHrOfOverdueFitNoteHandlerTests
     private static NotifyHrOfOverdueFitNoteHandler BuildHandler(
         FakeTaskCreator creator,
         FakeEmployeeNameReader? employeeNameReader = null) =>
-        new(creator, employeeNameReader ?? new FakeEmployeeNameReader());
+        new(creator, new FakeOpenTaskBySourceEntityReader(), employeeNameReader ?? new FakeEmployeeNameReader());
 
     [Fact]
     public async Task HandleAsync_Creates_One_Task()
