@@ -460,4 +460,75 @@ public class EmailDeliveryJobTests
 
         Assert.Empty(alertWriter.Commands);
     }
+
+    // OBT-REM-12: the "claim" step's DbUpdateConcurrencyException guard --------------------------
+
+    [Fact]
+    public async Task SendAsync_Concurrency_Conflict_On_Claim_Step_Backs_Off_Without_Sending()
+    {
+        // Two separate DbContext instances pointed at the same InMemory database name, sharing the
+        // same EmailDelivery row's xmin-backed concurrency token (see EmailDeliveryConfiguration):
+        // the first context "wins" the claim by saving first (bumping the store's current token
+        // value), so when the second context — the one this job runs against — tries to persist its
+        // own RecordAttempt() with its now-stale original token value, EF Core raises
+        // DbUpdateConcurrencyException exactly as it would for a real overlapping Hangfire execution.
+        var dbName = Guid.NewGuid().ToString("N");
+        var options = new DbContextOptionsBuilder<NotificationsDbContext>()
+            .UseInMemoryDatabase(dbName)
+            .Options;
+
+        var companyId = Guid.NewGuid();
+        var notificationId = Guid.NewGuid();
+
+        await using (var seedDb = new NotificationsDbContext(options))
+        {
+            await SeedPendingDelivery(seedDb, companyId, notificationId);
+        }
+
+        // staleLoadContext loads (and tracks) the row FIRST, capturing the pre-conflict concurrency
+        // token as its "original value" — this is the context/job under test.
+        await using var staleLoadContext = new NotificationsDbContext(options);
+        await staleLoadContext.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
+
+        // Context A then loads its own, independent copy and saves first, bumping the concurrency
+        // token's current store value — simulating another execution "winning" the claim race.
+        // EF Core's InMemory provider does not auto-generate a new xmin-shaped value the way
+        // PostgreSQL does on every UPDATE, so the shadow token is bumped explicitly here to make the
+        // InMemory provider surface the same DbUpdateConcurrencyException a real overlapping Hangfire
+        // execution would get from Npgsql's real xmin system column.
+        await using (var contextA = new NotificationsDbContext(options))
+        {
+            var deliveryA = await contextA.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
+            deliveryA.RecordAttempt(FixedUtcNow);
+            var currentToken = (uint)contextA.Entry(deliveryA).Property("xmin").CurrentValue!;
+            contextA.Entry(deliveryA).Property("xmin").CurrentValue = currentToken + 1;
+            await contextA.SaveChangesAsync();
+        }
+
+        var emailSender = new FakeEmailSender();
+        var logger = new FakeLogger<EmailDeliveryJob>();
+        var job = new EmailDeliveryJob(
+            staleLoadContext,
+            emailSender,
+            new FakeUserEmailReader(),
+            new FakeClock(FixedUtcNow),
+            new FakeAuditPublisher(),
+            new CapturingAdministrativeAlertWriter(),
+            new FakeCompanyNotificationSettingsReader(),
+            logger);
+
+        // staleLoadContext's tracked copy of the row still carries the pre-contextA-save concurrency
+        // token in its OriginalValues, so this SendAsync's own RecordAttempt()+SaveChangesAsync should
+        // be rejected as a concurrency conflict rather than overwrite context A's already-persisted
+        // attempt.
+        await job.SendAsync(notificationId, companyId); // must not throw — caught and treated as a no-op
+
+        Assert.Empty(emailSender.Calls);
+
+        await using var verifyDb = new NotificationsDbContext(options);
+        var stored = await verifyDb.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
+        // Context A's attempt (the "winner") is the one that persisted.
+        Assert.Equal(1, stored.AttemptCount);
+        Assert.Equal(EmailDeliveryStatus.Pending, stored.Status);
+    }
 }

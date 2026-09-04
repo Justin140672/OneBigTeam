@@ -18,10 +18,30 @@ namespace HR.Integration.Tests.Infrastructure;
 /// never creates a job in storage — keeps job enqueuing a deliberate no-op so tests' own manual
 /// state setup is the only thing that determines scan status, matching what those tests already
 /// assume.
+///
+/// OBT-REM-12: also records every "created" (enqueued) job so tests that need to assert on
+/// enqueuing behaviour (e.g. reconciliation jobs re-enqueuing EmailDeliveryJob) can inspect
+/// <see cref="CreatedJobs"/> without a real Hangfire storage backend actually running the job.
+/// Since ApiWebApplicationFactory registers this as a singleton shared by every test class in the
+/// "Integration" collection (which xunit runs sequentially within a collection), tests that assert
+/// on CreatedJobs should filter by the specific notification/entity id(s) they seeded rather than
+/// asserting on the raw Count, to stay safe even if that sequencing assumption ever changes.
 /// </summary>
 internal sealed class FakeBackgroundJobClient : IBackgroundJobClient
 {
-    public string Create(Job job, IState state) => Guid.NewGuid().ToString();
+    private readonly List<Job> _createdJobs = [];
+    private readonly object _lock = new();
+
+    public IReadOnlyList<Job> CreatedJobs
+    {
+        get { lock (_lock) { return _createdJobs.ToList(); } }
+    }
+
+    public string Create(Job job, IState state)
+    {
+        lock (_lock) { _createdJobs.Add(job); }
+        return Guid.NewGuid().ToString();
+    }
 
     public bool ChangeState(string jobId, IState state, string? expectedState) => true;
 }
