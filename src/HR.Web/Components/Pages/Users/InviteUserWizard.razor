@@ -1,11 +1,8 @@
 @inject UserAdministrationService UserAdministrationService
 
-<SfDialog Visible="IsOpen" IsModal="true" Width="620px" ShowCloseIcon="false">
-    <DialogTemplates>
-        <Header>Invite User</Header>
-        <Content>
-            <HrStepper Steps="_stepLabels" CurrentStep="_step" AriaLabel="Invite user progress" />
-
+<HrWizardDialog IsOpen="IsOpen" Title="Invite User" Steps="_stepLabels" CurrentStep="_step"
+                GlobalError="_error" Busy="_submitting" OnCancelled="CancelAsync">
+    <ChildContent>
             @if (_loading)
             {
                 <HrLoadingIndicator Label="Loading employees…" />
@@ -90,14 +87,11 @@
                     </dd>
                 </dl>
             }
-
-            @if (!string.IsNullOrEmpty(_error))
-            {
-                <div class="alert alert-danger py-2 mt-3 mb-0">@_error</div>
-            }
-        </Content>
-        <FooterTemplate>
+    </ChildContent>
+    <FooterContent>
+            @* Secondary/navigation actions first, primary/confirming action rightmost. *@
             <SfButton Disabled="@(_step == 1 || _submitting)" OnClick="Back">Back</SfButton>
+            <SfButton Disabled="@_submitting" OnClick="CancelAsync">Cancel</SfButton>
             @if (_step < 4)
             {
                 <SfButton IsPrimary="true" Disabled="@(!CanAdvance || _submitting)" OnClick="Next">Next</SfButton>
@@ -112,10 +106,8 @@
                     Send invitation
                 </SfButton>
             }
-            <SfButton Disabled="@_submitting" OnClick="CancelAsync">Cancel</SfButton>
-        </FooterTemplate>
-    </DialogTemplates>
-</SfDialog>
+    </FooterContent>
+</HrWizardDialog>
 
 @code {
     [Parameter] public bool IsOpen { get; set; }

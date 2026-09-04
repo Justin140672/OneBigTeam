@@ -2,10 +2,9 @@
 @using HR.Infrastructure.Abstractions
 @inject EmployeeService EmployeeService
 
-<SfDialog Visible="IsOpen" IsModal="true" Width="480px" ShowCloseIcon="false">
-    <DialogTemplates>
-        <Header>Cancel Leaving Process</Header>
-        <Content>
+<HrFormDialog IsOpen="IsOpen" Title="Cancel Leaving Process" Width="480px"
+              GlobalError="_globalError" Busy="_submitting" OnCancelled="DismissAsync">
+    <ChildContent>
             <p class="text-muted">
                 This will cancel the leaving process and return this employee's status to Active.
             </p>
@@ -20,13 +19,10 @@
                 <label class="form-label">Cancellation Reason <span class="text-danger">*</span></label>
                 <HrTextBox @bind-Value="_cancellationReason" Multiline="true" Rows="3" Maxlength="1000" Placeholder="Why is the leaving process being cancelled?" />
             </div>
-
-            @if (!string.IsNullOrEmpty(_globalError))
-            {
-                <div class="alert alert-danger py-2">@_globalError</div>
-            }
-        </Content>
-        <FooterTemplate>
+    </ChildContent>
+    <FooterContent>
+            @* Secondary action first, destructive primary action rightmost. *@
+            <SfButton Disabled="@_submitting" OnClick="DismissAsync">Close</SfButton>
             <SfButton CssClass="e-danger" IsPrimary="true" Disabled="@_submitting" OnClick="ConfirmAsync">
                 @if (_submitting)
                 {
@@ -34,10 +30,8 @@
                 }
                 Cancel Leaving Process
             </SfButton>
-            <SfButton Disabled="@_submitting" OnClick="DismissAsync">Close</SfButton>
-        </FooterTemplate>
-    </DialogTemplates>
-</SfDialog>
+    </FooterContent>
+</HrFormDialog>
 
 @code {
     [Parameter] public bool IsOpen { get; set; }

@@ -1,0 +1,23 @@
+@* Explicitly-named destructive variant of the shared confirmation dialog, for delete/deactivate/
+   cancel-subscription-type actions. Thin wrapper over HrConfirmDialog (DangerConfirm forced on)
+   so call sites read their intent at a glance instead of remembering to set a boolean flag. *@
+<HrConfirmDialog Visible="Visible"
+                 Title="Title"
+                 Message="Message"
+                 ConfirmText="ConfirmText"
+                 CancelText="CancelText"
+                 DangerConfirm="true"
+                 Busy="Busy"
+                 OnConfirmed="OnConfirmed"
+                 OnCancelled="OnCancelled" />
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string Title { get; set; } = "Confirm";
+    [Parameter] public string Message { get; set; } = "Are you sure?";
+    [Parameter] public string ConfirmText { get; set; } = "Delete";
+    [Parameter] public string CancelText { get; set; } = "Cancel";
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback OnConfirmed { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+}

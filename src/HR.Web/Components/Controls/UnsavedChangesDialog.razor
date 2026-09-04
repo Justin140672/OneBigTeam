@@ -1,13 +1,19 @@
+@* NOTE: conditionally mounted (@if, not a Visible toggle like HrConfirmDialog) — this is the
+   dialog issue 4 fixes for focus restoration. Left as-is here per that issue's scope; only the
+   header/footer chrome below was brought in line with the other shared dialogs. *@
 @if (Visible)
 {
-    <SfDialog Visible="Visible" IsModal="true" Width="420px" ShowCloseIcon="false">
+    <SfDialog CssClass="hr-dialog" Visible="Visible" IsModal="true" Width="420px" ShowCloseIcon="true">
+        <DialogEvents Closed="OnCancel" />
         <DialogTemplates>
             <Header>Unsaved Changes</Header>
             <Content>You have unsaved changes. Do you want to save them before leaving?</Content>
             <FooterTemplate>
-                <SfButton IsPrimary="true" OnClick="OnSaveAndClose">Save</SfButton>
-                <SfButton CssClass="e-danger e-outline" OnClick="OnDiscard">Discard Changes</SfButton>
+                @* Footer order matches the other shared dialogs: least-committal action first,
+                   primary/confirming action ("Save") rightmost. *@
                 <SfButton OnClick="OnCancel">Cancel</SfButton>
+                <SfButton CssClass="e-danger e-outline" OnClick="OnDiscard">Discard Changes</SfButton>
+                <SfButton IsPrimary="true" OnClick="OnSaveAndClose">Save</SfButton>
             </FooterTemplate>
         </DialogTemplates>
     </SfDialog>

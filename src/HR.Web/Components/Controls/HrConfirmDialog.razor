@@ -1,20 +1,24 @@
 @* Kept mounted and toggled via Visible (not wrapped in @if) so Syncfusion's SfDialog runs its
    normal open/close lifecycle — including returning keyboard focus to the element that was
    focused when it opened (NFR-05). An @if wrapper tears the dialog out of the render tree before
-   that focus-restoration can run, dropping focus to <body>. *@
-<SfDialog Visible="Visible" IsModal="true" Width="420px" ShowCloseIcon="false">
+   that focus-restoration can run, dropping focus to <body>. This is also referenced by name in
+   issue 4's unsaved-changes-dialog focus fix — do not change this mount strategy here. *@
+<SfDialog CssClass="hr-dialog" Visible="Visible" IsModal="true" Width="420px" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleClosed" />
     <DialogTemplates>
         <Header>@Title</Header>
         <Content>@Message</Content>
         <FooterTemplate>
-            <SfButton IsPrimary="true" CssClass="@(DangerConfirm ? "e-danger" : "")" Disabled="Busy" OnClick="OnConfirmed">
+            @* Footer button order convention used by every shared Hr*Dialog: secondary/cancel
+               action first, primary/confirming action rightmost. *@
+            <SfButton Disabled="Busy" OnClick="HandleCancelClicked">@CancelText</SfButton>
+            <SfButton IsPrimary="true" CssClass="@(DangerConfirm ? "e-danger" : "")" Disabled="Busy" OnClick="HandleConfirmClicked">
                 @if (Busy)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                 }
                 @ConfirmText
             </SfButton>
-            <SfButton Disabled="Busy" OnClick="OnCancelled">@CancelText</SfButton>
         </FooterTemplate>
     </DialogTemplates>
 </SfDialog>
@@ -23,6 +27,9 @@
     // Generic app-wide confirmation "message box" — mirrors UnsavedChangesDialog's structure
     // (plain SfDialog + parameter-driven content/callbacks) so any page can show a consistent
     // Yes/No confirmation instead of hand-rolling inline grid confirmation UI or ad-hoc dialogs.
+    // DangerConfirm toggles between the "standard confirmation" and "destructive confirmation"
+    // shared patterns from the same component — see HrDestructiveConfirmDialog for the
+    // explicitly-named destructive wrapper used by delete/deactivate call sites.
     [Parameter] public bool Visible { get; set; }
     [Parameter] public string Title { get; set; } = "Confirm";
     [Parameter] public string Message { get; set; } = "Are you sure?";
@@ -32,4 +39,36 @@
     [Parameter] public bool Busy { get; set; }
     [Parameter] public EventCallback OnConfirmed { get; set; }
     [Parameter] public EventCallback OnCancelled { get; set; }
+
+    // The footer Cancel button and the close-icon/Escape/backdrop path both need to end in
+    // OnCancelled — but the footer button already invokes it directly, and SfDialog's Closed
+    // event then fires anyway once Visible flips to false in response, which would invoke
+    // OnCancelled a second time. This mirrors EditDialogBase's _suppressNextClosedEvent guard.
+    private bool _suppressNextClosed;
+
+    private Task HandleClosed()
+    {
+        if (_suppressNextClosed)
+        {
+            _suppressNextClosed = false;
+            return Task.CompletedTask;
+        }
+
+        // Soft-cancel: close icon, Escape, and backdrop click all behave like the Cancel button,
+        // except while a confirm/cancel action is already in flight (Busy) — ignore those so an
+        // in-progress save can't be raced by a stray close.
+        return Busy ? Task.CompletedTask : OnCancelled.InvokeAsync();
+    }
+
+    private Task HandleCancelClicked()
+    {
+        _suppressNextClosed = true;
+        return OnCancelled.InvokeAsync();
+    }
+
+    private Task HandleConfirmClicked()
+    {
+        _suppressNextClosed = true;
+        return OnConfirmed.InvokeAsync();
+    }
 }

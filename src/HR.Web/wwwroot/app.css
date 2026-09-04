@@ -63,6 +63,18 @@
     --hr-color-warning-alt: #eab308;
     --hr-color-success: #16a34a;
 
+    /* Interaction-state tokens for destructive controls (delete/deactivate/cancel-subscription
+       buttons) — same naming convention as the primary set above, so shared dialog components
+       (HrConfirmDialog's DangerConfirm mode) never need one-off hex values. */
+    --hr-color-danger-hover: #b91c1c;
+    --hr-color-danger-active: #991b1b;
+    --hr-color-danger-subtle: rgba(220, 38, 38, 0.12);
+    --hr-color-danger-disabled-bg: #f3b4b4;
+    --hr-color-danger-disabled-border: #f3b4b4;
+    --hr-color-danger-disabled-fg: #f3f4f6;
+    --hr-color-danger-loading-bg: var(--hr-color-danger-hover);
+    --hr-color-danger-loading-fg: #ffffff;
+
     /* Radius / shadow scale */
     --hr-radius-sm: 4px;
     --hr-radius-md: 8px;
@@ -111,6 +123,14 @@ html[data-theme="dark"] {
     --hr-color-secondary-subtle: rgba(27, 180, 204, 0.16);
 
     --hr-color-danger: #f87171;
+    --hr-color-danger-hover: #ef4444;
+    --hr-color-danger-active: #dc2626;
+    --hr-color-danger-subtle: rgba(248, 113, 113, 0.16);
+    --hr-color-danger-disabled-bg: #5c2b2b;
+    --hr-color-danger-disabled-border: #5c2b2b;
+    --hr-color-danger-disabled-fg: #8b96a0;
+    --hr-color-danger-loading-bg: var(--hr-color-danger-hover);
+    --hr-color-danger-loading-fg: #0b1220;
     --hr-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.4);
     --hr-shadow-md: 0 8px 20px rgba(0, 0, 0, 0.35);
 
@@ -181,6 +201,66 @@ html, body {
     background: var(--hr-color-primary-loading-bg);
     border-color: var(--hr-color-primary-loading-bg);
     color: var(--hr-color-primary-loading-fg);
+}
+
+/* Same interaction-state treatment as e-primary above, for Syncfusion's e-danger variant used by
+   the destructive confirmation dialog (HrConfirmDialog's DangerConfirm mode) and other
+   delete/deactivate buttons across the app. */
+.e-btn.e-danger:hover,
+.e-css.e-btn.e-danger:hover {
+    background: var(--hr-color-danger-hover);
+    border-color: var(--hr-color-danger-hover);
+}
+
+.e-btn.e-danger:focus,
+.e-css.e-btn.e-danger:focus {
+    background: var(--hr-color-danger-hover);
+    border-color: var(--hr-color-danger);
+    box-shadow: 0 0 0 4px var(--hr-color-danger-subtle);
+}
+
+.e-btn.e-danger:active,
+.e-css.e-btn.e-danger:active,
+.e-btn.e-danger.e-active,
+.e-css.e-btn.e-danger.e-active {
+    background: var(--hr-color-danger-active);
+    border-color: var(--hr-color-danger-active);
+}
+
+.e-btn.e-danger:disabled,
+.e-css.e-btn.e-danger:disabled,
+.e-btn.e-danger.e-disabled,
+.e-css.e-btn.e-danger.e-disabled {
+    background: var(--hr-color-danger-disabled-bg);
+    border-color: var(--hr-color-danger-disabled-border);
+    color: var(--hr-color-danger-disabled-fg);
+    opacity: 1;
+}
+
+.e-btn.e-danger:disabled:has(.spinner-border),
+.e-css.e-btn.e-danger:disabled:has(.spinner-border) {
+    background: var(--hr-color-danger-loading-bg);
+    border-color: var(--hr-color-danger-loading-bg);
+    color: var(--hr-color-danger-loading-fg);
+}
+
+/* ── Shared dialog chrome ───────────────────────────────────────────
+   Common structural styling for every dialog built from the shared
+   Components/Controls/Hr*Dialog components (HrConfirmDialog and its
+   destructive/form/wizard variants). Header layout, footer alignment,
+   and a mobile width breakpoint live here so no individual dialog
+   needs its own one-off CSS or inline style. Marker class "hr-dialog"
+   is stamped by each shared dialog component. */
+.hr-dialog.e-dialog .e-dlg-header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.hr-dialog.e-dialog .e-footer-content {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
 }
 
 /* Bootstrap's compiled .btn-primary bakes hover/active/disabled colors as literal hex values on
@@ -1918,4 +1998,15 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
 .hr-field .e-input-group,
 .hr-field .e-control-wrapper {
     width: 100%;
+}
+
+/* Mobile width for every shared Hr*Dialog — Syncfusion's SfDialog Width parameter is a fixed
+   pixel value (e.g. 420px/480px), which overflows small viewports. This clamps any dialog
+   carrying the shared "hr-dialog" marker class down to a viewport-relative width below the
+   small-phone breakpoint, without every dialog needing its own responsive CSS. */
+@media (max-width: 576px) {
+    .hr-dialog.e-dialog {
+        width: 92vw !important;
+        max-width: 92vw !important;
+    }
 }

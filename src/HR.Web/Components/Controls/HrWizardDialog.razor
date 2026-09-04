@@ -1,0 +1,41 @@
+@* Shared chrome for a dialog hosting a multi-step wizard (HrStepper progress + per-step content),
+   with the same consistent header/close-icon/footer/mobile-width treatment as the other Hr*Dialog
+   components. Step content and footer buttons (Back/Next/Send, which vary per wizard) stay owned
+   by the caller via render fragments; this component supplies the shared shell plus the stepper. *@
+<SfDialog CssClass="hr-dialog" Visible="IsOpen" IsModal="true" Width="@Width" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleClosed" />
+    <DialogTemplates>
+        <Header>@Title</Header>
+        <Content>
+            <HrStepper Steps="Steps" CurrentStep="CurrentStep" AriaLabel="@($"{Title} progress")" />
+
+            @if (!string.IsNullOrEmpty(GlobalError))
+            {
+                <div class="alert alert-danger py-2 mt-3">@GlobalError</div>
+            }
+            @ChildContent
+        </Content>
+        <FooterTemplate>
+            @* Footer order convention shared by every Hr*Dialog: secondary/navigation actions
+               (Back, Cancel) first, primary/confirming action (Next/Send) rightmost. *@
+            @FooterContent
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Width { get; set; } = "620px";
+    [Parameter, EditorRequired] public List<string> Steps { get; set; } = [];
+    [Parameter, EditorRequired] public int CurrentStep { get; set; }
+    [Parameter] public string? GlobalError { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? FooterContent { get; set; }
+
+    // Soft-cancel via close icon/Escape/backdrop click, same as the other shared dialogs.
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private Task HandleClosed() => Busy ? Task.CompletedTask : OnCancelled.InvokeAsync();
+}

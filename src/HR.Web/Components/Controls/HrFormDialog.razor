@@ -1,0 +1,39 @@
+@* Shared chrome for a dialog hosting a form with Save/Cancel actions — consistent header/close
+   icon, footer alignment, and mobile width with every other Hr*Dialog. Content and the specific
+   footer buttons (which vary per form — e.g. extra "Save and add another" actions) stay owned by
+   the caller via the two render fragments below; this component only supplies the shared shell. *@
+<SfDialog CssClass="hr-dialog" Visible="IsOpen" IsModal="true" Width="@Width" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleClosed" />
+    <DialogTemplates>
+        <Header>@Title</Header>
+        <Content>
+            @if (!string.IsNullOrEmpty(GlobalError))
+            {
+                <div class="alert alert-danger py-2">@GlobalError</div>
+            }
+            @ChildContent
+        </Content>
+        <FooterTemplate>
+            @* Footer order convention shared by every Hr*Dialog: secondary/cancel action(s)
+               first, primary/confirming action rightmost. Callers should place their Cancel
+               button(s) before the Save button inside FooterContent to keep this consistent. *@
+            @FooterContent
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Width { get; set; } = "520px";
+    [Parameter] public string? GlobalError { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? FooterContent { get; set; }
+
+    // Soft-cancel via close icon/Escape/backdrop click, same as HrConfirmDialog — except while
+    // Busy (an async save in flight), which ignores the close attempt rather than racing it.
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private Task HandleClosed() => Busy ? Task.CompletedTask : OnCancelled.InvokeAsync();
+}
