@@ -19,19 +19,3 @@
     border-top: 1px solid var(--hr-gray-200, #e5e7eb);
     z-index: 5;
 }
-
-/* Backfill action: visually separated from ordinary form fields as an operational action. */
-::deep .hr-settings-action-card {
-    border: 1px solid var(--hr-gray-200, #e5e7eb);
-    background: var(--hr-gray-50, #f9fafb);
-    border-radius: var(--hr-radius-md, 8px);
-    padding: 1rem 1.25rem;
-}
-
-::deep .hr-settings-action-card__body {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-}

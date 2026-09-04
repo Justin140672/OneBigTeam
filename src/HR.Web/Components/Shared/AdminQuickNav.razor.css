@@ -77,15 +77,6 @@
     overflow-y: auto;
 }
 
-.quick-nav-group-heading {
-    padding: 0.5rem 1rem 0.25rem;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    opacity: 0.55;
-}
-
 .quick-nav-option {
     display: flex;
     align-items: center;

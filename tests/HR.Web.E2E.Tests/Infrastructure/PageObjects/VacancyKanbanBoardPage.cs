@@ -133,7 +133,7 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
         (await Card(candidateNameFragment).GetAttributeAsync("class")) ?? "";
 
     public Task<bool> HasWithdrawnStylingAsync(string candidateNameFragment) =>
-        HasClassAsync(candidateNameFragment, "kanban-applicant-card--muted");
+        HasClassAsync(candidateNameFragment, "kanban-applicant-card--danger");
 
     public Task<bool> HasRejectedStylingAsync(string candidateNameFragment) =>
         HasClassAsync(candidateNameFragment, "kanban-applicant-card--danger");
