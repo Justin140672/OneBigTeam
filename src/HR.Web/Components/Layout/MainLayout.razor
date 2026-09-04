@@ -82,14 +82,30 @@ else
                             {
                                 @foreach (var section in _adminSections)
                                 {
-                                    <MenuItem Text="@section.Label" IconCss="@SectionIcon(section.Group)">
-                                        <MenuItems>
-                                            @foreach (var dest in section.Destinations)
-                                            {
-                                                <MenuItem Text="@dest.Title" IconCss="@dest.IconCss" Url="@dest.Url" />
-                                            }
-                                        </MenuItems>
-                                    </MenuItem>
+                                    @if (section.Group == AdminNavGroup.CompanyAdministration)
+                                    {
+                                        @* Company administration never holds more than a couple of destinations
+                                           (Company Profile & Addresses, Subscription & Billing) — for a Company
+                                           Administrator this fly-out was one of only three destinations in the
+                                           entire app, so nesting it added a click for no organisational benefit.
+                                           Rendered as direct top-level items for every role that sees this
+                                           section instead of wrapping it in a single-purpose fly-out. *@
+                                        @foreach (var dest in section.Destinations)
+                                        {
+                                            <MenuItem Text="@dest.Title" IconCss="@dest.IconCss" Url="@dest.Url" />
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <MenuItem Text="@section.Label" IconCss="@SectionIcon(section.Group)">
+                                            <MenuItems>
+                                                @foreach (var dest in section.Destinations)
+                                                {
+                                                    <MenuItem Text="@dest.Title" IconCss="@dest.IconCss" Url="@dest.Url" />
+                                                }
+                                            </MenuItems>
+                                        </MenuItem>
+                                    }
                                 }
                             }
                             @if (Session.IsHrAdministrator || Session.CanManageCompany)
