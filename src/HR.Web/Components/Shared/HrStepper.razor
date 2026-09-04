@@ -1,0 +1,79 @@
+@* Sequential multi-step wizard progress indicator. Visually and semantically distinct from
+   HrTabs (content-switching): this communicates *progress through an ordered sequence*, not a
+   set of independently-selectable views. Steps are shown as numbered nodes; the current step,
+   completed steps, and upcoming steps each get a distinct visual state using the shared
+   interaction-state tokens from app.css (never framework-default blue). *@
+
+<ol class="hr-stepper" role="list" aria-label="@AriaLabel">
+    @for (var i = 0; i < Steps.Count; i++)
+    {
+        var index = i;
+        var step = Steps[index];
+        var state = StateFor(index);
+        var clickable = AllowRevisit && state == HrStepState.Completed;
+
+        <li class="hr-stepper-item hr-stepper-item--@state.ToString().ToLowerInvariant()">
+            @if (clickable)
+            {
+                <button type="button"
+                        class="hr-stepper-button"
+                        aria-current="@(state == HrStepState.Current ? "step" : null)"
+                        @onclick="@(() => OnStepSelected.InvokeAsync(index))">
+                    <span class="hr-stepper-node">
+                        @if (state == HrStepState.Completed)
+                        {
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                        }
+                        else
+                        {
+                            @(index + 1)
+                        }
+                    </span>
+                    <span class="hr-stepper-label">@step</span>
+                </button>
+            }
+            else
+            {
+                <span class="hr-stepper-static" aria-current="@(state == HrStepState.Current ? "step" : null)">
+                    <span class="hr-stepper-node">
+                        @if (state == HrStepState.Completed)
+                        {
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                        }
+                        else
+                        {
+                            @(index + 1)
+                        }
+                    </span>
+                    <span class="hr-stepper-label">@step</span>
+                </span>
+            }
+        </li>
+    }
+</ol>
+
+@code {
+    /// <summary>Ordered list of step labels, e.g. ["Employee", "Email", "Roles", "Review"].</summary>
+    [Parameter, EditorRequired] public List<string> Steps { get; set; } = [];
+
+    /// <summary>1-based index of the currently active step.</summary>
+    [Parameter, EditorRequired] public int CurrentStep { get; set; }
+
+    /// <summary>Accessible label for the stepper's role="list" container.</summary>
+    [Parameter] public string AriaLabel { get; set; } = "Progress";
+
+    /// <summary>When true, completed steps are rendered as clickable buttons so the user can jump back.</summary>
+    [Parameter] public bool AllowRevisit { get; set; }
+
+    /// <summary>Raised with the 0-based step index when a completed step is clicked (only fires when AllowRevisit is true).</summary>
+    [Parameter] public EventCallback<int> OnStepSelected { get; set; }
+
+    private enum HrStepState { Completed, Current, Upcoming }
+
+    private HrStepState StateFor(int zeroBasedIndex)
+    {
+        var stepNumber = zeroBasedIndex + 1;
+        if (stepNumber < CurrentStep) return HrStepState.Completed;
+        return stepNumber == CurrentStep ? HrStepState.Current : HrStepState.Upcoming;
+    }
+}

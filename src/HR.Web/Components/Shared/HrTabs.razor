@@ -1,0 +1,47 @@
+@* Shared content-switching tabs component. Wraps Syncfusion's SfTab (the majority pattern
+   already used across the app — CompanyEdit, EmployeeEdit, PositionProfileEdit, HrSettingsPage,
+   VacancyDetail, MyProfile all use SfTab directly) behind a simple items+content API, so new
+   consumers get a single place to pick up overflow handling and consistent styling instead of
+   hand-rolling SfTab/TabItems markup or ad-hoc Bootstrap nav-tabs.
+
+   This is distinct from HrStepper: tabs switch between independently viewable content panes,
+   they don't represent progress through a sequence. *@
+
+<SfTab @bind-SelectedItem="SelectedIndex" CssClass="@($"hr-tabs {CssClass}".Trim())" OverflowMode="OverflowMode">
+    <TabItems>
+        @for (var i = 0; i < Items.Count; i++)
+        {
+            var item = Items[i];
+            <TabItem CssClass="@(item.Disabled ? "e-disable" : null)">
+                <ChildContent>
+                    <TabHeader Text="@item.Text" IconCss="@item.IconCss" />
+                </ChildContent>
+                <ContentTemplate>
+                    @item.Content
+                </ContentTemplate>
+            </TabItem>
+        }
+    </TabItems>
+</SfTab>
+
+@code {
+    public sealed record HrTabItem(string Text, RenderFragment Content, string? IconCss = null, bool Disabled = false);
+
+    /// <summary>The tabs to render, in order.</summary>
+    [Parameter, EditorRequired] public List<HrTabItem> Items { get; set; } = [];
+
+    /// <summary>0-based selected tab index. Supports two-way binding for URL/deep-link driven selection.</summary>
+    [Parameter] public int SelectedIndex { get; set; }
+
+    [Parameter] public EventCallback<int> SelectedIndexChanged { get; set; }
+
+    /// <summary>Additional CSS classes applied to the underlying SfTab.</summary>
+    [Parameter] public string CssClass { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Overflow behaviour for many tabs. Scrollable gives horizontal-scroll-with-arrows, which is
+    /// what HrSettingsPage already uses; kept as the default here so all consumers get one
+    /// consistent overflow affordance automatically.
+    /// </summary>
+    [Parameter] public OverflowMode OverflowMode { get; set; } = OverflowMode.Scrollable;
+}

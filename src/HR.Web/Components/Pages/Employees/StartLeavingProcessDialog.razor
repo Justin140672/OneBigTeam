@@ -6,16 +6,7 @@
     <DialogTemplates>
         <Header>Start Leaving Process</Header>
         <Content>
-            <ul class="nav nav-pills mb-3">
-                @foreach (var step in _steps)
-                {
-                    <li class="nav-item">
-                        <span class="nav-link @(step.Number == _step ? "active" : (step.Number < _step ? "text-success" : "text-muted"))">
-                            @step.Number. @step.Label
-                        </span>
-                    </li>
-                }
-            </ul>
+            <HrStepper Steps="_stepLabels" CurrentStep="_step" AriaLabel="Start leaving process progress" />
 
             @if (_step == 1)
             {
@@ -149,14 +140,8 @@
     private DateOnly? _lastWorkingDay;
     private string _leavingReason = string.Empty;
 
-    private static readonly (int Number, string Label)[] _steps =
-    [
-        (1, "Resignation Date"),
-        (2, "Leaving Date"),
-        (3, "Last Working Day"),
-        (4, "Reason"),
-        (5, "Confirm"),
-    ];
+    private static readonly List<string> _stepLabels =
+        ["Resignation Date", "Leaving Date", "Last Working Day", "Reason", "Confirm"];
 
     // No clear button and no "None" item, per this codebase's convention for required dropdowns
     // (see Model.Gender in EmployeeEdit.razor) — the empty default simply shows the Placeholder

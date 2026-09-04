@@ -4,16 +4,7 @@
     <DialogTemplates>
         <Header>Invite User</Header>
         <Content>
-            <ol class="wizard-steps">
-                @for (var i = 1; i <= 4; i++)
-                {
-                    var stepIndex = i;
-                    <li class="@StepClass(stepIndex)">
-                        <span class="wizard-step-number">@stepIndex</span>
-                        <span class="wizard-step-label">@StepLabel(stepIndex)</span>
-                    </li>
-                }
-            </ol>
+            <HrStepper Steps="_stepLabels" CurrentStep="_step" AriaLabel="Invite user progress" />
 
             @if (_loading)
             {
@@ -189,16 +180,7 @@
         _loading = false;
     }
 
-    private static string StepLabel(int step) => step switch
-    {
-        1 => "Employee",
-        2 => "Email",
-        3 => "Roles",
-        _ => "Review",
-    };
-
-    private string StepClass(int step) =>
-        step == _step ? "active" : step < _step ? "done" : string.Empty;
+    private static readonly List<string> _stepLabels = ["Employee", "Email", "Roles", "Review"];
 
     private void OnRoleCheckedChanged(Guid roleId, bool isChecked)
     {

@@ -12,16 +12,7 @@
     <DialogTemplates>
         <Header>Promote Employee</Header>
         <Content>
-            <ul class="nav nav-pills mb-3">
-                @foreach (var step in _steps)
-                {
-                    <li class="nav-item">
-                        <span class="nav-link @(step.Number == _step ? "active" : (step.Number < _step ? "text-success" : "text-muted"))">
-                            @step.Number. @step.Label
-                        </span>
-                    </li>
-                }
-            </ul>
+            <HrStepper Steps="_stepLabels" CurrentStep="_step" AriaLabel="Promote employee progress" />
 
             @if (!string.IsNullOrEmpty(GlobalError))
             {
@@ -239,13 +230,7 @@
         new("Daily", "Daily")
     ];
 
-    private static readonly (int Number, string Label)[] _steps =
-    [
-        (1, "Position"),
-        (2, "Manager & Location"),
-        (3, "Compensation"),
-        (4, "Confirm"),
-    ];
+    private static readonly List<string> _stepLabels = ["Position", "Manager & Location", "Compensation", "Confirm"];
 
     private int _step = 1;
     private bool _awaitingBackdateConfirmation;

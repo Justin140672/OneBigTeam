@@ -31,22 +31,13 @@
             <div class="alert alert-danger">@GlobalError</div>
         }
 
-        <SfTab>
-            <TabItems>
-                <TabItem>
-                    <ChildContent><TabHeader Text="Profile" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4 @(IsViewMode ? "view-mode" : "")">
-                            <EditForm EditContext="EditContext">
-                                <DataAnnotationsValidator />
-                                <NestedDataAnnotationsValidator />
-                                <CompanyProfileTab Company="_company" Model="Model" />
-                            </EditForm>
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
-            </TabItems>
-        </SfTab>
+        <div class="mt-4 @(IsViewMode ? "view-mode" : "")">
+            <EditForm EditContext="EditContext">
+                <DataAnnotationsValidator />
+                <NestedDataAnnotationsValidator />
+                <CompanyProfileTab Company="_company" Model="Model" />
+            </EditForm>
+        </div>
 
         @* Branding: hidden per product decision, not removed — CompanyBrandingTab itself is
            untouched, just not shown as its own tab for now. *@

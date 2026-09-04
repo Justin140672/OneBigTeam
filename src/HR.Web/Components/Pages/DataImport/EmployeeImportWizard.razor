@@ -13,16 +13,7 @@
     </div>
     <p class="text-muted mb-4">Upload an Excel (.xlsx) file of employees, map its columns, validate, review the preview, then confirm to create the records.</p>
 
-    <ul class="nav nav-pills mb-4">
-        @foreach (var step in _steps)
-        {
-            <li class="nav-item">
-                <span class="nav-link @(step.Number == CurrentStep ? "active" : (step.Number < CurrentStep ? "text-success" : "text-muted"))">
-                    @step.Number. @step.Label
-                </span>
-            </li>
-        }
-    </ul>
+    <HrStepper Steps="_stepLabels" CurrentStep="CurrentStep" AriaLabel="Employee import progress" />
 
     @if (_globalError is not null)
     {
@@ -342,14 +333,8 @@
         _validation is not null ? 3 :
         _session is not null ? 2 : 1;
 
-    private static readonly (int Number, string Label)[] _steps =
-    [
-        (1, "Upload"),
-        (2, "Column Mapping"),
-        (3, "Validation Results"),
-        (4, "Preview & Confirm"),
-        (5, "Completion"),
-    ];
+    private static readonly List<string> _stepLabels =
+        ["Upload", "Column Mapping", "Validation Results", "Preview & Confirm", "Completion"];
 
     private static readonly (string Field, bool Required, string Format)[] _fieldReference =
     [
