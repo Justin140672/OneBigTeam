@@ -12,8 +12,8 @@
     See docs/dependency-management.md for the update and severity policy.
   -->
   <ItemGroup>
-    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.5.3" />
+    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.5.3" />
     <PackageVersion Include="ClosedXML" Version="0.105.1" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="Deque.AxeCore.Playwright" Version="4.7.2" />
@@ -62,7 +62,7 @@
     <PackageVersion Include="Syncfusion.Blazor.Themes" Version="34.2.3" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
   </ItemGroup>
 
   <!--
@@ -71,7 +71,7 @@
     advisory GHSA-5crp-9r3c-p9vr. Pinning it here forces every project to the patched 13.0.3.
   -->
   <ItemGroup>
-    <GlobalPackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <GlobalPackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
 </Project>
