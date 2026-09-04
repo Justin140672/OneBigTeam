@@ -222,6 +222,12 @@ public abstract class EditPageBase : ComponentBase, IDisposable
     // Wired to the Close button. Prompts to save first if there are unsaved changes.
     protected void RequestClose()
     {
+        // Guard against a second trigger (e.g. a rapid double click on the Close button) opening
+        // a duplicate dialog instance while one is already open — mirrors
+        // HandleLocationChangingAsync's `|| ShowUnsavedChangesDialog` guard above.
+        if (ShowUnsavedChangesDialog)
+            return;
+
         if (HasUnsavedChanges)
             ShowUnsavedChangesDialog = true;
         else

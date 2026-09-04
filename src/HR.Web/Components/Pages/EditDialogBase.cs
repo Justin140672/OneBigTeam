@@ -125,6 +125,13 @@ public abstract class EditDialogBase<TModel> : ComponentBase where TModel : clas
     // if there are unsaved changes, rather than silently discarding them.
     protected async Task CancelAsync()
     {
+        // Guard against a second trigger (e.g. a rapid double click on the close icon, or the
+        // close icon firing while the Cancel button's own click is still being processed) opening
+        // a duplicate dialog instance or clobbering pending callback state — mirrors
+        // EditPageBase.HandleLocationChangingAsync's equivalent `|| ShowUnsavedChangesDialog` guard.
+        if (ShowUnsavedChangesDialog)
+            return;
+
         if (HasUnsavedChanges)
         {
             ShowUnsavedChangesDialog = true;
