@@ -13,15 +13,30 @@ namespace HR.Modules.Tasks.Features.SicknessEvidenceOverdue;
 /// Uses TaskActionType.Complete, not Review — Source=Sickness/ActionType=Review is reserved
 /// for return-to-work review tasks in TaskView.razor's dispatch, and this task's
 /// SourceEntityId is a SicknessEvidenceRequest.Id, not a ReturnToWorkReview.Id.
+///
+/// <para>
+/// OBT-REM-10: the SicknessEvidenceReminderJob may publish this event more than once for the same
+/// evidence request — e.g. after a Hangfire retry, or because the event's own progress marker was
+/// committed but the job process crashed before that commit was durable. The evidence request id
+/// (SourceEntityId) is a stable, deterministic identity for the underlying overdue occurrence, so
+/// this handler checks for an existing open task against that id before creating another rather
+/// than relying on the publisher to guarantee exactly-once delivery.
+/// </para>
 /// </summary>
 internal sealed class NotifyHrOfOverdueFitNoteHandler(
     ITaskCreator taskCreator,
+    IOpenTaskBySourceEntityReader openTaskReader,
     IEmployeeNameReader employeeNameReader) : IIntegrationEventHandler<SicknessEvidenceOverdueIntegrationEvent>
 {
     private static readonly Guid SystemUserId = Guid.Empty;
 
     public async Task HandleAsync(SicknessEvidenceOverdueIntegrationEvent e, CancellationToken cancellationToken)
     {
+        var openTasks = await openTaskReader.GetOpenTaskIdsAsync(
+            e.CompanyId, [e.EvidenceRequestId], cancellationToken, TaskActionType.Complete);
+        if (openTasks.ContainsKey(e.EvidenceRequestId))
+            return;
+
         var names = await employeeNameReader.GetNamesAsync(e.CompanyId, [e.EmployeeId], cancellationToken);
         var employeeName = names.GetValueOrDefault(e.EmployeeId, "Unknown Employee");
 

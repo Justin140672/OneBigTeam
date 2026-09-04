@@ -50,6 +50,12 @@ internal sealed class SicknessEvidenceRequestConfiguration : IEntityTypeConfigur
         builder.Property(r => r.FulfilledAt)
             .HasColumnName("fulfilled_at");
 
+        builder.Property(r => r.OverdueNotifiedAt)
+            .HasColumnName("overdue_notified_at");
+
+        builder.Property(r => r.OverdueEventPublishedAt)
+            .HasColumnName("overdue_event_published_at");
+
         builder.Property(r => r.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

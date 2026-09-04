@@ -4,6 +4,7 @@ using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Sickness.Jobs;
@@ -21,6 +22,10 @@ namespace HR.Modules.Sickness.Jobs;
 /// recently-overdue review using a durable idempotency key
 /// (<c>ExistsAsync(manager, reviewId, ReturnToWorkReviewOverdue)</c>). A Hangfire retry completes
 /// only the missing work; one failing employee is logged and skipped.
+/// </para>
+/// <para>
+/// OBT-REM-10: a save failure for one review only detaches that review from the change tracker
+/// (not the whole batch), so later reviews in the same run still transition and persist correctly.
 /// </para>
 /// </summary>
 internal sealed class ReturnToWorkReminderJob(
@@ -107,7 +112,13 @@ internal sealed class ReturnToWorkReminderJob(
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                db.ChangeTracker.Clear();
+                // OBT-REM-10: detach only the failed entity — clearing the whole change tracker
+                // would also detach every other still-pending review already loaded into
+                // `newlyOverdue`, silently preventing their MarkOverdue() calls from persisting.
+                var entry = db.Entry(review);
+                if (entry.State != EntityState.Detached)
+                    entry.State = EntityState.Detached;
+
                 logger.LogError(
                     exception,
                     "Failed to mark return-to-work review {ReviewId} overdue; continuing with the rest of the batch.",
