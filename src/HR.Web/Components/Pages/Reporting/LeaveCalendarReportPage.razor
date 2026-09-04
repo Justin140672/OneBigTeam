@@ -100,7 +100,6 @@
     private int _month = DateTime.UtcNow.Month;
     private Guid? _departmentId;
 
-    private bool _exporting;
     private string? _exportError;
 
     private sealed record MonthOption(int Value, string Label);
@@ -162,7 +161,6 @@
             _ => ReportExportFormat.Csv,
         };
 
-        _exporting = true;
         _exportError = null;
         StateHasChanged();
 
@@ -182,7 +180,6 @@
                 Convert.ToBase64String(bytes));
         }
 
-        _exporting = false;
         StateHasChanged();
     }
 }

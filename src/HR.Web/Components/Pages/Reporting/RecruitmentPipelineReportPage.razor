@@ -85,7 +85,6 @@
     private ReportFilterCriteriaModel _currentFilter = new();
     private RecruitmentPipelineGroupBy _groupBy = RecruitmentPipelineGroupBy.Recruiter;
 
-    private bool _exporting;
     private string? _exportError;
 
     private string GroupLabelHeader => _groupBy == RecruitmentPipelineGroupBy.Vacancy ? "Vacancy" : "Recruiter";
@@ -159,7 +158,6 @@
             _ => ReportExportFormat.Csv,
         };
 
-        _exporting = true;
         _exportError = null;
         StateHasChanged();
 
@@ -179,7 +177,6 @@
                 Convert.ToBase64String(bytes));
         }
 
-        _exporting = false;
         StateHasChanged();
     }
 }

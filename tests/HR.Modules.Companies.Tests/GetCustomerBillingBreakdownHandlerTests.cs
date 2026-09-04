@@ -6,7 +6,6 @@ using HR.Modules.Companies.Tests.Infrastructure;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Companies.Tests;
 
@@ -67,8 +66,7 @@ public class GetCustomerBillingBreakdownHandlerTests
             new FakeCurrentUser(Guid.NewGuid(), email: "admin@example.com"),
             BuildConfiguration("admin@example.com"),
             directoryReader,
-            starterReader,
-            monthlyPriceGbp: 10m);
+            starterReader);
 
         var result = await handler.HandleAsync(
             new GetCustomerBillingBreakdownRequest(company.Id), CancellationToken.None);
@@ -114,8 +112,7 @@ public class GetCustomerBillingBreakdownHandlerTests
             new FakeCurrentUser(Guid.NewGuid(), email: "admin@example.com"),
             BuildConfiguration("admin@example.com"),
             directoryReader,
-            starterReader,
-            monthlyPriceGbp: 25m);
+            starterReader);
 
         var result = await handler.HandleAsync(
             new GetCustomerBillingBreakdownRequest(company.Id), CancellationToken.None);
@@ -148,7 +145,6 @@ public class GetCustomerBillingBreakdownHandlerTests
             BuildConfiguration("admin@example.com"),
             directoryReader,
             starterReader,
-            monthlyPriceGbp: 10m,
             clock: new FakeClock(Now));
 
         var firstResult = await firstHandler.HandleAsync(
@@ -161,7 +157,6 @@ public class GetCustomerBillingBreakdownHandlerTests
             BuildConfiguration("admin@example.com"),
             directoryReader,
             starterReader,
-            monthlyPriceGbp: 10m,
             clock: new FakeClock(Now.AddHours(1)));
 
         var secondResult = await secondHandler.HandleAsync(
@@ -184,7 +179,6 @@ public class GetCustomerBillingBreakdownHandlerTests
         IConfiguration configuration,
         FakeEmployeeDirectoryReader? employeeDirectoryReader = null,
         FakeEmployeeStarterReader? employeeStarterReader = null,
-        decimal monthlyPriceGbp = 49m,
         FakeClock? clock = null)
     {
         return new GetCustomerBillingBreakdownHandler(
@@ -193,7 +187,6 @@ public class GetCustomerBillingBreakdownHandlerTests
             configuration,
             employeeDirectoryReader ?? new FakeEmployeeDirectoryReader(),
             employeeStarterReader ?? new FakeEmployeeStarterReader(),
-            Options.Create(new StripeOptions { MonthlyPriceGbp = monthlyPriceGbp }),
             clock ?? new FakeClock(Now));
     }
 

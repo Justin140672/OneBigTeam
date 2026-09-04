@@ -83,7 +83,6 @@
     private ReportFilterCriteriaModel _currentFilter = new();
     private SicknessReportGroupBy _groupBy = SicknessReportGroupBy.Employee;
 
-    private bool _exporting;
     private string? _exportError;
 
     private string GroupLabelHeader => _groupBy == SicknessReportGroupBy.Department ? "Department" : "Employee";
@@ -157,7 +156,6 @@
             _ => ReportExportFormat.Csv,
         };
 
-        _exporting = true;
         _exportError = null;
         StateHasChanged();
 
@@ -177,7 +175,6 @@
                 Convert.ToBase64String(bytes));
         }
 
-        _exporting = false;
         StateHasChanged();
     }
 }

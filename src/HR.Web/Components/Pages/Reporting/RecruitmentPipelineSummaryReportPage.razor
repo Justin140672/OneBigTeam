@@ -86,7 +86,6 @@
 
     private bool _includeClosed;
 
-    private bool _exporting;
     private string? _exportError;
 
     protected override async Task OnParametersSetAsync()
@@ -142,7 +141,6 @@
             _ => ReportExportFormat.Csv,
         };
 
-        _exporting = true;
         _exportError = null;
         StateHasChanged();
 
@@ -162,7 +160,6 @@
                 Convert.ToBase64String(bytes));
         }
 
-        _exporting = false;
         StateHasChanged();
     }
 }

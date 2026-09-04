@@ -113,7 +113,6 @@
     private Guid? _leaveTypeId;
     private LeaveSummaryGroupBy _groupBy = LeaveSummaryGroupBy.Employee;
 
-    private bool _exporting;
     private string? _exportError;
 
     private string _groupByLabel => _groupBy switch
@@ -185,7 +184,6 @@
             _ => ReportExportFormat.Csv,
         };
 
-        _exporting = true;
         _exportError = null;
         StateHasChanged();
 
@@ -205,7 +203,6 @@
                 Convert.ToBase64String(bytes));
         }
 
-        _exporting = false;
         StateHasChanged();
     }
 }

@@ -30,8 +30,7 @@ public class AssetAcknowledgementTaskCompletionActionTests
         FakeAssetAcknowledgementService? ackService = null,
         FakeTaskCreator? taskCreator = null) =>
         new(ackService ?? new FakeAssetAcknowledgementService(),
-            taskCreator ?? new FakeTaskCreator(),
-            new FakeClock(DateTime.UtcNow));
+            taskCreator ?? new FakeTaskCreator());
 
     // ── Source / ActionType ────────────────────────────────────────────────────
 

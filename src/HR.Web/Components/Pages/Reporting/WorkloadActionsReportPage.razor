@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using System.Text.Json
 @using HR.Infrastructure.Abstractions
+@using HR.Web.Components.Pages.Tasks
 @using HR.Web.Models
 @using HR.Web.Services
 @inject ReportingService ReportingService
@@ -253,7 +254,6 @@
     private Guid? _locationId;
     private string? _recruitmentUser;
 
-    private bool _exporting;
     private string? _exportError;
 
     private List<string> _actionTypeOptions = [];
@@ -569,7 +569,6 @@
             _ => ReportExportFormat.Csv,
         };
 
-        _exporting = true;
         _exportError = null;
         StateHasChanged();
 
@@ -589,7 +588,6 @@
                 Convert.ToBase64String(bytes));
         }
 
-        _exporting = false;
         StateHasChanged();
     }
 

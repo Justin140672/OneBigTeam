@@ -84,7 +84,6 @@
     private readonly DateOnly _defaultStartDate = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private ReportFilterCriteriaModel _currentFilter = null!;
 
-    private bool _exporting;
     private string? _exportError;
 
     protected override async Task OnParametersSetAsync()
@@ -177,7 +176,6 @@
             _ => ReportExportFormat.Csv,
         };
 
-        _exporting = true;
         _exportError = null;
         StateHasChanged();
 
@@ -197,7 +195,6 @@
                 Convert.ToBase64String(bytes));
         }
 
-        _exporting = false;
         StateHasChanged();
     }
 }

@@ -197,11 +197,11 @@ public class LeaveYearRolloverJobTests
         var job = new LeaveYearRolloverJob(
             context,
             new FakeClock(fixedUtcNow),
-            new PerCompanyLeaveSettingsReader(notDueCompanyId, 4, dueCompanyId, 1),
+            new PerCompanyLeaveSettingsReader(notDueCompanyId, 4, 1),
             new FakeCompanyTimeZoneReader("UTC"),
             new LeaveYearRolloverService(
                 context, new FakeClock(fixedUtcNow),
-                new PerCompanyLeaveSettingsReader(notDueCompanyId, 4, dueCompanyId, 1),
+                new PerCompanyLeaveSettingsReader(notDueCompanyId, 4, 1),
                 new NoOpAuditEventPublisher()),
             NullLogger<LeaveYearRolloverJob>.Instance);
 
@@ -218,7 +218,7 @@ public class LeaveYearRolloverJobTests
 // Test-only reader returning different LeaveYearStartMonth settings per company, used to exercise
 // two companies with different rollover-day outcomes in a single job run.
 internal sealed class PerCompanyLeaveSettingsReader(
-    Guid companyIdA, int startMonthA, Guid companyIdB, int startMonthB) : ICompanyLeaveSettingsReader
+    Guid companyIdA, int startMonthA, int startMonthB) : ICompanyLeaveSettingsReader
 {
     public Task<CompanyLeaveSettings> GetLeaveSettingsAsync(Guid companyId, CancellationToken cancellationToken)
     {

@@ -7,7 +7,6 @@ using HR.SharedKernel.Pricing;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Companies.Features.GetCustomerBillingBreakdown;
 
@@ -23,7 +22,6 @@ internal sealed class GetCustomerBillingBreakdownHandler(
     IConfiguration configuration,
     IEmployeeDirectoryReader employeeDirectoryReader,
     IEmployeeStarterReader employeeStarterReader,
-    IOptions<StripeOptions> stripeOptions,
     IClock clock)
 {
     private readonly CompaniesDbContext _dbContext = dbContext;
