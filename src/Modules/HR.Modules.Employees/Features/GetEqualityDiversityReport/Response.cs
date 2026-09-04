@@ -7,6 +7,9 @@ namespace HR.Modules.Employees.Features.GetEqualityDiversityReport;
 /// </summary>
 internal sealed record GetEqualityDiversityReportResponse(
     int TotalEmployees,
+    int RespondentCount,
+    decimal RespondentPercentage,
+    DateOnly ReportingDate,
     int MinimumGroupSize,
     IReadOnlyList<EqualityReportDimension> Dimensions);
 

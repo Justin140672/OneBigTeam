@@ -102,6 +102,10 @@ public class GetEqualityDiversityReportHandlerTests
         var report = result.Value!;
         Assert.Equal(15, report.TotalEmployees);
         Assert.Equal(5, report.MinimumGroupSize);
+        // 13 of the 15 employees have a saved equality record.
+        Assert.Equal(13, report.RespondentCount);
+        Assert.Equal(Math.Round(13 * 100m / 15, 1), report.RespondentPercentage);
+        Assert.Equal(DateOnly.FromDateTime(Now), report.ReportingDate);
         Assert.Equal(
             new[] { "gender", "age-band", "ethnicity", "disability", "sexual-orientation", "religion-or-belief", "caring-responsibilities" }.OrderBy(x => x),
             report.Dimensions.Select(d => d.Key).OrderBy(x => x));

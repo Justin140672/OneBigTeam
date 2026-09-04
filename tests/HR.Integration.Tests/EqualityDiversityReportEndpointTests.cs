@@ -116,6 +116,9 @@ public class EqualityDiversityReportEndpointTests
         Assert.NotNull(payload);
         Assert.Equal(5, payload!.MinimumGroupSize);
         Assert.Equal(15, payload.TotalEmployees);
+        Assert.Equal(13, payload.RespondentCount);
+        Assert.True(payload.RespondentPercentage is > 0 and < 100);
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), payload.ReportingDate);
 
         Assert.Equal(
             new[] { "gender", "age-band", "ethnicity", "disability", "sexual-orientation", "religion-or-belief", "caring-responsibilities" }
@@ -176,6 +179,9 @@ public class EqualityDiversityReportEndpointTests
 
     private sealed record ReportPayload(
         int TotalEmployees,
+        int RespondentCount,
+        decimal RespondentPercentage,
+        DateOnly ReportingDate,
         int MinimumGroupSize,
         List<DimensionPayload> Dimensions);
 

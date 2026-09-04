@@ -36,6 +36,18 @@
             </div>
             <div class="col-md-3">
                 <div class="card"><div class="card-body">
+                    <div class="text-muted small">Provided monitoring information</div>
+                    <div class="fs-4" data-testid="equality-respondents">@_report.RespondentCount (@_report.RespondentPercentage.ToString("0.0")%)</div>
+                </div></div>
+            </div>
+            <div class="col-md-3">
+                <div class="card"><div class="card-body">
+                    <div class="text-muted small">Reporting date</div>
+                    <div class="fs-4" data-testid="equality-reporting-date">@_report.ReportingDate.ToString("d MMM yyyy")</div>
+                </div></div>
+            </div>
+            <div class="col-md-3">
+                <div class="card"><div class="card-body">
                     <div class="text-muted small">Suppression threshold</div>
                     <div class="fs-4">&lt; @_report.MinimumGroupSize</div>
                 </div></div>
@@ -48,6 +60,31 @@
                 <div class="col-lg-6">
                     <div class="card h-100" data-testid="@($"equality-dimension-{dimension.Key}")">
                         <div class="card-header fw-semibold">@dimension.Name</div>
+                        @{
+                            var chartRows = dimension.Rows.Where(r => !r.Suppressed).ToList();
+                        }
+                        @if (chartRows.Count > 0)
+                        {
+                            <div class="card-body pb-0">
+                                <SfChart Title="" Height="260px" Background="transparent">
+                                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
+                                        <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
+                                    </ChartPrimaryXAxis>
+                                    <ChartPrimaryYAxis Minimum="0">
+                                        <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
+                                    </ChartPrimaryYAxis>
+                                    <ChartTooltipSettings Enable="true"></ChartTooltipSettings>
+                                    <ChartSeriesCollection>
+                                        <ChartSeries DataSource="@chartRows"
+                                                     XName="@nameof(EqualityReportRowModel.Value)"
+                                                     YName="@nameof(EqualityReportRowModel.Count)"
+                                                     Type="ChartSeriesType.Column"
+                                                     Fill="#0f766e">
+                                        </ChartSeries>
+                                    </ChartSeriesCollection>
+                                </SfChart>
+                            </div>
+                        }
                         <table class="table table-sm mb-0">
                             <thead>
                                 <tr><th>Response</th><th class="text-end">Count</th><th class="text-end">%</th></tr>

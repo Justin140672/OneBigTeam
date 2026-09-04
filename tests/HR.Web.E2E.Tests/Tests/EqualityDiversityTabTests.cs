@@ -140,6 +140,12 @@ public sealed class EqualityDiversityTabTests(EmployeePersonaFixture fixture)
     {
         var (profile, ed) = await OpenTabAsync();
 
+        // Tom's profile is seeded with equality answers (see EmployeesModule.SeedEmployeesAsync) —
+        // clear them so this test starts from a known-empty questionnaire.
+        ed.AcceptConfirmDialogs();
+        await ed.ClearAnswersAsync();
+        await ed.WaitForLoadAsync();
+
         // Only two of the six questions answered.
         await ed.SelectAsync(EqualityDiversityTab.DisabilityField, "Yes");
         await ed.SelectAsync(EqualityDiversityTab.OrientationField, "Bisexual");

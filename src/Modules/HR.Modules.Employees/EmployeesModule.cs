@@ -816,6 +816,8 @@ public static class EmployeesModule
             }
         }
 
+        await SeedAcmeEqualityDataAsync(db, acmeId, now);
+
         // ── Beta Corp ─────────────────────────────────────────────────────────
         var betaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
         if (!await db.Employees.AnyAsync(e => e.CompanyId == betaCorpId))
@@ -903,5 +905,153 @@ public static class EmployeesModule
 
             await db.SaveChangesAsync();
         }
+    }
+
+    /// <summary>
+    /// Voluntary equality-monitoring records for the Acme workforce, so the anonymous Equality &amp;
+    /// Diversity report (Ticket 7) has something to aggregate. Values are stored as the equality
+    /// enum member name — exactly what SaveMyEqualityDataHandler writes — and are transparently
+    /// encrypted at rest by the EmployeesDbContext value converter.
+    ///
+    /// Runs independently of the main Acme employee seed (which is skipped once employees exist),
+    /// so it also back-fills an already-seeded dev/E2E database. Idempotent: no-op once any Acme
+    /// equality record exists.
+    ///
+    /// The 10 permanent employees get a hand-picked distribution so that — even without the E2E
+    /// arrange-data pool — every dimension shows a real visible group AND exercises the Ticket 6
+    /// minimum-group suppression ("Not reported") collapse. Tom Williams keeps a record too; the
+    /// equality-tab E2E test clears it first. Emma Jones is deliberately left without a record so
+    /// "provided monitoring information" is below 100%. Any other Acme employees (the E2E pool)
+    /// get a deterministic pseudo-random spread keyed off their id.
+    /// </summary>
+    private static async Task SeedAcmeEqualityDataAsync(EmployeesDbContext db, Guid acmeId, DateTimeOffset now)
+    {
+        if (!await db.Employees.AnyAsync(e => e.CompanyId == acmeId))
+            return;
+        if (await db.EmployeeEqualityData.AnyAsync(x => x.CompanyId == acmeId))
+            return;
+
+        const string man = nameof(GenderIdentity.Man);
+        const string woman = nameof(GenderIdentity.Woman);
+        const string white = nameof(EthnicGroup.White);
+        const string asian = nameof(EthnicGroup.AsianOrAsianBritish);
+        const string black = nameof(EthnicGroup.BlackOrAfricanOrCaribbeanOrBlackBritish);
+        const string no = nameof(DisabilityStatus.No);
+        const string hetero = nameof(SexualOrientation.HeterosexualOrStraight);
+        const string noReligion = nameof(ReligionOrBelief.NoReligion);
+        const string christian = nameof(ReligionOrBelief.Christian);
+        const string muslim = nameof(ReligionOrBelief.Muslim);
+        const string caringYes = nameof(CaringResponsibilities.Yes);
+        const string caringNo = nameof(CaringResponsibilities.No);
+        const string marriedYes = nameof(MarriedOrCivilPartnershipStatus.Yes);
+        const string marriedNo = nameof(MarriedOrCivilPartnershipStatus.No);
+
+        Guid Emp(string tail) => Guid.Parse($"30000000-0000-0000-0000-0000000000{tail}");
+
+        // (employeeId, gender, ethnicGroup, disability, sexualOrientation, religion, caring, marital)
+        var permanentAnswers = new (Guid Id, string? Gender, string? Ethnic, string? Disability,
+            string? Orientation, string? Religion, string? Caring, string? Marital)[]
+        {
+            (Emp("01"), woman, asian, no,   hetero, noReligion, caringNo,  marriedYes), // Sarah Chen
+            (Emp("02"), man,   black, no,   hetero, christian,  caringNo,  marriedNo),  // James Okafor
+            (Emp("03"), woman, asian, no,   hetero, muslim,     caringYes, marriedNo),  // Priya Sharma
+            (Emp("04"), man,   white, null, hetero, noReligion, caringNo,  marriedNo),  // Tom Williams
+            (Emp("05"), woman, white, no,   hetero, noReligion, caringNo,  marriedYes), // Laura Bennett
+            (Emp("06"), man,   black, no,   hetero, christian,  caringNo,  marriedNo),  // Marcus Diallo
+            (Emp("07"), woman, white, no,   null,   noReligion, caringYes, marriedYes), // Sophie Laurent
+            (Emp("08"), man,   white, no,   hetero, christian,  caringYes, marriedYes), // David Park
+            (Emp("10"), man,   white, no,   null,   noReligion, caringYes, marriedNo),  // Carlos Rivera
+            (Emp("13"), woman, asian, null, hetero, christian,  caringYes, marriedYes), // Priya Shah
+        };
+
+        var permanentIds = permanentAnswers.Select(a => a.Id).ToHashSet();
+        var acmeEmployeeIds = await db.Employees
+            .Where(e => e.CompanyId == acmeId)
+            .Select(e => e.Id)
+            .ToListAsync();
+
+        foreach (var employeeId in acmeEmployeeIds)
+        {
+            if (permanentIds.Contains(employeeId))
+            {
+                var a = permanentAnswers.First(x => x.Id == employeeId);
+                db.EmployeeEqualityData.Add(EmployeeEqualityData.Create(
+                    Guid.NewGuid(), acmeId, employeeId,
+                    a.Gender, null, a.Marital,
+                    a.Ethnic, null,
+                    a.Disability, null,
+                    a.Orientation, null,
+                    a.Religion, null,
+                    a.Caring, now));
+                continue;
+            }
+
+            // Emma Jones (…09) and ~18% of the E2E pool volunteer no record at all.
+            if (employeeId == Emp("09") || SeedRoll(employeeId, 0) >= 82)
+                continue;
+
+            db.EmployeeEqualityData.Add(EmployeeEqualityData.Create(
+                Guid.NewGuid(), acmeId, employeeId,
+                SeedPick(employeeId, 1, (nameof(GenderIdentity.Man), 55), (nameof(GenderIdentity.Woman), 35),
+                    (nameof(GenderIdentity.NonBinary), 4), (nameof(GenderIdentity.PreferNotToSay), 4),
+                    (nameof(GenderIdentity.SelfDescribed), 2)),
+                null,
+                SeedPick(employeeId, 7, (nameof(MarriedOrCivilPartnershipStatus.Yes), 46),
+                    (nameof(MarriedOrCivilPartnershipStatus.No), 47),
+                    (nameof(MarriedOrCivilPartnershipStatus.PreferNotToSay), 7)),
+                SeedPick(employeeId, 2, (nameof(EthnicGroup.White), 52), (nameof(EthnicGroup.AsianOrAsianBritish), 20),
+                    (nameof(EthnicGroup.BlackOrAfricanOrCaribbeanOrBlackBritish), 12), (nameof(EthnicGroup.Mixed), 7),
+                    (nameof(EthnicGroup.OtherEthnicGroup), 3), (nameof(EthnicGroup.PreferNotToSay), 6)),
+                null,
+                SeedPick(employeeId, 3, (nameof(DisabilityStatus.No), 78), (nameof(DisabilityStatus.Yes), 13),
+                    (nameof(DisabilityStatus.PreferNotToSay), 9)),
+                null,
+                SeedPick(employeeId, 4, (nameof(SexualOrientation.HeterosexualOrStraight), 76),
+                    (nameof(SexualOrientation.GayOrLesbian), 8), (nameof(SexualOrientation.Bisexual), 7),
+                    (nameof(SexualOrientation.Other), 2), (nameof(SexualOrientation.PreferNotToSay), 7)),
+                null,
+                SeedPick(employeeId, 5, (nameof(ReligionOrBelief.NoReligion), 42), (nameof(ReligionOrBelief.Christian), 32),
+                    (nameof(ReligionOrBelief.Muslim), 9), (nameof(ReligionOrBelief.Hindu), 5), (nameof(ReligionOrBelief.Jewish), 3),
+                    (nameof(ReligionOrBelief.Sikh), 3), (nameof(ReligionOrBelief.Buddhist), 2), (nameof(ReligionOrBelief.OtherReligion), 2),
+                    (nameof(ReligionOrBelief.PreferNotToSay), 2)),
+                null,
+                SeedPick(employeeId, 6, (nameof(CaringResponsibilities.No), 60), (nameof(CaringResponsibilities.Yes), 32),
+                    (nameof(CaringResponsibilities.PreferNotToSay), 8)),
+                now));
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Deterministic 0-99 roll from an employee id and a field salt (stable FNV-1a over the id
+    /// bytes — unlike <see cref="HashCode"/> it does not vary per process, so seed data is
+    /// identical on every run).
+    /// </summary>
+    private static int SeedRoll(Guid id, int salt)
+    {
+        unchecked
+        {
+            uint h = 2166136261u;
+            foreach (var b in id.ToByteArray())
+                h = (h ^ b) * 16777619u;
+            h = (h ^ (uint)salt) * 16777619u;
+            return (int)(h % 100u);
+        }
+    }
+
+    /// <summary>Picks one weighted option deterministically for the given employee id / field salt.</summary>
+    private static string SeedPick(Guid id, int salt, params (string Value, int Weight)[] options)
+    {
+        var roll = SeedRoll(id, salt);
+        var cumulative = 0;
+        foreach (var (value, weight) in options)
+        {
+            cumulative += weight;
+            if (roll < cumulative)
+                return value;
+        }
+
+        return options[^1].Value;
     }
 }

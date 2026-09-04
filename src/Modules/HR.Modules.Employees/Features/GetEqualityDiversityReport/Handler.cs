@@ -45,6 +45,11 @@ internal sealed class GetEqualityDiversityReportHandler(
 
         var today = DateOnly.FromDateTime(clock.UtcNow);
 
+        // "Provided monitoring information" = has at least one saved equality record. A record that
+        // only contains "prefer not to say" answers still counts as having engaged with monitoring.
+        var respondentCount = employees.Count(e => byEmployee.ContainsKey(e.Id));
+        var respondentPercentage = Percentage(respondentCount, total);
+
         var dimensions = new List<EqualityReportDimension>
         {
             BuildEnumDimension("gender", "Gender", employees.Count, r => r.GenderIdentity),
@@ -56,7 +61,8 @@ internal sealed class GetEqualityDiversityReportHandler(
             BuildEnumDimension("caring-responsibilities", "Caring responsibilities", employees.Count, r => r.CaringResponsibilities),
         };
 
-        return Result.Success(new GetEqualityDiversityReportResponse(total, threshold, dimensions));
+        return Result.Success(new GetEqualityDiversityReportResponse(
+            total, respondentCount, respondentPercentage, today, threshold, dimensions));
 
         EqualityReportDimension BuildEnumDimension(
             string key,

@@ -540,6 +540,9 @@ public sealed record EqualityFieldOption<T>(T Value, string Label);
 
 public sealed record GetEqualityDiversityReportResponse(
     int TotalEmployees,
+    int RespondentCount,
+    decimal RespondentPercentage,
+    DateOnly ReportingDate,
     int MinimumGroupSize,
     IReadOnlyList<EqualityReportDimensionModel> Dimensions);
 
