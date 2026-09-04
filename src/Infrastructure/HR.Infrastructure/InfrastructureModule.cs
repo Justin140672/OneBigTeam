@@ -5,6 +5,7 @@ using HR.Infrastructure.BackgroundJobs;
 using HR.Infrastructure.Email;
 using HR.Infrastructure.Persistence;
 using HR.Infrastructure.Reporting;
+using HR.Infrastructure.Security;
 using HR.Infrastructure.Storage;
 using HR.SharedKernel;
 using QuestPDF.Infrastructure;
@@ -16,6 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace HR.Infrastructure;
 
@@ -42,6 +44,7 @@ public static class InfrastructureModule
 
         services.AddHttpContextAccessor();
         services.AddHttpClient();
+        AddSensitiveDataProtection(services, configuration);
         AddProfilePhotoStorageService(services, configuration);
         AddSupportAttachmentStorageService(services, configuration);
         AddOrganisationDataExportStorage(services, configuration);
@@ -61,6 +64,20 @@ public static class InfrastructureModule
             .AddCheck<SupabaseStorageHealthCheck>("storage", tags: ["degraded"]);
 
         return services;
+    }
+
+    private static void AddSensitiveDataProtection(IServiceCollection services, IConfiguration configuration)
+    {
+        // Ticket 1: application-level AES-256-GCM protection for sensitive persisted values.
+        // Keys are bound from environment/secret configuration only; the protector is built lazily so
+        // that environments which do not yet persist any protected field are not forced to configure
+        // keys. The first use of ISensitiveDataProtector without valid key config fails fast with a
+        // SensitiveDataProtectionException.
+        services.Configure<SensitiveDataProtectionOptions>(
+            configuration.GetSection(SensitiveDataProtectionOptions.SectionName));
+        services.AddSingleton<ISensitiveDataProtector>(sp =>
+            AesGcmSensitiveDataProtector.Create(
+                sp.GetRequiredService<IOptions<SensitiveDataProtectionOptions>>().Value));
     }
 
     private static void AddProfilePhotoStorageService(IServiceCollection services, IConfiguration configuration)

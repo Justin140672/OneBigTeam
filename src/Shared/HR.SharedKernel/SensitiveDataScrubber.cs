@@ -25,6 +25,18 @@ public static class SensitiveDataScrubber
     public const string Redacted = "***REDACTED***";
 
     /// <summary>
+    /// Ticket 1: prefix of an application-level encrypted value
+    /// (<c>OBTENC1:{keyId}:{base64}</c>). Such a value is ciphertext and safe to persist or log as-is;
+    /// the plaintext it protects is still governed by the field-name and value rules below and must
+    /// never be logged after decryption.
+    /// </summary>
+    public const string ProtectedValuePrefix = "OBTENC1:";
+
+    /// <summary>Returns true when <paramref name="value"/> is an already-encrypted protected token.</summary>
+    public static bool IsProtectedValue(string? value) =>
+        !string.IsNullOrEmpty(value) && value.StartsWith(ProtectedValuePrefix, StringComparison.Ordinal);
+
+    /// <summary>
     /// Field names that must never carry a value in an audit payload, log property or trace tag.
     /// Exact, case-insensitive matches. Boolean display-preference flags such as
     /// <c>DisplaySalaryOnEmployeeProfile</c> are deliberately not exact matches here.
