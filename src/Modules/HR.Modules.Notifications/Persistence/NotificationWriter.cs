@@ -86,7 +86,7 @@ internal sealed class NotificationWriter(
 
         if (emailDelivery is not null)
         {
-            backgroundJobClient.Enqueue<EmailDeliveryJob>(job => job.SendAsync(id, null));
+            backgroundJobClient.Enqueue<EmailDeliveryJob>(job => job.SendAsync(id, companyId, null));
         }
 
         return Result.Success();
@@ -147,7 +147,7 @@ internal sealed class NotificationWriter(
 
         if (emailDelivery is not null)
         {
-            backgroundJobClient.Enqueue<EmailDeliveryJob>(job => job.SendAsync(id, null));
+            backgroundJobClient.Enqueue<EmailDeliveryJob>(job => job.SendAsync(id, companyId, null));
         }
     }
 

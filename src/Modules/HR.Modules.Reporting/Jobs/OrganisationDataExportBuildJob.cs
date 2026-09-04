@@ -24,7 +24,7 @@ internal sealed class OrganisationDataExportBuildJob(
     IClock clock,
     ILogger<OrganisationDataExportBuildJob> logger)
 {
-    public async Task RunAsync(Guid exportId, Guid? requestedByUserId, CancellationToken cancellationToken)
+    public async Task RunAsync(Guid exportId, Guid companyId, Guid? requestedByUserId, CancellationToken cancellationToken)
     {
         var view = await jobStore.GetAsync(exportId, cancellationToken);
         if (view is null || view.Status != "Pending")
@@ -35,7 +35,16 @@ internal sealed class OrganisationDataExportBuildJob(
             return;
         }
 
-        var companyId = view.CompanyId;
+        // OBT-REM-11: verify the caller-supplied companyId (used by the Hangfire failure-audit
+        // filter to scope this job to a tenant) actually matches the export row being processed.
+        if (view.CompanyId != companyId)
+        {
+            logger.LogError(
+                "Organisation data export {ExportId}: company mismatch — job argument {ArgCompanyId} does not match export's company {ActualCompanyId}.",
+                exportId, companyId, view.CompanyId);
+            throw new InvalidOperationException(
+                $"OrganisationDataExport {exportId} does not belong to company {companyId}.");
+        }
 
         try
         {

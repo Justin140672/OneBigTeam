@@ -72,7 +72,7 @@ public class EmailDeliveryJobTests
         var emailSender       = new FakeEmailSender();
         var job                = BuildJob(db, emailSender);
 
-        await job.SendAsync(notificationId);
+        await job.SendAsync(notificationId, companyId);
 
         var call = Assert.Single(emailSender.Calls);
         Assert.Equal("recipient@example.test", call.ToEmail);
@@ -83,6 +83,24 @@ public class EmailDeliveryJobTests
         Assert.NotNull(stored.SentAt);
         Assert.Equal(1, stored.AttemptCount);
         Assert.NotNull(stored.LastAttemptAt);
+    }
+
+    // OBT-REM-11: the caller-supplied companyId (used to scope the Hangfire failure audit to a
+    // tenant) must be verified against the entity actually loaded, so a caller cannot enqueue a
+    // job whose job-argument company id disagrees with the delivery it operates on.
+    [Fact]
+    public async Task SendAsync_Throws_When_Supplied_CompanyId_Does_Not_Match_Delivery()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        var notificationId = Guid.NewGuid();
+        await SeedPendingDelivery(db, companyId, notificationId);
+        var emailSender = new FakeEmailSender();
+        var job          = BuildJob(db, emailSender);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => job.SendAsync(notificationId, otherCompanyId));
+        Assert.Empty(emailSender.Calls);
     }
 
     // NOT-05: audit -------------------------------------------------------------------------------
@@ -98,7 +116,7 @@ public class EmailDeliveryJobTests
         var auditPublisher    = new FakeAuditPublisher();
         var job                = BuildJob(db, emailSender, auditPublisher: auditPublisher);
 
-        await job.SendAsync(notificationId);
+        await job.SendAsync(notificationId, companyId);
 
         var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
         var evt = Assert.Single(auditPublisher.Published);
@@ -124,7 +142,7 @@ public class EmailDeliveryJobTests
         var auditPublisher    = new FakeAuditPublisher();
         var job                = BuildJob(db, emailSender, auditPublisher: auditPublisher);
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => job.SendAsync(notificationId));
+        await Assert.ThrowsAsync<HttpRequestException>(() => job.SendAsync(notificationId, companyId));
 
         var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
         Assert.Equal(EmailDeliveryStatus.Pending, stored.Status);
@@ -149,7 +167,7 @@ public class EmailDeliveryJobTests
         var auditPublisher    = new FakeAuditPublisher();
         var job                = BuildJob(db, emailSender, new FakeUserEmailReader(email: null), auditPublisher);
 
-        await job.SendAsync(notificationId); // must not throw
+        await job.SendAsync(notificationId, companyId); // must not throw
 
         var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
         Assert.Equal(EmailDeliveryStatus.Failed,        stored.Status);
@@ -177,7 +195,7 @@ public class EmailDeliveryJobTests
         var emailSender       = new FakeEmailSender();
         var job                = BuildJob(db, emailSender, new FakeUserEmailReader(email: email));
 
-        await job.SendAsync(notificationId);
+        await job.SendAsync(notificationId, companyId);
 
         var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
         Assert.Equal(EmailDeliveryStatus.Failed,   stored.Status);
@@ -200,7 +218,7 @@ public class EmailDeliveryJobTests
         var auditPublisher = new FakeAuditPublisher();
         var job          = BuildJob(db, emailSender, auditPublisher: auditPublisher);
 
-        await job.SendAsync(notificationId);
+        await job.SendAsync(notificationId, companyId);
 
         Assert.Empty(emailSender.Calls);
         var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
@@ -218,7 +236,7 @@ public class EmailDeliveryJobTests
         var emailSender      = new FakeEmailSender();
         var job                = BuildJob(db, emailSender);
 
-        await job.SendAsync(Guid.NewGuid()); // no EmailDelivery row exists for this id
+        await job.SendAsync(Guid.NewGuid(), Guid.NewGuid()); // no EmailDelivery row exists for this id
 
         Assert.Empty(emailSender.Calls);
         Assert.Empty(db.EmailDeliveries);
@@ -253,7 +271,7 @@ public class EmailDeliveryJobTests
         var emailSender = new FakeEmailSender();
         var job = BuildJob(db, emailSender);
 
-        await job.SendAsync(notificationId);
+        await job.SendAsync(notificationId, companyId);
 
         var call = Assert.Single(emailSender.Calls);
         Assert.Equal("Your leave request has been approved", call.Subject);
@@ -280,7 +298,7 @@ public class EmailDeliveryJobTests
         var emailSender = new FakeEmailSender();
         var job = BuildJob(db, emailSender);
 
-        await job.SendAsync(notificationId);
+        await job.SendAsync(notificationId, companyId);
 
         var call = Assert.Single(emailSender.Calls);
         Assert.Equal(notification.Title, call.Subject);
@@ -302,7 +320,7 @@ public class EmailDeliveryJobTests
             new HR.Infrastructure.Abstractions.CompanyNotificationSettings(false, true));
         var job = BuildJob(db, emailSender, notificationSettingsReader: settingsReader);
 
-        await job.SendAsync(notificationId); // must not throw
+        await job.SendAsync(notificationId, companyId); // must not throw
 
         var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
         Assert.Equal(EmailDeliveryStatus.Skipped, stored.Status);
@@ -332,7 +350,7 @@ public class EmailDeliveryJobTests
             new HR.Infrastructure.Abstractions.CompanyNotificationSettings(false, true));
         var job = BuildJob(db, emailSender, notificationSettingsReader: settingsReader);
 
-        await job.SendAsync(notificationId);
+        await job.SendAsync(notificationId, companyId);
 
         var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
         Assert.Equal(EmailDeliveryStatus.Sent, stored.Status);
@@ -355,7 +373,7 @@ public class EmailDeliveryJobTests
             new HR.Infrastructure.Abstractions.CompanyNotificationSettings(false, true));
         var job = BuildJob(db, emailSender, notificationSettingsReader: settingsReader);
 
-        await job.SendAsync(notificationId);
+        await job.SendAsync(notificationId, companyId);
 
         var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
         Assert.Equal(EmailDeliveryStatus.Skipped, stored.Status);
@@ -374,7 +392,7 @@ public class EmailDeliveryJobTests
             new HR.Infrastructure.Abstractions.CompanyNotificationSettings(true, true));
         var job = BuildJob(db, emailSender, notificationSettingsReader: settingsReader);
 
-        await job.SendAsync(notificationId);
+        await job.SendAsync(notificationId, companyId);
 
         var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
         Assert.Equal(EmailDeliveryStatus.Sent, stored.Status);
@@ -396,7 +414,7 @@ public class EmailDeliveryJobTests
         var emailSender = new FakeEmailSender();
         var job          = BuildJob(db, emailSender);
 
-        await job.SendAsync(notificationId);
+        await job.SendAsync(notificationId, companyId);
 
         var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
         Assert.Equal(EmailDeliveryStatus.Failed,        stored.Status);
@@ -417,7 +435,7 @@ public class EmailDeliveryJobTests
         var job                = BuildJob(db, new FakeEmailSender(), new FakeUserEmailReader(email: null),
             administrativeAlertWriter: alertWriter);
 
-        await job.SendAsync(notificationId);
+        await job.SendAsync(notificationId, companyId);
 
         var command = Assert.Single(alertWriter.Commands);
         Assert.Equal(companyId, command.CompanyId);
@@ -438,7 +456,7 @@ public class EmailDeliveryJobTests
         var job                = BuildJob(db, new FakeEmailSender(failuresBeforeSuccess: int.MaxValue),
             administrativeAlertWriter: alertWriter);
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => job.SendAsync(notificationId));
+        await Assert.ThrowsAsync<HttpRequestException>(() => job.SendAsync(notificationId, companyId));
 
         Assert.Empty(alertWriter.Commands);
     }

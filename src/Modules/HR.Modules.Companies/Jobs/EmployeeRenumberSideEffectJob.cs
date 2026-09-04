@@ -28,7 +28,7 @@ internal sealed class EmployeeRenumberSideEffectJob(
 {
     public const int MaxAttempts = 4;
 
-    public async Task ProcessAsync(Guid outboxMessageId)
+    public async Task ProcessAsync(Guid outboxMessageId, Guid companyId)
     {
         var message = await db.OutboxMessages.SingleOrDefaultAsync(m => m.Id == outboxMessageId);
 
@@ -38,6 +38,17 @@ internal sealed class EmployeeRenumberSideEffectJob(
                 "EmployeeRenumberSideEffectJob: no outbox message found for id {OutboxMessageId} — skipping.",
                 outboxMessageId);
             return;
+        }
+
+        // OBT-REM-11: verify the caller-supplied companyId (used by the Hangfire failure-audit
+        // filter to scope this job to a tenant) actually matches the outbox row being processed.
+        if (message.CompanyId != companyId)
+        {
+            logger.LogError(
+                "EmployeeRenumberSideEffectJob: company mismatch for outbox message {OutboxMessageId} — job argument {ArgCompanyId} does not match message's company {ActualCompanyId}.",
+                outboxMessageId, companyId, message.CompanyId);
+            throw new InvalidOperationException(
+                $"OutboxMessage {outboxMessageId} does not belong to company {companyId}.");
         }
 
         // Idempotency guard: already completed (possibly by a prior attempt that succeeded but

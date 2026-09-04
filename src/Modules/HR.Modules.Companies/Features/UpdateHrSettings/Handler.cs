@@ -216,7 +216,7 @@ internal sealed class UpdateHrSettingsHandler
 		if (renumberOutboxMessage is not null)
 		{
 			_backgroundJobClient.Enqueue<EmployeeRenumberSideEffectJob>(
-				job => job.ProcessAsync(renumberOutboxMessage.Id));
+				job => job.ProcessAsync(renumberOutboxMessage.Id, renumberOutboxMessage.CompanyId));
 		}
 
 		await _auditEventPublisher.PublishAsync(

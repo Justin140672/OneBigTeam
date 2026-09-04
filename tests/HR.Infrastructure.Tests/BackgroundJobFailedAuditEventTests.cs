@@ -4,8 +4,10 @@ using HR.SharedKernel;
 namespace HR.Infrastructure.Tests;
 
 /// <summary>
-/// OBT-REM-02: a background-job failure audit row must never carry the raw exception message and
-/// must be deterministically keyed on the Hangfire job id so a retried job yields exactly one row.
+/// OBT-REM-11: a background-job failure audit row must never carry the raw exception message —
+/// not even after regex scrubbing — and must be deterministically keyed on the Hangfire job id so
+/// a retried job (or a duplicate OnPerformed callback for the same attempt) yields exactly one row.
+/// Only a fixed, closed-set failure category derived from the exception's .NET type is persisted.
 /// </summary>
 public class BackgroundJobFailedAuditEventTests
 {
@@ -13,13 +15,13 @@ public class BackgroundJobFailedAuditEventTests
 
     private static IAuditEvent Build(
         string jobId = "job-1",
-        string? message = null,
+        Exception? exception = null,
         Guid? companyId = null)
         => new BackgroundJobFailedAuditEvent(
             jobId,
             jobType: "SicknessEvidenceReminderJob",
             methodName: "ExecuteAsync",
-            exception: new InvalidOperationException(message ?? "boom"),
+            exception: exception ?? new InvalidOperationException("boom"),
             occurredAt: When,
             companyId: companyId);
 
@@ -29,28 +31,42 @@ public class BackgroundJobFailedAuditEventTests
         => Meta(e).GetType().GetProperty(prop)!.GetValue(Meta(e)) as string;
 
     [Theory]
-    [InlineData("Login failed for Bearer abc123.def456-ghi")]
+    [InlineData("Login failed for jane.doe@example.com from 10.0.0.1")]
     [InlineData("NI number QQ123456C rejected")]
-    [InlineData("sort code 12-34-56 invalid")]
-    [InlineData("account 1234567890123456 not found")]
-    public void Sensitive_tokens_are_scrubbed_from_summary_and_metadata(string raw)
+    [InlineData("Patient diagnosis: chronic fatigue syndrome, see /uploads/employee-42/fitnote.pdf")]
+    [InlineData("Bearer eyJhbGciOiJIUzI1NiJ9.abc.def rejected for user John Smith")]
+    public void Raw_exception_message_is_never_persisted_regardless_of_content(string raw)
     {
-        var e = Build(message: raw);
+        var e = Build(exception: new InvalidOperationException(raw));
 
-        Assert.Contains(SensitiveDataScrubber.Redacted, e.Summary);
-        Assert.Contains(SensitiveDataScrubber.Redacted, MetaString(e, "ExceptionMessage")!);
-        // the exact scrubbed form the scrubber would produce
-        var scrubbed = SensitiveDataScrubber.ScrubText(raw);
-        Assert.Contains(scrubbed, e.Summary);
-        Assert.Equal(scrubbed, MetaString(e, "ExceptionMessage"));
+        Assert.DoesNotContain(raw, e.Summary);
+        var metadataJson = System.Text.Json.JsonSerializer.Serialize(Meta(e));
+        Assert.DoesNotContain(raw, metadataJson);
+        // The message text (or any scrubbed derivative of it) is nowhere in the metadata at all —
+        // only the fixed category/exception-type fields are present.
+        Assert.Equal(nameof(InvalidOperationException), MetaString(e, "ExceptionType"));
+        Assert.Equal("ValidationOrDataIntegrityError", MetaString(e, "FailureCategory"));
+    }
+
+    [Theory]
+    [InlineData(typeof(TimeoutException), "Timeout")]
+    [InlineData(typeof(System.Net.Http.HttpRequestException), "ExternalServiceError")]
+    [InlineData(typeof(KeyNotFoundException), "NotFound")]
+    [InlineData(typeof(ArgumentException), "ValidationOrDataIntegrityError")]
+    [InlineData(typeof(InvalidOperationException), "ValidationOrDataIntegrityError")]
+    public void Exception_type_maps_to_a_fixed_safe_category(Type exceptionType, string expectedCategory)
+    {
+        var exception = (Exception)Activator.CreateInstance(exceptionType, "some message with PII: jane@example.com")!;
+        var e = Build(exception: exception);
+
+        Assert.Equal(expectedCategory, MetaString(e, "FailureCategory"));
     }
 
     [Fact]
-    public void Clean_message_passes_through()
+    public void Unrecognised_exception_type_maps_to_unknown_category()
     {
-        var e = Build(message: "database timeout after 30s");
-        Assert.Contains("database timeout after 30s", e.Summary);
-        Assert.Equal("database timeout after 30s", MetaString(e, "ExceptionMessage"));
+        var e = Build(exception: new NotSupportedException("boom"));
+        Assert.Equal("Unknown", MetaString(e, "FailureCategory"));
     }
 
     [Fact]

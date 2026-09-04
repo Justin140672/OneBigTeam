@@ -74,7 +74,7 @@ internal sealed class EmailDeliveryJob(
         }
     }
 
-    public async Task SendAsync(Guid notificationId, PerformContext? context = null)
+    public async Task SendAsync(Guid notificationId, Guid companyId, PerformContext? context = null)
     {
         var delivery = await db.EmailDeliveries
             .SingleOrDefaultAsync(d => d.NotificationId == notificationId);
@@ -85,6 +85,19 @@ internal sealed class EmailDeliveryJob(
                 "EmailDeliveryJob: no EmailDelivery row found for notification {NotificationId} — skipping.",
                 notificationId);
             return;
+        }
+
+        // OBT-REM-11: the caller-supplied companyId (the Hangfire job argument the audit filter
+        // scopes this failure to) must match the entity actually loaded — otherwise a caller could
+        // enqueue a job carrying one company's id while operating on another company's delivery,
+        // and any resulting failure audit would be scoped/labelled incorrectly.
+        if (delivery.CompanyId != companyId)
+        {
+            logger.LogError(
+                "EmailDeliveryJob: company mismatch for notification {NotificationId} — job argument {ArgCompanyId} does not match delivery's company {ActualCompanyId}.",
+                notificationId, companyId, delivery.CompanyId);
+            throw new InvalidOperationException(
+                $"EmailDelivery {notificationId} does not belong to company {companyId}.");
         }
 
         // Idempotency guard: a prior attempt already succeeded (possibly one whose "Sent" status

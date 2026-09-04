@@ -37,7 +37,7 @@ internal sealed class RetryEmployeeRenumberSideEffectHandler(
         message.ResetForRetry(clock.UtcNowOffset());
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        backgroundJobClient.Enqueue<EmployeeRenumberSideEffectJob>(job => job.ProcessAsync(message.Id));
+        backgroundJobClient.Enqueue<EmployeeRenumberSideEffectJob>(job => job.ProcessAsync(message.Id, message.CompanyId));
 
         return Result.Success(new RetryEmployeeRenumberSideEffectResponse(message.Id, message.CompanyId, message.Status));
     }

@@ -33,7 +33,7 @@ internal sealed class RequestOrganisationDataExportHandler(
         await db.SaveChangesAsync(cancellationToken);
 
         backgroundJobClient.Enqueue<OrganisationDataExportBuildJob>(
-            job => job.RunAsync(export.Id, userId, CancellationToken.None));
+            job => job.RunAsync(export.Id, request.CompanyId, userId, CancellationToken.None));
 
         await auditEventPublisher.PublishAsync(
             new OrganisationDataExportRequestedAuditEvent(request.CompanyId, export.Id, userId, now),
