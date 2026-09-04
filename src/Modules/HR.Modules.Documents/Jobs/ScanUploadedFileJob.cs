@@ -124,7 +124,14 @@ internal sealed class ScanUploadedFileJob(
             {
                 var previousStatus = target.ScanStatus.ToString();
                 var failedNow = clock.UtcNowOffset();
-                target.MarkScanFailed(ex.Message, failedNow);
+
+                // Only a safe, closed-set category is ever persisted/audited — the raw exception
+                // (which can carry internal paths, hosts, storage addresses, signed URLs, tokens or
+                // personal data) is logged in full below via ILogger for restricted operational
+                // diagnosis only. See VirusScanFailureReasonMapper for the mapping rules.
+                var safeFailureReason = VirusScanFailureReasonMapper.ToSafeCategory(ex);
+
+                target.MarkScanFailed(safeFailureReason, failedNow);
                 await db.SaveChangesAsync();
 
                 logger.LogCritical(ex,
@@ -133,7 +140,7 @@ internal sealed class ScanUploadedFileJob(
 
                 await auditPublisher.PublishAsync(new FileScanStatusChangedAuditEvent(
                     companyId, targetType.ToString(), entityId, target.EmployeeId,
-                    previousStatus, FileScanStatus.Failed.ToString(), ex.Message, failedNow), CancellationToken.None);
+                    previousStatus, FileScanStatus.Failed.ToString(), safeFailureReason, failedNow), CancellationToken.None);
             }
 
             // Rethrow in all cases: while retries remain, this is what triggers Hangfire's retry;
