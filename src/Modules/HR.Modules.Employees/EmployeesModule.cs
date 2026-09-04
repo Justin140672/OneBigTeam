@@ -21,6 +21,9 @@ using HR.Modules.Employees.Features.GetCompensationImportTemplate;
 using HR.Modules.Employees.Features.ImportCompensationChanges;
 using HR.Modules.Employees.Features.ListNationalities;
 using HR.Modules.Employees.Features.RemoveMyEmergencyContact;
+using HR.Modules.Employees.Features.GetMyEqualityData;
+using HR.Modules.Employees.Features.SaveMyEqualityData;
+using HR.Modules.Employees.Features.DeleteMyEqualityData;
 using HR.Modules.Employees.Features.UpdateMyContactDetails;
 using HR.Modules.Employees.Features.UpdateMyEmergencyContact;
 using HR.Modules.Employees.Features.CreateDepartment;
@@ -252,6 +255,13 @@ public static class EmployeesModule
         services.AddScoped<IValidator<UpdateMyEmergencyContactRequest>, UpdateMyEmergencyContactValidator>();
         services.AddScoped<RemoveMyEmergencyContactHandler>();
         services.AddScoped<GetEmployeeEmergencyContactsHandler>();
+
+        services.AddScoped<GetMyEqualityDataHandler>();
+        services.AddScoped<IValidator<GetMyEqualityDataRequest>, GetMyEqualityDataValidator>();
+        services.AddScoped<SaveMyEqualityDataHandler>();
+        services.AddScoped<IValidator<SaveMyEqualityDataRequest>, SaveMyEqualityDataValidator>();
+        services.AddScoped<DeleteMyEqualityDataHandler>();
+        services.AddScoped<IValidator<DeleteMyEqualityDataRequest>, DeleteMyEqualityDataValidator>();
 
         services.AddScoped<GetCurrentCompensationHandler>();
         services.AddScoped<GetCompensationHistoryHandler>();

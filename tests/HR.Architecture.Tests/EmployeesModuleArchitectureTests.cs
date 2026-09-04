@@ -103,6 +103,57 @@ public class EmployeesModuleArchitectureTests
     }
 
     [Fact]
+    public void EmployeeEqualityData_Entity_Is_Not_Public()
+    {
+        var entityType = ModuleAssembly
+            .GetTypes()
+            .Single(t => t.Name == "EmployeeEqualityData");
+
+        Assert.False(entityType.IsPublic, "EmployeeEqualityData entity must be internal, not public.");
+    }
+
+    [Fact]
+    public void EmployeeEqualityData_Entity_Maps_To_Correct_Table_And_Schema()
+    {
+        using var context = BuildContext();
+
+        var entityType = context.Model.FindEntityType(typeof(EmployeeEqualityData))!;
+
+        Assert.Equal("employee_equality_data", entityType.GetTableName());
+        Assert.Equal("employees", entityType.GetSchema());
+    }
+
+    [Fact]
+    public void EmployeeEqualityData_Entity_Primary_Key_Is_Guid()
+    {
+        using var context = BuildContext();
+
+        var entityType = context.Model.FindEntityType(typeof(EmployeeEqualityData))!;
+        var pk = entityType.FindPrimaryKey()!;
+
+        Assert.Single(pk.Properties);
+        Assert.Equal(typeof(Guid), pk.Properties[0].ClrType);
+    }
+
+    [Fact]
+    public void EmployeeEqualityData_Entity_All_Columns_Are_snake_case()
+    {
+        using var context = BuildContext();
+
+        var entityType = context.Model.FindEntityType(typeof(EmployeeEqualityData))!;
+
+        var violations = entityType
+            .GetProperties()
+            .Select(p => p.GetColumnName())
+            .Where(name => name.Any(char.IsUpper))
+            .ToArray();
+
+        Assert.True(
+            violations.Length == 0,
+            $"Column names must be snake_case. Violations: {string.Join(", ", violations)}");
+    }
+
+    [Fact]
     public void Department_Entity_Maps_To_Correct_Table_And_Schema()
     {
         using var context = BuildContext();

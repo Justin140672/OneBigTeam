@@ -5,6 +5,7 @@ using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 
@@ -38,8 +39,22 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
         await _postgres.DisposeAsync();
     }
 
+    // A fixed, throwaway AES-256 key (32 zero bytes, base64) so the sensitive-data protector is
+    // resolvable in integration tests. Required for any test that persists an application-encrypted
+    // column (e.g. employee equality-monitoring answers) and asserts on ciphertext at rest.
+    private const string TestSensitiveDataKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.ConfigureAppConfiguration((_, config) =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Infrastructure:SensitiveDataProtection:ActiveKeyId"] = "test",
+                ["Infrastructure:SensitiveDataProtection:Keys:test"] = TestSensitiveDataKey
+            });
+        });
+
         builder.ConfigureServices(services =>
         {
             services
