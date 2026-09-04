@@ -25,6 +25,46 @@ public class SensitiveDataScrubberTests
     }
 
     [Theory]
+    // Ticket 3: voluntary equality-monitoring answer fields — special-category data.
+    [InlineData("genderIdentity")]
+    [InlineData("genderIdentitySelfDescribed")]
+    [InlineData("marriedOrCivilPartnershipStatus")]
+    [InlineData("maritalStatus")]
+    [InlineData("civilPartnershipStatus")]
+    [InlineData("ethnicGroup")]
+    [InlineData("ethnicGroupSelfDescribed")]
+    [InlineData("ethnicity")]
+    [InlineData("disabilityStatus")]
+    [InlineData("disabilityImpact")]
+    [InlineData("sexualOrientation")]
+    [InlineData("sexualOrientationSelfDescribed")]
+    [InlineData("religionOrBelief")]
+    [InlineData("religionOrBeliefSelfDescribed")]
+    [InlineData("religion")]
+    [InlineData("EthnicGroup")]            // casing variant
+    [InlineData("RELIGIONORBELIEF")]       // casing variant
+    [InlineData("DisabilityImpact")]       // casing variant
+    public void IsProhibitedFieldName_true_for_equality_monitoring_fields(string name)
+    {
+        Assert.True(SensitiveDataScrubber.IsProhibitedFieldName(name));
+    }
+
+    [Theory]
+    // Regression guard: the equality audit events use "<field>Provided" boolean flag names and
+    // "Created" — none of these must be rejected by the redaction guard.
+    [InlineData("GenderIdentityProvided")]
+    [InlineData("MarriedOrCivilPartnershipStatusProvided")]
+    [InlineData("EthnicGroupProvided")]
+    [InlineData("DisabilityStatusProvided")]
+    [InlineData("SexualOrientationProvided")]
+    [InlineData("ReligionOrBeliefProvided")]
+    [InlineData("Created")]
+    public void IsProhibitedFieldName_false_for_equality_audit_flag_names(string name)
+    {
+        Assert.False(SensitiveDataScrubber.IsProhibitedFieldName(name));
+    }
+
+    [Theory]
     [InlineData("employeeNumber")]
     [InlineData("firstName")]
     [InlineData("displaySalaryOnProfile")]           // contains "salary" but is not an exact match / fragment

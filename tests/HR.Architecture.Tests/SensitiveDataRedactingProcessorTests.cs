@@ -47,4 +47,22 @@ public class SensitiveDataRedactingProcessorTests
 
         Assert.Equal("ok", activity.GetTagItem("safe"));
     }
+
+    [Fact]
+    public void OnEnd_redacts_equality_monitoring_span_tags()
+    {
+        var processor = new SensitiveDataRedactingProcessor();
+
+        using var activity = StartActivity();
+        activity.SetTag("EthnicGroup", "White");
+        activity.SetTag("DisabilityImpact", "free text about a condition");
+        activity.SetTag("ReligionOrBelief", "Christian");
+        activity.Stop();
+
+        processor.OnEnd(activity);
+
+        Assert.Equal(SensitiveDataScrubber.Redacted, activity.GetTagItem("EthnicGroup"));
+        Assert.Equal(SensitiveDataScrubber.Redacted, activity.GetTagItem("DisabilityImpact"));
+        Assert.Equal(SensitiveDataScrubber.Redacted, activity.GetTagItem("ReligionOrBelief"));
+    }
 }

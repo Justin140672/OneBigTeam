@@ -538,17 +538,6 @@
           "HR.SharedKernel": "[0.1.0-dev, )"
         }
       },
-      "hr.modules.equalitymonitoring": {
-        "type": "Project",
-        "dependencies": {
-          "FastEndpoints": "[8.2.0, )",
-          "FluentValidation": "[12.1.1, )",
-          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
-          "HR.SharedKernel": "[0.1.0-dev, )",
-          "Microsoft.EntityFrameworkCore": "[10.0.11, )",
-          "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
-        }
-      },
       "hr.modules.identity": {
         "type": "Project",
         "dependencies": {

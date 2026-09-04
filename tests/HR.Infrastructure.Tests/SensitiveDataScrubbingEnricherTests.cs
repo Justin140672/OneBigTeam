@@ -69,6 +69,33 @@ public class SensitiveDataScrubbingEnricherTests
     }
 
     [Fact]
+    public void Redacts_equality_monitoring_properties_including_nested_structure()
+    {
+        var (logger, sink) = BuildLogger();
+
+        logger
+            .ForContext("EmployeeId", "EMP-0001")
+            .ForContext("GenderIdentity", "SelfDescribed")
+            .ForContext("ReligionOrBelief", "Christian")
+            .ForContext("DisabilityImpact", "free text about a condition")
+            .ForContext("EqualityAnswers", new { EthnicGroup = "White" }, destructureObjects: true)
+            .Information("equality data saved");
+
+        var evt = Assert.Single(sink.Events);
+
+        Assert.Equal(SensitiveDataScrubber.Redacted, ScalarText(evt.Properties["GenderIdentity"]));
+        Assert.Equal(SensitiveDataScrubber.Redacted, ScalarText(evt.Properties["ReligionOrBelief"]));
+        Assert.Equal(SensitiveDataScrubber.Redacted, ScalarText(evt.Properties["DisabilityImpact"]));
+
+        var structure = Assert.IsType<StructureValue>(evt.Properties["EqualityAnswers"]);
+        var ethnicGroup = Assert.Single(structure.Properties, p => p.Name == "EthnicGroup");
+        Assert.Equal(SensitiveDataScrubber.Redacted, ScalarText(ethnicGroup.Value));
+
+        // Non-sensitive identifier is untouched.
+        Assert.Equal("EMP-0001", ScalarText(evt.Properties["EmployeeId"]));
+    }
+
+    [Fact]
     public void Leaves_clean_properties_untouched()
     {
         var (logger, sink) = BuildLogger();

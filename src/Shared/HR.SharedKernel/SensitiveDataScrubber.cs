@@ -61,6 +61,16 @@ public static class SensitiveDataScrubber
         "dateOfBirth", "dob", "personalEmail", "personalPhone", "personalPhoneNumber", "homeAddress",
         // Medical / sickness
         "medicalNote", "sicknessNote", "diagnosisNote", "diagnosisCode",
+        // Equality & diversity monitoring (special-category data — Ticket 3).
+        // Exact names only: the audit redaction guard rejects (drops) a payload containing any of
+        // these, and the log enricher / trace processor redact them. The equality audit events
+        // deliberately use "<field>Provided" boolean flag names instead, which do NOT match here.
+        "genderIdentity", "genderIdentitySelfDescribed",
+        "marriedOrCivilPartnershipStatus", "maritalStatus", "civilPartnershipStatus",
+        "ethnicGroup", "ethnicGroupSelfDescribed", "ethnicity",
+        "disabilityStatus", "disabilityImpact",
+        "sexualOrientation", "sexualOrientationSelfDescribed",
+        "religionOrBelief", "religionOrBeliefSelfDescribed", "religion",
     };
 
     /// <summary>
