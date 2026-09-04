@@ -26,14 +26,15 @@ public class RolePermissionSeedTests(IdentityDatabaseFixture fixture)
         // No authorization policy actually grants Company Administrator role-assignment access
         // (Features/UpdateUserRoles is gated by "users:manage", which is HR Administrator-only), so
         // that grant was misleading seeded data implying a capability the role could never exercise.
+        // OBT-IAM-09: onboarding:view, onboarding:manage and support:manage further removed — a
+        // Company-Administrator-only account is limited to company settings and subscription
+        // administration. The initial company creator retains onboarding/support access because
+        // signup also assigns HR Administrator (see SignUp/Handler.cs).
         var expected = new HashSet<Guid>
         {
             SystemPermissions.CompanyRead,
             SystemPermissions.CompanyEdit,
-            SystemPermissions.OnboardingView,
-            SystemPermissions.OnboardingManage,
             SystemPermissions.SubscriptionManage,
-            SystemPermissions.SupportManage,
         };
 
         Assert.Equal(expected, actual.ToHashSet());
@@ -72,6 +73,9 @@ public class RolePermissionSeedTests(IdentityDatabaseFixture fixture)
     [InlineData(nameof(SystemPermissions.SicknessRead))]
     [InlineData(nameof(SystemPermissions.SicknessManage))]
     [InlineData(nameof(SystemPermissions.RoleAssign))]
+    [InlineData(nameof(SystemPermissions.OnboardingView))]
+    [InlineData(nameof(SystemPermissions.OnboardingManage))]
+    [InlineData(nameof(SystemPermissions.SupportManage))]
     public async Task CompanyAdministrator_No_Longer_Has_HR_Admin_Permissions(string permissionName)
     {
         await using var db = fixture.BuildContext();
@@ -90,6 +94,9 @@ public class RolePermissionSeedTests(IdentityDatabaseFixture fixture)
             nameof(SystemPermissions.SicknessRead) => SystemPermissions.SicknessRead,
             nameof(SystemPermissions.SicknessManage) => SystemPermissions.SicknessManage,
             nameof(SystemPermissions.RoleAssign) => SystemPermissions.RoleAssign,
+            nameof(SystemPermissions.OnboardingView) => SystemPermissions.OnboardingView,
+            nameof(SystemPermissions.OnboardingManage) => SystemPermissions.OnboardingManage,
+            nameof(SystemPermissions.SupportManage) => SystemPermissions.SupportManage,
             _ => throw new ArgumentOutOfRangeException(nameof(permissionName))
         };
 

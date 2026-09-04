@@ -30,12 +30,15 @@ public class PolicyMatrixTests(IdentityDatabaseFixture fixture)
         ["employee:manage"] = [SystemRoles.HrAdministrator],
         ["employee:read"] = [SystemRoles.Manager, SystemRoles.Recruiter, SystemRoles.HrAdministrator],
         ["company:manage"] = [SystemRoles.CompanyAdministrator],
-        ["support:manage"] = [SystemRoles.HrAdministrator, SystemRoles.CompanyAdministrator],
+        // OBT-IAM-09: support:manage / onboarding:view / onboarding:manage narrowed to HR
+        // Administrator only — a Company-Administrator-only account is limited to company settings
+        // and subscription administration (see RolePermissionConfiguration remarks).
+        ["support:manage"] = [SystemRoles.HrAdministrator],
         ["hr-settings:manage"] = [SystemRoles.HrAdministrator],
         ["users:view"] = [SystemRoles.HrAdministrator],
         ["users:manage"] = [SystemRoles.HrAdministrator],
-        ["onboarding:view"] = [SystemRoles.HrAdministrator, SystemRoles.CompanyAdministrator],
-        ["onboarding:manage"] = [SystemRoles.HrAdministrator, SystemRoles.CompanyAdministrator],
+        ["onboarding:view"] = [SystemRoles.HrAdministrator],
+        ["onboarding:manage"] = [SystemRoles.HrAdministrator],
         ["subscription:manage"] = [SystemRoles.CompanyAdministrator],
         ["leave:request"] = [SystemRoles.Employee, SystemRoles.Manager, SystemRoles.HrAdministrator],
         ["leave:approve"] = [SystemRoles.Manager, SystemRoles.HrAdministrator],

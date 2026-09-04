@@ -67,7 +67,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!(Session.IsHrAdministrator || Session.CanManageCompanyConfiguration))
+        // OBT-IAM-09: gate on onboarding:view (the same permission the underlying checklist API
+        // policy enforces) — not company:edit (CanManageCompanyConfiguration), which a
+        // Company-Administrator-only account keeps regardless and would have let it render this
+        // page's shell even though the checklist fetch itself is 403'd server-side.
+        if (!(Session.IsHrAdministrator || Session.CanViewOnboarding))
         {
             Navigation.NavigateTo("/access-denied", replace: true);
             return;

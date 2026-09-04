@@ -194,7 +194,9 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (!Session.IsHrAdministrator && !Session.CanManageCompany)
+        // OBT-IAM-09: gate on support:manage — not company:manage — so a Company-Administrator-only
+        // account (no longer granted support:manage) is denied.
+        if (!Session.IsHrAdministrator && !Session.CanManageSupport)
         {
             Navigation.NavigateTo("/access-denied", replace: true);
             return;

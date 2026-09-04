@@ -8,6 +8,12 @@ namespace HR.Modules.Identity.Tests;
 /// IAM-08 — a "Company Administrator only" account must not inherit employee visibility.
 /// Covers the reconciliation migration's DELETE (idempotency + correctness), the effective-access
 /// override semantics that back api/me, and end-to-end role removal.
+///
+/// OBT-IAM-09: the allow-list below was further narrowed — onboarding:view, onboarding:manage and
+/// support:manage were removed from Company Administrator (see RolePermissionConfiguration and
+/// migration OBT_IAM09_RemoveCompanyAdministratorOnboardingSupport). Company Administrator is now
+/// limited to company:read, company:edit and subscription:manage; a company creator retains
+/// onboarding/support access via the HR Administrator role also assigned at signup.
 /// </summary>
 [Collection("IdentityDatabase")]
 public class Iam08CompanyAdministratorPermissionsTests(IdentityDatabaseFixture fixture)
@@ -17,16 +23,15 @@ public class Iam08CompanyAdministratorPermissionsTests(IdentityDatabaseFixture f
 
     // Kept in sync with
     // src/Modules/HR.Modules.Identity/Migrations/20260903114519_IAM08_ReconcileCompanyAdministratorPermissions.cs
+    // and, for the OBT-IAM-09 narrowing (onboarding:view/manage, support:manage removed), with
+    // src/Modules/HR.Modules.Identity/Migrations/*_OBT_IAM09_RemoveCompanyAdministratorOnboardingSupport.cs
     private const string ReconcileSql = """
         DELETE FROM identity.role_permissions
         WHERE role_id = '00000000-0000-0000-0000-000000000006'
           AND permission_id NOT IN (
             '00000000-0000-0000-0001-000000000011',
             '00000000-0000-0000-0001-000000000012',
-            '00000000-0000-0000-0001-000000000019',
-            '00000000-0000-0000-0001-000000000020',
-            '00000000-0000-0000-0001-000000000021',
-            '00000000-0000-0000-0001-000000000042'
+            '00000000-0000-0000-0001-000000000021'
           );
         """;
 
@@ -34,10 +39,7 @@ public class Iam08CompanyAdministratorPermissionsTests(IdentityDatabaseFixture f
     {
         SystemPermissions.CompanyRead,
         SystemPermissions.CompanyEdit,
-        SystemPermissions.OnboardingView,
-        SystemPermissions.OnboardingManage,
         SystemPermissions.SubscriptionManage,
-        SystemPermissions.SupportManage,
     };
 
     private IdentityAuthorizationService BuildService() => new(fixture.BuildContext(), Clock);

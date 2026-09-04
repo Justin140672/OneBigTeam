@@ -88,11 +88,14 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             // hr-settings:manage — HR Administrator only.
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.HrSettingsManage),
 
-            // onboarding:view / onboarding:manage — HR or Company Administrator.
+            // onboarding:view / onboarding:manage — HR Administrator only.
+            // OBT-IAM-09: Company Administrator's grants removed — a Company-Administrator-only
+            // account is limited to company settings and subscription administration; a company
+            // creator retains onboarding access via the HR Administrator role they are also
+            // assigned at signup (see SignUp). Company Administrator + HR Administrator together
+            // still has full onboarding access via the HR Administrator grant below.
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.OnboardingView),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.OnboardingView),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.OnboardingManage),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.OnboardingManage),
 
             // subscription:manage — Company Administrator only. Subscription & billing is a company-
             // ownership function, not an HR one; HR Administrator's grant was removed by migration
@@ -164,10 +167,10 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             // HR Administrator only; deliberately not Manager/Recruiter/Company Administrator.
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.ReportingViewEquality),
 
-            // support:manage — HR or Company Administrator (closest existing approximation; no
-            // dedicated "platform staff" role exists yet — see IdentityModule comment).
+            // support:manage — HR Administrator only.
+            // OBT-IAM-09: Company Administrator's grant removed — see the onboarding:view/manage
+            // comment above; the same administrative-role-separation rationale applies.
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.SupportManage),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.SupportManage),
 
             // compliance:view — ADM-02 consolidated Compliance Centre. HR Administrator only;
             // Company Administrator is deliberately excluded (administrative role separation).

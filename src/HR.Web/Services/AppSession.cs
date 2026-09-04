@@ -40,6 +40,15 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     public bool CanViewEqualityReports        => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000046"));
     public bool CanManageSharedDocuments      => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000030"));
 
+    // OBT-IAM-09: Getting Started and Support Requests must be gated on their own explicit
+    // permissions (onboarding:view, support:manage), not on CanManageCompany — a
+    // Company-Administrator-only account no longer holds either grant (see
+    // RolePermissionConfiguration), so it must not see or reach either destination. HR
+    // Administrator (and any Company Administrator who also holds HR Administrator) still holds
+    // both via its own RolePermission grants.
+    public bool CanViewOnboarding             => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000019"));
+    public bool CanManageSupport              => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000042"));
+
     // ADM-05: shared access-denied outcome. Admin pages call this from OnBeforeLoadAsync/LoadAsync
     // instead of hand-rolling a redirect; when not allowed it bounces to the consistent
     // /access-denied page (replace: true so back-button doesn't re-trigger it) and returns false.
@@ -99,7 +108,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     // Manager > Company Administrator (no HR role) > plain Employee's own profile. Consumed by
     // Home.razor as the fallback when there's no (or no longer valid) localStorage selection.
     public string LandingUrl =>
-        ShowGettingStarted && (IsHrAdministrator || CanManageCompany) ? "/getting-started" :
+        ShowGettingStarted && (IsHrAdministrator || CanViewOnboarding) ? "/getting-started" :
         IsHrAdministrator ? "/dashboard/hr" :
         IsRecruiter ? "/dashboard/recruitment" :
         IsManager ? "/dashboard/manager" :
@@ -240,10 +249,13 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
             var hrSettingsTask = GetHrSettingsOrNullAsync(me.CompanyId);
             var employeeTask   = GetEmployeeOrNullAsync(me.CompanyId);
 
-            // Only HR Administrators / Company Administrators are granted the onboarding:view
-            // policy; everyone else gets a 403, so skip the call entirely rather than let it
-            // noisily fail.
-            var onboardingTask = me.IsHrAdministrator || me.CanManageCompany
+            // OBT-IAM-09: only HR Administrators and holders of the onboarding:view permission
+            // are granted the onboarding:view policy; everyone else gets a 403, so skip the call
+            // entirely rather than let it noisily fail. A Company-Administrator-only account no
+            // longer holds onboarding:view (see RolePermissionConfiguration), so CanViewOnboarding
+            // (permission-derived, computed from PermissionIds set just above) correctly excludes
+            // it — CanManageCompany (role-derived) previously did not.
+            var onboardingTask = me.IsHrAdministrator || CanViewOnboarding
                 ? GetOnboardingChecklistOrNullAsync()
                 : Task.FromResult<GetCompanyOnboardingChecklistResponse?>(null);
             var subscriptionTask = GetSubscriptionStatusOrNullAsync();

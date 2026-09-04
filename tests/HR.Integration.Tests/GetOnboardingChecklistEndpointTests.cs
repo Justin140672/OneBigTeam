@@ -77,19 +77,20 @@ public class GetOnboardingChecklistEndpointTests
         Assert.InRange(payload.CompletionPercentage, 0, 100);
     }
 
+    // OBT-IAM-09: onboarding:view was removed from Company Administrator — a
+    // Company-Administrator-only account is limited to company settings and subscription
+    // administration and must be denied here, same as a plain Employee. The initial company
+    // creator retains access because signup also assigns HR Administrator (see
+    // Get_Checklist_Returns_Ok_For_HrAdministrator above).
     [Fact]
-    public async Task Get_Checklist_Returns_Ok_For_CompanyAdministrator()
+    public async Task Get_Checklist_Returns_Forbidden_For_CompanyAdministrator_Only()
     {
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(companyId, CompanyAdminUserId);
 
         var response = await client.GetAsync("/api/company-onboarding/checklist");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var payload = await response.Content.ReadFromJsonAsync<ChecklistPayload>();
-        Assert.NotNull(payload);
-        Assert.Equal(9, payload!.Tasks.Count);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     private sealed record OnboardingTaskItemPayload(

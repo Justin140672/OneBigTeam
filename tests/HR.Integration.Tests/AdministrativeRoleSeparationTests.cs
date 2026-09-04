@@ -593,11 +593,26 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(response);
     }
 
+    // OBT-IAM-09: onboarding:view removed from Company Administrator — a
+    // Company-Administrator-only account is limited to company settings and subscription
+    // administration. CompanyAdminPlusHrAdmin retains access via HR Administrator's own grant (see
+    // CompanyAdministratorPlusHrAdministrator_CanReach_OnboardingChecklist below).
     [Fact]
-    public async Task CompanyAdministrator_CanReach_OnboardingChecklist()
+    public async Task CompanyAdministratorOnly_CannotReach_OnboardingChecklist()
     {
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(CompanyAdmin, companyId);
+
+        var response = await client.GetAsync("/api/company-onboarding/checklist");
+
+        AssertForbidden(response);
+    }
+
+    [Fact]
+    public async Task CompanyAdministratorPlusHrAdministrator_CanReach_OnboardingChecklist()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientFor(CompanyAdminPlusHrAdmin, companyId);
 
         var response = await client.GetAsync("/api/company-onboarding/checklist");
 
@@ -655,11 +670,26 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(await companyAdminClient.GetAsync("/api/companies/subscription-details"));
     }
 
+    // OBT-IAM-09: support:manage removed from Company Administrator — a
+    // Company-Administrator-only account is limited to company settings and subscription
+    // administration. CompanyAdminPlusHrAdmin retains access via HR Administrator's own grant (see
+    // CompanyAdministratorPlusHrAdministrator_CanReach_SupportRequestsQueue below).
     [Fact]
-    public async Task CompanyAdministrator_CanReach_SupportRequestsQueue()
+    public async Task CompanyAdministratorOnly_CannotReach_SupportRequestsQueue()
     {
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(CompanyAdmin, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/support/requests");
+
+        AssertForbidden(response);
+    }
+
+    [Fact]
+    public async Task CompanyAdministratorPlusHrAdministrator_CanReach_SupportRequestsQueue()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientFor(CompanyAdminPlusHrAdmin, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/support/requests");
 

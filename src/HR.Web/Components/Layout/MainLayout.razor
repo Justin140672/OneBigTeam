@@ -54,7 +54,7 @@ else
                             CssClass="app-nav-menu"
                             ShowItemOnClick="true">
                         <MenuItems>
-                            @if (Session.ShowGettingStarted && (Session.IsHrAdministrator || Session.CanManageCompany))
+                            @if (Session.ShowGettingStarted && (Session.IsHrAdministrator || Session.CanViewOnboarding))
                             {
                                 <MenuItem Text="Getting Started" IconCss="fa-solid fa-list-check" Url="/getting-started" />
                             }
@@ -108,7 +108,7 @@ else
                                     }
                                 }
                             }
-                            @if (Session.IsHrAdministrator || Session.CanManageCompany)
+                            @if (Session.IsHrAdministrator || Session.CanManageSupport)
                             {
                                 <MenuItem Text="Support Requests" IconCss="fa-solid fa-headset" Url="@_menuItems["SupportQueue"]" />
                             }
@@ -144,7 +144,7 @@ else
                             <i class="fa-solid fa-moon"></i>
                         }
                     </button>
-                    @if (Session.IsLoaded && Session.EmployeeId.HasValue && (Session.IsHrAdministrator || Session.CanManageCompany))
+                    @if (Session.IsLoaded && Session.EmployeeId.HasValue && (Session.IsHrAdministrator || Session.CanViewOnboarding || Session.CanManageSupport))
                     {
                         <div class="help-menu @(_helpOpen ? "help-open" : "")">
                             <button class="help-btn" @onclick="ToggleHelp" title="Help" aria-label="Help" aria-haspopup="true" aria-expanded="@_helpOpen">
@@ -153,12 +153,18 @@ else
                             @if (_helpOpen)
                             {
                                 <div class="help-dropdown">
-                                    <a class="help-item" href="/getting-started" @onclick="CloseHelp">
-                                        <i class="fa-solid fa-list-check me-2"></i>Getting Started
-                                    </a>
-                                    <a class="help-item" href="/companies/@Session.CompanyId/support" @onclick="CloseHelp">
-                                        <i class="fa-solid fa-life-ring me-2"></i>Help &amp; Feedback
-                                    </a>
+                                    @if (Session.IsHrAdministrator || Session.CanViewOnboarding)
+                                    {
+                                        <a class="help-item" href="/getting-started" @onclick="CloseHelp">
+                                            <i class="fa-solid fa-list-check me-2"></i>Getting Started
+                                        </a>
+                                    }
+                                    @if (Session.IsHrAdministrator || Session.CanManageSupport)
+                                    {
+                                        <a class="help-item" href="/companies/@Session.CompanyId/support" @onclick="CloseHelp">
+                                            <i class="fa-solid fa-life-ring me-2"></i>Help &amp; Feedback
+                                        </a>
+                                    }
                                 </div>
                             }
                         </div>
