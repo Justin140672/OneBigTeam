@@ -16,6 +16,17 @@ internal sealed class FakeStripeGateway : IStripeGateway
 
     public Exception? ExceptionToThrowOnConstructEvent { get; set; }
 
+    /// <summary>
+    /// OBT-REM-09: for tests that need two DIFFERENT events delivered concurrently (e.g. via
+    /// Task.WhenAll against two HttpClient requests), <see cref="WebhookEventToReturn"/> alone
+    /// cannot distinguish between the two in-flight requests since it is a single shared field.
+    /// Callers that need distinct events per request can post a distinct raw payload string per
+    /// request and register the matching event here; ConstructAndParseWebhookEvent looks the
+    /// payload up in this map first and falls back to WebhookEventToReturn, so existing
+    /// single-event tests are unaffected.
+    /// </summary>
+    public Dictionary<string, StripeWebhookEvent> WebhookEventsByPayload { get; } = [];
+
     public Task<string> CreateCheckoutSessionAsync(
         Guid companyId,
         string customerEmail,
@@ -31,6 +42,9 @@ internal sealed class FakeStripeGateway : IStripeGateway
     {
         if (ExceptionToThrowOnConstructEvent is not null)
             throw ExceptionToThrowOnConstructEvent;
+
+        if (WebhookEventsByPayload.TryGetValue(payload, out var keyedEvent))
+            return keyedEvent;
 
         return WebhookEventToReturn
             ?? throw new InvalidOperationException("WebhookEventToReturn was not configured for this test.");
@@ -98,6 +112,7 @@ internal sealed class FakeStripeGateway : IStripeGateway
         CheckoutUrlToReturn = "https://checkout.stripe.com/test-session";
         WebhookEventToReturn = null;
         ExceptionToThrowOnConstructEvent = null;
+        WebhookEventsByPayload.Clear();
         PortalUrlToReturn = "https://billing.stripe.com/test-portal";
         LastCancelledStripeSubscriptionId = null;
         LastCancelAtPeriodEnd = null;

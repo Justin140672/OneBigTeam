@@ -21,6 +21,27 @@ internal sealed class CustomerSubscription
     public DateTimeOffset UpdatedAt { get; private set; }
 
     /// <summary>
+    /// OBT-REM-09: optimistic concurrency token. Two different Stripe webhook events for the same
+    /// subscription can be handled by concurrent requests; both may pass the "is this event newer"
+    /// check before either commits. Incrementing this on every mutation and mapping it as an EF Core
+    /// concurrency token means the loser of a concurrent SaveChangesAsync race gets a
+    /// DbUpdateConcurrencyException instead of silently overwriting newer state — the caller must
+    /// reload and re-evaluate rather than blindly retry. A plain persisted int column (matching
+    /// CompanySettings.Version), not Postgres xmin, per project convention.
+    /// </summary>
+    public int Version { get; private set; }
+
+    /// <summary>
+    /// OBT-REM-09: durable last-applied Stripe event marker, stored on the subscription row itself
+    /// (rather than derived by querying ProcessedStripeEvents) so the ordering check and the
+    /// projection update are protected by the SAME optimistic-concurrency token in the SAME
+    /// transaction. This is what makes "compare and update the ordering marker" atomic with the
+    /// subscription projection change.
+    /// </summary>
+    public string? LastAppliedStripeEventId { get; private set; }
+    public DateTimeOffset? LastAppliedStripeEventCreatedAt { get; private set; }
+
+    /// <summary>
     /// Support/admin override that forces read-only mode regardless of trial/subscription status.
     /// Distinct from the automatic TrialExpired-driven read-only gate (see
     /// SubscriptionStatusReader.GetStatusAsync) — this is an explicit platform-administrator
@@ -80,7 +101,55 @@ internal sealed class CustomerSubscription
             CancelAtPeriodEnd = false,
             CreatedAt = now,
             UpdatedAt = now,
+            Version = 1,
         };
+    }
+
+    /// <summary>
+    /// OBT-REM-09: true when a Stripe event with the given creation timestamp/id is older than (or a
+    /// deterministic tie-break loser against) the last event actually applied to this subscription.
+    /// A stale event must be recorded as processed but must NOT be projected.
+    ///
+    /// <para>
+    /// Deterministic tie-break for two different events sharing the same
+    /// <c>EventCreatedAt</c> (Stripe timestamps only have second resolution, so this is not
+    /// theoretical): the event whose id sorts LATER using ordinal string comparison wins. This has
+    /// no special meaning to Stripe, but it is cheap, requires no extra Stripe API call, and — most
+    /// importantly — is deterministic and commutative, so replaying either event in either order
+    /// always converges on the same winner.
+    /// </para>
+    /// </summary>
+    public bool IsStaleStripeEvent(string? eventId, DateTimeOffset? eventCreatedAt)
+    {
+        if (eventCreatedAt is null)
+            return false;
+
+        if (LastAppliedStripeEventCreatedAt is null)
+            return false;
+
+        if (eventCreatedAt.Value > LastAppliedStripeEventCreatedAt.Value)
+            return false;
+
+        if (eventCreatedAt.Value < LastAppliedStripeEventCreatedAt.Value)
+            return true;
+
+        // Equal timestamps — deterministic tie-break by event id.
+        if (string.IsNullOrEmpty(eventId) || string.IsNullOrEmpty(LastAppliedStripeEventId))
+            return false;
+
+        return string.CompareOrdinal(eventId, LastAppliedStripeEventId) <= 0;
+    }
+
+    private void RecordAppliedStripeEvent(string? eventId, DateTimeOffset? eventCreatedAt, DateTimeOffset now)
+    {
+        if (eventCreatedAt is not null)
+        {
+            LastAppliedStripeEventId = eventId;
+            LastAppliedStripeEventCreatedAt = eventCreatedAt;
+        }
+
+        Version++;
+        UpdatedAt = now;
     }
 
     /// <summary>
@@ -96,6 +165,7 @@ internal sealed class CustomerSubscription
             return false;
 
         Status = SubscriptionStatus.TrialExpired;
+        Version++;
         UpdatedAt = now;
         return true;
     }
@@ -109,7 +179,9 @@ internal sealed class CustomerSubscription
         string stripeSubscriptionId,
         string priceId,
         DateTimeOffset? currentPeriodEnd,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? stripeEventId = null,
+        DateTimeOffset? stripeEventCreatedAt = null)
     {
         Status = SubscriptionStatus.Active;
         StripeCustomerId = stripeCustomerId;
@@ -117,34 +189,39 @@ internal sealed class CustomerSubscription
         PriceId = priceId;
         CurrentPeriodEnd = currentPeriodEnd;
         CancelAtPeriodEnd = false;
-        UpdatedAt = now;
+        RecordAppliedStripeEvent(stripeEventId, stripeEventCreatedAt, now);
     }
 
     /// <summary>
     /// Reconciles local state from a Stripe webhook payload (customer.subscription.updated/deleted).
-    /// Idempotent — safe to call repeatedly with the same payload.
+    /// Idempotent — safe to call repeatedly with the same payload. Callers must have already checked
+    /// <see cref="IsStaleStripeEvent"/> before invoking this — it does not re-check ordering itself.
     /// </summary>
     public void UpdateFromStripe(
         SubscriptionStatus status,
         DateTimeOffset? currentPeriodEnd,
         bool cancelAtPeriodEnd,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? stripeEventId = null,
+        DateTimeOffset? stripeEventCreatedAt = null)
     {
         Status = status;
         CurrentPeriodEnd = currentPeriodEnd;
         CancelAtPeriodEnd = cancelAtPeriodEnd;
-        UpdatedAt = now;
+        RecordAppliedStripeEvent(stripeEventId, stripeEventCreatedAt, now);
     }
 
     public void RequestCancellation(DateTimeOffset now)
     {
         CancelAtPeriodEnd = true;
+        Version++;
         UpdatedAt = now;
     }
 
     public void Resume(DateTimeOffset now)
     {
         CancelAtPeriodEnd = false;
+        Version++;
         UpdatedAt = now;
     }
 
@@ -164,6 +241,7 @@ internal sealed class CustomerSubscription
 
         TrialExpiresAt = newTrialExpiresAt;
         Status = SubscriptionStatus.Trial;
+        Version++;
         UpdatedAt = now;
         return Result.Success();
     }
@@ -179,6 +257,7 @@ internal sealed class CustomerSubscription
             return Result.Failure(Error.Validation("Only an active or past-due subscription can be cancelled."));
 
         CancelAtPeriodEnd = true;
+        Version++;
         UpdatedAt = now;
         return Result.Success();
     }
@@ -207,6 +286,7 @@ internal sealed class CustomerSubscription
         }
 
         CancelAtPeriodEnd = false;
+        Version++;
         UpdatedAt = now;
         return Result.Success();
     }
@@ -221,6 +301,7 @@ internal sealed class CustomerSubscription
             return Result.Failure(Error.Validation("This company is already in forced read-only mode."));
 
         AdminForcedReadOnly = true;
+        Version++;
         UpdatedAt = now;
         return Result.Success();
     }
@@ -234,6 +315,7 @@ internal sealed class CustomerSubscription
             return Result.Failure(Error.Validation("This company is not currently in forced read-only mode."));
 
         AdminForcedReadOnly = false;
+        Version++;
         UpdatedAt = now;
         return Result.Success();
     }
@@ -256,6 +338,7 @@ internal sealed class CustomerSubscription
         DeletionScheduledAt = scheduledFor;
         DeletionScheduledBy = scheduledByUserId;
         DeletionCancelledAt = null;
+        Version++;
         UpdatedAt = now;
         return Result.Success();
     }
@@ -270,6 +353,7 @@ internal sealed class CustomerSubscription
             return Result.Failure(Error.Validation("This company does not have a pending deletion to cancel."));
 
         DeletionCancelledAt = now;
+        Version++;
         UpdatedAt = now;
         return Result.Success();
     }
@@ -298,6 +382,7 @@ internal sealed class CustomerSubscription
         LegalHoldPlacedAt = now;
         LegalHoldPlacedBy = placedByUserId;
         LegalHoldReason = reason.Trim();
+        Version++;
         UpdatedAt = now;
         return Result.Success();
     }
@@ -314,6 +399,7 @@ internal sealed class CustomerSubscription
         LegalHoldPlacedAt = null;
         LegalHoldPlacedBy = null;
         LegalHoldReason = null;
+        Version++;
         UpdatedAt = now;
         return Result.Success();
     }
@@ -334,6 +420,7 @@ internal sealed class CustomerSubscription
 
         DeletionExecutedAt = now;
         AdminForcedReadOnly = true;
+        Version++;
         UpdatedAt = now;
         return Result.Success();
     }

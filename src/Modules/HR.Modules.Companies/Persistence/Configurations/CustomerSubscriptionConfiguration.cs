@@ -87,6 +87,21 @@ internal sealed class CustomerSubscriptionConfiguration : IEntityTypeConfigurati
             .HasColumnName("updated_at")
             .IsRequired();
 
+        // OBT-REM-09: optimistic concurrency token — protects the subscription projection update
+        // against two concurrent Stripe webhook deliveries for different events racing each other.
+        // A plain persisted int (not Postgres xmin), matching CompanySettings.Version convention.
+        builder.Property(s => s.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken();
+
+        builder.Property(s => s.LastAppliedStripeEventId)
+            .HasColumnName("last_applied_stripe_event_id")
+            .HasMaxLength(100);
+
+        builder.Property(s => s.LastAppliedStripeEventCreatedAt)
+            .HasColumnName("last_applied_stripe_event_created_at");
+
         builder.HasOne<Company>()
             .WithOne()
             .HasForeignKey<CustomerSubscription>(s => s.CompanyId)
