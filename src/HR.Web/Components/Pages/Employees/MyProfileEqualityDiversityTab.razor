@@ -1,0 +1,366 @@
+@inject EmployeeService EmployeeService
+@inject AppSession Session
+@inject IJSRuntime JS
+
+@if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
+{
+    <div class="alert alert-danger">
+        <i class="fa-solid fa-lock me-2"></i>You can only view your own equality and diversity information.
+    </div>
+}
+else if (_loading)
+{
+    <HrLoadingIndicator />
+}
+else
+{
+    <div class="ed-section" data-testid="my-profile-equality-section">
+        @if (!string.IsNullOrEmpty(_successMsg))
+        {
+            <div class="ed-success-banner mb-3" data-testid="my-profile-equality-success">
+                <i class="fa-solid fa-circle-check ed-success-icon"></i>
+                <div>
+                    <div class="ed-success-title">@_successMsg</div>
+                    <div class="ed-success-body">Your equality and diversity information has been updated.</div>
+                </div>
+                <button class="ed-success-dismiss" @onclick="@(() => _successMsg = null)">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        }
+
+        @if (_globalError is not null)
+        {
+            <div class="alert alert-danger alert-dismissible mb-3">
+                @_globalError
+                <button type="button" class="btn-close" @onclick="@(() => _globalError = null)"></button>
+            </div>
+        }
+
+        <div class="ed-card">
+            <div class="ed-card-header">
+                <i class="fa-solid fa-users-line ed-card-icon"></i>
+                <span class="ed-card-title">Equality &amp; Diversity</span>
+            </div>
+
+            <div class="ed-intro">
+                <p>
+                    Providing this information is <strong>entirely voluntary</strong>. It is collected
+                    <strong>only for equality and diversity monitoring</strong> and is
+                    <strong>not used for normal employee-management decisions</strong> such as pay, promotion or performance.
+                </p>
+                <p>
+                    A <strong>&ldquo;Prefer not to say&rdquo;</strong> option is available for every question, and you can
+                    <strong>leave the questionnaire incomplete</strong> — answer as many or as few questions as you wish.
+                </p>
+            </div>
+
+            <div class="ed-form-body">
+                <div class="ed-field-group" data-testid="my-profile-equality-gender">
+                    <label class="ed-label">Gender identity</label>
+                    <SfDropDownList TValue="GenderIdentityChoice" TItem="EqualityFieldOption<GenderIdentityChoice>"
+                                    DataSource="_genderOptions" @bind-Value="_model.GenderIdentity">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+                @if (_model.GenderIdentity == GenderIdentityChoice.SelfDescribed)
+                {
+                    <div class="ed-field-group">
+                        <label class="ed-label">Describe your gender identity</label>
+                        <HrTextBox @bind-Value="_model.GenderIdentitySelfDescribed" Maxlength="200" />
+                    </div>
+                }
+
+                <div class="ed-field-group" data-testid="my-profile-equality-marital">
+                    <label class="ed-label">Are you married or in a civil partnership?</label>
+                    <SfDropDownList TValue="YesNoChoice" TItem="EqualityFieldOption<YesNoChoice>"
+                                    DataSource="_yesNoOptions" @bind-Value="_model.MarriedOrCivilPartnershipStatus">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+
+                <div class="ed-field-group" data-testid="my-profile-equality-ethnicgroup">
+                    <label class="ed-label">Ethnic group</label>
+                    <SfDropDownList TValue="EthnicGroupChoice" TItem="EqualityFieldOption<EthnicGroupChoice>"
+                                    DataSource="_ethnicOptions" @bind-Value="_model.EthnicGroup">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+                @if (_model.EthnicGroup == EthnicGroupChoice.SelfDescribed)
+                {
+                    <div class="ed-field-group">
+                        <label class="ed-label">Describe your ethnic group</label>
+                        <HrTextBox @bind-Value="_model.EthnicGroupSelfDescribed" Maxlength="200" />
+                    </div>
+                }
+
+                <div class="ed-field-group" data-testid="my-profile-equality-disability">
+                    <label class="ed-label">Do you consider yourself to have a disability?</label>
+                    <SfDropDownList TValue="YesNoChoice" TItem="EqualityFieldOption<YesNoChoice>"
+                                    DataSource="_yesNoOptions" @bind-Value="_model.DisabilityStatus">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+                @if (_model.DisabilityStatus == YesNoChoice.Yes)
+                {
+                    <div class="ed-field-group">
+                        <label class="ed-label">If you wish, describe the impact of your disability</label>
+                        <HrTextBox @bind-Value="_model.DisabilityImpact" Multiline="true" Rows="3" Maxlength="1000" />
+                    </div>
+                }
+
+                <div class="ed-field-group" data-testid="my-profile-equality-orientation">
+                    <label class="ed-label">Sexual orientation</label>
+                    <SfDropDownList TValue="SexualOrientationChoice" TItem="EqualityFieldOption<SexualOrientationChoice>"
+                                    DataSource="_orientationOptions" @bind-Value="_model.SexualOrientation">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+                @if (_model.SexualOrientation == SexualOrientationChoice.SelfDescribed)
+                {
+                    <div class="ed-field-group">
+                        <label class="ed-label">Describe your sexual orientation</label>
+                        <HrTextBox @bind-Value="_model.SexualOrientationSelfDescribed" Maxlength="200" />
+                    </div>
+                }
+
+                <div class="ed-field-group" data-testid="my-profile-equality-religion">
+                    <label class="ed-label">Religion or belief</label>
+                    <SfDropDownList TValue="ReligionOrBeliefChoice" TItem="EqualityFieldOption<ReligionOrBeliefChoice>"
+                                    DataSource="_religionOptions" @bind-Value="_model.ReligionOrBelief">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+                @if (_model.ReligionOrBelief == ReligionOrBeliefChoice.SelfDescribed)
+                {
+                    <div class="ed-field-group">
+                        <label class="ed-label">Describe your religion or belief</label>
+                        <HrTextBox @bind-Value="_model.ReligionOrBeliefSelfDescribed" Maxlength="200" />
+                    </div>
+                }
+
+                <div class="ed-form-footer">
+                    <SfButton Disabled="@_saving" OnClick="ClearAnswersAsync">
+                        Clear my answers
+                    </SfButton>
+                    <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAsync"
+                              HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "my-profile-equality-save" })">
+                        @if (_saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Save
+                    </SfButton>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private bool _loading = true;
+    private bool _saving;
+    private string? _globalError;
+    private string? _successMsg;
+    private readonly FormModel _model = new();
+
+    private static readonly IReadOnlyDictionary<GenderIdentityChoice, string> GenderLabels = new Dictionary<GenderIdentityChoice, string>
+    {
+        [GenderIdentityChoice.NotSpecified] = "Not answered",
+        [GenderIdentityChoice.Man] = "Man",
+        [GenderIdentityChoice.Woman] = "Woman",
+        [GenderIdentityChoice.NonBinary] = "Non-binary",
+        [GenderIdentityChoice.SelfDescribed] = "Prefer to self-describe",
+        [GenderIdentityChoice.PreferNotToSay] = "Prefer not to say",
+    };
+
+    private static readonly IReadOnlyDictionary<YesNoChoice, string> YesNoLabels = new Dictionary<YesNoChoice, string>
+    {
+        [YesNoChoice.NotSpecified] = "Not answered",
+        [YesNoChoice.Yes] = "Yes",
+        [YesNoChoice.No] = "No",
+        [YesNoChoice.PreferNotToSay] = "Prefer not to say",
+    };
+
+    private static readonly IReadOnlyDictionary<EthnicGroupChoice, string> EthnicLabels = new Dictionary<EthnicGroupChoice, string>
+    {
+        [EthnicGroupChoice.NotSpecified] = "Not answered",
+        [EthnicGroupChoice.White] = "White",
+        [EthnicGroupChoice.Mixed] = "Mixed or multiple ethnic groups",
+        [EthnicGroupChoice.AsianOrAsianBritish] = "Asian or Asian British",
+        [EthnicGroupChoice.BlackOrAfricanOrCaribbeanOrBlackBritish] = "Black, African, Caribbean or Black British",
+        [EthnicGroupChoice.OtherEthnicGroup] = "Other ethnic group",
+        [EthnicGroupChoice.SelfDescribed] = "Prefer to self-describe",
+        [EthnicGroupChoice.PreferNotToSay] = "Prefer not to say",
+    };
+
+    private static readonly IReadOnlyDictionary<SexualOrientationChoice, string> OrientationLabels = new Dictionary<SexualOrientationChoice, string>
+    {
+        [SexualOrientationChoice.NotSpecified] = "Not answered",
+        [SexualOrientationChoice.HeterosexualOrStraight] = "Heterosexual or straight",
+        [SexualOrientationChoice.GayOrLesbian] = "Gay or lesbian",
+        [SexualOrientationChoice.Bisexual] = "Bisexual",
+        [SexualOrientationChoice.Other] = "Other",
+        [SexualOrientationChoice.SelfDescribed] = "Prefer to self-describe",
+        [SexualOrientationChoice.PreferNotToSay] = "Prefer not to say",
+    };
+
+    private static readonly IReadOnlyDictionary<ReligionOrBeliefChoice, string> ReligionLabels = new Dictionary<ReligionOrBeliefChoice, string>
+    {
+        [ReligionOrBeliefChoice.NotSpecified] = "Not answered",
+        [ReligionOrBeliefChoice.NoReligion] = "No religion",
+        [ReligionOrBeliefChoice.Christian] = "Christian",
+        [ReligionOrBeliefChoice.Buddhist] = "Buddhist",
+        [ReligionOrBeliefChoice.Hindu] = "Hindu",
+        [ReligionOrBeliefChoice.Jewish] = "Jewish",
+        [ReligionOrBeliefChoice.Muslim] = "Muslim",
+        [ReligionOrBeliefChoice.Sikh] = "Sikh",
+        [ReligionOrBeliefChoice.OtherReligion] = "Other religion or belief",
+        [ReligionOrBeliefChoice.SelfDescribed] = "Prefer to self-describe",
+        [ReligionOrBeliefChoice.PreferNotToSay] = "Prefer not to say",
+    };
+
+    private static List<EqualityFieldOption<T>> BuildOptions<T>(IReadOnlyDictionary<T, string> labels) where T : struct, Enum =>
+        Enum.GetValues<T>().Select(v => new EqualityFieldOption<T>(v, labels[v])).ToList();
+
+    private readonly List<EqualityFieldOption<GenderIdentityChoice>> _genderOptions = BuildOptions(GenderLabels);
+    private readonly List<EqualityFieldOption<YesNoChoice>> _yesNoOptions = BuildOptions(YesNoLabels);
+    private readonly List<EqualityFieldOption<EthnicGroupChoice>> _ethnicOptions = BuildOptions(EthnicLabels);
+    private readonly List<EqualityFieldOption<SexualOrientationChoice>> _orientationOptions = BuildOptions(OrientationLabels);
+    private readonly List<EqualityFieldOption<ReligionOrBeliefChoice>> _religionOptions = BuildOptions(ReligionLabels);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
+        {
+            _loading = false;
+            return;
+        }
+
+        _loading = true;
+        var record = await EmployeeService.GetMyEqualityRecordAsync(CompanyId, EmployeeId);
+        if (record is not null)
+            ApplyToModel(record);
+        _loading = false;
+    }
+
+    private void ApplyToModel(GetMyEqualityDataResponse r)
+    {
+        _model.GenderIdentity = r.GenderIdentity ?? GenderIdentityChoice.NotSpecified;
+        _model.GenderIdentitySelfDescribed = r.GenderIdentitySelfDescribed;
+        _model.MarriedOrCivilPartnershipStatus = r.MarriedOrCivilPartnershipStatus ?? YesNoChoice.NotSpecified;
+        _model.EthnicGroup = r.EthnicGroup ?? EthnicGroupChoice.NotSpecified;
+        _model.EthnicGroupSelfDescribed = r.EthnicGroupSelfDescribed;
+        _model.DisabilityStatus = r.DisabilityStatus ?? YesNoChoice.NotSpecified;
+        _model.DisabilityImpact = r.DisabilityImpact;
+        _model.SexualOrientation = r.SexualOrientation ?? SexualOrientationChoice.NotSpecified;
+        _model.SexualOrientationSelfDescribed = r.SexualOrientationSelfDescribed;
+        _model.ReligionOrBelief = r.ReligionOrBelief ?? ReligionOrBeliefChoice.NotSpecified;
+        _model.ReligionOrBeliefSelfDescribed = r.ReligionOrBeliefSelfDescribed;
+    }
+
+    private static T? Nullify<T>(T value) where T : struct, Enum =>
+        Convert.ToInt32(value) == 0 ? null : value;
+
+    private static string? TextFor<T>(T selected, T selfDescribed, string? text) where T : struct, Enum =>
+        EqualityComparer<T>.Default.Equals(selected, selfDescribed) && !string.IsNullOrWhiteSpace(text)
+            ? text!.Trim()
+            : null;
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _globalError = null;
+        _successMsg = null;
+
+        var request = new SaveMyEqualityDataRequest(
+            CompanyId,
+            EmployeeId,
+            Nullify(_model.GenderIdentity),
+            TextFor(_model.GenderIdentity, GenderIdentityChoice.SelfDescribed, _model.GenderIdentitySelfDescribed),
+            Nullify(_model.MarriedOrCivilPartnershipStatus),
+            Nullify(_model.EthnicGroup),
+            TextFor(_model.EthnicGroup, EthnicGroupChoice.SelfDescribed, _model.EthnicGroupSelfDescribed),
+            Nullify(_model.DisabilityStatus),
+            _model.DisabilityStatus == YesNoChoice.Yes && !string.IsNullOrWhiteSpace(_model.DisabilityImpact)
+                ? _model.DisabilityImpact!.Trim() : null,
+            Nullify(_model.SexualOrientation),
+            TextFor(_model.SexualOrientation, SexualOrientationChoice.SelfDescribed, _model.SexualOrientationSelfDescribed),
+            Nullify(_model.ReligionOrBelief),
+            TextFor(_model.ReligionOrBelief, ReligionOrBeliefChoice.SelfDescribed, _model.ReligionOrBeliefSelfDescribed));
+
+        var (success, error) = await EmployeeService.SaveMyEqualityRecordAsync(CompanyId, EmployeeId, request);
+
+        _saving = false;
+
+        if (!success)
+        {
+            _globalError = error ?? "Failed to save your equality and diversity information.";
+            return;
+        }
+
+        var refreshed = await EmployeeService.GetMyEqualityRecordAsync(CompanyId, EmployeeId);
+        if (refreshed is not null)
+            ApplyToModel(refreshed);
+
+        _successMsg = "Equality and diversity information saved";
+    }
+
+    private async Task ClearAnswersAsync()
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm",
+            "Clear all of your equality and diversity answers? This cannot be undone.");
+        if (!confirmed)
+            return;
+
+        _saving = true;
+        _globalError = null;
+        _successMsg = null;
+
+        var (success, error) = await EmployeeService.ClearMyEqualityRecordAsync(CompanyId, EmployeeId);
+
+        _saving = false;
+
+        if (!success)
+        {
+            _globalError = error ?? "Failed to clear your equality and diversity information.";
+            return;
+        }
+
+        _model.Reset();
+        _successMsg = "Equality and diversity answers cleared";
+    }
+
+    private sealed class FormModel
+    {
+        public GenderIdentityChoice GenderIdentity { get; set; }
+        public string? GenderIdentitySelfDescribed { get; set; }
+        public YesNoChoice MarriedOrCivilPartnershipStatus { get; set; }
+        public EthnicGroupChoice EthnicGroup { get; set; }
+        public string? EthnicGroupSelfDescribed { get; set; }
+        public YesNoChoice DisabilityStatus { get; set; }
+        public string? DisabilityImpact { get; set; }
+        public SexualOrientationChoice SexualOrientation { get; set; }
+        public string? SexualOrientationSelfDescribed { get; set; }
+        public ReligionOrBeliefChoice ReligionOrBelief { get; set; }
+        public string? ReligionOrBeliefSelfDescribed { get; set; }
+
+        public void Reset()
+        {
+            GenderIdentity = GenderIdentityChoice.NotSpecified;
+            GenderIdentitySelfDescribed = null;
+            MarriedOrCivilPartnershipStatus = YesNoChoice.NotSpecified;
+            EthnicGroup = EthnicGroupChoice.NotSpecified;
+            EthnicGroupSelfDescribed = null;
+            DisabilityStatus = YesNoChoice.NotSpecified;
+            DisabilityImpact = null;
+            SexualOrientation = SexualOrientationChoice.NotSpecified;
+            SexualOrientationSelfDescribed = null;
+            ReligionOrBelief = ReligionOrBeliefChoice.NotSpecified;
+            ReligionOrBeliefSelfDescribed = null;
+        }
+    }
+}

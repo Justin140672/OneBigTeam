@@ -569,5 +569,67 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         return (null, $"Failed to cancel leaving process ({(int)response.StatusCode} {response.StatusCode}).");
     }
 
+    // ── EQUALITY & DIVERSITY (self-service) ───────────────────────────────────
+
+    public async Task<GetMyEqualityDataResponse?> GetMyEqualityRecordAsync(
+        Guid companyId,
+        Guid employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetMyEqualityDataResponse>(
+                $"api/companies/{companyId}/employees/{employeeId}/equality-record",
+                HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    public async Task<(bool Success, string? Error)> SaveMyEqualityRecordAsync(
+        Guid companyId,
+        Guid employeeId,
+        SaveMyEqualityDataRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/equality-record",
+                request, HrApiJsonOptions.Default, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return (true, null);
+
+            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
+                return (false, businessMessage);
+
+            if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
+                return (false, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
+
+            return (false, "Failed to save your equality and diversity information.");
+        }
+        catch { return (false, "An unexpected error occurred."); }
+    }
+
+    public async Task<(bool Success, string? Error)> ClearMyEqualityRecordAsync(
+        Guid companyId,
+        Guid employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/equality-record",
+                cancellationToken);
+
+            return response.IsSuccessStatusCode
+                ? (true, null)
+                : (false, "Failed to clear your equality and diversity information.");
+        }
+        catch { return (false, "An unexpected error occurred."); }
+    }
+
     private sealed record ErrorEnvelope(string? Error);
 }

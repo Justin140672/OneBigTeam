@@ -20,10 +20,10 @@
                     <div class="mt-4">
                         <MyProfileOverviewTab CompanyId="CompanyId"
                                              EmployeeId="EmployeeId"
-                                             OnNavigateToDocuments="() => _activeTabIndex = 6"
-                                             OnNavigateToTasks="() => _activeTabIndex = 7"
-                                             OnNavigateToLeave="() => _activeTabIndex = 4"
-                                             OnNavigateToSickness="() => _activeTabIndex = 5" />
+                                             OnNavigateToDocuments="() => _activeTabIndex = 7"
+                                             OnNavigateToTasks="() => _activeTabIndex = 8"
+                                             OnNavigateToLeave="() => _activeTabIndex = 5"
+                                             OnNavigateToSickness="() => _activeTabIndex = 6" />
                     </div>
                 </ContentTemplate>
             </TabItem>
@@ -43,6 +43,12 @@
                 <ChildContent><TabHeader Text="Emergency Contacts" /></ChildContent>
                 <ContentTemplate>
                     <div class="mt-4"><MyProfileEmergencyContactsTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent><TabHeader Text="Equality & Diversity" /></ChildContent>
+                <ContentTemplate>
+                    <div class="mt-4"><MyProfileEqualityDiversityTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
                 </ContentTemplate>
             </TabItem>
             <TabItem>
@@ -80,7 +86,7 @@
                 <ContentTemplate>
                     <div class="mt-4">
                         <EmployeeTimelineTab CompanyId="CompanyId" EmployeeId="EmployeeId"
-                                              OnNavigateToDocuments="@(() => _activeTabIndex = 6)" />
+                                              OnNavigateToDocuments="@(() => _activeTabIndex = 7)" />
                     </div>
                 </ContentTemplate>
             </TabItem>
@@ -111,14 +117,14 @@
         {
             _activeTabIndex = tab.ToString() switch
             {
-                "leave"     => 4,
+                "leave"     => 5,
                 // "companyDocuments" merged into "documents" — see MyProfileDocumentsTab's
                 // combined-list remarks — kept as an alias so any existing bookmarked/shared link
                 // using the old query value still lands on the (now single) Documents tab.
-                "documents" or "companyDocuments" => 6,
-                "tasks"     => 7,
-                "assets"    => 8,
-                "timeline"  => 9,
+                "documents" or "companyDocuments" => 7,
+                "tasks"     => 8,
+                "assets"    => 9,
+                "timeline"  => 10,
                 _           => 0
             };
         }

@@ -105,6 +105,55 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     /// .e-row/.e-headercell DOM on a separate JS tick, so waiting on a bare ".card" (as before)
     /// could resolve before the grid had actually finished rendering.
     /// </summary>
+    // ── Equality & Diversity tab (MyProfileEqualityDiversityTab — self-service) ──
+    // Tab index 4, immediately after "Emergency Contacts", before "Leave". The section
+    // container carries data-testid="my-profile-equality-section"; drive its fields with the
+    // EqualityDiversityTab page object.
+
+    public async Task OpenEqualityDiversityTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Equality & Diversity" }).ClickAsync();
+        await page.WaitForSelectorAsync(
+            "[data-testid='my-profile-equality-section'], .ed-section, .alert-danger",
+            new() { Timeout = 15_000 });
+    }
+
+    public async Task OpenEqualityGenderAsync(string optionText) =>
+        await DropDownSelector.SelectAsync(page, page.Locator("[data-testid='my-profile-equality-gender']"), optionText);
+
+    public async Task OpenEqualityMaritalAsync(string optionText) =>
+        await DropDownSelector.SelectAsync(page, page.Locator("[data-testid='my-profile-equality-marital']"), optionText);
+
+    public async Task OpenEqualityEthnicGroupAsync(string optionText) =>
+        await DropDownSelector.SelectAsync(page, page.Locator("[data-testid='my-profile-equality-ethnicgroup']"), optionText);
+
+    public async Task OpenEqualityDisabilityAsync(string optionText) =>
+        await DropDownSelector.SelectAsync(page, page.Locator("[data-testid='my-profile-equality-disability']"), optionText);
+
+    public async Task OpenEqualityOrientationAsync(string optionText) =>
+        await DropDownSelector.SelectAsync(page, page.Locator("[data-testid='my-profile-equality-orientation']"), optionText);
+
+    public async Task OpenEqualityReligionAsync(string optionText) =>
+        await DropDownSelector.SelectAsync(page, page.Locator("[data-testid='my-profile-equality-religion']"), optionText);
+
+    public async Task<string> GetEqualitySelectedValueAsync(string fieldTestId) =>
+        (await page.Locator($"[data-testid='{fieldTestId}'] span[role='combobox'] input").First.InputValueAsync())?.Trim() ?? "";
+
+    public async Task SaveEqualityAsync()
+    {
+        await page.Locator("[data-testid='my-profile-equality-save']").ClickAsync();
+        await page.WaitForSelectorAsync("[data-testid='my-profile-equality-success']", new() { Timeout = 15_000 });
+    }
+
+    public async Task ClearEqualityAnswersAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Clear my answers" }).ClickAsync();
+        await page.WaitForSelectorAsync("[data-testid='my-profile-equality-success']", new() { Timeout = 15_000 });
+    }
+
+    public async Task<bool> IsEqualitySuccessBannerVisibleAsync() =>
+        await page.Locator("[data-testid='my-profile-equality-success']").IsVisibleAsync();
+
     public async Task OpenDocumentsTabAsync()
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Documents", Exact = true }).ClickAsync();

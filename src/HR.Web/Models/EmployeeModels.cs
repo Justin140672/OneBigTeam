@@ -473,6 +473,66 @@ public record ListNationalitiesResponse(IReadOnlyList<NationalityListItem> Items
 
 public record NationalityListItem(int Id, string Name);
 
+// ── EQUALITY & DIVERSITY (self-service) ───────────────────────────────────────
+//
+// Local mirrors of HR.Modules.Employees' internal enums (they cannot be referenced from
+// HR.Web). Enum members are serialized/deserialized by NAME (see HrApiJsonOptions.Default).
+// null or "NotSpecified" both mean "not answered".
+
+public enum GenderIdentityChoice { NotSpecified, Man, Woman, NonBinary, SelfDescribed, PreferNotToSay }
+
+public enum YesNoChoice { NotSpecified, Yes, No, PreferNotToSay }
+
+public enum EthnicGroupChoice
+{
+    NotSpecified, White, Mixed, AsianOrAsianBritish,
+    BlackOrAfricanOrCaribbeanOrBlackBritish, OtherEthnicGroup, SelfDescribed, PreferNotToSay
+}
+
+public enum SexualOrientationChoice
+{
+    NotSpecified, HeterosexualOrStraight, GayOrLesbian, Bisexual, Other, SelfDescribed, PreferNotToSay
+}
+
+public enum ReligionOrBeliefChoice
+{
+    NotSpecified, NoReligion, Christian, Buddhist, Hindu, Jewish, Muslim, Sikh,
+    OtherReligion, SelfDescribed, PreferNotToSay
+}
+
+public sealed record GetMyEqualityDataResponse(
+    bool HasRecord,
+    GenderIdentityChoice? GenderIdentity,
+    string? GenderIdentitySelfDescribed,
+    YesNoChoice? MarriedOrCivilPartnershipStatus,
+    EthnicGroupChoice? EthnicGroup,
+    string? EthnicGroupSelfDescribed,
+    YesNoChoice? DisabilityStatus,
+    string? DisabilityImpact,
+    SexualOrientationChoice? SexualOrientation,
+    string? SexualOrientationSelfDescribed,
+    ReligionOrBeliefChoice? ReligionOrBelief,
+    string? ReligionOrBeliefSelfDescribed,
+    DateTimeOffset? CreatedAt,
+    DateTimeOffset? UpdatedAt);
+
+public sealed record SaveMyEqualityDataRequest(
+    Guid CompanyId,
+    Guid EmployeeId,
+    GenderIdentityChoice? GenderIdentity,
+    string? GenderIdentitySelfDescribed,
+    YesNoChoice? MarriedOrCivilPartnershipStatus,
+    EthnicGroupChoice? EthnicGroup,
+    string? EthnicGroupSelfDescribed,
+    YesNoChoice? DisabilityStatus,
+    string? DisabilityImpact,
+    SexualOrientationChoice? SexualOrientation,
+    string? SexualOrientationSelfDescribed,
+    ReligionOrBeliefChoice? ReligionOrBelief,
+    string? ReligionOrBeliefSelfDescribed);
+
+public sealed record EqualityFieldOption<T>(T Value, string Label);
+
 // ── DASHBOARD: HEADCOUNT SUMMARY ────────────────────────────────────────────────
 
 public sealed record GetHeadcountSummaryResponse(IReadOnlyList<HeadcountSummaryItem> Items);

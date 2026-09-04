@@ -1,0 +1,147 @@
+/* ── Card ─────────────────────────────────────────────── */
+
+.ed-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.ed-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 20px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.ed-card-icon {
+    color: var(--hr-color-primary);
+    font-size: 0.95rem;
+}
+
+.ed-card-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+/* ── Intro ───────────────────────────────────────────── */
+
+.ed-intro {
+    padding: 16px 20px;
+    background: #f9fafb;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 0.82rem;
+    color: #4b5563;
+}
+
+.ed-intro p {
+    margin-bottom: 8px;
+}
+
+.ed-intro p:last-child {
+    margin-bottom: 0;
+}
+
+/* ── Form body ───────────────────────────────────────── */
+
+.ed-form-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.ed-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 460px;
+}
+
+.ed-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+/* ── Footer ──────────────────────────────────────────── */
+
+.ed-form-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #f3f4f6;
+    margin-top: 4px;
+}
+
+/* ── Success banner ──────────────────────────────────── */
+
+.ed-success-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+
+.ed-success-icon {
+    color: #16a34a;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.ed-success-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #15803d;
+    margin-bottom: 2px;
+}
+
+.ed-success-body {
+    font-size: 0.8rem;
+    color: #166534;
+}
+
+.ed-success-dismiss {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #16a34a;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+
+.ed-success-dismiss:hover { opacity: 1; }
+
+/* ── Dark mode ───────────────────────────────────────── */
+
+html[data-theme="dark"] .ed-card {
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .ed-card-header,
+html[data-theme="dark"] .ed-intro,
+html[data-theme="dark"] .ed-form-footer {
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .ed-intro {
+    background: var(--hr-gray-900);
+    color: var(--hr-gray-300);
+}
+
+html[data-theme="dark"] .ed-card-title,
+html[data-theme="dark"] .ed-label {
+    color: var(--hr-gray-50);
+}
