@@ -10,7 +10,7 @@ internal sealed class FakeTaskCreator : ITaskCreator
         Guid CompanyId, Guid CreatedBy, string Title, string? Description,
         TaskPriority Priority, TaskSource Source, TaskActionType ActionType,
         DateOnly? DueDate, Guid? AssignedEmployeeId, Guid? AssignedUserId, Guid? SourceEntityId,
-        bool NotifyAssignee = true);
+        bool NotifyAssignee = true, string? IdempotencyKey = null);
 
     public List<CreatedTask> Created { get; } = [];
 
@@ -19,12 +19,13 @@ internal sealed class FakeTaskCreator : ITaskCreator
         TaskPriority priority, TaskSource source, TaskActionType actionType,
         DateOnly? dueDate, Guid? assignedEmployeeId, Guid? assignedUserId,
         Guid? sourceEntityId, CancellationToken cancellationToken,
-        bool notifyAssignee = true)
+        bool notifyAssignee = true,
+        string? idempotencyKey = null)
     {
         Created.Add(new CreatedTask(
             companyId, createdBy, title, description,
             priority, source, actionType, dueDate, assignedEmployeeId, assignedUserId, sourceEntityId,
-            notifyAssignee));
+            notifyAssignee, idempotencyKey));
 
         return Task.FromResult(Guid.NewGuid());
     }

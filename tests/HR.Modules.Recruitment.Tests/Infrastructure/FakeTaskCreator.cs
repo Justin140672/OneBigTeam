@@ -22,7 +22,8 @@ internal sealed class FakeTaskCreator : ITaskCreator
         Guid? assignedUserId,
         Guid? sourceEntityId,
         CancellationToken cancellationToken,
-        bool notifyAssignee = true)
+        bool notifyAssignee = true,
+        string? idempotencyKey = null)
     {
         var id = Guid.NewGuid();
         _created.Add(new CreatedTask(

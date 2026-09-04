@@ -148,4 +148,38 @@ public class NotifyHrOfOverdueFitNoteHandlerTests
 
         Assert.Contains("overdue", creator.Created[0].Description, StringComparison.OrdinalIgnoreCase);
     }
+
+    // OBT-REM-13: idempotency-key wiring ------------------------------------------------------------
+
+    [Fact]
+    public async Task HandleAsync_Passes_A_Deterministic_IdempotencyKey_Derived_From_EvidenceRequestId()
+    {
+        var creator           = new FakeTaskCreator();
+        var handler           = BuildHandler(creator);
+        var evidenceRequestId = Guid.NewGuid();
+
+        await handler.HandleAsync(MakeEvent(evidenceRequestId: evidenceRequestId), CancellationToken.None);
+
+        Assert.Equal($"SicknessEvidenceOverdue:{evidenceRequestId}", creator.Created[0].IdempotencyKey);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Called_Twice_For_Same_Event_Passes_The_Same_IdempotencyKey_Both_Times()
+    {
+        // Sequential replay of the same underlying occurrence (e.g. a retried Hangfire delivery) must
+        // produce two CreateAsync calls with an identical idempotency key — correctness against the
+        // resulting duplicate is then TaskCreator's/the database's responsibility (see
+        // TaskCreatorIdempotencyTests and TaskCreatorIdempotencyIntegrationTests), not this handler's.
+        var creator           = new FakeTaskCreator();
+        var handler           = BuildHandler(creator);
+        var evidenceRequestId = Guid.NewGuid();
+        var evt                = MakeEvent(evidenceRequestId: evidenceRequestId);
+
+        await handler.HandleAsync(evt, CancellationToken.None);
+        await handler.HandleAsync(evt, CancellationToken.None);
+
+        Assert.Equal(2, creator.Created.Count);
+        Assert.Equal(creator.Created[0].IdempotencyKey, creator.Created[1].IdempotencyKey);
+        Assert.Equal($"SicknessEvidenceOverdue:{evidenceRequestId}", creator.Created[1].IdempotencyKey);
+    }
 }

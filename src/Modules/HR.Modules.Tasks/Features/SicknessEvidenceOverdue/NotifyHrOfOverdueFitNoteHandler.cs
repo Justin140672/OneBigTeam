@@ -22,6 +22,15 @@ namespace HR.Modules.Tasks.Features.SicknessEvidenceOverdue;
 /// this handler checks for an existing open task against that id before creating another rather
 /// than relying on the publisher to guarantee exactly-once delivery.
 /// </para>
+///
+/// <para>
+/// OBT-REM-13: the read-before-create check above is a check-then-act race — two concurrent
+/// deliveries of the same event (e.g. overlapping Hangfire executions, or a retry racing the
+/// original attempt) can both observe "no open task" and both proceed to create one. Correctness
+/// against that race comes from <see cref="ITaskCreator.CreateAsync"/>'s idempotencyKey parameter,
+/// backed by a database unique constraint (see TaskItemConfiguration) — not from the read check,
+/// which remains purely an optimisation to skip unnecessary work in the common case.
+/// </para>
 /// </summary>
 internal sealed class NotifyHrOfOverdueFitNoteHandler(
     ITaskCreator taskCreator,
@@ -52,6 +61,7 @@ internal sealed class NotifyHrOfOverdueFitNoteHandler(
             assignedEmployeeId: null,
             assignedUserId:     null,
             sourceEntityId:     e.EvidenceRequestId,
-            cancellationToken);
+            cancellationToken,
+            idempotencyKey:     $"SicknessEvidenceOverdue:{e.EvidenceRequestId}");
     }
 }

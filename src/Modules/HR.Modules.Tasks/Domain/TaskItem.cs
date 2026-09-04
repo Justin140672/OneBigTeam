@@ -20,6 +20,15 @@ internal sealed class TaskItem
     public Guid? AssignedEmployeeId { get; private set; }
     public Guid? AssignedUserId { get; private set; }
     public Guid? SourceEntityId { get; private set; }
+
+    // OBT-REM-13: a deterministic, workflow-owned key (e.g. "SicknessEvidenceOverdue:{requestId}")
+    // that makes creating a workflow-triggered task idempotent under retries and concurrent event
+    // delivery. Null for tasks created outside a workflow that needs this (most tasks — manual,
+    // interactive-endpoint-created tasks have no meaningful replay to guard against). Uniqueness is
+    // enforced per company by a partial unique index (see TaskItemConfiguration) rather than by the
+    // pre-existing read-before-create check alone, which is a check-then-act race under concurrency.
+    public string? IdempotencyKey { get; private set; }
+
     public Guid CreatedBy { get; private set; }
     public Guid? CompletedBy { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
@@ -39,7 +48,8 @@ internal sealed class TaskItem
         Guid? assignedEmployeeId,
         Guid? assignedUserId,
         DateTimeOffset now,
-        Guid? sourceEntityId = null)
+        Guid? sourceEntityId = null,
+        string? idempotencyKey = null)
     {
         return new TaskItem
         {
@@ -55,6 +65,7 @@ internal sealed class TaskItem
             AssignedEmployeeId = assignedEmployeeId,
             AssignedUserId = assignedUserId,
             SourceEntityId = sourceEntityId,
+            IdempotencyKey = idempotencyKey,
             Status = TaskItemStatus.Open,
             CreatedAt = now,
             UpdatedAt = now

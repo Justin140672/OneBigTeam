@@ -19,7 +19,8 @@ internal sealed class FakeTaskCreator : ITaskCreator
         TaskPriority priority, TaskSource source, TaskActionType actionType,
         DateOnly? dueDate, Guid? assignedEmployeeId, Guid? assignedUserId,
         Guid? sourceEntityId, CancellationToken cancellationToken,
-        bool notifyAssignee = true)
+        bool notifyAssignee = true,
+        string? idempotencyKey = null)
     {
         Created.Add(new CreatedTask(
             companyId, createdBy, title, description,
