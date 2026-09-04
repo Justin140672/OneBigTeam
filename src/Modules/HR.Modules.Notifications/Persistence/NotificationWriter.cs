@@ -73,9 +73,13 @@ internal sealed class NotificationWriter(
         var created = await TrySaveIdempotentlyAsync(employeeId, sourceEntityId, type, cancellationToken);
         if (!created)
         {
-            // OBT-REM-03: a concurrent caller already created the notification for this
-            // (employee, source entity, type) idempotency key. That winner publishes the audit
-            // event and enqueues the email — the loser must do neither. Treat as success.
+            // OBT-REM-03 / OBT-REM-12: a concurrent or retried caller already created the
+            // notification for this (employee, source entity, type) idempotency key. The original
+            // winner is normally the one that publishes the audit event and enqueues the email — but
+            // if that winner crashed after its SaveChangesAsync committed and before it finished
+            // those two steps, neither would ever happen. Rather than silently no-op (the pre-REM-12
+            // behaviour), repair any missing downstream work for the existing row before returning.
+            await RepairExistingNotificationAsync(employeeId, sourceEntityId, type, cancellationToken);
             return Result.Success();
         }
 
@@ -135,8 +139,11 @@ internal sealed class NotificationWriter(
         var created = await TrySaveIdempotentlyAsync(employeeId, sourceEntityId, type, cancellationToken);
         if (!created)
         {
-            // OBT-REM-03: idempotent no-op — a concurrent caller won the race on the
-            // (employee, source entity, type) unique key. Do not double-audit or double-enqueue.
+            // OBT-REM-03 / OBT-REM-12: a concurrent or retried caller won the race on the
+            // (employee, source entity, type) unique key — repair any missing downstream work for
+            // the existing row (see the WriteTemplatedAsync overload's identical comment) rather than
+            // silently no-op.
+            await RepairExistingNotificationAsync(employeeId, sourceEntityId, type, cancellationToken);
             return;
         }
 
@@ -180,6 +187,48 @@ internal sealed class NotificationWriter(
                 entry.State = EntityState.Detached;
 
             return false;
+        }
+    }
+
+    /// <summary>
+    /// OBT-REM-12: called when a write loses the (employee_id, source_entity_id, type) uniqueness
+    /// race — the notification (and, if channel-eligible, its EmailDelivery row) already exists from
+    /// an earlier attempt. That earlier attempt is normally the one responsible for publishing the
+    /// creation audit and enqueuing the delivery job, but if it crashed after its own commit and
+    /// before finishing those steps, this repairs the gap:
+    ///  - Re-publishes NotificationCreatedAuditEvent. Safe to call unconditionally: its EventId is
+    ///    deterministic (== NotificationId), and both the audit staging table and the committed
+    ///    audit table dedupe on that unique EventId — a duplicate publish is a guaranteed no-op.
+    ///  - Re-enqueues EmailDeliveryJob for a still-Pending delivery. Safe to call unconditionally:
+    ///    the job re-reads its own row, no-ops on Sent, and the xmin concurrency token on
+    ///    EmailDelivery (see EmailDeliveryConfiguration) prevents two concurrent executions from
+    ///    both sending.
+    /// Never re-creates a Notification or EmailDelivery row — both already exist by definition here.
+    /// </summary>
+    private async Task RepairExistingNotificationAsync(
+        Guid employeeId, Guid sourceEntityId, NotificationType type, CancellationToken cancellationToken)
+    {
+        var existing = await dbContext.Notifications
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                n => n.EmployeeId == employeeId && n.SourceEntityId == sourceEntityId && n.Type == type,
+                cancellationToken);
+
+        if (existing is null)
+            return; // Should not happen (the unique-violation implies a row exists) — nothing to repair.
+
+        var channel = NotificationChannelDefaults.GetChannel(type);
+        await auditPublisher.PublishAsync(new NotificationCreatedAuditEvent(
+            existing.CompanyId, existing.Id, existing.EmployeeId, existing.Type, channel, existing.CreatedAt),
+            cancellationToken);
+
+        var delivery = await dbContext.EmailDeliveries
+            .AsNoTracking()
+            .SingleOrDefaultAsync(d => d.NotificationId == existing.Id, cancellationToken);
+
+        if (delivery is not null && delivery.Status == EmailDeliveryStatus.Pending)
+        {
+            backgroundJobClient.Enqueue<EmailDeliveryJob>(job => job.SendAsync(existing.Id, existing.CompanyId, null));
         }
     }
 

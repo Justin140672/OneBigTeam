@@ -66,6 +66,18 @@ internal sealed class EmailDeliveryConfiguration : IEntityTypeConfiguration<Emai
         builder.HasIndex(e => e.IdempotencyKey).IsUnique();
         builder.HasIndex(e => new { e.CompanyId, e.Status });
 
+        // OBT-REM-12: PostgreSQL's system xmin column used as an optimistic concurrency token — no
+        // migration required (xmin always exists). Guards the "claim" step in EmailDeliveryJob
+        // against two concurrent executions of the same delivery (duplicate Hangfire enqueue from
+        // the reconciliation job racing a normal enqueue, or two reconciliation runs overlapping):
+        // whichever save loses the race gets a DbUpdateConcurrencyException and backs off as a no-op
+        // instead of both proceeding to send.
+        builder.Property<uint>("xmin")
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
         builder.HasOne<Notification>()
             .WithMany()
             .HasForeignKey(e => e.NotificationId)

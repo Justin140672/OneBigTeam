@@ -58,6 +58,11 @@ public static class NotificationsModule
         // NFR-07: scheduled read-notification retention sweep (dry-run by default).
         services.AddScoped<PurgeExpiredReadNotificationsJob>();
 
+        // OBT-REM-12: bounded reconciliation for lost downstream work (email enqueue / creation
+        // audit) after a partial failure in NotificationWriter.
+        services.AddScoped<ReconcilePendingEmailDeliveriesJob>();
+        services.AddScoped<ReconcileMissingNotificationAuditsJob>();
+
         return services;
     }
 
@@ -72,6 +77,18 @@ public static class NotificationsModule
             "notifications-retention-sweep",
             job => job.ExecuteAsync(CancellationToken.None),
             Cron.Daily(3));
+
+        // OBT-REM-12: hourly bounded reconciliation sweeps — frequent enough to recover promptly,
+        // cheap enough (grace period + per-company cap) to run every hour indefinitely.
+        jobManager.AddOrUpdate<ReconcilePendingEmailDeliveriesJob>(
+            "notifications-reconcile-pending-email-deliveries",
+            job => job.ExecuteAsync(CancellationToken.None),
+            Cron.Hourly());
+        jobManager.AddOrUpdate<ReconcileMissingNotificationAuditsJob>(
+            "notifications-reconcile-missing-creation-audits",
+            job => job.ExecuteAsync(CancellationToken.None),
+            Cron.Hourly());
+
         return app;
     }
 

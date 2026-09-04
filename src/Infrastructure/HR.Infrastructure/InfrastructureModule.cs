@@ -32,6 +32,7 @@ public static class InfrastructureModule
         services.AddSingleton<IInviteLinkBuilder, ConfiguredInviteLinkBuilder>();
         services.AddScoped<IAuditEventPublisher, DbAuditEventPublisher>();
         services.AddScoped<IAuditHistoryReader, AuditHistoryReader>();
+        services.AddScoped<IAuditEventExistenceReader, AuditEventExistenceReader>();
         services.AddScoped<IAuditDataExportSource, Persistence.AuditDataExportSource>();
         services.AddScoped<AuditPendingItemPromotionJob>();
         services.AddSingleton<IRecurringJobRegistrar, AuditJobRegistrar>();

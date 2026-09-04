@@ -161,7 +161,22 @@ internal sealed class EmailDeliveryJob(
         }
 
         delivery.RecordAttempt(clock.UtcNowOffset());
-        await db.SaveChangesAsync();
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // OBT-REM-12: another execution of this same delivery (duplicate Hangfire job — e.g. a
+            // normal enqueue racing ReconcilePendingEmailDeliveriesJob, or two reconciliation runs
+            // overlapping) already claimed/updated this row (xmin concurrency token — see
+            // EmailDeliveryConfiguration) since it was loaded above. Back off as a no-op rather than
+            // risk a duplicate send; whichever execution won the race proceeds to actually deliver.
+            logger.LogInformation(
+                "EmailDeliveryJob: concurrent claim detected for notification {NotificationId} — deferring to the other execution.",
+                notificationId);
+            return;
+        }
 
         try
         {

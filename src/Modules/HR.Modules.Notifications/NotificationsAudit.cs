@@ -20,6 +20,13 @@ internal sealed record NotificationCreatedAuditEvent(
     NotificationChannel Channel,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
+    // OBT-REM-12: deterministic EventId derived from the notification id — exactly one
+    // NotificationCreatedAuditEvent is ever meaningful per notification, so reusing NotificationId
+    // as the idempotency key means republishing this event (e.g. from
+    // ReconcileMissingNotificationAuditsJob, or the duplicate-request repair path in
+    // NotificationWriter) can never create a duplicate audit row: DbAuditEventPublisher /
+    // AuditPendingItemPromotionJob both dedupe on EventId via a unique index.
+    Guid IAuditEvent.EventId => NotificationId;
     string IAuditEvent.EventType => "notifications.created";
     string IAuditEvent.EntityType => "Notification";
     Guid IAuditEvent.EntityId => NotificationId;
