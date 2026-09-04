@@ -13,6 +13,11 @@ public class AppSessionTests
     // Matches the permission ID hard-coded in AppSession.CanManageEmployees.
     private static readonly Guid ManageEmployeesPermission = new("00000000-0000-0000-0001-000000000004");
 
+    // Matches the permission IDs hard-coded in AppSession.CanViewOnboarding / CanManageSupport
+    // (OBT-IAM-09).
+    private static readonly Guid OnboardingViewPermission = new("00000000-0000-0000-0001-000000000019");
+    private static readonly Guid SupportManagePermission = new("00000000-0000-0000-0001-000000000042");
+
     private static IHttpClientFactory BuildFactory(HttpMessageHandler handler)
     {
         var services = new ServiceCollection();
@@ -258,6 +263,161 @@ public class AppSessionTests
     public void DashboardUrl_Maps_Known_Keys(string dashboardKey, string? expected)
     {
         Assert.Equal(expected, AppSession.DashboardUrl(dashboardKey));
+    }
+
+    // ── OBT-IAM-09: CanViewOnboarding / CanManageSupport permission-derived flags ──────────────
+
+    private static RoutingHandler BuildHandlerWithPermissions(
+        Guid userId, Guid companyId, Guid employeeId, IReadOnlyList<Guid> permissionIds,
+        bool isHrAdministrator = false, GetCompanyOnboardingChecklistResponse? checklist = null)
+    {
+        var me = new MeResponse(userId, companyId, "alice@example.com", permissionIds.ToList(), [], true,
+            isHrAdministrator, false, false, true);
+        var company = new GetCompanyResponse(companyId, "Acme Corporation", true, DateTime.UtcNow, [],
+            new GetCompanyBrandingResponse("logo.png", "small-logo.png", null));
+        var settings = new GetCompanySettingsResponse(
+            companyId, "Europe/London", "en-GB",
+            "^postcode$", "^telephone$", "^mobile$", DateTime.UtcNow);
+        var hrSettings = new GetHrSettingsResponse(
+            companyId, 31, 7.5m, 1, 25m, 6, true, false, true, 7, 1,
+            "I confirm that I have read and understood this document.", 3,
+            NoticePeriodUnit.Months, 1, true,
+            EmployeeNumberMode.Automatic, "EMP-", 1, 4,
+            AssetNumberMode.Manual, null, 1, 1, DateTime.UtcNow, 9);
+        var employee = new MyEmployeeResponse(employeeId, "Alice", "Smith", "Engineer", null, null, "avatar.png", false);
+
+        var responses = new Dictionary<string, object>
+        {
+            ["api/me"] = me,
+            [$"api/companies/{companyId}"] = company,
+            [$"api/companies/{companyId}/settings"] = settings,
+            [$"api/companies/{companyId}/hr-settings"] = hrSettings,
+            [$"api/companies/{companyId}/employees/me"] = employee,
+        };
+
+        if (checklist is not null)
+            responses["api/company-onboarding/checklist"] = checklist;
+
+        return new RoutingHandler(responses);
+    }
+
+    [Fact]
+    public async Task CanViewOnboarding_Is_True_Only_When_Permission_Present()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var factory = BuildFactory(BuildHandlerWithPermissions(
+            userId, companyId, employeeId, [OnboardingViewPermission]));
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.True(session.CanViewOnboarding);
+        Assert.False(session.CanManageSupport);
+    }
+
+    [Fact]
+    public async Task CanViewOnboarding_Is_False_Without_The_Permission()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var factory = BuildFactory(BuildHandlerWithPermissions(
+            userId, companyId, employeeId, []));
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.False(session.CanViewOnboarding);
+    }
+
+    [Fact]
+    public async Task CanManageSupport_Is_True_Only_When_Permission_Present()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var factory = BuildFactory(BuildHandlerWithPermissions(
+            userId, companyId, employeeId, [SupportManagePermission]));
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.True(session.CanManageSupport);
+        Assert.False(session.CanViewOnboarding);
+    }
+
+    [Fact]
+    public async Task CanManageSupport_Is_False_Without_The_Permission()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var factory = BuildFactory(BuildHandlerWithPermissions(
+            userId, companyId, employeeId, []));
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.False(session.CanManageSupport);
+    }
+
+    // OBT-IAM-09: a Company-Administrator-only account (CanManageCompany=true) no longer holds
+    // onboarding:view, so ShowGettingStarted's fetch must be skipped and LandingUrl must NOT route
+    // to "/getting-started" for it — it falls through to the CanManageCompany branch instead. This
+    // pins the regression the ticket fixed: previously LandingUrl's guard was
+    // `IsHrAdministrator || CanManageCompany`, which incorrectly included this persona.
+    [Fact]
+    public async Task LandingUrl_Does_Not_Route_To_GettingStarted_For_CompanyAdministratorOnly()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        // CanManageCompany=true is baked into BuildHandlerWithPermissions' MeResponse
+        // (hard-coded `true` for the CanManageCompany positional argument); no onboarding:view
+        // permission granted, so the checklist fetch is skipped and ShowGettingStarted stays false
+        // even though a checklist response is supplied here (it must never be requested).
+        var checklist = new GetCompanyOnboardingChecklistResponse([], 0, IsHidden: false, IsDismissedEarly: false);
+        var handler = BuildHandlerWithPermissions(
+            userId, companyId, employeeId, [], isHrAdministrator: false, checklist: checklist);
+        var factory = BuildFactory(handler);
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.False(session.CanViewOnboarding);
+        Assert.True(session.CanManageCompany);
+        Assert.False(session.ShowGettingStarted);
+        Assert.Equal($"/companies/{companyId}/edit", session.LandingUrl);
+    }
+
+    // OBT-IAM-09: once the account also holds onboarding:view (e.g. Company Administrator + HR
+    // Administrator, or any future permission grant carrying it) the checklist is fetched and, if
+    // not hidden/dismissed, LandingUrl routes to "/getting-started".
+    [Fact]
+    public async Task LandingUrl_Routes_To_GettingStarted_When_CanViewOnboarding_And_Checklist_Not_Hidden()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var checklist = new GetCompanyOnboardingChecklistResponse([], 0, IsHidden: false, IsDismissedEarly: false);
+        var handler = BuildHandlerWithPermissions(
+            userId, companyId, employeeId, [OnboardingViewPermission], isHrAdministrator: false, checklist: checklist);
+        var factory = BuildFactory(handler);
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.True(session.CanViewOnboarding);
+        Assert.True(session.ShowGettingStarted);
+        Assert.Equal("/getting-started", session.LandingUrl);
     }
 
     // ── Fake handlers ────────────────────────────────────────────────────────────
