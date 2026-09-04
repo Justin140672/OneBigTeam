@@ -211,7 +211,7 @@ public class TaskReschedulerTests
 
         Assert.Equal(1, firstCount);
         Assert.Equal(0, secondCount);
-        Assert.Single(notificationWriter.Written.Where(n => n.Type == NotificationType.TaskDateChanged));
+        Assert.Single(notificationWriter.Written, n => n.Type == NotificationType.TaskDateChanged);
     }
 
     // Dedup: two changed tasks assigned to the same employee should only trigger one TaskDateChanged

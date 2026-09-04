@@ -6,7 +6,12 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// Page object for the location type create/edit page.
 /// Routes: /companies/{id}/location-types/new  and  /companies/{id}/location-types/{id}
 /// </summary>
+// CS9113 (baseUrl unread): kept for constructor-signature consistency with the other page objects
+// in this suite, all of which take (IPage page, string baseUrl) even where — as here — the page
+// has no direct-navigation helper yet.
+#pragma warning disable CS9113
 public sealed class LocationTypeEditPage(IPage page, string baseUrl)
+#pragma warning restore CS9113
 {
     public async Task FillNameAsync(string name)
     {

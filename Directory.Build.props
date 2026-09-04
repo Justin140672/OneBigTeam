@@ -29,7 +29,18 @@
       emitting it. Remaining hand-written source warnings (BL0005, CS8602, CS0414, ...) are a
       known pre-existing baseline tracked as tech-debt, outside the scope of NFR-09.
     -->
-    <NoWarn>$(NoWarn);CS8669</NoWarn>
+    <!--
+      BL0005: "component parameter should not be set outside of its component" fires as a false
+      positive for Syncfusion Blazor model/item classes (e.g. ItemModel, MenuItem, ColumnDirective
+      subclasses) that inherit ComponentBase internally for Syncfusion's own serialization needs but
+      are used throughout HR.Web as plain POCOs via object initializers in C# code, never rendered
+      as live components in a Razor tree. All ~118 occurrences in this codebase are this pattern
+      (Syncfusion menu/dropdown item models built with `new() { Id = ..., Text = ... }`). Suppressed
+      repo-wide; genuine component-encapsulation violations would instead show up in Razor markup
+      setting parameters on rendered <SomeComponent> instances, which this suppression does not mask
+      differently than before (the analyzer offers no way to scope by "was this new'd, not rendered").
+    -->
+    <NoWarn>$(NoWarn);CS8669;BL0005</NoWarn>
   </PropertyGroup>
 
   <!--

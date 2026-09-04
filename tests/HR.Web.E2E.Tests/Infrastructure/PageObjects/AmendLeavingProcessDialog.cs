@@ -40,7 +40,7 @@ public sealed class AmendLeavingProcessDialog(IPage page)
     /// Reads the current (pre-populated, or since-amended) Leaving Date value — used to assert
     /// the dialog opens pre-populated with the leaving process's existing value.
     /// </summary>
-    public Task<string?> GetLeavingDateTextAsync() => LeavingDateInput.InputValueAsync();
+    public async Task<string?> GetLeavingDateTextAsync() => await LeavingDateInput.InputValueAsync();
 
     public async Task FillLeavingDateAsync(string ddMMyyyy)
     {
@@ -55,7 +55,7 @@ public sealed class AmendLeavingProcessDialog(IPage page)
 
     private ILocator LastWorkingDayInput => Dialog.Locator(".e-date-wrapper input.e-input").Nth(1);
 
-    public Task<string?> GetLastWorkingDayTextAsync() => LastWorkingDayInput.InputValueAsync();
+    public async Task<string?> GetLastWorkingDayTextAsync() => await LastWorkingDayInput.InputValueAsync();
 
     public async Task FillLastWorkingDayAsync(string ddMMyyyy)
     {

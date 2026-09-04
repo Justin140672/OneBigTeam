@@ -147,7 +147,7 @@ internal sealed class ConfirmImportSessionHandler(
         {
             createdByRow[confirmed.RowNumber] = (confirmed.CreatedEmployeeId!.Value, confirmed.ManagerReference);
             createdRowResults.Add(new ConfirmImportSessionRowResult(
-                confirmed.RowNumber, confirmed.CreatedEmployeeId.Value, confirmed.EmployeeNumber));
+                confirmed.RowNumber, confirmed.CreatedEmployeeId.Value, confirmed.EmployeeNumber ?? string.Empty));
         }
 
         foreach (var row in stagingRows)

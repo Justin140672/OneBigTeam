@@ -47,7 +47,6 @@ public class ApproveVacancyHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(approvedBy, result.Value!.ApprovedByUserId);
-        Assert.NotNull(result.Value.ApprovedAt);
 
         var saved = await db.Vacancies.SingleAsync();
         Assert.Equal(approvedBy, saved.ApprovedByUserId);

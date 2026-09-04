@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace HR.SharedKernel;
 
 public class Result
@@ -42,6 +44,16 @@ public sealed class Result<T> : Result
     }
 
     public T? Value { get; }
+
+    /// <summary>
+    /// Shadows <see cref="Result.IsSuccess"/> purely to attach a nullability contract: callers that
+    /// check <c>IsSuccess</c> before reading <see cref="Value"/> (the standard pattern throughout
+    /// this codebase, e.g. in handler tests) no longer trigger CS8602 "possibly null reference" on
+    /// <c>Value</c> — the compiler now understands the invariant already enforced at runtime by the
+    /// base constructor (a successful Result always carries a non-null value via <see cref="Success"/>).
+    /// </summary>
+    [MemberNotNullWhen(true, nameof(Value))]
+    public new bool IsSuccess => base.IsSuccess;
 
     public static Result<T> Success(T value) => new(value, true, Error.None);
 

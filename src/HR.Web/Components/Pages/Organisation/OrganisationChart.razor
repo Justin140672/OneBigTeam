@@ -349,7 +349,7 @@
     {
         if (_diagram is null || employeeId is null) return;
 
-        var node = _diagram.Nodes.FirstOrDefault(n => n.ID == employeeId);
+        var node = _diagram.Nodes?.FirstOrDefault(n => n.ID == employeeId);
         if (node is null) return;
 
         _diagram.BringIntoCenter(new DiagramRect(

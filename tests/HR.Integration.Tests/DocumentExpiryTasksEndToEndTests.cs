@@ -94,7 +94,7 @@ public class DocumentExpiryTasksEndToEndTests
         var tasksResp = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/tasks");
         var tasks     = await tasksResp.Content.ReadFromJsonAsync<TaskListPayload>();
-        var task      = Assert.Single(tasks!.Items.Where(t => t.Source == "Document"));
+        var task      = Assert.Single(tasks!.Items, t => t.Source == "Document");
         Assert.Equal("Critical",  task.Priority);
         Assert.Contains("expired", task.Title, StringComparison.OrdinalIgnoreCase);
     }

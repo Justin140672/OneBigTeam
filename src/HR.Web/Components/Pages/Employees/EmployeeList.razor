@@ -535,6 +535,7 @@
     private void OnRecordClick(Syncfusion.Blazor.Grids.RecordClickEventArgs<EmployeeListItemModel> args)
     {
         if (args.Column?.Type == Syncfusion.Blazor.Grids.ColumnType.CheckBox) return;
+        if (args.RowData is null) return;
         Navigation.NavigateTo($"/companies/{CompanyId}/employees/{args.RowData.Id}");
     }
 

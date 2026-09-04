@@ -13,8 +13,7 @@ namespace HR.Integration.Tests.Infrastructure;
 
 public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("hr_integration")
         .WithUsername("postgres")
         .WithPassword("postgres")

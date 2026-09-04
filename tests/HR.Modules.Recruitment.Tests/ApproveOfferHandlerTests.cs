@@ -35,7 +35,6 @@ public class ApproveOfferHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(approvedBy, result.Value!.OfferApprovedByUserId);
-        Assert.NotNull(result.Value.OfferApprovedAt);
 
         var saved = await db.Applications.SingleAsync();
         Assert.Equal(approvedBy, saved.OfferApprovedByUserId);

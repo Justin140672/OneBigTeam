@@ -188,7 +188,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
         var employeeId = await CreateEmployeeAsync(client, companyId, profileId);
 
         var tasks      = await GetEmployeeTasksAsync(client, companyId, employeeId);
-        var uploadTask = Assert.Single(tasks.Where(t => t.Source == "Document"));
+        var uploadTask = Assert.Single(tasks, t => t.Source == "Document");
         Assert.Equal(employeeId, uploadTask.AssignedEmployeeId);
     }
 
@@ -205,7 +205,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
         var employeeId = await CreateEmployeeAsync(client, companyId, profileId);
 
         var tasks      = await GetEmployeeTasksAsync(client, companyId, employeeId);
-        var uploadTask = Assert.Single(tasks.Where(t => t.Source == "Document"));
+        var uploadTask = Assert.Single(tasks, t => t.Source == "Document");
         Assert.Equal("Upload", uploadTask.ActionType);
     }
 
@@ -222,7 +222,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
         var employeeId = await CreateEmployeeAsync(client, companyId, profileId);
 
         var tasks      = await GetEmployeeTasksAsync(client, companyId, employeeId);
-        var uploadTask = Assert.Single(tasks.Where(t => t.Source == "Document"));
+        var uploadTask = Assert.Single(tasks, t => t.Source == "Document");
         Assert.Equal(new DateOnly(2026, 7, 1).AddDays(30), uploadTask.DueDate);
     }
 
@@ -235,7 +235,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
         var employeeId = await CreateEmployeeAsync(client, companyId, positionProfileId: null);
 
         var tasks = await GetEmployeeTasksAsync(client, companyId, employeeId);
-        Assert.Empty(tasks.Where(t => t.Source == "Document"));
+        Assert.DoesNotContain(tasks, t => t.Source == "Document");
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────

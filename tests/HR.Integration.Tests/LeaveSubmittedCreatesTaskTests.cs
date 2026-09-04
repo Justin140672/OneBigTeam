@@ -44,7 +44,7 @@ public class LeaveSubmittedCreatesTaskTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var payload = await response.Content.ReadFromJsonAsync<TaskListPayload>();
-        var task    = Assert.Single(payload!.Items.Where(t => t.Source == "Leave"));
+        var task    = Assert.Single(payload!.Items, t => t.Source == "Leave");
         Assert.Contains(report.FirstName, task.Title);
         Assert.Equal("Medium",            task.Priority);
         Assert.Equal(manager.Id,          task.AssignedEmployeeId);

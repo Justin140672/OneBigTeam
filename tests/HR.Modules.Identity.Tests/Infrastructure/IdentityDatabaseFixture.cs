@@ -10,8 +10,7 @@ namespace HR.Modules.Identity.Tests.Infrastructure;
 /// </summary>
 public sealed class IdentityDatabaseFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("hr_identity_tests")
         .WithUsername("postgres")
         .WithPassword("postgres")

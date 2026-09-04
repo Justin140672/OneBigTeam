@@ -423,7 +423,7 @@ public class GenerateDueProbationReviewsJobTests
         var task = Assert.Single(taskCreator.Created);
         Assert.Equal(managerId, task.AssignedEmployeeId);
 
-        var notification = Assert.Single(notificationWriter.Written.Where(n => n.SourceEntityId == review.Id));
+        var notification = Assert.Single(notificationWriter.Written, n => n.SourceEntityId == review.Id);
         Assert.Equal(managerId, notification.EmployeeId);
     }
 
@@ -447,7 +447,7 @@ public class GenerateDueProbationReviewsJobTests
         var hrReview = await context.ProbationReviews.SingleAsync(r => r.ReviewType == ProbationReviewType.HrReview);
         var hrReviewTask = taskCreator.Created.Single(t => t.SourceEntityId == hrReview.Id);
         Assert.Null(hrReviewTask.AssignedEmployeeId);
-        Assert.Empty(notificationWriter.Written.Where(n => n.SourceEntityId == hrReview.Id));
+        Assert.DoesNotContain(notificationWriter.Written, n => n.SourceEntityId == hrReview.Id);
 
         // The ManagerCheckIn review for the same record is still created and notified normally.
         var managerCheckInReview = await context.ProbationReviews
