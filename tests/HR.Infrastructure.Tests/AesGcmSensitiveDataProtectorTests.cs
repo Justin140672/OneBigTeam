@@ -190,6 +190,18 @@ public class AesGcmSensitiveDataProtectorTests
         Assert.Throws<SensitiveDataProtectionException>(() => AesGcmSensitiveDataProtector.Create(options));
     }
 
+    [Fact]
+    public void Create_throws_and_never_fabricates_a_key_when_both_ActiveKeyId_and_Keys_are_empty()
+    {
+        // Ticket 9: Create must never silently generate/derive a replacement key when configuration
+        // is entirely absent — it must always throw so misconfiguration fails fast at startup rather
+        // than producing a protector backed by an unpredictable or ephemeral key.
+        var options = new SensitiveDataProtectionOptions { ActiveKeyId = string.Empty };
+
+        Assert.Throws<SensitiveDataProtectionException>(() => AesGcmSensitiveDataProtector.Create(options));
+        Assert.Empty(options.Keys);
+    }
+
     // 9. IsProtected
     [Fact]
     public void IsProtected_true_for_real_token()

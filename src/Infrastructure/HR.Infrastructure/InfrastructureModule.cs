@@ -79,6 +79,35 @@ public static class InfrastructureModule
         services.AddSingleton<ISensitiveDataProtector>(sp =>
             AesGcmSensitiveDataProtector.Create(
                 sp.GetRequiredService<IOptions<SensitiveDataProtectionOptions>>().Value));
+
+        // Ticket 9: a safe readiness signal that encryption is configured and the active key works.
+        // Tagged "ready" only (not "critical") — the hard production gate is
+        // ValidateSensitiveDataProtectionOrThrow, called from the API host on non-Development startup.
+        services.AddHealthChecks()
+            .AddCheck<SensitiveDataProtectionHealthCheck>(
+                "sensitive-data-encryption", tags: ["ready"]);
+    }
+
+    /// <summary>
+    /// Ticket 9 — operational safety. Fails fast (throws, crashing startup) when sensitive-data
+    /// encryption is absent or invalid. Call this from the application host during startup in every
+    /// environment where encrypted data is expected (production and staging). It resolves the
+    /// protector — which runs <c>AesGcmSensitiveDataProtector.Create</c> key validation and never
+    /// silently generates a replacement key — and proves the active key with a fixed non-sensitive
+    /// round-trip. Any failure is a deliberate hard stop: starting with broken or missing encryption
+    /// config risks writing plaintext or permanently losing access to encrypted customer data.
+    /// The thrown <see cref="SensitiveDataProtectionException"/> message never contains key material.
+    /// </summary>
+    public static void ValidateSensitiveDataProtectionOrThrow(this IServiceProvider services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        var protector = services.GetRequiredService<ISensitiveDataProtector>();
+        const string sentinel = "obt-sensitive-data-encryption-startup-selftest";
+        var token = protector.Protect(sentinel);
+        if (protector.Unprotect(token) != sentinel)
+            throw new SensitiveDataProtectionException(
+                "Sensitive-data encryption self-test failed during startup: encrypt/decrypt round-trip mismatch.");
     }
 
     private static void AddProfilePhotoStorageService(IServiceCollection services, IConfiguration configuration)

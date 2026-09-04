@@ -99,5 +99,19 @@ Do not process live Customer personal data until all applicable gates have recor
 - full customer deletion has a tested per-store procedure and accountable operator;
 - Customer data return can be completed using exports plus the assisted process;
 - equality/diversity collection remains disabled until its DPIA, field-level protection, access
-  restrictions and audit tests are approved; and
-- complaint, rights-request and breach channels are monitored by named people with cover arrangements.
+  restrictions and audit tests are approved;
+- complaint, rights-request and breach channels are monitored by named people with cover arrangements; and
+- sensitive-data encryption keys exist for the target environment (distinct per environment), are
+  held in the vault plus a secondary copy, Railway service variables are set, and `/health/ready`
+  detail reports the `sensitive-data-encryption` check as Healthy — see
+  `docs/runbooks/encryption-key-management.md`.
+
+## Encryption key management
+
+Sensitive and special-category fields (currently equality-monitoring answers) are encrypted at the
+application layer before persistence; the AES-256 keys live only in environment/secret configuration
+and never in the database, a backup or source control. The API host fails fast at startup in every
+non-Development environment if the key configuration is absent or invalid — it will not serve traffic
+in that state. The full procedure (initial production key creation, Railway secret configuration,
+staging configuration, backup implications, key recovery requirements, and the rotation procedure) is
+in `docs/runbooks/encryption-key-management.md`.

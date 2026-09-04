@@ -130,3 +130,37 @@ batches → switch reads → drop old column), each step independently deployabl
 round-trip, decrypt, tampered ciphertext (auth-tag failure), wrong key, key rotation/versioning
 (old key id still decrypts, active key id used for new writes), missing/invalid key configuration,
 stored value is not plaintext, `IsProtected` / `TryUnprotect` behaviour.
+
+## Operational safety (Ticket 9)
+
+The mechanism above is necessary but not sufficient — it must also be operationally hard to deploy
+with broken or missing encryption configuration. Full runbook:
+`docs/runbooks/encryption-key-management.md` (initial production key creation, Railway secret
+configuration, staging configuration, backup implications, key recovery requirements, rotation
+procedure). Summary of the controls added in Ticket 9:
+
+- **Fail fast at startup.** `InfrastructureModule.ValidateSensitiveDataProtectionOrThrow` is called
+  from `HR.Api`'s `Program.cs` in every non-Development environment, immediately after the host is
+  built and before the request pipeline is wired up. It resolves `ISensitiveDataProtector` (which
+  runs the `Create` validation above) and performs a fixed non-sensitive round-trip. Any failure
+  throws `SensitiveDataProtectionException` and crashes startup — the instance never serves traffic
+  with broken encryption. The exception message never contains key material. Development (and the
+  integration test host, which runs as Development) keeps the previous lazy-resolution behaviour so
+  environments without protected data are not forced to configure keys.
+- **Never a fabricated key.** `AesGcmSensitiveDataProtector.Create` has no code path that generates a
+  key — missing, empty, malformed or wrong-length key configuration always throws. This is exercised
+  directly by `AesGcmSensitiveDataProtectorTests` and indirectly by the startup fail-fast above.
+- **Health check.** `SensitiveDataProtectionHealthCheck` (`src/Infrastructure/HR.Infrastructure/Security/SensitiveDataProtectionHealthCheck.cs`)
+  is registered as the `sensitive-data-encryption` check, tag `ready`. It performs the same
+  non-sensitive round-trip and is visible in `/health/ready` detail (behind `X-Health-Token`) without
+  ever performing a real decrypt or disclosing key material. It is intentionally not tagged
+  `critical` — the hard gate is the startup check above, which prevents an unconfigured instance from
+  starting at all; the health check exists so an operator can see the state (e.g. mid-rotation, or a
+  stale deploy) without needing to reproduce a startup crash.
+- **Payload already carries a rotation identifier.** No format change was needed for Ticket 9: the
+  `OBTENC1:{keyId}:...` token already embeds both a format version and the key id (see *Encrypted
+  value format* above), which is what makes rotation a configuration change rather than a data
+  migration.
+- **Never logged.** `SensitiveDataProtectionException` messages, the health check description and the
+  startup fail-fast message are all fixed, curated strings — none of them include key ids, key bytes,
+  ciphertext or plaintext.

@@ -368,6 +368,21 @@ if (!migrationRunner.AllSucceeded)
 	return;
 }
 
+// Ticket 9 — operational safety for sensitive-data encryption. In every non-Development environment
+// (staging, production) encryption MUST be fully configured before this instance serves traffic:
+// special-category equality-monitoring data is stored as ciphertext and the keys — supplied only via
+// environment/secret config at Infrastructure:SensitiveDataProtection:Keys — are the only thing
+// standing between a database dump and readable data. A missing/invalid key set here is a deliberate
+// hard startup crash (far safer than starting up and later discovering encrypted data is unreadable,
+// or silently persisting plaintext). AesGcmSensitiveDataProtector.Create never generates a
+// replacement key, and the thrown exception never contains key material. Development (including the
+// integration test host) keeps the lazy behaviour so environments without protected data are not
+// forced to configure keys.
+if (!app.Environment.IsDevelopment())
+{
+	app.Services.ValidateSensitiveDataProtectionOrThrow();
+}
+
 if (app.Environment.IsDevelopment())
 {
 	// AllPersonas (seeded catalog + runtime-registered self-service signups), not the static
