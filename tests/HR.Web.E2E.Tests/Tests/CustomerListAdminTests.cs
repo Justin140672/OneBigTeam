@@ -49,8 +49,12 @@ public sealed class CustomerListAdminTests(EmployeePersonaFixture fixture) : Rol
         await list.GoToAsync();
         Assert.True(await list.HasCompanyAsync("Acme Corporation"));
 
-        // Debounced (300ms) SfTextBox search — see CustomerList.razor's OnSearchChanged.
-        await _page.Locator(".customer-search-box input").FillAsync($"no-such-tenant-{Guid.NewGuid():N}");
+        // Debounced (300ms) SfTextBox search — see CustomerList.razor's OnSearchChanged. SfTextBox's
+        // ValueChanged fires on the native change event (focus loss), not per keystroke, so a bare
+        // FillAsync never triggers it — Tab out to commit the value.
+        var searchInput = _page.Locator(".customer-search-box input");
+        await searchInput.FillAsync($"no-such-tenant-{Guid.NewGuid():N}");
+        await searchInput.PressAsync("Tab");
         await _page.WaitForTimeoutAsync(600);
         await _page.WaitForSelectorAsync(".e-grid .e-emptyrow, .e-grid .e-row, .dashboard-error", new() { Timeout = 15_000 });
 
@@ -64,20 +68,16 @@ public sealed class CustomerListAdminTests(EmployeePersonaFixture fixture) : Rol
     }
 
     [Fact]
-    public async Task NonAllowListedPersona_SeesErrorBanner_NotCustomerData()
+    public async Task NonAllowListedPersona_IsRejectedAtLogin_NotGivenCustomerAccess()
     {
         var login = new AdminLoginPage(_page, _fixture.AdminWebBaseUrl);
-        var list = new CustomerListPage(_page, _fixture.AdminWebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(NonAllowListedEmail);
+        var error = await login.SubmitExpectingNotAuthorisedAsync(NonAllowListedEmail);
 
-        await list.GoToAsync();
-
-        Assert.True(await list.IsErrorBannerVisibleAsync(),
-            "Expected a non-allow-listed persona to see the unauthorised error banner");
-        Assert.False(await list.HasCompanyAsync("Acme Corporation"),
-            "No tenant rows should render for a non-allow-listed persona");
+        Assert.Contains("not authorised", error, StringComparison.OrdinalIgnoreCase);
+        Assert.True(login.IsOnLoginPage(),
+            "A non-allow-listed account must be rejected on the login page, not handed a session");
     }
 
     [Fact]

@@ -97,6 +97,11 @@ public sealed class PositionProfileEditModel
     [Required(ErrorMessage = "Default leave policy is required.")]
     public Guid? DefaultLeavePolicyId { get; set; }
     public Guid? OnboardingTemplateId { get; set; }
+
+    // Optional roles every holder of this position inherits (the mandatory "Employee" role is
+    // implicit and never stored here). Edited on the "Inherited Roles" tab and persisted by the
+    // page's single Save alongside the profile fields — see PositionProfileEdit.SaveCoreAsync.
+    public List<Guid> InheritedRoleIds { get; set; } = [];
 }
 
 // ── CREATE ────────────────────────────────────────────────────────────────────

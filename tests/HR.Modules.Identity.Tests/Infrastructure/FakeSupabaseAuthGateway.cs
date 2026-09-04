@@ -104,6 +104,11 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         return Task.FromResult(MfaFactorsRemovedToReturn);
     }
 
+    public Dictionary<string, Guid> UserIdsByEmail { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken) =>
+        Task.FromResult(UserIdsByEmail.TryGetValue(email.Trim(), out var id) ? id : (Guid?)null);
+
     public Task<SupabaseSession> ExchangeCodeForSessionAsync(string code, CancellationToken cancellationToken)
     {
         if (ShouldThrowOnExchange)

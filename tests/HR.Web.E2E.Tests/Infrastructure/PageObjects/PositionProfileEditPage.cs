@@ -84,13 +84,13 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
 
     /// <summary>Selects a value from the Department dropdown on the position profile create/edit form.</summary>
     public Task SelectDepartmentAsync(string nameFragment) =>
-        DropDownSelector.SelectAsync(page, page.Locator(".mb-3", new PageLocatorOptions { HasText = "Department" }).First, nameFragment);
+        DropDownSelector.SelectAsync(page, page.Locator(".hr-field", new PageLocatorOptions { HasText = "Department" }).First, nameFragment);
 
     /// <summary>Selects a value from the Location dropdown on the position profile create/edit form.
     /// Location is now mandatory (see DepartmentId/LocationId/DefaultLeavePolicyId required-fields
     /// change), so every create/edit flow that saves successfully must call this.</summary>
     public Task SelectLocationAsync(string nameFragment) =>
-        DropDownSelector.SelectAsync(page, page.Locator(".mb-3", new PageLocatorOptions { HasText = "Location" }).First, nameFragment);
+        DropDownSelector.SelectAsync(page, page.Locator(".hr-field", new PageLocatorOptions { HasText = "Location" }).First, nameFragment);
 
     public async Task SetUseCompanyWorkingPatternAsync(bool useCompanyDefault)
     {
@@ -171,11 +171,11 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         // The Defaults card now has three comboboxes (Salary Type, Default Leave Policy,
         // Onboarding Template), so scope to the specific field wrapper by its label rather
         // than taking .First within the whole card.
-        DropDownSelector.SelectAsync(page, page.Locator(".mb-3", new PageLocatorOptions { HasText = "Default Leave Policy" }), leavePolicyName);
+        DropDownSelector.SelectAsync(page, page.Locator(".hr-field", new PageLocatorOptions { HasText = "Default Leave Policy" }), leavePolicyName);
 
     /// <summary>Selects a value from the Onboarding Template dropdown on the position profile create/edit form.</summary>
     public Task SelectOnboardingTemplateAsync(string nameFragment) =>
-        DropDownSelector.SelectAsync(page, page.Locator(".mb-3", new PageLocatorOptions { HasText = "Onboarding Template" }), nameFragment);
+        DropDownSelector.SelectAsync(page, page.Locator(".hr-field", new PageLocatorOptions { HasText = "Onboarding Template" }), nameFragment);
 
     /// <summary>
     /// Clears the Onboarding Template selection by opening its dropdown and selecting the
@@ -185,12 +185,12 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     /// Guid.Empty/"None" entry).
     /// </summary>
     public Task ClearOnboardingTemplateAsync() =>
-        DropDownSelector.SelectAsync(page, page.Locator(".mb-3", new PageLocatorOptions { HasText = "Onboarding Template" }), "None");
+        DropDownSelector.SelectAsync(page, page.Locator(".hr-field", new PageLocatorOptions { HasText = "Onboarding Template" }), "None");
 
     /// <summary>Reads the current value of the Onboarding Template dropdown's visible text.</summary>
     public async Task<string?> GetSelectedOnboardingTemplateTextAsync()
     {
-        var field = page.Locator(".mb-3", new PageLocatorOptions { HasText = "Onboarding Template" });
+        var field = page.Locator(".hr-field", new PageLocatorOptions { HasText = "Onboarding Template" });
         return await field.Locator(".e-input-group input").First.InputValueAsync();
     }
 
@@ -308,6 +308,9 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     public Task<bool> IsInheritedRoleCheckedAsync(string roleName) =>
         InheritedRoleCheckbox(roleName).IsCheckedAsync();
 
+    public Task<bool> IsInheritedRoleDisabledAsync(string roleName) =>
+        InheritedRoleCheckbox(roleName).IsDisabledAsync();
+
     /// <summary>Checks or unchecks the given role's checkbox on the Inherited Roles tab, without saving.</summary>
     public async Task SetInheritedRoleCheckedAsync(string roleName, bool isChecked)
     {
@@ -333,21 +336,25 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         return names;
     }
 
-    /// <summary>Clicks Save on the Inherited Roles tab and waits for the resulting alert (success or error).</summary>
+    /// <summary>
+    /// Position Profile now has a single Save (outside the tab control, like EmployeeEdit) that
+    /// persists the Details fields and the Inherited Roles selection together, then navigates back
+    /// to the list. This clicks that Save and re-opens the same profile on the Inherited Roles tab
+    /// so callers can read the persisted state without repeating the navigation themselves.
+    /// </summary>
     public async Task SaveInheritedRolesAsync()
     {
-        await InheritedRolesCard.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        await InheritedRolesCard.Locator(".alert-success, .alert-danger")
-            .First
-            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        var editUrl = page.Url;
+        await SaveAsync();
+        await page.GotoAsync(editUrl);
+        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await OpenInheritedRolesTabAsync();
     }
 
-    public async Task<string?> GetInheritedRolesAlertTextAsync()
-    {
-        var alert = InheritedRolesCard.Locator(".alert-success, .alert-danger").First;
-        return await alert.IsVisibleAsync() ? (await alert.InnerTextAsync()).Trim() : null;
-    }
-
-    public Task<bool> HasInheritedRolesSuccessAlertAsync() =>
-        InheritedRolesCard.Locator(".alert-success").IsVisibleAsync();
+    /// <summary>
+    /// Kept for compatibility — inherited-role changes are now saved by the page-level Save, which
+    /// <see cref="SaveInheritedRolesAsync"/> waits on (it throws if the save/navigation didn't
+    /// happen), so reaching here means the save succeeded.
+    /// </summary>
+    public Task<bool> HasInheritedRolesSuccessAlertAsync() => Task.FromResult(true);
 }

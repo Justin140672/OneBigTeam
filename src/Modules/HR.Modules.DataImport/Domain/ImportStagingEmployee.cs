@@ -23,6 +23,17 @@ internal sealed class ImportStagingEmployee
     public bool IsValid { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
+    // OBT-REM-06: durable per-row confirmation state. Once set, a retry of the confirm step skips
+    // this row instead of creating the employee a second time.
+    public Guid? CreatedEmployeeId { get; private set; }
+    public DateTimeOffset? ConfirmedAt { get; private set; }
+
+    public void MarkConfirmed(Guid createdEmployeeId, DateTimeOffset now)
+    {
+        CreatedEmployeeId = createdEmployeeId;
+        ConfirmedAt = now;
+    }
+
     public static ImportStagingEmployee Create(
         Guid id,
         Guid companyId,

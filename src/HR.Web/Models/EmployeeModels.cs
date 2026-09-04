@@ -167,7 +167,9 @@ public sealed class EmployeeProfileEditModel
         get => _postCode;
         set => _postCode = value.ToUpperInvariant();
     }
-    public string Country { get; set; } = string.Empty;
+    // Not user-editable (UK-only for now) — no Country input is rendered on the employee form.
+    // Defaults here for new employees; an existing non-empty value is preserved on load.
+    public string Country { get; set; } = "United Kingdom";
 
     // Populated from the company's settings after load; not bound to any input — used only as
     // the pattern source for the [DynamicRegex] attributes above.

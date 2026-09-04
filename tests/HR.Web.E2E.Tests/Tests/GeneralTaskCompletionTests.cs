@@ -117,6 +117,8 @@ public sealed class GeneralTaskCompletionTests(HrAdminPersonaFixture fixture) : 
 
         await taskView.CompleteGeneralTaskAsync();
 
-        Assert.Equal("Completed", await taskView.GetStatusAsync());
+        // Completing a task closes the dialog and refreshes the list — verify the change landed on
+        // the list row, not the (now-gone) dialog.
+        Assert.Equal("Completed", await taskView.GetListTaskStatusAsync(taskSurveyId));
     }
 }

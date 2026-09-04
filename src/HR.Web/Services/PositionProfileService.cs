@@ -274,8 +274,17 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             return (false, "Position profile not found.");
 
-        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-        return (false, body?.Error ?? "Failed to save inherited roles.");
+        try
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return (false, body?.Error ?? "Failed to save inherited roles.");
+        }
+        catch
+        {
+            // Non-JSON / empty error body (e.g. a bare 500) — don't let a deserialisation failure
+            // bubble out as an unhandled exception.
+            return (false, "Failed to save inherited roles.");
+        }
     }
 
     private sealed record ErrorEnvelope(string? Error);

@@ -1,4 +1,6 @@
 using FluentValidation;
+using HR.Modules.Tasks.Contracts;
+using HR.Modules.Tasks.Domain;
 
 namespace HR.Modules.Tasks.Features.GetEmployeeTasks;
 
@@ -11,6 +13,14 @@ internal sealed class GetEmployeeTasksValidator : AbstractValidator<GetEmployeeT
 
         RuleFor(r => r.EmployeeId)
             .NotEmpty();
+
+        RuleFor(r => r.Status)
+            .Must(TaskListFilterValidation.IsValidOptionalFilter<TaskItemStatus>)
+            .WithMessage(TaskListFilterValidation.AllowedValuesMessage<TaskItemStatus>("Status"));
+
+        RuleFor(r => r.Priority)
+            .Must(TaskListFilterValidation.IsValidOptionalFilter<TaskPriority>)
+            .WithMessage(TaskListFilterValidation.AllowedValuesMessage<TaskPriority>("Priority"));
 
         RuleFor(r => r.PageNumber)
             .GreaterThanOrEqualTo(1);

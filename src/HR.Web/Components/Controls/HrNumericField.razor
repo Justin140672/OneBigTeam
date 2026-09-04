@@ -47,17 +47,38 @@
     [Parameter] public bool ShowSpinButton { get; set; }
     [Parameter] public TValue? Min { get; set; }
     [Parameter] public TValue? Max { get; set; }
+    // double? (a real Nullable) so it is only forwarded when a call site actually sets it — and
+    // then converted to TValue below. Passing it straight through as a boxed Double threw
+    // InvalidCastException (Double -> Decimal / Int32) inside SfNumericTextBox<TValue> at render.
     [Parameter] public double? Step { get; set; }
     [Parameter] public string? Format { get; set; }
+
+    // TValue is unconstrained (some call sites use nullable TValue, e.g. int?), so "Min is not
+    // null" cannot tell "unset" from "default(TValue)" for a non-nullable numeric TValue — it is
+    // ALWAYS true, which used to force Min=0 / Max=0 onto every field that didn't set them.
+    // Max=0 then clamped the bound value to 0 (e.g. HrSettings' "Next employee number" -> 0 ->
+    // fails its [Range(1, ...)]). Track what the call site actually supplied instead.
+    private bool _minSet, _maxSet;
+
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        foreach (var p in parameters)
+        {
+            if (p.Name == nameof(Min)) _minSet = true;
+            else if (p.Name == nameof(Max)) _maxSet = true;
+        }
+        return base.SetParametersAsync(parameters);
+    }
 
     private Dictionary<string, object> Passthrough
     {
         get
         {
             var d = new Dictionary<string, object>();
-            if (Min is not null) d["Min"] = Min;
-            if (Max is not null) d["Max"] = Max;
-            if (Step is not null) d["Step"] = Step;
+            if (_minSet && Min is not null) d["Min"] = Min;
+            if (_maxSet && Max is not null) d["Max"] = Max;
+            if (Step is double step)
+                d["Step"] = (TValue)Convert.ChangeType(step, typeof(TValue), System.Globalization.CultureInfo.InvariantCulture);
             if (Format is not null) d["Format"] = Format;
             return d;
         }

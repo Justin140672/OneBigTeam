@@ -28,17 +28,33 @@ public sealed class SupabaseSessionAccessor(IHttpContextAccessor httpContextAcce
     {
         get
         {
-            if (_captured)
-                return _accessToken;
-
-            var fromCookie = httpContextAccessor.HttpContext?.Request.Cookies[CookieName];
-            if (fromCookie is not null)
+            // Re-read the live cookie whenever a real HttpContext exposes it — this runs during the
+            // SSR pass of EVERY page load, so a persona switch / re-login lands here with the NEW
+            // cookie and updates the cache. Caching once (as this did) meant the first user's token
+            // stuck inside the pooled IHttpClientFactory handler scope for its whole ~2-minute
+            // lifetime: a second login on the same server within that window kept authenticating as
+            // the first user ("switched to James, still shows Tom").
+            //
+            // Guarded: IHttpContextAccessor.HttpContext can hand back a stale/disposed reference
+            // once its request has completed (a documented Blazor Server footgun) — touching
+            // Request then throws. Fall back to the last captured value in that case; NEVER clear a
+            // good cached token off a bad context read.
+            try
             {
-                _accessToken = fromCookie;
-                _captured = true;
+                var cookie = httpContextAccessor.HttpContext?.Request.Cookies[CookieName];
+                if (cookie is not null)
+                {
+                    _accessToken = cookie;
+                    _captured = true;
+                    return _accessToken;
+                }
+            }
+            catch
+            {
+                // stale/disposed HttpContext — use the cached value below
             }
 
-            return _accessToken;
+            return _captured ? _accessToken : null;
         }
     }
 

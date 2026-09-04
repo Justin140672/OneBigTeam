@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
@@ -24,6 +25,7 @@ internal sealed class ProbationReviewsDueWorkloadActionProvider(
     IEmployeeDepartmentReader employeeDepartmentReader,
     IAuthorizationService authorizationService,
     HR.SharedKernel.ICurrentUser currentUser,
+    IOpenTaskBySourceEntityReader taskReader,
     IClock clock) : IWorkloadActionProvider
 {
     public string ActionCategory => "Probation Reviews Due";
@@ -33,7 +35,7 @@ internal sealed class ProbationReviewsDueWorkloadActionProvider(
         ClaimsPrincipal caller,
         CancellationToken cancellationToken)
         => await ProbationReviewWorkloadActions.GetAsync(
-            dbContext, directReportsReader, employeeDepartmentReader, authorizationService, currentUser, clock,
+            dbContext, directReportsReader, employeeDepartmentReader, authorizationService, currentUser, taskReader, clock,
             companyId, caller, ActionCategory, overdueOnly: false, cancellationToken);
 }
 
@@ -47,6 +49,7 @@ internal sealed class OverdueProbationReviewsWorkloadActionProvider(
     IEmployeeDepartmentReader employeeDepartmentReader,
     IAuthorizationService authorizationService,
     HR.SharedKernel.ICurrentUser currentUser,
+    IOpenTaskBySourceEntityReader taskReader,
     IClock clock) : IWorkloadActionProvider
 {
     public string ActionCategory => "Overdue Probation Reviews";
@@ -56,7 +59,7 @@ internal sealed class OverdueProbationReviewsWorkloadActionProvider(
         ClaimsPrincipal caller,
         CancellationToken cancellationToken)
         => await ProbationReviewWorkloadActions.GetAsync(
-            dbContext, directReportsReader, employeeDepartmentReader, authorizationService, currentUser, clock,
+            dbContext, directReportsReader, employeeDepartmentReader, authorizationService, currentUser, taskReader, clock,
             companyId, caller, ActionCategory, overdueOnly: true, cancellationToken);
 }
 
@@ -73,6 +76,7 @@ internal static class ProbationReviewWorkloadActions
         IEmployeeDepartmentReader employeeDepartmentReader,
         IAuthorizationService authorizationService,
         HR.SharedKernel.ICurrentUser currentUser,
+        IOpenTaskBySourceEntityReader taskReader,
         IClock clock,
         Guid companyId,
         ClaimsPrincipal caller,
@@ -145,10 +149,18 @@ internal static class ProbationReviewWorkloadActions
         var reviewEmployeeIds = reviews.Select(r => recordMap[r.ProbationRecordId]).Distinct();
         var departments = await employeeDepartmentReader.GetDepartmentsAsync(companyId, reviewEmployeeIds, cancellationToken);
 
+        // A pending probation review is actioned via its Task (TaskActionType.Review, keyed by the
+        // review id as SourceEntityId). Surface that task id so the dashboard row opens the task
+        // dialog in place rather than deep-linking to the employee page — falls back to the
+        // employee deep link only when no open task exists.
+        var taskIdsByReview = await taskReader.GetOpenTaskIdsAsync(
+            companyId, reviews.Select(r => r.Id), cancellationToken, TaskActionType.Review);
+
         return reviews.Select(r =>
         {
             var employeeId = recordMap[r.ProbationRecordId];
             departments.TryGetValue(employeeId, out var dept);
+            var taskId = taskIdsByReview.TryGetValue(r.Id, out var tid) ? tid : (Guid?)null;
 
             return new WorkloadAction(
                 EmployeeId: employeeId,
@@ -159,7 +171,8 @@ internal static class ProbationReviewWorkloadActions
                 DueDate: r.DueDate,
                 AssignedTo: null,
                 Status: overdueOnly ? "Overdue" : "Due",
-                DeepLinkUrl: $"/companies/{companyId}/employees/{employeeId}/view");
+                DeepLinkUrl: $"/companies/{companyId}/employees/{employeeId}/view",
+                TaskId: taskId);
         }).ToList();
     }
 }

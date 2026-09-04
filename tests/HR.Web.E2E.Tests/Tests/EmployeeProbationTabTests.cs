@@ -41,7 +41,8 @@ public sealed class EmployeeProbationTabTests(HrAdminPersonaFixture fixture) : R
         // combobox) can resolve on an earlier render pass than that, before the tab strip has
         // picked it up. Use an auto-retrying assertion rather than a single IsVisibleAsync()
         // snapshot, which has no built-in wait and can catch the page mid-render.
-        await Assertions.Expect(_page.GetByRole(AriaRole.Tab, new() { Name = "Probation" }))
+        await EmployeeEditPage.SelectOwningGroupAsync(_page, "Probation");
+        await Assertions.Expect(EmployeeEditPage.SectionTab(_page, "Probation"))
             .ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
@@ -107,7 +108,7 @@ public sealed class EmployeeProbationTabTests(HrAdminPersonaFixture fixture) : R
         await empEdit.GoToAsync(AcmeId, JamesOkafor);
 
         Assert.False(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Probation" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Probation"),
             "Expected no 'Probation' tab for an employee whose only probation record is Passed");
     }
 
@@ -123,7 +124,7 @@ public sealed class EmployeeProbationTabTests(HrAdminPersonaFixture fixture) : R
         await empEdit.GoToAsync(AcmeId, SarahChen);
 
         Assert.False(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Probation" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Probation"),
             "Expected no 'Probation' tab for an employee who never had a probation record");
     }
 }

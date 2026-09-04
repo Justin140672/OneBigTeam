@@ -101,6 +101,7 @@ public static class TasksModule
         var empSenDev1Id  = Guid.Parse("30000000-0000-0000-0000-000000000002"); // James Okafor
         var empDev1Id     = Guid.Parse("30000000-0000-0000-0000-000000000004"); // Tom Williams
         var empHrMgrId    = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett
+        var empSalesMgrId = Guid.Parse("30000000-0000-0000-0000-000000000008"); // David Park (HrAdministrator + Manager, manages Carlos Rivera)
         var empAe2Id      = Guid.Parse("30000000-0000-0000-0000-000000000010"); // Carlos Rivera
 
         // Probation review task — links to the active seeded probation review (50000000-...-000000000100)
@@ -117,6 +118,9 @@ public static class TasksModule
         var taskGenericSurveyId = Guid.Parse("a0000000-0000-0000-0000-000000000028");
         // Assigned to Laura — used by TaskReassignmentTests.
         var taskLauraGenericAgendaId = Guid.Parse("a0000000-0000-0000-0000-000000000029");
+        // Assigned to David Park — used by ProbationReviewTaskTests to verify the probation
+        // review panel is absent for a non-probation task (David is that class's persona).
+        var taskDavidGenericPipelineId = Guid.Parse("a0000000-0000-0000-0000-00000000002a");
 
         TaskItem Make(
             Guid id,
@@ -190,34 +194,46 @@ public static class TasksModule
                 "Prepare board meeting agenda",
                 "Draft the Q3 board meeting agenda including financial review and product roadmap.",
                 TaskPriority.High, TaskSource.Workflow,
-                new DateOnly(2026, 6, 25), empHrMgrId));
+                new DateOnly(2026, 6, 25), empHrMgrId),
+
+            // Generic (non-domain-specific) task assigned to David Park — ProbationReviewTaskTests
+            // opens it to assert TaskViewDialog shows the generic CompleteTaskPanel, not a
+            // probation review panel.
+            Make(taskDavidGenericPipelineId,
+                "Review Q3 sales pipeline",
+                "Summarise pipeline health and forecast for the quarterly leadership review.",
+                TaskPriority.Medium, TaskSource.Workflow,
+                new DateOnly(2026, 6, 28), empSalesMgrId));
 
         // Probation review task — linked to the active seeded review in ProbationModule seed.
-        // Assigned to Sarah (dev user) so it appears in her task list during E2E tests.
+        // Assigned to David Park (Carlos Rivera's actual line manager and an HrAdministrator):
+        // the single-resource probation review read (GET /probation-reviews/{id}) enforces
+        // reporting-chain / HR scope, so the assignee must genuinely be able to view the review.
         db.TaskItems.Add(TaskItem.Create(
             taskProbationReviewId, companyId, empCtoId,
             "Complete probation review — Carlos Rivera",
             "Probation manager check-in due 7 May 2026.",
             TaskPriority.High, TaskSource.Probation, TaskActionType.Review,
             new DateOnly(2026, 5, 7),
-            assignedEmployeeId: empCtoId,
-            assignedUserId: devUserId,
+            assignedEmployeeId: empSalesMgrId,
+            assignedUserId: empSalesMgrId,
             now,
             sourceEntityId: Guid.Parse("50000000-0000-0000-0000-000000000100")));
 
         // Second, independent probation review task — linked to the second active seeded
         // review in ProbationModule seed (Sophie Laurent). Kept separate from the Carlos
         // Rivera task above so ProbationReviewFlowTests (which completes this review) does not
-        // mutate the review that ProbationReviewTaskTests relies on staying open.
-        // Assigned to Sarah (dev user) so it appears in her task list during E2E tests.
+        // mutate the review that ProbationReviewTaskTests relies on staying open. Assigned to
+        // David Park (HrAdministrator) so the reporting-chain-scoped review read succeeds —
+        // Sophie is a department head with no line manager of her own.
         db.TaskItems.Add(TaskItem.Create(
             Guid.Parse("a0000000-0000-0000-0000-000000000026"), companyId, empCtoId,
             "Complete probation review — Sophie Laurent",
             "Probation manager check-in due 7 May 2026.",
             TaskPriority.High, TaskSource.Probation, TaskActionType.Review,
             new DateOnly(2026, 5, 7),
-            assignedEmployeeId: empCtoId,
-            assignedUserId: devUserId,
+            assignedEmployeeId: empSalesMgrId,
+            assignedUserId: empSalesMgrId,
             now,
             sourceEntityId: Guid.Parse("50000000-0000-0000-0000-000000000101")));
 

@@ -9,6 +9,7 @@ public sealed record MeResponse(
     Guid CompanyId,
     string? Email,
     List<Guid> PermissionIds,
+    List<Guid> RoleIds,
     bool CanManageCompany,
     bool IsHrAdministrator,
     bool IsManager,

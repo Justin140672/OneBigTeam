@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
@@ -20,6 +21,7 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
     IDirectReportsReader directReportsReader,
     IEmployeeDepartmentReader employeeDepartmentReader,
     IAuthorizationService authorizationService,
+    IOpenTaskBySourceEntityReader taskReader,
     HR.SharedKernel.ICurrentUser currentUser) : IWorkloadActionProvider
 {
     public string ActionCategory => "Pending Leave Approvals";
@@ -68,6 +70,13 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
         var departments = await employeeDepartmentReader.GetDepartmentsAsync(
             companyId, pending.Select(p => p.EmployeeId).Distinct(), cancellationToken);
 
+        // A pending leave request is actioned via its approval Task (TaskActionType.Approve, keyed
+        // by the leave request id as SourceEntityId — see LeaveRequestedHandler). Surface that task
+        // id so a dashboard/attention-queue row opens the Task view dialog in place rather than
+        // deep-linking to the employee page; falls back to the deep link when no open task exists.
+        var taskIdsByRequest = await taskReader.GetOpenTaskIdsAsync(
+            companyId, pending.Select(p => p.Id), cancellationToken, TaskActionType.Approve);
+
         // No dedicated leave-approval screen exists yet in HR.Web, so the deep link routes to the
         // employee's profile page, which is where a Manager/HR user actions leave requests today —
         // documented interpretation, see OBT-721 ticket note on providers without a clean existing
@@ -77,6 +86,7 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
         return pending.Select(p =>
         {
             departments.TryGetValue(p.EmployeeId, out var dept);
+            var taskId = taskIdsByRequest.TryGetValue(p.Id, out var tid) ? tid : (Guid?)null;
 
             return new WorkloadAction(
                 EmployeeId: p.EmployeeId,
@@ -87,7 +97,8 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
                 DueDate: p.StartDate,
                 AssignedTo: null,
                 Status: "Pending",
-                DeepLinkUrl: $"/companies/{companyId}/employees/{p.EmployeeId}/view");
+                DeepLinkUrl: $"/companies/{companyId}/employees/{p.EmployeeId}/view",
+                TaskId: taskId);
         }).ToList();
     }
 }

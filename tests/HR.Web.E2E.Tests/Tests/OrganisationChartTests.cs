@@ -29,14 +29,11 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // "Organisation Chart" lives inside the "People" submenu (MainLayout.razor). Confirmed by
-        // actually running this: ".app-nav-menu"'s DOM content is only the five top-level labels
-        // ("DashboardPeopleAssetsRecruitmentLeave") until "People" is clicked — Syncfusion's
-        // SfMenu doesn't just CSS-hide the submenu, it isn't rendered at all until expanded, and
-        // (per Syncfusion's usual popup-based submenu rendering) it may render as a portal
-        // elsewhere in the DOM rather than nested inside ".app-nav-menu" — so search the whole
-        // page for the resulting text instead of assuming it stays inside that container.
-        await _page.Locator(".app-nav-menu").GetByText("People", new() { Exact = true }).ClickAsync();
+        // "Organisation Chart" lives inside the "People and users" submenu group (MainLayout.razor
+        // / AdminNavigation.Sections). Syncfusion's SfMenu doesn't render a group's children at all
+        // until it is expanded, and then as a popup (role="menuitem" nodes) that may be portaled
+        // outside ".app-nav-menu" — so click the group, then search the whole page for the child.
+        await _page.Locator(".app-nav-menu").GetByText("People and users", new() { Exact = true }).ClickAsync();
 
         var orgChartLink = _page.GetByText("Organisation Chart", new() { Exact = true });
         await orgChartLink.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });

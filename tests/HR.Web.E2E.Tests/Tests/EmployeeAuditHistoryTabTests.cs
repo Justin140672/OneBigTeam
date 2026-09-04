@@ -34,7 +34,8 @@ public sealed class EmployeeAuditHistoryTabTests(HrAdminPersonaFixture fixture) 
         // Auto-retrying assertion rather than a single IsVisibleAsync() snapshot — the Audit tab
         // item can render after GoToAsync's own wait condition (the Details tab's combobox) has
         // already resolved on an earlier render pass, same race class as Probation/Notes/Assets.
-        await Assertions.Expect(_page.GetByRole(AriaRole.Tab, new() { Name = "Audit" }))
+        await EmployeeEditPage.SelectOwningGroupAsync(_page, "Audit");
+        await Assertions.Expect(EmployeeEditPage.SectionTab(_page, "Audit"))
             .ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
@@ -71,8 +72,11 @@ public sealed class EmployeeAuditHistoryTabTests(HrAdminPersonaFixture fixture) 
         Assert.Contains("Compensation record created", dialogText);
         Assert.Contains("Salary Type", dialogText);
         Assert.Contains("Annual", dialogText);
-        Assert.Contains("39500", dialogText);
         Assert.Contains("GBP", dialogText);
+        // AUD-03: the salary *amount* is deliberately never written to the audit trail (only the
+        // structured, non-sensitive fields EffectiveFrom / SalaryType / Currency — see
+        // CompensationRecordCreatedAuditEvent.After), so "39500" must NOT appear here.
+        Assert.DoesNotContain("39500", dialogText);
         // Before values are unset for a Created event, so they must render as the "—" placeholder.
         Assert.Contains("—", dialogText);
 

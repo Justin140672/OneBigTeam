@@ -50,7 +50,33 @@ internal sealed class ResetPlatformAdministratorMfaHandler(
 
         var now = clock.UtcNow;
 
-        if (administrator.SupabaseAuthUserId is not { } supabaseUserId)
+        // The local row is only linked to a Supabase Auth user id when the administrator has
+        // authenticated at least once (see GetPlatformAdminMe) — an admin created through the Admin
+        // Portal has none yet. Resolve it by email from the identity provider and back-link it so
+        // later operations don't have to.
+        var supabaseUserId = administrator.SupabaseAuthUserId;
+        if (supabaseUserId is null)
+        {
+            try
+            {
+                supabaseUserId = await supabaseAuthGateway.GetUserIdByEmailAsync(administrator.Email, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Resolving the identity-provider account for platform administrator {AdministratorId} failed.",
+                    administrator.Id);
+                supabaseUserId = null;
+            }
+
+            if (supabaseUserId is { } resolvedId)
+            {
+                administrator.LinkSupabaseAuthUserId(resolvedId);
+                await db.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        if (supabaseUserId is not { } targetSupabaseUserId)
         {
             await auditEventPublisher.PublishAsync(
                 new PlatformAdministratorMfaResetAuditEvent(
@@ -66,7 +92,7 @@ internal sealed class ResetPlatformAdministratorMfaHandler(
         int factorsRemoved;
         try
         {
-            factorsRemoved = await supabaseAuthGateway.RemoveAllMfaFactorsAsync(supabaseUserId, cancellationToken);
+            factorsRemoved = await supabaseAuthGateway.RemoveAllMfaFactorsAsync(targetSupabaseUserId, cancellationToken);
         }
         catch (Exception ex)
         {

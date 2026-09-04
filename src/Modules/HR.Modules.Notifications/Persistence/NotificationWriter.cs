@@ -70,7 +70,14 @@ internal sealed class NotificationWriter(
             dbContext.EmailDeliveries.Add(emailDelivery);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var created = await TrySaveIdempotentlyAsync(employeeId, sourceEntityId, type, cancellationToken);
+        if (!created)
+        {
+            // OBT-REM-03: a concurrent caller already created the notification for this
+            // (employee, source entity, type) idempotency key. That winner publishes the audit
+            // event and enqueues the email — the loser must do neither. Treat as success.
+            return Result.Success();
+        }
 
         // NOT-05: creation audit — actor is the system, since this is shared infrastructure with
         // no reliable human actor at this call site (see NotificationsSystemActor doc comment).
@@ -125,7 +132,13 @@ internal sealed class NotificationWriter(
             dbContext.EmailDeliveries.Add(emailDelivery);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var created = await TrySaveIdempotentlyAsync(employeeId, sourceEntityId, type, cancellationToken);
+        if (!created)
+        {
+            // OBT-REM-03: idempotent no-op — a concurrent caller won the race on the
+            // (employee, source entity, type) unique key. Do not double-audit or double-enqueue.
+            return;
+        }
 
         // NOT-05: creation audit — actor is the system, since this is shared infrastructure with
         // no reliable human actor at this call site (see NotificationsSystemActor doc comment).
@@ -135,6 +148,38 @@ internal sealed class NotificationWriter(
         if (emailDelivery is not null)
         {
             backgroundJobClient.Enqueue<EmailDeliveryJob>(job => job.SendAsync(id, null));
+        }
+    }
+
+    /// <summary>
+    /// Persists the pending <see cref="Notification"/> (and optional <see cref="EmailDelivery"/>)
+    /// added to the change tracker by the caller. Returns <c>true</c> when this call inserted the
+    /// row, <c>false</c> when a concurrent caller had already inserted a notification for the same
+    /// <c>(employee_id, source_entity_id, type)</c> idempotency key (PostgreSQL 23505 on
+    /// <c>IX_notifications_employee_id_source_entity_id_type</c>). Any other database error
+    /// propagates unchanged.
+    /// </summary>
+    private async Task<bool> TrySaveIdempotentlyAsync(
+        Guid employeeId, Guid sourceEntityId, NotificationType type, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException exception) when (
+            PostgresUniqueViolation.Is(exception, "IX_notifications_employee_id_source_entity_id_type")
+            || PostgresUniqueViolation.Is(exception, "IX_email_deliveries_notification_id")
+            || PostgresUniqueViolation.Is(exception, "IX_email_deliveries_idempotency_key"))
+        {
+            // Detach the entities this losing caller tried (and failed) to insert so the shared
+            // scoped DbContext is safe to reuse.
+            foreach (var entry in dbContext.ChangeTracker.Entries<Notification>().ToList())
+                entry.State = EntityState.Detached;
+            foreach (var entry in dbContext.ChangeTracker.Entries<EmailDelivery>().ToList())
+                entry.State = EntityState.Detached;
+
+            return false;
         }
     }
 

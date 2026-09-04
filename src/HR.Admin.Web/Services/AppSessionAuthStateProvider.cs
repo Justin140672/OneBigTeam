@@ -31,6 +31,10 @@ public sealed class AppSessionAuthStateProvider(
     private static readonly AuthenticationState Anonymous =
         new(new ClaimsPrincipal(new ClaimsIdentity()));
 
+    private static AuthenticationState Authenticated(string name) =>
+        new(new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.Name, name)], authenticationType: "hrapi")));
+
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
         // Bounded so a slow/unreachable API can't hang navigation on every page (including
@@ -42,16 +46,15 @@ public sealed class AppSessionAuthStateProvider(
             var http = httpClientFactory.CreateClient("hrapi");
             var response = await http.GetAsync("api/platform-admin/me", cts.Token);
 
+            // The Admin Portal is platform-admin-only, and Login.razor already rejects a
+            // valid-but-not-allow-listed sign-in on the login page (so a non-admin never gets a
+            // usable cookie). Anything short of a 200 here therefore means "not a usable Admin
+            // Portal session" — treat it as anonymous and let the router send them to /login.
             if (!response.IsSuccessStatusCode)
                 return Anonymous;
 
             var me = await response.Content.ReadFromJsonAsync<MeResponse>(cancellationToken: cts.Token);
-            if (me is null)
-                return Anonymous;
-
-            var identity = new ClaimsIdentity(
-                [new Claim(ClaimTypes.Name, me.Email ?? "platform-admin")], authenticationType: "hrapi");
-            return new AuthenticationState(new ClaimsPrincipal(identity));
+            return Authenticated(me?.Email ?? "platform-admin");
         }
         catch (Exception ex)
         {

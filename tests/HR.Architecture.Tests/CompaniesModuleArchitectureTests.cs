@@ -101,4 +101,60 @@ public class CompaniesModuleArchitectureTests
             violations.Length == 0,
             $"Column names must be snake_case. Violations: {string.Join(", ", violations)}");
     }
+
+    // ── OBT-REM-07: ProcessedStripeEvent entity ──────────────────────────
+
+    private static Type ProcessedStripeEventType => ModuleAssembly
+        .GetTypes()
+        .Single(t => t.Name == "ProcessedStripeEvent");
+
+    [Fact]
+    public void ProcessedStripeEvent_Entity_Is_Not_Public()
+        => Assert.False(ProcessedStripeEventType.IsPublic, "ProcessedStripeEvent must be internal.");
+
+    [Fact]
+    public void ProcessedStripeEvent_Maps_To_Expected_Table_And_Schema()
+    {
+        using var context = BuildContext();
+        var entityType = context.Model.FindEntityType(ProcessedStripeEventType)!;
+
+        Assert.Equal("processed_stripe_events", entityType.GetTableName());
+        Assert.Equal("companies", entityType.GetSchema());
+    }
+
+    [Fact]
+    public void ProcessedStripeEvent_Primary_Key_Is_Guid()
+    {
+        using var context = BuildContext();
+        var pk = context.Model.FindEntityType(ProcessedStripeEventType)!.FindPrimaryKey()!;
+
+        Assert.Single(pk.Properties);
+        Assert.Equal(typeof(Guid), pk.Properties[0].ClrType);
+    }
+
+    [Fact]
+    public void ProcessedStripeEvent_All_Columns_Are_snake_case()
+    {
+        using var context = BuildContext();
+        var entityType = context.Model.FindEntityType(ProcessedStripeEventType)!;
+
+        var violations = entityType
+            .GetProperties()
+            .Select(p => p.GetColumnName())
+            .Where(name => name.Any(char.IsUpper))
+            .ToArray();
+
+        Assert.True(violations.Length == 0, $"Violations: {string.Join(", ", violations)}");
+    }
+
+    [Fact]
+    public void ProcessedStripeEvent_Has_Unique_Index_On_StripeEventId()
+    {
+        using var context = BuildContext();
+        var entityType = context.Model.FindEntityType(ProcessedStripeEventType)!;
+
+        var unique = entityType.GetIndexes().Single(i => i.IsUnique);
+        Assert.Equal("ix_processed_stripe_events_stripe_event_id", unique.GetDatabaseName());
+        Assert.Equal("StripeEventId", Assert.Single(unique.Properties).Name);
+    }
 }

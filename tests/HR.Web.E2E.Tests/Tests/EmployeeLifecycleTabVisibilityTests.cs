@@ -91,13 +91,13 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
         await empEdit.GoToAsync(AcmeId, SarahChen);
 
         Assert.False(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Onboarding"),
             "Expected no 'Onboarding' tab for an employee who never had a plan");
         Assert.False(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Probation" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Probation"),
             "Expected no 'Probation' tab for an employee who never had a record");
         Assert.False(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
             "Expected no 'Offboarding' tab for an employee who never had a plan");
 
         // There is no manual entry point to start offboarding anywhere in the UI anymore —
@@ -124,10 +124,10 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
         // manager was set on the New Employee form, so probation never gets created; offboarding
         // hasn't started yet.
         Assert.True(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Onboarding"),
             "Expected the Onboarding tab to already be visible on a freshly created employee");
         Assert.False(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
             "Expected no Offboarding tab yet");
 
         // Drive the Start Leaving Process wizard — offboarding only ever starts as a side effect
@@ -137,10 +137,10 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
         await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
 
         Assert.True(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Onboarding"),
             "Expected the Onboarding tab to remain visible");
         Assert.True(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
             "Expected the Offboarding tab to now also be visible");
     }
 
@@ -164,7 +164,7 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
         // confirming the Start Leaving Process wizard.
         await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
 
-        Assert.True(await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
+        Assert.True(await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
             "Expected the Offboarding tab to be visible once started");
 
         // No manager and no assets, so StartOffboardingHandler generates exactly 5 unassigned
@@ -228,7 +228,7 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
         await empEdit.GoToAsync(AcmeId, employeeId);
 
         Assert.False(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
             "Expected the Offboarding tab to be hidden once the plan is Completed");
         Assert.False(
             await _page.GetByRole(AriaRole.Button, new() { Name = "Start Offboarding" }).IsVisibleAsync(),

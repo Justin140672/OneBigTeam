@@ -55,7 +55,7 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
 
         await gettingStarted.GoToAsync();
 
-        Assert.Equal(9, await gettingStarted.GetTaskCardCountAsync());
+        Assert.Equal(10, await gettingStarted.GetTaskCardCountAsync());
 
         // All seven of the currently-registered task names (Order 1-7) — see
         // CompleteCompanyDetailsTask, ConfigureHrSettingsTask, ReviewDefaultLeavePolicyTask,

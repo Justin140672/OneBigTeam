@@ -137,3 +137,21 @@ recruitment data. Flagged here as a known, reviewed exception.
 - `tests/HR.Web.E2E.Tests/Tests/AdministrativeRoleSeparationTests.cs` +
   `CompanyAdministratorAccessTests.cs` — per-role UI matrix, direct-URL access-denied,
   navigation visibility.
+
+## Legacy database reconciliation (IAM-08)
+
+The Company Administrator permission catalogue has been correct in the seed since migration
+`20260710120353_NarrowCompanyAdministratorPermissions`, but databases created before it (or
+drifted by a rolled-back/aborted migration, a restored snapshot or manual seeding) could retain
+obsolete `role_permissions` rows (`employee.*`, `leave.*`, `sickness.*`, `document.*`, `role.assign`)
+for the Company Administrator role — which is enough to make Employees appear in navigation for a
+"Company Administrator only" user even though `IdentityAuthorizationService` and every API policy
+are already correct. Migration `20260903114519_IAM08_ReconcileCompanyAdministratorPermissions`
+deletes every Company Administrator `role_permissions` row outside the allow-list
+(`company.read`, `company.edit`, `onboarding.view`, `onboarding.manage`, `subscription.manage`,
+`support.manage`) with a single set-based statement that is safe to re-run (idempotent). It never
+touches the `permissions` catalogue rows themselves (still used by other roles) or any user's
+direct role assignments / position roles / overrides — a user who genuinely still holds
+`HrAdministrator` (directly, via a position, or via an active Grant override) keeps HR access, and
+loses it on the next authenticated session once that role is removed (permissions are computed
+live, with no server-side cache).

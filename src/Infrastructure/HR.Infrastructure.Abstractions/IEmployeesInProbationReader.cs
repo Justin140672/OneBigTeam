@@ -7,9 +7,9 @@ namespace HR.Infrastructure.Abstractions;
 ///
 /// "Currently serving probation" means an <b>active probation record</b> — status Active,
 /// ReviewDue or Extended. It deliberately excludes NotStarted (probation start date still in the
-/// future), Passed / Failed / NotApplicable (terminal). This is distinct from
-/// <see cref="IProbationReviewComplianceReader"/> / upcoming-review readers, which answer "who has
-/// a review due soon" — a review being due is not the same as being in probation.
+/// future), Passed / Failed / NotApplicable (terminal). This is distinct from the upcoming-review
+/// readers, which answer "who has a review due soon" — a review being due is not the same as being
+/// in probation.
 /// </summary>
 public interface IEmployeesInProbationReader
 {

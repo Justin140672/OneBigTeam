@@ -26,7 +26,7 @@ public sealed class EmployeeOffboardingTab(IPage page)
     /// </summary>
     public async Task OpenAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).ClickAsync();
+        await EmployeeEditPage.NavigateToSectionAsync(page, "Offboarding");
 
         // Wait for the tab content to render — either the progress panel's progress bar (a plan
         // exists, the expected case) or the "No offboarding plan found for this employee" empty

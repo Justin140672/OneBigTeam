@@ -100,6 +100,16 @@ internal interface ISupabaseAuthGateway
     /// for diagnostics but never the API keys.
     /// </summary>
     Task<int> RemoveAllMfaFactorsAsync(Guid supabaseUserId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Resolves the identity provider's user id for <paramref name="email"/> via the GoTrue Admin
+    /// API (<c>GET /auth/v1/admin/users?filter=…</c>, server-only SECRET key), or null when no such
+    /// user exists. Used to reset MFA for a platform administrator whose local row was never linked
+    /// to a Supabase Auth user id (e.g. created through the Admin Portal, which does not provision
+    /// the IdP account). Throws <see cref="InvalidOperationException"/> if Supabase rejects the
+    /// lookup.
+    /// </summary>
+    Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken);
 }
 
 internal sealed record SupabaseSession(string AccessToken, string RefreshToken, Guid UserId, DateTimeOffset ExpiresAt);

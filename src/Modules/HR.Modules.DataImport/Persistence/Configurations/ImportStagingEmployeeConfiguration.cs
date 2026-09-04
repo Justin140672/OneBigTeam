@@ -67,6 +67,12 @@ internal sealed class ImportStagingEmployeeConfiguration : IEntityTypeConfigurat
             .HasColumnName("created_at")
             .IsRequired();
 
+        builder.Property(e => e.CreatedEmployeeId)
+            .HasColumnName("created_employee_id");
+
+        builder.Property(e => e.ConfirmedAt)
+            .HasColumnName("confirmed_at");
+
         builder.HasIndex(e => e.CompanyId);
         builder.HasIndex(e => e.ImportSessionId);
         builder.HasIndex(e => new { e.ImportSessionId, e.EmployeeNumber });

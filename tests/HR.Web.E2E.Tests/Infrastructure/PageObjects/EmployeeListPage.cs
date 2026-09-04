@@ -68,7 +68,7 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             await button.ClickAsync();
             try
             {
-                await page.WaitForURLAsync("**/employees/new", new() { Timeout = attempt < 5 ? 2_000 : 10_000 });
+                await page.WaitForURLAsync("**/employees/new**", new() { Timeout = attempt < 5 ? 2_000 : 10_000 });
                 return;
             }
             catch (TimeoutException) when (attempt < 5)
@@ -348,60 +348,84 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         page.Locator(".e-grid .e-row").Filter(new() { HasTextRegex = NameMatcher(nameFragment) }).First;
 
     /// <summary>
-    /// Returns the trimmed rendered text (icon label, e.g. "Active"/"Pending Invitation"/"No
-    /// User") of the "User Account" column's cell for the row matching <paramref name="nameFragment"/>.
-    /// The column is the last one in EmployeeList.razor's GridColumns, so its cell is the last
-    /// ".e-rowcell" in the row. Searches first via <see cref="SearchAsync"/> — same reasoning as
-    /// HasEmployeeAsync: the unfiltered page is capped at 100 rows, so a specific employee can
-    /// silently fall outside it on this shared, long-lived E2E database.
+    /// The "User Account" column cell (its <c>.user-account-cell</c> wrapper) for the row matching
+    /// <paramref name="nameFragment"/>. Targeted by its own marker class rather than by cell index
+    /// (<c>.e-rowcell:last</c>) — the grid also carries a hidden "Start Date" column after it, so a
+    /// positional lookup lands on the wrong (empty) cell.
+    /// </summary>
+    private ILocator AccountStatusLabel(string nameFragment) =>
+        Row(nameFragment).Locator("span.user-account-status-label").First;
+
+    /// <summary>
+    /// Returns the trimmed rendered status label (e.g. "Active" / "Invited" / "No account") of the
+    /// "User Account" column's cell for the row matching <paramref name="nameFragment"/>. Searches
+    /// first via <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync: the unfiltered
+    /// page is capped, so a specific employee can silently fall outside it on this shared,
+    /// long-lived E2E database.
     /// </summary>
     public async Task<string?> GetUserAccountStatusTextAsync(string nameFragment)
     {
         await SearchAsync(nameFragment);
-        // The cell can also contain a trailing "Invite User" action link (rendered only for
-        // "NoUser" rows — see EmployeeList.razor's User Account GridColumn Template). Reading the
-        // whole cell's InnerText would concatenate that link's text onto the status label (e.g.
-        // "No UserInvite User"). Read only the status label <span> so callers get just the status.
-        var label = Row(nameFragment).Locator(".e-rowcell").Last.Locator("span.user-account-status-label").First;
-        return (await label.InnerTextAsync())?.Trim();
+        return (await AccountStatusLabel(nameFragment).InnerTextAsync())?.Trim();
     }
 
     /// <summary>
-    /// Returns the CSS class of the &lt;i&gt; icon rendered in the "User Account" cell for the row
-    /// matching <paramref name="nameFragment"/> (e.g. "fa-solid fa-circle-check me-1" for Active) —
-    /// see EmployeeList.UserAccountStatusDisplay for the icon/status mapping this proves. Searches
-    /// first via <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
+    /// Returns the CSS class of the &lt;i&gt; icon rendered inside the "User Account" cell's status
+    /// label for the row matching <paramref name="nameFragment"/> (e.g. "fa-solid fa-circle-check
+    /// me-1" for Active) — see EmployeeList.AccountStateDisplay for the icon/status mapping this
+    /// proves. Searches first via <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
     /// </summary>
     public async Task<string?> GetUserAccountStatusIconClassAsync(string nameFragment)
     {
         await SearchAsync(nameFragment);
-        var icon = Row(nameFragment).Locator(".e-rowcell").Last.Locator("i").First;
+        var icon = AccountStatusLabel(nameFragment).Locator("i").First;
         return await icon.GetAttributeAsync("class");
     }
 
     /// <summary>
-    /// Returns true if the row-level "Invite User" link (rendered only when
-    /// UserAccountStatus == "NoUser" — see EmployeeList.razor's User Account GridColumn Template)
-    /// is visible for the row matching <paramref name="nameFragment"/>. Searches first via
-    /// <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
+    /// The per-row "User Account" actions dropdown button (⋮). Rendered only when the viewer can
+    /// manage user accounts (EmployeeList._canManageUserAccounts) and the row has at least one
+    /// applicable action — see EmployeeList.AccountMenuItems.
+    /// </summary>
+    private ILocator AccountActionsButton(string nameFragment) =>
+        Row(nameFragment).Locator(".user-account-actions-btn");
+
+    /// <summary>
+    /// Returns true if the row matching <paramref name="nameFragment"/> offers an "Invite" action
+    /// — the redesigned User Account column (commit a80960cc) moved the old inline "Invite User"
+    /// link into the ⋮ actions menu, where "Invite" appears only for "No account" rows (see
+    /// EmployeeList.AccountMenuItems). Opens the menu, checks, then dismisses it. Searches first
+    /// via <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
     /// </summary>
     public async Task<bool> HasInviteUserLinkAsync(string nameFragment)
     {
-        return await Row(nameFragment).GetByRole(AriaRole.Link, new() { Name = "Invite User" }).IsVisibleAsync();
+        await SearchAsync(nameFragment);
+        if (!await AccountActionsButton(nameFragment).First.IsVisibleAsync())
+            return false;
+
+        await AccountActionsButton(nameFragment).First.ClickAsync();
+        var inviteItem = page.Locator(".e-dropdown-popup li")
+            .Filter(new() { HasTextRegex = new Regex(@"^\s*Invite\s*$") });
+        var present = await inviteItem.First.IsVisibleAsync();
+        await page.Keyboard.PressAsync("Escape");
+        return present;
     }
 
     /// <summary>
-    /// Clicks the row-level "Invite User" link for the row matching <paramref name="nameFragment"/>
-    /// (only present on "No User" rows) and waits for the resulting InviteUserDialog to open.
+    /// Opens the row's ⋮ User Account actions menu and clicks its "Invite" item (present only on
+    /// "No account" rows), then waits for the resulting InviteUserDialog to open.
     /// EmployeeList.OnInviteUserClicked pre-populates PreselectedEmployeeId/Name/Email, so the
     /// dialog opens directly on its single Roles + Confirm screen — there is no employee-picker
-    /// step (InviteUserDialog.razor is no longer a multi-step wizard). Searches first via
-    /// <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
+    /// step. Searches first via <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
     /// </summary>
     public async Task ClickInviteUserLinkAsync(string nameFragment)
     {
         await SearchAsync(nameFragment);
-        await Row(nameFragment).GetByRole(AriaRole.Link, new() { Name = "Invite User" }).ClickAsync();
+        await AccountActionsButton(nameFragment).First.ClickAsync();
+        await page.Locator(".e-dropdown-popup li")
+            .Filter(new() { HasTextRegex = new Regex(@"^\s*Invite\s*$") })
+            .First
+            .ClickAsync();
         await InviteUserDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
 
@@ -443,140 +467,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         return (await dd.TextContentAsync())?.Trim();
     }
 
-    // ── Sorting ────────────────────────────────────────────────────────────────
-
-    private ILocator UserAccountHeaderCell =>
-        page.Locator(".e-headercell").Filter(new() { HasText = "User Account" });
-
-    /// <summary>
-    /// Clicks the "User Account" column header (standard EJ2 single-column sort click target —
-    /// same pattern as SharedDocumentSortByReviewDateTests' ClickReviewDateHeaderAsync) and
-    /// best-effort waits for the sort-indicator class. Row-order assertions in tests are the
-    /// actual source of truth regardless of whether this wait's indicator-class assumption holds.
-    /// </summary>
-    public async Task ClickUserAccountHeaderAsync(string expectedDirectionClass)
-    {
-        await UserAccountHeaderCell.Locator(".e-headercelldiv").First.ClickAsync();
-        try
-        {
-            await page.WaitForSelectorAsync(
-                $".e-headercell.{expectedDirectionClass}:has-text('User Account')",
-                new() { Timeout = 5_000 });
-        }
-        catch (TimeoutException)
-        {
-            await page.WaitForTimeoutAsync(500);
-        }
-    }
-
-    /// <summary>
-    /// Reads every visible ".e-row"'s "User Account" cell text (last ".e-rowcell") in DOM order —
-    /// used to prove the column is genuinely sortable (values move from ascending to descending
-    /// order relative to each other) without needing to know exactly which employees/statuses are
-    /// on the shared, long-lived E2E database at any given time.
-    /// </summary>
-    public async Task<IReadOnlyList<string>> GetVisibleUserAccountStatusesInOrderAsync()
-    {
-        var rows = page.Locator(".e-grid .e-row");
-        var count = await rows.CountAsync();
-        var result = new List<string>();
-        for (var i = 0; i < count; i++)
-        {
-            // Read only the status label <span> (see GetUserAccountStatusTextAsync above) —
-            // the cell's full InnerText would concatenate the "NoUser" row's trailing "Invite
-            // User" action-link text onto the label with no separator (e.g. "No UserInvite User"),
-            // breaking exact-match comparisons like the Excel-filter test's Assert.Equal.
-            var label = rows.Nth(i).Locator(".e-rowcell").Last.Locator("span.user-account-status-label").First;
-            // rows.CountAsync() above only proves the row *elements* exist, not that each row's
-            // own cell content (including this per-row status lookup) has finished rendering yet
-            // — Syncfusion/Blazor can populate later rows' cell content a tick or more after
-            // earlier ones, and a growing employee list (more rows overall, from the many more
-            // tests that now create fresh employees) makes a mid-list row like #10 more likely to
-            // still be catching up when this loop reaches it. A bounded wait per row avoids
-            // racing that instead of relying on InnerTextAsync's much shorter implicit wait.
-            await label.WaitForAsync(new() { Timeout = 15_000 });
-            result.Add((await label.InnerTextAsync()).Trim());
-        }
-        return result;
-    }
-
-    // ── Column (Excel-style) filter ───────────────────────────────────────────
-    //
-    // The global "Search by name, email or employee number" textbox is server-side and only
-    // matches FirstName/LastName/WorkEmail/EmployeeNumber (see ListEmployeesHandler) — it does not
-    // and cannot filter on User Account status. The mechanism every grid column (including this
-    // one) actually participates in is HrGrid's own per-column Excel-style filter
-    // (AllowFiltering="true" + GridFilterSettings { Type = FilterType.Excel } — see HrGrid.cs),
-    // triggered via the small filter icon Syncfusion renders in each header cell.
-
-    /// <summary>Opens the "User Account" column's Excel-style filter popup.</summary>
-    public async Task OpenUserAccountColumnFilterAsync()
-    {
-        await UserAccountHeaderCell.Locator(".e-filtermenudiv").ClickAsync();
-        await page.WaitForSelectorAsync(".e-excelfilter:visible, .e-flmenu:visible", new() { Timeout = 10_000 });
-    }
-
-    /// <summary>
-    /// Ticks the checkbox for <paramref name="valueLabel"/> (e.g. "No User") — and only that
-    /// value — in the (already open) Excel filter popup and applies it via the popup's own "OK"
-    /// button, then waits for the grid to settle on the filtered result. An unfiltered column's
-    /// popup opens with every value (and "Select All") already checked, since "all checked" is
-    /// what an unfiltered/show-everything state means — so a single click on
-    /// <paramref name="valueLabel"/> alone would *uncheck* it (filtering it out, leaving every
-    /// other value still selected) rather than isolating it. Unchecking "Select All" first clears
-    /// every value, then the search narrows the list so the one remaining click checks only
-    /// <paramref name="valueLabel"/> back on.
-    /// </summary>
-    public async Task ApplyUserAccountColumnFilterAsync(string valueLabel)
-    {
-        var selectAllCheckbox = page.Locator(".e-excelfilter:visible .e-ftrchk")
-            .Filter(new() { HasText = "Select All" })
-            .First
-            .Locator(".e-frame, .e-checkbox-wrapper")
-            .First;
-        if (await selectAllCheckbox.CountAsync() > 0)
-            await selectAllCheckbox.ClickAsync();
-
-        var searchInput = page.Locator(".e-excelfilter:visible .e-searchinput input");
-        if (await searchInput.CountAsync() > 0)
-            await searchInput.FillAsync(valueLabel);
-
-        await page.Locator(".e-excelfilter:visible .e-ftrchk")
-            .Filter(new() { HasText = valueLabel })
-            .First
-            .ClickAsync();
-
-        await page.Locator(".e-excelfilter:visible button")
-            .Filter(new() { HasText = "OK" })
-            .First
-            .ClickAsync();
-
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
-        await WaitForRowCountToStabilizeAsync();
-    }
-
-    /// <summary>
-    /// RowsRenderedSelector only proves *some* row/empty-row element exists — it's satisfied by
-    /// stale pre-filter rows that haven't been replaced yet. After a filter/sort change, the grid
-    /// briefly transitions through the old row count before Blazor re-renders with the narrowed
-    /// set, so callers that immediately read row-by-row content (e.g.
-    /// GetVisibleUserAccountStatusesInOrderAsync, which snapshots CountAsync() once and then reads
-    /// each row) can index past the end of the row list mid-transition. Wait for the row count to
-    /// stop changing before proceeding.
-    /// </summary>
-    private async Task WaitForRowCountToStabilizeAsync()
-    {
-        var rows = page.Locator(".e-grid .e-row");
-        var previous = -1;
-        for (var i = 0; i < 20; i++)
-        {
-            var current = await rows.CountAsync();
-            if (current == previous)
-                return;
-            previous = current;
-            await page.WaitForTimeoutAsync(150);
-        }
-    }
 
     // ── Search box clear / result summary ─────────────────────────────────────
 
@@ -725,47 +615,4 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
 
     /// <summary>Unchecks a previously-checked row's checkbox (same click target as CheckEmployeeRowAsync).</summary>
     public async Task UncheckEmployeeRowAsync(string nameFragment) => await CheckEmployeeRowAsync(nameFragment);
-
-    /// <summary>Clears any active filter on the "User Account" column via the header's clear-filter icon.</summary>
-    public async Task ClearUserAccountColumnFilterAsync()
-    {
-        await OpenUserAccountColumnFilterAsync();
-
-        var okButton = page.Locator(".e-excelfilter:visible button").Filter(new() { HasText = "OK" }).First;
-
-        // Reopening the popup after a narrowed filter (e.g. only "No User" checked) leaves "Select
-        // All" indeterminate, and OK stays disabled until at least one value is checked. A single
-        // click on the row is not always reliable at hitting the actual checkbox input rather than
-        // its label/wrapper, so click the checkbox frame itself and poll for OK to become enabled,
-        // retrying the click if the first one didn't register.
-        var selectAllCheckbox = page.Locator(".e-excelfilter:visible .e-ftrchk")
-            .Filter(new() { HasText = "Select All" })
-            .First
-            .Locator(".e-frame, .e-checkbox-wrapper")
-            .First;
-
-        if (await selectAllCheckbox.CountAsync() > 0)
-        {
-            for (var attempt = 0; attempt < 5; attempt++)
-            {
-                if (await okButton.IsEnabledAsync())
-                    break;
-
-                await selectAllCheckbox.ClickAsync();
-                try
-                {
-                    await okButton.WaitForAsync(new() { Timeout = 2_000 });
-                    if (await okButton.IsEnabledAsync())
-                        break;
-                }
-                catch (TimeoutException)
-                {
-                    // fall through and retry the click
-                }
-            }
-        }
-
-        await okButton.ClickAsync();
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
-    }
 }

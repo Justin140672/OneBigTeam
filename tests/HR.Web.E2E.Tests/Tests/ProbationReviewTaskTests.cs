@@ -9,26 +9,25 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Verifies the probation review task detail screen.
 ///
 /// Uses the seeded "Complete probation review — Carlos Rivera" task
-/// (ID: a0000000-0000-0000-0000-000000000005), which is a ManagerCheckIn review
-/// assigned to Sarah Chen.
+/// (ID: a0000000-0000-0000-0000-000000000005), a ManagerCheckIn review assigned to David Park —
+/// Carlos's actual line manager and an HrAdministrator. The single-resource probation review
+/// read (GET /probation-reviews/{id}) enforces reporting-chain / HR scope, so the task assignee
+/// (and this test's persona) has to be someone who can genuinely view Carlos's review.
 /// </summary>
-public sealed class ProbationReviewTaskTests(SarahChenPersonaFixture fixture)
-    : RoleE2ETestBase<SarahChenPersonaFixture>(fixture)
+public sealed class ProbationReviewTaskTests(DavidParkPersonaFixture fixture)
+    : RoleE2ETestBase<DavidParkPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private static readonly Guid SarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");
+    private static readonly Guid DavidId = Guid.Parse("30000000-0000-0000-0000-000000000008");
 
-    // Seeded probation review task — ManagerCheckIn for Carlos Rivera, assigned to Sarah.
+    // Seeded probation review task — ManagerCheckIn for Carlos Rivera, assigned to David Park.
     private static readonly Guid TaskProbationReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000005");
 
-    // A non-probation-review task used to verify the panel is absent for other sources.
-    // Originally Sarah's TaskSource.Manual "Review Q2 performance reports" task
-    // (a0000000-...0001); that source has been removed entirely, so this now points at her
-    // existing seeded Asset-acknowledgement task instead — it's an unrelated, real-domain
-    // task and serves the same purpose (verifying the probation panel doesn't render for it).
-    private static readonly Guid TaskQ2ReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000021");
+    // A non-probation-review task assigned to David Park, used to verify the probation panel is
+    // absent for other sources (seeded generic TaskSource.Workflow task).
+    private static readonly Guid TaskQ2ReviewId = Guid.Parse("a0000000-0000-0000-0000-00000000002a");
 
-    private const string SarahEmail = "sarah.chen@acme.example";
+    private const string DavidEmail = "david.park@acme.example";
 
     [Fact]
     public async Task TaskView_ShowsProbationReviewPanel_ForProbationReviewTask()
@@ -37,9 +36,9 @@ public sealed class ProbationReviewTaskTests(SarahChenPersonaFixture fixture)
         var taskView = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(SarahEmail);
+        await login.LoginAsync(DavidEmail);
 
-        await taskView.GoToAsync(AcmeId, SarahId, TaskProbationReviewId);
+        await taskView.GoToAsync(AcmeId, DavidId, TaskProbationReviewId);
 
         Assert.True(await taskView.HasProbationReviewPanelAsync(),
             "Expected 'Complete Probation Review' panel to be visible for a ProbationReview task");
@@ -52,9 +51,9 @@ public sealed class ProbationReviewTaskTests(SarahChenPersonaFixture fixture)
         var taskView = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(SarahEmail);
+        await login.LoginAsync(DavidEmail);
 
-        await taskView.GoToAsync(AcmeId, SarahId, TaskProbationReviewId);
+        await taskView.GoToAsync(AcmeId, DavidId, TaskProbationReviewId);
 
         var reviewType = await taskView.GetProbationReviewTypeAsync();
         Assert.Equal("Manager Check-in", reviewType);
@@ -67,9 +66,9 @@ public sealed class ProbationReviewTaskTests(SarahChenPersonaFixture fixture)
         var taskView = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(SarahEmail);
+        await login.LoginAsync(DavidEmail);
 
-        await taskView.GoToAsync(AcmeId, SarahId, TaskProbationReviewId);
+        await taskView.GoToAsync(AcmeId, DavidId, TaskProbationReviewId);
 
         var title = await taskView.GetTitleAsync();
         Assert.Contains("Carlos Rivera", title, StringComparison.OrdinalIgnoreCase);
@@ -82,9 +81,9 @@ public sealed class ProbationReviewTaskTests(SarahChenPersonaFixture fixture)
         var taskView = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(SarahEmail);
+        await login.LoginAsync(DavidEmail);
 
-        await taskView.GoToAsync(AcmeId, SarahId, TaskQ2ReviewId);
+        await taskView.GoToAsync(AcmeId, DavidId, TaskQ2ReviewId);
 
         Assert.False(await taskView.HasProbationReviewPanelAsync(),
             "Expected no 'Complete Probation Review' panel on a non-ProbationReview task");
@@ -98,9 +97,9 @@ public sealed class ProbationReviewTaskTests(SarahChenPersonaFixture fixture)
         var taskView = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(SarahEmail);
+        await login.LoginAsync(DavidEmail);
 
-        await taskView.GoToAsync(AcmeId, SarahId, TaskProbationReviewId);
+        await taskView.GoToAsync(AcmeId, DavidId, TaskProbationReviewId);
 
         var statusBefore = await taskView.GetStatusAsync();
         Assert.NotEqual("Completed", statusBefore);

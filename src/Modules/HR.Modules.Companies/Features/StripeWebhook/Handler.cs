@@ -18,8 +18,26 @@ internal sealed class StripeWebhookHandler(
 {
     public async Task HandleAsync(string payload, string signatureHeader, CancellationToken cancellationToken)
     {
+        // Signature verification happens inside the gateway; a bad signature throws before this line.
         var webhookEvent = stripeGateway.ConstructAndParseWebhookEvent(payload, signatureHeader);
         var now = clock.UtcNowOffset();
+
+        // OBT-REM-07: idempotency — a redelivery of an event we have already processed is a
+        // successful no-op. (Stripe retries deliveries aggressively; without this an "updated"
+        // event replayed after a later one would clobber newer state.)
+        if (!string.IsNullOrWhiteSpace(webhookEvent.EventId))
+        {
+            var alreadyProcessed = await dbContext.ProcessedStripeEvents
+                .AnyAsync(e => e.StripeEventId == webhookEvent.EventId, cancellationToken);
+
+            if (alreadyProcessed)
+            {
+                logger.LogInformation(
+                    "Stripe webhook {EventType} ({StripeEventId}) already processed — ignoring duplicate delivery",
+                    webhookEvent.EventType, webhookEvent.EventId);
+                return;
+            }
+        }
 
         var subscription = await FindSubscriptionAsync(webhookEvent, cancellationToken);
 
@@ -39,6 +57,34 @@ internal sealed class StripeWebhookHandler(
             }
 
             return;
+        }
+
+        // OBT-REM-07: ordering guard for subscription lifecycle events. If we have already applied a
+        // strictly newer event for this subscription, this one is stale — record it as seen but do
+        // not let it overwrite newer state.
+        var isSubscriptionLifecycle = webhookEvent.EventType is
+            "customer.subscription.updated" or "customer.subscription.deleted";
+
+        if (isSubscriptionLifecycle && webhookEvent.EventCreatedAt is { } createdAt)
+        {
+            var newerAlreadyApplied = await dbContext.ProcessedStripeEvents
+                .Where(e => e.Applied
+                    && e.StripeSubscriptionId != null
+                    && e.StripeSubscriptionId == subscription.StripeSubscriptionId
+                    && (e.EventType == "customer.subscription.updated"
+                        || e.EventType == "customer.subscription.deleted"))
+                .AnyAsync(e => e.EventCreatedAt >= createdAt, cancellationToken);
+
+            if (newerAlreadyApplied)
+            {
+                logger.LogWarning(
+                    "Stripe webhook {EventType} ({StripeEventId}) is older than an event already applied to subscription {StripeSubscriptionId} — ignoring out-of-order delivery",
+                    webhookEvent.EventType, webhookEvent.EventId, subscription.StripeSubscriptionId);
+
+                MarkProcessed(webhookEvent, subscription, applied: false, now);
+                await SaveProcessedAsync(cancellationToken);
+                return;
+            }
         }
 
         switch (webhookEvent.EventType)
@@ -72,7 +118,44 @@ internal sealed class StripeWebhookHandler(
                 return;
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        // The processed-event row is written in the SAME SaveChanges as the projection: the event is
+        // "processed" only if and when the local state change commits. A concurrent duplicate loses
+        // the race on the unique stripe_event_id index — treat that as a successful no-op.
+        MarkProcessed(webhookEvent, subscription, applied: true, now);
+        await SaveProcessedAsync(cancellationToken);
+    }
+
+    private void MarkProcessed(
+        StripeWebhookEvent webhookEvent, CustomerSubscription subscription, bool applied, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(webhookEvent.EventId))
+            return;
+
+        dbContext.ProcessedStripeEvents.Add(ProcessedStripeEvent.Record(
+            webhookEvent.EventId,
+            webhookEvent.EventType,
+            webhookEvent.EventCreatedAt ?? now,
+            webhookEvent.CompanyId ?? subscription.CompanyId,
+            webhookEvent.StripeSubscriptionId ?? subscription.StripeSubscriptionId,
+            applied,
+            now));
+    }
+
+    private async Task SaveProcessedAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (
+            ex.InnerException?.Message.Contains("ix_processed_stripe_events_stripe_event_id", StringComparison.OrdinalIgnoreCase) == true
+            || ex.InnerException?.Message.Contains("duplicate key value violates unique constraint", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            // Concurrent duplicate delivery — the winner applied the projection and recorded the
+            // event. Discard this caller's tracked changes and treat as a successful no-op.
+            dbContext.ChangeTracker.Clear();
+            logger.LogInformation("Stripe webhook duplicate resolved by unique constraint — no-op");
+        }
     }
 
     private async Task<CustomerSubscription?> FindSubscriptionAsync(

@@ -69,20 +69,16 @@ public sealed class CustomerSupportViewTests(EmployeePersonaFixture fixture) : R
     }
 
     [Fact]
-    public async Task NonAllowListedPersona_SeesErrorBanner_NotSupportData()
+    public async Task NonAllowListedPersona_IsRejectedAtLogin_NotGivenSupportAccess()
     {
         var login = new AdminLoginPage(_page, _fixture.AdminWebBaseUrl);
-        var support = new CustomerSupportViewPage(_page, _fixture.AdminWebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(NonAllowListedEmail);
+        var error = await login.SubmitExpectingNotAuthorisedAsync(NonAllowListedEmail);
 
-        await support.GoToAsync(AcmeId);
-
-        Assert.True(await support.IsErrorBannerVisibleAsync(),
-            "Expected a non-allow-listed persona to see the unauthorised error banner");
-        Assert.False(await support.IsDetailsGridVisibleAsync(),
-            "No support summary should render for a non-allow-listed persona");
+        Assert.Contains("not authorised", error, StringComparison.OrdinalIgnoreCase);
+        Assert.True(login.IsOnLoginPage(),
+            "A non-allow-listed account must be rejected on the login page, not handed a session");
     }
 
     [Fact]

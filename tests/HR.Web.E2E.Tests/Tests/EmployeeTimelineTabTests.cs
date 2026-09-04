@@ -205,7 +205,7 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
 
         await timeline.ClickViewDetailsAsync("HR Manager");
         await _page.WaitForSelectorAsync("[data-testid='promote-employee-btn']", new() { Timeout = 15_000 });
-        Assert.True(await _page.GetByRole(AriaRole.Tab, new() { Name = "Promotion History" })
+        Assert.True(await EmployeeEditPage.SectionTab(_page, "Promotion History")
             .GetAttributeAsync("aria-selected") == "true");
 
         // ── Self-service view (MyProfile): the same event type has no wired navigation callback ──

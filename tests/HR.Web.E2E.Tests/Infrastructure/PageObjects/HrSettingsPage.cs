@@ -13,8 +13,11 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// </summary>
 public sealed class HrSettingsPage(IPage page, string baseUrl)
 {
+    private Guid _companyId;
+
     public async Task GoToAsync(Guid companyId)
     {
+        _companyId = companyId;
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/hr-settings");
         await page.WaitForSelectorAsync(".card", new() { Timeout = 20_000 });
         // Wait for Syncfusion to initialise — span[role='combobox'] (the Leave Year Start
@@ -193,21 +196,29 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         }
     }
 
-    public async Task SetFitNoteRequiredAfterDaysAsync(int? days) =>
+    public async Task SetFitNoteRequiredAfterDaysAsync(int? days)
+    {
+        await SwitchToTabAsync("Sickness");
         await FillNullableNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Fit Note Required After (Days)"), days);
+    }
 
     public async Task<int?> GetFitNoteRequiredAfterDaysAsync()
     {
+        await SwitchToTabAsync("Sickness");
         var input = NumericBoxByLabel(".col-md-4", "Fit Note Required After (Days)");
         var value = await input.InputValueAsync();
         return int.TryParse(value, out var parsed) ? parsed : null;
     }
 
-    public async Task SetReturnToWorkRequiredAfterDaysAsync(int? days) =>
+    public async Task SetReturnToWorkRequiredAfterDaysAsync(int? days)
+    {
+        await SwitchToTabAsync("Sickness");
         await FillNullableNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Return-to-Work Review Required After (Days)"), days);
+    }
 
     public async Task<int?> GetReturnToWorkRequiredAfterDaysAsync()
     {
+        await SwitchToTabAsync("Sickness");
         var input = NumericBoxByLabel(".col-md-4", "Return-to-Work Review Required After (Days)");
         var value = await input.InputValueAsync();
         return int.TryParse(value, out var parsed) ? parsed : null;
@@ -220,18 +231,26 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
 
     public async Task SetDefaultAcknowledgementStatementAsync(string value)
     {
+        await SwitchToTabAsync("Document Acknowledgement");
         await DefaultAcknowledgementStatementTextArea.FillAsync(value);
         await page.Keyboard.PressAsync("Tab");
     }
 
-    public Task<string> GetDefaultAcknowledgementStatementAsync() =>
-        DefaultAcknowledgementStatementTextArea.InputValueAsync();
+    public async Task<string> GetDefaultAcknowledgementStatementAsync()
+    {
+        await SwitchToTabAsync("Document Acknowledgement");
+        return await DefaultAcknowledgementStatementTextArea.InputValueAsync();
+    }
 
-    public async Task SetAcknowledgementReminderIntervalDaysAsync(int days) =>
+    public async Task SetAcknowledgementReminderIntervalDaysAsync(int days)
+    {
+        await SwitchToTabAsync("Document Acknowledgement");
         await FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Acknowledgement Reminder Interval (days)"), days.ToString(), days);
+    }
 
     public async Task<int> GetAcknowledgementReminderIntervalDaysAsync()
     {
+        await SwitchToTabAsync("Document Acknowledgement");
         var input = NumericBoxByLabel(".col-md-4", "Acknowledgement Reminder Interval (days)");
         var value = await input.InputValueAsync();
         return int.Parse(value);
@@ -239,11 +258,15 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
 
     // ── Leaving Process / Notice Period ──────────────────────────────────────────
 
-    public Task SelectNoticePeriodPresetAsync(string presetLabel) =>
-        DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Default Notice Period" }).First, presetLabel);
+    public async Task SelectNoticePeriodPresetAsync(string presetLabel)
+    {
+        await SwitchToTabAsync("Leaving Process");
+        await DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Default Notice Period" }).First, presetLabel);
+    }
 
     public async Task<string> GetNoticePeriodPresetAsync()
     {
+        await SwitchToTabAsync("Leaving Process");
         var group = page.Locator(".col-md-4")
             .Filter(new() { HasText = "Default Notice Period" })
             .First;
@@ -251,15 +274,22 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         return (await combobox.Locator("input").InputValueAsync()).Trim();
     }
 
-    public Task WaitForNoticePeriodCustomControlsAsync() =>
-        page.Locator(".col-md-4").Filter(new() { HasText = "Unit" }).First
+    public async Task WaitForNoticePeriodCustomControlsAsync()
+    {
+        await SwitchToTabAsync("Leaving Process");
+        await page.Locator(".col-md-4").Filter(new() { HasText = "Unit" }).First
             .WaitForAsync(new() { Timeout = 10_000 });
+    }
 
-    public Task SelectNoticePeriodUnitAsync(string unitLabel) =>
-        DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Unit" }).First, unitLabel);
+    public async Task SelectNoticePeriodUnitAsync(string unitLabel)
+    {
+        await SwitchToTabAsync("Leaving Process");
+        await DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Unit" }).First, unitLabel);
+    }
 
     public async Task<string> GetNoticePeriodUnitAsync()
     {
+        await SwitchToTabAsync("Leaving Process");
         var group = page.Locator(".col-md-4")
             .Filter(new() { HasText = "Unit" })
             .First;
@@ -267,11 +297,15 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         return (await combobox.Locator("input").InputValueAsync()).Trim();
     }
 
-    public async Task SetNoticePeriodLengthAsync(int length) =>
+    public async Task SetNoticePeriodLengthAsync(int length)
+    {
+        await SwitchToTabAsync("Leaving Process");
         await FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Length"), length.ToString(), length);
+    }
 
     public async Task<int> GetNoticePeriodLengthAsync()
     {
+        await SwitchToTabAsync("Leaving Process");
         var input = NumericBoxByLabel(".col-md-4", "Length");
         var value = await input.InputValueAsync();
         return int.Parse(value);
@@ -279,6 +313,7 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
 
     public async Task<bool> IsAutoDisableAccessOnLeavingDateCheckedAsync()
     {
+        await SwitchToTabAsync("Leaving Process");
         var wrapper = page.Locator(".e-checkbox-wrapper")
             .Filter(new() { HasText = "Automatically disable system access on the employee's leaving date" });
         return await wrapper.Locator("input[type='checkbox']").IsCheckedAsync();
@@ -297,12 +332,16 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
 
     // ── Employee Numbering ────────────────────────────────────────────────────
 
-    // HrSettingsPage.razor now groups its fields into an SfTab (Working & Leave, Sickness,
-    // Documents, Leaving Process, Employee Numbering) instead of one flat card — GoToAsync always
-    // lands on the first tab, so every Employee Numbering accessor below must activate that tab
-    // before touching its fields, the same way MyProfilePage.OpenTasksTabAsync does for its tabs.
-    private Task SwitchToEmployeeNumberingTabAsync() =>
-        page.GetByRole(AriaRole.Tab, new() { Name = "Employee Numbering" }).ClickAsync();
+    // HrSettingsPage.razor groups its fields into an SfTab (Working & Leave, Sickness,
+    // Document Acknowledgement, Leaving Process, Employee Numbering, Asset Numbering) instead of
+    // one flat card — GoToAsync always lands on the first tab, and SfTab only renders the active
+    // tab's content, so every accessor for a field on a non-first tab must activate that tab first
+    // (the same way MyProfilePage.OpenTasksTabAsync does for its tabs).
+    private Task SwitchToTabAsync(string tabName) =>
+        // Not Exact: SfTab headers can carry an error-icon span that perturbs the accessible name.
+        page.GetByRole(AriaRole.Tab, new() { Name = tabName }).First.ClickAsync();
+
+    private Task SwitchToEmployeeNumberingTabAsync() => SwitchToTabAsync("Employee Numbering");
 
     public async Task SelectEmployeeNumberModeAsync(string modeLabel)
     {
@@ -380,27 +419,66 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         return (await paragraph.TextContentAsync())?.Trim();
     }
 
-    private ILocator BackfillEmployeeNumbersButton =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Backfill Employee Numbers…" });
+    // ── Renumber-existing-employees confirmation ─────────────────────────────────
+    // Changing the employee-number prefix or minimum length WHILE the company is in Automatic mode
+    // pops this confirmation before the save proceeds (HrSettingsPage.razor's _showRenumberWarning
+    // SfDialog); confirming it queues the background renumber of every existing employee.
 
-    public async Task<bool> IsBackfillEmployeeNumbersButtonVisibleAsync()
+    private ILocator RenumberDialog =>
+        page.Locator("[role='dialog']").Filter(new() { HasText = "Renumber existing employees?" });
+
+    public async Task<bool> IsRenumberDialogVisibleAsync()
     {
-        await SwitchToEmployeeNumberingTabAsync();
-        return await BackfillEmployeeNumbersButton.IsVisibleAsync();
+        try
+        {
+            await RenumberDialog.First.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = 4_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
     }
 
-    public async Task OpenBackfillEmployeeNumbersDialogAsync()
+    public async Task ConfirmRenumberAsync()
     {
-        await SwitchToEmployeeNumberingTabAsync();
-        await BackfillEmployeeNumbersButton.ClickAsync();
+        await RenumberDialog.GetByRole(AriaRole.Button, new() { Name = "Continue" }).ClickAsync();
+        await RenumberDialog.First.WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    public async Task CancelRenumberAsync()
+    {
+        await RenumberDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+        await RenumberDialog.First.WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
     // ── Save / Cancel ────────────────────────────────────────────────────────
 
+    public Task ClickSaveAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+
     public async Task SaveAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await ClickSaveAsync();
+        // A prefix / minimum-length change in Automatic mode interposes the renumber confirmation
+        // before the save runs — confirm it and let the save through. Short settle (the dialog is
+        // one Blazor Server round-trip away) rather than a long wait on every save.
+        await page.WaitForTimeoutAsync(600);
+        if (await RenumberDialog.First.IsVisibleAsync())
+            await ConfirmRenumberAsync();
         await page.WaitForSpinnerToClearAsync();
+
+        // A SUCCESSFUL save navigates away to the HR dashboard (HrSettingsPage.razor's
+        // ListUrl => "/dashboard/hr", via EditPageBase.OnSavedAsync). A FAILED save (validation
+        // error) stays put. Re-open the settings page after a successful save so post-save
+        // accessors/assertions (e.g. GetEmployeeNumberModeAsync, reload-persistence checks) keep
+        // working against the settings form rather than the dashboard.
+        await page.WaitForTimeoutAsync(300);
+        if (!page.Url.Contains("/hr-settings", StringComparison.OrdinalIgnoreCase))
+            await GoToAsync(_companyId);
     }
 
     public Task CancelAsync() =>

@@ -51,7 +51,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -74,7 +74,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService(), new FakeCurrentUser(callerEmployeeId));
+            new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerEmployeeId));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerEmployeeId), CancellationToken.None);
 
@@ -94,7 +94,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             context, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService(), new FakeCurrentUser(callerId));
+            new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -112,7 +112,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             context, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService(), new FakeCurrentUser(null));
+            new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(null));
 
         // No resolved current-user id at all — the caller can't even be resolved to an employee id.
         var result = await provider.GetActionsAsync(companyId, new ClaimsPrincipal(new ClaimsIdentity()), CancellationToken.None);
@@ -134,7 +134,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 

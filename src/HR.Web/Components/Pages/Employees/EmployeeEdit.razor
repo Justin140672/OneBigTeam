@@ -569,6 +569,36 @@
                     </ContentTemplate>
                 </TabItem>
 
+                <TabItem>
+                    <ChildContent><TabHeader Text="Employment" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeeEmploymentTab @ref="_employmentTab" CompanyId="CompanyId" EmployeeId="Id!.Value" IsViewMode="IsViewMode" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+                @if (_showProbationTab)
+                {
+                    <TabItem>
+                        <ChildContent><TabHeader Text="Probation" /></ChildContent>
+                        <ContentTemplate>
+                            <div class="mt-4">
+                                <EmployeeProbationTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                }
+
+                <TabItem>
+                    <ChildContent><TabHeader Text="Emergency Contacts" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeeEmergencyContactsTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
                             </TabItems>
                         </SfTab>
                         </div>
@@ -1083,7 +1113,7 @@
                 Model.City           = _employee.City           ?? string.Empty;
                 Model.County         = _employee.County         ?? string.Empty;
                 Model.PostCode       = _employee.PostCode       ?? string.Empty;
-                Model.Country        = _employee.Country        ?? string.Empty;
+                Model.Country        = string.IsNullOrWhiteSpace(_employee.Country) ? "United Kingdom" : _employee.Country;
                 Model.HasSystemAccess = _employee.HasSystemAccess;
                 // Not shown on this tab (owned by the Employment tab's own model/form), but
                 // EmployeeProfileEditModel is validated as a whole via the shared EditContext, so

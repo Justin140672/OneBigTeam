@@ -173,6 +173,17 @@ public sealed class EffectiveAccessViewTests(HrAdminPersonaFixture fixture) : Po
         var employeeId = Guid.Parse(System.Text.RegularExpressions.Regex.Match(
             _page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})").Groups[1].Value);
 
+        // A brand-new Employee row has no user-administration record (no ApplicationUser, no
+        // UserInvite), so GetUserDetails 404s and UserDetail.razor renders "No user administration
+        // record was found…" — the Effective Access card never mounts. Sending an invite creates
+        // the UserInvite row GetUserDetails needs; the inherited/effective-role computation itself
+        // works off the employee's position and doesn't need an accepted account.
+        await empList.GoToAsync(AcmeId);
+        Assert.True(await empList.HasInviteUserLinkAsync(lastName),
+            $"Expected '{lastName}' (freshly created) to offer the 'Invite' action");
+        await empList.ClickInviteUserLinkAsync(lastName);
+        await empList.CompleteQuickInviteAsync([]);
+
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
 
         try
@@ -242,4 +253,5 @@ public sealed class EffectiveAccessViewTests(HrAdminPersonaFixture fixture) : Po
             }
         }
     }
+
 }

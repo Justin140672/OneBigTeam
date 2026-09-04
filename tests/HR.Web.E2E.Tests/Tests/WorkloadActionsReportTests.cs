@@ -254,21 +254,18 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
     public async Task NonHrPersona_DirectlyNavigatingToReportPage_DoesNotCrash()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var report = new WorkloadActionsReportPage(_page, _fixture.WebBaseUrl);
+        var accessDenied = new AccessDeniedPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        // The report data endpoint denies a persona with no baseline reporting role;
-        // ReportingService.GetWorkloadActionsReportAsync catches that and returns null, and the
-        // page renders its own alert-danger error banner ("Failed to load the workload & HR
-        // actions report.") instead of a blank or crashed screen — mirroring the access-denied
-        // convention used elsewhere (see UnauthorizedAccessTests.Employee_CannotAccess_HrInbox and
-        // EmployeeDirectoryReportTests.NonHrPersona_DirectlyNavigatingToReportPage_DoesNotCrash).
+        // ADM-05 (commit e67ba6ff): WorkloadActionsReportPage guards on Session.CanViewReporting
+        // via AppSession.GuardAccess, redirecting a persona that lacks it to /access-denied
+        // (replace) rather than rendering and letting the data call 403. Tom is a plain Employee
+        // with no reporting role at all.
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/reporting/workload-actions");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
-        Assert.True(await report.HasLoadErrorAsync(),
-            "Expected a graceful error banner (not a crash/blank page) when a persona with no baseline reporting role is denied the report data");
+        await accessDenied.WaitForLoadedAsync();
+        Assert.True(accessDenied.IsOnRoute, $"Expected redirect to /access-denied, was: {_page.Url}");
     }
 }

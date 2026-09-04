@@ -59,22 +59,16 @@ public sealed class BackgroundJobsAdminTests(EmployeePersonaFixture fixture) : R
     }
 
     [Fact]
-    public async Task NonAllowListedPersona_SeesErrorBanner_NotJobData()
+    public async Task NonAllowListedPersona_IsRejectedAtLogin_NotGivenJobAccess()
     {
         var login = new AdminLoginPage(_page, _fixture.AdminWebBaseUrl);
-        var jobs = new JobsPage(_page, _fixture.AdminWebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(NonAllowListedEmail);
+        var error = await login.SubmitExpectingNotAuthorisedAsync(NonAllowListedEmail);
 
-        await jobs.GoToAsync();
-
-        Assert.True(await jobs.IsErrorBannerVisibleAsync(),
-            "Expected a non-allow-listed persona to see the unauthorised error banner");
-        Assert.False(await jobs.AreJobSectionsVisibleAsync(),
-            "No job sections should render for a non-allow-listed persona");
-        var text = await jobs.GetErrorBannerTextAsync() ?? "";
-        Assert.Contains("authorised", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not authorised", error, StringComparison.OrdinalIgnoreCase);
+        Assert.True(login.IsOnLoginPage(),
+            "A non-allow-listed account must be rejected on the login page, not handed a session");
     }
 
     [Fact]

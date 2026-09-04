@@ -40,6 +40,13 @@ internal sealed class Endpoint(
         var roles = await authorizationService.GetEffectiveRolesAsync(userId.Value, ct);
         var canManageCompany = roles.Contains(SystemRoles.CompanyAdministrator);
 
+        // IAM-08: expose the full effective role-id set so callers (and tests) can verify a
+        // "Company Administrator only" account really holds only that role and has not silently
+        // retained HrAdministrator / a position-derived role / a Grant override. This mirrors the
+        // same live computation used for PermissionIds — there is no server-side cache, so a role
+        // change is reflected on the next api/me call / fresh Blazor circuit with no stale state.
+        var roleIds = roles.ToList();
+
         // Role-derived landing/nav flags, additive to CanManageCompany above — CanManageEmployees
         // (computed client-side from PermissionIds) still drives all existing widget gates unchanged.
         var isHrAdministrator = roles.Contains(SystemRoles.HrAdministrator);
@@ -57,6 +64,7 @@ internal sealed class Endpoint(
             companyId,
             currentUser.Email,
             permissions.ToList(),
+            roleIds,
             canManageCompany,
             isHrAdministrator,
             isManager,
@@ -70,6 +78,7 @@ internal sealed record GetMeResponse(
     Guid CompanyId,
     string? Email,
     List<Guid> PermissionIds,
+    List<Guid> RoleIds,
     bool CanManageCompany,
     bool IsHrAdministrator,
     bool IsManager,

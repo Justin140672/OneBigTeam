@@ -33,7 +33,7 @@ public sealed class DepartmentListPage(IPage page, string baseUrl)
     public async Task ClickNewDepartmentAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/departments/new", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/departments/new**", new() { Timeout = 15_000 });
     }
 
     public async Task<bool> HasDepartmentAsync(string nameFragment)

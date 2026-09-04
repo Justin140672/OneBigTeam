@@ -12,9 +12,8 @@ namespace HR.Modules.Employees.Features.GetManagerTeamStatusSummary;
 /// <summary>
 /// DSH-05 coordinating query for the Manager Dashboard "Team Status" widget. Composes this
 /// module's own employee/hierarchy/working-pattern data with per-module cross-module contract
-/// readers (leave, sickness, probation) into one authoritative summary — mirroring how ADM-02's
-/// Compliance Centre composes readers — without HR.Modules.Employees referencing any other
-/// module's implementation.
+/// readers (leave, sickness, probation) into one authoritative summary — without
+/// HR.Modules.Employees referencing any other module's implementation.
 ///
 /// Scope is the manager's entire reporting sub-tree, resolved fresh by
 /// <see cref="IDirectReportsReader.GetAllDescendantIdsAsync"/>

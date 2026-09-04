@@ -99,7 +99,7 @@ public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) :
         await CreateEmployeeAsync(empList, empEdit, slot: 0);
 
         Assert.False(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
             "Expected no 'Offboarding' tab for an employee with no offboarding record");
         Assert.False(
             await _page.GetByRole(AriaRole.Button, new() { Name = "Start Offboarding" }).IsVisibleAsync(),

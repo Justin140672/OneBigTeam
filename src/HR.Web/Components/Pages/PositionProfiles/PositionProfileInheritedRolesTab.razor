@@ -1,126 +1,67 @@
-@inject PositionProfileService PositionProfileService
-
-@if (_loading)
-{
-    <HrLoadingIndicator />
-}
-else
-{
-    <div class="card">
-        <div class="card-header d-flex align-items-center">
-            <i class="fa-solid fa-user-shield text-muted me-2"></i>
-            <h5 class="mb-0">Inherited Roles</h5>
-        </div>
-        <div class="card-body">
-            <p class="text-muted small">Every employee holding this position automatically receives the roles selected below.</p>
-            <table class="table table-sm table-borderless mb-1">
-                <tbody>
-                    @foreach (var role in _roleOptions)
-                    {
-                        <tr>
-                            <td class="ps-0" style="width: 2.5rem;">
-                                <input type="checkbox"
-                                       class="form-check-input"
-                                       id="@($"inherited-role-{role.Id}")"
-                                       checked="@_selectedRoleIds.Contains(role.Id)"
-                                       disabled="@(!CanEdit)"
-                                       @onchange="@(e => OnRoleCheckedChanged(role.Id, e.Value is bool b && b))" />
-                            </td>
-                            <td class="align-middle">
-                                <label class="form-check-label mb-0" for="@($"inherited-role-{role.Id}")">
-                                    @role.Name
-                                </label>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-
-            @if (!string.IsNullOrEmpty(_error))
-            {
-                <div class="alert alert-danger py-2">@_error</div>
-            }
-            @if (!string.IsNullOrEmpty(_success))
-            {
-                <div class="alert alert-success py-2">@_success</div>
-            }
-
-            @if (CanEdit)
-            {
-                <div class="d-flex justify-content-end mt-3">
-                    <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAsync">
-                        @if (_saving)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                        }
-                        Save
-                    </SfButton>
-                </div>
-            }
-        </div>
+@* Thin view over the parent's PositionProfileEditModel.InheritedRoleIds — mutated in place here,
+   persisted by the page's single Save button (outside the tab control), the same way EmployeeEdit's
+   tabs feed one save. No own Save button, no own load/service call. *@
+<div class="card">
+    <div class="card-header d-flex align-items-center">
+        <i class="fa-solid fa-user-shield text-muted me-2"></i>
+        <h5 class="mb-0">Inherited Roles</h5>
     </div>
-}
+    <div class="card-body">
+        <p class="text-muted small">Every employee holding this position automatically receives the roles selected below. Save the position profile to apply changes.</p>
+        <table class="table table-sm table-borderless mb-1">
+            <tbody>
+                @foreach (var role in _roleOptions)
+                {
+                    var isEmployeeRole = role.Id == SystemRoleOptions.EmployeeRoleId;
+                    <tr>
+                        <td class="ps-0" style="width: 2.5rem;">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   id="@($"inherited-role-{role.Id}")"
+                                   checked="@(isEmployeeRole || SelectedRoleIds.Contains(role.Id))"
+                                   disabled="@(isEmployeeRole || !CanEdit)"
+                                   @onchange="@(e => OnRoleCheckedChanged(role.Id, e.Value is bool b && b))" />
+                        </td>
+                        <td class="align-middle">
+                            <label class="form-check-label mb-0" for="@($"inherited-role-{role.Id}")">
+                                @role.Name
+                                @if (isEmployeeRole)
+                                {
+                                    <span class="text-muted small ms-1">(always — every employee has this role)</span>
+                                }
+                            </label>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid PositionProfileId { get; set; }
     [Parameter] public bool CanEdit { get; set; }
 
-    private bool _loading = true;
-    private bool _saving;
-    private string? _error;
-    private string? _success;
-    private List<Guid> _selectedRoleIds = [];
+    // The parent's Model.InheritedRoleIds — mutated in place; the mandatory Employee role is never
+    // in this list (it's implicit).
+    [Parameter, EditorRequired] public List<Guid> SelectedRoleIds { get; set; } = [];
 
     private readonly List<RoleOption> _roleOptions = SystemRoleOptions.All.ToList();
 
-    protected override async Task OnParametersSetAsync() => await LoadAsync();
-
-    private async Task LoadAsync()
-    {
-        _loading = true;
-        _error = null;
-        _success = null;
-        StateHasChanged();
-
-        var response = await PositionProfileService.ListPositionRoleDefaultsAsync(CompanyId);
-        var current = response?.Positions.FirstOrDefault(p => p.PositionProfileId == PositionProfileId);
-        _selectedRoleIds = current?.RoleIds.ToList() ?? [];
-
-        _loading = false;
-    }
-
     private void OnRoleCheckedChanged(Guid roleId, bool isChecked)
     {
+        if (roleId == SystemRoleOptions.EmployeeRoleId)
+            return; // always inherited — the checkbox is disabled, this is just defence in depth
+
         if (isChecked)
         {
-            if (!_selectedRoleIds.Contains(roleId))
-                _selectedRoleIds.Add(roleId);
+            if (!SelectedRoleIds.Contains(roleId))
+                SelectedRoleIds.Add(roleId);
         }
         else
         {
-            _selectedRoleIds.Remove(roleId);
+            SelectedRoleIds.Remove(roleId);
         }
-    }
-
-    private async Task SaveAsync()
-    {
-        _saving = true;
-        _error = null;
-        _success = null;
-
-        var request = new SetPositionRoleDefaultsRequest(CompanyId, PositionProfileId, _selectedRoleIds);
-        var (success, error) = await PositionProfileService.SetPositionRoleDefaultsAsync(CompanyId, PositionProfileId, request);
-
-        _saving = false;
-
-        if (!success)
-        {
-            _error = error ?? "Failed to save inherited roles.";
-            return;
-        }
-
-        _success = "Inherited roles saved.";
-        await LoadAsync();
     }
 }

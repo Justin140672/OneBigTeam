@@ -119,27 +119,62 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Returns "Completed" once the dialog's detail list shows a "Completed" row — the only
-    /// status signal left in the dialog now that the status badge has been removed — otherwise
-    /// "Not Started". None of the current E2E scenarios distinguish Open from InProgress, so
-    /// both collapse to "Not Started" here.
+    /// Returns "Completed" if the (still-open) dialog's detail list shows a "Completed" row,
+    /// otherwise "Not Started". NOTE: completing a task now CLOSES the dialog (see
+    /// TaskViewDialog.OnActionCompletedAsync), so after a Complete*/Confirm* call read the list
+    /// row instead — <see cref="GetListTaskStatusAsync"/> / <see cref="GetListTaskStatusByTitleAsync"/>.
     /// </summary>
     public async Task<string> GetStatusAsync()
     {
+        // A successful terminal action (Complete/Confirm/Approve/Reject/…) closes the dialog — every
+        // such method here waits for that close before returning — so a dialog that is no longer
+        // visible at this point can only mean the task was just actioned: report "Completed".
+        if (!await Dialog.IsVisibleAsync())
+            return "Completed";
+
         var completedRow = Dialog.Locator("dl.row dt").Filter(new() { HasText = "Completed" });
         return await completedRow.IsVisibleAsync() ? "Completed" : "Not Started";
     }
 
-    /// <summary>Waits for the dialog's detail list to show a "Completed" row.</summary>
+    /// <summary>
+    /// Completing/actioning a task closes the dialog (TaskViewDialog.OnActionCompletedAsync) and
+    /// the host list refreshes. This waits for that close — the panels only fire their OnCompleted
+    /// once the terminal action has committed server-side, so a hidden dialog IS the "done" signal.
+    /// </summary>
     public async Task WaitForCompletedAsync() =>
-        await page.WaitForFunctionAsync(
-            @"() => Array.from(document.querySelectorAll('.task-view-dialog dl.row dt'))
-                .some(dt => dt.textContent?.trim() === 'Completed')",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
 
-    /// <summary>Closes the dialog via its Close button.</summary>
+    /// <summary>
+    /// Reads a task's status from the host TaskList grid row (the row that owns
+    /// data-testid="task-view-btn-{id}"). "Completed" when the row's ".task-status-badge" carries
+    /// the "--completed" modifier, else "Not Started" — matching <see cref="GetStatusAsync"/>'s
+    /// two-state convention (no current scenario distinguishes Open from InProgress).
+    /// </summary>
+    public async Task<string> GetListTaskStatusAsync(Guid taskId)
+    {
+        var badge = page.Locator($".e-row:has([data-testid='task-view-btn-{taskId}']) .task-status-badge").First;
+        await badge.WaitForAsync(new() { Timeout = 15_000 });
+        var cssClass = await badge.GetAttributeAsync("class") ?? "";
+        return cssClass.Contains("task-status-badge--completed") ? "Completed" : "Not Started";
+    }
+
+    /// <summary>Same as <see cref="GetListTaskStatusAsync"/> but locates the row by its title text.</summary>
+    public async Task<string> GetListTaskStatusByTitleAsync(string taskTitle)
+    {
+        var badge = page.Locator(".e-row")
+            .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = taskTitle, Exact = true }) })
+            .First.Locator(".task-status-badge").First;
+        await badge.WaitForAsync(new() { Timeout = 15_000 });
+        var cssClass = await badge.GetAttributeAsync("class") ?? "";
+        return cssClass.Contains("task-status-badge--completed") ? "Completed" : "Not Started";
+    }
+
+    /// <summary>Closes the dialog via its Close button. No-op if a terminal action already dismissed it.</summary>
     public async Task CloseAsync()
     {
+        if (!await Dialog.IsVisibleAsync())
+            return;
+
         // TaskViewDialog.razor renders both Syncfusion's built-in "X" close icon (ShowCloseIcon,
         // which also carries aria-label="Close") and an explicit <SfButton>Close</SfButton> in
         // the footer — both share the accessible name "Close", so GetByRole(Button, "Close")

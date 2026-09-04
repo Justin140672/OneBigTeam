@@ -57,9 +57,12 @@ public sealed class DialogFocusManagementTests(CrossUserFixture fixture)
         await LoginAsync(LauraEmail);
         var leaveTypes = new LeaveTypeListPage(_page, _fixture.WebBaseUrl);
         await leaveTypes.GoToAsync(AcmeId);
-        await _page.Locator(".e-grid .e-row").First.ClickAsync();
+        await _page.Locator(".e-grid .e-row").Last.ClickAsync();
 
-        var trigger = _page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
+        // Scope to the grid toolbar: once the confirm dialog opens it also contains a "Deactivate"
+        // button, so an unscoped GetByRole(Button, "Deactivate") is ambiguous mid-test.
+        var trigger = _page.Locator(".e-toolbar-item")
+            .GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true });
         await trigger.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         var dialog = _page.GetByRole(AriaRole.Dialog);
 

@@ -148,8 +148,8 @@
             <GridSelectionSettings Type="Syncfusion.Blazor.Grids.SelectionType.Multiple" Mode="Syncfusion.Blazor.Grids.SelectionMode.Row"></GridSelectionSettings>
             <GridPageSettings PageSize="20" />
             <GridColumns>
-                <GridColumn Type="Syncfusion.Blazor.Grids.ColumnType.CheckBox" Width="50" IsFrozen="true"></GridColumn>
-                <GridColumn Field="@nameof(EmployeeListItemModel.LastName)" HeaderText="Employee" Width="260" AllowFiltering="false" IsFrozen="true">
+                <GridColumn Type="Syncfusion.Blazor.Grids.ColumnType.CheckBox" Width="50"></GridColumn>
+                <GridColumn Field="@nameof(EmployeeListItemModel.LastName)" HeaderText="Employee" Width="260" AllowFiltering="false">
                     <Template>
                         @{
                             var row = (context as EmployeeListItemModel)!;
@@ -291,7 +291,10 @@
 
     protected override async Task OnBeforeLoadAsync()
     {
-        if (!Session.CanManageEmployees)
+        // employee:read (Manager / Recruiter / HR Administrator — NOT a CompanyAdministrator-only
+        // user), matching this list's API policy and the ADM-05 intent. Manage-level actions on
+        // the page (create, edit) are gated separately below / per-row.
+        if (!Session.CanReadEmployees)
         {
             Navigation.NavigateTo("/access-denied", replace: true);
             return;

@@ -246,7 +246,10 @@
     {
         _open = false;
         _debounceCts?.Cancel();
-        Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{item.Id}/profile");
+        // The admin employee record (EmployeeEdit.razor), not "/…/profile" — that route is
+        // MyProfile.razor, which redirects away from any employee id that isn't the signed-in
+        // user's own. This palette is HR-only and is for looking at other people's records.
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{item.Id}");
     }
 
     private static string? PositionDepartment(EmployeeDirectorySearchItem item)

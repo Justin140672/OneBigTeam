@@ -90,20 +90,18 @@ public sealed class EmployeeDirectoryReportTests(ParallelBlankPersonaFixture fix
     public async Task NonHrPersona_DirectlyNavigatingToReportPage_DoesNotCrash()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var report = new EmployeeDirectoryReportPage(_page, _fixture.WebBaseUrl);
+        var accessDenied = new AccessDeniedPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // The report data endpoint 403s for a non-HR-admin persona; ReportingService.GetEmployeeDirectoryReportAsync
-        // catches that and returns null, and the page renders its own alert-danger error banner
-        // (see EmployeeDirectoryReportPage.razor's "_error is not null" branch) instead of a blank
-        // or crashed screen — mirroring the access-denied convention used elsewhere (see
-        // UnauthorizedAccessTests.Employee_CannotAccess_HrInbox).
+        // ADM-05 (commit e67ba6ff): EmployeeDirectoryReportPage guards on Session.CanViewHrReports
+        // via AppSession.GuardAccess, redirecting a persona that lacks it to /access-denied
+        // (replace) rather than rendering and letting the data call 403. Marcus is a Recruiter,
+        // not an HR Administrator.
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/reporting/employee-directory");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
-        Assert.True(await report.HasLoadErrorAsync(),
-            "Expected a graceful error banner (not a crash/blank page) when a non-HR-admin persona is denied the report data");
+        await accessDenied.WaitForLoadedAsync();
+        Assert.True(accessDenied.IsOnRoute, $"Expected redirect to /access-denied, was: {_page.Url}");
     }
 }

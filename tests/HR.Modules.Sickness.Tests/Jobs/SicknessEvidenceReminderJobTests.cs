@@ -23,7 +23,8 @@ public class SicknessEvidenceReminderJobTests
         SicknessDbContext db,
         FakeNotificationWriter writer,
         FakeIntegrationEventPublisher? eventPublisher = null) =>
-        new(db, writer, eventPublisher ?? new FakeIntegrationEventPublisher(), new FakeClock(FixedUtcNow));
+        new(db, writer, eventPublisher ?? new FakeIntegrationEventPublisher(), new FakeClock(FixedUtcNow),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SicknessEvidenceReminderJob>.Instance);
 
     private static async Task<(Guid recordId, Guid employeeId, Guid companyId)> SeedRecordAsync(
         SicknessDbContext db)
@@ -153,8 +154,11 @@ public class SicknessEvidenceReminderJobTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_Does_Not_Touch_Request_Already_Marked_Overdue()
+    public async Task ExecuteAsync_Reconciles_Missing_Overdue_Notification_For_Already_Overdue_Request_Exactly_Once()
     {
+        // OBT-REM-04: a request already persisted as Overdue but whose overdue notification never
+        // got sent (e.g. a prior run crashed after the status commit) must have that notification
+        // reconciled on a later run — and only once, however many times the job re-runs.
         await using var db = BuildContext();
         var (recordId, _, companyId) = await SeedRecordAsync(db);
         await SeedRequestAsync(db, recordId, companyId, Today.AddDays(-5), SicknessEvidenceRequestStatus.Overdue);
@@ -166,8 +170,8 @@ public class SicknessEvidenceReminderJobTests
         await job.ExecuteAsync();
         await job.ExecuteAsync();
 
-        Assert.DoesNotContain(writer.Written, n => n.Type == NotificationType.SicknessEvidenceOverdue);
-        Assert.Empty(events.PublishedEvents.OfType<SicknessEvidenceOverdueIntegrationEvent>());
+        Assert.Single(writer.Written, n => n.Type == NotificationType.SicknessEvidenceOverdue);
+        Assert.Single(events.PublishedEvents.OfType<SicknessEvidenceOverdueIntegrationEvent>());
     }
 
     [Fact]

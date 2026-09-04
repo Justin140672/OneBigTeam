@@ -35,6 +35,24 @@
             </div>
         </section>
 
+        <section class="section">
+            <div class="section-inner">
+                <div class="section-heading">
+                    <h2>Planned</h2>
+                </div>
+                <div class="card-grid">
+                    @foreach (var feature in PlannedFeatures)
+                    {
+                        <div class="card">
+                            <span class="card-icon" aria-hidden="true"><Icon Name="@feature.IconName" /></span>
+                            <h3>@feature.Title</h3>
+                            <p>@feature.Description</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </section>
+
         <section class="section roadmap-disclaimer-section">
             <div class="section-inner">
                 <p class="roadmap-disclaimer">
@@ -51,5 +69,10 @@
     private static readonly IReadOnlyList<UpcomingFeatureInfo> ComingSoonFeatures =
         UpcomingFeatureCatalog.All
             .Where(feature => feature.Status == UpcomingFeatureStatus.ComingSoon)
+            .ToList();
+
+    private static readonly IReadOnlyList<UpcomingFeatureInfo> PlannedFeatures =
+        UpcomingFeatureCatalog.All
+            .Where(feature => feature.Status == UpcomingFeatureStatus.Planned)
             .ToList();
 }

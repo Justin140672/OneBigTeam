@@ -20,7 +20,7 @@ public sealed class SicknessCategoryListPage(IPage page, string baseUrl)
     public async Task ClickNewAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/sickness-categories/new", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/sickness-categories/new**", new() { Timeout = 15_000 });
     }
 
     public async Task<bool> HasItemAsync(string nameFragment)

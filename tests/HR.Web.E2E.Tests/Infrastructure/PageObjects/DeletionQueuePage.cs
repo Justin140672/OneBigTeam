@@ -5,7 +5,7 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// <summary>
 /// Page object for HR.Admin.Web's DeletionQueue.razor (/deletion-queue) — the platform-admin-only
 /// list of companies that currently have, or have ever had, a permanent deletion scheduled. Each
-/// pending row exposes "Cancel deletion" / "Execute now" actions, both going through the shared
+/// pending row exposes "Cancel deletion" / "Begin deletion" actions, both going through the shared
 /// AdminActionConfirmDialog (mandatory reason, min 5 chars) also used by CustomerDetails.razor's
 /// Subscription management panel — see CustomerDetailsPage for that dialog's sibling usage.
 ///
@@ -70,7 +70,10 @@ public sealed class DeletionQueuePage(IPage page, string baseUrl)
 
     public async Task ClickExecuteNowAsync(string companyNameFragment)
     {
-        await RowByCompany(companyNameFragment).GetByRole(AriaRole.Button, new() { Name = "Execute now" }).ClickAsync();
+        // The row's danger action is labelled "Begin deletion" (DeletionQueue.razor) — it opens the
+        // "Begin controlled deletion" confirm dialog. (Historically "Execute now".)
+        await RowByCompany(companyNameFragment)
+            .GetByRole(AriaRole.Button, new() { Name = "Begin deletion", Exact = true }).ClickAsync();
         await ExecuteDeletionDialog.WaitForAsync(new() { Timeout = 15_000 });
     }
 
@@ -106,7 +109,7 @@ public sealed class DeletionQueuePage(IPage page, string baseUrl)
         CancelDeletionDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel deletion", Exact = true }).ClickAsync();
 
     public Task ClickExecuteDeletionConfirmAsync() =>
-        ExecuteDeletionDialog.GetByRole(AriaRole.Button, new() { Name = "Execute deletion", Exact = true }).ClickAsync();
+        ExecuteDeletionDialog.GetByRole(AriaRole.Button, new() { Name = "Begin deletion", Exact = true }).ClickAsync();
 
     public Task<string?> GetCancelDeletionValidationErrorAsync() =>
         CancelDeletionDialog.Locator(".admin-action-error").TextContentAsync();

@@ -98,7 +98,11 @@ public record GetHrSettingsResponse(
     string? AssetNumberPrefix,
     int NextAssetNumber,
     int AssetNumberMinimumLength,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    // SET-03 optimistic-concurrency counter shared with Company Settings (both slices mutate the
+    // same CompanySettings row). Must be round-tripped back on save or the server rejects every
+    // save after the first with a phantom "changed by someone else" conflict.
+    int Version);
 
 public record UpdateHrSettingsRequest(
     Guid Id,
@@ -124,7 +128,8 @@ public record UpdateHrSettingsRequest(
     AssetNumberMode AssetNumberMode,
     string? AssetNumberPrefix,
     int NextAssetNumber,
-    int AssetNumberMinimumLength);
+    int AssetNumberMinimumLength,
+    int Version);
 
 public record UpdateHrSettingsResponse(
     Guid CompanyId,
@@ -147,7 +152,8 @@ public record UpdateHrSettingsResponse(
     string? EmployeeNumberPrefix,
     int NextEmployeeNumber,
     int EmployeeNumberMinimumLength,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    int Version);
 
 // ── LOGO UPLOAD ───────────────────────────────────────────────────────────────
 

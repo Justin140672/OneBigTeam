@@ -140,8 +140,14 @@ public sealed class BulkCompensationUpdateDialogPage(IPage page)
 
         // Confirm the value actually committed rather than trusting the keystrokes landed —
         // same "assert the round-trip actually happened" convention used throughout this suite.
+        // The SfNumericTextBox re-renders the committed value with grouping + decimals
+        // ("58000" -> "58,000.00"), so match the digits with optional separators / trailing zeros.
+        var digits = value.TrimStart('-').TrimEnd();
+        var pattern = "^-?" +
+            string.Join(",?", digits.Select(c => System.Text.RegularExpressions.Regex.Escape(c.ToString()))) +
+            @"(\.\d+)?$";
         await Assertions.Expect(input).ToHaveValueAsync(
-            new System.Text.RegularExpressions.Regex(System.Text.RegularExpressions.Regex.Escape(value)),
+            new System.Text.RegularExpressions.Regex(pattern),
             new() { Timeout = 10_000 });
     }
 

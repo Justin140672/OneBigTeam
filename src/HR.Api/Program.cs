@@ -2,6 +2,7 @@ using System.Net;
 using System.Threading.RateLimiting;
 using FastEndpoints;
 using HR.Api.Authentication;
+using HR.Api.Startup;
 using HR.Infrastructure;
 using HR.Infrastructure.Logging;
 using HR.Modules.Companies;
@@ -208,142 +209,59 @@ builder.Services
 	.AddAuthorizationBuilder()
 	.AddRolePolicies();
 
+// A required migration failure must make the instance NOT ready (see StartupMigrationRunner).
+builder.Services.AddSingleton<StartupMigrationRunner>();
+builder.Services.AddHealthChecks()
+	.AddCheck<StartupMigrationHealthCheck>(
+		"startup-migrations",
+		failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy,
+		tags: ["ready", "critical"]);
+
 var app = builder.Build();
 
-var companiesMigrationStatus = "unknown";
-string? companiesMigrationError = null;
-DateTimeOffset? companiesMigrationCheckedAt = null;
-var companyOnboardingMigrationStatus = "unknown";
-string? companyOnboardingMigrationError = null;
-DateTimeOffset? companyOnboardingMigrationCheckedAt = null;
-var dataImportMigrationStatus = "unknown";
-string? dataImportMigrationError = null;
-DateTimeOffset? dataImportMigrationCheckedAt = null;
-var employeesMigrationStatus = "unknown";
-string? employeesMigrationError = null;
-DateTimeOffset? employeesMigrationCheckedAt = null;
-var identityMigrationStatus = "unknown";
-string? identityMigrationError = null;
-DateTimeOffset? identityMigrationCheckedAt = null;
-var auditMigrationStatus = "unknown";
-string? auditMigrationError = null;
-DateTimeOffset? auditMigrationCheckedAt = null;
-var documentsMigrationStatus = "unknown";
-string? documentsMigrationError = null;
-DateTimeOffset? documentsMigrationCheckedAt = null;
-var leaveMigrationStatus = "unknown";
-string? leaveMigrationError = null;
-DateTimeOffset? leaveMigrationCheckedAt = null;
-var tasksMigrationStatus = "unknown";
-string? tasksMigrationError = null;
-DateTimeOffset? tasksMigrationCheckedAt = null;
-var notificationsMigrationStatus = "unknown";
-string? notificationsMigrationError = null;
-DateTimeOffset? notificationsMigrationCheckedAt = null;
-var onboardingMigrationStatus = "unknown";
-string? onboardingMigrationError = null;
-DateTimeOffset? onboardingMigrationCheckedAt = null;
-var offboardingMigrationStatus = "unknown";
-string? offboardingMigrationError = null;
-DateTimeOffset? offboardingMigrationCheckedAt = null;
-var probationMigrationStatus = "unknown";
-string? probationMigrationError = null;
-DateTimeOffset? probationMigrationCheckedAt = null;
-var reportingMigrationStatus = "unknown";
-string? reportingMigrationError = null;
-DateTimeOffset? reportingMigrationCheckedAt = null;
-var assetsMigrationStatus = "unknown";
-string? assetsMigrationError = null;
-DateTimeOffset? assetsMigrationCheckedAt = null;
+var migrationRunner = app.Services.GetRequiredService<StartupMigrationRunner>();
 
-var supportMigrationStatus = "unknown";
-string? supportMigrationError = null;
-DateTimeOffset? supportMigrationCheckedAt = null;
-var sicknessMigrationStatus = "unknown";
-string? sicknessMigrationError = null;
-DateTimeOffset? sicknessMigrationCheckedAt = null;
-var recruitmentMigrationStatus = "unknown";
-string? recruitmentMigrationError = null;
-DateTimeOffset? recruitmentMigrationCheckedAt = null;
+// Required migrations + seeding, run in dependency order. Each step is awaited in sequence; a
+// failure records the affected module and (below) prevents the normal request pipeline and the
+// Hangfire recurring job registration from being wired up.
+await migrationRunner.RunAsync("companies", app.Services, async sp =>
+{
+	await sp.MigrateCompaniesAsync();
+	await sp.SeedCompaniesAsync();
+});
 
-try
+await migrationRunner.RunAsync("companyOnboarding", app.Services, async sp =>
 {
-	await app.Services.MigrateCompaniesAsync();
-	await app.Services.SeedCompaniesAsync();
-	companiesMigrationStatus = "succeeded";
-	companiesMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	companiesMigrationStatus = "failed";
-	companiesMigrationError = exception.Message;
-	companiesMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
+	await sp.MigrateCompanyOnboardingAsync();
+	await sp.SeedCompanyOnboardingAsync();
+});
 
-try
-{
-	await app.Services.MigrateCompanyOnboardingAsync();
-	await app.Services.SeedCompanyOnboardingAsync();
-	companyOnboardingMigrationStatus = "succeeded";
-	companyOnboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	companyOnboardingMigrationStatus = "failed";
-	companyOnboardingMigrationError = exception.Message;
-	companyOnboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
+await migrationRunner.RunAsync("dataImport", app.Services, sp => sp.MigrateDataImportAsync());
 
-try
+await migrationRunner.RunAsync("employees", app.Services, async sp =>
 {
-	await app.Services.MigrateDataImportAsync();
-	dataImportMigrationStatus = "succeeded";
-	dataImportMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	dataImportMigrationStatus = "failed";
-	dataImportMigrationError = exception.Message;
-	dataImportMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-
-try
-{
-	await app.Services.MigrateEmployeesAsync();
+	await sp.MigrateEmployeesAsync();
 	// The E2E arrange-data pool is only ever wanted for the Playwright E2E run (E2E_TESTING=true,
 	// the same flag that swaps in the fake Supabase/JWKS plumbing). It must NOT land in the
 	// integration test DB (WebApplicationFactory<Program> also runs as Development) nor in any
 	// real environment.
 	var seedE2eTestPool = string.Equals(
 		Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
-	await app.Services.SeedEmployeesAsync(includeE2eTestPool: seedE2eTestPool);
-	employeesMigrationStatus = "succeeded";
-	employeesMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	employeesMigrationStatus = "failed";
-	employeesMigrationError = exception.Message;
-	employeesMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
+	await sp.SeedEmployeesAsync(includeE2eTestPool: seedE2eTestPool);
+});
 
-try
+await migrationRunner.RunAsync("identity", app.Services, async sp =>
 {
-	await app.Services.MigrateIdentityAsync();
-	// Bootstrap PlatformAdministrator rows from the PlatformAdmin:AllowedEmails config allow-list
-	// (see IdentityModule.SeedPlatformAdministratorsFromConfigAsync remarks). Runs in every
-	// environment, not just Development, since the allow-list itself is configured per-environment
-	// (appsettings.json / appsettings.Staging.json / production config) and admin accounts must
-	// exist as real PlatformAdministrator rows wherever the Admin Portal is reachable. Idempotent.
-	await app.Services.SeedPlatformAdministratorsFromConfigAsync(app.Configuration);
-	// IAM-03: backfill/reconciliation for employees whose position assignment predates
-	// position-based role bridging (see IdentityModule.ReconcilePositionRoleAssignmentsAsync
-	// remarks). Idempotent and additive-only; runs in every environment.
-	await app.Services.ReconcilePositionRoleAssignmentsAsync();
+	await sp.MigrateIdentityAsync();
+	// Bootstrap PlatformAdministrator rows from the PlatformAdmin:AllowedEmails config allow-list.
+	// Runs in every environment (the allow-list itself is configured per-environment). Idempotent.
+	await sp.SeedPlatformAdministratorsFromConfigAsync(app.Configuration);
+	// IAM-03: idempotent, additive-only backfill of position-based role assignments.
+	await sp.ReconcilePositionRoleAssignmentsAsync();
 	if (app.Environment.IsDevelopment())
 	{
-		await app.Services.SeedDevUserAsync();
-		await app.Services.SeedDevSupabaseUsersAsync(DevPersonaStore.Personas.Select(p =>
+		await sp.SeedDevUserAsync();
+		await sp.SeedDevSupabaseUsersAsync(DevPersonaStore.Personas.Select(p =>
 		{
 			var nameParts = p.Name.Split(' ', 2);
 			return (
@@ -354,324 +272,102 @@ try
 				LastName: nameParts.Length > 1 ? nameParts[1] : "");
 		}));
 	}
-	identityMigrationStatus = "succeeded";
-	identityMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	identityMigrationStatus = "failed";
-	identityMigrationError = exception.Message;
-	identityMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
+});
 
-try
-{
-	await app.Services.MigrateAuditAsync();
-	auditMigrationStatus = "succeeded";
-	auditMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	auditMigrationStatus = "failed";
-	auditMigrationError = exception.Message;
-	auditMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
+await migrationRunner.RunAsync("audit", app.Services, sp => sp.MigrateAuditAsync());
 
-try
+await migrationRunner.RunAsync("documents", app.Services, async sp =>
 {
-	await app.Services.MigrateDocumentsAsync();
-	await app.Services.SeedDocumentsAsync();
-	documentsMigrationStatus = "succeeded";
-	documentsMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	documentsMigrationStatus = "failed";
-	documentsMigrationError = exception.Message;
-	documentsMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
+	await sp.MigrateDocumentsAsync();
+	await sp.SeedDocumentsAsync();
+});
 
-try
+await migrationRunner.RunAsync("leave", app.Services, async sp =>
 {
-	await app.Services.MigrateLeaveAsync();
-	await app.Services.SeedLeaveAsync();
-	leaveMigrationStatus = "succeeded";
-	leaveMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	leaveMigrationStatus = "failed";
-	leaveMigrationError = exception.Message;
-	leaveMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
+	await sp.MigrateLeaveAsync();
+	await sp.SeedLeaveAsync();
+});
 
-try
+await migrationRunner.RunAsync("notifications", app.Services, async sp =>
 {
-	await app.Services.MigrateNotificationsAsync();
-	await app.Services.SeedNotificationsAsync();
-	notificationsMigrationStatus = "succeeded";
-	notificationsMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	notificationsMigrationStatus = "failed";
-	notificationsMigrationError = exception.Message;
-	notificationsMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
+	await sp.MigrateNotificationsAsync();
+	await sp.SeedNotificationsAsync();
+});
 
-try
+await migrationRunner.RunAsync("tasks", app.Services, async sp =>
 {
-	await app.Services.MigrateTasksAsync();
-	await app.Services.SeedTasksAsync();
-	tasksMigrationStatus = "succeeded";
-	tasksMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	tasksMigrationStatus = "failed";
-	tasksMigrationError = exception.Message;
-	tasksMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
+	await sp.MigrateTasksAsync();
+	await sp.SeedTasksAsync();
+});
 
-try
+await migrationRunner.RunAsync("onboarding", app.Services, async sp =>
 {
-	await app.Services.MigrateOnboardingAsync();
+	await sp.MigrateOnboardingAsync();
 	if (string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase))
 	{
-		// E2E-only: every E2E arrange-data pool employee (EmployeesModule.E2eTestPool) gets a
-		// NotStarted onboarding plan + the 3 default checklist tasks — mirroring what
-		// EmployeeCreatedHandler produces for a UI-created employee, which these seeded rows
-		// replace. All Acme, StartDate 2026-03-01.
+		// E2E-only: every E2E arrange-data pool employee gets a NotStarted onboarding plan + the
+		// 3 default checklist tasks. All Acme, StartDate 2026-03-01.
 		var acmeCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 		var onboardingPoolStart = new DateOnly(2026, 3, 1);
-		await app.Services.SeedE2eOnboardingPlansAsync(
+		await sp.SeedE2eOnboardingPlansAsync(
 			HR.Modules.Employees.EmployeesModule.E2eTestPool.Select(p => (
 				acmeCompanyId, p.Id, onboardingPoolStart, $"E2E {p.LastName}")));
 	}
-	onboardingMigrationStatus = "succeeded";
-	onboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	onboardingMigrationStatus = "failed";
-	onboardingMigrationError = exception.Message;
-	onboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-
-try
-{
-	await app.Services.MigrateOffboardingAsync();
-	offboardingMigrationStatus = "succeeded";
-	offboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	offboardingMigrationStatus = "failed";
-	offboardingMigrationError = exception.Message;
-	offboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-
-try
-{
-	await app.Services.MigrateProbationAsync();
-	await app.Services.SeedProbationAsync();
-	probationMigrationStatus = "succeeded";
-	probationMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	probationMigrationStatus = "failed";
-	probationMigrationError = exception.Message;
-	probationMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-
-try
-{
-	await app.Services.MigrateReportingAsync();
-	reportingMigrationStatus = "succeeded";
-	reportingMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	reportingMigrationStatus = "failed";
-	reportingMigrationError = exception.Message;
-	reportingMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-
-try
-{
-	await app.Services.MigrateAssetsAsync();
-	await app.Services.SeedAssetsAsync();
-	assetsMigrationStatus = "succeeded";
-	assetsMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	assetsMigrationStatus = "failed";
-	assetsMigrationError = exception.Message;
-	assetsMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-
-try
-{
-	await app.Services.MigrateSicknessAsync();
-	await app.Services.SeedSicknessAsync();
-	sicknessMigrationStatus = "succeeded";
-	sicknessMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	sicknessMigrationStatus = "failed";
-	sicknessMigrationError = exception.Message;
-	sicknessMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-
-try
-{
-	await app.Services.MigrateSupportAsync();
-	await app.Services.SeedSupportAsync();
-	supportMigrationStatus = "succeeded";
-	supportMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	supportMigrationStatus = "failed";
-	supportMigrationError = exception.Message;
-	supportMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-
-try
-{
-	await app.Services.MigrateRecruitmentAsync();
-	await app.Services.SeedRecruitmentAsync();
-	recruitmentMigrationStatus = "succeeded";
-	recruitmentMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-catch (Exception exception)
-{
-	recruitmentMigrationStatus = "failed";
-	recruitmentMigrationError = exception.Message;
-	recruitmentMigrationCheckedAt = DateTimeOffset.UtcNow;
-}
-
-app.MapGet("/health/startup-migrations", () =>
-{
-	var response = new
-	{
-		audit = new
-		{
-			status = auditMigrationStatus,
-			checkedAt = auditMigrationCheckedAt,
-			error = auditMigrationError
-		},
-		companies = new
-		{
-			status = companiesMigrationStatus,
-			checkedAt = companiesMigrationCheckedAt,
-			error = companiesMigrationError
-		},
-		companyOnboarding = new
-		{
-			status = companyOnboardingMigrationStatus,
-			checkedAt = companyOnboardingMigrationCheckedAt,
-			error = companyOnboardingMigrationError
-		},
-		dataImport = new
-		{
-			status = dataImportMigrationStatus,
-			checkedAt = dataImportMigrationCheckedAt,
-			error = dataImportMigrationError
-		},
-		documents = new
-		{
-			status = documentsMigrationStatus,
-			checkedAt = documentsMigrationCheckedAt,
-			error = documentsMigrationError
-		},
-		employees = new
-		{
-			status = employeesMigrationStatus,
-			checkedAt = employeesMigrationCheckedAt,
-			error = employeesMigrationError
-		},
-		identity = new
-		{
-			status = identityMigrationStatus,
-			checkedAt = identityMigrationCheckedAt,
-			error = identityMigrationError
-		},
-		leave = new
-		{
-			status = leaveMigrationStatus,
-			checkedAt = leaveMigrationCheckedAt,
-			error = leaveMigrationError
-		},
-		notifications = new
-		{
-			status = notificationsMigrationStatus,
-			checkedAt = notificationsMigrationCheckedAt,
-			error = notificationsMigrationError
-		},
-		tasks = new
-		{
-			status = tasksMigrationStatus,
-			checkedAt = tasksMigrationCheckedAt,
-			error = tasksMigrationError
-		},
-		onboarding = new
-		{
-			status = onboardingMigrationStatus,
-			checkedAt = onboardingMigrationCheckedAt,
-			error = onboardingMigrationError
-		},
-		offboarding = new
-		{
-			status = offboardingMigrationStatus,
-			checkedAt = offboardingMigrationCheckedAt,
-			error = offboardingMigrationError
-		},
-		probation = new
-		{
-			status = probationMigrationStatus,
-			checkedAt = probationMigrationCheckedAt,
-			error = probationMigrationError
-		},
-		reporting = new
-		{
-			status = reportingMigrationStatus,
-			checkedAt = reportingMigrationCheckedAt,
-			error = reportingMigrationError
-		},
-		assets = new
-		{
-			status = assetsMigrationStatus,
-			checkedAt = assetsMigrationCheckedAt,
-			error = assetsMigrationError
-		},
-		sickness = new
-		{
-			status = sicknessMigrationStatus,
-			checkedAt = sicknessMigrationCheckedAt,
-			error = sicknessMigrationError
-		},
-		recruitment = new
-		{
-			status = recruitmentMigrationStatus,
-			checkedAt = recruitmentMigrationCheckedAt,
-			error = recruitmentMigrationError
-		},
-		support = new
-		{
-			status = supportMigrationStatus,
-			checkedAt = supportMigrationCheckedAt,
-			error = supportMigrationError
-		}
-	};
-
-	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || companyOnboardingMigrationStatus == "failed" || dataImportMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed" || onboardingMigrationStatus == "failed" || offboardingMigrationStatus == "failed" || probationMigrationStatus == "failed" || reportingMigrationStatus == "failed" || assetsMigrationStatus == "failed" || sicknessMigrationStatus == "failed" || recruitmentMigrationStatus == "failed" || supportMigrationStatus == "failed"
-		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
-		: Results.Ok(response);
 });
+
+await migrationRunner.RunAsync("offboarding", app.Services, sp => sp.MigrateOffboardingAsync());
+
+await migrationRunner.RunAsync("probation", app.Services, async sp =>
+{
+	await sp.MigrateProbationAsync();
+	await sp.SeedProbationAsync();
+});
+
+await migrationRunner.RunAsync("reporting", app.Services, sp => sp.MigrateReportingAsync());
+
+await migrationRunner.RunAsync("assets", app.Services, async sp =>
+{
+	await sp.MigrateAssetsAsync();
+	await sp.SeedAssetsAsync();
+});
+
+await migrationRunner.RunAsync("sickness", app.Services, async sp =>
+{
+	await sp.MigrateSicknessAsync();
+	await sp.SeedSicknessAsync();
+});
+
+await migrationRunner.RunAsync("support", app.Services, async sp =>
+{
+	await sp.MigrateSupportAsync();
+	await sp.SeedSupportAsync();
+});
+
+await migrationRunner.RunAsync("recruitment", app.Services, async sp =>
+{
+	await sp.MigrateRecruitmentAsync();
+	await sp.SeedRecruitmentAsync();
+});
+
+app.MapGet("/health/startup-migrations", () => migrationRunner.ToHealthResult());
+
+// OBT-REM-01: a required migration failure must NOT let the API serve normal traffic or register
+// Hangfire recurring jobs. The process stays up in a non-ready state (health endpoints only) so
+// orchestrators see 503 on /health/ready and do not route traffic here.
+if (!migrationRunner.AllSucceeded)
+{
+	app.Logger.LogCritical(
+		"API startup incomplete: required database migration(s) failed for {FailedModules}. "
+		+ "Serving health endpoints only — normal traffic and background job registration are disabled.",
+		string.Join(", ", migrationRunner.FailedModules));
+
+	app.UseLoggingMiddleware();
+	app.UseRouting();
+	app.MapDefaultEndpoints();
+	app.Run();
+	return;
+}
+
 if (app.Environment.IsDevelopment())
 {
 	// AllPersonas (seeded catalog + runtime-registered self-service signups), not the static

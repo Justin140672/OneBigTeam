@@ -12,4 +12,8 @@ internal sealed record StripeWebhookEvent(
     DateTimeOffset? CurrentPeriodEnd,
     bool? CancelAtPeriodEnd,
     string? StripeStatus,
-    string? PriceId);
+    string? PriceId,
+    // OBT-REM-07: Stripe's own event id (evt_...) and creation timestamp, used for idempotency
+    // (unique event id) and ordering (ignore an event older than the last one applied).
+    string? EventId = null,
+    DateTimeOffset? EventCreatedAt = null);

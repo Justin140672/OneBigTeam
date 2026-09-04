@@ -22,6 +22,10 @@ internal sealed class ImportSession
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    // OBT-REM-06: optimistic-concurrency token for the atomic confirm-session claim. Follows the
+    // persisted-column pattern used by CompanySettings.Version.
+    public int Version { get; private set; } = 1;
+
     public static ImportSession Create(
         Guid id,
         Guid companyId,
@@ -57,6 +61,21 @@ internal sealed class ImportSession
         Status = ImportStatus.Processing;
         StartedAt = now;
         UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// OBT-REM-06: atomically claims the session for a confirm/create run. Combined with the
+    /// row-version concurrency token, only one caller can transition the session into
+    /// <see cref="ImportStatus.Processing"/>; a competing confirmation loses the optimistic-
+    /// concurrency check and is rejected.
+    /// </summary>
+    public void ClaimForConfirmation(DateTimeOffset now)
+    {
+        Status = ImportStatus.Processing;
+        StartedAt ??= now;
+        CompletedAt = null;
+        UpdatedAt = now;
+        Version++;
     }
 
     public void Complete(int successfulRows, int failedRows, DateTimeOffset now)
@@ -97,6 +116,7 @@ internal sealed class ImportSession
         CompletedAt = now;
         Status = failedCount == 0 ? ImportStatus.Imported : ImportStatus.CompletedWithErrors;
         UpdatedAt = now;
+        Version++;
     }
 
     public void Fail(string errorSummary, DateTimeOffset now)

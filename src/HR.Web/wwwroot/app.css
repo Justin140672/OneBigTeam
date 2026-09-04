@@ -156,6 +156,20 @@ html, body {
     background: var(--hr-color-primary) !important;
 }
 
+/* Accessibility (WCAG 1.4.3): Syncfusion's Bootstrap5 theme paints INACTIVE tab text and the
+   grid header's group/count badge (".e-item-count") in a light grey (~#6c757d on white ≈ 4.4:1,
+   dipping below 4.5:1 at the 12–13px sizes these render at) — axe-core flags both as serious
+   colour-contrast violations. Darken them to a token that clears AA at any size. Active/hover tab
+   text keeps the brand-teal override above. */
+.e-tab .e-toolbar-item:not(.e-active):not(:hover) .e-tab-text {
+    color: #343a40;
+}
+
+.e-grid .e-item-count,
+.e-headercell .e-item-count {
+    color: #343a40;
+}
+
 /* nav-tabs' active state is text-color-only (transparent background, bordered underline), so the
    color-only override is correct there. nav-pills' active state is a solid colored *background*
    with light text (Bootstrap's default $primary pill) — color-only wasn't enough, the pill's

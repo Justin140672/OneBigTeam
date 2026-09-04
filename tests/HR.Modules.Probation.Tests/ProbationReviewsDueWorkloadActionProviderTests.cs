@@ -58,7 +58,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId),
-            new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -83,7 +83,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(callerId),
-            new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -103,7 +103,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             context, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(callerId),
-            new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -122,7 +122,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeCurrentUser(callerId),
-            new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -143,7 +143,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId),
-            new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -168,7 +168,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         var provider = new OverdueProbationReviewsWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId),
-            new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -190,7 +190,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         var provider = new OverdueProbationReviewsWorkloadActionProvider(
             context, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(callerId),
-            new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -209,7 +209,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         var provider = new OverdueProbationReviewsWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeCurrentUser(callerId),
-            new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 

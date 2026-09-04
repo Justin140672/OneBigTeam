@@ -5,6 +5,7 @@
 @inject AppSession Session
 @inject NotificationService NotificationService
 @inject DevAuthService DevAuth
+@inject HR.Web.Services.AuthHandoffStore HandoffStore
 @inject IWebHostEnvironment Env
 
 @if (!Session.IsLoaded)
@@ -573,13 +574,16 @@ else
         var session = await DevAuth.SwitchAsync(userId);
         if (session is null) return;
 
-        // Must be a genuine hard browser navigation, not NavigationManager.NavigateTo(forceLoad:
-        // true) — Blazor Server's enhanced navigation can intercept that and keep the SAME circuit
-        // (and its SupabaseSessionAccessor, cached empty from before any cookie existed) alive
-        // instead of tearing it down. hardNavigate (app.js) bypasses Blazor's navigation layer
-        // entirely via window.location.href, guaranteeing a fresh circuit.
-        var query = $"accessToken={Uri.EscapeDataString(session.AccessToken)}&expiresIn={session.ExpiresIn}";
-        await JS.InvokeVoidAsync("hardNavigate", $"/dev/persona-cookie?{query}");
+        // The session is stashed server-side; only an opaque, single-use code travels in the URL
+        // (matches Login.razor — /dev/persona-cookie takes ?code= and redeems it via
+        // AuthHandoffStore since the "no tokens in URLs" change). Must be a genuine hard browser
+        // navigation, not NavigationManager.NavigateTo(forceLoad: true) — Blazor Server's enhanced
+        // navigation can intercept that and keep the SAME circuit (and its SupabaseSessionAccessor,
+        // cached from before the new cookie existed) alive instead of tearing it down. hardNavigate
+        // (app.js) bypasses Blazor's navigation layer entirely via window.location.href.
+        var code = HandoffStore.Issue(new HR.Web.Services.AuthHandoffStore.Session(
+            session.AccessToken, session.RefreshToken, session.ExpiresIn));
+        await JS.InvokeVoidAsync("hardNavigate", $"/dev/persona-cookie?code={Uri.EscapeDataString(code)}");
     }
 
     // Tracks whether the toggle button's IsDark state has actually been synced with app.js's

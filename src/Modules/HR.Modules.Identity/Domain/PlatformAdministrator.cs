@@ -61,4 +61,15 @@ internal sealed class PlatformAdministrator
     {
         Role = newRole;
     }
+
+    /// <summary>
+    /// Back-links this administrator to their identity-provider (Supabase Auth) user id once it is
+    /// known — either the first time they authenticate (see GetPlatformAdminMe) or when resolved by
+    /// email during an MFA reset. Mirrors <c>UserProfile.UpdateSupabaseAuthUserId</c>. No-op if it
+    /// is already set to the same value.
+    /// </summary>
+    public void LinkSupabaseAuthUserId(Guid supabaseAuthUserId)
+    {
+        SupabaseAuthUserId = supabaseAuthUserId;
+    }
 }

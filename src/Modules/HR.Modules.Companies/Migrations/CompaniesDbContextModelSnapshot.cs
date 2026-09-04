@@ -795,6 +795,57 @@ namespace HR.Modules.Companies.Migrations
                     b.ToTable("platform_settings", "companies");
                 });
 
+            modelBuilder.Entity("HR.Modules.Companies.Domain.ProcessedStripeEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Applied")
+                        .HasColumnType("boolean")
+                        .HasColumnName("applied");
+
+                    b.Property<Guid?>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("EventCreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("event_created_at");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("event_type");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<string>("StripeEventId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("stripe_event_id");
+
+                    b.Property<string>("StripeSubscriptionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("stripe_subscription_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StripeEventId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_processed_stripe_events_stripe_event_id");
+
+                    b.HasIndex("StripeSubscriptionId", "EventCreatedAt")
+                        .HasDatabaseName("ix_processed_stripe_events_subscription_created");
+
+                    b.ToTable("processed_stripe_events", "companies");
+                });
+
             modelBuilder.Entity("HR.Modules.Companies.Domain.PublicHoliday", b =>
                 {
                     b.Property<Guid>("Id")

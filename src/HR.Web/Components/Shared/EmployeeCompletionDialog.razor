@@ -147,10 +147,7 @@
                             <HrTextBox ID="ecd-postcode" @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" HtmlAttributes="@_ariaRequired" />
                             <ValidationMessage For="@(() => Model.PostCode)" />
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="ecd-country">Country <span class="text-muted">(optional)</span></label>
-                            <HrTextBox ID="ecd-country" @bind-Value="Model.Country" Placeholder="e.g. United Kingdom" />
-                        </div>
+                        @* Country is not shown — UK-only for now. Model.Country defaults to "United Kingdom". *@
                     </div>
                 </section>
             </EditForm>
@@ -279,6 +276,26 @@
         }
     }
 
+    // [EmailAddress] treats "" as invalid (only null passes). This optional field defaults to
+    // string.Empty, so validate the format only when the user actually typed something.
+    private sealed class OptionalEmailAttribute : System.ComponentModel.DataAnnotations.ValidationAttribute
+    {
+        private static readonly System.ComponentModel.DataAnnotations.EmailAddressAttribute _email = new();
+
+        protected override System.ComponentModel.DataAnnotations.ValidationResult? IsValid(
+            object? value, System.ComponentModel.DataAnnotations.ValidationContext validationContext)
+        {
+            if (value is not string s || string.IsNullOrWhiteSpace(s))
+                return System.ComponentModel.DataAnnotations.ValidationResult.Success;
+
+            return _email.IsValid(s)
+                ? System.ComponentModel.DataAnnotations.ValidationResult.Success
+                : new System.ComponentModel.DataAnnotations.ValidationResult(
+                    ErrorMessage ?? "Enter a valid email address.",
+                    validationContext.MemberName is null ? null : [validationContext.MemberName]);
+        }
+    }
+
     private sealed class EmployeeInitialSetupModel
     {
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "First name is required.")]
@@ -297,7 +314,10 @@
         public string Gender { get; set; } = string.Empty;
         public string GenderOther { get; set; } = string.Empty;
 
-        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Enter a valid email address.")]
+        // Optional field. [EmailAddress] alone rejects "" (an empty non-null string is invalid to
+        // it — only null passes), so it would flag this field on every submit that leaves personal
+        // email blank. OptionalEmail skips blank and validates the format otherwise.
+        [OptionalEmail(ErrorMessage = "Enter a valid email address.")]
         public string PersonalEmail { get; set; } = string.Empty;
 
         [DynamicRegex(nameof(MobileRegexPattern), ErrorMessage = "Enter a valid mobile number.")]
@@ -321,7 +341,8 @@
             set => _postCode = value.ToUpperInvariant();
         }
 
-        public string Country { get; set; } = string.Empty;
+        // Not user-editable (UK-only for now) — no input rendered. Sent to the server as-is.
+        public string Country { get; set; } = "United Kingdom";
 
         public string? PostcodeRegexPattern { get; set; }
         public string? TelephoneRegexPattern { get; set; }

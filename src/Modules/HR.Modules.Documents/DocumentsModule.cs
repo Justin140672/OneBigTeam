@@ -294,8 +294,6 @@ public static class DocumentsModule
         services.AddScoped<IOutstandingDocumentRequestReader, OutstandingDocumentRequestReader>();
         services.AddScoped<IProfilePhotoReader, ProfilePhotoReader>();
         services.AddScoped<IDocumentComplianceReportReader, DocumentComplianceReportReader>();
-        services.AddScoped<IExpiringEmployeeDocumentReader, ExpiringEmployeeDocumentReader>();
-        services.AddScoped<IOutstandingDocumentRequestComplianceReader, OutstandingDocumentRequestComplianceReader>();
         services.AddScoped<ICompanyDocumentAcknowledgementReportReader, CompanyDocumentAcknowledgementReportReader>();
         services.AddScoped<IDocumentStorageReader, DocumentStorageReader>();
 
@@ -406,7 +404,7 @@ public static class DocumentsModule
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000002"), acmeId, null, "Employment Contract – James Okafor", null, acmeContract,  "employment-contract-james-okafor.pdf", 184320,  "application/pdf", "seed/acme/contracts/employment-contract-james-okafor.pdf", null,                      acmeHrMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000003"), acmeId, null, "Employment Contract – Priya Sharma", null, acmeContract,  "employment-contract-priya-sharma.pdf", 184320,  "application/pdf", "seed/acme/contracts/employment-contract-priya-sharma.pdf", null,                      acmeHrMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000004"), acmeId, null, "Employment Contract – Tom Williams", null, acmeContract,  "employment-contract-tom-williams.pdf", 184320,  "application/pdf", "seed/acme/contracts/employment-contract-tom-williams.pdf", null,                      acmeHrMgr, now),
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000005"), acmeId, null, "Offer Letter – Tom Williams",        null, acmeContract,  "offer-letter-tom-williams.pdf",        102400,  "application/pdf", "seed/acme/contracts/offer-letter-tom-williams.pdf",        null,                      acmeHrMgr, now),
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000005"), acmeId, null, "Offer Letter – Tom Williams",        null, acmeOther,     "offer-letter-tom-williams.pdf",        102400,  "application/pdf", "seed/acme/contracts/offer-letter-tom-williams.pdf",        null,                      acmeHrMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000006"), acmeId, null, "Employee Handbook 2026",             null, acmeOther,     "employee-handbook-2026.pdf",          2097152,  "application/pdf", "seed/acme/other/employee-handbook-2026.pdf",               new DateOnly(2027, 1, 1),  acmeHrMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000007"), acmeId, null, "Remote Working Policy",             null, acmeOther,     "remote-working-policy.pdf",            307200,  "application/pdf", "seed/acme/other/remote-working-policy.pdf",                new DateOnly(2027, 6, 30), acmeHrMgr, now),
             };

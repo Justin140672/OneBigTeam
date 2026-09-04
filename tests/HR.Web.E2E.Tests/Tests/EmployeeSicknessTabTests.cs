@@ -36,11 +36,12 @@ public sealed class EmployeeSicknessTabTests(HrAdminPersonaFixture fixture) : Ro
         // depends on the employee's own async-loaded data (_showProbationTab etc.) — so a bare
         // instant IsVisibleAsync() here can race that and report "not visible" for a tab that's
         // genuinely there a moment later. A bounded wait avoids that.
-        await _page.GetByRole(AriaRole.Tab, new() { Name = "Sickness" }).WaitForAsync(
+        await EmployeeEditPage.SelectOwningGroupAsync(_page, "Sickness");
+        await EmployeeEditPage.SectionTab(_page, "Sickness").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
         Assert.True(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Sickness" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Sickness"),
             "Expected a 'Sickness' tab on the employee edit page");
     }
 

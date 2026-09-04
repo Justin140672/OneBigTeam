@@ -4,7 +4,8 @@
 @*
     Accessible single-line / multiline / password text field. Wraps HrTextBox so all of its
     behaviour notes still hold: FloatLabelType.Never by default (native `placeholder` attribute,
-    so Playwright GetByPlaceholder keeps working), and per-keystroke value commit. The visible
+    so Playwright GetByPlaceholder keeps working). Value commits on change/blur (stock SfTextBox);
+    an optional per-keystroke `Input` hook is available for callers that need it. The visible
     <label> is associated to the input via for/id AND the input gets aria-label / aria-labelledby,
     so it now has a real accessible name. Placeholder is kept ALONGSIDE the label, never as a
     substitute for it.

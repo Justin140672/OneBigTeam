@@ -113,7 +113,7 @@
 
                     <TabItem>
                         <ChildContent>
-                            <TabHeader Text="Documents" IconCss="@ErrorIconCss(2)" />
+                            <TabHeader Text="Document Acknowledgement" IconCss="@ErrorIconCss(2)" />
                         </ChildContent>
                         <ContentTemplate>
                             <div class="card mt-3">
@@ -532,6 +532,7 @@
             Model.AssetNumberPrefix = settings.AssetNumberPrefix;
             Model.NextAssetNumber = settings.NextAssetNumber;
             Model.AssetNumberMinimumLength = settings.AssetNumberMinimumLength;
+            Model.Version = settings.Version;
             Model.AssetNumberOriginalMode = Model.AssetNumberMode;
             Model.AssetNumberOriginalPrefix = Model.AssetNumberPrefix;
             Model.AssetNumberOriginalMinimumLength = Model.AssetNumberMinimumLength;
@@ -571,10 +572,16 @@
             Model.AssetNumberMode,
             string.IsNullOrWhiteSpace(Model.AssetNumberPrefix) ? null : Model.AssetNumberPrefix.Trim(),
             Model.NextAssetNumber,
-            Model.AssetNumberMinimumLength);
+            Model.AssetNumberMinimumLength,
+            Model.Version);
 
         var result = await CompanyService.UpdateHrSettingsAsync(Id, request);
-        return result is not null ? null : "Failed to save HR settings.";
+        if (result is null)
+            return "Failed to save HR settings.";
+
+        // Keep the concurrency token current so a second save without leaving the page succeeds.
+        Model.Version = result.Version;
+        return null;
     }
 
     // Save navigates to the HR Dashboard — this page is only ever reachable by an HR

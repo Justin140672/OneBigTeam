@@ -59,6 +59,12 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
     public Task<int> RemoveAllMfaFactorsAsync(Guid supabaseUserId, CancellationToken cancellationToken) =>
         Task.FromResult(0);
 
+    // Every E2E identity maps deterministically from its email (see DeriveFakeUserId) — a platform
+    // administrator created through the Admin Portal has no locally-linked id, so MFA reset resolves
+    // it by email through here.
+    public Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken) =>
+        Task.FromResult<Guid?>(DeriveFakeUserId(email));
+
     public Task<SupabaseSession> ExchangeCodeForSessionAsync(string code, CancellationToken cancellationToken) =>
         throw new InvalidOperationException("No live Supabase project is configured for E2E testing.");
 

@@ -20,7 +20,7 @@ public sealed class AssetListPage(IPage page, string baseUrl)
     public async Task ClickNewAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/assets/new", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/assets/new**", new() { Timeout = 15_000 });
     }
 
     public Task<bool> HasItemAsync(string nameFragment) =>

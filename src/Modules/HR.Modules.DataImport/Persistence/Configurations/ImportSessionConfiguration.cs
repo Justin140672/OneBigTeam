@@ -84,6 +84,13 @@ internal sealed class ImportSessionConfiguration : IEntityTypeConfiguration<Impo
             .HasColumnName("updated_at")
             .IsRequired();
 
+        // OBT-REM-06: optimistic concurrency for the atomic confirm-session claim.
+        builder.Property(s => s.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.HasIndex(s => s.CompanyId);
         builder.HasIndex(s => s.Status);
     }

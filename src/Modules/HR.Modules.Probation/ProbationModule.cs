@@ -78,7 +78,6 @@ public static class ProbationModule
         services.AddScoped<GenerateDueProbationReviewsJob>();
         services.AddScoped<IProbationHistoryReplayer, ProbationHistoryReplayer>();
         services.AddScoped<IProbationReportReader, ProbationReportReader>();
-        services.AddScoped<IProbationReviewComplianceReader, Services.ProbationReviewComplianceReader>();
         services.AddScoped<IEmployeesInProbationReader, Services.EmployeesInProbationReader>();
         services.AddScoped<Services.ProbationResourceAuthorizer>();
     }
@@ -159,16 +158,16 @@ public static class ProbationModule
             db.ProbationReviews.Add(finalReview);
         }
 
-        // Active probation — Carlos Rivera on probation under James Okafor.
-        // ManagerCheckIn is overdue; record is ReviewDue.
-        // Fixed IDs so the UI/E2E tests can navigate directly to this review.
+        // Active probation — Carlos Rivera on probation under David Park (his actual line
+        // manager in EmployeesModule, and an HrAdministrator). ManagerCheckIn is overdue;
+        // record is ReviewDue. Fixed IDs so the UI/E2E tests can navigate directly to this review.
         var activeRecordId = Guid.Parse("40000000-0000-0000-0000-000000000010");
         var activeReviewId = Guid.Parse("50000000-0000-0000-0000-000000000100");
         var empCarlosId    = Guid.Parse("30000000-0000-0000-0000-000000000010");
-        var empJamesId     = Guid.Parse("30000000-0000-0000-0000-000000000002");
+        var empDavidId     = Guid.Parse("30000000-0000-0000-0000-000000000008");
 
         var activeRecord = ProbationRecord.Create(
-            activeRecordId, acmeId, empCarlosId, empJamesId,
+            activeRecordId, acmeId, empCarlosId, empDavidId,
             new DateOnly(2026, 4, 7), new DateOnly(2026, 7, 7), null, today, now);
         activeRecord.MarkReviewDue(now);
         db.ProbationRecords.Add(activeRecord);

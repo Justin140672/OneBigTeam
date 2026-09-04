@@ -9,6 +9,100 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// </summary>
 public sealed class EmployeeEditPage(IPage page, string baseUrl)
 {
+    // EmployeeEdit.razor's profile tabs are now two-level: an outer group strip
+    // (.employee-profile-groups — Overview / Career & Pay / Time Off / Tasks & Records / Assets /
+    // Activity) and, per group, an inner section strip (.employee-profile-sections). SfTab renders
+    // a group's inner strip only once that group is selected, so a section tab ("Leave",
+    // "Employment", …) isn't in the DOM until its group is opened. Select the group first.
+    // Groups whose single section is rendered directly under the group tab with NO inner
+    // ".employee-profile-sections" strip (see EmployeeEdit.razor — the "Assets" group's
+    // ContentTemplate renders <EmployeeAssetsTab> straight away, unlike Overview/Career & Pay/…
+    // which nest their own SfTab). For these, selecting the group tab IS opening the section —
+    // there is no section tab to click or wait for.
+    internal static readonly IReadOnlySet<string> FlatSingleSectionGroups = new HashSet<string> { "Assets" };
+
+    internal static readonly IReadOnlyDictionary<string, string> SectionGroups = new Dictionary<string, string>
+    {
+        ["Details"] = "Overview",
+        ["Employment"] = "Overview",
+        ["Probation"] = "Overview",
+        ["Emergency Contacts"] = "Overview",
+        ["Compensation History"] = "Career & Pay",
+        ["Promotion History"] = "Career & Pay",
+        ["Leave"] = "Time Off",
+        ["Sickness"] = "Time Off",
+        ["Tasks"] = "Tasks & Records",
+        ["Documents"] = "Tasks & Records",
+        ["Acknowledgement History"] = "Tasks & Records",
+        ["Onboarding"] = "Tasks & Records",
+        ["Offboarding"] = "Tasks & Records",
+        ["Leaving"] = "Tasks & Records",
+        ["Assets"] = "Assets",
+        ["Timeline"] = "Activity",
+        ["Notes"] = "Activity",
+        ["Audit"] = "Activity",
+    };
+
+    /// <summary>
+    /// Opens a profile section by first selecting its owning group tab, then the section tab.
+    /// Both strips are scoped to their own <c>.e-tab-header</c> so the group locator can't also
+    /// match a nested section tab of the same name (e.g. "Assets").
+    /// </summary>
+    public static async Task NavigateToSectionAsync(IPage page, string sectionName)
+    {
+        if (!SectionGroups.TryGetValue(sectionName, out var groupName))
+            throw new ArgumentException($"Unknown employee-profile section '{sectionName}'.", nameof(sectionName));
+
+        var groupTab = page.Locator(".employee-profile-groups > .e-tab-header")
+            .GetByRole(AriaRole.Tab, new() { Name = groupName, Exact = true });
+        await groupTab.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        await groupTab.ClickAsync();
+
+        // A flat single-section group ("Assets") has no inner strip — the group tab click above
+        // already opened the section content. Nothing more to do.
+        if (FlatSingleSectionGroups.Contains(groupName))
+            return;
+
+        var sectionTab = page.Locator(".employee-profile-sections > .e-tab-header")
+            .GetByRole(AriaRole.Tab, new() { Name = sectionName, Exact = true });
+        await sectionTab.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        await sectionTab.ClickAsync();
+    }
+
+    private Task OpenSectionAsync(string sectionName) => NavigateToSectionAsync(page, sectionName);
+
+    /// <summary>Selects the group that owns <paramref name="sectionName"/> (no-op if already selected).</summary>
+    public static async Task SelectOwningGroupAsync(IPage page, string sectionName)
+    {
+        if (!SectionGroups.TryGetValue(sectionName, out var groupName))
+            throw new ArgumentException($"Unknown employee-profile section '{sectionName}'.", nameof(sectionName));
+
+        var groupTab = page.Locator(".employee-profile-groups > .e-tab-header")
+            .GetByRole(AriaRole.Tab, new() { Name = groupName, Exact = true });
+        await groupTab.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        await groupTab.ClickAsync();
+    }
+
+    /// <summary>
+    /// The section tab locator, scoped to the inner section strip's header. Select its owning
+    /// group first (<see cref="SelectOwningGroupAsync"/> / <see cref="NavigateToSectionAsync"/>) —
+    /// the strip isn't in the DOM until the group is chosen.
+    /// </summary>
+    public static ILocator SectionTab(IPage page, string sectionName) =>
+        page.Locator(".employee-profile-sections > .e-tab-header")
+            .GetByRole(AriaRole.Tab, new() { Name = sectionName, Exact = true });
+
+    /// <summary>
+    /// True when a section tab is present in its group's strip. Selects the owning group first,
+    /// so this works for the "is it visible" / "is it hidden" lifecycle assertions regardless of
+    /// which group was previously active.
+    /// </summary>
+    public static async Task<bool> IsSectionTabPresentAsync(IPage page, string sectionName)
+    {
+        await SelectOwningGroupAsync(page, sectionName);
+        return await SectionTab(page, sectionName).IsVisibleAsync();
+    }
+
     public async Task GoToNewAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/new");
@@ -291,7 +385,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task OpenEmploymentTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Employment" }).ClickAsync();
+        await OpenSectionAsync("Employment");
         // Wait for the Employment-tab-specific heading — the generic .card-header selector
         // would resolve immediately against the Details tab's already-rendered card headers.
         await page.WaitForSelectorAsync(".card-header:has-text('Employment Details')", new() { Timeout = 15_000 });
@@ -539,6 +633,19 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>
+    /// Reads the current Employee Number shown on an existing employee's Employment section
+    /// (Overview group → Employment). Works in both edit and view mode — the field renders
+    /// read-only in view mode but still exposes its value.
+    /// </summary>
+    public async Task<string> GetEmployeeNumberFieldValueAsync()
+    {
+        await NavigateToSectionAsync(page, "Employment");
+        var field = page.GetByPlaceholder("e.g. EMP-001");
+        await field.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        return await field.InputValueAsync();
+    }
+
+    /// <summary>
     /// Returns true if the Employee Number text input is visible on the new-employee form —
     /// false when the company's numbering mode is Automatic, in which case the informational
     /// message below is shown instead (see <see cref="HasEmployeeNumberAutoAssignedMessageAsync"/>).
@@ -754,7 +861,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task OpenCompensationTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Compensation History" }).ClickAsync();
+        await OpenSectionAsync("Compensation History");
         await page.WaitForSelectorAsync(
             "[data-testid='compensation-history-grid'], [data-testid='no-compensation-message']",
             new() { Timeout = 15_000 });
@@ -931,7 +1038,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task OpenPromotionHistoryTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Promotion History" }).ClickAsync();
+        await OpenSectionAsync("Promotion History");
         await page.WaitForSelectorAsync(
             "[data-testid='promote-employee-btn']",
             new() { Timeout = 15_000 });
@@ -959,7 +1066,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task OpenAuditTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Audit" }).ClickAsync();
+        await OpenSectionAsync("Audit");
         await page.WaitForSelectorAsync(
             "[data-testid='audit-history-grid'], .alert-secondary",
             new() { Timeout = 15_000 });
@@ -1007,7 +1114,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task OpenProbationTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Probation" }).ClickAsync();
+        await OpenSectionAsync("Probation");
         // EmployeeEdit.razor always renders a ".card" above the tab strip (e.g. the "Reporting
         // Chain" card, for any employee who has a manager) — waiting on a bare
         // ".card, .alert-secondary" selector resolves immediately against that pre-existing card
@@ -1068,7 +1175,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task OpenTasksTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Tasks" }).ClickAsync();
+        await OpenSectionAsync("Tasks");
         await page.WaitForSelectorAsync(".e-grid, .task-cell, p", new() { Timeout = 15_000 });
     }
 
@@ -1088,7 +1195,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task OpenSicknessTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Sickness" }).ClickAsync();
+        await OpenSectionAsync("Sickness");
         // Same trap as OpenProbationTabAsync: EmployeeEdit.razor always renders a ".card" above
         // the tab strip, so a bare ".card, .alert-secondary" wait resolves immediately against
         // that pre-existing card instead of EmployeeSicknessTab's own async-loaded content — the
@@ -1188,7 +1295,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task OpenOnboardingTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).ClickAsync();
+        await OpenSectionAsync("Onboarding");
         // Wait for the tab content to render — either the progress panel's progress bar
         // (a plan exists) or the "No onboarding plan found for this employee" empty state.
         await page.WaitForSelectorAsync(".progress, .hr-empty-state", new() { Timeout = 15_000 });
@@ -1351,29 +1458,38 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task OpenNotesTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Notes" }).ClickAsync();
+        await OpenSectionAsync("Notes");
         await page.WaitForSelectorAsync(
             "[data-testid='add-note-btn'], [data-testid='no-notes-message']",
             new() { Timeout = 15_000 });
     }
 
     /// <summary>
-    /// Returns true if the "Notes" tab is visible — polls briefly rather than taking a single
-    /// IsVisibleAsync() snapshot, since (like Probation) it only renders once EmployeeEdit.razor's
-    /// own async LoadAsync sets its HR-administrator-gated flag, which can land after GoToAsync's
-    /// own wait condition (the Details tab's combobox) has already resolved on an earlier render.
+    /// Returns true if the "Notes" tab is present. Notes lives in the "Activity" group's inner
+    /// section strip (with Timeline and Audit), which SfTab only renders once that group is
+    /// selected — so select the owning group first rather than snapshotting a tab that isn't in
+    /// the DOM yet. It is also HR-administrator-gated (EmployeeEdit.razor's
+    /// @if(Session.IsHrAdministrator)) and that flag can land after GoToAsync's own wait
+    /// resolved, so retry briefly before giving up.
     /// </summary>
     public async Task<bool> HasNotesTabAsync()
     {
-        try
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (true)
         {
-            await Assertions.Expect(page.GetByRole(AriaRole.Tab, new() { Name = "Notes" }))
-                .ToBeVisibleAsync(new() { Timeout = 15_000 });
-            return true;
-        }
-        catch (PlaywrightException)
-        {
-            return false;
+            try
+            {
+                if (await IsSectionTabPresentAsync(page, "Notes"))
+                    return true;
+            }
+            catch (PlaywrightException)
+            {
+                // group tab not ready yet — fall through to the retry
+            }
+
+            if (DateTime.UtcNow > deadline)
+                return false;
+            await page.WaitForTimeoutAsync(250);
         }
     }
 

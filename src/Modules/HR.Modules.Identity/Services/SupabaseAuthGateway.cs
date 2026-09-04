@@ -427,6 +427,35 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         return removed;
     }
 
+    public async Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        // Admin API — SECRET key (server-only). GoTrue's admin list endpoint accepts a free-text
+        // `filter` that matches on email; we still compare the address exactly on the way out.
+        var http = CreateClient(options.Value.SecretKey);
+        var normalized = email.Trim().ToLowerInvariant();
+
+        using var response = await http.GetAsync(
+            $"/auth/v1/admin/users?filter={Uri.EscapeDataString(normalized)}&per_page=200", cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase list-users request failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<SupabaseAdminUsersResponse>(JsonOptions, cancellationToken);
+
+        var match = payload?.Users?.FirstOrDefault(u =>
+            string.Equals(u.Email?.Trim(), normalized, StringComparison.OrdinalIgnoreCase));
+
+        return match?.Id is { } id && Guid.TryParse(id, out var userId) ? userId : null;
+    }
+
+    private sealed record SupabaseAdminUsersResponse(List<SupabaseAdminUser>? Users);
+
+    private sealed record SupabaseAdminUser(string? Id, string? Email);
+
     public async Task SignOutAsync(string userAccessToken, CancellationToken cancellationToken)
     {
         // scope=global: revoke every refresh token for this user, not just the current session.

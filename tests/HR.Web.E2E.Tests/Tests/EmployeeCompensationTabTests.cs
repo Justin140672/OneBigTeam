@@ -38,16 +38,17 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         // depends on the employee's own async-loaded data (_showProbationTab etc.) — so a bare
         // instant IsVisibleAsync() here can race that and report "not visible" for a tab that's
         // genuinely there a moment later. A bounded wait avoids that.
-        await _page.GetByRole(AriaRole.Tab, new() { Name = "Compensation History" }).WaitForAsync(
+        await EmployeeEditPage.SelectOwningGroupAsync(_page, "Compensation History");
+        await EmployeeEditPage.SectionTab(_page, "Compensation History").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
         // Renamed from "Compensation" to "Compensation History" (the separate "Current
         // Compensation" card was removed entirely — see the next test).
         Assert.True(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Compensation History" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Compensation History"),
             "Expected a 'Compensation History' tab on the employee edit page");
         Assert.False(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Compensation", Exact = true }).IsVisibleAsync(),
+            await EmployeeEditPage.SectionTab(_page, "Compensation").IsVisibleAsync(),
             "Did not expect a tab labelled exactly 'Compensation' (renamed to 'Compensation History')");
     }
 

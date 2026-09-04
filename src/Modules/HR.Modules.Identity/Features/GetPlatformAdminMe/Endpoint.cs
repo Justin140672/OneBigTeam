@@ -29,17 +29,25 @@ internal sealed class Endpoint(
         var normalizedEmail = currentUser.Email?.Trim().ToLowerInvariant();
 
         var admin = await dbContext.PlatformAdministrators
-            .AsNoTracking()
             .Where(a => a.IsEnabled &&
                 ((a.SupabaseAuthUserId == userId) ||
                  (normalizedEmail != null && a.Email == normalizedEmail)))
-            .Select(a => new { a.SupabaseAuthUserId, a.Email, a.Role })
             .FirstOrDefaultAsync(ct);
 
         if (admin is null)
         {
             await Send.ResultAsync(TypedResults.Forbid());
             return;
+        }
+
+        // First authenticated request for an administrator whose row was created without a linked
+        // identity-provider account (Admin Portal creation, or config bootstrap): back-link it to
+        // the "sub" on the token now, so operations that need it (e.g. MFA reset) work without a
+        // separate email lookup. Mirrors UserProfile's self-heal.
+        if (admin.SupabaseAuthUserId != userId.Value)
+        {
+            admin.LinkSupabaseAuthUserId(userId.Value);
+            await dbContext.SaveChangesAsync(ct);
         }
 
         await Send.ResultAsync(TypedResults.Ok(new GetPlatformAdminMeResponse(

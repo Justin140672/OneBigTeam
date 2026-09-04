@@ -111,24 +111,20 @@ public sealed class FailedPaymentsDashboardTests(EmployeePersonaFixture fixture)
     }
 
     [Fact]
-    public async Task NonAllowListedPersona_SeesErrorBanner_NotFailedPaymentData()
+    public async Task NonAllowListedPersona_IsRejectedAtLogin_NotGivenFailedPaymentAccess()
     {
-        // Mirrors CustomerDetailsPageTests.NonAllowListedPersona_SeesErrorBanner_NotCustomerData —
-        // a valid dev-login persona that is not on "PlatformAdmin:AllowedEmails" still gets
-        // rejected server-side, which FailedPaymentsService surfaces as a null response and
-        // FailedPayments.razor renders as the "not authorised" dashboard-error branch.
+        // Mirrors CustomerDetailsPageTests.NonAllowListedPersona_IsRejectedAtLogin_NotGivenCustomerAccess —
+        // a valid dev-login persona that is not on "PlatformAdmin:AllowedEmails" is rejected on the
+        // Admin Portal login page itself (Login.razor probes /api/platform-admin/me), never handed
+        // a session cookie.
         var login = new AdminLoginPage(_page, _fixture.AdminWebBaseUrl);
-        var dashboard = new FailedPaymentsPage(_page, _fixture.AdminWebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(NonAllowListedEmail);
+        var error = await login.SubmitExpectingNotAuthorisedAsync(NonAllowListedEmail);
 
-        await dashboard.GoToAsync();
-
-        Assert.True(await dashboard.IsErrorBannerVisibleAsync(),
-            "Expected a non-allow-listed persona to see the unauthorised error banner");
-        Assert.False(await dashboard.IsGridVisibleAsync(),
-            "No failed payments grid should render for a non-allow-listed persona");
+        Assert.Contains("not authorised", error, StringComparison.OrdinalIgnoreCase);
+        Assert.True(login.IsOnLoginPage(),
+            "A non-allow-listed account must be rejected on the login page, not handed a session");
     }
 
     [Fact]

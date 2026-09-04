@@ -96,11 +96,12 @@ public static class SicknessModule
             Cron.Daily(3));
         jobManager.AddOrUpdate<SicknessEvidenceReminderJob>(
             "sickness-evidence-reminders",
-            job => job.ExecuteAsync(),
+            // CancellationToken.None is replaced by Hangfire with a live shutdown/abort token at run time.
+            job => job.ExecuteAsync(CancellationToken.None),
             Cron.Daily(4));
         jobManager.AddOrUpdate<ReturnToWorkReminderJob>(
             "return-to-work-reminders",
-            job => job.ExecuteAsync(),
+            job => job.ExecuteAsync(CancellationToken.None),
             Cron.Daily(5));
         jobManager.AddOrUpdate<AttendanceAlertEvaluationJob>(
             "attendance-alert-evaluation",

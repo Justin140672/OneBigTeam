@@ -26,15 +26,24 @@ public sealed class KeyboardAuthJourneyTests(ParallelBlankPersonaFixture fixture
             "Expected the email field to be focusable.");
         await _page.Keyboard.TypeAsync(TomEmail);
 
-        await _page.Keyboard.PressAsync("Tab");
+        // Tab forward to the password field — there is now a "Forgot password?" link between the
+        // email and password inputs, so don't assume a fixed number of hops.
+        for (var i = 0; i < 6 && await FocusedTypeAsync() != "password"; i++)
+            await _page.Keyboard.PressAsync("Tab");
+        Assert.Equal("password", await FocusedTypeAsync());
         await _page.Keyboard.TypeAsync(DevPersonaPassword);
 
-        // Tab to the submit button and activate it from the keyboard.
-        await _page.Keyboard.PressAsync("Tab");
-        var focusedTag = await _page.EvaluateAsync<string>("() => document.activeElement?.tagName ?? ''");
-        Assert.Equal("BUTTON", focusedTag);
+        // Tab forward to the submit button — there is a Show/Hide-password toggle button in
+        // between. Activate it from the keyboard.
+        for (var i = 0; i < 6 && await FocusedTypeAsync() != "submit"; i++)
+            await _page.Keyboard.PressAsync("Tab");
+        Assert.Equal("BUTTON", await _page.EvaluateAsync<string>("() => document.activeElement?.tagName ?? ''"));
+        Assert.Equal("submit", await FocusedTypeAsync());
         await _page.Keyboard.PressAsync("Enter");
 
         await _page.WaitForSelectorAsync(".app-shell", new() { Timeout = 45_000 });
     }
+
+    private Task<string> FocusedTypeAsync() =>
+        _page.EvaluateAsync<string>("() => document.activeElement?.getAttribute('type') ?? document.activeElement?.type ?? ''");
 }

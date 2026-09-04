@@ -99,20 +99,6 @@
                                             </div>
 
                                             @DefaultsCard()
-
-                                            <div class="d-flex gap-2 align-items-center mt-3 justify-content-end">
-                                                @if (!IsViewMode)
-                                                {
-                                                    <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
-                                                        @if (Saving)
-                                                        {
-                                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                                                        }
-                                                        Save
-                                                    </SfButton>
-                                                }
-                                                <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
-                                            </div>
                                         </EditForm>
                                     </div>
                                 </div>
@@ -150,7 +136,8 @@
                                     <PositionProfileInheritedRolesTab
                                         CompanyId="CompanyId"
                                         PositionProfileId="Id!.Value"
-                                        CanEdit="!IsViewMode" />
+                                        CanEdit="!IsViewMode"
+                                        SelectedRoleIds="Model.InheritedRoleIds" />
                                 </div>
                             </ContentTemplate>
                         </TabItem>
@@ -180,6 +167,24 @@
                     }
                 </TabItems>
             </SfTab>
+
+            @* One Save for the whole profile — the Details fields and the Inherited Roles tab all
+               feed PositionProfileEditModel and are persisted together by SaveCoreAsync. Sits
+               outside the tab control, like EmployeeEdit. (Required Documents / Required Assets
+               manage themselves inline.) *@
+            <div class="d-flex gap-2 align-items-center mt-4 justify-content-end">
+                @if (!IsViewMode)
+                {
+                    <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                        @if (Saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Save
+                    </SfButton>
+                }
+                <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+            </div>
         }
     }
 
@@ -276,6 +281,15 @@
 
                 _assignedEmployees = profile.AssignedEmployees ?? [];
             }
+
+            // Inherited-role defaults are edited on the "Inherited Roles" tab but persisted by this
+            // page's single Save (see SaveCoreAsync). The mandatory "Employee" role is implicit and
+            // never stored, so keep it out of the editable list.
+            var roleDefaults = await PositionProfileService.ListPositionRoleDefaultsAsync(CompanyId);
+            Model.InheritedRoleIds = roleDefaults?.Positions
+                .FirstOrDefault(p => p.PositionProfileId == Id!.Value)?.RoleIds
+                .Where(id => id != SystemRoleOptions.EmployeeRoleId)
+                .ToList() ?? [];
         }
     }
 
@@ -348,7 +362,19 @@
                 NoticePeriodLengthOverride: noticePeriodLengthOverride);
 
             var (success, error) = await PositionProfileService.UpdatePositionProfileAsync(CompanyId, Id!.Value, request);
-            return success ? null : error;
+            if (!success)
+                return error ?? "Failed to update position profile.";
+
+            // Persist the Inherited Roles tab's selection as part of the same Save. Employee is
+            // implicit and never stored. Idempotent PUT of the whole list.
+            var roleIds = Model.InheritedRoleIds
+                .Where(id => id != SystemRoleOptions.EmployeeRoleId)
+                .Distinct()
+                .ToList();
+            var rolesRequest = new SetPositionRoleDefaultsRequest(CompanyId, Id!.Value, roleIds);
+            var (rolesSaved, rolesError) =
+                await PositionProfileService.SetPositionRoleDefaultsAsync(CompanyId, Id!.Value, rolesRequest);
+            return rolesSaved ? null : rolesError ?? "Failed to save inherited roles.";
         }
     }
 

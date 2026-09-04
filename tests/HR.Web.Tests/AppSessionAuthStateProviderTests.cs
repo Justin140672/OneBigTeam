@@ -49,7 +49,7 @@ public class AppSessionAuthStateProviderTests
     {
         var userId    = Guid.NewGuid();
         var companyId = Guid.NewGuid();
-        var me        = new MeResponse(userId, companyId, "alice@example.com", [], false, false, false, false, true);
+        var me        = new MeResponse(userId, companyId, "alice@example.com", [], [], false, false, false, false, true);
 
         var factory  = BuildFactory(new JsonResponseHandler(me));
         var provider = new AppSessionAuthStateProvider(factory);

@@ -417,7 +417,8 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
 
         await GetSharedEmployeeAsync(empList, empEdit);
 
-        var detailsTab = _page.GetByRole(AriaRole.Tab, new() { Name = "Details" });
+        await EmployeeEditPage.SelectOwningGroupAsync(_page, "Details");
+        var detailsTab = EmployeeEditPage.SectionTab(_page, "Details");
         await detailsTab.FocusAsync();
         await Assertions.Expect(detailsTab).ToBeFocusedAsync(new() { Timeout = 5_000 });
 
@@ -425,7 +426,7 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         // between tabs within the tablist, matching standard ARIA tabs pattern.
         await _page.Keyboard.PressAsync("ArrowRight");
 
-        var employmentTab = _page.GetByRole(AriaRole.Tab, new() { Name = "Employment" });
+        var employmentTab = EmployeeEditPage.SectionTab(_page, "Employment");
         await Assertions.Expect(employmentTab).ToBeFocusedAsync(new() { Timeout = 5_000 });
 
         await _page.Keyboard.PressAsync("Enter");

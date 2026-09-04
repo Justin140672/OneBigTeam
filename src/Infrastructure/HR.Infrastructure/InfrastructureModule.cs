@@ -170,7 +170,8 @@ public static class InfrastructureModule
 
         GlobalJobFilters.Filters.Add(
             new BackgroundJobAuditFilter(
-                app.Services.GetRequiredService<IServiceScopeFactory>()));
+                app.Services.GetRequiredService<IServiceScopeFactory>(),
+                app.Services.GetRequiredService<ILogger<BackgroundJobAuditFilter>>()));
 
         app.MapGet("/health/background-jobs", (JobStorage jobStorage) =>
         {

@@ -23,7 +23,8 @@ public class ReturnToWorkReminderJobTests
         SicknessDbContext db,
         FakeNotificationWriter writer,
         Guid? managerId) =>
-        new(db, writer, new FakeManagerReader(managerId), new FakeClock(FixedUtcNow));
+        new(db, writer, new FakeManagerReader(managerId), new FakeClock(FixedUtcNow),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ReturnToWorkReminderJob>.Instance);
 
     private static async Task<ReturnToWorkReview> SeedReviewAsync(
         SicknessDbContext db,
@@ -161,8 +162,11 @@ public class ReturnToWorkReminderJobTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_Does_Not_Touch_Review_Already_Marked_Overdue()
+    public async Task ExecuteAsync_Reconciles_Missing_Overdue_Notification_For_Already_Overdue_Review_Exactly_Once()
     {
+        // OBT-REM-04: a review already persisted as Overdue whose overdue notification was never
+        // sent (prior run crashed after the status commit) gets that notification reconciled on a
+        // later run — exactly once across repeated runs.
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -175,7 +179,7 @@ public class ReturnToWorkReminderJobTests
         await job.ExecuteAsync();
         await job.ExecuteAsync();
 
-        Assert.DoesNotContain(writer.Written, n => n.Type == NotificationType.ReturnToWorkReviewOverdue);
+        Assert.Single(writer.Written, n => n.Type == NotificationType.ReturnToWorkReviewOverdue);
     }
 
     [Fact]

@@ -103,9 +103,31 @@ public abstract class EditPageBase : ComponentBase, IDisposable
         return ValueTask.CompletedTask;
     }
 
+    // The URL path (ignoring query string) that the current Model was loaded for. Blazor calls
+    // SetParametersAsync -> OnParametersSetAsync on EVERY re-render of this component's parent
+    // (MainLayout re-renders on persona switch, AppSession.Changed, LocationChanged, theme load,
+    // the employee-completion dialog closing, an AdminQuickNav search, ...), not only when this
+    // page's route parameters actually change. Without this guard every one of those parent
+    // re-renders flips the page back to its loading spinner and re-runs LoadAsync — which unmounts
+    // the form mid-edit (losing text the user has typed but not yet blurred) and, in edit mode,
+    // overwrites their changes with a fresh server copy. Only (re)load when the thing being edited
+    // actually changes: a real navigation to a different route (new <-> {id} <-> {id}/view).
+    private string? _loadedForPath;
+
+    // Query-string changes don't change identity by default (a "?tab=" or "?returnUrl=" tweak must
+    // not reload the page). A page that genuinely needs to reload on a query change overrides this.
+    protected virtual string LoadIdentity() =>
+        Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath;
+
     protected override async Task OnParametersSetAsync()
     {
         IsViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
+
+        var identity = LoadIdentity();
+        if (_loadedForPath == identity)
+            return;
+        _loadedForPath = identity;
+
         IsLoading = true;
         GlobalError = null;
         SuccessMsg = null;
@@ -113,7 +135,9 @@ public abstract class EditPageBase : ComponentBase, IDisposable
         // A throw out of LoadAsync (or a page's OnLoadedAsync hook fetching picker data) would
         // otherwise propagate out of OnParametersSetAsync and leave IsLoading pinned true — the
         // edit page then shows its loading spinner forever instead of the form or an error.
-        // Every edit page in the app derives from this base.
+        // Every edit page in the app derives from this base. Surface the real failure (not a
+        // generic message) so a broken picker/list endpoint is diagnosable rather than showing an
+        // empty dropdown with no explanation.
         try
         {
             await LoadAsync();
@@ -121,7 +145,7 @@ public abstract class EditPageBase : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
-            GlobalError = "Failed to load. Please try again.";
+            GlobalError = $"Failed to load this page: {ex.Message}";
             System.Diagnostics.Debug.WriteLine(ex);
         }
         finally

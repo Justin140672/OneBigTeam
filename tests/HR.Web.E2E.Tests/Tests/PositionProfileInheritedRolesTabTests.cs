@@ -61,6 +61,27 @@ public sealed class PositionProfileInheritedRolesTabTests(HrAdminPersonaFixture 
     }
 
     [Fact]
+    public async Task InheritedRolesTab_EmployeeRole_IsAlwaysCheckedAndDisabled()
+    {
+        var login  = new LoginPage(_page, _fixture.WebBaseUrl);
+        var list   = new PositionProfileListPage(_page, _fixture.WebBaseUrl);
+        var ppEdit = new PositionProfileEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await list.GoToAsync(AcmeId);
+        await list.OpenPositionProfileAsync(QaEngineerTitle);
+        await ppEdit.OpenInheritedRolesTabAsync();
+
+        // Everyone holding any position is always an Employee — the row is informational only.
+        Assert.True(await ppEdit.IsInheritedRoleCheckedAsync("Employee"),
+            "Expected the 'Employee' inherited role to always be checked");
+        Assert.True(await ppEdit.IsInheritedRoleDisabledAsync("Employee"),
+            "Expected the 'Employee' inherited role checkbox to be disabled (it cannot be unchecked)");
+    }
+
+    [Fact]
     public async Task InheritedRolesTab_CanCheckRole_AndPersistsAfterReload()
     {
         var login  = new LoginPage(_page, _fixture.WebBaseUrl);

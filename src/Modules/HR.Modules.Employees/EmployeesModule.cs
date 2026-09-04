@@ -572,6 +572,13 @@ public static class EmployeesModule
             // permanently hide it from those unrelated tests for the rest of the run (see
             // CreateEmployeeTests and EmployeePromotionTabTests).
             var posQaEngId = Guid.Parse("20000000-0000-0000-0000-00000000000B");
+            // "Senior Software Engineer" (posSenDevId) MUST stay unoccupied at seed time — many
+            // Recruitment E2E tests select it in VacancyDetail's "New Vacancy" Position Profile
+            // dropdown, which excludes any profile with a currently-active holder (see
+            // VacancyDetail.OnLoadedAsync), and several other test files' comments rely on that.
+            // James Okafor and Priya Sharma (the two seeded senior engineers) sit on this dedicated
+            // profile instead so the seed matches that contract.
+            var posPrincipalEngId = Guid.Parse("20000000-0000-0000-0000-00000000000C");
 
             db.PositionProfiles.AddRange(
                 PositionProfile.Create(posCtoId,        acmeId, deptEngId,     locLondonId, "Chief Technology Officer", null, null, null, null, null, null, null, acmeLeavePolicyId, now),
@@ -584,7 +591,8 @@ public static class EmployeesModule
                 PositionProfile.Create(posAeId,         acmeId, deptSalesId,   locLondonId, "Account Executive",        null, null, null, null, null, null, null, acmeLeavePolicyId, now),
                 PositionProfile.Create(posCfoId,        acmeId, deptFinanceId, locLondonId, "Chief Financial Officer",  null, null, null, null, null, null, null, acmeLeavePolicyId, now),
                 PositionProfile.Create(posMarketingCoordId, acmeId, deptSalesId, locLondonId, "Marketing Coordinator",  null, null, null, null, null, null, null, acmeLeavePolicyId, now),
-                PositionProfile.Create(posQaEngId,      acmeId, deptEngId,     locLondonId, "QA Engineer",              null, null, null, null, null, null, null, acmeLeavePolicyId, now));
+                PositionProfile.Create(posQaEngId,      acmeId, deptEngId,     locLondonId, "QA Engineer",              null, null, null, null, null, null, null, acmeLeavePolicyId, now),
+                PositionProfile.Create(posPrincipalEngId, acmeId, deptEngId,   locLondonId, "Principal Engineer",       null, null, null, null, null, null, null, acmeLeavePolicyId, now));
 
             var empCtoId      = Guid.Parse("30000000-0000-0000-0000-000000000001");
             var empSenDev1Id  = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -624,8 +632,8 @@ public static class EmployeesModule
 
             db.Employees.AddRange(
                 MakeAcme(empCtoId,      "Sarah",  "Chen",     "sarah.chen@acme.example",     new DateOnly(2020, 1, 6),  deptEngId,     posCtoId,        null,         new DateOnly(1982, 3, 15),  "Taiwanese", "Female", "sarah.chen@gmail.com",       "07700 900001", "14 Rivington Street",  null,       "London",      "Greater London",     "EC2A 3DU",  "ACME-001", etPermId),
-                MakeAcme(empSenDev1Id,  "James",  "Okafor",   "james.okafor@acme.example",   new DateOnly(2021, 3, 15), deptEngId,     posSenDevId,     empCtoId,     new DateOnly(1988, 7, 22),  "Nigerian",  "Male",   "james.okafor@outlook.com",   "07700 900002", "27 Coldharbour Lane",  "Flat 4",   "London",      "Greater London",     "SE5 9NR",   "ACME-002", etPermId),
-                MakeAcme(empSenDev2Id,  "Priya",  "Sharma",   "priya.sharma@acme.example",   new DateOnly(2021, 9, 1),  deptEngId,     posSenDevId,     empCtoId,     new DateOnly(1990, 11, 5),  "Indian",    "Female", "priya.sharma@gmail.com",     "07700 900003", "8 Brick Lane",         "Apt 2B",   "London",      "Greater London",     "E1 6RF",    "ACME-003", etPermId),
+                MakeAcme(empSenDev1Id,  "James",  "Okafor",   "james.okafor@acme.example",   new DateOnly(2021, 3, 15), deptEngId,     posPrincipalEngId, empCtoId,  new DateOnly(1988, 7, 22),  "Nigerian",  "Male",   "james.okafor@outlook.com",   "07700 900002", "27 Coldharbour Lane",  "Flat 4",   "London",      "Greater London",     "SE5 9NR",   "ACME-002", etPermId),
+                MakeAcme(empSenDev2Id,  "Priya",  "Sharma",   "priya.sharma@acme.example",   new DateOnly(2021, 9, 1),  deptEngId,     posPrincipalEngId, empCtoId,  new DateOnly(1990, 11, 5),  "Indian",    "Female", "priya.sharma@gmail.com",     "07700 900003", "8 Brick Lane",         "Apt 2B",   "London",      "Greater London",     "E1 6RF",    "ACME-003", etPermId),
                 MakeAcme(empDev1Id,     "Tom",    "Williams", "tom.williams@acme.example",   new DateOnly(2023, 2, 20), deptEngId,     posDevId,        empSenDev1Id, new DateOnly(1996, 4, 12),  "British",   "Male",   "tom.williams@hotmail.com",   "07700 900004", "52 Didsbury Road",     null,       "Manchester",  "Greater Manchester", "M20 5LH",   "ACME-004", etFixedTermId),
                 MakeAcme(empHrMgrId,    "Laura",  "Bennett",  "laura.bennett@acme.example",  new DateOnly(2019, 6, 3),  deptHrId,      posHrMgrId,      null,         new DateOnly(1979, 9, 28),  "British",   "Female", "laura.bennett@gmail.com",    "07700 900005", "3 Thornton Avenue",    null,       "London",      "Greater London",     "SW2 4HX",   "ACME-005", etPermId),
                 MakeAcme(empHrAdvId,    "Marcus", "Diallo",   "marcus.diallo@acme.example",  new DateOnly(2022, 11, 7), deptHrId,      posHrAdvisorId,  empHrMgrId,   new DateOnly(1991, 2, 14),  "French",    "Male",   "marcus.diallo@gmail.com",    "07700 900006", "19 Seven Sisters Road","Floor 2",  "London",      "Greater London",     "N4 2BY",    "ACME-006", etPermId),

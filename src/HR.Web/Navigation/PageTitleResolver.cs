@@ -56,7 +56,6 @@ public static class PageTitleResolver
     private static readonly Dictionary<string, string> ReportTitles = new(StringComparer.Ordinal)
     {
         ["document-acknowledgement"] = "Document Acknowledgement Report",
-        ["compliance-centre"] = "Compliance Centre",
         ["document-compliance"] = "Document Compliance Report",
         ["asset-assignment"] = "Asset Assignment Report",
         ["employee-directory"] = "Employee Directory Report",

@@ -63,10 +63,10 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         await login.GoToAsync();
         await login.LoginAsync(HrAdminEmail);
 
-        Assert.True(await sidebar.HasTopLevelMenuItemAsync("HR Settings"),
-            "Expected Laura (HrAdministrator) to see the 'HR Settings' nav link");
+        Assert.True(await sidebar.HasGroupedMenuItemAsync("HR configuration", "HR Settings"),
+            "Expected Laura (HrAdministrator) to see the 'HR Settings' nav link under 'HR configuration'");
 
-        await sidebar.ClickTopLevelMenuItemAsync("HR Settings");
+        await sidebar.ClickGroupedMenuItemAsync("HR configuration", "HR Settings");
         await _page.WaitForURLAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/hr-settings", new() { Timeout = 15_000 });
     }
 
@@ -251,7 +251,160 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         await login.GoToAsync();
         await login.LoginAsync(HrAdminEmail);
 
-        Assert.True(await sidebar.HasTopLevelMenuItemAsync("HR Settings"),
-            "Expected Laura (HrAdministrator) to see the 'HR Settings' nav link");
+        Assert.True(await sidebar.HasGroupedMenuItemAsync("HR configuration", "HR Settings"),
+            "Expected Laura (HrAdministrator) to see the 'HR Settings' nav link under 'HR configuration'");
+    }
+
+    // ── Employee-number renumbering ────────────────────────────────────────────
+    // There is no "Backfill Employee Numbers" button any more. Instead: changing the prefix or
+    // minimum length WHILE the company is in Automatic mode pops a "Renumber existing employees?"
+    // confirmation, and confirming it queues a background job that rewrites EVERY existing
+    // employee's number to the new format. A Manual <-> Automatic mode switch does NOT renumber
+    // (existing numbers are left as-is). These exercise that flow through the UI; the handler /
+    // job / outbox mechanics are covered by UpdateHrSettingsHandlerTests,
+    // EmployeeRenumberSideEffectJobTests and EmployeeRenumberSideEffectEndpointTests.
+
+    private static readonly Guid GraceKimEmployeeId = Guid.Parse("30000000-0000-0000-0000-000000000015");
+
+    [Fact]
+    public async Task PrefixChange_ShowsRenumberDialog_AndConfirming_RenumbersExistingEmployees()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(BetaHrAdminEmail);
+
+        await hrSettings.GoToAsync(BetaCorpId);
+        var initialMode = await hrSettings.GetEmployeeNumberModeAsync();
+
+        var newPrefix = $"RN{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}-";
+
+        try
+        {
+            await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
+
+            // Changing the prefix in Automatic mode interposes the "Renumber existing employees?"
+            // confirmation. A prior renumber from another test in this serial class may still be
+            // processing (SET-08 allows only one in flight per company, 409ing the rest) — retry a
+            // few times, waiting it out, so this test isn't order-dependent.
+            var accepted = false;
+            for (var attempt = 1; attempt <= 4 && !accepted; attempt++)
+            {
+                await hrSettings.GoToAsync(BetaCorpId);
+                await hrSettings.SetEmployeeNumberPrefixAsync(newPrefix);
+                await hrSettings.ClickSaveAsync();
+
+                Assert.True(await hrSettings.IsRenumberDialogVisibleAsync(),
+                    "Expected the 'Renumber existing employees?' confirmation after changing the prefix in Automatic mode");
+
+                await hrSettings.ConfirmRenumberAsync();
+                await _page.WaitForSpinnerToClearAsync();
+
+                if (await hrSettings.HasErrorAsync())
+                    await _page.WaitForTimeoutAsync(15_000); // another company renumber still running — wait then retry
+                else
+                    accepted = true;
+            }
+
+            Assert.True(accepted, "The renumber-triggering save kept 409ing on a still-processing prior renumber");
+
+            // The renumber runs as a background job — poll an existing Beta employee until her
+            // number is rewritten to the new format.
+            await empEdit.GoToViewAsync(BetaCorpId, GraceKimEmployeeId);
+
+            var deadline = DateTime.UtcNow.AddSeconds(90);
+            var number = await empEdit.GetEmployeeNumberFieldValueAsync();
+            while (!number.StartsWith(newPrefix, StringComparison.Ordinal) && DateTime.UtcNow < deadline)
+            {
+                await _page.WaitForTimeoutAsync(3_000);
+                await _page.ReloadAsync();
+                number = await empEdit.GetEmployeeNumberFieldValueAsync();
+            }
+
+            Assert.StartsWith(newPrefix, number);
+        }
+        finally
+        {
+            await hrSettings.GoToAsync(BetaCorpId);
+            await hrSettings.SelectEmployeeNumberModeAsync(initialMode);
+            await hrSettings.SaveAsync();
+        }
+    }
+
+    [Fact]
+    public async Task PrefixChange_RenumberDialog_Cancel_AbandonsTheSave()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(BetaHrAdminEmail);
+
+        await hrSettings.GoToAsync(BetaCorpId);
+        var initialMode = await hrSettings.GetEmployeeNumberModeAsync();
+
+        try
+        {
+            await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
+            var prefixBefore = await hrSettings.GetEmployeeNumberPrefixAsync();
+
+            await hrSettings.SetEmployeeNumberPrefixAsync($"CX{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}-");
+            await hrSettings.ClickSaveAsync();
+
+            Assert.True(await hrSettings.IsRenumberDialogVisibleAsync());
+            await hrSettings.CancelRenumberAsync();
+
+            // Cancel abandons the save entirely — reload and the prefix is unchanged.
+            await hrSettings.GoToAsync(BetaCorpId);
+            Assert.Equal(prefixBefore, await hrSettings.GetEmployeeNumberPrefixAsync());
+        }
+        finally
+        {
+            await hrSettings.GoToAsync(BetaCorpId);
+            await hrSettings.SelectEmployeeNumberModeAsync(initialMode);
+            await hrSettings.SaveAsync();
+        }
+    }
+
+    [Fact]
+    public async Task SwitchingManualToAutomatic_DoesNotShowRenumberDialog()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(BetaHrAdminEmail);
+
+        await hrSettings.GoToAsync(BetaCorpId);
+        var initialMode = await hrSettings.GetEmployeeNumberModeAsync();
+
+        try
+        {
+            await hrSettings.SelectEmployeeNumberModeAsync("Manual");
+            await hrSettings.SaveAsync();
+            Assert.False(await hrSettings.HasErrorAsync());
+
+            await hrSettings.GoToAsync(BetaCorpId);
+            await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
+            await hrSettings.SetEmployeeNumberPrefixAsync($"MA{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}-");
+            await hrSettings.ClickSaveAsync();
+
+            Assert.False(await hrSettings.IsRenumberDialogVisibleAsync(),
+                "Manual -> Automatic must not trigger the renumber confirmation — existing numbers are left as-is");
+
+            await _page.WaitForSpinnerToClearAsync();
+            Assert.False(await hrSettings.HasErrorAsync());
+
+            await hrSettings.GoToAsync(BetaCorpId);
+            Assert.Equal("Automatic", await hrSettings.GetEmployeeNumberModeAsync());
+        }
+        finally
+        {
+            await hrSettings.GoToAsync(BetaCorpId);
+            await hrSettings.SelectEmployeeNumberModeAsync(initialMode);
+            await hrSettings.SaveAsync();
+        }
     }
 }

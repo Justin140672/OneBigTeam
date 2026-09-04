@@ -18,7 +18,10 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// </summary>
 public sealed class EmployeeCompletionDialogPage(IPage page)
 {
-    private ILocator Dialog => page.Locator(".employee-completion-dialog");
+    // Syncfusion's SfDialog stamps CssClass onto BOTH the outer ".e-dlg-container" positioning
+    // wrapper AND the inner ".e-dialog[role=dialog]" element, so a bare ".employee-completion-dialog"
+    // matches two nodes and trips Playwright strict mode. Scope to the actual dialog element.
+    private ILocator Dialog => page.Locator("[role='dialog'].employee-completion-dialog");
 
     public async Task WaitForVisibleAsync() =>
         await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
@@ -52,10 +55,18 @@ public sealed class EmployeeCompletionDialogPage(IPage page)
 
     public Task<string> ReadOnlyLastNameText() => ReadOnlyLastName.InnerTextAsync();
 
-    /// <summary>First name is rendered as static display text — there is no editable input for it.</summary>
-    public async Task<bool> IsFirstNameEditable() => await Dialog.GetByPlaceholder("First name").CountAsync() > 0;
+    /// <summary>
+    /// First/last name are rendered as static ".ecd-readonly" display text (role="text"), not
+    /// inputs. "Editable" means an actual &lt;input&gt;/&lt;textarea&gt; carrying the field's own
+    /// label association exists — checked against the label id rather than a placeholder, since the
+    /// Preferred Name input's placeholder ("Defaults to first name") contains "first name" and
+    /// Playwright's GetByPlaceholder is a case-insensitive substring match.
+    /// </summary>
+    public async Task<bool> IsFirstNameEditable() =>
+        await Dialog.Locator("input[aria-labelledby='ecd-firstname-label'], textarea[aria-labelledby='ecd-firstname-label'], input#ecd-firstname, textarea#ecd-firstname").CountAsync() > 0;
 
-    public async Task<bool> IsLastNameEditable() => await Dialog.GetByPlaceholder("Last name").CountAsync() > 0;
+    public async Task<bool> IsLastNameEditable() =>
+        await Dialog.Locator("input[aria-labelledby='ecd-lastname-label'], textarea[aria-labelledby='ecd-lastname-label'], input#ecd-lastname, textarea#ecd-lastname").CountAsync() > 0;
 
     public Task<bool> NameCorrectionNoteVisibleAsync() =>
         Dialog.GetByText("Need to correct your name? Contact your HR administrator after setup.").IsVisibleAsync();
@@ -75,7 +86,11 @@ public sealed class EmployeeCompletionDialogPage(IPage page)
     {
         var field = Dialog.GetByPlaceholder(placeholder);
         await field.FillAsync(value);
-        await field.BlurAsync();
+        // Tab (not a bare .blur()) to commit: stock SfTextBox only raises ValueChanged on the
+        // native "change" event, and a real focus move is the reliable way to fire it — matching
+        // every other page object in this suite. A programmatic element.blur() does not always
+        // produce "change" for a Syncfusion-wrapped input.
+        await field.PressAsync("Tab");
     }
 
     public Task FillPreferredNameAsync(string value) => FillFieldAsync("Defaults to first name", value);
@@ -112,7 +127,8 @@ public sealed class EmployeeCompletionDialogPage(IPage page)
 
     public Task FillPostcodeAsync(string value) => FillFieldAsync("e.g. SW1A 1AA", value);
 
-    public Task FillCountryAsync(string value) => FillFieldAsync("e.g. United Kingdom", value);
+    // Country is not shown on the completion dialog (UK-only for now — Model.Country defaults to
+    // "United Kingdom").
 
     /// <summary>
     /// Fills every required field with valid values (plus a fixed Nationality/Gender selection),

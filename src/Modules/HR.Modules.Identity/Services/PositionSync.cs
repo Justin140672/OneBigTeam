@@ -33,7 +33,12 @@ internal sealed class PositionSync(IdentityDbContext db, IPositionProfileReader 
     public async Task<Position?> EnsureExistsAsync(
         Guid companyId, Guid positionProfileId, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var existing = await db.Positions.FirstOrDefaultAsync(p => p.Id == positionProfileId, cancellationToken);
+        // FindAsync (not a query): checks the context's already-tracked entities before hitting the
+        // DB. The reconciliation loop calls this once per employee, and several employees can share
+        // one PositionProfile — a plain query would miss the row this loop just Added-but-not-yet-
+        // saved for an earlier employee and Add() it a second time, throwing an identity conflict
+        // on the duplicate key. Position.Id IS the PositionProfile id, so a key lookup is exact.
+        var existing = await db.Positions.FindAsync([positionProfileId], cancellationToken);
 
         var summary = await positionProfileReader.GetSummaryAsync(companyId, positionProfileId, cancellationToken);
         if (summary is null)
@@ -43,7 +48,24 @@ internal sealed class PositionSync(IdentityDbContext db, IPositionProfileReader 
         {
             var created = Position.Create(positionProfileId, companyId, summary.Title, now);
             db.Positions.Add(created);
-            return created;
+
+            // Persist the row now, tolerating a concurrent creator. identity.positions is a lazy
+            // projection created from several unsynchronised triggers — an employee-created /
+            // position-changed integration event, the startup reconciliation loop, and an admin
+            // opening the role-defaults screen — which can race to insert the same key. Without
+            // this, the loser's later SaveChangesAsync (e.g. SetPositionRoleDefaultsHandler's
+            // combined position + position_roles insert) blew up with a duplicate-key
+            // DbUpdateException and 500'd the request.
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                return created;
+            }
+            catch (DbUpdateException)
+            {
+                db.Entry(created).State = EntityState.Detached;
+                return await db.Positions.FindAsync([positionProfileId], cancellationToken);
+            }
         }
 
         if (!string.Equals(existing.Name, summary.Title, StringComparison.Ordinal))

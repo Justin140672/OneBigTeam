@@ -126,7 +126,7 @@ public class GetRecentLeaveRequestsHierarchyScopeTests
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             db, reader, new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService(), new FakeCurrentUser(manager));
+            new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(manager));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(manager), CancellationToken.None);
 
@@ -149,7 +149,7 @@ public class GetRecentLeaveRequestsHierarchyScopeTests
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             db, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(caller));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(caller));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), CancellationToken.None);
 
@@ -169,7 +169,7 @@ public class GetRecentLeaveRequestsHierarchyScopeTests
 
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             db, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService(), new FakeCurrentUser(caller));
+            new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(caller));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), CancellationToken.None);
 

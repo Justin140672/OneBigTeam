@@ -57,8 +57,8 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
             await login.LoginAsync(LauraEmail);
 
             // Acme's Employee Number Mode is shared, mutable company state that other test
-            // classes (HrSettingsPageTests, BackfillEmployeeNumbersTests, etc.) flip between
-            // Manual and Automatic via the UI. This test's row supplies an explicit
+            // classes (HrSettingsPageTests, etc.) flip between Manual and Automatic via the UI.
+            // This test's row supplies an explicit
             // "Employee Number" value, which EmployeeStagingRowValidator rejects outright when
             // the company is in Automatic mode (see ValidateEmployeeNumberField) — so set the
             // mode deterministically rather than assuming whatever an earlier test happened to

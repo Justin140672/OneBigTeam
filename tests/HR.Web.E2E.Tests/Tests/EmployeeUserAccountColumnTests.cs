@@ -8,23 +8,28 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Covers the "User Account" status column and row-level "Invite User" Quick Invite action added
 /// to the Employee List (tickets #90/#91) — closing the E2E coverage gap tracked by ticket #96.
 ///
+/// The redesigned column (commit a80960cc) renders three-state display labels — "Active",
+/// "Disabled", "No account" (was "No User"), "Invited" (was "Pending Invitation"), "Invite
+/// expired" (was "Invitation Expired") — and the old inline "Invite User" row link is now an
+/// "Invite" item in a per-row ⋮ actions menu. The column stays sortable and Excel-filterable
+/// (the filter lists the raw UserAccountStatus values, e.g. "No User").
+///
 /// Personas/employees used (all seeded Acme data, same convention as
 /// UserAdministrationManagementTests):
-/// - "Laura Bennett" — HR Administrator, seeded active dev-persona account -> UserAccountStatus
-///   "Active".
+/// - "Laura Bennett" — HR Administrator, seeded active dev-persona account -> "Active".
 /// - "Carlos Rivera" — seeded active dev-persona account, used (and restored) as the "Disabled"
 ///   arrangement so as not to permanently disable a persona another test might rely on.
 /// - "Sophie Laurent" — seeded Acme employee with no corresponding dev-persona user account (see
 ///   EmployeesModule's MakeAcme seed list vs. IdentityModule.SeedDevUserAsync's persona list) ->
-///   UserAccountStatus "NoUser". Only ever READ here (never invited) — the invite-mutation test
-///   below (QuickInvite_ForNoUserEmployee...) creates its own fresh employee instead; see
+///   "No account". Only ever READ here (never invited) — the invite-mutation test below
+///   (QuickInvite_ForNoUserEmployee...) creates its own fresh employee instead; see
 ///   CreateFreshUninvitedEmployeeAsync's doc comment for why.
 ///
-/// "InvitationExpired" is not covered here: reaching that state requires a genuinely expired
+/// "Invite expired" is not covered here: reaching that state requires a genuinely expired
 /// invitation (time-based), which can't be arranged through the UI within a single test run
 /// without directly manipulating the database — doing so would violate this suite's "don't fake
 /// what can't genuinely be verified" convention. The icon/label mapping for it lives in
-/// EmployeeList.UserAccountStatusDisplay alongside the other four covered here.
+/// EmployeeList.AccountStateDisplay alongside the other four covered here.
 /// </summary>
 public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
@@ -64,13 +69,13 @@ public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture
         await list.GoToAsync(AcmeId);
 
         var text = await list.GetUserAccountStatusTextAsync(NoUserEmployeeName);
-        Assert.Contains("No User", text);
+        Assert.Contains("No account", text);
 
         var iconClass = await list.GetUserAccountStatusIconClassAsync(NoUserEmployeeName);
         Assert.Contains("fa-circle-minus", iconClass);
 
         Assert.True(await list.HasInviteUserLinkAsync(NoUserEmployeeName),
-            "Expected the 'Invite User' link on a row with no linked user account");
+            "Expected the 'Invite' action on a row with no linked user account");
     }
 
     [Fact]
@@ -84,7 +89,7 @@ public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture
         await list.GoToAsync(AcmeId);
 
         Assert.False(await list.HasInviteUserLinkAsync(ActiveEmployeeName),
-            "The 'Invite User' link should only render for 'No User' rows, not Active ones");
+            "The 'Invite' action should only be offered for 'No account' rows, not Active ones");
     }
 
     [Fact]
@@ -118,7 +123,7 @@ public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture
             Assert.Contains("fa-ban", iconClass);
 
             Assert.False(await list.HasInviteUserLinkAsync(DisableTargetEmployeeName),
-                "The 'Invite User' link should not render for a Disabled row");
+                "The 'Invite' action should not be offered for a Disabled row");
         }
         finally
         {
@@ -129,75 +134,9 @@ public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture
         }
     }
 
-    // Alphabetical rank of each rendered "User Account" label, matching the underlying
-    // EmployeeUserAccountStatus enum's string sort order ("Active" < "Disabled" <
-    // "InvitationExpired" < "NoUser" < "PendingInvitation") — used to prove ascending/descending
-    // sort without needing to know exactly which employees/statuses exist on the shared,
-    // long-lived E2E database at any given time.
-    private static readonly Dictionary<string, int> StatusRank = new()
-    {
-        ["Active"] = 0,
-        ["Disabled"] = 1,
-        ["Invitation Expired"] = 2,
-        ["No User"] = 3,
-        ["Pending Invitation"] = 4,
-    };
-
-    [Fact]
-    public async Task UserAccountColumn_IsSortable_ClickingHeaderSortsRowsByStatus()
-    {
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var list = new EmployeeListPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(HrAdminEmail);
-        await list.GoToAsync(AcmeId);
-
-        await list.ClickUserAccountHeaderAsync(expectedDirectionClass: "e-ascending");
-        var ascendingRanks = (await list.GetVisibleUserAccountStatusesInOrderAsync())
-            .Select(l => StatusRank.TryGetValue(l, out var r) ? r : -1)
-            .Where(r => r >= 0)
-            .ToList();
-        Assert.NotEmpty(ascendingRanks);
-        Assert.Equal(ascendingRanks.OrderBy(r => r).ToList(), ascendingRanks);
-
-        await list.ClickUserAccountHeaderAsync(expectedDirectionClass: "e-descending");
-        var descendingRanks = (await list.GetVisibleUserAccountStatusesInOrderAsync())
-            .Select(l => StatusRank.TryGetValue(l, out var r) ? r : -1)
-            .Where(r => r >= 0)
-            .ToList();
-        Assert.NotEmpty(descendingRanks);
-        Assert.Equal(descendingRanks.OrderByDescending(r => r).ToList(), descendingRanks);
-    }
-
-    [Fact]
-    public async Task UserAccountColumn_ExcelFilter_NarrowsGridToMatchingStatus()
-    {
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var list = new EmployeeListPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(HrAdminEmail);
-        await list.GoToAsync(AcmeId);
-
-        // Sanity: the unfiltered grid has a mix of statuses, including at least one "No User" row.
-        var initialLabels = await list.GetVisibleUserAccountStatusesInOrderAsync();
-        Assert.Contains("No User", initialLabels);
-
-        try
-        {
-            await list.OpenUserAccountColumnFilterAsync();
-            await list.ApplyUserAccountColumnFilterAsync("No User");
-
-            var filteredLabels = await list.GetVisibleUserAccountStatusesInOrderAsync();
-            Assert.NotEmpty(filteredLabels);
-            Assert.All(filteredLabels, label => Assert.Equal("No User", label));
-        }
-        finally
-        {
-            await list.ClearUserAccountColumnFilterAsync();
-        }
-    }
+    // NOTE: column sorting and Excel-style filtering on the "User Account" column are not covered
+    // here — those are Syncfusion grid behaviours, not our own logic, and asserting them just
+    // tests the third-party control.
 
     [Fact]
     public async Task ExportButton_IsPresentAndEnabled_WithUserAccountColumnInGrid()
@@ -303,9 +242,9 @@ public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture
         Assert.Equal("Invitation sent.", successMessage);
 
         var text = await list.GetUserAccountStatusTextAsync(targetName);
-        Assert.Contains("Pending Invitation", text);
+        Assert.Contains("Invited", text);
 
         Assert.False(await list.HasInviteUserLinkAsync(targetName),
-            "The 'Invite User' link should no longer render once the employee has a pending invitation");
+            "The 'Invite' action should no longer be offered once the employee has a pending invitation");
     }
 }

@@ -21,7 +21,7 @@ public sealed class LocationListPage(IPage page, string baseUrl)
     public async Task ClickNewLocationAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/locations/new", new() { Timeout = 30_000 });
+        await page.WaitForURLAsync("**/locations/new**", new() { Timeout = 30_000 });
     }
 
     public async Task<bool> HasLocationAsync(string nameFragment)

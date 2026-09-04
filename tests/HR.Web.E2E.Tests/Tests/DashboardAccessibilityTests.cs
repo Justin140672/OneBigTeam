@@ -177,18 +177,12 @@ public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : Cros
         await Assertions.Expect(details.Locator("table")).ToHaveCountAsync(1);
     }
 
-    [Fact]
-    public async Task HrDashboardCharts_ProvideAccessibleTableAlternative()
-    {
-        await LoginAsync(HrEmail);
-        await _page.GotoAsync($"{_fixture.WebBaseUrl}/dashboard/hr");
-
-        var details = _page.Locator("details", new() { HasText = "as a table" }).First;
-        await details.WaitForAsync(new() { Timeout = 20_000 });
-
-        await Assertions.Expect(details.Locator("summary")).ToContainTextAsync(new Regex("View .* as a table"));
-        await Assertions.Expect(details.Locator("table").First).ToBeVisibleAsync();
-    }
+    // NOTE: there is no "…ProvideAccessibleTableAlternative" test for the HR dashboard — its
+    // insight tiles (Headcount by Department, Gender Split, Employment Type Split) render as
+    // accessible HTML bar components (HorizontalBarChart / the custom headcount bars) with
+    // aria-labels and visible values, not SVG/canvas Syncfusion charts, so there is no chart
+    // needing a separate <details>/<table> alternative. The recruitment "Insights" tab still
+    // uses a real SfChart — see RecruitmentInsightsCharts_ProvideAccessibleTableAlternative above.
 
     // ── Responsive: no horizontal overflow ─────────────────────────────────
 

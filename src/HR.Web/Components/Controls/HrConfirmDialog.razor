@@ -1,22 +1,23 @@
-@if (Visible)
-{
-    <SfDialog Visible="Visible" IsModal="true" Width="420px" ShowCloseIcon="false">
-        <DialogTemplates>
-            <Header>@Title</Header>
-            <Content>@Message</Content>
-            <FooterTemplate>
-                <SfButton IsPrimary="true" CssClass="@(DangerConfirm ? "e-danger" : "")" Disabled="Busy" OnClick="OnConfirmed">
-                    @if (Busy)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                    }
-                    @ConfirmText
-                </SfButton>
-                <SfButton Disabled="Busy" OnClick="OnCancelled">@CancelText</SfButton>
-            </FooterTemplate>
-        </DialogTemplates>
-    </SfDialog>
-}
+@* Kept mounted and toggled via Visible (not wrapped in @if) so Syncfusion's SfDialog runs its
+   normal open/close lifecycle — including returning keyboard focus to the element that was
+   focused when it opened (NFR-05). An @if wrapper tears the dialog out of the render tree before
+   that focus-restoration can run, dropping focus to <body>. *@
+<SfDialog Visible="Visible" IsModal="true" Width="420px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>@Title</Header>
+        <Content>@Message</Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" CssClass="@(DangerConfirm ? "e-danger" : "")" Disabled="Busy" OnClick="OnConfirmed">
+                @if (Busy)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                @ConfirmText
+            </SfButton>
+            <SfButton Disabled="Busy" OnClick="OnCancelled">@CancelText</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
 
 @code {
     // Generic app-wide confirmation "message box" — mirrors UnsavedChangesDialog's structure

@@ -24,7 +24,7 @@ public sealed class PublicHolidayListPage(IPage page, string baseUrl)
     public async Task ClickNewPublicHolidayAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/public-holidays/new", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/public-holidays/new**", new() { Timeout = 15_000 });
     }
 
     public Task<bool> HasHolidayAsync(string nameFragment) =>

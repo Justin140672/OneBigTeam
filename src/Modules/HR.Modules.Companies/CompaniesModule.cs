@@ -127,7 +127,11 @@ public static class CompaniesModule
         var now = DateTimeOffset.UtcNow;
 
         var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var acme = await db.Companies.SingleOrDefaultAsync(c => c.Id == acmeId);
+        // Include(Settings): the "if (acme.Settings is null)" guard below must reflect what's
+        // actually in the DB. Without this the navigation is always null on an existing DB, so the
+        // seeder tries to INSERT a second company_settings row and SaveChanges fails with a
+        // duplicate PK_company_settings on every app start after the first.
+        var acme = await db.Companies.Include(c => c.Settings).SingleOrDefaultAsync(c => c.Id == acmeId);
         if (acme is null)
         {
             acme = Company.Create(acmeId, "Acme Corporation", now);
@@ -143,7 +147,7 @@ public static class CompaniesModule
         }
 
         var betaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
-        var betaCorp = await db.Companies.SingleOrDefaultAsync(c => c.Id == betaCorpId);
+        var betaCorp = await db.Companies.Include(c => c.Settings).SingleOrDefaultAsync(c => c.Id == betaCorpId);
         if (betaCorp is null)
         {
             betaCorp = Company.Create(betaCorpId, "Beta Corp", now);

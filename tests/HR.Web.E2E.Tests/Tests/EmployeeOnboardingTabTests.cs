@@ -43,6 +43,39 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         return (seeded.EmployeeId, seeded.LastName);
     }
 
+    /// <summary>
+    /// Creates a brand-new Acme employee through the "New Employee" UI. EmployeeCreatedHandler
+    /// then provisions an onboarding plan + the 3 default checklist tasks for it. Used by the
+    /// plan-completion test, which must not mutate a shared pool employee.
+    /// </summary>
+    private async Task<(Guid EmployeeId, string LastName)> CreateGenuinelyFreshEmployeeAsync(
+        EmployeeListPage empList, EmployeeEditPage empEdit)
+    {
+        var unique   = Guid.NewGuid().ToString("N")[..8];
+        var lastName = $"OnbFresh{unique}";
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync($"e2e.onbfresh{unique}@acme.example");
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-ONB-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
+        await empEdit.SaveNewEmployeeAsync();
+
+        await empList.ClickEmployeeAsync(lastName);
+        var employeeId = Guid.Parse(System.Text.RegularExpressions.Regex.Match(
+            _page.Url, @"/employees/([0-9a-fA-F-]{36})").Groups[1].Value);
+
+        return (employeeId, lastName);
+    }
+
     [Fact]
     public async Task OnboardingTab_IsVisible_OnNewlyCreatedEmployee()
     {
@@ -56,7 +89,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 0);
 
         Assert.True(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Onboarding"),
             "Expected an 'Onboarding' tab on the employee edit page");
     }
 
@@ -146,10 +179,14 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var (employeeId, lastName) = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 1);
+        // This test COMPLETES the plan, which is irreversible — a shared pool employee could only
+        // ever pass on the very first run against a given database. Create a genuinely new
+        // employee so it's self-contained; EmployeeCreatedHandler provisions its onboarding plan +
+        // the 3 default checklist tasks (async, so the tab-visibility check below doubles as the wait).
+        var (employeeId, lastName) = await CreateGenuinelyFreshEmployeeAsync(empList, empEdit);
 
         Assert.True(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).IsVisibleAsync(),
+            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Onboarding"),
             "Expected the Onboarding tab to be visible while the plan is not yet completed");
 
         // Claim and complete all three default checklist tasks — the plan only transitions to
@@ -198,7 +235,8 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         // depends on its own async plan-status load — a bare IsVisibleAsync() snapshot right after
         // navigation can catch that transient state instead of the settled (hidden) one. Use an
         // auto-retrying negative assertion instead of a one-shot check.
-        await Assertions.Expect(_page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }))
+        await EmployeeEditPage.SelectOwningGroupAsync(_page, "Onboarding");
+        await Assertions.Expect(EmployeeEditPage.SectionTab(_page, "Onboarding"))
             .Not.ToBeVisibleAsync(new() { Timeout = 15_000 });
 
         // The underlying data isn't deleted — HR can still find the completion in Audit history.

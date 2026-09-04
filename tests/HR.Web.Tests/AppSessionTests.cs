@@ -29,7 +29,7 @@ public class AppSessionTests
         bool isHrAdministrator = false, bool isManager = false, bool isRecruiter = false,
         bool isEmailConfirmed = true)
     {
-        var me = new MeResponse(userId, companyId, "alice@example.com", [ManageEmployeesPermission], true,
+        var me = new MeResponse(userId, companyId, "alice@example.com", [ManageEmployeesPermission], [], true,
             isHrAdministrator, isManager, isRecruiter, isEmailConfirmed);
         var company = new GetCompanyResponse(companyId, "Acme Corporation", true, DateTime.UtcNow, [],
             new GetCompanyBrandingResponse("logo.png", "small-logo.png", null));
@@ -41,7 +41,7 @@ public class AppSessionTests
             "I confirm that I have read and understood this document.", 3,
             NoticePeriodUnit.Months, 1, true,
             EmployeeNumberMode.Automatic, "EMP-", 1, 4,
-            AssetNumberMode.Manual, null, 1, 1, DateTime.UtcNow);
+            AssetNumberMode.Manual, null, 1, 1, DateTime.UtcNow, 9);
         var employee = new MyEmployeeResponse(employeeId, "Alice", "Smith", "Engineer", null, null, "avatar.png", false);
 
         return new RoutingHandler(new()

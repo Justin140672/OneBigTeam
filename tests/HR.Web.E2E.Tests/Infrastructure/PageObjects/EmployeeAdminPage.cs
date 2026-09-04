@@ -19,6 +19,17 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
 
     public async Task<string> GetActiveTabNameAsync()
     {
+        // EmployeeEdit's profile nav is two-level (group strip + inner section strip), so BOTH a
+        // group tab AND a section tab carry aria-selected='true'. Callers want the section name
+        // ("Onboarding", "Leaving", …), so prefer the inner ".employee-profile-sections" strip;
+        // fall back to any selected tab for the flat MyProfile strip.
+        var section = page.Locator(".employee-profile-sections [role='tab'][aria-selected='true']").First;
+        if (await section.CountAsync() > 0)
+        {
+            await section.WaitForAsync(new() { Timeout = 10_000 });
+            return (await section.TextContentAsync())?.Trim() ?? "";
+        }
+
         var active = page.Locator("[role='tab'][aria-selected='true']").First;
         await active.WaitForAsync(new() { Timeout = 10_000 });
         return (await active.TextContentAsync())?.Trim() ?? "";
@@ -28,7 +39,7 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
 
     public async Task OpenDocumentsTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Documents", Exact = true }).ClickAsync();
+        await EmployeeEditPage.NavigateToSectionAsync(page, "Documents");
         // Spinner appears while loading, then grid renders
         await page.WaitForSpinnerToClearAsync();
         // Scoped to the actual Documents grid card specifically (data-testid=
@@ -49,7 +60,10 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     {
         try
         {
-            await page.Locator(".e-gridcontent td, .card-body td")
+            // Scoped to the Documents grid card — NOT the sibling "Document Requests" section
+            // (data-testid="admin-document-requests-section"), whose own table also has cells that
+            // can contain a document-type name like "Passport".
+            await page.Locator("[data-testid='employee-documents-grid-section'] .e-gridcontent td")
                 .Filter(new() { HasText = titleFragment })
                 .First
                 .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
@@ -219,7 +233,7 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
 
     public async Task OpenAssetsTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Assets" }).ClickAsync();
+        await EmployeeEditPage.NavigateToSectionAsync(page, "Assets");
         // Wait for the spinner to disappear, then ensure either the grid or the
         // empty-state placeholder has rendered.
         await page.WaitForSpinnerToClearAsync();
@@ -341,7 +355,7 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
 
     public async Task OpenLeaveTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Leave" }).ClickAsync();
+        await EmployeeEditPage.NavigateToSectionAsync(page, "Leave");
         // Wait for the spinner to disappear, then for at least one balance value/"n/a" span
         // to render inside the "Current Balance" card — not just the static card shell that
         // is present before the async balance fetch completes.
@@ -535,7 +549,7 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
 
     public async Task OpenEmploymentTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Employment" }).ClickAsync();
+        await EmployeeEditPage.NavigateToSectionAsync(page, "Employment");
         // Wait for the Employment-tab-specific heading — the generic .card-header selector
         // would resolve immediately against the Details tab's already-rendered card headers.
         await page.WaitForSelectorAsync(".card-header:has-text('Employment Details')", new() { Timeout = 15_000 });

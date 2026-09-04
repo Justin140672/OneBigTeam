@@ -24,13 +24,24 @@ public sealed class EmployeeLeavingTab(IPage page)
     /// </summary>
     public async Task OpenAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Leaving" }).ClickAsync();
+        await EmployeeEditPage.NavigateToSectionAsync(page, "Leaving");
         await page.WaitForSelectorAsync(".card-header:has-text('Leaving Details'), .hr-empty-state", new() { Timeout = 15_000 });
     }
 
-    /// <summary>Returns true if the "Leaving" tab is currently visible in the tab strip.</summary>
-    public Task<bool> IsTabVisibleAsync() =>
-        page.GetByRole(AriaRole.Tab, new() { Name = "Leaving" }).IsVisibleAsync();
+    /// <summary>
+    /// Returns true if the "Leaving" tab is present in the tab strip. The tab lives under the
+    /// "Tasks &amp; Records" group, whose inner strip only renders once that group is selected —
+    /// so open the group first, then check.
+    /// </summary>
+    public async Task<bool> IsTabVisibleAsync()
+    {
+        await page.Locator(".employee-profile-groups > .e-tab-header")
+            .GetByRole(AriaRole.Tab, new() { Name = "Tasks & Records", Exact = true })
+            .ClickAsync();
+        return await page.Locator(".employee-profile-sections > .e-tab-header")
+            .GetByRole(AriaRole.Tab, new() { Name = "Leaving", Exact = true })
+            .IsVisibleAsync();
+    }
 
     /// <summary>
     /// Returns true if the "More actions" overflow menu's "Start offboarding" item is present —

@@ -16,3 +16,6 @@ public sealed class SarahChenPersonaFixture() : RolePersonaFixtureBase("sarah.ch
 
 /// <summary>Priya Shah — CompanyAdministrator-only persona, and the allow-listed platform admin used by several Admin Portal test classes.</summary>
 public sealed class PriyaShahPersonaFixture() : RolePersonaFixtureBase("priya.shah@acme.example");
+
+/// <summary>David Park — Sales Manager (HrAdministrator + Manager, manages Carlos Rivera); persona for the probation review task tests.</summary>
+public sealed class DavidParkPersonaFixture() : RolePersonaFixtureBase("david.park@acme.example");

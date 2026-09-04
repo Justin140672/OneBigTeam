@@ -62,7 +62,7 @@ public class ProbationReviewsDueHierarchyScopeTests
 
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             db, reader, new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(manager), ClockAt(Today));
+            new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(manager), new FakeOpenTaskBySourceEntityReader(), ClockAt(Today));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(manager), CancellationToken.None);
 
@@ -92,7 +92,7 @@ public class ProbationReviewsDueHierarchyScopeTests
 
         var provider = new OverdueProbationReviewsWorkloadActionProvider(
             db, reader, new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(manager), ClockAt(Today));
+            new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(manager), new FakeOpenTaskBySourceEntityReader(), ClockAt(Today));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(manager), CancellationToken.None);
 
@@ -113,7 +113,7 @@ public class ProbationReviewsDueHierarchyScopeTests
 
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             db, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(caller), ClockAt(Today));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(caller), new FakeOpenTaskBySourceEntityReader(), ClockAt(Today));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), CancellationToken.None);
 
@@ -132,7 +132,7 @@ public class ProbationReviewsDueHierarchyScopeTests
 
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             db, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(caller), ClockAt(Today));
+            new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(caller), new FakeOpenTaskBySourceEntityReader(), ClockAt(Today));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), CancellationToken.None);
 

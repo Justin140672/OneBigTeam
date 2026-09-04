@@ -60,7 +60,6 @@ public sealed class ContactDetailsTabTests(EmployeePersonaFixture fixture) : Rol
         await contactDetails.FillAddressLine1Async("123 Test Street");
         await contactDetails.FillCityAsync("London");
         await contactDetails.FillPostCodeAsync("EC1A 1BB");
-        await contactDetails.FillCountryAsync("United Kingdom");
 
         // ── Update the mobile phone number ────────────────────────────────────
         await contactDetails.FillMobilePhoneAsync("07700 900001");
@@ -96,7 +95,6 @@ public sealed class ContactDetailsTabTests(EmployeePersonaFixture fixture) : Rol
         await contactDetails.FillAddressLine1Async("1 High Street");
         await contactDetails.FillCityAsync("Manchester");
         await contactDetails.FillPostCodeAsync("M1 1AE");
-        await contactDetails.FillCountryAsync("United Kingdom");
 
         await contactDetails.SaveChangesAsync();
 
@@ -129,7 +127,6 @@ public sealed class ContactDetailsTabTests(EmployeePersonaFixture fixture) : Rol
         await contactDetails.FillAddressLine1Async("123 Test Street");
         await contactDetails.FillCityAsync("London");
         await contactDetails.FillPostCodeAsync("not a postcode");
-        await contactDetails.FillCountryAsync("United Kingdom");
 
         await contactDetails.ClickSaveAsync();
 
@@ -156,7 +153,6 @@ public sealed class ContactDetailsTabTests(EmployeePersonaFixture fixture) : Rol
         await contactDetails.FillAddressLine1Async("123 Test Street");
         await contactDetails.FillCityAsync("London");
         await contactDetails.FillPostCodeAsync("EC1A 1BB");
-        await contactDetails.FillCountryAsync("United Kingdom");
         await contactDetails.FillMobilePhoneAsync("12345");
 
         await contactDetails.ClickSaveAsync();
@@ -184,7 +180,6 @@ public sealed class ContactDetailsTabTests(EmployeePersonaFixture fixture) : Rol
         await contactDetails.FillAddressLine1Async("123 Test Street");
         await contactDetails.FillCityAsync("London");
         await contactDetails.FillPostCodeAsync("EC1A 1BB");
-        await contactDetails.FillCountryAsync("United Kingdom");
         await contactDetails.FillHomePhoneAsync("abcdefg");
 
         await contactDetails.ClickSaveAsync();

@@ -20,11 +20,14 @@ namespace HR.Web.E2E.Tests.Tests;
 public sealed class ProbationReviewFlowTests(CrossUserFixture fixture) : CrossUserTenantAndMiscTestBase(fixture)
 {
     private static readonly Guid AcmeId           = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private static readonly Guid SarahId           = Guid.Parse("30000000-0000-0000-0000-000000000001");
+    private static readonly Guid ReviewerId           = Guid.Parse("30000000-0000-0000-0000-000000000008");
     private static readonly Guid SophieLaurent     = Guid.Parse("30000000-0000-0000-0000-000000000007");
     private static readonly Guid ProbationTaskId   = Guid.Parse("a0000000-0000-0000-0000-000000000026");
 
-    private const string SarahEmail = "sarah.chen@acme.example";
+    // The "Complete probation review — Sophie Laurent" task is assigned to David Park
+    // (HrAdministrator) — Sophie is a department head with no line manager, and the probation
+    // review read is reporting-chain / HR scoped, so the assignee/reviewer must be HR.
+    private const string ReviewerEmail = "david.park@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
 
     /// <summary>
@@ -37,7 +40,7 @@ public sealed class ProbationReviewFlowTests(CrossUserFixture fixture) : CrossUs
         var taskView = new TaskViewPage(_page, _fixture.WebBaseUrl);
         var empEdit  = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Log in as Sarah (the review task assignee) and complete the review ──
+        // ── Step 1: Log in as the review task assignee (David Park) and complete the review ──
 
         // Gate against HrDashboardTests.UpcomingProbationReviewsWidget_ShowsCarlosRivera, which
         // reads a capped "upcoming probation reviews" list that Sophie's still-pending review can
@@ -47,9 +50,9 @@ public sealed class ProbationReviewFlowTests(CrossUserFixture fixture) : CrossUs
         try
         {
             await login.GoToAsync();
-            await login.LoginAsync(SarahEmail);
+            await login.LoginAsync(ReviewerEmail);
 
-            await taskView.GoToAsync(AcmeId, SarahId, ProbationTaskId);
+            await taskView.GoToAsync(AcmeId, ReviewerId, ProbationTaskId);
 
             var statusBefore = await taskView.GetStatusAsync();
             if (statusBefore != "Completed")

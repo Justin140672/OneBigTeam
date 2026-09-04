@@ -43,13 +43,19 @@ internal sealed class ConfirmImportSessionHandler(
                 Error.NotFound($"Import session '{request.ImportSessionId}' was not found."));
         }
 
-        // A session is confirmable when it has been validated, or when a previous confirm
-        // attempt failed outright without creating a single employee (SuccessfulRows == 0) —
-        // that case is a legitimate "fix the data and retry" flow. Once any employee has been
-        // created for the session, re-confirming is a conflict: the created rows are not
-        // reprocessed, so a retry would only ever add duplicate-failure noise.
-        var confirmable = session.Status == ImportStatus.Validated
-            || (session.Status == ImportStatus.CompletedWithErrors && session.SuccessfulRows == 0);
+        var now = clock.UtcNowOffset();
+
+        // OBT-REM-06: a session is confirmable when validated, or when a previous confirm attempt
+        // finished with errors (a legitimate "fix the data / transient failure — retry" flow: the
+        // retry only reprocesses rows that were not already turned into employees), or when a prior
+        // run claimed it but appears to have crashed (Processing, but stale).
+        const int staleClaimMinutes = 15;
+        var claimIsStale = session.Status == ImportStatus.Processing
+            && session.StartedAt is { } startedAt
+            && now - startedAt > TimeSpan.FromMinutes(staleClaimMinutes);
+
+        var confirmable = session.Status is ImportStatus.Validated or ImportStatus.CompletedWithErrors
+            || claimIsStale;
 
         if (!confirmable)
         {
@@ -57,15 +63,42 @@ internal sealed class ConfirmImportSessionHandler(
                 Error.Conflict($"Import session '{request.ImportSessionId}' is not in a confirmable state (status: {session.Status})."));
         }
 
-        var stagingRows = await db.ImportStagingEmployees
+        // Atomically claim the session before doing any work. The xmin concurrency token means a
+        // second simultaneous confirmation loses this save and is rejected with a conflict.
+        session.ClaimForConfirmation(now);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure<ConfirmImportSessionResponse>(
+                Error.Conflict($"Import session '{request.ImportSessionId}' is already being confirmed."));
+        }
+
+        var allValidRows = await db.ImportStagingEmployees
             .Where(s => s.ImportSessionId == session.Id && s.CompanyId == request.CompanyId && s.IsValid)
             .OrderBy(s => s.RowNumber)
             .ToListAsync(cancellationToken);
 
-        if (stagingRows.Count == 0)
+        if (allValidRows.Count == 0)
         {
             return Result.Failure<ConfirmImportSessionResponse>(
                 Error.Conflict($"Import session '{request.ImportSessionId}' has no valid rows to confirm."));
+        }
+
+        // Only rows that have not already been turned into an employee are (re)processed.
+        var stagingRows = allValidRows.Where(s => s.CreatedEmployeeId is null).ToList();
+
+        // Clear any confirm-phase error rows from a previous attempt for the rows we are about to
+        // retry, so cumulative counts and the error list do not double-count across retries.
+        var rowNumbersToProcess = stagingRows.Select(s => s.RowNumber).ToHashSet();
+        if (rowNumbersToProcess.Count > 0)
+        {
+            var staleErrors = await db.ImportRowErrors
+                .Where(e => e.ImportSessionId == session.Id && rowNumbersToProcess.Contains(e.RowNumber))
+                .ToListAsync(cancellationToken);
+            db.ImportRowErrors.RemoveRange(staleErrors);
         }
 
         // Rows that failed the earlier Validate step never enter the loop below (only IsValid
@@ -76,10 +109,17 @@ internal sealed class ConfirmImportSessionHandler(
         var alreadyInvalidRowCount = await db.ImportStagingEmployees
             .CountAsync(s => s.ImportSessionId == session.Id && s.CompanyId == request.CompanyId && !s.IsValid, cancellationToken);
 
-        var createdCount = 0;
-        var failedCount = alreadyInvalidRowCount;
         var createdByRow = new Dictionary<int, (Guid EmployeeId, string? ManagerReference)>();
         var createdRowResults = new List<ConfirmImportSessionRowResult>();
+
+        // Seed with rows already confirmed by an earlier (partial) run so this run's manager
+        // resolution can still point at them, and the response reflects the full picture.
+        foreach (var confirmed in allValidRows.Where(r => r.CreatedEmployeeId is not null))
+        {
+            createdByRow[confirmed.RowNumber] = (confirmed.CreatedEmployeeId!.Value, confirmed.ManagerReference);
+            createdRowResults.Add(new ConfirmImportSessionRowResult(
+                confirmed.RowNumber, confirmed.CreatedEmployeeId.Value, confirmed.EmployeeNumber));
+        }
 
         foreach (var row in stagingRows)
         {
@@ -174,6 +214,14 @@ internal sealed class ConfirmImportSessionHandler(
                         cancellationToken);
                 }
 
+                // OBT-REM-06: record the durable per-row confirmation state (and clear the tracked
+                // employee-writer work) BEFORE publishing integration events. A crash between here
+                // and the publish leaves the row marked confirmed, so a retry will not create the
+                // employee a second time — the far more damaging outcome than a re-runnable
+                // downstream projection gap.
+                row.MarkConfirmed(createResult.EmployeeId, clock.UtcNowOffset());
+                await db.SaveChangesAsync(cancellationToken);
+
                 // Publishes synchronously in-process; InitialiseEmployeeLeave's handler will
                 // have created the baseline leave balances by the time PublishAsync returns.
                 await integrationEventPublisher.PublishAsync(new EmployeeCreatedIntegrationEvent(
@@ -207,11 +255,12 @@ internal sealed class ConfirmImportSessionHandler(
                 createdByRow[row.RowNumber] = (createResult.EmployeeId, row.ManagerReference);
                 createdRowResults.Add(new ConfirmImportSessionRowResult(
                     row.RowNumber, createResult.EmployeeId, createResult.EmployeeNumber));
-                createdCount++;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                failedCount++;
+                // The DataImport DbContext only tracks the session + staging rows + error rows; a
+                // failure inside the (separately-scoped) employee writer does not dirty it, so the
+                // error row can be persisted immediately for durability.
                 db.ImportRowErrors.Add(ImportRowError.Create(
                     Guid.NewGuid(),
                     request.CompanyId,
@@ -221,6 +270,7 @@ internal sealed class ConfirmImportSessionHandler(
                     $"Failed to create employee: {ex.Message}",
                     row.RawData,
                     clock.UtcNowOffset()));
+                await db.SaveChangesAsync(cancellationToken);
             }
         }
 
@@ -236,7 +286,7 @@ internal sealed class ConfirmImportSessionHandler(
 
             Guid? managerId = null;
 
-            var matchInFile = stagingRows.FirstOrDefault(r =>
+            var matchInFile = allValidRows.FirstOrDefault(r =>
                 r.RowNumber != rowNumber &&
                 createdByRow.ContainsKey(r.RowNumber) &&
                 (string.Equals(r.EmployeeNumber?.Trim(), normalizedReference, StringComparison.OrdinalIgnoreCase) ||
@@ -272,11 +322,18 @@ internal sealed class ConfirmImportSessionHandler(
             }
         }
 
-        session.Confirm(createdCount, failedCount, clock.UtcNowOffset());
+        // Recompute cumulative counts from the durable per-row state rather than this run's deltas,
+        // so a resumed/retried confirmation reports the whole session's outcome.
+        var confirmedTotal = await db.ImportStagingEmployees
+            .CountAsync(s => s.ImportSessionId == session.Id && s.CreatedEmployeeId != null, cancellationToken);
+        var validTotal = allValidRows.Count;
+        var failedTotal = (validTotal - confirmedTotal) + alreadyInvalidRowCount;
+
+        session.Confirm(confirmedTotal, failedTotal, clock.UtcNowOffset());
         await db.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new ConfirmImportSessionResponse(
-            session.Id, session.Status.ToString(), createdCount, failedCount,
+            session.Id, session.Status.ToString(), confirmedTotal, failedTotal,
             createdRowResults.OrderBy(r => r.RowNumber).ToList()));
     }
 

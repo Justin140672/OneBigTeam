@@ -190,7 +190,9 @@
 
 .stat-label {
     font-size: 0.75rem;
-    color: #9ca3af;
+    /* WCAG 1.4.3: #9ca3af on the white card is only ~2.5:1 at this 12px size — axe flags it
+       serious. #6b7280 (Tailwind gray-500) clears AA at ~4.6:1. */
+    color: #6b7280;
 }
 
 /* ── Upcoming leave list ─────────────────────────────── */
@@ -389,7 +391,8 @@ html[data-theme="dark"] .upcoming-leave-item {
     border-color: var(--hr-gray-700);
 }
 
-html[data-theme="dark"] .overview-dl dt {
+html[data-theme="dark"] .overview-dl dt,
+html[data-theme="dark"] .stat-label {
     /* #6b7280 is ~2.9:1 on the dark card surface; --hr-gray-300 clears AA comfortably. */
     color: var(--hr-gray-300);
 }

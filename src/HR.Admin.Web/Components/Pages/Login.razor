@@ -73,6 +73,16 @@
             return;
         }
 
+        // The Admin Portal is platform-admin-only. A valid account that isn't on the platform-admin
+        // allow-list is rejected here, on the login page, rather than being handed a session cookie
+        // and bounced through a dashboard it can't use.
+        if (!await DevAuth.IsPlatformAdminAsync(session.AccessToken))
+        {
+            _error = "This account is not authorised for the Admin Portal.";
+            _busy = false;
+            return;
+        }
+
         // The session is stashed server-side; only an opaque, single-use code travels in the URL.
         var code = HandoffStore.Issue(new AuthHandoffStore.Session(
             session.AccessToken, session.RefreshToken, session.ExpiresIn));

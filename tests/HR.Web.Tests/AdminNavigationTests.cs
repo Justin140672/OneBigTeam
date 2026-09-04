@@ -181,6 +181,39 @@ public class AdminNavigationTests
         Assert.All(sections, s => Assert.Equal(AdminNavGroupInfo.Label(s.Group), s.Label));
     }
 
+    // IAM-08 — a Company-Administrator-only capability set (company.read/edit, onboarding,
+    // subscription, support; NO employee.read / employee.edit) must never surface any employee-,
+    // leave-, sickness-, recruitment-, HR-reporting- or HR-settings-oriented destination.
+    [Fact]
+    public void CompanyAdministratorOnly_Nav_HasNoEmployeeOrHrDestinations()
+    {
+        var destinations = AdminNavigation.Build(CompanyAdminAlone(), CompanyId);
+        var keys = destinations.Select(d => d.Key).ToList();
+
+        Assert.DoesNotContain("employees", keys);
+        Assert.DoesNotContain("departments", keys);
+        Assert.DoesNotContain("leave-types", keys);
+        Assert.DoesNotContain("leave-policies", keys);
+        Assert.DoesNotContain("sickness-categories", keys);
+        Assert.DoesNotContain("recruitment-stages", keys);
+        Assert.DoesNotContain("external-recruiters", keys);
+        Assert.DoesNotContain("reporting", keys);
+        Assert.DoesNotContain("hr-settings", keys);
+        Assert.DoesNotContain("user-administration", keys);
+
+        // Only company-administration destinations remain.
+        Assert.All(destinations, d => Assert.Equal(AdminNavGroup.CompanyAdministration, d.Group));
+    }
+
+    // IAM-08 — once employee.read is granted (Company Administrator + HR Administrator) the
+    // Employees destination appears.
+    [Fact]
+    public void CompanyAdministratorPlusHrAdministrator_Nav_HasEmployeesDestination()
+    {
+        Assert.Contains(AdminNavigation.Build(HrPlusCompanyAdmin(), CompanyId), d => d.Key == "employees");
+        Assert.Contains(AdminNavigation.Build(Caps(canReadEmployees: true), CompanyId), d => d.Key == "employees");
+    }
+
     [Fact]
     public void Build_EveryUrlContainsCompanyId_ExceptFixedSubscriptionPath()
     {

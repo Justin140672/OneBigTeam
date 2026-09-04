@@ -61,6 +61,8 @@ internal sealed class StripeGateway(IOptions<StripeOptions> options) : IStripeGa
     public StripeWebhookEvent ConstructAndParseWebhookEvent(string payload, string signatureHeader)
     {
         var stripeEvent = EventUtility.ConstructEvent(payload, signatureHeader, options.Value.WebhookSecret);
+        var eventId = stripeEvent.Id;
+        var eventCreatedAt = new DateTimeOffset(stripeEvent.Created, TimeSpan.Zero);
 
         switch (stripeEvent.Type)
         {
@@ -77,7 +79,9 @@ internal sealed class StripeGateway(IOptions<StripeOptions> options) : IStripeGa
                     CurrentPeriodEnd: null,
                     CancelAtPeriodEnd: null,
                     StripeStatus: null,
-                    PriceId: options.Value.PriceId);
+                    PriceId: options.Value.PriceId,
+                    EventId: eventId,
+                    EventCreatedAt: eventCreatedAt);
             }
 
             case "customer.subscription.updated":
@@ -98,11 +102,14 @@ internal sealed class StripeGateway(IOptions<StripeOptions> options) : IStripeGa
                     currentPeriodEnd,
                     subscription?.CancelAtPeriodEnd,
                     subscription?.Status,
-                    PriceId: null);
+                    PriceId: null,
+                    EventId: eventId,
+                    EventCreatedAt: eventCreatedAt);
             }
 
             default:
-                return new StripeWebhookEvent(stripeEvent.Type, null, null, null, null, null, null, null);
+                return new StripeWebhookEvent(
+                    stripeEvent.Type, null, null, null, null, null, null, null, eventId, eventCreatedAt);
         }
     }
 

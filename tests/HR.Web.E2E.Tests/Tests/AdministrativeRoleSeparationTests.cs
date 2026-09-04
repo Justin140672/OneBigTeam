@@ -123,14 +123,20 @@ public sealed class AdministrativeRoleSeparationCompanyAdminTests(PriyaShahPerso
     }
 
     [Fact]
-    public async Task CompanyAdminOnly_SeesNoSidebar()
+    public async Task CompanyAdminOnly_Sidebar_ShowsOnlyCompanyAdministration()
     {
+        var sidebar = new SidebarPage(_page);
+
         await LoginAsync();
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AdminRoutes.AcmeId}/edit");
         await _page.WaitForSelectorAsync(".app-shell", new() { Timeout = 15_000 });
 
-        Assert.False(await _page.Locator(".app-nav-menu").IsVisibleAsync(),
-            "Company-Administrator-only persona should see no sidebar nav menu at all");
+        // ShowSidebar now includes CanManageCompany (so she can reach Subscription & Billing), but
+        // AdminNavigation filters her sidebar down to the single "Company administration" group.
+        Assert.True(await sidebar.IsSidebarVisibleAsync());
+        Assert.True(await sidebar.HasGroupedMenuItemAsync("Company administration", "Subscription & Billing"));
+        Assert.False(await sidebar.HasTopLevelMenuItemAsync("People and users"));
+        Assert.False(await sidebar.HasTopLevelMenuItemAsync("HR configuration"));
     }
 
     [Fact]

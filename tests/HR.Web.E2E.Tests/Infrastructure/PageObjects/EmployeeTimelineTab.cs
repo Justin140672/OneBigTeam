@@ -26,14 +26,30 @@ public sealed class EmployeeTimelineTab(IPage page)
     /// <summary>Opens the "Timeline" tab and waits for either the entry list or the empty state to render.</summary>
     public async Task OpenAsync()
     {
+        // EmployeeEdit hosts Timeline under an "Activity" group tab; MyProfile has it flat in a
+        // single strip. Select the group first when it's present.
+        var activityGroup = page.Locator(".employee-profile-groups > .e-tab-header")
+            .GetByRole(AriaRole.Tab, new() { Name = "Activity", Exact = true });
+        if (await activityGroup.CountAsync() > 0)
+            await activityGroup.ClickAsync();
+
         await page.GetByRole(AriaRole.Tab, new() { Name = "Timeline" }).ClickAsync();
         await page.WaitForSelectorAsync(
             "[data-testid='employee-timeline'], .hr-empty-state",
             new() { Timeout = 15_000 });
     }
 
-    public Task<bool> IsTabVisibleAsync() =>
-        page.GetByRole(AriaRole.Tab, new() { Name = "Timeline" }).IsVisibleAsync();
+    public async Task<bool> IsTabVisibleAsync()
+    {
+        // EmployeeEdit nests Timeline under an "Activity" group; MyProfile is flat. Open the group
+        // first when present so the section tab is actually in the DOM.
+        var activityGroup = page.Locator(".employee-profile-groups > .e-tab-header")
+            .GetByRole(AriaRole.Tab, new() { Name = "Activity", Exact = true });
+        if (await activityGroup.CountAsync() > 0)
+            await activityGroup.ClickAsync();
+
+        return await page.GetByRole(AriaRole.Tab, new() { Name = "Timeline" }).IsVisibleAsync();
+    }
 
     public Task<bool> IsEmptyStateVisibleAsync() => EmptyState.IsVisibleAsync();
 

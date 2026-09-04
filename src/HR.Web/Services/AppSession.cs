@@ -38,10 +38,6 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     public bool CanViewHrReports              => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000036"));
     public bool CanViewRecruitmentReports     => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000035"));
     public bool CanManageSharedDocuments      => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000030"));
-    // ADM-02: Compliance Centre — HR Administrator only. No longer surfaced in navigation, but the
-    // page (ComplianceCentrePage) stays reachable by direct URL and via compliance-alert
-    // notification deep-links, and still guards on this flag.
-    public bool CanViewComplianceCentre       => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000043"));
 
     // ADM-05: shared access-denied outcome. Admin pages call this from OnBeforeLoadAsync/LoadAsync
     // instead of hand-rolling a redirect; when not allowed it bounces to the consistent

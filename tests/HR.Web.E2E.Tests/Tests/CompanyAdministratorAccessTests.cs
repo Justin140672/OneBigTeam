@@ -7,11 +7,11 @@ namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
 /// Verifies that a CompanyAdministrator-only user (CanManageCompany true, CanManageEmployees
-/// false — no other HR role) is scoped to the Company edit screen only:
+/// false — no other HR role) is scoped to company administration only:
 /// - Landing on "/" redirects straight to the Company edit page (Home.razor).
-/// - No sidebar is shown at all (MainLayout.razor's ShowSidebar deliberately excludes
-///   CanManageCompany — her whole job is company profile/settings, reachable directly from her
-///   landing page, so a full nav menu is unnecessary surface area), same as a plain Employee.
+/// - The sidebar shows ONLY the "Company administration" group (Company Profile & Addresses,
+///   Subscription & Billing) — MainLayout.razor's ShowSidebar now includes CanManageCompany so
+///   she can reach Subscription & Billing, but AdminNavigation still filters every other group out.
 /// - Backend access to the employee list is still denied even via direct navigation, proving
 ///   the narrowing isn't just a hidden UI affordance.
 ///
@@ -50,24 +50,29 @@ public sealed class CompanyAdministratorAccessTests(HrAdminPersonaFixture fixtur
     }
 
     [Fact]
-    public async Task CompanyAdministrator_SeesNoSidebar()
+    public async Task CompanyAdministrator_SeesSidebar_WithOnlyTheCompanyAdministrationGroup()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var sidebar = new SidebarPage(_page);
 
         // ── Step 1: Login as Priya (CompanyAdministrator-only) ────────────────
         await login.GoToAsync();
         await login.LoginAsync(CompanyAdminEmail);
 
-        // ── Step 2: Same as a plain Employee, Priya gets no sidebar at all —
-        // MainLayout.razor's ShowSidebar deliberately excludes CanManageCompany (her whole job
-        // is company profile/settings, reachable directly from her landing page — see
-        // CompanyAdministrator_RedirectedFromRoot_ToCompanyEdit above), so there's no ".app-nav-menu"
-        // to show a "Company" item (or a User Administration item — HR-Administrator-only, see
-        // IdentityModule.AddRolePolicies' "users:view"/"users:manage" policies) in.
         await _page.WaitForURLAsync(new Regex($"/companies/{AcmeId}/edit"), new() { Timeout = 15_000 });
 
-        Assert.False(await _page.Locator(".app-nav-menu").IsVisibleAsync(),
-            "Priya (CompanyAdministrator-only) should not see a sidebar nav menu");
+        // ── Step 2: She gets a sidebar (MainLayout's ShowSidebar now includes CanManageCompany so
+        // she can reach Subscription & Billing), but AdminNavigation filters it to the "Company
+        // administration" group only — no People / HR configuration / Reports for her.
+        Assert.True(await sidebar.IsSidebarVisibleAsync(),
+            "A CompanyAdministrator needs the sidebar to reach Subscription & Billing / Company Profile");
+
+        Assert.True(await sidebar.HasGroupedMenuItemAsync("Company administration", "Subscription & Billing"),
+            "Expected the CompanyAdministrator's sidebar to contain the Company administration group");
+        Assert.False(await sidebar.HasTopLevelMenuItemAsync("People and users"),
+            "A CompanyAdministrator-only user must not see the People and users nav group");
+        Assert.False(await sidebar.HasTopLevelMenuItemAsync("HR configuration"),
+            "A CompanyAdministrator-only user must not see the HR configuration nav group");
     }
 
     [Fact]

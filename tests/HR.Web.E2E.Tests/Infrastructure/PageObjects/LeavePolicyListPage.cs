@@ -19,7 +19,7 @@ public sealed class LeavePolicyListPage(IPage page, string baseUrl)
     public async Task ClickNewAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/leave-policies/new", new() { Timeout = 30_000 });
+        await page.WaitForURLAsync("**/leave-policies/new**", new() { Timeout = 30_000 });
     }
 
     public Task<bool> HasItemAsync(string nameFragment) =>

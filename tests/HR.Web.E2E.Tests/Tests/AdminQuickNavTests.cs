@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
@@ -7,7 +8,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// <summary>
 /// The top-bar HR-only Employee Search palette (Ctrl+K), which replaced the old admin quick-nav:
 /// - An HR admin (Laura Bennett) can search seeded Acme employees by name, employee number or work
-///   email, and selecting a result lands on that employee's profile.
+///   email, and selecting a result lands on that employee's admin record (EmployeeEdit.razor, not
+///   the self-service "/profile" route, which only ever shows the signed-in user's own record).
 /// - A leaver is hidden by default and only shown once "Include leavers / archived employees" is ticked.
 /// - The trigger is absent for every non-HR role, and Ctrl+K is inert for them.
 /// - Esc closes the palette and returns focus to the trigger.
@@ -35,7 +37,7 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
     }
 
     [Fact]
-    public async Task HrAdmin_SearchesByName_SeesEmployeeRow_AndSelectingLandsOnProfile()
+    public async Task HrAdmin_SearchesByName_SeesEmployeeRow_AndSelectingLandsOnAdminRecord()
     {
         var palette = new AdminQuickNavComponent(_page);
         await LoginAndOpenPaletteAsync(palette);
@@ -49,8 +51,12 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
 
         await palette.ClickResultAsync(TargetFullName);
 
-        await _page.WaitForURLAsync($"**/companies/{AcmeId}/employees/*/profile", new() { Timeout = 30_000 });
-        Assert.Matches(@$"/companies/{AcmeId}/employees/[0-9a-fA-F-]+/profile", _page.Url);
+        // Lands on the admin employee record (EmployeeEdit.razor: "/companies/{c}/employees/{id}",
+        // which may then swap to its "…/view" variant), never the self-service "/profile" route.
+        await _page.WaitForURLAsync(
+            new Regex(@$"/companies/{AcmeId}/employees/[0-9a-fA-F-]{{36}}(/view)?(\?|#|$)"),
+            new() { Timeout = 30_000 });
+        Assert.DoesNotContain("/profile", _page.Url);
     }
 
     [Fact]

@@ -91,8 +91,8 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         await login.GoToAsync();
         await login.LoginAsync(HrAdminEmail);
 
-        Assert.True(await sidebar.HasTopLevelMenuItemAsync("User Administration"),
-            "Expected the HR Administrator to see the 'User Administration' nav link");
+        Assert.True(await sidebar.HasGroupedMenuItemAsync("People and users", "User Administration"),
+            "Expected the HR Administrator to see the 'User Administration' nav link under 'People and users'");
 
         await list.GoToAsync(AcmeId);
 

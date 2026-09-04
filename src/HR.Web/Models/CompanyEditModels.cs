@@ -107,4 +107,9 @@ public sealed class HrSettingsEditModel
     public AssetNumberMode AssetNumberOriginalMode { get; set; }
     public string? AssetNumberOriginalPrefix { get; set; }
     public int AssetNumberOriginalMinimumLength { get; set; }
+
+    // SET-03 optimistic-concurrency counter for the shared CompanySettings row. Captured on load,
+    // sent back on save, and refreshed from the save response so repeated saves in one sitting
+    // don't hit a phantom "changed by someone else" conflict.
+    public int Version { get; set; }
 }

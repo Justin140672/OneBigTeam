@@ -157,26 +157,21 @@ public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : R
     }
 
     [Fact]
-    public async Task NonAllowListedPersona_SeesErrorBanner_NotCustomerData()
+    public async Task NonAllowListedPersona_IsRejectedAtLogin_NotGivenCustomerAccess()
     {
         // tom.williams@acme.example is a valid seeded dev-login persona (dev-login stub only
         // checks the persona exists + password "password"), but is not on
-        // "PlatformAdmin:AllowedEmails" — the server-side check that actually gates every Admin
-        // Portal API call. CustomerDetailsService.GetCustomerDetailsOrNullAsync returns null for
-        // any non-2xx response (401 here), which CustomerDetails.razor renders as the same
-        // dashboard-error banner used for "not found" — see class remarks.
+        // "PlatformAdmin:AllowedEmails". The Admin Portal is platform-admin-only, so Login.razor
+        // probes /api/platform-admin/me with the fresh token and rejects a non-authorised account
+        // on the login page itself rather than handing it a session cookie.
         var login = new AdminLoginPage(_page, _fixture.AdminWebBaseUrl);
-        var details = new CustomerDetailsPage(_page, _fixture.AdminWebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(NonAllowListedEmail);
+        var error = await login.SubmitExpectingNotAuthorisedAsync(NonAllowListedEmail);
 
-        await details.GoToAsync(AcmeId);
-
-        Assert.True(await details.IsErrorBannerVisibleAsync(),
-            "Expected a non-allow-listed persona to see the unauthorised error banner");
-        Assert.False(await details.HasSettingsConfiguredAsync(),
-            "No customer detail sections should render for a non-allow-listed persona");
+        Assert.Contains("not authorised", error, StringComparison.OrdinalIgnoreCase);
+        Assert.True(login.IsOnLoginPage(),
+            "A non-allow-listed account must be rejected on the login page, not handed a session");
     }
 
     [Fact]

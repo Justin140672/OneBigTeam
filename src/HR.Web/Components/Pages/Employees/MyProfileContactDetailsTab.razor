@@ -93,11 +93,8 @@ else
                         <input class="form-control" @bind="Model.PostCode" placeholder="e.g. SW1A 1AA" maxlength="20" />
                         <ValidationMessage For="@(() => Model.PostCode)" />
                     </div>
-                    <div class="cd-field-group">
-                        <label class="cd-label">Country <span class="cd-required">*</span></label>
-                        <input class="form-control" @bind="Model.Country" placeholder="e.g. United Kingdom" maxlength="100" />
-                        <ValidationMessage For="@(() => Model.Country)" />
-                    </div>
+                    @* Country is not shown — UK-only for now. Model.Country defaults to "United
+                       Kingdom" and is preserved from the loaded value if one is already set. *@
                 </div>
 
                 <!-- Phone -->
@@ -156,7 +153,7 @@ else
             Model.City = details.City ?? string.Empty;
             Model.County = details.County;
             Model.PostCode = details.PostCode ?? string.Empty;
-            Model.Country = details.Country ?? string.Empty;
+            Model.Country = string.IsNullOrWhiteSpace(details.Country) ? "United Kingdom" : details.Country;
         }
     }
 
@@ -210,8 +207,10 @@ else
             get => _postCode;
             set => _postCode = value.ToUpperInvariant();
         }
+        // Not user-editable (UK-only for now) — no input is rendered. Defaults here and is
+        // preserved from the loaded value on OnLoadedAsync if the record already has one.
         [Required(ErrorMessage = "Country is required.")]
-        public string Country { get; set; } = string.Empty;
+        public string Country { get; set; } = "United Kingdom";
 
         public string? PostcodeRegexPattern { get; set; }
         public string? TelephoneRegexPattern { get; set; }

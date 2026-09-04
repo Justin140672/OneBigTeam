@@ -64,13 +64,8 @@ public sealed class ContactDetailsTab(IPage page)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    public async Task FillCountryAsync(string value)
-    {
-        var input = page.GetByPlaceholder("e.g. United Kingdom");
-        await input.ClearAsync();
-        await input.FillAsync(value);
-        await page.Keyboard.PressAsync("Tab");
-    }
+    // Country is not shown on the contact details form (UK-only for now — the model defaults to
+    // "United Kingdom"), so there is no FillCountryAsync.
 
     // ── Actions ────────────────────────────────────────────────────────────────
 
