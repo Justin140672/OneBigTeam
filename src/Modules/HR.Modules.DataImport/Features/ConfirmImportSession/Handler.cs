@@ -75,7 +75,7 @@ internal sealed class ConfirmImportSessionHandler(
                 s => s.ImportSessionId == session.Id
                     && s.CompanyId == request.CompanyId
                     && s.IsValid
-                    && s.CreatedEmployeeId == null,
+                    && s.FullyConfirmedAt == null,
                 cancellationToken);
 
             if (!hasRetryableRows)
@@ -109,8 +109,14 @@ internal sealed class ConfirmImportSessionHandler(
                 Error.Conflict($"Import session '{request.ImportSessionId}' has no valid rows to confirm."));
         }
 
-        // Only rows that have not already been turned into an employee are (re)processed.
-        var stagingRows = allValidRows.Where(s => s.CreatedEmployeeId is null).ToList();
+        // OBT-REM-08: rows that are not YET fully confirmed are (re)processed — this includes rows
+        // that never got an employee created at all, and rows whose employee exists but one or
+        // more downstream steps (integration events, opening leave balance, manager assignment)
+        // did not complete on a previous attempt. A row is never re-created once CreatedEmployeeId
+        // is set; only its remaining incomplete steps are resumed.
+        var stagingRows = allValidRows.Where(s => !s.IsFullyConfirmed).ToList();
+
+        var rowsByNumber = allValidRows.ToDictionary(r => r.RowNumber);
 
         // Clear any confirm-phase error rows from a previous attempt for the rows we are about to
         // retry, so cumulative counts and the error list do not double-count across retries.
@@ -134,8 +140,9 @@ internal sealed class ConfirmImportSessionHandler(
         var createdByRow = new Dictionary<int, (Guid EmployeeId, string? ManagerReference)>();
         var createdRowResults = new List<ConfirmImportSessionRowResult>();
 
-        // Seed with rows already confirmed by an earlier (partial) run so this run's manager
-        // resolution can still point at them, and the response reflects the full picture.
+        // Seed with every row that already has an employee (from this run or an earlier partial
+        // run) so this run's manager resolution can still point at them, and the response reflects
+        // the full picture.
         foreach (var confirmed in allValidRows.Where(r => r.CreatedEmployeeId is not null))
         {
             createdByRow[confirmed.RowNumber] = (confirmed.CreatedEmployeeId!.Value, confirmed.ManagerReference);
@@ -149,134 +156,174 @@ internal sealed class ConfirmImportSessionHandler(
             {
                 var fields = ParseRawData(row.RawData);
 
-                // Reference data (new departments/locations/employment types/position profiles) is
-                // deliberately NOT created during preview/validation — only here, at confirm time,
-                // once the user has reviewed the preview and clicked Confirm. The staging row's
-                // DepartmentId/LocationId/EmploymentTypeId/PositionProfileId may therefore be null
-                // even for an otherwise-valid row; resolve (get-or-create) them by name now.
-                var departmentId = row.DepartmentId ?? (await lookupResolver.GetOrCreateDepartmentAsync(
-                    request.CompanyId, GetRequired(fields, "DepartmentName"), cancellationToken)).Id;
+                EmployeeImportCreateResult createResult;
 
-                var locationId = row.LocationId ?? (await lookupResolver.GetOrCreateLocationAsync(
-                    request.CompanyId, GetRequired(fields, "LocationName"), cancellationToken)).Id;
-
-                var employmentTypeId = row.EmploymentTypeId ?? (await lookupResolver.GetOrCreateEmploymentTypeAsync(
-                    request.CompanyId, GetRequired(fields, "EmploymentTypeName"), cancellationToken)).Id;
-
-                Guid positionProfileId;
-                if (row.PositionProfileId is not null)
+                if (row.CreatedEmployeeId is null)
                 {
-                    positionProfileId = row.PositionProfileId.Value;
+                    // Reference data (new departments/locations/employment types/position
+                    // profiles) is deliberately NOT created during preview/validation — only
+                    // here, at confirm time, once the user has reviewed the preview and clicked
+                    // Confirm. The staging row's DepartmentId/LocationId/EmploymentTypeId/
+                    // PositionProfileId may therefore be null even for an otherwise-valid row;
+                    // resolve (get-or-create) them by name now.
+                    var departmentId = row.DepartmentId ?? (await lookupResolver.GetOrCreateDepartmentAsync(
+                        request.CompanyId, GetRequired(fields, "DepartmentName"), cancellationToken)).Id;
+
+                    var locationId = row.LocationId ?? (await lookupResolver.GetOrCreateLocationAsync(
+                        request.CompanyId, GetRequired(fields, "LocationName"), cancellationToken)).Id;
+
+                    var employmentTypeId = row.EmploymentTypeId ?? (await lookupResolver.GetOrCreateEmploymentTypeAsync(
+                        request.CompanyId, GetRequired(fields, "EmploymentTypeName"), cancellationToken)).Id;
+
+                    Guid positionProfileId;
+                    if (row.PositionProfileId is not null)
+                    {
+                        positionProfileId = row.PositionProfileId.Value;
+                    }
+                    else
+                    {
+                        var positionProfileResult = await lookupResolver.GetOrCreatePositionProfileAsync(
+                            request.CompanyId, GetRequired(fields, "PositionProfileTitle"), departmentId, locationId, cancellationToken);
+
+                        if (positionProfileResult.Skipped || positionProfileResult.Id is null)
+                            throw new InvalidOperationException($"Position Profile '{GetRequired(fields, "PositionProfileTitle")}' could not be created.");
+
+                        positionProfileId = positionProfileResult.Id.Value;
+                    }
+
+                    var createRequest = new EmployeeImportCreateRequest(
+                        Guid.NewGuid(),
+                        request.CompanyId,
+                        GetRequired(fields, "FirstName"),
+                        GetRequired(fields, "LastName"),
+                        fields.GetValueOrDefault("PreferredName"),
+                        GetRequired(fields, "WorkEmail"),
+                        fields.GetValueOrDefault("PersonalEmail"),
+                        ParseDate(fields.GetValueOrDefault("StartDate"))!.Value,
+                        ParseDate(fields.GetValueOrDefault("DateOfBirth"))!.Value,
+                        GetRequired(fields, "Nationality"),
+                        GetRequired(fields, "Gender"),
+                        departmentId,
+                        locationId,
+                        employmentTypeId,
+                        positionProfileId,
+                        row.EmployeeNumber,
+                        session.Id,
+                        actorUserId,
+                        fields.GetValueOrDefault("Address"),
+                        ParseDate(fields.GetValueOrDefault("ProbationEndDate")));
+
+                    // Rows whose Work Email matched the company's seed admin employee (see
+                    // Employee.IsInitialCompanyAdmin) update that existing employee rather than
+                    // creating a duplicate — this is the ONLY case where import ever updates an
+                    // existing employee (see EmployeeStagingRowValidator's remarks).
+                    createResult = row.ExistingEmployeeIdToUpdate is not null
+                        ? await employeeWriter.UpdateEmployeeAsync(row.ExistingEmployeeIdToUpdate.Value, createRequest, cancellationToken)
+                        : await employeeWriter.CreateEmployeeAsync(createRequest, cancellationToken);
+
+                    var workingDaysRaw = fields.GetValueOrDefault("WorkingDays");
+                    var hoursPerDayRaw = fields.GetValueOrDefault("HoursPerDay");
+                    if (!string.IsNullOrWhiteSpace(workingDaysRaw) || !string.IsNullOrWhiteSpace(hoursPerDayRaw))
+                    {
+                        await employeeWriter.SetWorkingPatternAsync(
+                            request.CompanyId,
+                            createResult.EmployeeId,
+                            new EmployeeImportWorkingPattern(
+                                ParseWorkingDays(workingDaysRaw),
+                                ParseDecimal(hoursPerDayRaw)),
+                            cancellationToken);
+                    }
+
+                    var salaryAmountRaw = fields.GetValueOrDefault("SalaryAmount");
+                    if (!string.IsNullOrWhiteSpace(salaryAmountRaw))
+                    {
+                        await employeeWriter.CreateOpeningCompensationAsync(
+                            request.CompanyId,
+                            createResult.EmployeeId,
+                            createResult.StartDate,
+                            new EmployeeImportCompensation(
+                                decimal.Parse(salaryAmountRaw, CultureInfo.InvariantCulture),
+                                fields.GetValueOrDefault("SalaryType") ?? "Annual",
+                                fields.GetValueOrDefault("Currency") ?? "GBP"),
+                            cancellationToken);
+                    }
+
+                    // OBT-REM-08: record the durable per-row "employee created" step BEFORE
+                    // publishing integration events or laying the opening leave balance. A crash
+                    // between here and those later steps leaves the row's remaining steps
+                    // incomplete (not the whole row "confirmed"), so a retry resumes exactly the
+                    // steps that did not finish instead of creating the employee a second time OR
+                    // silently losing the events/balance.
+                    row.MarkEmployeeCreated(createResult.EmployeeId, clock.UtcNowOffset());
+                    await db.SaveChangesAsync(cancellationToken);
+
+                    createdByRow[row.RowNumber] = (createResult.EmployeeId, row.ManagerReference);
+                    createdRowResults.Add(new ConfirmImportSessionRowResult(
+                        row.RowNumber, createResult.EmployeeId, createResult.EmployeeNumber));
                 }
                 else
                 {
-                    var positionProfileResult = await lookupResolver.GetOrCreatePositionProfileAsync(
-                        request.CompanyId, GetRequired(fields, "PositionProfileTitle"), departmentId, locationId, cancellationToken);
-
-                    if (positionProfileResult.Skipped || positionProfileResult.Id is null)
-                        throw new InvalidOperationException($"Position Profile '{GetRequired(fields, "PositionProfileTitle")}' could not be created.");
-
-                    positionProfileId = positionProfileResult.Id.Value;
+                    // Employee already created by an earlier (partial) attempt — resume without
+                    // creating it again. Read back the data needed to (re)publish events from the
+                    // Employees module rather than re-deriving it from the raw staging row.
+                    createResult = await employeeWriter.GetImportSnapshotAsync(
+                        request.CompanyId, row.CreatedEmployeeId.Value, cancellationToken)
+                        ?? throw new InvalidOperationException(
+                            $"Employee '{row.CreatedEmployeeId}' recorded against row {row.RowNumber} could not be found.");
                 }
 
-                var createRequest = new EmployeeImportCreateRequest(
-                    Guid.NewGuid(),
-                    request.CompanyId,
-                    GetRequired(fields, "FirstName"),
-                    GetRequired(fields, "LastName"),
-                    fields.GetValueOrDefault("PreferredName"),
-                    GetRequired(fields, "WorkEmail"),
-                    fields.GetValueOrDefault("PersonalEmail"),
-                    ParseDate(fields.GetValueOrDefault("StartDate"))!.Value,
-                    ParseDate(fields.GetValueOrDefault("DateOfBirth"))!.Value,
-                    GetRequired(fields, "Nationality"),
-                    GetRequired(fields, "Gender"),
-                    departmentId,
-                    locationId,
-                    employmentTypeId,
-                    positionProfileId,
-                    row.EmployeeNumber,
-                    session.Id,
-                    actorUserId,
-                    fields.GetValueOrDefault("Address"),
-                    ParseDate(fields.GetValueOrDefault("ProbationEndDate")));
-
-                // Rows whose Work Email matched the company's seed admin employee (see
-                // Employee.IsInitialCompanyAdmin) update that existing employee rather than
-                // creating a duplicate — this is the ONLY case where import ever updates an
-                // existing employee (see EmployeeStagingRowValidator's remarks).
-                var createResult = row.ExistingEmployeeIdToUpdate is not null
-                    ? await employeeWriter.UpdateEmployeeAsync(row.ExistingEmployeeIdToUpdate.Value, createRequest, cancellationToken)
-                    : await employeeWriter.CreateEmployeeAsync(createRequest, cancellationToken);
-
-                var workingDaysRaw = fields.GetValueOrDefault("WorkingDays");
-                var hoursPerDayRaw = fields.GetValueOrDefault("HoursPerDay");
-                if (!string.IsNullOrWhiteSpace(workingDaysRaw) || !string.IsNullOrWhiteSpace(hoursPerDayRaw))
+                // Each downstream step is independently resumable: only run (and only persist) a
+                // step that did not already complete for this row.
+                if (row.EmployeeCreatedEventPublishedAt is null)
                 {
-                    await employeeWriter.SetWorkingPatternAsync(
-                        request.CompanyId,
-                        createResult.EmployeeId,
-                        new EmployeeImportWorkingPattern(
-                            ParseWorkingDays(workingDaysRaw),
-                            ParseDecimal(hoursPerDayRaw)),
-                        cancellationToken);
-                }
-
-                var salaryAmountRaw = fields.GetValueOrDefault("SalaryAmount");
-                if (!string.IsNullOrWhiteSpace(salaryAmountRaw))
-                {
-                    await employeeWriter.CreateOpeningCompensationAsync(
+                    // Publishes synchronously in-process; InitialiseEmployeeLeave's handler will
+                    // have created the baseline leave balances by the time PublishAsync returns.
+                    await integrationEventPublisher.PublishAsync(new EmployeeCreatedIntegrationEvent(
                         request.CompanyId,
                         createResult.EmployeeId,
                         createResult.StartDate,
-                        new EmployeeImportCompensation(
-                            decimal.Parse(salaryAmountRaw, CultureInfo.InvariantCulture),
-                            fields.GetValueOrDefault("SalaryType") ?? "Annual",
-                            fields.GetValueOrDefault("Currency") ?? "GBP"),
-                        cancellationToken);
+                        createResult.ManagerId,
+                        createResult.ProbationEndDate,
+                        createResult.PositionProfileId,
+                        createResult.DefaultLeavePolicyId,
+                        IsImported: true), cancellationToken);
+
+                    row.MarkEmployeeCreatedEventPublished(clock.UtcNowOffset());
+                    await db.SaveChangesAsync(cancellationToken);
                 }
 
-                // OBT-REM-06: record the durable per-row confirmation state (and clear the tracked
-                // employee-writer work) BEFORE publishing integration events. A crash between here
-                // and the publish leaves the row marked confirmed, so a retry will not create the
-                // employee a second time — the far more damaging outcome than a re-runnable
-                // downstream projection gap.
-                row.MarkConfirmed(createResult.EmployeeId, clock.UtcNowOffset());
-                await db.SaveChangesAsync(cancellationToken);
-
-                // Publishes synchronously in-process; InitialiseEmployeeLeave's handler will
-                // have created the baseline leave balances by the time PublishAsync returns.
-                await integrationEventPublisher.PublishAsync(new EmployeeCreatedIntegrationEvent(
-                    request.CompanyId,
-                    createResult.EmployeeId,
-                    createResult.StartDate,
-                    createResult.ManagerId,
-                    createResult.ProbationEndDate,
-                    createResult.PositionProfileId,
-                    createResult.DefaultLeavePolicyId,
-                    IsImported: true), cancellationToken);
-
-                await integrationEventPublisher.PublishAsync(new EmployeeImportedIntegrationEvent(
-                    request.CompanyId, createResult.EmployeeId, session.Id, row.RowNumber), cancellationToken);
-
-                // Leave Type Code was removed from the import template — Annual Leave is the only
-                // leave type an import ever sets an opening balance for, so it's hardcoded here
-                // rather than asking the user to specify a type.
-                var leaveBalanceDaysRaw = fields.GetValueOrDefault("LeaveBalanceDays");
-                if (!string.IsNullOrWhiteSpace(leaveBalanceDaysRaw))
+                if (row.EmployeeImportedEventPublishedAt is null)
                 {
-                    await leaveWriter.TryLayOpeningBalanceAsync(
-                        request.CompanyId,
-                        createResult.EmployeeId,
-                        "Annual Leave",
-                        decimal.Parse(leaveBalanceDaysRaw, CultureInfo.InvariantCulture),
-                        actorUserId,
-                        cancellationToken);
+                    await integrationEventPublisher.PublishAsync(new EmployeeImportedIntegrationEvent(
+                        request.CompanyId, createResult.EmployeeId, session.Id, row.RowNumber), cancellationToken);
+
+                    row.MarkEmployeeImportedEventPublished(clock.UtcNowOffset());
+                    await db.SaveChangesAsync(cancellationToken);
                 }
 
-                createdByRow[row.RowNumber] = (createResult.EmployeeId, row.ManagerReference);
-                createdRowResults.Add(new ConfirmImportSessionRowResult(
-                    row.RowNumber, createResult.EmployeeId, createResult.EmployeeNumber));
+                if (row.OpeningLeaveBalanceProcessedAt is null)
+                {
+                    // Leave Type Code was removed from the import template — Annual Leave is the
+                    // only leave type an import ever sets an opening balance for, so it's
+                    // hardcoded here rather than asking the user to specify a type.
+                    // TryLayOpeningBalanceAsync computes the adjustment as a delta from the
+                    // employee's current balance, so calling it again on retry (or when there is
+                    // nothing to apply) is a safe no-op.
+                    var leaveBalanceDaysRaw = fields.GetValueOrDefault("LeaveBalanceDays");
+                    if (!string.IsNullOrWhiteSpace(leaveBalanceDaysRaw))
+                    {
+                        await leaveWriter.TryLayOpeningBalanceAsync(
+                            request.CompanyId,
+                            createResult.EmployeeId,
+                            "Annual Leave",
+                            decimal.Parse(leaveBalanceDaysRaw, CultureInfo.InvariantCulture),
+                            actorUserId,
+                            cancellationToken);
+                    }
+
+                    row.MarkOpeningLeaveBalanceProcessed(clock.UtcNowOffset());
+                    await db.SaveChangesAsync(cancellationToken);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -298,11 +345,21 @@ internal sealed class ConfirmImportSessionHandler(
 
         // Second pass: manager resolution, now that every row's employee (if created
         // successfully) exists. A manager reference can point at another row in this same file
-        // or at a pre-existing employee.
+        // or at a pre-existing employee. Only rows whose manager-assignment step has not already
+        // completed are (re)processed — this keeps a retry from repeatedly re-resolving managers
+        // for rows that finished this step on an earlier attempt.
         foreach (var (rowNumber, (employeeId, managerReference)) in createdByRow)
         {
-            if (string.IsNullOrWhiteSpace(managerReference))
+            var stagingRow = rowsByNumber[rowNumber];
+            if (stagingRow.ManagerAssignmentProcessedAt is not null)
                 continue;
+
+            if (string.IsNullOrWhiteSpace(managerReference))
+            {
+                stagingRow.MarkManagerAssignmentProcessed(clock.UtcNowOffset());
+                await db.SaveChangesAsync(cancellationToken);
+                continue;
+            }
 
             var normalizedReference = managerReference.Trim();
 
@@ -325,7 +382,11 @@ internal sealed class ConfirmImportSessionHandler(
                 request.CompanyId, normalizedReference, cancellationToken);
 
             if (managerId is null)
+            {
+                stagingRow.MarkManagerAssignmentProcessed(clock.UtcNowOffset());
+                await db.SaveChangesAsync(cancellationToken);
                 continue;
+            }
 
             var assigned = await employeeWriter.TryAssignManagerAsync(
                 request.CompanyId, employeeId, managerId.Value, cancellationToken);
@@ -342,12 +403,34 @@ internal sealed class ConfirmImportSessionHandler(
                     null,
                     clock.UtcNowOffset()));
             }
+
+            stagingRow.MarkManagerAssignmentProcessed(clock.UtcNowOffset());
+            await db.SaveChangesAsync(cancellationToken);
         }
 
-        // Recompute cumulative counts from the durable per-row state rather than this run's deltas,
-        // so a resumed/retried confirmation reports the whole session's outcome.
+        // A row is fully confirmed only once every mandatory step has completed. This must be
+        // computed after both passes above, since manager assignment (pass two) can be the last
+        // outstanding step for a row that already had its employee/events/leave-balance steps
+        // done on an earlier attempt.
+        var nowFinal = clock.UtcNowOffset();
+        var rowsToFinalize = allValidRows.Where(r =>
+            !r.IsFullyConfirmed
+            && r.CreatedEmployeeId is not null
+            && r.EmployeeCreatedEventPublishedAt is not null
+            && r.EmployeeImportedEventPublishedAt is not null
+            && r.OpeningLeaveBalanceProcessedAt is not null
+            && r.ManagerAssignmentProcessedAt is not null);
+
+        foreach (var row in rowsToFinalize)
+            row.MarkFullyConfirmed(nowFinal);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        // Recompute cumulative counts from fully-completed rows (not merely rows with an employee
+        // id), so a resumed/retried confirmation reports the whole session's true outcome and a
+        // row with dangling downstream work is never counted as a success.
         var confirmedTotal = await db.ImportStagingEmployees
-            .CountAsync(s => s.ImportSessionId == session.Id && s.CreatedEmployeeId != null, cancellationToken);
+            .CountAsync(s => s.ImportSessionId == session.Id && s.FullyConfirmedAt != null, cancellationToken);
         var validTotal = allValidRows.Count;
         var failedTotal = (validTotal - confirmedTotal) + alreadyInvalidRowCount;
 

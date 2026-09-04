@@ -255,4 +255,30 @@ internal sealed class EmployeeImportWriter(
 
         return true;
     }
+
+    public async Task<EmployeeImportCreateResult?> GetImportSnapshotAsync(
+        Guid companyId, Guid employeeId, CancellationToken cancellationToken)
+    {
+        var employee = await dbContext.Employees
+            .AsNoTracking()
+            .SingleOrDefaultAsync(e => e.Id == employeeId && e.CompanyId == companyId, cancellationToken);
+
+        if (employee is null)
+            return null;
+
+        var positionProfile = await dbContext.PositionProfiles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                p => p.Id == employee.PositionProfileId && p.CompanyId == companyId,
+                cancellationToken);
+
+        return new EmployeeImportCreateResult(
+            employee.Id,
+            employee.EmployeeNumber,
+            employee.StartDate,
+            employee.ManagerId,
+            employee.PositionProfileId,
+            employee.ProbationEndDate ?? employee.StartDate,
+            positionProfile?.DefaultLeavePolicyId);
+    }
 }

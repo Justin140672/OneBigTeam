@@ -70,7 +70,22 @@ internal sealed class ImportStagingEmployeeConfiguration : IEntityTypeConfigurat
         builder.Property(e => e.CreatedEmployeeId)
             .HasColumnName("created_employee_id");
 
-        builder.Property(e => e.ConfirmedAt)
+        builder.Property(e => e.EmployeeCreatedAt)
+            .HasColumnName("employee_created_at");
+
+        builder.Property(e => e.EmployeeCreatedEventPublishedAt)
+            .HasColumnName("employee_created_event_published_at");
+
+        builder.Property(e => e.EmployeeImportedEventPublishedAt)
+            .HasColumnName("employee_imported_event_published_at");
+
+        builder.Property(e => e.OpeningLeaveBalanceProcessedAt)
+            .HasColumnName("opening_leave_balance_processed_at");
+
+        builder.Property(e => e.ManagerAssignmentProcessedAt)
+            .HasColumnName("manager_assignment_processed_at");
+
+        builder.Property(e => e.FullyConfirmedAt)
             .HasColumnName("confirmed_at");
 
         builder.HasIndex(e => e.CompanyId);

@@ -36,15 +36,17 @@ public class ImportConfirmationRetrySafetyDomainTests
     }
 
     [Fact]
-    public void ClaimForConfirmation_preserves_original_StartedAt()
+    public void ClaimForConfirmation_refreshes_StartedAt_on_every_claim()
     {
+        // OBT-REM-08: StartedAt must be refreshed on every claim (not just the first), so an
+        // actively running confirmation is judged for staleness from when THIS attempt started,
+        // not from a much earlier Validate/first-claim timestamp.
         var s = NewSession();
         s.Start(Now);
-        var originalStart = s.StartedAt;
 
         s.ClaimForConfirmation(Now.AddHours(2));
 
-        Assert.Equal(originalStart, s.StartedAt);
+        Assert.Equal(Now.AddHours(2), s.StartedAt);
     }
 
     [Fact]
@@ -72,32 +74,58 @@ public class ImportConfirmationRetrySafetyDomainTests
     }
 
     [Fact]
-    public void MarkConfirmed_records_created_employee_and_timestamp()
+    public void MarkEmployeeCreated_records_created_employee_and_timestamp()
     {
         var row = ImportStagingEmployee.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 2, "EMP-1", "a@x.com", null,
             null, null, null, null, "{}", isValid: true, Now);
 
         Assert.Null(row.CreatedEmployeeId);
-        Assert.Null(row.ConfirmedAt);
+        Assert.Null(row.FullyConfirmedAt);
+        Assert.False(row.IsFullyConfirmed);
 
         var employeeId = Guid.NewGuid();
-        row.MarkConfirmed(employeeId, Now.AddMinutes(1));
+        row.MarkEmployeeCreated(employeeId, Now.AddMinutes(1));
 
         Assert.Equal(employeeId, row.CreatedEmployeeId);
-        Assert.Equal(Now.AddMinutes(1), row.ConfirmedAt);
+        Assert.Equal(Now.AddMinutes(1), row.EmployeeCreatedAt);
+        // Creating the employee alone does not yet make the row fully confirmed — downstream
+        // steps (events, leave balance, manager assignment) still need to complete.
+        Assert.False(row.IsFullyConfirmed);
     }
 
     [Fact]
-    public void MarkConfirmed_is_the_signal_a_retry_uses_to_skip_a_row()
+    public void MarkEmployeeCreated_is_the_signal_a_retry_uses_to_skip_re_creating_the_employee()
     {
         // A row that already produced an employee must report a non-null CreatedEmployeeId so the
-        // handler's "only rows with CreatedEmployeeId == null" filter excludes it on retry.
+        // handler's resume path reads back the snapshot instead of creating a second employee.
         var row = ImportStagingEmployee.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 5, null, null, null,
             null, null, null, null, "{}", isValid: true, Now);
-        row.MarkConfirmed(Guid.NewGuid(), Now);
+        row.MarkEmployeeCreated(Guid.NewGuid(), Now);
 
         Assert.NotNull(row.CreatedEmployeeId);
+    }
+
+    [Fact]
+    public void IsFullyConfirmed_requires_every_mandatory_step()
+    {
+        var row = ImportStagingEmployee.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 7, null, null, null,
+            null, null, null, null, "{}", isValid: true, Now);
+
+        row.MarkEmployeeCreated(Guid.NewGuid(), Now);
+        row.MarkEmployeeCreatedEventPublished(Now);
+        row.MarkEmployeeImportedEventPublished(Now);
+        row.MarkOpeningLeaveBalanceProcessed(Now);
+        Assert.False(row.IsFullyConfirmed);
+
+        row.MarkManagerAssignmentProcessed(Now);
+        Assert.False(row.IsFullyConfirmed);
+
+        row.MarkFullyConfirmed(Now.AddMinutes(1));
+
+        Assert.True(row.IsFullyConfirmed);
+        Assert.Equal(Now.AddMinutes(1), row.FullyConfirmedAt);
     }
 }

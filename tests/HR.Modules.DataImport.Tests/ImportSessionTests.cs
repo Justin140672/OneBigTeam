@@ -288,4 +288,78 @@ public class ImportSessionTests
         Assert.Equal(0, session.SuccessfulRows);
         Assert.Equal(2, session.FailedRows);
     }
+
+    // --- OBT-REM-08: ClaimForConfirmation always refreshes StartedAt ---
+
+    [Fact]
+    public void ClaimForConfirmation_Sets_Status_To_Processing()
+    {
+        var session = CreateSession(FixedNow);
+        session.Validate(successfulRows: 1, failedRows: 0, FixedNow.AddMinutes(1));
+
+        session.ClaimForConfirmation(FixedNow.AddMinutes(2));
+
+        Assert.Equal(ImportStatus.Processing, session.Status);
+    }
+
+    [Fact]
+    public void ClaimForConfirmation_Sets_StartedAt_On_First_Claim()
+    {
+        var session = CreateSession(FixedNow);
+        session.Validate(successfulRows: 1, failedRows: 0, FixedNow.AddMinutes(1));
+        var claimedAt = FixedNow.AddMinutes(2);
+
+        session.ClaimForConfirmation(claimedAt);
+
+        Assert.Equal(claimedAt, session.StartedAt);
+    }
+
+    [Fact]
+    public void ClaimForConfirmation_Always_Refreshes_StartedAt_Even_When_Already_Set()
+    {
+        // This is the OBT-REM-08 fix: previously StartedAt ??= now meant a second claim would never
+        // move StartedAt forward, so a staleness check comparing "now" to StartedAt would keep
+        // comparing against the ORIGINAL claim time forever, even while a brand-new attempt is
+        // actively running.
+        var session = CreateSession(FixedNow);
+        session.Validate(successfulRows: 1, failedRows: 0, FixedNow.AddMinutes(1));
+
+        var firstClaim = FixedNow.AddMinutes(2);
+        session.ClaimForConfirmation(firstClaim);
+        Assert.Equal(firstClaim, session.StartedAt);
+
+        var secondClaim = FixedNow.AddHours(1);
+        session.ClaimForConfirmation(secondClaim);
+
+        Assert.Equal(secondClaim, session.StartedAt);
+        Assert.NotEqual(firstClaim, session.StartedAt);
+    }
+
+    [Fact]
+    public void ClaimForConfirmation_Clears_CompletedAt()
+    {
+        var session = CreateSession(FixedNow);
+        session.Validate(successfulRows: 1, failedRows: 0, FixedNow.AddMinutes(1));
+        session.Confirm(createdCount: 0, failedCount: 1, FixedNow.AddMinutes(2));
+        Assert.NotNull(session.CompletedAt);
+
+        session.ClaimForConfirmation(FixedNow.AddMinutes(3));
+
+        Assert.Null(session.CompletedAt);
+    }
+
+    [Fact]
+    public void ClaimForConfirmation_Increments_Version_Each_Call()
+    {
+        var session = CreateSession(FixedNow);
+        session.Validate(successfulRows: 1, failedRows: 0, FixedNow.AddMinutes(1));
+        var initialVersion = session.Version;
+
+        session.ClaimForConfirmation(FixedNow.AddMinutes(2));
+        var afterFirstClaim = session.Version;
+        session.ClaimForConfirmation(FixedNow.AddMinutes(3));
+
+        Assert.Equal(initialVersion + 1, afterFirstClaim);
+        Assert.Equal(initialVersion + 2, session.Version);
+    }
 }

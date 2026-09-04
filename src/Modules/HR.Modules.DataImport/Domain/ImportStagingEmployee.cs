@@ -23,16 +23,42 @@ internal sealed class ImportStagingEmployee
     public bool IsValid { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
-    // OBT-REM-06: durable per-row confirmation state. Once set, a retry of the confirm step skips
-    // this row instead of creating the employee a second time.
+    // OBT-REM-06/OBT-REM-08: durable per-row confirmation progress. Each step is recorded
+    // independently so a retry after a crash resumes exactly the steps that did not complete,
+    // without ever creating a second employee for the row. A row is only counted as successfully
+    // confirmed (see ConfirmImportSessionHandler) once FullyConfirmedAt is set.
     public Guid? CreatedEmployeeId { get; private set; }
-    public DateTimeOffset? ConfirmedAt { get; private set; }
+    public DateTimeOffset? EmployeeCreatedAt { get; private set; }
+    public DateTimeOffset? EmployeeCreatedEventPublishedAt { get; private set; }
+    public DateTimeOffset? EmployeeImportedEventPublishedAt { get; private set; }
+    public DateTimeOffset? OpeningLeaveBalanceProcessedAt { get; private set; }
+    public DateTimeOffset? ManagerAssignmentProcessedAt { get; private set; }
+    // Mapped to the pre-existing "confirmed_at" column (was previously set right after employee
+    // creation; now only set once every mandatory step below has completed).
+    public DateTimeOffset? FullyConfirmedAt { get; private set; }
 
-    public void MarkConfirmed(Guid createdEmployeeId, DateTimeOffset now)
+    public bool IsFullyConfirmed => FullyConfirmedAt is not null;
+
+    public void MarkEmployeeCreated(Guid createdEmployeeId, DateTimeOffset now)
     {
         CreatedEmployeeId = createdEmployeeId;
-        ConfirmedAt = now;
+        EmployeeCreatedAt = now;
     }
+
+    public void MarkEmployeeCreatedEventPublished(DateTimeOffset now) => EmployeeCreatedEventPublishedAt = now;
+
+    public void MarkEmployeeImportedEventPublished(DateTimeOffset now) => EmployeeImportedEventPublishedAt = now;
+
+    public void MarkOpeningLeaveBalanceProcessed(DateTimeOffset now) => OpeningLeaveBalanceProcessedAt = now;
+
+    public void MarkManagerAssignmentProcessed(DateTimeOffset now) => ManagerAssignmentProcessedAt = now;
+
+    /// <summary>
+    /// Marks the row as fully confirmed. Only valid once every mandatory downstream step
+    /// (employee creation, both integration events, and the leave-balance / manager-assignment
+    /// passes) has completed for this row.
+    /// </summary>
+    public void MarkFullyConfirmed(DateTimeOffset now) => FullyConfirmedAt = now;
 
     public static ImportStagingEmployee Create(
         Guid id,

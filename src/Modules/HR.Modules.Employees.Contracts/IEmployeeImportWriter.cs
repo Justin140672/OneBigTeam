@@ -81,4 +81,14 @@ public interface IEmployeeImportWriter
     /// </summary>
     Task<bool> TryAssignManagerAsync(
         Guid companyId, Guid employeeId, Guid managerId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads back the data needed to (re)publish import integration events for an employee that
+    /// was already created by a previous (failed/partial) confirm run. Used by
+    /// ConfirmImportSession's resume path so a retry never calls CreateEmployeeAsync/
+    /// UpdateEmployeeAsync a second time for a row whose employee already exists. Null if the
+    /// employee cannot be found (should not normally happen since the row recorded its id).
+    /// </summary>
+    Task<EmployeeImportCreateResult?> GetImportSnapshotAsync(
+        Guid companyId, Guid employeeId, CancellationToken cancellationToken);
 }

@@ -4,6 +4,7 @@ using HR.Modules.DataImport.Features.ConfirmImportSession;
 using HR.Modules.DataImport.Persistence;
 using HR.Modules.DataImport.Tests.Infrastructure;
 using HR.Modules.Employees.Contracts;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.DataImport.Tests;
@@ -27,15 +28,17 @@ public class ConfirmImportSessionHardeningTests
         DataImportDbContext db,
         FakeEmployeeImportWriter? employeeWriter = null,
         FakeImportLookupResolver? lookupResolver = null,
-        FakeIntegrationEventPublisher? publisher = null) =>
+        FakeIntegrationEventPublisher? publisher = null,
+        FakeLeaveImportWriter? leaveWriter = null,
+        DateTime? now = null) =>
         new(
             db,
             employeeWriter ?? new FakeEmployeeImportWriter(),
-            new FakeLeaveImportWriter(),
+            leaveWriter ?? new FakeLeaveImportWriter(),
             new FakeEmployeeImportLookupReader(),
             lookupResolver ?? new FakeImportLookupResolver(),
             publisher ?? new FakeIntegrationEventPublisher(),
-            new FakeClock(FixedUtcNow));
+            new FakeClock(now ?? FixedUtcNow));
 
     private static ImportSession SeedSession(
         DataImportDbContext db, Guid companyId, int totalRows = 1, ImportStatus target = ImportStatus.Validated)
@@ -321,5 +324,249 @@ public class ConfirmImportSessionHardeningTests
         var created = publisher.Published.OfType<EmployeeCreatedIntegrationEvent>().ToList();
         Assert.Equal(2, created.Count);
         Assert.All(created, e => Assert.True(e.IsImported));
+    }
+
+    // --- OBT-REM-08: granular per-row resume, without ever recreating an already-created employee ---
+
+    [Fact]
+    public async Task Row_With_Employee_Already_Created_But_Events_Not_Published_Republishes_Without_Recreating_Employee()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var session = SeedSession(db, companyId, totalRows: 1);
+        var employeeId = Guid.NewGuid();
+
+        // Simulates a crash immediately after MarkEmployeeCreated was persisted, before any of the
+        // downstream steps ran.
+        var row = AddRow(db, companyId, session.Id, 2, workEmail: "resume@example.com");
+        row.MarkEmployeeCreated(employeeId, FixedNowOffset);
+        db.SaveChanges();
+
+        var employeeWriter = new FakeEmployeeImportWriter();
+        employeeWriter.SeedSnapshot(employeeId, new EmployeeImportCreateResult(
+            employeeId, "EMP-0001", new DateOnly(2026, 1, 1), null, null, new DateOnly(2026, 7, 1), null));
+        var publisher = new FakeIntegrationEventPublisher();
+        var handler = BuildHandler(db, employeeWriter, publisher: publisher);
+
+        var result = await handler.HandleAsync(Request(companyId, session.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(employeeWriter.CreateRequests); // never recreated
+        Assert.Equal(1, employeeWriter.GetImportSnapshotCalls);
+        Assert.Single(publisher.Published.OfType<EmployeeCreatedIntegrationEvent>());
+        Assert.Single(publisher.Published.OfType<EmployeeImportedIntegrationEvent>());
+
+        var saved = await db.ImportStagingEmployees.SingleAsync(s => s.Id == row.Id);
+        Assert.Equal(employeeId, saved.CreatedEmployeeId);
+        Assert.NotNull(saved.EmployeeCreatedEventPublishedAt);
+        Assert.NotNull(saved.EmployeeImportedEventPublishedAt);
+        Assert.True(saved.IsFullyConfirmed);
+        Assert.Equal(nameof(ImportStatus.Imported), result.Value!.Status);
+    }
+
+    [Fact]
+    public async Task Row_Missing_OpeningLeaveBalanceProcessedAt_Gets_Balance_Applied_On_Retry()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var session = SeedSession(db, companyId, totalRows: 1);
+        var employeeId = Guid.NewGuid();
+
+        var fields = new Dictionary<string, string?>
+        {
+            ["FirstName"] = "Alice", ["LastName"] = "Smith", ["WorkEmail"] = "leave@example.com",
+            ["StartDate"] = "2026-01-01", ["DateOfBirth"] = "1990-01-01",
+            ["Nationality"] = "British", ["Gender"] = "Female", ["LeaveBalanceDays"] = "5",
+        };
+        var row = AddRow(db, companyId, session.Id, 2, workEmail: "leave@example.com", rawData: JsonSerializer.Serialize(fields));
+        row.MarkEmployeeCreated(employeeId, FixedNowOffset);
+        row.MarkEmployeeCreatedEventPublished(FixedNowOffset);
+        row.MarkEmployeeImportedEventPublished(FixedNowOffset);
+        db.SaveChanges();
+
+        var employeeWriter = new FakeEmployeeImportWriter();
+        employeeWriter.SeedSnapshot(employeeId, new EmployeeImportCreateResult(
+            employeeId, "EMP-0001", new DateOnly(2026, 1, 1), null, null, new DateOnly(2026, 7, 1), null));
+        var leaveWriter = new FakeLeaveImportWriter();
+        var handler = BuildHandler(db, employeeWriter, leaveWriter: leaveWriter);
+
+        var result = await handler.HandleAsync(Request(companyId, session.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var call = Assert.Single(leaveWriter.Calls);
+        Assert.Equal(employeeId, call.EmployeeId);
+        Assert.Equal(5m, call.OpeningBalanceDays);
+
+        var saved = await db.ImportStagingEmployees.SingleAsync(s => s.Id == row.Id);
+        Assert.NotNull(saved.OpeningLeaveBalanceProcessedAt);
+        Assert.True(saved.IsFullyConfirmed);
+    }
+
+    [Fact]
+    public async Task Row_With_OpeningLeaveBalance_Already_Processed_Is_Not_Reapplied_On_Retry()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var session = SeedSession(db, companyId, totalRows: 1);
+        var employeeId = Guid.NewGuid();
+
+        var fields = new Dictionary<string, string?>
+        {
+            ["FirstName"] = "Alice", ["LastName"] = "Smith", ["WorkEmail"] = "already@example.com",
+            ["StartDate"] = "2026-01-01", ["DateOfBirth"] = "1990-01-01",
+            ["Nationality"] = "British", ["Gender"] = "Female", ["LeaveBalanceDays"] = "5",
+        };
+        var row = AddRow(db, companyId, session.Id, 2, workEmail: "already@example.com", rawData: JsonSerializer.Serialize(fields));
+        row.MarkEmployeeCreated(employeeId, FixedNowOffset);
+        row.MarkEmployeeCreatedEventPublished(FixedNowOffset);
+        row.MarkEmployeeImportedEventPublished(FixedNowOffset);
+        // The step under test is already marked complete from a previous attempt; only manager
+        // assignment (which resolves to "no manager reference" here) is still outstanding.
+        row.MarkOpeningLeaveBalanceProcessed(FixedNowOffset);
+        db.SaveChanges();
+
+        var employeeWriter = new FakeEmployeeImportWriter();
+        employeeWriter.SeedSnapshot(employeeId, new EmployeeImportCreateResult(
+            employeeId, "EMP-0001", new DateOnly(2026, 1, 1), null, null, new DateOnly(2026, 7, 1), null));
+        var leaveWriter = new FakeLeaveImportWriter();
+        var handler = BuildHandler(db, employeeWriter, leaveWriter: leaveWriter);
+
+        var result = await handler.HandleAsync(Request(companyId, session.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(leaveWriter.Calls); // must not double-apply the opening balance
+
+        var saved = await db.ImportStagingEmployees.SingleAsync(s => s.Id == row.Id);
+        Assert.True(saved.IsFullyConfirmed);
+    }
+
+    [Fact]
+    public async Task Session_Completes_As_Imported_Once_The_Last_Outstanding_Step_Finishes_For_Every_Row()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var session = SeedSession(db, companyId, totalRows: 1, target: ImportStatus.CompletedWithErrors);
+        var employeeId = Guid.NewGuid();
+
+        // Every step is already done except manager assignment (no manager reference here, so this
+        // finalizes with no external calls at all) - proves a retry that only needed to finish the
+        // very last step still transitions the session out of CompletedWithErrors.
+        var row = AddRow(db, companyId, session.Id, 2, workEmail: "last-step@example.com");
+        row.MarkEmployeeCreated(employeeId, FixedNowOffset);
+        row.MarkEmployeeCreatedEventPublished(FixedNowOffset);
+        row.MarkEmployeeImportedEventPublished(FixedNowOffset);
+        row.MarkOpeningLeaveBalanceProcessed(FixedNowOffset);
+        db.SaveChanges();
+
+        var employeeWriter = new FakeEmployeeImportWriter();
+        employeeWriter.SeedSnapshot(employeeId, new EmployeeImportCreateResult(
+            employeeId, "EMP-0001", new DateOnly(2026, 1, 1), null, null, new DateOnly(2026, 7, 1), null));
+        var leaveWriter = new FakeLeaveImportWriter();
+        var handler = BuildHandler(db, employeeWriter, leaveWriter: leaveWriter);
+
+        var result = await handler.HandleAsync(Request(companyId, session.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(nameof(ImportStatus.Imported), result.Value!.Status);
+        Assert.Empty(employeeWriter.CreateRequests);
+        Assert.Empty(leaveWriter.Calls);
+
+        var savedSession = await db.ImportSessions.SingleAsync(s => s.Id == session.Id);
+        Assert.Equal(ImportStatus.Imported, savedSession.Status);
+        var savedRow = await db.ImportStagingEmployees.SingleAsync(s => s.Id == row.Id);
+        Assert.True(savedRow.IsFullyConfirmed);
+        Assert.NotNull(savedRow.ManagerAssignmentProcessedAt);
+    }
+
+    [Fact]
+    public async Task Retry_Reports_Cumulative_Totals_Including_Rows_Confirmed_On_An_Earlier_Attempt()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var session = SeedSession(db, companyId, totalRows: 2, target: ImportStatus.CompletedWithErrors);
+
+        // Row 2 was fully confirmed by an earlier attempt; row 3 has never been touched at all.
+        var alreadyDoneEmployeeId = Guid.NewGuid();
+        var rowAlreadyDone = AddRow(db, companyId, session.Id, 2, workEmail: "done@example.com", employeeNumber: "EMP-0002");
+        rowAlreadyDone.MarkEmployeeCreated(alreadyDoneEmployeeId, FixedNowOffset);
+        rowAlreadyDone.MarkEmployeeCreatedEventPublished(FixedNowOffset);
+        rowAlreadyDone.MarkEmployeeImportedEventPublished(FixedNowOffset);
+        rowAlreadyDone.MarkOpeningLeaveBalanceProcessed(FixedNowOffset);
+        rowAlreadyDone.MarkManagerAssignmentProcessed(FixedNowOffset);
+        rowAlreadyDone.MarkFullyConfirmed(FixedNowOffset);
+
+        AddRow(db, companyId, session.Id, 3, workEmail: "fresh@example.com", employeeNumber: "EMP-0003");
+        db.SaveChanges();
+
+        var employeeWriter = new FakeEmployeeImportWriter();
+        employeeWriter.SeedSnapshot(alreadyDoneEmployeeId, new EmployeeImportCreateResult(
+            alreadyDoneEmployeeId, "EMP-0002", new DateOnly(2026, 1, 1), null, null, new DateOnly(2026, 7, 1), null));
+        var handler = BuildHandler(db, employeeWriter);
+
+        var result = await handler.HandleAsync(Request(companyId, session.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value!.CreatedCount);
+        Assert.Equal(0, result.Value.FailedCount);
+        Assert.Equal(nameof(ImportStatus.Imported), result.Value.Status);
+        Assert.Equal(2, result.Value.CreatedRows.Count);
+        // The already-confirmed row is fully skipped (no writer interaction at all) - only the
+        // still-outstanding row goes through CreateEmployeeAsync.
+        Assert.Single(employeeWriter.CreateRequests);
+    }
+
+    // --- OBT-REM-08: an actively-running claim is judged for staleness from when THIS attempt
+    // started, not from the original Validate timestamp. ---
+
+    [Fact]
+    public async Task Stale_Processing_Claim_Older_Than_15_Minutes_Is_Reclaimable_And_StartedAt_Is_Refreshed()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var session = SeedSession(db, companyId, totalRows: 1);
+        AddRow(db, companyId, session.Id, 2, workEmail: "stale@example.com");
+
+        // Simulates a prior run that claimed the session (Processing) 20 minutes ago and then
+        // crashed without ever completing - older than the 15-minute stale-claim window.
+        session.Start(FixedNowOffset.AddMinutes(-20));
+        db.SaveChanges();
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(Request(companyId, session.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var saved = await db.ImportSessions.SingleAsync(s => s.Id == session.Id);
+        // The bug this guards against: StartedAt used to only ever be set once (??=), so a stale
+        // claim's timestamp would stay frozen at the original crash time forever. It must now
+        // reflect this attempt's own claim time.
+        Assert.Equal(FixedNowOffset, saved.StartedAt);
+        Assert.NotEqual(FixedNowOffset.AddMinutes(-20), saved.StartedAt);
+    }
+
+    [Fact]
+    public async Task Recently_Claimed_Processing_Session_Is_Not_Confirmable_Even_If_Validated_Long_Ago()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var session = SeedSession(db, companyId, totalRows: 1);
+        AddRow(db, companyId, session.Id, 2);
+
+        // Actively running: claimed 5 minutes ago, well inside the 15-minute stale window, even
+        // though the original Validate call (inside SeedSession) happened at the same FixedNowOffset
+        // - i.e. this must NOT be judged stale using the original validation timestamp.
+        session.Start(FixedNowOffset.AddMinutes(-5));
+        db.SaveChanges();
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(Request(companyId, session.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+
+        var saved = await db.ImportSessions.SingleAsync(s => s.Id == session.Id);
+        Assert.Equal(ImportStatus.Processing, saved.Status);
     }
 }

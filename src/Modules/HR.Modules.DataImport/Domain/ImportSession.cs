@@ -72,7 +72,12 @@ internal sealed class ImportSession
     public void ClaimForConfirmation(DateTimeOffset now)
     {
         Status = ImportStatus.Processing;
-        StartedAt ??= now;
+        // OBT-REM-08: always refresh StartedAt on claim (not just the first time) so an active
+        // confirmation is judged for staleness from when THIS attempt started, not from when the
+        // original validation step ran. Without this, a session validated more than 15 minutes ago
+        // would be treated as an abandoned claim the instant it is claimed, even though the claim
+        // itself is brand new and actively running.
+        StartedAt = now;
         CompletedAt = null;
         UpdatedAt = now;
         Version++;
