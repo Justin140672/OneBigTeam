@@ -43,7 +43,12 @@ controller's responsibilities for Customer-controlled HR data.
    complete merely because access has been disabled.
 4. Inventory and delete tenant records across every application module, Supabase private objects,
    authentication profiles, queued/staged imports, generated exports, support attachments and other
-   Customer-controlled stores. Record per-store completion and failures.
+   Customer-controlled stores. Record per-store completion and failures. This explicitly includes
+   special-category equality-monitoring data in `employees.employee_equality_data`: it has an
+   `ON DELETE CASCADE` foreign key to `employees.employees`, so deleting the employee rows (or
+   dropping the `employees` schema) removes it automatically — verify the table is empty for the
+   tenant as part of per-store sign-off. The stored answer columns are ciphertext only; the
+   encryption keys are held outside the database and are not part of any backup.
 5. Preserve only information covered by a documented legal-retention exception. Separate it from
    ordinary use, restrict access and record the lawful reason and review/deletion date.
 6. Record the applicable provider backup expiry. If disaster recovery restores an earlier copy,

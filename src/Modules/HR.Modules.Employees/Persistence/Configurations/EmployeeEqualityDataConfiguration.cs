@@ -43,5 +43,23 @@ internal sealed class EmployeeEqualityDataConfiguration : IEntityTypeConfigurati
 
         builder.HasIndex(x => x.CompanyId);
         builder.HasIndex(x => new { x.CompanyId, x.EmployeeId }).IsUnique();
+
+        // Ticket 8 — equality data follows the employee lifecycle and must never survive as an
+        // identifiable orphan. A real FK to employees.employees guarantees a row cannot exist
+        // without its employee, and ON DELETE CASCADE guarantees it is destroyed the instant the
+        // employee row is physically deleted (the manual per-store customer-deletion procedure in
+        // docs/compliance/data-protection-operations.md, and full-tenant deletion which drops the
+        // whole `employees` schema).
+        //
+        // Cascade is deliberately chosen here even though sibling employee-child tables use
+        // DeleteBehavior.Restrict: those rows carry independent business/retention value and
+        // employees are only ever *soft*-deleted (Status = FormerEmployee) in normal operation, so
+        // this cascade never fires during offboarding/leaving — only on a genuine physical DELETE,
+        // which is exactly the moment this special-category record must disappear.
+        builder.HasOne<Employee>()
+            .WithMany()
+            .HasForeignKey(x => x.EmployeeId)
+            .HasPrincipalKey(e => e.Id)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

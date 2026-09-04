@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using HR.Infrastructure.Persistence;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Identity.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +31,23 @@ public class EqualityRecordEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, companyId);
+
+        // The equality-record endpoints write to employees.employee_equality_data, which has a real
+        // FK (ON DELETE CASCADE) to employees.employees. Seed a minimal self-service employee row
+        // whose Id == the identity user id (the established convention — see
+        // GetMyPersonalDetails/Handler.cs: e.Id == userId).
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
+            var refData = await EmployeeReferenceDataSeeder.SeedAsync(db, companyId);
+            var now = DateTimeOffset.UtcNow;
+            db.Employees.Add(Employee.Create(
+                userId, companyId, "Equality", "Tester", $"equality.{userId:N}@example.com",
+                new DateOnly(2024, 1, 1), hasSystemAccess: false, new DateOnly(1990, 1, 1),
+                "British", "Prefer not to say", $"EMP-{userId:N}",
+                refData.EmploymentTypeId, refData.DepartmentId, refData.LocationId, refData.PositionProfileId, now));
+            await db.SaveChangesAsync();
+        }
 
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
