@@ -3,12 +3,13 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using HR.Web.Models;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Web.Services;
 
 // Wraps the HR.Modules.Support API surface (submission, thread, staff status changes and the
 // staff-only cross-company dashboard). See src/Modules/HR.Modules.Support/Features/*.
-public sealed class SupportService(IHttpClientFactory httpClientFactory)
+public sealed class SupportService(IHttpClientFactory httpClientFactory, ILogger<SupportService> logger)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -23,7 +24,13 @@ public sealed class SupportService(IHttpClientFactory httpClientFactory)
 
             return await Http.GetFromJsonAsync<List<SupportRequestListItem>>(url, HrApiJsonOptions.Default, cancellationToken);
         }
-        catch (HttpRequestException) { return null; }
+        catch (HttpRequestException ex)
+        {
+            // Technical detail logged server-side only — callers surface a generic, non-technical
+            // failure message to the end user (see SupportRequestQueue's Failed state).
+            logger.LogWarning(ex, "Failed to list support requests for company {CompanyId}.", companyId);
+            return null;
+        }
     }
 
     public async Task<SupportRequestDetailModel?> GetSupportRequestAsync(

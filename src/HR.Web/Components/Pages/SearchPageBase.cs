@@ -328,8 +328,26 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
 
     protected virtual string LoadErrorMessage => "Failed to load data.";
 
+    // Override to bound how long LoadAsync waits for FetchItemsAsync before treating the load as
+    // failed (surfacing the Failed/Retry state instead of hanging on the loading indicator
+    // forever). Null (the default) preserves the previous unbounded-wait behaviour for pages that
+    // haven't opted in, so this is safe to add without touching every list screen at once.
+    protected virtual TimeSpan? LoadTimeout => null;
+
+    // Bumped on every LoadAsync call (including via Dispose) so a response that arrives after a
+    // newer load was kicked off — or after the component was disposed/navigated away from — is
+    // recognised as stale and never applied to Items/Error.
+    private int _loadGeneration;
+
+    // Override to react to a load finishing (success or failure) — e.g. to push a screen-reader
+    // announcement. Only invoked for the most recent LoadAsync call, never for a stale/superseded
+    // one.
+    protected virtual void OnLoadCompleted(bool success) { }
+
     protected async Task LoadAsync()
     {
+        var generation = ++_loadGeneration;
+
         IsLoading = true;
         Error = null;
         StateHasChanged();
@@ -345,21 +363,51 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
         // finishes loading" failure mode. Fail into the visible Error state instead.
         try
         {
-            var result = await FetchItemsAsync(search);
+            var fetchTask = FetchItemsAsync(search);
+            var timedOut = false;
 
-            if (result is null)
+            if (LoadTimeout is { } timeout)
+            {
+                var delayTask = Task.Delay(timeout);
+                var completedTask = await Task.WhenAny(fetchTask, delayTask);
+                timedOut = completedTask == delayTask;
+            }
+
+            if (generation != _loadGeneration)
+                return; // superseded by a newer load (retry) or the component was disposed
+
+            if (timedOut)
+            {
                 Error = LoadErrorMessage;
+            }
             else
-                Items = result;
+            {
+                var result = await fetchTask;
+
+                if (generation != _loadGeneration)
+                    return;
+
+                if (result is null)
+                    Error = LoadErrorMessage;
+                else
+                    Items = result;
+            }
         }
         catch (Exception)
         {
+            if (generation != _loadGeneration)
+                return;
+
             Error = LoadErrorMessage;
         }
         finally
         {
-            IsLoading = false;
+            if (generation == _loadGeneration)
+                IsLoading = false;
         }
+
+        if (generation == _loadGeneration)
+            OnLoadCompleted(Error is null);
     }
 
     protected async Task OnSearchChanged(string value)
@@ -390,6 +438,9 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
 
     public void Dispose()
     {
+        // Invalidate any in-flight LoadAsync so a late response (e.g. one that timed out, or is
+        // still waiting on a slow backend) can never be applied after the user has navigated away.
+        _loadGeneration++;
         _searchCts?.Cancel();
         _searchCts?.Dispose();
     }

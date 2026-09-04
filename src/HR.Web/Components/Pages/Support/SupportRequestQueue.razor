@@ -3,8 +3,11 @@
 @inherits SearchPageBase<SupportRequestListItem>
 @inject SupportService SupportService
 @inject AppSession Session
+@inject ILogger<SupportRequestQueue> Logger
 
 <PageTitle>Support Requests</PageTitle>
+
+<div class="hr-visually-hidden" aria-live="polite" aria-atomic="true" role="status">@_announcement</div>
 
 <div class="container-fluid py-4">
     <h1 class="mb-1">Support Requests</h1>
@@ -19,7 +22,14 @@
     }
     else if (Error is not null)
     {
-        <div class="alert alert-danger">@Error</div>
+        <div class="alert alert-danger d-flex align-items-center justify-content-between">
+            <span>@Error</span>
+            <SfButton CssClass="e-outline" Content="Retry" @onclick="RetryAsync" />
+        </div>
+    }
+    else if (DisplayedItems.Count == 0)
+    {
+        <div class="alert alert-info">No support requests to show.</div>
     }
     else
     {
@@ -99,13 +109,40 @@
         return Task.CompletedTask;
     }
 
+    // Bounds how long the queue waits on a slow/unresponsive backend before surfacing the Failed
+    // state with a Retry action, rather than showing "Loading support requests…" indefinitely. No
+    // existing shared HTTP-timeout convention was found elsewhere in HR.Web (the "hrapi"
+    // HttpClient itself has no explicit Timeout set), so this is a new, page-local constant.
+    private static readonly TimeSpan FetchTimeout = TimeSpan.FromSeconds(20);
+
+    protected override TimeSpan? LoadTimeout => FetchTimeout;
+
+    private string? _announcement;
+
     protected override async Task<IReadOnlyList<SupportRequestListItem>?> FetchItemsAsync(string? search)
     {
-        var result = await SupportService.ListSupportRequestsAsync(CompanyId);
-        return result;
+        try
+        {
+            return await SupportService.ListSupportRequestsAsync(CompanyId);
+        }
+        catch (Exception ex)
+        {
+            // Technical detail stays in the log — the user only ever sees LoadErrorMessage below.
+            Logger.LogError(ex, "Unexpected error loading support requests for company {CompanyId}.", CompanyId);
+            return null;
+        }
     }
 
     protected override string LoadErrorMessage => "Failed to load support requests.";
+
+    protected override void OnLoadCompleted(bool success)
+    {
+        _announcement = success
+            ? "Support requests loaded."
+            : "Failed to load support requests.";
+    }
+
+    private Task RetryAsync() => LoadAsync();
 
     protected override string? GetViewUrl(SupportRequestListItem item) =>
         $"/companies/{CompanyId}/support/{item.Id}";
