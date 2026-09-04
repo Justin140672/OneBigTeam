@@ -1,5 +1,6 @@
 @page "/subscription"
 @rendermode InteractiveServer
+@using HR.Web.Components.Controls
 @using HR.Web.Components.Pages.Companies
 @inject SubscriptionService SubscriptionService
 @inject NavigationManager NavigationManager
@@ -17,11 +18,6 @@
     }
     else
     {
-        @if (_errorMessage is not null)
-        {
-            <div class="alert alert-danger">@_errorMessage</div>
-        }
-
         @if (_infoMessage is not null)
         {
             <div class="alert alert-success">@_infoMessage</div>
@@ -35,11 +31,11 @@
                 <div class="row g-4">
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Plan</label>
-                        <p class="mb-0">@(_details?.PlanName ?? "—")</p>
+                        <p class="mb-0">@PlanDisplayHelper.GetDisplayName(_details?.PlanName)</p>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Status</label>
-                        <p class="mb-0">@(_status is not null ? EnumDisplay.Humanize(_status.Status) : "Unknown")</p>
+                        <p class="mb-0">@StatusDisplay</p>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Active Employees</label>
@@ -70,27 +66,70 @@
             </div>
         </div>
 
-        <div class="mt-4 d-flex gap-2">
-            @if (_status?.Status is SubscriptionStatus.Trial or SubscriptionStatus.TrialExpired)
-            {
-                <SfButton IsPrimary="true" Disabled="@_isBusy" OnClick="StartCheckoutAsync">
-                    Start subscription
-                </SfButton>
-            }
+        <div class="mt-4">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                @if (_status?.Status is SubscriptionStatus.Trial or SubscriptionStatus.TrialExpired)
+                {
+                    <SfButton IsPrimary="true" Disabled="@_checkoutBusy" OnClick="StartCheckoutAsync">
+                        @if (_checkoutBusy)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Start subscription
+                    </SfButton>
+                }
 
-            @if (_details?.Status == SubscriptionStatus.Active && _details.CancelAtPeriodEnd == false)
-            {
-                <SfButton Disabled="@_isBusy" OnClick="CancelAsync">Cancel subscription</SfButton>
-            }
+                @if (_details?.CancelAtPeriodEnd == true)
+                {
+                    <SfButton IsPrimary="true" Disabled="@_resumeBusy" OnClick="ResumeAsync">
+                        @if (_resumeBusy)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Resume subscription
+                    </SfButton>
+                }
+                else
+                {
+                    <span title="@CancelUnavailableReason">
+                        <SfButton Disabled="@(!CancelIsAvailable || _cancelBusy)" OnClick="RequestCancelAsync">
+                            @if (_cancelBusy)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Cancel subscription
+                        </SfButton>
+                    </span>
+                    @if (!CancelIsAvailable)
+                    {
+                        <span class="text-muted small">@CancelUnavailableReason</span>
+                    }
+                }
 
-            @if (_details?.CancelAtPeriodEnd == true)
-            {
-                <SfButton IsPrimary="true" Disabled="@_isBusy" OnClick="ResumeAsync">Resume subscription</SfButton>
-            }
+                <span title="@ManageBillingUnavailableReason">
+                    <SfButton Disabled="@(!ManageBillingIsAvailable || _manageBillingBusy)" OnClick="ManageBillingAsync">
+                        @if (_manageBillingBusy)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Manage billing
+                    </SfButton>
+                </span>
+                @if (!ManageBillingIsAvailable)
+                {
+                    <span class="text-muted small">@ManageBillingUnavailableReason</span>
+                }
+            </div>
 
-            @if (_details is not null && _details.Status != SubscriptionStatus.Trial)
+            @if (_actionError is not null)
             {
-                <SfButton Disabled="@_isBusy" OnClick="ManageBillingAsync">Manage billing</SfButton>
+                <div class="alert alert-danger mt-3 d-flex justify-content-between align-items-center">
+                    <span>@_actionError</span>
+                    @if (_retryAction is not null)
+                    {
+                        <SfButton CssClass="ms-3" OnClick="RetryAsync">Retry</SfButton>
+                    }
+                </div>
             }
         </div>
 
@@ -101,16 +140,57 @@
     }
 </div>
 
+<HrDestructiveConfirmDialog Visible="_showCancelConfirm"
+                             Title="Cancel subscription"
+                             Message="Are you sure you want to cancel your subscription? You'll keep access until the end of your current billing period, then your account will move to read-only."
+                             ConfirmText="Cancel subscription"
+                             CancelText="Keep subscription"
+                             Busy="_cancelBusy"
+                             OnConfirmed="ConfirmCancelAsync"
+                             OnCancelled="() => _showCancelConfirm = false" />
+
 @code {
     private GetSubscriptionStatusResponse? _status;
     private GetSubscriptionDetailsResponse? _details;
     private bool _isLoading = true;
-    private bool _isBusy;
-    private string? _errorMessage;
+
+    private bool _checkoutBusy;
+    private bool _cancelBusy;
+    private bool _resumeBusy;
+    private bool _manageBillingBusy;
+
+    private bool _showCancelConfirm;
+
     private string? _infoMessage;
+    private string? _actionError;
+    private Func<Task>? _retryAction;
+
+    private string StatusDisplay =>
+        _status is not null ? EnumDisplay.Humanize(_status.Status) : "Unknown";
 
     private string NextBillingDateDisplay =>
         _details?.NextBillingDate is { } date ? date.ToLocalTime().ToString("d") : "Not yet billed";
+
+    // "Available" here means the action makes business sense right now, independent of whether an
+    // API call is currently in flight (that's covered separately by the *_Busy flags above/spinner
+    // state) — this is the "unavailable by design" case called out in the styling/UX conventions.
+    private bool CancelIsAvailable =>
+        _details is not null && _details.Status == SubscriptionStatus.Active && _details.CancelAtPeriodEnd == false;
+
+    private string? CancelUnavailableReason => CancelIsAvailable
+        ? null
+        : _details is null
+            ? "Cancelling is unavailable because your subscription details could not be loaded."
+            : "Cancelling is unavailable because you don't have an active paid subscription.";
+
+    private bool ManageBillingIsAvailable =>
+        _details is not null && _details.Status != SubscriptionStatus.Trial;
+
+    private string? ManageBillingUnavailableReason => ManageBillingIsAvailable
+        ? null
+        : _details is null
+            ? "Billing management is unavailable because your subscription details could not be loaded."
+            : "Billing management is not available while you're on a trial — start a subscription first.";
 
     protected override async Task OnInitializedAsync()
     {
@@ -122,6 +202,14 @@
         if (!AppSession.GuardAccess(NavigationManager, Session.CanManageCompany))
             return;
 
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
         var statusTask = SubscriptionService.GetStatusAsync();
         var detailsTask = SubscriptionService.GetDetailsAsync();
 
@@ -132,73 +220,93 @@
         _isLoading = false;
     }
 
+    private async Task RetryAsync()
+    {
+        var action = _retryAction;
+        _actionError = null;
+        _retryAction = null;
+        if (action is not null)
+            await action();
+    }
+
     private async Task StartCheckoutAsync()
     {
-        _errorMessage = null;
+        _actionError = null;
         _infoMessage = null;
-        _isBusy = true;
+        _checkoutBusy = true;
 
         var response = await SubscriptionService.CreateCheckoutSessionAsync();
 
         if (response is null)
         {
-            _errorMessage = "Unable to start checkout. Please try again.";
-            _isBusy = false;
+            _actionError = "We couldn't start checkout just now. This may be a temporary problem — please try again.";
+            _retryAction = StartCheckoutAsync;
+            _checkoutBusy = false;
             return;
         }
 
         NavigationManager.NavigateTo(response.CheckoutUrl, forceLoad: true);
     }
 
-    private async Task CancelAsync()
+    private void RequestCancelAsync() => _showCancelConfirm = true;
+
+    private async Task ConfirmCancelAsync()
     {
-        _errorMessage = null;
+        _actionError = null;
         _infoMessage = null;
-        _isBusy = true;
+        _cancelBusy = true;
 
         var response = await SubscriptionService.CancelAsync();
         if (response is null)
         {
-            _errorMessage = "Unable to cancel your subscription. Please try again.";
-            _isBusy = false;
+            _showCancelConfirm = false;
+            _actionError = "We couldn't cancel your subscription just now. This may be a temporary problem — please try again.";
+            _retryAction = ConfirmCancelAsync;
+            _cancelBusy = false;
             return;
         }
 
         _details = _details is null ? null : _details with { CancelAtPeriodEnd = response.CancelAtPeriodEnd };
-        _infoMessage = "Your subscription is scheduled to be cancelled.";
-        _isBusy = false;
+        _infoMessage = "Your subscription is scheduled to be cancelled at the end of the current billing period.";
+        _cancelBusy = false;
+        _showCancelConfirm = false;
     }
 
     private async Task ResumeAsync()
     {
-        _errorMessage = null;
+        _actionError = null;
         _infoMessage = null;
-        _isBusy = true;
+        _resumeBusy = true;
 
         var response = await SubscriptionService.ResumeAsync();
         if (response is null)
         {
-            _errorMessage = "Unable to resume your subscription. Please try again.";
-            _isBusy = false;
+            _actionError = "We couldn't resume your subscription just now. This may be a temporary problem — please try again.";
+            _retryAction = ResumeAsync;
+            _resumeBusy = false;
             return;
         }
 
         _details = _details is null ? null : _details with { CancelAtPeriodEnd = response.CancelAtPeriodEnd };
         _infoMessage = "Your subscription has been resumed.";
-        _isBusy = false;
+        _resumeBusy = false;
     }
 
     private async Task ManageBillingAsync()
     {
-        _errorMessage = null;
+        if (!ManageBillingIsAvailable)
+            return;
+
+        _actionError = null;
         _infoMessage = null;
-        _isBusy = true;
+        _manageBillingBusy = true;
 
         var response = await SubscriptionService.GetBillingPortalAsync();
         if (response is null)
         {
-            _errorMessage = "Unable to open the billing portal. Please try again.";
-            _isBusy = false;
+            _actionError = "We couldn't open the billing portal just now. This may be a temporary problem — please try again.";
+            _retryAction = ManageBillingAsync;
+            _manageBillingBusy = false;
             return;
         }
 
