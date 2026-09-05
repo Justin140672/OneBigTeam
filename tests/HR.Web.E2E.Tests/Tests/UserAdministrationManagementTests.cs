@@ -236,22 +236,27 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         await list.OpenUserDetailAsync("David Park");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
+        var access = new UserAccessDetailPage(_page, _fixture.WebBaseUrl);
 
         Assert.Equal("Active", await detail.GetAccountStatusAsync());
 
         // Seeded dev personas carry no audit trail of their own (seeding bypasses the normal
         // audit-event flow), so the empty-history state is expected here — an actual edit is
-        // what should produce the first entry.
-        Assert.True(await detail.HasAuditHistoryEmptyMessageAsync(),
+        // what should produce the first entry. Audit History now lives on the secondary
+        // UserAccessDetail.razor page.
+        await detail.OpenAccessDetailsAsync();
+        Assert.True(await access.HasAuditHistoryEmptyMessageAsync(),
             "Expected a freshly seeded account to start with no audit history");
+        await access.BackToUserDetailAsync();
 
         await detail.OpenManageRolesDialogAsync();
         await detail.ToggleRolesAndSaveAsync(["Manager"]);
         Assert.Equal("Roles updated.", await detail.GetSuccessMessageAsync());
 
-        Assert.False(await detail.HasAuditHistoryEmptyMessageAsync(),
+        await detail.OpenAccessDetailsAsync();
+        Assert.False(await access.HasAuditHistoryEmptyMessageAsync(),
             "Expected the account to have at least one audit history entry after a roles edit");
-        Assert.True(await detail.GetAuditHistoryCountAsync() > 0,
+        Assert.True(await access.GetAuditHistoryCountAsync() > 0,
             "Expected the roles edit to produce a visible audit history entry");
     }
 

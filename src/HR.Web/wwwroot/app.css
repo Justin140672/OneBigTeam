@@ -1223,6 +1223,19 @@ html[data-theme="dark"] .card-header {
     white-space: nowrap;
 }
 
+/* At mobile widths, the row's non-shrinking children (priority pip + due-badge +
+   this action label, each flex-shrink:0 / white-space:nowrap) can together demand more
+   width than the viewport, forcing .task-widget-item's flex layout wider than its 100%-width
+   container and overflowing the whole page horizontally (DSH-07 gate). The action text is
+   already folded into the row button's aria-label (AccessibleLabel in
+   AttentionQueueWidget/ManagerAttentionQueueWidget), so it's redundant for a11y — hide it
+   visually below 480px rather than truncating the title/meta text further. */
+@media (max-width: 480px) {
+    .attention-queue-action {
+        display: none;
+    }
+}
+
 .attention-queue-all-clear {
     display: flex;
     align-items: center;
@@ -1958,6 +1971,16 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
     .recruitment-dashboard-action-btn {
         min-width: 0;
         flex: 1;
+    }
+
+    /* flex-wrap alone still lets a single child (the vacancy-picker SfDropDownList, the search
+       HrTextBox, the terminal-stages checkbox label) sit on its own line but overflow that line if
+       the Syncfusion control's own default/min width exceeds the viewport. Force every toolbar
+       child to fit its wrapped line instead of pushing the page wider (DSH-07 gate). */
+    .recruitment-dashboard-toolbar > * {
+        min-width: 0;
+        max-width: 100%;
+        flex: 1 1 100%;
     }
 
     .recruitment-dashboard-tabs {

@@ -55,15 +55,18 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
             new() { Timeout = 15_000 });
     }
 
-    /// <summary>Returns true if any grid cell in the Documents tab contains <paramref name="titleFragment"/>.</summary>
+    /// <summary>Returns true if any row in the Documents tab grid contains <paramref name="titleFragment"/>.</summary>
     public async Task<bool> HasDocumentAsync(string titleFragment)
     {
         try
         {
-            // Scoped to the Documents grid card — NOT the sibling "Document Requests" section
+            // Row-level, matching the same selector shape as EmployeeEditPage.PromotionHistoryRow
+            // (".e-grid .e-row", not a bare cell) — a row-level match is robust to a column's text
+            // being wrapped in a nested element rather than sitting directly in the <td>. Scoped to
+            // the Documents grid card — NOT the sibling "Document Requests" section
             // (data-testid="admin-document-requests-section"), whose own table also has cells that
             // can contain a document-type name like "Passport".
-            await page.Locator("[data-testid='employee-documents-grid-section'] .e-gridcontent td")
+            await page.Locator("[data-testid='employee-documents-grid-section'] .e-grid .e-row")
                 .Filter(new() { HasText = titleFragment })
                 .First
                 .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });

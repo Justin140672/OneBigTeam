@@ -324,10 +324,19 @@
             {
                 var parts = new List<string>();
                 if (!string.IsNullOrWhiteSpace(EmployeeName)) parts.Add(EmployeeName);
-                if (!string.IsNullOrWhiteSpace(Category)) parts.Add(Category);
+
+                // When the row is overdue, the due-badge already reads "Overdue" — drop any
+                // supporting part (category name, status) that would repeat the word rather than
+                // only guarding against an exact "Overdue" status match (e.g. category names like
+                // "Manager Tasks Overdue" would otherwise duplicate it).
+                if (!string.IsNullOrWhiteSpace(Category) &&
+                    !(IsOverdue && Category.Contains("Overdue", StringComparison.OrdinalIgnoreCase)))
+                {
+                    parts.Add(Category);
+                }
 
                 if (!string.IsNullOrWhiteSpace(StatusLabel) &&
-                    !string.Equals(StatusLabel, "Overdue", StringComparison.OrdinalIgnoreCase))
+                    !StatusLabel.Contains("Overdue", StringComparison.OrdinalIgnoreCase))
                 {
                     parts.Add(StatusLabel);
                 }

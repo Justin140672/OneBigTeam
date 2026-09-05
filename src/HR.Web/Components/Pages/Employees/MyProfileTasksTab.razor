@@ -29,7 +29,10 @@ else
     private async Task LoadTasksAsync()
     {
         _loading = _tasks.Count == 0;
-        var result = await TaskService.GetMyTasksAsync(CompanyId);
+        // See EmployeeTasksTab's identical comment: TaskList/HrGrid has AllowPaging="false" with
+        // no "next page" control, so the default pageSize=20 would silently drop tasks past the
+        // first page (soonest-due first) with no indication anything is missing.
+        var result = await TaskService.GetMyTasksAsync(CompanyId, pageSize: 200);
         _tasks = result?.Items ?? [];
         _loading = false;
         StateHasChanged();

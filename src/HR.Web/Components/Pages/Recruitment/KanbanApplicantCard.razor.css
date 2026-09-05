@@ -68,3 +68,65 @@
     font-weight: 600;
     color: var(--hr-gray-500);
 }
+
+.kanban-applicant-card__actions {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.kanban-applicant-card__move-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: none;
+    border-radius: var(--hr-radius-sm, 4px);
+    background: transparent;
+    color: var(--hr-gray-500);
+    cursor: pointer;
+}
+
+.kanban-applicant-card__move-btn:hover,
+.kanban-applicant-card__move-btn:focus-visible {
+    background: var(--hr-gray-100);
+    color: var(--hr-gray-900);
+}
+
+.kanban-applicant-card__move-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 20;
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid var(--hr-gray-200);
+    border-radius: var(--hr-radius-md);
+    box-shadow: var(--hr-shadow-sm);
+    padding: 0.25rem;
+}
+
+.kanban-applicant-card__move-menu button {
+    text-align: left;
+    background: transparent;
+    border: none;
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--hr-radius-sm, 4px);
+    font-size: 0.8rem;
+    color: var(--hr-gray-900);
+    cursor: pointer;
+}
+
+.kanban-applicant-card__move-menu button:hover,
+.kanban-applicant-card__move-menu button:focus-visible {
+    background: var(--hr-gray-100);
+}
+
+.kanban-applicant-card__move-menu-empty {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+    color: var(--hr-gray-500);
+}

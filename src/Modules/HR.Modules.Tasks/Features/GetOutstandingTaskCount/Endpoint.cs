@@ -9,7 +9,12 @@ internal sealed class Endpoint(GetOutstandingTaskCountHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/tasks/outstanding-count");
-        Policies("employee:manage");
+        // Sole caller is RecruitmentSummaryWidget, querying Source=Recruitment counts for a
+        // Recruiter persona — Recruiter does not hold employee:manage (see
+        // RolePermissionConfiguration), so that policy 403'd this endpoint for every real
+        // Recruiter-only user. candidate:view matches the widget's actual caller and its sibling
+        // metric endpoint (GetInterviewsTodayCount) in the same widget.
+        Policies("candidate:view");
     }
 
     public override async Task HandleAsync(GetOutstandingTaskCountRequest request, CancellationToken cancellationToken)

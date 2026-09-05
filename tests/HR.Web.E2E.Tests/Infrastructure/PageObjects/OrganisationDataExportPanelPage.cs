@@ -40,16 +40,27 @@ public sealed class OrganisationDataExportPanelPage(IPage page, string baseUrl)
     public async Task ClickRequestAsync()
     {
         await RequestButton.ClickAsync();
-        // The panel reloads latest status after POSTing; wait for the confirmation alert or a
-        // disabled Request button (whichever the new state produces).
-        await page.WaitForTimeoutAsync(1_000);
+        await WaitForReloadAsync();
     }
 
     public async Task ClickRefreshAsync()
     {
         await RefreshButton.ClickAsync();
-        await page.WaitForTimeoutAsync(1_000);
+        await WaitForReloadAsync();
     }
+
+    /// <summary>
+    /// Waits for OrganisationDataExportPanel.razor's own re-render after a click, not a fixed
+    /// delay: RequestAsync/RefreshAsync each chain a SignalR round trip into up to three
+    /// sequential HTTP calls (POST + two GETs in ReloadAsync) before the DOM updates, which can
+    /// comfortably exceed a flat 1s wait under any load. The status block (dl.row) and the "no
+    /// export yet" paragraph are mutually exclusive and cover every reachable post-reload state.
+    /// </summary>
+    private async Task WaitForReloadAsync() =>
+        await Panel.Locator("dl.row")
+            .Or(Panel.GetByText("No export has been requested yet."))
+            .First
+            .WaitForAsync(new() { Timeout = 15_000 });
 
     public async Task<string?> StatusTextAsync()
     {

@@ -17,7 +17,7 @@ public class CreateEmployeeNoteHandlerTests
     {
         await using var context = BuildContext();
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeEmployeeTimelineWriter());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeNoteRequest(Guid.NewGuid(), Guid.NewGuid(), NoteCategory.General, "Some note.", false),
@@ -41,7 +41,7 @@ public class CreateEmployeeNoteHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeEmployeeTimelineWriter());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeNoteRequest(companyId, employee.Id, NoteCategory.Performance, "  Great quarter.  ", true),
@@ -93,7 +93,7 @@ public class CreateEmployeeNoteHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeEmployeeTimelineWriter());
 
         var confidentialText = "Highly confidential performance concerns about the employee.";
         var result = await handler.HandleAsync(
@@ -110,7 +110,7 @@ public class CreateEmployeeNoteHandlerTests
     {
         await using var context = BuildContext();
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeEmployeeTimelineWriter());
 
         await handler.HandleAsync(
             new CreateEmployeeNoteRequest(Guid.NewGuid(), Guid.NewGuid(), NoteCategory.General, "Some note.", false),

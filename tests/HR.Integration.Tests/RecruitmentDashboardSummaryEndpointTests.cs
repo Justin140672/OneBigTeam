@@ -30,10 +30,10 @@ public class RecruitmentDashboardSummaryEndpointTests
         {
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.HrAdministrator);
             // Also granted Recruiter: these tests exercise interviews-today-count/outstanding-task
-            // counting logic, not authorization (candidate:view/recruitment:manage are Recruiter-only
-            // by design — see IdentityModule.AddRolePolicies), and this user drives both the
-            // Recruitment-side setup calls (SeedApplicationAsync, scheduling interviews) and the
-            // Tasks-side outstanding-count reads, so it needs access to both.
+            // counting logic, not authorization, and this user drives the Recruitment-side setup
+            // calls (SeedApplicationAsync needs recruitment:manage; scheduling interviews needs
+            // candidate:view). GetOutstandingTaskCount itself is also gated on candidate:view
+            // (a plain Recruiter can call it directly — see GetOutstandingTaskCount/Endpoint.cs).
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.Recruiter);
             await TestRoleSeeder.AssignRoleAsync(factory, EmployeeUserId, SystemRoles.Employee);
         }).GetAwaiter().GetResult();

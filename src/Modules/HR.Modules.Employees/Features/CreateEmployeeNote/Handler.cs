@@ -1,6 +1,7 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,7 +10,8 @@ namespace HR.Modules.Employees.Features.CreateEmployeeNote;
 internal sealed class CreateEmployeeNoteHandler(
     EmployeesDbContext dbContext,
     IClock clock,
-    IAuditEventPublisher auditEventPublisher)
+    IAuditEventPublisher auditEventPublisher,
+    IEmployeeTimelineWriter timelineWriter)
 {
     public async Task<Result<CreateEmployeeNoteResponse>> HandleAsync(
         CreateEmployeeNoteRequest request,
@@ -48,6 +50,26 @@ internal sealed class CreateEmployeeNoteHandler(
                 note.IsImportant,
                 actorUserId,
                 actorEmployeeId,
+                now),
+            cancellationToken);
+
+        // EmployeeTimelineVisibility's Wave 2/3 rules: HR notes must always be written as HrOnly
+        // and with a generic Title/Summary — the actual note text/category must never appear on
+        // the timeline, only in the Notes feature itself.
+        await timelineWriter.TryAddAsync(
+            EmployeeTimelineEntry.Create(
+                Guid.NewGuid(),
+                request.CompanyId,
+                request.EmployeeId,
+                DateOnly.FromDateTime(now.DateTime),
+                EmployeeTimelineEventType.HrNoteAdded,
+                EmployeeTimelineCategory.HrNotes,
+                "HR note added",
+                "An HR note was added to this employee's record.",
+                performedByUserId: actorEmployeeId,
+                "Employees",
+                sourceRecordId: note.Id,
+                EmployeeTimelineVisibility.HrOnly,
                 now),
             cancellationToken);
 

@@ -77,6 +77,9 @@ tests/HR.Web.E2E.Tests/packages.lock.json
 # Tye
 .tye/
 
+# Claude Code scratch build/output dirs (isolated builds to avoid locked-file contention)
+.claude-scratch*/
+
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 

@@ -40,7 +40,8 @@
              detailed RecruitmentSummaryWidget (reused below, in the Activity tab) rather than
              replacing it — this row is about "where should I click next", the widget below is
              about the same few numbers presented as a normal dashboard KPI card. -->
-        <section class="dashboard-section mb-4" aria-label="Recruitment summary">
+        <section class="dashboard-section recruitment-dashboard-summary" aria-label="Recruitment summary">
+            <h2 class="recruitment-dashboard-summary-title">Recruitment summary <span class="text-muted fw-normal">— company-wide</span></h2>
             @if (_summaryLoading)
             {
                 <HrLoadingIndicator Label="Loading recruitment summary…" />
@@ -53,7 +54,7 @@
                         var s = source;
                         <WidgetSourceWarning SourceName="@s" Retrying="_retrying.Contains(s)" OnRetry="() => RetrySummarySourceAsync(s)" />
                     }
-                    <div class="widget-kpi-row" role="list">
+                    <div class="widget-kpi-row recruitment-dashboard-summary-row" role="list">
                         <RecruitmentSummaryTile Label="Open vacancies" Value="_openVacancies" Failed="_vacanciesRes.IsFailed"
                                                  Href="@($"/companies/{Session.CompanyId}/vacancies")" />
                         <RecruitmentSummaryTile Label="New applications" Value="_newApplications" Failed="_newApplicationsRes.IsFailed"
@@ -105,37 +106,46 @@
             <section class="dashboard-section" role="tabpanel" tabindex="0"
                      id="recruitment-tabpanel-pipeline" aria-labelledby="recruitment-tab-pipeline"
                      aria-label="Recruitment pipeline">
-                <h2 class="dashboard-section-title">Pipeline</h2>
+                <h2 class="dashboard-section-title">Selected vacancy pipeline</h2>
 
                 <div class="recruitment-dashboard-toolbar mb-3">
                     @if (_view == PipelineView.Board)
                     {
-                        <div class="recruitment-dashboard-vacancy-picker">
-                            <SfDropDownList TValue="Guid?" TItem="VacancyListItemModel"
-                                            DataSource="@_vacancies" @bind-Value="_selectedVacancyId"
-                                            Placeholder="Select a vacancy" AllowFiltering="true"
-                                            data-testid="recruitment-board-vacancy-picker">
-                                <DropDownListFieldSettings Value="Id" Text="EffectiveTitle" />
-                            </SfDropDownList>
-                        </div>
-                        <HrTextBox Placeholder="Search by name or email…"
-                                   Value="@_boardSearchText"
-                                   ValueChange="OnBoardSearchChanged"
-                                   CssClass="recruitment-dashboard-search"
-                                   data-testid="kanban-search-box" />
-                        <div class="form-check recruitment-dashboard-terminal-toggle">
-                            <input class="form-check-input" type="checkbox" id="show-terminal-stages"
-                                   checked="@_showTerminalStages" @onchange="OnShowTerminalStagesChanged" />
-                            <label class="form-check-label" for="show-terminal-stages">
-                                Show closed candidates
-                            </label>
+                        <div class="recruitment-dashboard-toolbar-group">
+                            <div class="recruitment-dashboard-vacancy-picker">
+                                <SfDropDownList TValue="Guid?" TItem="VacancyListItemModel"
+                                                DataSource="@_vacancies" @bind-Value="_selectedVacancyId"
+                                                Placeholder="Select a vacancy" AllowFiltering="true"
+                                                data-testid="recruitment-board-vacancy-picker">
+                                    <DropDownListFieldSettings Value="Id" Text="EffectiveTitle" />
+                                </SfDropDownList>
+                            </div>
+                            <HrTextBox Placeholder="Search by name or email…"
+                                       Value="@_boardSearchText"
+                                       ValueChange="OnBoardSearchChanged"
+                                       CssClass="recruitment-dashboard-search"
+                                       data-testid="kanban-search-box" />
+                            <div class="form-check recruitment-dashboard-terminal-toggle">
+                                <input class="form-check-input" type="checkbox" id="show-terminal-stages"
+                                       checked="@_showTerminalStages" @onchange="OnShowTerminalStagesChanged" />
+                                <label class="form-check-label" for="show-terminal-stages">
+                                    Show closed candidates
+                                </label>
+                            </div>
                         </div>
                     }
-                    <div class="recruitment-dashboard-view-toggle ms-auto" data-testid="recruitment-view-toggle">
-                        <SfButton CssClass="@(_view == PipelineView.Board ? "e-active" : "")" OnClick="() => SetView(PipelineView.Board)" data-testid="recruitment-view-board-btn">
+                    <div class="recruitment-dashboard-view-toggle ms-auto" role="group"
+                         aria-label="Pipeline view" data-testid="recruitment-view-toggle">
+                        <SfButton CssClass="@("recruitment-dashboard-view-toggle-btn" + (_view == PipelineView.Board ? " e-active" : ""))"
+                                  OnClick="() => SetView(PipelineView.Board)"
+                                  aria-pressed="@(_view == PipelineView.Board ? "true" : "false")"
+                                  data-testid="recruitment-view-board-btn">
                             <i class="fa-solid fa-table-columns me-1"></i>Board
                         </SfButton>
-                        <SfButton CssClass="@(_view == PipelineView.List ? "e-active" : "")" OnClick="() => SetView(PipelineView.List)" data-testid="recruitment-view-list-btn">
+                        <SfButton CssClass="@("recruitment-dashboard-view-toggle-btn" + (_view == PipelineView.List ? " e-active" : ""))"
+                                  OnClick="() => SetView(PipelineView.List)"
+                                  aria-pressed="@(_view == PipelineView.List ? "true" : "false")"
+                                  data-testid="recruitment-view-list-btn">
                             <i class="fa-solid fa-list me-1"></i>List
                         </SfButton>
                     </div>

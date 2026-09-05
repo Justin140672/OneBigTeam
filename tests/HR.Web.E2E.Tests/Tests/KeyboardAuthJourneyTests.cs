@@ -1,4 +1,5 @@
 using HR.Web.E2E.Tests.Infrastructure;
+using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
@@ -34,11 +35,15 @@ public sealed class KeyboardAuthJourneyTests(ParallelBlankPersonaFixture fixture
         await _page.Keyboard.TypeAsync(DevPersonaPassword);
 
         // Tab forward to the submit button — there is a Show/Hide-password toggle button in
-        // between. Activate it from the keyboard.
-        for (var i = 0; i < 6 && await FocusedTypeAsync() != "submit"; i++)
+        // between. Identify it the same way LoginPage.cs's own click helper does (accessible
+        // role/name), not by a "type=submit" attribute: Syncfusion's SfButton does not
+        // necessarily render that attribute, so sniffing for it is unreliable and previously
+        // let the loop run past the button entirely into the page's legal-links nav.
+        var loginButton = _page.GetByRole(AriaRole.Button, new() { Name = "Login" });
+        for (var i = 0; i < 6 && !await loginButton.EvaluateAsync<bool>("el => el === document.activeElement"); i++)
             await _page.Keyboard.PressAsync("Tab");
-        Assert.Equal("BUTTON", await _page.EvaluateAsync<string>("() => document.activeElement?.tagName ?? ''"));
-        Assert.Equal("submit", await FocusedTypeAsync());
+        Assert.True(await loginButton.EvaluateAsync<bool>("el => el === document.activeElement"),
+            "Expected keyboard focus to reach the Login button.");
         await _page.Keyboard.PressAsync("Enter");
 
         await _page.WaitForSelectorAsync(".app-shell", new() { Timeout = 45_000 });

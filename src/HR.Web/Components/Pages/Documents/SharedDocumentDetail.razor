@@ -271,21 +271,18 @@
                         <i class="fa-solid fa-magnifying-glass-chart overview-card-icon"></i>
                         <span class="overview-card-title">Review History</span>
                     </div>
-                    @if (_detail.ReviewHistory.Count == 0)
-                    {
-                        <div class="doc-detail-empty-state">No reviews yet.</div>
-                    }
-                    else
-                    {
-                        <HrGrid TValue="SharedCompanyDocumentReviewHistoryModel" DataSource="@_detail.ReviewHistory" AllowPaging="false" AllowTextWrap="true">
-                            <GridColumns>
-                                <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewDate)" HeaderText="Review Date" Width="130" Format="d" />
-                                <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewedByName)" HeaderText="Reviewer" Width="180" />
-                                <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewNotes)" HeaderText="Notes" Width="280" />
-                                <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.PreviousReviewDate)" HeaderText="Previous Review Date" Width="170" Format="d" />
-                            </GridColumns>
-                        </HrGrid>
-                    }
+                    @* Always render the grid, even with zero rows — Syncfusion's own empty-row state
+                       (".e-emptyrow") covers the no-reviews-yet case, and the E2E suite
+                       (SharedDocumentReviewHistoryTests) expects the grid — with its headers — to
+                       be present for a never-reviewed document, not a substitute empty-state div. *@
+                    <HrGrid TValue="SharedCompanyDocumentReviewHistoryModel" DataSource="@_detail.ReviewHistory" AllowPaging="false" AllowTextWrap="true">
+                        <GridColumns>
+                            <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewDate)" HeaderText="Review Date" Width="130" Format="d" />
+                            <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewedByName)" HeaderText="Reviewer" Width="180" />
+                            <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewNotes)" HeaderText="Notes" Width="280" />
+                            <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.PreviousReviewDate)" HeaderText="Previous Review Date" Width="170" Format="d" />
+                        </GridColumns>
+                    </HrGrid>
                 </div>
             </div>
 

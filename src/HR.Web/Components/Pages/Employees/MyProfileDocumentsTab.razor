@@ -1,5 +1,6 @@
 @inject DocumentService DocumentService
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 @* Combines the employee's personal documents (uploads/requests) and published company-wide
    documents into a single list — previously two separate tabs ("Documents" and "Company
@@ -127,11 +128,9 @@ else
                             @{ var r = (context as MyProfileDocumentRow)!; }
                             @if (r.Source == DocumentSource.Personal)
                             {
-                                <a class="e-btn e-outline e-small"
-                                   href="@DocumentService.GetEmployeeDocumentDownloadUrl(CompanyId, EmployeeId, r.PersonalDocumentId!.Value)"
-                                   target="_blank">
+                                <SfButton CssClass="e-outline e-small" OnClick="@(() => DownloadPersonalDocument(r.PersonalDocumentId!.Value))">
                                     Download
-                                </a>
+                                </SfButton>
                             }
                             else
                             {
@@ -246,6 +245,10 @@ else
             _           => ("text-bg-secondary", r.Status),
         };
     }
+
+    private async Task DownloadPersonalDocument(Guid employeeDocumentId) =>
+        await JS.InvokeVoidAsync("openInNewTab",
+            DocumentService.GetEmployeeDocumentDownloadUrl(CompanyId, EmployeeId, employeeDocumentId));
 
     private void OpenCompanyDocument(Guid documentId) =>
         Navigation.NavigateTo($"/companies/{CompanyId}/shared-documents/published/{documentId}");

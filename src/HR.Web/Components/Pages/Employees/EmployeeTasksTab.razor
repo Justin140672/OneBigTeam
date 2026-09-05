@@ -34,7 +34,11 @@ else
     private async Task LoadTasksAsync()
     {
         _loading = _tasks.Count == 0;
-        var result = await TaskService.GetEmployeeTasksAsync(CompanyId, EmployeeId);
+        // TaskList/HrGrid here renders with AllowPaging="false" — there is no "next page" control,
+        // so the default pageSize=20 silently drops any tasks past the first page (soonest-due
+        // first) with no indication anything is missing. Request a much larger page instead of
+        // adding pagination UI for what is normally a short per-employee list.
+        var result = await TaskService.GetEmployeeTasksAsync(CompanyId, EmployeeId, pageSize: 200);
         _tasks = result?.Items ?? [];
         _loading = false;
         StateHasChanged();

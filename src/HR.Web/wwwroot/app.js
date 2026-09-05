@@ -211,3 +211,12 @@ function downloadFileFromBase64(fileName, contentType, base64Content) {
     link.click();
     document.body.removeChild(link);
 }
+
+// Opens a document download/view URL in a new tab from a Blazor Server button click handler.
+// A plain <a href target="_blank"> can't be used for these rows because the Playwright E2E
+// suite (SelfServiceDocumentTests/MyProfileDocumentsTabTests) asserts an accessible
+// role="button" Download control, not a role="link" one — so the row action is a real button
+// that triggers navigation via this JS interop call instead.
+function openInNewTab(url) {
+    window.open(url, '_blank');
+}

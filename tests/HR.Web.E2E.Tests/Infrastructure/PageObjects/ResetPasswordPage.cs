@@ -13,31 +13,9 @@ public sealed class ResetPasswordPage(IPage page, string baseUrl)
     public Task GoToWithoutTokenAsync() =>
         page.GotoAsync($"{baseUrl}/reset-password");
 
-    // The recovery token is no longer accepted in the URL — the completion page takes an opaque
-    // single-use handoff code instead (see AuthHandoffStore). Passing an arbitrary value here
-    // exercises the "invalid / expired link" path, which is all this environment can reach.
-    public Task GoToCompleteWithTokenAsync(string handoffCode) =>
-        page.GotoAsync($"{baseUrl}/reset-password-complete?code={Uri.EscapeDataString(handoffCode)}");
-
     public Task<bool> IsInvalidLinkMessageVisibleAsync() =>
         page.GetByText("This password reset link is no longer valid. Please request a new one.").IsVisibleAsync();
 
     public Task ClickBackToForgotPasswordAsync() =>
         page.GetByRole(AriaRole.Link, new() { Name = "Back to Forgot Password" }).ClickAsync();
-
-    public async Task WaitForFormAsync()
-    {
-        await page.GetByText("Choose a new password").WaitForAsync(new() { Timeout = 30_000 });
-    }
-
-    public async Task SubmitNewPasswordAsync(string newPassword, string confirmPassword)
-    {
-        var boxes = page.Locator("input[type='password']");
-        await boxes.Nth(0).FillAsync(newPassword);
-        await boxes.Nth(1).FillAsync(confirmPassword);
-        await page.GetByRole(AriaRole.Button, new() { Name = "Update Password" }).ClickAsync();
-    }
-
-    public Task<bool> IsPasswordsDoNotMatchVisibleAsync() =>
-        page.GetByText("Passwords do not match.").IsVisibleAsync();
 }

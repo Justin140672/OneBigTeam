@@ -1,20 +1,54 @@
-@* Card template used inside VacancyKanbanBoard's SfKanban. Rendered once per applicant. *@
+@* Card template used inside VacancyKanbanBoard's drag-and-drop columns. Rendered once per applicant.
+   The vacancy title and a plain stage-name badge were deliberately removed from this card (kept on
+   the underlying KanbanApplicantModel DTO for other consumers, e.g. drill-down dialogs): the board is
+   already filtered to a single vacancy, and every card already sits inside a column labelled with its
+   stage name, so repeating both on every card was pure redundancy. The Hired/Rejected accent (border +
+   badge) is still shown since that status is not otherwise visible once a card leaves the "current
+   stage" column context. *@
 <div class="kanban-applicant-card @StageCssClass" @onclick="() => OnOpen.InvokeAsync(Applicant)">
     <div class="kanban-applicant-card__top">
         <ProfilePhotoAvatar PhotoUrl="@Applicant.CandidatePhotoUrl" Initials="@Initials" SizePx="36" />
         <div class="kanban-applicant-card__name-block">
             <div class="kanban-applicant-card__name">@Applicant.CandidateFullName</div>
-            <div class="kanban-applicant-card__vacancy text-muted">@Applicant.VacancyTitle</div>
         </div>
-        <StatusBadge Variant="@StatusVariant">@Applicant.StageName</StatusBadge>
+        @if (TerminalOutcome != RecruitmentStageTerminalOutcome.None)
+        {
+            <StatusBadge Variant="@StatusVariant">@TerminalOutcome</StatusBadge>
+        }
+        <div class="kanban-applicant-card__actions">
+            <button type="button" class="kanban-applicant-card__move-btn"
+                    title="Move to stage…" aria-label="Move to stage…" aria-haspopup="true"
+                    aria-expanded="@(_menuOpen ? "true" : "false")"
+                    data-testid="kanban-card-move-stage-btn"
+                    @onclick="ToggleMenu" @onclick:stopPropagation="true">
+                <i class="fa-solid fa-ellipsis-vertical"></i>
+            </button>
+            @if (_menuOpen)
+            {
+                <div class="kanban-applicant-card__move-menu" role="menu" aria-label="Move to stage"
+                     data-testid="kanban-card-move-stage-menu">
+                    @if (AvailableStages.Count == 0)
+                    {
+                        <span class="kanban-applicant-card__move-menu-empty">No other stages available</span>
+                    }
+                    else
+                    {
+                        @foreach (var stage in AvailableStages)
+                        {
+                            var s = stage;
+                            <button type="button" role="menuitem"
+                                    @onclick="() => SelectStage(s.StageId)" @onclick:stopPropagation="true">
+                                @s.StageName
+                            </button>
+                        }
+                    }
+                </div>
+            }
+        </div>
     </div>
     <div class="kanban-applicant-card__meta">
         <span><i class="fa-regular fa-calendar me-1"></i>Applied @Applicant.AppliedAt.ToString("d MMM yyyy")</span>
         <span><i class="fa-regular fa-user me-1"></i>@RecruiterName</span>
-        @if (Applicant.IsWithdrawn)
-        {
-            <span class="kanban-applicant-card__withdrawn"><i class="fa-solid fa-circle-minus me-1"></i>Withdrawn</span>
-        }
     </div>
 </div>
 
@@ -26,32 +60,43 @@
     [Parameter] public RecruitmentStageTerminalOutcome TerminalOutcome { get; set; } = RecruitmentStageTerminalOutcome.None;
     [Parameter] public EventCallback<KanbanApplicantModel> OnOpen { get; set; }
 
+    // Stages offered by the "Move to stage…" menu — the parent board passes exactly the columns
+    // currently visible on the board (minus this card's own current stage), never a client-invented
+    // list. The server (MoveApplicationStageAsync's endpoint) still owns all real authorization/
+    // validation — this menu is just a keyboard-accessible alternative to dragging, not a parallel
+    // rules engine.
+    [Parameter] public IReadOnlyList<KanbanColumnModel> AvailableStages { get; set; } = [];
+    [Parameter] public EventCallback<Guid> OnMoveToStage { get; set; }
+
+    private bool _menuOpen;
+
+    private void ToggleMenu() => _menuOpen = !_menuOpen;
+
+    private async Task SelectStage(Guid stageId)
+    {
+        _menuOpen = false;
+        await OnMoveToStage.InvokeAsync(stageId);
+    }
+
     private string Initials =>
         $"{(Applicant.CandidateFirstName.Length > 0 ? Applicant.CandidateFirstName[0] : '?')}{(Applicant.CandidateLastName.Length > 0 ? Applicant.CandidateLastName[0] : '?')}"
             .ToUpperInvariant();
 
-    // Withdrawn/Rejected/Hired get a visually distinct accent — see StatusBadge for the badge itself,
-    // this is the card container accent (danger/success border). IsWithdrawn takes priority over
-    // the stage's terminal outcome since a withdrawn application can sit under any stage (see
-    // Applicant.IsWithdrawn's remarks) and that fact is more relevant to a recruiter scanning the
-    // board than which stage it happened to be on when withdrawn. Withdrawn now shares Rejected's
-    // "danger" treatment (same as VacancyApplicationsTab's grid StatusVariant) rather than a
-    // separate muted/secondary style, so both views are visually consistent.
-    private string StageCssClass =>
-        Applicant.IsWithdrawn ? "kanban-applicant-card--danger"
-        : TerminalOutcome switch
-        {
-            RecruitmentStageTerminalOutcome.Hired => "kanban-applicant-card--success",
-            RecruitmentStageTerminalOutcome.Rejected => "kanban-applicant-card--danger",
-            _ => string.Empty,
-        };
+    // Rejected/Hired get a visually distinct accent — see StatusBadge for the badge itself, this is
+    // the card container accent (danger/success border). Withdrawn applications never reach this
+    // card at all (VacancyKanbanBoard.FilteredCards excludes them from the board entirely), so there
+    // is no IsWithdrawn branch here to maintain.
+    private string StageCssClass => TerminalOutcome switch
+    {
+        RecruitmentStageTerminalOutcome.Hired => "kanban-applicant-card--success",
+        RecruitmentStageTerminalOutcome.Rejected => "kanban-applicant-card--danger",
+        _ => string.Empty,
+    };
 
-    private StatusBadgeVariant StatusVariant =>
-        Applicant.IsWithdrawn ? StatusBadgeVariant.Danger
-        : TerminalOutcome switch
-        {
-            RecruitmentStageTerminalOutcome.Hired => StatusBadgeVariant.Success,
-            RecruitmentStageTerminalOutcome.Rejected => StatusBadgeVariant.Danger,
-            _ => StatusBadgeVariant.Info,
-        };
+    private StatusBadgeVariant StatusVariant => TerminalOutcome switch
+    {
+        RecruitmentStageTerminalOutcome.Hired => StatusBadgeVariant.Success,
+        RecruitmentStageTerminalOutcome.Rejected => StatusBadgeVariant.Danger,
+        _ => StatusBadgeVariant.Info,
+    };
 }

@@ -44,9 +44,27 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
         var vacancyList    = new VacancyListPage(_page, _fixture.WebBaseUrl);
         var vacancyDetail  = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
         var employeeList   = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var hrSettings     = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
+        // The Hire dialog's Employee Number field only renders when the company's numbering mode
+        // is Manual (see HireCandidateDialog.razor) — Automatic mode (Acme's seeded default) hides
+        // it and assigns the number server-side instead, so FillHireEmployeeNumberAsync below would
+        // otherwise hang waiting for a field that doesn't exist. Set Manual for this run, same
+        // pattern (and same hardcoded-restore reasoning) as CreateEmployeeTests.
+        // EmploymentTab_EditingEmployeeNumber_PersistsNewValue: restoring to a captured "whatever
+        // it currently was" is self-perpetuating if a previous run died mid-test, so the finally
+        // below hardcodes the known-correct baseline ("Automatic") rather than reading it back.
+        // hr-settings:manage is HR-Administrator-only, so this needs Laura, not Marcus.
         await login.GoToAsync();
-        await login.LoginAsync(MarcusEmail);
+        await login.LoginAsync(LauraEmail);
+        await hrSettings.GoToAsync(AcmeId);
+        await hrSettings.SelectEmployeeNumberModeAsync("Manual");
+        await hrSettings.SaveAsync();
+
+        try
+        {
+
+        await login.SwitchAccountAsync(MarcusEmail);
 
         // ── Step 1: Create the candidate ──────────────────────────────────────────
         await candidateList.GoToAsync(AcmeId);
@@ -158,6 +176,15 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
         await employeeList.GoToAsync(AcmeId);
         Assert.True(await employeeList.HasEmployeeAsync(candidateLast),
             $"Expected an employee named '{candidateLast}' to appear in the employee list after hiring");
+        }
+        finally
+        {
+            // Restore Acme's known seed default — see the comment above for why this is hardcoded
+            // rather than capture-and-restore. Already logged in as Laura from Step 9.
+            await hrSettings.GoToAsync(AcmeId);
+            await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
+            await hrSettings.SaveAsync();
+        }
     }
 
     [Fact]

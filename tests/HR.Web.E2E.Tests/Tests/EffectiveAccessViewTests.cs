@@ -48,31 +48,34 @@ public sealed class EffectiveAccessViewTests(HrAdminPersonaFixture fixture) : Po
         await list.OpenUserDetailAsync("Tom Williams");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
-        await detail.WaitForEffectiveAccessLoadedAsync();
+        var access = new UserAccessDetailPage(_page, _fixture.WebBaseUrl);
+        var accountRoleNames = await detail.GetRoleNamesAsync();
 
-        Assert.False(await detail.HasEffectiveAccessErrorAsync(),
+        await detail.OpenAccessDetailsAsync();
+        await access.WaitForEffectiveAccessLoadedAsync();
+
+        Assert.False(await access.HasEffectiveAccessErrorAsync(),
             "Expected the Effective Access card to load without an error for a normal user");
 
-        var directRoleNames = await detail.GetDirectRoleNamesAsync();
-        var accountRoleNames = await detail.GetRoleNamesAsync();
+        var directRoleNames = await access.GetDirectRoleNamesAsync();
         Assert.NotEmpty(accountRoleNames);
         Assert.Equal(accountRoleNames.OrderBy(n => n), directRoleNames.OrderBy(n => n));
 
         // No permission overrides exist for this user, so the Overrides list should be empty and
         // every direct role should be reflected in Effective Roles with a "Direct" source badge.
-        Assert.Empty(await detail.GetEffectiveAccessOverrideRoleNamesAsync());
+        Assert.Empty(await access.GetEffectiveAccessOverrideRoleNamesAsync());
 
         foreach (var roleName in accountRoleNames)
         {
-            Assert.True(await detail.HasEffectiveRoleAsync(roleName),
+            Assert.True(await access.HasEffectiveRoleAsync(roleName),
                 $"Expected '{roleName}' to appear in Effective Roles");
-            var sources = await detail.GetEffectiveRoleSourcesAsync(roleName);
+            var sources = await access.GetEffectiveRoleSourcesAsync(roleName);
             Assert.Contains("Direct", sources);
         }
 
         // Position profile is either "No position assigned." or a named position — either is a
         // valid rendered state, but the section itself must always render some text.
-        var positionText = await detail.GetPositionProfileTextAsync();
+        var positionText = await access.GetPositionProfileTextAsync();
         Assert.False(string.IsNullOrWhiteSpace(positionText));
     }
 
@@ -91,15 +94,17 @@ public sealed class EffectiveAccessViewTests(HrAdminPersonaFixture fixture) : Po
         await list.OpenUserDetailAsync("Carlos Rivera");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
-        await detail.WaitForEffectiveAccessLoadedAsync();
+        var access = new UserAccessDetailPage(_page, _fixture.WebBaseUrl);
+        await detail.OpenAccessDetailsAsync();
+        await access.WaitForEffectiveAccessLoadedAsync();
 
         // Sanity check: the Recruiter role isn't already an effective role for this user before
         // the override is added, so the assertions below actually attribute the change to the
         // override rather than to pre-existing seeded state.
-        Assert.False(await detail.HasEffectiveRoleAsync("Recruiter"),
+        Assert.False(await access.HasEffectiveRoleAsync("Recruiter"),
             "Test setup assumption violated: Recruiter was already an effective role before adding the override");
 
-        await detail.OpenAddOverrideDialogAsync();
+        await access.OpenAddOverrideDialogAsync();
         var dialog = new AddRoleOverrideDialog(_page);
 
         await dialog.SelectRoleAsync("Recruiter");
@@ -107,15 +112,15 @@ public sealed class EffectiveAccessViewTests(HrAdminPersonaFixture fixture) : Po
         await dialog.FillReasonAsync("Temporary recruiter access for backfill coverage");
         await dialog.SaveAsync();
 
-        Assert.Equal("Permission override added.", await detail.GetSuccessMessageAsync());
+        Assert.Equal("Permission override added.", await access.GetSuccessMessageAsync());
 
-        await detail.WaitForEffectiveAccessLoadedAsync();
+        await access.WaitForEffectiveAccessLoadedAsync();
 
-        Assert.Contains("Recruiter", await detail.GetEffectiveAccessOverrideRoleNamesAsync());
+        Assert.Contains("Recruiter", await access.GetEffectiveAccessOverrideRoleNamesAsync());
 
-        Assert.True(await detail.HasEffectiveRoleAsync("Recruiter"),
+        Assert.True(await access.HasEffectiveRoleAsync("Recruiter"),
             "Expected the Grant-overridden Recruiter role to appear in Effective Roles");
-        var sources = await detail.GetEffectiveRoleSourcesAsync("Recruiter");
+        var sources = await access.GetEffectiveRoleSourcesAsync("Recruiter");
         Assert.Contains("Override", sources);
     }
 
@@ -184,7 +189,7 @@ public sealed class EffectiveAccessViewTests(HrAdminPersonaFixture fixture) : Po
         await empList.ClickInviteUserLinkAsync(lastName);
         await empList.CompleteQuickInviteAsync([]);
 
-        var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
+        var access = new UserAccessDetailPage(_page, _fixture.WebBaseUrl);
 
         try
         {
@@ -201,19 +206,19 @@ public sealed class EffectiveAccessViewTests(HrAdminPersonaFixture fixture) : Po
             await ppEdit.SaveInheritedRolesAsync();
 
             // ── Confirm it's reflected as an Inherited Role / Effective Role ────────
-            await detail.GoToAsync(AcmeId, employeeId);
-            await detail.WaitForEffectiveAccessLoadedAsync();
+            await access.GoToAsync(AcmeId, employeeId);
+            await access.WaitForEffectiveAccessLoadedAsync();
 
-            Assert.Contains("Recruiter", await detail.GetInheritedRoleNamesAsync());
-            Assert.True(await detail.HasEffectiveRoleAsync("Recruiter"),
+            Assert.Contains("Recruiter", await access.GetInheritedRoleNamesAsync());
+            Assert.True(await access.HasEffectiveRoleAsync("Recruiter"),
                 "Expected the position-inherited Recruiter role to appear in Effective Roles");
-            Assert.Contains($"Position:{QaEngineerTitle}", await detail.GetEffectiveRoleSourcesAsync("Recruiter"));
+            Assert.Contains($"Position:{QaEngineerTitle}", await access.GetEffectiveRoleSourcesAsync("Recruiter"));
 
             // No overrides yet, so nothing should be denied.
-            Assert.Equal(0, await detail.GetDeniedPermissionsCountAsync());
+            Assert.Equal(0, await access.GetDeniedPermissionsCountAsync());
 
             // ── Deny the Recruiter role via a permission override ───────────────────
-            await detail.OpenAddOverrideDialogAsync();
+            await access.OpenAddOverrideDialogAsync();
             var dialog = new AddRoleOverrideDialog(_page);
 
             await dialog.SelectRoleAsync("Recruiter");
@@ -221,27 +226,27 @@ public sealed class EffectiveAccessViewTests(HrAdminPersonaFixture fixture) : Po
             await dialog.FillReasonAsync("Testing denied-permission attribution for a position-inherited role");
             await dialog.SaveAsync();
 
-            Assert.Equal("Permission override added.", await detail.GetSuccessMessageAsync());
-            await detail.WaitForEffectiveAccessLoadedAsync();
+            Assert.Equal("Permission override added.", await access.GetSuccessMessageAsync());
+            await access.WaitForEffectiveAccessLoadedAsync();
 
             // ── The role is no longer effectively granted, and its otherwise-inherited ──
             // permissions (except document.read, still granted via the base Employee role)
             // now show up as denied.
-            Assert.False(await detail.HasEffectiveRoleAsync("Recruiter"),
+            Assert.False(await access.HasEffectiveRoleAsync("Recruiter"),
                 "Expected the Deny override to remove the position-inherited Recruiter role from Effective Roles");
 
-            Assert.Equal(2, await detail.GetDeniedPermissionsCountAsync());
-            Assert.True(await detail.HasDeniedPermissionAsync("employee.read"));
-            Assert.True(await detail.HasDeniedPermissionAsync("employee.create"));
-            Assert.False(await detail.HasDeniedPermissionAsync("document.read"),
+            Assert.Equal(2, await access.GetDeniedPermissionsCountAsync());
+            Assert.True(await access.HasDeniedPermissionAsync("employee.read"));
+            Assert.True(await access.HasDeniedPermissionAsync("employee.create"));
+            Assert.False(await access.HasDeniedPermissionAsync("document.read"),
                 "document.read is also granted via the base Employee role, so it should not appear as denied");
         }
         finally
         {
             // ── Cleanup: remove the override and reset QA Engineer's inherited roles ───
             // so neither leaks into other tests sharing this long-lived E2E database.
-            if (await detail.HasOverrideAsync("Recruiter"))
-                await detail.RemoveOverrideAsync("Recruiter");
+            if (await access.HasOverrideAsync("Recruiter"))
+                await access.RemoveOverrideAsync("Recruiter");
 
             await ppList.GoToAsync(AcmeId);
             await ppList.OpenPositionProfileAsync(QaEngineerTitle);

@@ -108,22 +108,6 @@
           "Syncfusion.Blazor.SplitButtons": "34.2.3"
         }
       },
-      "Syncfusion.Blazor.Kanban": {
-        "type": "Direct",
-        "requested": "[34.2.3, )",
-        "resolved": "34.2.3",
-        "contentHash": "U611YvWkus80+0g+5wlfooYm5uU3bmdLDA0mr9wJV0uCq9OZakqXcNl/YOwFOOkQqZBT+k3yKxrozIbVYgIRyQ==",
-        "dependencies": {
-          "Syncfusion.Blazor.Buttons": "34.2.3",
-          "Syncfusion.Blazor.Core": "34.2.3",
-          "Syncfusion.Blazor.Data": "34.2.3",
-          "Syncfusion.Blazor.DropDowns": "34.2.3",
-          "Syncfusion.Blazor.Inputs": "34.2.3",
-          "Syncfusion.Blazor.Navigations": "34.2.3",
-          "Syncfusion.Blazor.Popups": "34.2.3",
-          "Syncfusion.Blazor.Spinner": "34.2.3"
-        }
-      },
       "Syncfusion.Blazor.Popups": {
         "type": "Direct",
         "requested": "[34.2.3, )",

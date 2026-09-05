@@ -21,10 +21,40 @@
     min-width: 160px;
 }
 
+/* ── Company-wide summary strip ──────────────────────────────────────────
+   Kept visually compact (smaller KPI padding than the default .widget-kpi-row
+   used elsewhere) and separated from the Pipeline section below by a clear
+   border + heading, so "company-wide" numbers here are never mistaken for the
+   card counts on the single-vacancy board beneath it. */
+
+.recruitment-dashboard-summary {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--hr-gray-200);
+}
+
+.recruitment-dashboard-summary-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--hr-gray-500);
+    margin-bottom: 0.5rem;
+}
+
+.recruitment-dashboard-summary-row.widget-kpi-row {
+    padding: 8px 16px;
+    gap: 6px;
+}
+
+.recruitment-dashboard-summary-row .widget-kpi {
+    padding: 8px 8px;
+}
+
 /* ── Tabs (Pipeline | Activity | Insights) ─────────────────────────────
-   Plain Bootstrap nav-tabs — app.css already re-points .nav-tabs .nav-link.active
-   to the brand teal underline, so this reuses the same tab treatment as the rest
-   of the app instead of a bespoke button group. */
+   Plain Bootstrap nav-tabs base, but with a heavier active indicator than the
+   default app.css teal underline alone (thicker bar + tinted background) since
+   the plain underline read as too faint against the summary strip above it. */
 
 .recruitment-dashboard-tabs .nav-link {
     display: flex;
@@ -32,12 +62,20 @@
     color: var(--hr-gray-500);
     font-weight: 600;
     border: none;
-    border-bottom: 2px solid transparent;
+    border-bottom: 3px solid transparent;
+    border-radius: var(--hr-radius-sm, 4px) var(--hr-radius-sm, 4px) 0 0;
     background: transparent;
+    padding: 0.5rem 0.9rem;
 }
 
 .recruitment-dashboard-tabs .nav-link:hover {
     color: var(--hr-color-primary);
+}
+
+.recruitment-dashboard-tabs .nav-link.active {
+    color: var(--hr-color-primary);
+    background: var(--hr-color-primary-subtle);
+    border-bottom-color: var(--hr-color-primary);
 }
 
 /* ── Pipeline toolbar (vacancy picker + search + toggle + view switch) ── */
@@ -49,9 +87,39 @@
     gap: 0.75rem;
 }
 
+/* Groups the vacancy picker / search / terminal-stage toggle as one cohesive
+   cluster distinct from the view toggle (which stays pinned right via ms-auto
+   on its own element), so the toolbar reads as two logical groups rather than
+   four independent controls scattered across the row. */
+.recruitment-dashboard-toolbar-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .recruitment-dashboard-view-toggle {
     display: flex;
-    gap: 0.25rem;
+    gap: 0;
+    border: 1px solid var(--hr-gray-200);
+    border-radius: 999px;
+    padding: 2px;
+    background: var(--hr-gray-50);
+}
+
+.recruitment-dashboard-view-toggle-btn {
+    border-radius: 999px !important;
+    border: none !important;
+    background: transparent !important;
+    color: var(--hr-gray-500) !important;
+    box-shadow: none !important;
+}
+
+.recruitment-dashboard-view-toggle-btn.e-active {
+    background: var(--hr-color-primary) !important;
+    color: #fff !important;
 }
 
 .recruitment-dashboard-vacancy-picker {
@@ -68,4 +136,18 @@
 
 .recruitment-dashboard-terminal-toggle {
     white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+    .recruitment-dashboard-toolbar-group {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+        width: 100%;
+    }
+
+    .recruitment-dashboard-view-toggle {
+        width: 100%;
+        justify-content: center;
+    }
 }

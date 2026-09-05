@@ -83,7 +83,8 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
                 planTasks.Count,
                 planTasks.Count(t => t.Status == OnboardingTaskStatus.Completed),
                 planTasks.Count(t => t.Status == OnboardingTaskStatus.Skipped),
-                now), cancellationToken);
+                now,
+                context.CompletedBy), cancellationToken);
 
             await integrationEventPublisher.PublishAsync(
                 new OnboardingCompletedIntegrationEvent(plan.CompanyId, plan.EmployeeId, plan.Id, now),

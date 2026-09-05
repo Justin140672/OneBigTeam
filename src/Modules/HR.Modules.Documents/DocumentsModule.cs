@@ -417,6 +417,44 @@ public static class DocumentsModule
             await db.SaveChangesAsync();
         }
 
+        // Reconciliation: the guard above only ever fires once per company, so a long-lived shared
+        // database can be carrying these fixed-GUID rows from an older version of this seed with
+        // stale Title/DocumentTypeId values (observed: rows showing the bare DocumentType name —
+        // "Contract"/"Other" — instead of a real title). Bring exactly these known ids back in
+        // line with the current expected values on every startup; harmless once already correct.
+        var expectedAcmeDocuments = new Dictionary<Guid, (string Title, Guid DocumentTypeId)>
+        {
+            [Guid.Parse("60000000-0000-0000-0000-000000000001")] = ("Employment Contract – Sarah Chen", acmeContract),
+            [Guid.Parse("60000000-0000-0000-0000-000000000002")] = ("Employment Contract – James Okafor", acmeContract),
+            [Guid.Parse("60000000-0000-0000-0000-000000000003")] = ("Employment Contract – Priya Sharma", acmeContract),
+            [Guid.Parse("60000000-0000-0000-0000-000000000004")] = ("Employment Contract – Tom Williams", acmeContract),
+            [Guid.Parse("60000000-0000-0000-0000-000000000005")] = ("Offer Letter – Tom Williams", acmeOther),
+            [Guid.Parse("60000000-0000-0000-0000-000000000006")] = ("Employee Handbook 2026", acmeOther),
+            [Guid.Parse("60000000-0000-0000-0000-000000000007")] = ("Remote Working Policy", acmeOther),
+        };
+
+        var acmeDocsToReconcile = await db.Documents
+            .Where(d => expectedAcmeDocuments.Keys.Contains(d.Id))
+            .ToListAsync();
+
+        var reconciledAny = false;
+        foreach (var doc in acmeDocsToReconcile)
+        {
+            var expected = expectedAcmeDocuments[doc.Id];
+            if (doc.Title == expected.Title && doc.DocumentTypeId == expected.DocumentTypeId)
+                continue;
+
+            // Title/DocumentTypeId have private setters (no legitimate domain reason for a document's
+            // recorded title or type to be edited after upload) — EF's change-tracker metadata can
+            // still target them directly for this one-time data-correction path.
+            db.Entry(doc).Property(nameof(Document.Title)).CurrentValue = expected.Title;
+            db.Entry(doc).Property(nameof(Document.DocumentTypeId)).CurrentValue = expected.DocumentTypeId;
+            reconciledAny = true;
+        }
+
+        if (reconciledAny)
+            await db.SaveChangesAsync();
+
         if (!await db.DocumentRequests.AnyAsync(r => r.CompanyId == acmeId))
         {
             var empJamesId  = Guid.Parse("30000000-0000-0000-0000-000000000002"); // James Okafor

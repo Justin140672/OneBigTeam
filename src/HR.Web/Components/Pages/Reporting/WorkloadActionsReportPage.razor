@@ -220,9 +220,17 @@
         {
             <div class="alert alert-info">No outstanding actions. Everything is up to date.</div>
         }
-        else
+        else if (_groupBy is null)
         {
             @RenderGrid(_items)
+        }
+        else
+        {
+            @foreach (var group in GroupedRows())
+            {
+                <h5 class="mt-4">@group.Label (@group.Items.Count)</h5>
+                @RenderGrid(group.Items)
+            }
         }
     }
 </div>
@@ -661,19 +669,33 @@
         await LoadAsync();
     }
 
-    // Maps the report's own WorkloadActionsGroupBy filter (Action Type / Assigned User /
-    // Department / Due Date) to the matching grid column field, so Syncfusion's native
-    // single-grid Group By feature reflects the same grouping the filter dropdown offers — one
-    // grid with Group By replaces what used to be a separate <HrGrid> rendered per server-computed
-    // group (see item 48's identical Asset List pattern).
-    private string[] GroupColumns => _groupBy switch
+    /// <summary>
+    /// Splits <see cref="_items"/> into one section per distinct value of the selected GroupBy
+    /// field, each rendered as its own heading ("&lt;value&gt; (&lt;count&gt;)") followed by its
+    /// own grid — restored explicit per-group rendering (see
+    /// WorkloadActionsReportTests.GroupByActionType_RendersGroupedSections, which asserts on
+    /// these headings) rather than relying on Syncfusion's native single-grid Group By, whose
+    /// runtime column-change behaviour via a plain reactive parameter binding was unverified
+    /// (this environment cannot run the E2E suite) and did not reliably re-group already-rendered
+    /// rows.
+    /// </summary>
+    private List<(string Label, List<WorkloadActionRowModel> Items)> GroupedRows()
     {
-        WorkloadActionsGroupBy.ActionType   => [nameof(WorkloadActionRowModel.ActionType)],
-        WorkloadActionsGroupBy.AssignedUser => [nameof(WorkloadActionRowModel.AssignedTo)],
-        WorkloadActionsGroupBy.Department   => [nameof(WorkloadActionRowModel.Department)],
-        WorkloadActionsGroupBy.DueDate      => [nameof(WorkloadActionRowModel.DueDate)],
-        _                                   => [],
-    };
+        Func<WorkloadActionRowModel, string> keySelector = _groupBy switch
+        {
+            WorkloadActionsGroupBy.ActionType   => r => r.ActionType,
+            WorkloadActionsGroupBy.AssignedUser => r => string.IsNullOrWhiteSpace(r.AssignedTo) ? "Unassigned" : r.AssignedTo,
+            WorkloadActionsGroupBy.Department   => r => string.IsNullOrWhiteSpace(r.Department) ? "No Department" : r.Department,
+            WorkloadActionsGroupBy.DueDate      => r => r.DueDate?.ToString("d MMM yyyy") ?? "No Due Date",
+            _                                   => r => "",
+        };
+
+        return _items
+            .GroupBy(keySelector)
+            .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(g => (Label: g.Key, Items: g.ToList()))
+            .ToList();
+    }
 
     private RenderFragment RenderGrid(List<WorkloadActionRowModel> rows) => @<HrGrid TValue="WorkloadActionRowModel"
             Toolbar="@Toolbar"
@@ -681,7 +703,6 @@
             AllowPaging="true"
             AllowSorting="true"
             AllowGrouping="true">
-        <GridGroupSettings Columns="@GroupColumns" />
         <GridColumns>
             <GridColumn HeaderText="Employee" Width="180">
                 <Template>

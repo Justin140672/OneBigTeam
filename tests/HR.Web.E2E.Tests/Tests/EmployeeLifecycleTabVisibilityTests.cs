@@ -209,12 +209,16 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
                 // (EmployeeTasksTab.razor applies no status filter) — since the HR document-review
                 // title repeats across duplicate claims, excluding rows already marked "Completed"
                 // picks out the one just claimed rather than an earlier, already-finished one.
-                await _page.Locator(".e-row")
+                var claimedRow = _page.Locator(".e-row")
                     .Filter(new() { HasText = claimedTitle })
                     .Filter(new() { HasNotText = "Completed" })
-                    .First
-                    .Locator("button[title='View']")
-                    .ClickAsync();
+                    .First;
+
+                // OpenTasksTabAsync's own wait only proves *some* row/empty-row rendered, not that
+                // this specific just-claimed row has landed yet — same race MyProfilePage's own
+                // ClickTaskAsync guards against for the identical reason.
+                await claimedRow.WaitForAsync(new() { Timeout = 15_000 });
+                await claimedRow.Locator("button[title='View']").ClickAsync();
 
                 await taskView.WaitForLoadedAsync();
                 await taskView.CompleteGeneralTaskAsync();

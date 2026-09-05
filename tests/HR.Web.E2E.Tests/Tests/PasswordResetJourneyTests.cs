@@ -16,7 +16,15 @@ namespace HR.Web.E2E.Tests.Tests;
 ///      instructions.") — identical whether or not the address matches an account.
 ///   2. Direct navigation to /reset-password (no recovery token in the fragment) lands on the
 ///      "link no longer valid" panel with a route back to Forgot Password.
-///   3. The reset form's client-side "passwords do not match" guard, driven with a dummy token.
+///
+/// A third scenario — the reset form's client-side "passwords do not match" guard — was removed.
+/// It navigated to /reset-password-complete with a fabricated, never-issued handoff code, but
+/// ResetPasswordComplete.razor only renders the password form when AuthHandoffStore.Redeem(code)
+/// resolves a session that was actually Issue()'d by a real Supabase recovery round trip
+/// (AuthHandoffStore.cs) — a fabricated code always redeems to null and always lands on the "link
+/// no longer valid" panel instead, making that scenario architecturally unreachable here rather
+/// than flaky. Covering the mismatch guard would need either a live Supabase project or a
+/// deliberate, environment-gated test seam into the handoff store, neither of which exists today.
 /// </summary>
 public sealed class PasswordResetJourneyTests(ParallelBlankPersonaFixture fixture)
     : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
@@ -46,17 +54,5 @@ public sealed class PasswordResetJourneyTests(ParallelBlankPersonaFixture fixtur
 
         await page.ClickBackToForgotPasswordAsync();
         await _page.WaitForURLAsync(new Regex("/forgot-password"), new() { Timeout = 20_000 });
-    }
-
-    [Fact]
-    public async Task ResetPassword_WithMismatchedPasswords_ShowsValidationError()
-    {
-        var page = new ResetPasswordPage(_page, _fixture.WebBaseUrl);
-        await page.GoToCompleteWithTokenAsync("dummy-non-empty-token");
-
-        await page.WaitForFormAsync();
-        await page.SubmitNewPasswordAsync("N3w-Passw0rd!", "Different-Passw0rd!");
-
-        Assert.True(await page.IsPasswordsDoNotMatchVisibleAsync());
     }
 }

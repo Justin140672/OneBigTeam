@@ -14,14 +14,23 @@ internal sealed record OnboardingPlanCompletedAuditEvent(
     int TotalTasks,
     int CompletedTasks,
     int SkippedTasks,
-    DateTimeOffset OccurredAt) : IAuditEvent
+    DateTimeOffset OccurredAt,
+    // Whoever completed/skipped the specific task that resolved the plan (never the affected
+    // employee themselves unless they happened to be the one completing it). Attributed as a
+    // Human actor rather than a system actor because plan completion is a direct, immediate
+    // consequence of that person's own task-completion action, not an independent background
+    // process — mirrors OffboardingPlanCompletedAuditEvent's actorEmployeeId. Without this, the
+    // event was previously always rejected by AuditActorAttributionGuard (Human events require a
+    // resolvable actor) and silently dropped, so "Onboarding completed" never actually reached
+    // the Audit tab despite this record's Summary claiming it would.
+    Guid ActorEmployeeId) : IAuditEvent
 {
     string IAuditEvent.EventType        => "onboarding-plan.completed";
     string IAuditEvent.EntityType       => "OnboardingPlan";
     Guid   IAuditEvent.EntityId         => OnboardingPlanId;
     Guid?  IAuditEvent.EmployeeId       => EmployeeId;
     Guid?  IAuditEvent.ActorUserId      => null;
-    Guid?  IAuditEvent.ActorEmployeeId  => null;
+    Guid?  IAuditEvent.ActorEmployeeId  => ActorEmployeeId;
     Guid?  IAuditEvent.CorrelationId    => null;
     string? IAuditEvent.Summary         => $"Onboarding completed ({CompletedTasks} of {TotalTasks} tasks done, {SkippedTasks} skipped)";
     object? IAuditEvent.Before          => new { Status = "InProgress" };

@@ -11,13 +11,14 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// (GoToStandaloneAsync here, or VacancyDetailPage.OpenKanbanTabAsync / RecruitmentDashboardPage),
 /// then use the rest of this page object once the board itself is on screen.
 ///
-/// Column/card structure (Syncfusion Blazor Kanban, SfKanban/KanbanColumn/KanbanCardSettings),
-/// confirmed against a live board's DOM: the widget renders a header row with one ".e-header-cells"
-/// (plural) per KanbanColumn (containing ".e-header-text" for the HeaderText and ".e-item-count",
-/// formatted like "- 1 item"/"- 0 items", for the ShowItemCount badge), and a
-/// content row with one ".e-content-cells" per column holding its cards. Card content itself is our
-/// own KanbanApplicantCard.razor template, whose outer element carries the well-known
-/// "kanban-applicant-card" class (plus a stage-specific modifier — see StageCssClassAsync).
+/// Column/card structure: a plain HTML5 drag-and-drop board (VacancyKanbanBoard.razor) — replaced
+/// an earlier Syncfusion SfKanban-based implementation whose own JS drag engine couldn't reliably
+/// complete a drop under Blazor Server's re-render cycle. Each column is a
+/// "[data-testid='kanban-column']" div carrying its stage name in ".vacancy-kanban-board__column-title"
+/// and its card count in ".vacancy-kanban-board__column-count"; cards are native
+/// draggable="true" wrappers around our own KanbanApplicantCard.razor template, whose outer element
+/// carries the well-known "kanban-applicant-card" class (plus a stage-specific modifier — see
+/// StageCssClassAsync).
 /// </summary>
 public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
 {
@@ -31,13 +32,13 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
 
     /// <summary>
     /// Waits until the board itself has finished its initial load (the HrLoadingIndicator spinner
-    /// shown while _loading is true has been replaced by the actual SfKanban widget).
+    /// shown while _loading is true has been replaced by the actual columns).
     /// </summary>
     public async Task WaitForLoadedAsync()
     {
         await page.WaitForSelectorAsync("[data-testid='vacancy-kanban-board']", new() { Timeout = 20_000 });
         await page.WaitForSelectorAsync(
-            "[data-testid='vacancy-kanban-board'] .e-kanban, [data-testid='vacancy-kanban-board'] .e-content-cells",
+            "[data-testid='vacancy-kanban-board'] [data-testid='kanban-columns']",
             new() { Timeout = 20_000 });
     }
 
@@ -75,85 +76,79 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
 
     // ── Columns (tickets #69/#71) ────────────────────────────────────────────────
 
-    // Confirmed against a live board's rendered DOM: Syncfusion's Kanban header cell is
-    // ".e-header-cells" (plural — NOT the singular ".e-header-cell" this used to guess at, which
-    // matched nothing and made every header-dependent assertion below fail/time out).
-    private ILocator HeaderCell(string stageName) =>
-        Board.Locator(".e-header-cells").Filter(new() { HasText = stageName }).First;
-
     /// <summary>
-    /// Returns true if the Kanban column header for <paramref name="stageName"/> is visible.
-    /// Polls briefly rather than taking a single IsVisibleAsync() snapshot — WaitForLoadedAsync
-    /// only confirms the Kanban widget shell itself exists, not that all of its (up to six)
-    /// column headers have individually finished rendering yet.
-    /// </summary>
-    public async Task<bool> HasColumnHeaderAsync(string stageName)
-    {
-        try
-        {
-            await Assertions.Expect(HeaderCell(stageName)).ToBeVisibleAsync(new() { Timeout = 10_000 });
-            return true;
-        }
-        catch (PlaywrightException)
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Reads the ShowItemCount badge (".e-item-count") for the column headed by
-    /// <paramref name="stageName"/>. Confirmed against a live board: its text is formatted like
-    /// "- 1 item" / "- 0 items" (not a bare digit), so this extracts the digits rather than
-    /// int.TryParse-ing the whole string directly.
-    /// </summary>
-    public async Task<int> GetColumnCountAsync(string stageName)
-    {
-        var header = HeaderCell(stageName);
-        var countEl = header.Locator(".e-item-count");
-        if (await countEl.CountAsync() > 0)
-        {
-            var text = (await countEl.First.TextContentAsync()) ?? "";
-            var digits = new string(text.Where(char.IsDigit).ToArray());
-            if (int.TryParse(digits, out var parsed)) return parsed;
-        }
-
-        var full = (await header.TextContentAsync()) ?? "";
-        var fullDigits = new string(full.Where(char.IsDigit).ToArray());
-        return int.TryParse(fullDigits, out var fallback) ? fallback : 0;
-    }
-
-    /// <summary>
-    /// Resolves the column position of the header text matching <paramref name="stageName"/> — the
-    /// header row and content row share the same column order (ApplicationStatusTransitionRules.
-    /// ColumnOrder), so this index is used to find the matching content cell elsewhere (drag/drop,
-    /// column-membership checks).
+    /// Resolves the column position of the title text matching <paramref name="stageName"/> exactly
+    /// (not a substring match — a candidate's own card content, e.g. a name that happens to contain
+    /// a stage name, must never accidentally match a column title). Index-based rather than a
+    /// Playwright Filter(Has:) chain: that pattern proved unreliable here (every column lookup was
+    /// silently resolving to zero elements), whereas indexing the plain title-and-column lists in
+    /// lockstep is the same reliable approach this suite already used against the previous
+    /// Syncfusion-based DOM.
     /// </summary>
     private async Task<int> GetColumnIndexAsync(string stageName)
     {
-        var headerCells = Board.Locator(".e-header-cells");
-        var headerCount = await headerCells.CountAsync();
-        for (var i = 0; i < headerCount; i++)
+        var titles = Board.Locator(".vacancy-kanban-board__column-title");
+        var count = await titles.CountAsync();
+        for (var i = 0; i < count; i++)
         {
-            var text = (await headerCells.Nth(i).TextContentAsync()) ?? "";
-            if (text.Contains(stageName, StringComparison.OrdinalIgnoreCase))
+            var text = ((await titles.Nth(i).TextContentAsync()) ?? "").Trim();
+            if (text.Equals(stageName, StringComparison.OrdinalIgnoreCase))
                 return i;
         }
 
-        throw new InvalidOperationException($"Could not find a Kanban column header for stage '{stageName}'.");
+        return -1;
+    }
+
+    private async Task<ILocator?> TryColumnAsync(string stageName)
+    {
+        var index = await GetColumnIndexAsync(stageName);
+        return index < 0 ? null : Board.Locator("[data-testid='kanban-column']").Nth(index);
+    }
+
+    private async Task<ILocator> ColumnAsync(string stageName) =>
+        await TryColumnAsync(stageName)
+            ?? throw new InvalidOperationException($"Could not find a Kanban column for stage '{stageName}'.");
+
+    /// <summary>
+    /// Returns true if the Kanban column header for <paramref name="stageName"/> is visible. Polls
+    /// briefly rather than taking a single instant snapshot — WaitForLoadedAsync only confirms the
+    /// board shell itself exists, not that all of its (up to six) columns have individually finished
+    /// rendering yet.
+    /// </summary>
+    public async Task<bool> HasColumnHeaderAsync(string stageName)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await TryColumnAsync(stageName) is not null)
+                return true;
+            await page.WaitForTimeoutAsync(200);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Reads the card-count badge (".vacancy-kanban-board__column-count") for the column headed by
+    /// <paramref name="stageName"/>.
+    /// </summary>
+    public async Task<int> GetColumnCountAsync(string stageName)
+    {
+        var column = await ColumnAsync(stageName);
+        var text = (await column.Locator(".vacancy-kanban-board__column-count").TextContentAsync()) ?? "";
+        return int.TryParse(text.Trim(), out var parsed) ? parsed : 0;
     }
 
     /// <summary>
     /// Returns true if the card matching <paramref name="candidateNameFragment"/> currently sits in
-    /// the content cell of the column headed by <paramref name="stageName"/> — used to confirm which
-    /// column a card actually landed in after a drag (or after a fresh page load/re-navigation, to
-    /// prove a drag's server-side effect actually persisted rather than being a client-only visual
-    /// move).
+    /// the column headed by <paramref name="stageName"/> — used to confirm which column a card
+    /// actually landed in after a drag (or after a fresh page load/re-navigation, to prove a drag's
+    /// server-side effect actually persisted rather than being a client-only visual move).
     /// </summary>
     public async Task<bool> IsCardInColumnAsync(string candidateNameFragment, string stageName)
     {
-        var index = await GetColumnIndexAsync(stageName);
-        var cell = Board.Locator(".e-content-cells").Nth(index);
-        return await cell.Locator(".kanban-applicant-card").Filter(new() { HasText = candidateNameFragment }).CountAsync() > 0;
+        var column = await ColumnAsync(stageName);
+        return await column.Locator(".kanban-applicant-card").Filter(new() { HasText = candidateNameFragment }).CountAsync() > 0;
     }
 
     // ── Card content / visual distinction (ticket #71) ───────────────────────────
@@ -165,9 +160,6 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
 
     public async Task<string> GetCardClassAsync(string candidateNameFragment) =>
         (await Card(candidateNameFragment).GetAttributeAsync("class")) ?? "";
-
-    public Task<bool> HasWithdrawnStylingAsync(string candidateNameFragment) =>
-        HasClassAsync(candidateNameFragment, "kanban-applicant-card--danger");
 
     public Task<bool> HasRejectedStylingAsync(string candidateNameFragment) =>
         HasClassAsync(candidateNameFragment, "kanban-applicant-card--danger");
@@ -195,82 +187,24 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
     public Task ClickCardAsync(string candidateNameFragment) => Card(candidateNameFragment).ClickAsync();
 
     // ── Drag and drop between columns (ticket #72) ───────────────────────────────
-    // Syncfusion's EJ2 Kanban (which SfKanban wraps) implements its own pointer-based drag rather
-    // than native HTML5 drag-and-drop, so a plain Locator.DragToAsync (which dispatches
-    // dragstart/drop DOM events) is not recognized by the widget. A manual mouse down/move/up
-    // sequence — hovering the source card, pressing, moving in incremental steps toward the target
-    // column's content area, then releasing — is used instead. Exercised against a live board: the
-    // original version (a single pre-drag bounding-box snapshot, straight-line move, no dwell
-    // before release) reliably dropped right on the boundary between the target column and its
-    // neighbor instead of solidly inside it, which Syncfusion couldn't resolve to a column and just
-    // reverted the card — see the re-measure/dwell comments in DragCardToColumnAsync below for what
-    // that fixed.
+    // The board now uses native HTML5 drag-and-drop (draggable="true" cards, dragover/drop on each
+    // column) rather than a JS-widget-owned pointer drag, so Playwright's own DragToAsync — which
+    // dispatches the real dragstart/dragenter/dragover/drop DOM event sequence — is recognized
+    // directly; no manual mouse down/move/up choreography is needed anymore.
     public async Task DragCardToColumnAsync(string candidateNameFragment, string targetStageName)
     {
         var card = Card(candidateNameFragment);
         await card.ScrollIntoViewIfNeededAsync();
-        var cardBox = await card.BoundingBoxAsync()
-            ?? throw new InvalidOperationException($"Could not locate a bounding box for card '{candidateNameFragment}'.");
 
-        // WaitForLoadedAsync only confirms the Kanban widget shell itself exists, not that all of
-        // its (up to six) column headers have individually finished rendering yet (same race
-        // HasColumnHeaderAsync above already guards against) — a bare instant CountAsync() here can
-        // run before any header has rendered and see zero. Wait for the target column's own header
-        // specifically before counting/indexing into the header row.
-        if (!await HasColumnHeaderAsync(targetStageName))
-            throw new InvalidOperationException($"Could not find a Kanban column header for stage '{targetStageName}'.");
+        var column = await ColumnAsync(targetStageName);
+        var targetColumn = column.Locator(".vacancy-kanban-board__column-content");
+        await targetColumn.ScrollIntoViewIfNeededAsync();
 
-        var targetIndex = await GetColumnIndexAsync(targetStageName);
+        await card.DragToAsync(targetColumn);
 
-        var contentCells = Board.Locator(".e-content-cells");
-        var targetCell = contentCells.Nth(targetIndex);
-        await targetCell.ScrollIntoViewIfNeededAsync();
-
-        var startX = cardBox.X + cardBox.Width / 2;
-        var startY = cardBox.Y + cardBox.Height / 2;
-
-        await page.Mouse.MoveAsync(startX, startY);
-        await page.Mouse.DownAsync();
-
-        // A small "wiggle" right after mousedown, well short of leaving the card, so Syncfusion's
-        // own drag-start threshold is crossed and its drag-start reflow (removing the card from
-        // its origin column, inserting a placeholder) has already happened before any of the real
-        // movement below — otherwise that reflow can shift column layout mid-drag, making a
-        // bounding box captured before drag-start stale by the time of the drop (observed
-        // symptom: the drop landing right on the boundary between two columns instead of solidly
-        // inside the target one, which Syncfusion then can't resolve to a column at all and just
-        // reverts the card to its original position).
-        await page.Mouse.MoveAsync(startX + 5, startY + 5);
-        await page.WaitForTimeoutAsync(100);
-
-        // Re-measure the target column now that the drag (and its reflow) is actually in progress,
-        // rather than trusting the pre-drag snapshot. Aim at 35% across the column's width — closer
-        // to its center-left than dead center — so a few more pixels of measurement drift still
-        // land solidly inside the column instead of drifting into the boundary with its neighbor.
-        var liveTargetBox = await targetCell.BoundingBoxAsync()
-            ?? throw new InvalidOperationException($"Could not locate a bounding box for the '{targetStageName}' column's content cell.");
-        var endX = liveTargetBox.X + liveTargetBox.Width * 0.35f;
-        var endY = liveTargetBox.Y + Math.Min(liveTargetBox.Height / 2, 40f);
-
-        const int steps = 12;
-        for (var i = 1; i <= steps; i++)
-        {
-            var x = startX + (endX - startX) * i / steps;
-            var y = startY + (endY - startY) * i / steps;
-            await page.Mouse.MoveAsync(x, y);
-            await page.WaitForTimeoutAsync(50);
-        }
-
-        // Dwell briefly at the drop point before releasing — Syncfusion's drop-zone highlight
-        // (".e-dropping" on the target ".e-content-cells") needs the pointer to sit still over it
-        // for a moment to fully commit as the resolved drop target, not just pass through.
-        await page.Mouse.MoveAsync(endX, endY);
-        await page.WaitForTimeoutAsync(300);
-        await page.Mouse.UpAsync();
-
-        // DragStop's handler always re-fetches the board afterward (see VacancyKanbanBoard.razor's
-        // OnDragStopAsync comment), whether the move was accepted or reverted — give that round-trip
-        // a moment to settle before the caller asserts on the resulting column membership.
+        // The drop handler (OnDropAsync) always re-fetches the board afterward, whether the move
+        // was accepted or rejected by the server — give that round-trip a moment to settle before
+        // the caller asserts on the resulting column membership.
         await page.WaitForTimeoutAsync(500);
     }
 
@@ -283,4 +217,108 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
         var error = Board.Locator("[data-testid='kanban-error']");
         return await error.IsVisibleAsync() ? (await error.TextContentAsync())?.Trim() : null;
     }
+
+    // ── Empty-column copy (redesign) ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the empty-state text (".vacancy-kanban-board__column-empty") shown inside the column
+    /// headed by <paramref name="stageName"/> when it has zero cards, or null if the column currently
+    /// has at least one card (and so never renders the empty-state div at all).
+    /// </summary>
+    public async Task<string?> GetColumnEmptyTextAsync(string stageName)
+    {
+        var column = await ColumnAsync(stageName);
+        var empty = column.Locator(".vacancy-kanban-board__column-empty");
+        return await empty.IsVisibleAsync() ? (await empty.TextContentAsync())?.Trim() : null;
+    }
+
+    // ── Drop-target "dragging" highlight (redesign) ──────────────────────────────
+
+    private ILocator ColumnsContainer => Board.Locator("[data-testid='kanban-columns']");
+
+    /// <summary>
+    /// True while the board's outer columns container carries the "dragging" CSS class, which
+    /// VacancyKanbanBoard.razor toggles on in OnDragStart and off in OnDragEnd — used to assert the
+    /// class's lifecycle around a drag rather than any actual visual highlight (that part is pure
+    /// CSS :hover and not meaningfully assertable via Playwright without visual regression tooling).
+    /// </summary>
+    public async Task<bool> HasDraggingClassAsync() =>
+        ((await ColumnsContainer.GetAttributeAsync("class")) ?? "").Split(' ').Contains("dragging");
+
+    /// <summary>
+    /// Manually dispatches a "dragstart" event on the given card (bypassing Playwright's
+    /// DragToAsync, which completes the whole drag+drop sequence too fast to observe the
+    /// intermediate "dragging" class) so the caller can assert the class is present mid-drag, then
+    /// dispatches "dragend" to return the board to its rest state without ever dropping the card
+    /// onto a column (so no server-side move happens as a side effect of this helper).
+    /// </summary>
+    public async Task<bool> ObserveDraggingClassDuringManualDragAsync(string candidateNameFragment)
+    {
+        var card = Card(candidateNameFragment);
+        await card.ScrollIntoViewIfNeededAsync();
+
+        // A DataTransfer instance is required for a realistic dragstart dispatch even though this
+        // board's handlers don't read anything off it.
+        await card.EvaluateAsync(@"el => {
+            const dt = new DataTransfer();
+            el.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+        }");
+
+        var duringDrag = await HasDraggingClassAsync();
+
+        await card.EvaluateAsync(@"el => {
+            const dt = new DataTransfer();
+            el.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer: dt }));
+        }");
+
+        return duringDrag;
+    }
+
+    // ── "Move to stage…" card menu (redesign, keyboard-accessible alternative to drag) ──────────
+
+    private ILocator MoveStageButton(string candidateNameFragment) =>
+        Card(candidateNameFragment).Locator("[data-testid='kanban-card-move-stage-btn']");
+
+    private ILocator MoveStageMenu(string candidateNameFragment) =>
+        Card(candidateNameFragment).Locator("[data-testid='kanban-card-move-stage-menu']");
+
+    private ILocator MoveStageMenuItem(string candidateNameFragment, string targetStageName) =>
+        MoveStageMenu(candidateNameFragment).GetByRole(AriaRole.Menuitem, new() { Name = targetStageName, Exact = true });
+
+    /// <summary>
+    /// Mouse-driven path: click the card's kebab "Move to stage…" button, then click the named
+    /// stage's menu item.
+    /// </summary>
+    public async Task MoveToStageViaMouseAsync(string candidateNameFragment, string targetStageName)
+    {
+        await MoveStageButton(candidateNameFragment).ClickAsync();
+        await MoveStageMenu(candidateNameFragment).WaitForAsync(new() { Timeout = 10_000 });
+        await MoveStageMenuItem(candidateNameFragment, targetStageName).ClickAsync();
+
+        // MoveApplicationAsync always reloads the board afterward (success or failure) — mirror the
+        // same settle delay DragCardToColumnAsync uses before the caller asserts on the outcome.
+        await page.WaitForTimeoutAsync(500);
+    }
+
+    /// <summary>
+    /// Keyboard-only path: focuses the card's kebab "Move to stage…" button directly (simulating
+    /// having tabbed to it) and activates it with Enter, then focuses the target stage's menu item
+    /// and activates it with Enter — no mouse clicks anywhere in this method.
+    /// </summary>
+    public async Task MoveToStageViaKeyboardAsync(string candidateNameFragment, string targetStageName)
+    {
+        var button = MoveStageButton(candidateNameFragment);
+        await button.FocusAsync();
+        await button.PressAsync("Enter");
+
+        var menuItem = MoveStageMenuItem(candidateNameFragment, targetStageName);
+        await menuItem.WaitForAsync(new() { Timeout = 10_000 });
+        await menuItem.FocusAsync();
+        await menuItem.PressAsync("Enter");
+
+        await page.WaitForTimeoutAsync(500);
+    }
+
+    public Task<bool> IsMoveStageMenuOpenAsync(string candidateNameFragment) =>
+        MoveStageMenu(candidateNameFragment).IsVisibleAsync();
 }

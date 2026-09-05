@@ -22,19 +22,6 @@ public sealed class UserDetailPage(IPage page, string baseUrl)
         return await page.Locator(".d-flex.align-items-center.gap-2.mb-1 span.badge").First.InnerTextAsync();
     }
 
-    public async Task<int> GetAuditHistoryCountAsync()
-    {
-        await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
-        var card = page.Locator(".card", new() { HasText = "Audit History" });
-        return await card.Locator("ul.list-unstyled > li").CountAsync();
-    }
-
-    public async Task<bool> HasAuditHistoryEmptyMessageAsync()
-    {
-        var card = page.Locator(".card", new() { HasText = "Audit History" });
-        return await card.GetByText("No audit history recorded for this user.").IsVisibleAsync();
-    }
-
     public async Task ResendInvitationAsync() => await ClickActionAsync("Resend Invitation");
 
     public async Task CancelInvitationAsync() => await ClickActionAsync("Cancel Invitation");
@@ -111,118 +98,14 @@ public sealed class UserDetailPage(IPage page, string baseUrl)
         return names;
     }
 
-    // ── Permission Overrides (UserDetail.razor's "Permission Overrides" card) ──────────────────
-
     /// <summary>
-    /// The "Permission Override" badge shown next to the Account/Invitation Status badges when
-    /// the user has at least one active override — scoped to the header row (not the
-    /// Permission Overrides card body) via ".d-flex.align-items-center.gap-2.mb-1", the same
-    /// container <see cref="GetAccountStatusAsync"/> reads from.
+    /// Clicks the "View Access Details & History" button and waits for the
+    /// UserAccessDetail.razor page (the "/access-details" route) to finish loading.
     /// </summary>
-    public Task<bool> HasPermissionOverrideBadgeAsync() =>
-        page.Locator(".d-flex.align-items-center.gap-2.mb-1 span.badge")
-            .Filter(new() { HasText = "Permission Override" })
-            .IsVisibleAsync();
-
-    private ILocator PermissionOverridesCard => page.Locator(".card", new() { HasText = "Permission Overrides" });
-
-    public async Task<bool> HasNoOverridesMessageAsync()
+    public async Task OpenAccessDetailsAsync()
     {
+        await page.GetByRole(AriaRole.Button, new() { Name = "View Access Details & History" }).ClickAsync();
+        await page.WaitForURLAsync("**/access-details", new() { Timeout = 15_000 });
         await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
-        return await PermissionOverridesCard.GetByText("No permission overrides for this user.").IsVisibleAsync();
     }
-
-    /// <summary>Number of override rows currently listed in the "Permission Overrides" card.</summary>
-    public async Task<int> GetOverrideCountAsync()
-    {
-        await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
-        return await PermissionOverridesCard.Locator("ul.list-unstyled > li").CountAsync();
-    }
-
-    /// <summary>The override row (li) whose role name contains <paramref name="roleName"/>.</summary>
-    private ILocator OverrideRow(string roleName) =>
-        PermissionOverridesCard.Locator("li").Filter(new() { HasText = roleName });
-
-    public Task<bool> HasOverrideAsync(string roleName) => OverrideRow(roleName).IsVisibleAsync();
-
-    public async Task<string?> GetOverrideTypeAsync(string roleName) =>
-        (await OverrideRow(roleName).Locator(".badge").InnerTextAsync())?.Trim();
-
-    public async Task OpenAddOverrideDialogAsync()
-    {
-        await page.GetByRole(AriaRole.Button, new() { Name = "+ Add Override" }).ClickAsync();
-        await page.GetByRole(AriaRole.Dialog, new() { Name = "Add Permission Override" })
-            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
-    }
-
-    /// <summary>
-    /// Clicks the per-row "Remove" button for the override on <paramref name="roleName"/> and
-    /// waits for the row to disappear (UserDetail.razor's RemoveOverrideAsync reloads the page's
-    /// state on success).
-    /// </summary>
-    public async Task RemoveOverrideAsync(string roleName)
-    {
-        var row = OverrideRow(roleName);
-        await row.GetByRole(AriaRole.Button, new() { Name = "Remove" }).ClickAsync();
-        await row.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
-    }
-
-    // ── Effective Access (UserDetail.razor's "Effective Access" card, IAM-05) ───────────────────
-
-    private ILocator EffectiveAccessCard => page.Locator(".card", new() { HasText = "Effective Access" });
-
-    /// <summary>
-    /// Waits for the Effective Access card to finish loading (i.e. the async
-    /// GetEffectiveAccessAsync call has resolved and either the data or an error is rendered).
-    /// </summary>
-    public async Task WaitForEffectiveAccessLoadedAsync()
-    {
-        await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
-        await EffectiveAccessCard.Locator("h6", new() { HasText = "Position Profile" })
-            .Or(EffectiveAccessCard.Locator(".alert-warning"))
-            .WaitForAsync(new() { Timeout = 15_000 });
-    }
-
-    public Task<bool> HasEffectiveAccessErrorAsync() =>
-        EffectiveAccessCard.Locator(".alert-warning").IsVisibleAsync();
-
-    private ILocator SectionOf(string heading) =>
-        EffectiveAccessCard.Locator("h6", new() { HasText = heading }).Locator("xpath=..");
-
-    public async Task<string> GetPositionProfileTextAsync() =>
-        (await SectionOf("Position Profile").InnerTextAsync()).Replace("Position Profile", "").Trim();
-
-    public async Task<IReadOnlyList<string>> GetDirectRoleNamesAsync() =>
-        await SectionOf("Direct Roles").Locator(".badge").AllInnerTextsAsync();
-
-    public async Task<IReadOnlyList<string>> GetInheritedRoleNamesAsync() =>
-        await SectionOf("Inherited Roles").Locator(".badge").AllInnerTextsAsync();
-
-    public async Task<IReadOnlyList<string>> GetEffectiveAccessOverrideRoleNamesAsync()
-    {
-        var section = SectionOf("Overrides");
-        var count = await section.Locator("div.mb-1").CountAsync();
-        var names = new List<string>();
-        for (var i = 0; i < count; i++)
-            names.Add((await section.Locator("div.mb-1").Nth(i).Locator("span.fw-semibold").InnerTextAsync()).Trim());
-        return names;
-    }
-
-    /// <summary>The Effective Roles list item (li) whose role name contains <paramref name="roleName"/>.</summary>
-    private ILocator EffectiveRoleRow(string roleName) =>
-        SectionOf("Effective Roles").Locator("li").Filter(new() { HasText = roleName });
-
-    public Task<bool> HasEffectiveRoleAsync(string roleName) => EffectiveRoleRow(roleName).IsVisibleAsync();
-
-    public async Task<IReadOnlyList<string>> GetEffectiveRoleSourcesAsync(string roleName) =>
-        await EffectiveRoleRow(roleName).Locator(".badge").AllInnerTextsAsync();
-
-    public async Task<bool> HasEffectivePermissionAsync(string permissionName) =>
-        await SectionOf("Effective Permissions").Locator("li").Filter(new() { HasText = permissionName }).IsVisibleAsync();
-
-    public async Task<int> GetDeniedPermissionsCountAsync() =>
-        await SectionOf("Denied Permissions").Locator("li").CountAsync();
-
-    public async Task<bool> HasDeniedPermissionAsync(string permissionName) =>
-        await SectionOf("Denied Permissions").Locator("li").Filter(new() { HasText = permissionName }).IsVisibleAsync();
 }

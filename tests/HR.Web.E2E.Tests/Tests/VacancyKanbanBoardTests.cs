@@ -178,6 +178,33 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
     }
 
     [Fact]
+    public async Task WithdrawnApplication_IsNotShownOnTheBoard()
+    {
+        var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
+
+        Assert.True(await kanban.HasCardForNameAsync(candidateLast),
+            "Expected the freshly created application's card to be visible before withdrawal");
+
+        // Withdraw via the Applications tab (VacancyApplicationsTab's grid toolbar), then return to
+        // the Kanban tab — GetRecruitmentKanbanHandler still returns a withdrawn application under
+        // its current stage (there's no dedicated "Withdrawn" column, see its remarks), but
+        // VacancyKanbanBoard.FilteredCards now excludes any card with IsWithdrawn from the board
+        // entirely, since a withdrawn application can never be moved (MoveApplicationStageHandler
+        // rejects it) and showing an undraggable card there only confused what dragging it should do.
+        var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
+        await vacancyDetail.OpenApplicationsTabAsync();
+        await vacancyDetail.ClickWithdrawForAsync(candidateLast);
+
+        await vacancyDetail.OpenKanbanTabAsync();
+        await kanban.WaitForLoadedAsync();
+
+        Assert.False(await kanban.HasCardForNameAsync(candidateLast),
+            "Expected the withdrawn application's card to no longer appear anywhere on the board");
+        Assert.False(await kanban.IsCardInColumnAsync(candidateLast, InitialStage),
+            $"Expected the withdrawn application to no longer be reported under '{InitialStage}' either");
+    }
+
+    [Fact]
     public async Task RecruitmentDashboard_TogglingBetweenBoardAndList_RemembersBoardSearchFilter()
     {
         var (candidateLast, _) = await ArrangeAppliedApplicationAsync();

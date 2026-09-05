@@ -15,44 +15,83 @@
     text-decoration: none;
 }
 
-.vacancy-kanban-board__kanban {
-    height: 640px;
-}
-
-/* ── Column spacing / header treatment ──────────────────────────────────
+/* ── Plain HTML5 drag-and-drop columns ──────────────────────────────────
    Reuses the same gray-50 header / gray-200 border language as .hr-grid's
    header (app.css) so the Kanban board reads as part of the same design
-   system instead of Syncfusion's stock look. */
+   system. Replaces an earlier Syncfusion SfKanban-based layout. */
 
-::deep .vacancy-kanban-board__kanban.e-kanban .e-kanban-table {
+.vacancy-kanban-board__columns {
+    display: flex;
+    align-items: flex-start;
     gap: 0.75rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
 }
 
-::deep .vacancy-kanban-board__kanban.e-kanban .e-column-header {
+.vacancy-kanban-board__column {
+    flex: 0 0 300px;
+    display: flex;
+    flex-direction: column;
     background: var(--hr-gray-50);
-    border-radius: var(--hr-radius-md) var(--hr-radius-md) 0 0;
-    border-color: var(--hr-gray-200);
-    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--hr-gray-200);
+    border-radius: var(--hr-radius-md);
+    min-height: 200px;
+    max-height: 640px;
 }
 
-::deep .vacancy-kanban-board__kanban.e-kanban .e-header-text {
+.vacancy-kanban-board__column-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--hr-gray-50);
+    border-bottom: 1px solid var(--hr-gray-200);
+    border-radius: var(--hr-radius-md) var(--hr-radius-md) 0 0;
+}
+
+.vacancy-kanban-board__column-title {
     font-weight: 600;
     font-size: 0.85rem;
     color: var(--hr-gray-700);
 }
 
-::deep .vacancy-kanban-board__kanban.e-kanban .e-item-count {
+.vacancy-kanban-board__column-count {
     background: var(--hr-color-primary-subtle);
     color: var(--hr-color-primary);
     font-weight: 600;
+    font-size: 0.75rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
 }
 
-::deep .vacancy-kanban-board__kanban.e-kanban .e-content-row .e-column-content {
-    background: var(--hr-gray-50);
-    border-color: var(--hr-gray-200);
+.vacancy-kanban-board__column-content {
+    flex: 1 1 auto;
+    overflow-y: auto;
     padding: 0.5rem;
 }
 
-::deep .vacancy-kanban-board__kanban.e-kanban .e-card-wrapper {
+.vacancy-kanban-board__column-empty {
+    text-align: center;
+    color: var(--hr-gray-500, #6b7280);
+    padding: 1.5rem 0.5rem;
+    font-size: 0.85rem;
+}
+
+.vacancy-kanban-board__draggable {
+    cursor: grab;
     margin-bottom: 0.6rem;
+}
+
+.vacancy-kanban-board__draggable:active {
+    cursor: grabbing;
+}
+
+/* Drop-target highlighting — CSS-only, no dragenter/dragleave/dragover .NET handlers involved.
+   ".dragging" is toggled once per drag session (see the razor markup/OnDragStart/OnDragEnd
+   comments); the actual "which column is under the pointer" highlight below is pure native
+   :hover, so this never triggers a Blazor Server round trip mid-drag. */
+.vacancy-kanban-board__columns.dragging .vacancy-kanban-board__column:hover {
+    background: var(--hr-color-primary-subtle);
+    border-color: var(--hr-color-primary);
 }

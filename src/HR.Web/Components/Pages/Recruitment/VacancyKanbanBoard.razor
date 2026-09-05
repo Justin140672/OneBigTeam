@@ -4,6 +4,12 @@
 @inject CandidateService CandidateService
 @inject NavigationManager Navigation
 
+@* Plain HTML5 drag-and-drop board — replaces an earlier SfKanban-based implementation. SfKanban's
+   own JS drag engine couldn't be made to reliably complete a drop under Blazor Server's re-render
+   cycle (drags would stick mid-air instead of settling into the target column, reproduced by
+   DraggingCard_MovesApplicationToTargetStage_AndPersistsAcrossReload); native draggable/dragover/
+   drop DOM events are handled entirely by Blazor's own event dispatch, with no separate JS-side
+   drag state to fall out of sync with the server-rendered DOM. *@
 <div class="vacancy-kanban-board" data-testid="vacancy-kanban-board">
     @if (ShowToolbar)
     {
@@ -34,30 +40,51 @@
     }
     else
     {
-        <SfKanban TValue="KanbanApplicantModel"
-                  DataSource="@FilteredCards"
-                  KeyField="StageKey"
-                  Height="640px"
-                  CssClass="vacancy-kanban-board__kanban">
-            <KanbanCardSettings>
-                <Template>
-                    @{
-                        var applicant = (KanbanApplicantModel)context;
-                    }
-                    <KanbanApplicantCard Applicant="applicant"
-                                         RecruiterName="@RecruiterName(applicant)"
-                                         TerminalOutcome="@StageOutcome(applicant.StageId)"
-                                         OnOpen="OpenApplicant" />
-                </Template>
-            </KanbanCardSettings>
-            <KanbanColumns>
-                @foreach (var column in VisibleColumns)
-                {
-                    <KanbanColumn HeaderText="@column.StageName" KeyField="@(new List<string> { column.StageId.ToString() })" ShowItemCount="true" />
-                }
-            </KanbanColumns>
-            <KanbanEvents TValue="KanbanApplicantModel" DragStop="OnDragStopAsync" CardClick="OnCardClickAsync" />
-        </SfKanban>
+        @* "dragging" is toggled exactly twice per drag (once in OnDragStart, once in OnDragEnd) —
+           both are already .NET-bound handlers that fire a single time per drag session, unlike
+           dragover which fires continuously. The actual per-column highlight below is pure CSS
+           (:hover), so this does NOT add a per-dragover .NET round trip and does NOT reintroduce
+           the mid-drag re-render bug described in the comment above _draggedCard. *@
+        <div class="vacancy-kanban-board__columns @(_draggedCard is not null ? "dragging" : "")" data-testid="kanban-columns"
+             tabindex="0" role="group" aria-label="Recruitment pipeline columns">
+            @foreach (var column in VisibleColumns)
+            {
+                var col = column;
+                var cards = CardsFor(col).ToList();
+                <div class="vacancy-kanban-board__column"
+                     data-testid="kanban-column" data-stage-id="@col.StageId"
+                     @ondragover:preventDefault="true"
+                     @ondrop="() => OnDropAsync(col.StageId)" @ondrop:preventDefault="true">
+                    <div class="vacancy-kanban-board__column-header" data-testid="kanban-column-header">
+                        <span class="vacancy-kanban-board__column-title">@col.StageName</span>
+                        <span class="vacancy-kanban-board__column-count" data-testid="kanban-column-count">@cards.Count</span>
+                    </div>
+                    <div class="vacancy-kanban-board__column-content">
+                        @if (cards.Count == 0)
+                        {
+                            <div class="vacancy-kanban-board__column-empty">No candidates at this stage</div>
+                        }
+                        else
+                        {
+                            @foreach (var applicant in cards)
+                            {
+                                var app = applicant;
+                                <div class="vacancy-kanban-board__draggable" draggable="true"
+                                     @ondragstart="() => OnDragStart(app)"
+                                     @ondragend="OnDragEnd">
+                                    <KanbanApplicantCard Applicant="app"
+                                                         RecruiterName="@RecruiterName(app)"
+                                                         TerminalOutcome="@StageOutcome(app.StageId)"
+                                                         OnOpen="OpenApplicant"
+                                                         AvailableStages="@VisibleColumns.Where(c => c.StageId != app.StageId).ToList()"
+                                                         OnMoveToStage="(stageId) => MoveApplicationAsync(app, stageId)" />
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+        </div>
     }
 </div>
 
@@ -109,6 +136,17 @@
     // is built once per board load from the ticket #100 stages list endpoint instead (better UX than
     // falling back to a generic "terminal" accent for both outcomes).
     private Dictionary<Guid, RecruitmentStageTerminalOutcome> _stageOutcomes = [];
+
+    // Drag state — which card is currently being dragged. A plain component field since the whole
+    // interaction is native HTML5 drag events dispatched straight to Blazor; there is no separate
+    // client-side widget state to keep in sync with.
+    //
+    // Deliberately NOT tracking a "drag over" column for hover highlighting: that would need
+    // dragenter/dragleave bound to .NET handlers, and every such server round-trip re-renders the
+    // component mid-drag. A native HTML5 drag session is cancelled by the browser if the DOM under
+    // the pointer is mutated while it's in progress — exactly what a mid-drag Blazor re-render risks
+    // — which is what caused every drag to visually "bounce back" to its origin instead of dropping.
+    private KanbanApplicantModel? _draggedCard;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -169,9 +207,7 @@
 
     // Kanban-only reload used after drag-and-drop — reuses the already-cached _candidateEmails and
     // _stageOutcomes dictionaries instead of re-fetching candidates/stages, since neither changes
-    // when a card's stage moves. Swapping the whole board out for a spinner on every drop would be
-    // jarring, so the refresh always happens quietly (no spinner) and the grid just re-renders with
-    // the corrected (or confirmed) card positions once the fresh data arrives.
+    // when a card's stage moves.
     private async Task ReloadKanbanOnlyAsync()
     {
         _error = null;
@@ -201,7 +237,12 @@
         get
         {
             var visibleStageIds = VisibleColumns.Select(c => c.StageId).ToHashSet();
-            var cards = _cards.Where(c => visibleStageIds.Contains(c.StageId));
+            // Withdrawn applications stay under their current stage server-side (see
+            // GetRecruitmentKanbanHandler's remarks — there's no dedicated "Withdrawn" column) but
+            // are never shown on the board itself: a withdrawn candidate can't be moved (the server
+            // rejects it, see OnDropAsync), so surfacing it here only invited a confusing "why won't
+            // this card drag" experience with no useful action attached to it.
+            var cards = _cards.Where(c => visibleStageIds.Contains(c.StageId) && !c.IsWithdrawn);
 
             if (string.IsNullOrWhiteSpace(SearchText))
                 return cards;
@@ -213,6 +254,9 @@
                  email.Contains(term, StringComparison.OrdinalIgnoreCase)));
         }
     }
+
+    private IEnumerable<KanbanApplicantModel> CardsFor(KanbanColumnModel column) =>
+        FilteredCards.Where(c => c.StageId == column.StageId);
 
     private static string RecruiterName(KanbanApplicantModel applicant) =>
         applicant.AssignedRecruiterAgencyName ?? "Unassigned";
@@ -236,60 +280,41 @@
         Navigation.NavigateTo(candidateUrl);
     }
 
-    private Task OnCardClickAsync(CardClickEventArgs<KanbanApplicantModel> args) =>
-        args.Data is null ? Task.CompletedTask : OpenApplicant(args.Data);
+    private void OnDragStart(KanbanApplicantModel applicant) => _draggedCard = applicant;
 
-    // Judgement call: DragStop (not DragStart/Dragging) is the hook — by the time it fires, Syncfusion
-    // has already updated args.Data's KeyField (StageKey) to the target column's key, and
-    // args.PreviousCardData holds the pre-drag record, so both the "from" and "to" stage are available
-    // without any extra bookkeeping. Ticket #99/#101 deleted the whole client-side transition graph
-    // (ApplicationStatusTransitionRules) since the server now validates transitions dynamically
-    // per-company (arbitrary stage configuration, no fixed pipeline) — there is no equivalent
-    // client-side rule left to pre-check, so every drop is sent straight to the server and its 422
-    // response (if any) is surfaced via _error.
-    //
-    // Unlike an earlier version of this handler, args.Cancel is NOT set unconditionally on every
-    // drop anymore. That unconditional-cancel-and-full-reload approach was a workaround for a real
-    // symptom (a duplicated/stuck card after drop) — but the actual root cause turned out to be that
-    // KanbanApplicantModel had no field named "Id" (see its remarks), which Syncfusion's Kanban
-    // engine needs to reconcile a dragged card against a freshly reloaded DataSource. Without it,
-    // replacing the DataSource after every drop couldn't be matched back to the card mid-drag,
-    // leaving its drag clone stuck floating instead of settling into the target column (reproduced
-    // via DraggingCard_MovesApplicationToTargetStage_AndPersistsAcrossReload). Now that every card
-    // has a stable Id, the widget can complete its own drop normally: we let it, then only correct
-    // the board (via a full reload) if the server actually rejects the move.
-    private async Task OnDragStopAsync(Syncfusion.Blazor.Kanban.DragEventArgs<KanbanApplicantModel> args)
+    private void OnDragEnd() => _draggedCard = null;
+
+    // Native HTML5 drop — no separate widget-owned drag state to reconcile against a reloaded
+    // DataSource (the SfKanban-based implementation's failure mode), so the handler is just: was a
+    // card actually being dragged, is the target a different stage, persist, then refresh.
+    private async Task OnDropAsync(Guid targetStageId)
     {
-        var moved = args.Data?.FirstOrDefault();
-        var previous = args.PreviousCardData?.FirstOrDefault();
+        var moved = _draggedCard;
+        _draggedCard = null;
 
-        if (moved is null || previous is null)
+        if (moved is null)
             return;
 
-        // SfKanban mutates the dropped card's bound KeyField (StageKey) to the target column's key
-        // on drop — moved.StageId itself is never touched by the widget and still reflects the
-        // *source* stage at this point, so the actual target must be read back out of StageKey
-        // instead (see KanbanApplicantModel.StageKey's remarks for why it was silently unsettable
-        // before, which made every drag a no-op that only looked like it worked client-side).
-        if (!Guid.TryParse(moved.StageKey, out var targetStageId) || targetStageId == previous.StageId)
+        await MoveApplicationAsync(moved, targetStageId);
+    }
+
+    // Shared by both the drag-and-drop drop handler above and the keyboard-accessible "Move to
+    // stage…" card menu (KanbanApplicantCard.OnMoveToStage) — both paths call the exact same
+    // KanbanService method the server-side authorization/validation already gates, so neither path
+    // bypasses or duplicates that logic.
+    private async Task MoveApplicationAsync(KanbanApplicantModel applicant, Guid targetStageId)
+    {
+        if (applicant.StageId == targetStageId)
             return;
 
-        var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, moved.ApplicationId, targetStageId);
+        var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, applicant.ApplicationId, targetStageId);
 
-        if (result is null)
-        {
-            _error = error ?? "Failed to move applicant to the new stage.";
-            // Server rejected the move — cancel the widget's own optimistic placement and resync
-            // with the server's real (unchanged) state so the card snaps back to where it actually is.
-            args.Cancel = true;
-            await ReloadKanbanOnlyAsync();
-            return;
-        }
-
-        _error = null;
-        // Success: the widget already placed the card in its target column itself. Still refresh in
-        // the background so stage name/badge/terminal-outcome styling (which the widget doesn't know
-        // about) catch up with the move.
+        // ReloadKanbanOnlyAsync always clears _error at its own start (a fresh load has no error
+        // yet), so on failure the error message must be applied AFTER the reload, not before —
+        // setting it first (then reloading) silently wiped it out, leaving the card correctly
+        // snapped back but with no visible explanation why.
         await ReloadKanbanOnlyAsync();
+
+        _error = result is null ? (error ?? "Failed to move applicant to the new stage.") : null;
     }
 }

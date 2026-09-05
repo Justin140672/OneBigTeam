@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @implements IDisposable
+@using HR.Web.Components.Pages.Tasks
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject AppSession Session
@@ -295,6 +296,14 @@ else
 
     </div>
 
+    @if (Session.IsLoaded && Session.EmployeeId.HasValue)
+    {
+        <TaskViewDialog CompanyId="Session.CompanyId"
+                        TaskId="_selectedTaskId"
+                        IsOpen="_taskDialogOpen"
+                        OnClosed="CloseTaskDialogAsync" />
+    }
+
 }
 
 @code {
@@ -333,6 +342,19 @@ else
     private List<NotificationDto> _notifications = [];
     private bool _notifOpen;
     private bool _helpOpen;
+
+    private Guid? _selectedTaskId;
+    private bool _taskDialogOpen;
+
+    // NOT-04/task-dialog-consistency: task-backed notification types resolve to a
+    // "/tasks/{id}" ActionUrl, but per the WorkloadAction.TaskId wiring pattern used on the
+    // dashboards, a task-backed row/notification opens the Task View dialog in place instead
+    // of navigating away — SourceEntityId is the task id for every one of these types (see
+    // NotificationActionRouteBuilder).
+    private static readonly HashSet<string> TaskBackedNotificationTypes =
+    [
+        "TaskAssigned", "TaskDueSoon", "TaskOverdue", "TaskCompleted", "TaskDateChanged",
+    ];
 
     // NOT-06: progressive "load more" paging state for the notification dropdown.
     private const int NotifPageSize = 20;
@@ -546,10 +568,23 @@ else
                 _notifications[idx] = notification with { IsRead = true };
         }
 
+        if (TaskBackedNotificationTypes.Contains(notification.Type))
+        {
+            _selectedTaskId = notification.SourceEntityId;
+            _taskDialogOpen = true;
+            return;
+        }
+
         if (!string.IsNullOrEmpty(notification.ActionUrl))
         {
             NavigationManager.NavigateTo(notification.ActionUrl);
         }
+    }
+
+    private Task CloseTaskDialogAsync()
+    {
+        _taskDialogOpen = false;
+        return Task.CompletedTask;
     }
 
     private async Task MarkAllRead()

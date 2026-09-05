@@ -48,12 +48,13 @@ public sealed class PermissionOverrideManagementTests(HrAdminPersonaFixture fixt
         await list.OpenUserDetailAsync("James Okafor");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
-        Assert.True(await detail.HasNoOverridesMessageAsync(),
-            "Expected the empty-state message when a user has no permission overrides");
-        Assert.False(await detail.HasPermissionOverrideBadgeAsync(),
-            "Expected no header 'Permission Override' badge before any override exists");
+        var access = new UserAccessDetailPage(_page, _fixture.WebBaseUrl);
 
-        await detail.OpenAddOverrideDialogAsync();
+        await detail.OpenAccessDetailsAsync();
+        Assert.True(await access.HasNoOverridesMessageAsync(),
+            "Expected the empty-state message when a user has no permission overrides");
+
+        await access.OpenAddOverrideDialogAsync();
         var dialog = new AddRoleOverrideDialog(_page);
 
         await dialog.SelectRoleAsync("Recruiter");
@@ -61,13 +62,11 @@ public sealed class PermissionOverrideManagementTests(HrAdminPersonaFixture fixt
         await dialog.FillReasonAsync("Temporary cover for recruiter on leave");
         await dialog.SaveAsync();
 
-        Assert.Equal("Permission override added.", await detail.GetSuccessMessageAsync());
+        Assert.Equal("Permission override added.", await access.GetSuccessMessageAsync());
 
-        Assert.True(await detail.HasOverrideAsync("Recruiter"),
+        Assert.True(await access.HasOverrideAsync("Recruiter"),
             "Expected the newly added Recruiter override to appear in the Permission Overrides card");
-        Assert.Equal("Grant", await detail.GetOverrideTypeAsync("Recruiter"));
-        Assert.True(await detail.HasPermissionOverrideBadgeAsync(),
-            "Expected the header 'Permission Override' badge to appear once an override exists");
+        Assert.Equal("Grant", await access.GetOverrideTypeAsync("Recruiter"));
 
         await list.GoToAsync(AcmeId);
         Assert.True(await list.HasPermissionOverrideBadgeAsync("James Okafor"),
@@ -88,7 +87,9 @@ public sealed class PermissionOverrideManagementTests(HrAdminPersonaFixture fixt
         await list.OpenUserDetailAsync("Priya Shah");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
-        await detail.OpenAddOverrideDialogAsync();
+        var access = new UserAccessDetailPage(_page, _fixture.WebBaseUrl);
+        await detail.OpenAccessDetailsAsync();
+        await access.OpenAddOverrideDialogAsync();
         var dialog = new AddRoleOverrideDialog(_page);
 
         await dialog.SelectRoleAsync("Manager");
@@ -97,19 +98,16 @@ public sealed class PermissionOverrideManagementTests(HrAdminPersonaFixture fixt
         await dialog.FillExpiresAsync("31/12/2026");
         await dialog.SaveAsync();
 
-        Assert.Equal("Permission override added.", await detail.GetSuccessMessageAsync());
-        Assert.True(await detail.HasOverrideAsync("Manager"));
-        Assert.Equal("Deny", await detail.GetOverrideTypeAsync("Manager"));
-        Assert.True(await detail.HasPermissionOverrideBadgeAsync());
+        Assert.Equal("Permission override added.", await access.GetSuccessMessageAsync());
+        Assert.True(await access.HasOverrideAsync("Manager"));
+        Assert.Equal("Deny", await access.GetOverrideTypeAsync("Manager"));
 
         // ── Remove: the "delete" action for this feature ──
-        await detail.RemoveOverrideAsync("Manager");
+        await access.RemoveOverrideAsync("Manager");
 
-        Assert.Equal("Permission override removed.", await detail.GetSuccessMessageAsync());
-        Assert.True(await detail.HasNoOverridesMessageAsync(),
+        Assert.Equal("Permission override removed.", await access.GetSuccessMessageAsync());
+        Assert.True(await access.HasNoOverridesMessageAsync(),
             "Expected the empty-state message after removing the only override");
-        Assert.False(await detail.HasPermissionOverrideBadgeAsync(),
-            "Expected the header badge to clear once the last override is removed");
 
         await list.GoToAsync(AcmeId);
         Assert.False(await list.HasPermissionOverrideBadgeAsync("Priya Shah"),
@@ -130,7 +128,9 @@ public sealed class PermissionOverrideManagementTests(HrAdminPersonaFixture fixt
         await list.OpenUserDetailAsync("Sarah Chen");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
-        await detail.OpenAddOverrideDialogAsync();
+        var access = new UserAccessDetailPage(_page, _fixture.WebBaseUrl);
+        await detail.OpenAccessDetailsAsync();
+        await access.OpenAddOverrideDialogAsync();
         var dialog = new AddRoleOverrideDialog(_page);
 
         await dialog.SelectRoleAsync("Recruiter");
@@ -142,7 +142,7 @@ public sealed class PermissionOverrideManagementTests(HrAdminPersonaFixture fixt
             "Expected the Add Override dialog to stay open when the reason is missing");
         Assert.Equal("A reason is required.", await dialog.GetErrorAsync());
 
-        Assert.False(await detail.HasOverrideAsync("Recruiter"),
+        Assert.False(await access.HasOverrideAsync("Recruiter"),
             "Expected no override to have been created when validation failed");
     }
 }
