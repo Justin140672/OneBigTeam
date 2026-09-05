@@ -18,6 +18,7 @@ public sealed class VacancyPublishTests(RecruiterPersonaFixture fixture) : RoleE
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string MarcusEmail = "marcus.diallo@acme.example";
+    private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task NewDraftVacancy_ShowsPublishButton_AndHidesApplicationsInterviewsKanbanTabs()
@@ -29,11 +30,14 @@ public sealed class VacancyPublishTests(RecruiterPersonaFixture fixture) : RoleE
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         var vacancyTitle = $"E2E Publish {Guid.NewGuid().ToString("N")[..8]}";
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
@@ -60,11 +64,14 @@ public sealed class VacancyPublishTests(RecruiterPersonaFixture fixture) : RoleE
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         var vacancyTitle = $"E2E Publish {Guid.NewGuid().ToString("N")[..8]}";
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 

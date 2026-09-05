@@ -15,6 +15,7 @@ public sealed class VacancyRecruitmentAgencyTests(RecruiterPersonaFixture fixtur
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string MarcusEmail = "marcus.diallo@acme.example";
+    private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task CreateVacancy_SelectsActiveRecruitmentAgency_PersistsAcrossReload()
@@ -39,11 +40,18 @@ public sealed class VacancyRecruitmentAgencyTests(RecruiterPersonaFixture fixtur
         Assert.True(await recruiterList.HasItemAsync(agencyName),
             $"Expected the new agency '{agencyName}' to appear in the list");
 
+        // A fresh Position Profile is required here rather than the seeded "Senior Software
+        // Engineer" — that profile already has a permanently-open vacancy in seed data (see
+        // PositionProfileTestHelpers' remarks), which the "one live vacancy per position profile"
+        // rule would otherwise reject a second vacancy against.
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         // Create a vacancy and assign that agency via the Recruitment Agency dropdown.
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SelectRecruitmentAgencyAsync(agencyName);
         await vacancyDetail.SaveNewVacancyAsync();

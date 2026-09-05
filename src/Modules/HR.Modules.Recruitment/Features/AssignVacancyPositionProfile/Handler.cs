@@ -40,6 +40,25 @@ internal sealed class AssignVacancyPositionProfileHandler(
             return Result.Failure<AssignVacancyPositionProfileResponse>(
                 Error.NotFound($"Position profile '{request.PositionProfileId}' was not found."));
 
+        // Same "one live vacancy per position profile" rule as CreateVacancyHandler/UpdateVacancyHandler
+        // — excludes this vacancy itself, and only applies when actually changing the profile.
+        if (request.PositionProfileId != vacancy.PositionProfileId)
+        {
+            var hasConcurrentVacancy = await db.Vacancies
+                .AsNoTracking()
+                .AnyAsync(
+                    v => v.CompanyId == request.CompanyId
+                        && v.Id != vacancy.Id
+                        && v.PositionProfileId == request.PositionProfileId
+                        && v.Status != Domain.VacancyStatus.Closed
+                        && v.Status != Domain.VacancyStatus.Cancelled,
+                    cancellationToken);
+
+            if (hasConcurrentVacancy)
+                return Result.Failure<AssignVacancyPositionProfileResponse>(
+                    Error.Validation("This position profile already has an open vacancy. Close or cancel it before opening another."));
+        }
+
         var previousPositionProfileId = vacancy.PositionProfileId;
         var now = clock.UtcNowOffset();
 

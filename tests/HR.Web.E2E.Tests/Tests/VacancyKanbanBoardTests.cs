@@ -36,6 +36,7 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string MarcusEmail = "marcus.diallo@acme.example";
+    private const string LauraEmail = "laura.bennett@acme.example";
 
     // Every test here asserts against the exact seeded stage set/order for Acme (see class doc
     // comment) — that races RecruitmentStageManagementTests, which mutates the same shared,
@@ -275,11 +276,17 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
         await candidateEdit.FillEmailAsync(candidateEmail);
         await candidateEdit.SaveNewCandidateAsync();
 
-        // Position Profile is mandatory for creation — "Senior Software Engineer" is seeded for Acme.
+        // A fresh Position Profile is required here rather than the seeded "Senior Software
+        // Engineer" — that profile already has a permanently-open vacancy in seed data (see
+        // PositionProfileTestHelpers' remarks), which the "one live vacancy per position profile"
+        // rule would otherwise reject a second vacancy against.
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 

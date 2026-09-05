@@ -72,6 +72,22 @@ internal sealed class UpdateVacancyHandler(
                 return Result.Failure<UpdateVacancyResponse>(
                     Error.NotFound($"Position profile '{requestedPositionProfileId}' was not found."));
 
+            // Same "one live vacancy per position profile" rule as CreateVacancyHandler — excludes
+            // this vacancy itself so re-saving without actually changing the profile can't self-block.
+            var hasConcurrentVacancy = await db.Vacancies
+                .AsNoTracking()
+                .AnyAsync(
+                    v => v.CompanyId == request.CompanyId
+                        && v.Id != vacancy.Id
+                        && v.PositionProfileId == requestedPositionProfileId
+                        && v.Status != Domain.VacancyStatus.Closed
+                        && v.Status != Domain.VacancyStatus.Cancelled,
+                    cancellationToken);
+
+            if (hasConcurrentVacancy)
+                return Result.Failure<UpdateVacancyResponse>(
+                    Error.Validation("This position profile already has an open vacancy. Close or cancel it before opening another."));
+
             previousPositionProfileId = vacancy.PositionProfileId;
             newPositionProfileId = requestedPositionProfileId;
 

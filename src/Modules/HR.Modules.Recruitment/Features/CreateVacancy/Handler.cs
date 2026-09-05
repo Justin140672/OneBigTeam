@@ -28,6 +28,22 @@ internal sealed class CreateVacancyHandler(
             return Result.Failure<CreateVacancyResponse>(
                 Error.NotFound($"Position profile '{request.PositionProfileId}' was not found."));
 
+        // A position profile can only be recruited against by one live vacancy at a time — Closed
+        // and Cancelled are the only terminal statuses, so any other status (Draft/OnHold/Open)
+        // counts as "already in progress" here.
+        var hasConcurrentVacancy = await db.Vacancies
+            .AsNoTracking()
+            .AnyAsync(
+                v => v.CompanyId == request.CompanyId
+                    && v.PositionProfileId == request.PositionProfileId
+                    && v.Status != VacancyStatus.Closed
+                    && v.Status != VacancyStatus.Cancelled,
+                cancellationToken);
+
+        if (hasConcurrentVacancy)
+            return Result.Failure<CreateVacancyResponse>(
+                Error.Validation("This position profile already has an open vacancy. Close or cancel it before opening another."));
+
         // Ticket #81: AssignedRecruiterId is an optional FK to ExternalRecruiter (the external agency),
         // not an Employee — existence/company-ownership/active checks happen here via direct EF Core
         // access, since ExternalRecruiter lives in this same module/schema.

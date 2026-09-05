@@ -21,6 +21,7 @@ public sealed class VacancyPositionProfileCorrectionTests(RecruiterPersonaFixtur
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string MarcusEmail = "marcus.diallo@acme.example";
+    private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task LockedVacancy_ForRecruiter_ShowsDisabledDropdownAndCorrectionCheckbox()
@@ -75,11 +76,24 @@ public sealed class VacancyPositionProfileCorrectionTests(RecruiterPersonaFixtur
     public async Task AuthorisedCorrection_WithReasonAndNewProfile_SavesSuccessfully()
     {
         var (vacancyTitle, vacancyDetail) = await ArrangeVacancyWithApplicationAsync();
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var vacancyList = new VacancyListPage(_page, _fixture.WebBaseUrl);
 
+        // A fresh Position Profile is required as the correction target rather than the seeded
+        // "HR Advisor" — that profile already has a permanently-open (Draft, never-closed) vacancy
+        // in seed data (see PositionProfileTestHelpers' remarks), which the "one live vacancy per
+        // position profile" rule would otherwise reject this correction against.
+        var correctedProfileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
+        // The account-switch dance above navigated away from the vacancy — reopen it before
+        // continuing the correction flow.
+        await vacancyList.GoToAsync(AcmeId);
+        await vacancyList.ClickVacancyAsync(vacancyTitle);
+
         await vacancyDetail.SetAuthorisedCorrectionCheckedAsync(true);
-        await vacancyDetail.SelectPositionProfileAsync("HR Advisor");
-        await vacancyDetail.FillCorrectionReasonAsync("Wrong profile was selected at creation time — correcting to HR Advisor.");
+        await vacancyDetail.SelectPositionProfileAsync(correctedProfileTitle);
+        await vacancyDetail.FillCorrectionReasonAsync("Wrong profile was selected at creation time — correcting to the right one.");
 
         await vacancyDetail.SaveExistingVacancyAsync();
 
@@ -89,7 +103,7 @@ public sealed class VacancyPositionProfileCorrectionTests(RecruiterPersonaFixtur
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickVacancyAsync(vacancyTitle);
 
-        Assert.Equal("HR Advisor", await vacancyDetail.GetLinkedPositionProfileTitleAsync());
+        Assert.Equal(correctedProfileTitle, await vacancyDetail.GetLinkedPositionProfileTitleAsync());
     }
 
     [Fact]
@@ -145,10 +159,13 @@ public sealed class VacancyPositionProfileCorrectionTests(RecruiterPersonaFixtur
         await candidateEdit.FillEmailAsync(candidateEmail);
         await candidateEdit.SaveNewCandidateAsync();
 
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 

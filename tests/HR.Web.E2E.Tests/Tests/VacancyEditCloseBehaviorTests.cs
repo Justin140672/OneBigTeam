@@ -18,6 +18,7 @@ public sealed class VacancyEditCloseBehaviorTests(RecruiterPersonaFixture fixtur
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string MarcusEmail = "marcus.diallo@acme.example";
+    private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task Close_ExistingRecordWithNoChanges_NavigatesDirectlyToList()
@@ -29,14 +30,19 @@ public sealed class VacancyEditCloseBehaviorTests(RecruiterPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // Create a vacancy first so we have an existing, unmodified record to reopen. Position
-        // Profile is mandatory for creation (the API rejects a vacancy with no PositionProfileId
-        // belonging to the same company) — "Senior Software Engineer" is seeded for Acme.
+        // Create a vacancy first so we have an existing, unmodified record to reopen. A fresh
+        // Position Profile is required rather than the seeded "Senior Software Engineer" — that
+        // profile already has a permanently-open vacancy in seed data (see
+        // PositionProfileTestHelpers' remarks), which the "one live vacancy per position profile"
+        // rule would otherwise reject a second vacancy against.
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         var vacancyTitle = $"E2E Close {Guid.NewGuid().ToString("N")[..8]}";
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
@@ -110,10 +116,12 @@ public sealed class VacancyEditCloseBehaviorTests(RecruiterPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         await vacancyDetail.GoToNewAsync(AcmeId);
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        // Position Profile is mandatory for creation — "Senior Software Engineer" is seeded for Acme.
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
 
         await vacancyDetail.ClickCloseAsync();

@@ -44,11 +44,19 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fix
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
+        // A fresh Position Profile is required here rather than the seeded "Senior Software
+        // Engineer" — that profile already has a permanently-open vacancy in seed data (see
+        // PositionProfileTestHelpers' remarks), which the "one live vacancy per position profile"
+        // rule would otherwise reject a second vacancy against. (The seeded vacancy is still read,
+        // not created, by the fallback-indicator assertion further down.)
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         // Vacancy with an explicit AdvertTitle override — no fallback indicator expected.
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(withOverrideTitle);
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
@@ -215,10 +223,13 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fix
         await candidateEdit.FillEmailAsync(candidateEmail);
         await candidateEdit.SaveNewCandidateAsync();
 
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 

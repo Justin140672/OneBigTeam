@@ -61,10 +61,16 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
         await hrSettings.SelectEmployeeNumberModeAsync("Manual");
         await hrSettings.SaveAsync();
 
+        // A fresh Position Profile is required here rather than the seeded "Senior Software
+        // Engineer" — that profile already has a permanently-open vacancy in seed data (see
+        // PositionProfileTestHelpers' remarks), which the "one live vacancy per position profile"
+        // rule would otherwise reject a second vacancy against. Still logged in as Laura
+        // (HR Administrator, required for Position Profile creation) at this point.
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         try
         {
-
-        await login.SwitchAccountAsync(MarcusEmail);
 
         // ── Step 1: Create the candidate ──────────────────────────────────────────
         await candidateList.GoToAsync(AcmeId);
@@ -78,13 +84,10 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
             $"Expected the new candidate '{candidateLast}' to appear in the candidate list");
 
         // ── Step 2: Create the vacancy ─────────────────────────────────────────────
-        // Position Profile is mandatory for creation (the API rejects a vacancy with no
-        // PositionProfileId belonging to the same company) — "Senior Software Engineer" is
-        // seeded for Acme (see EmployeesModule.SeedEmployeesAsync).
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
@@ -260,11 +263,17 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
         await candidateEdit.FillEmailAsync(candidateEmail);
         await candidateEdit.SaveNewCandidateAsync();
 
-        // Position Profile is mandatory for creation — "Senior Software Engineer" is seeded for Acme.
+        // A fresh Position Profile is required here rather than the seeded "Senior Software
+        // Engineer" — that profile already has a permanently-open vacancy in seed data (see
+        // PositionProfileTestHelpers' remarks), which the "one live vacancy per position profile"
+        // rule would otherwise reject a second vacancy against.
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 

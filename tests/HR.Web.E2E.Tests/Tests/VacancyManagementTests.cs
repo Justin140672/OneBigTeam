@@ -62,14 +62,18 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : CrossUser
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
+        // A fresh Position Profile is required here rather than the seeded "Senior Software
+        // Engineer" — that profile already has a permanently-open vacancy in seed data (see
+        // PositionProfileTestHelpers' remarks), which the "one live vacancy per position profile"
+        // rule would otherwise reject a second vacancy against.
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
 
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        // Position Profile is now mandatory for vacancy creation (the API rejects a vacancy with
-        // no PositionProfileId belonging to the same company) — "Senior Software Engineer" is
-        // seeded for Acme (see EmployeesModule.SeedEmployeesAsync).
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
@@ -230,11 +234,18 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : CrossUser
         await candidateEdit.FillEmailAsync(candidateEmail);
         await candidateEdit.SaveNewCandidateAsync();
 
+        // A fresh Position Profile is required here rather than the seeded "Senior Software
+        // Engineer" — that profile already has a permanently-open vacancy in seed data (see
+        // PositionProfileTestHelpers' remarks), which the "one live vacancy per position profile"
+        // rule would otherwise reject a second vacancy against.
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
         // Create a vacancy with a known Position Profile so its value can be asserted after reopening.
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
@@ -263,7 +274,7 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : CrossUser
         // Position Profile still shows the value it was created with, but can no longer be changed.
         Assert.True(await vacancyDetail.IsPositionProfileDisabledAsync(),
             "Expected the Position Profile dropdown to be disabled once the vacancy has an application");
-        Assert.Equal("Senior Software Engineer", await vacancyDetail.GetSelectedPositionProfileTextAsync());
+        Assert.Equal(profileTitle, await vacancyDetail.GetSelectedPositionProfileTextAsync());
 
         // The vacancy's own fields card was renamed from "Vacancy Details" to "Recruitment Advert
         // Details" as part of the "Derive Vacancy Role Information from Position Profile" story —

@@ -264,6 +264,89 @@ public class CreateVacancyHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_PositionProfile_Already_Has_A_Live_Vacancy()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var positionProfileId = Guid.NewGuid();
+        var existing = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Backend Engineer", null, Guid.NewGuid(), FixedUtcNow);
+        db.Vacancies.Add(existing);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new CreateVacancyRequest
+            {
+                CompanyId         = companyId,
+                PositionProfileId = positionProfileId,
+                AdvertTitle       = "Backend Engineer (2nd req)",
+                HiringManagerId   = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("already has an open vacancy", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(db.Vacancies);
+    }
+
+    [Theory]
+    [InlineData((int)VacancyStatus.Closed)]
+    [InlineData((int)VacancyStatus.Cancelled)]
+    public async Task HandleAsync_Allows_Creation_When_Existing_Vacancy_For_Profile_Is_Terminal(int statusValue)
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var positionProfileId = Guid.NewGuid();
+        var existing = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Backend Engineer", null, Guid.NewGuid(), FixedUtcNow);
+        if ((VacancyStatus)statusValue == VacancyStatus.Cancelled)
+        {
+            existing.Cancel(FixedUtcNow);
+        }
+        else
+        {
+            existing.Open(FixedUtcNow, DateOnly.FromDateTime(FixedUtcNow));
+            existing.Close(FixedUtcNow, DateOnly.FromDateTime(FixedUtcNow));
+        }
+        db.Vacancies.Add(existing);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new CreateVacancyRequest
+            {
+                CompanyId         = companyId,
+                PositionProfileId = positionProfileId,
+                AdvertTitle       = "Backend Engineer (re-opened)",
+                HiringManagerId   = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, await db.Vacancies.CountAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Creation_When_Existing_Vacancy_For_Profile_Belongs_To_Different_Company()
+    {
+        await using var db = BuildContext();
+        var positionProfileId = Guid.NewGuid();
+        var existing = Vacancy.Create(Guid.NewGuid(), Guid.NewGuid(), positionProfileId, "Backend Engineer", null, Guid.NewGuid(), FixedUtcNow);
+        db.Vacancies.Add(existing);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new CreateVacancyRequest
+            {
+                CompanyId         = Guid.NewGuid(),
+                PositionProfileId = positionProfileId,
+                AdvertTitle       = "Backend Engineer",
+                HiringManagerId   = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
     public void CreateVacancyRequest_Has_No_Location_Field()
     {
         // Location was removed entirely from the domain — assert (via reflection, so this test would

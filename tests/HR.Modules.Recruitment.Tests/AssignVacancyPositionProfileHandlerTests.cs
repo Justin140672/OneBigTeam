@@ -188,6 +188,39 @@ public class AssignVacancyPositionProfileHandlerTests
         Assert.Equal(newPositionProfileId, auditEvent.PositionProfileId);
     }
 
+    [Fact]
+    public async Task HandleAsync_Rejects_Reassignment_When_Target_Already_Has_A_Live_Vacancy()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var originalPositionProfileId = Guid.NewGuid();
+        var targetPositionProfileId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, originalPositionProfileId, "Backend Engineer", null, Guid.NewGuid(), Now);
+        db.Vacancies.Add(vacancy);
+        var otherVacancy = Vacancy.Create(Guid.NewGuid(), companyId, targetPositionProfileId, "Other Vacancy", null, Guid.NewGuid(), Now);
+        db.Vacancies.Add(otherVacancy);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, auditPublisher: auditPublisher).HandleAsync(
+            new AssignVacancyPositionProfileRequest
+            {
+                CompanyId = companyId,
+                VacancyId = vacancy.Id,
+                PositionProfileId = targetPositionProfileId,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("already has an open vacancy", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(auditPublisher.Published);
+
+        var saved = await db.Vacancies.SingleAsync(v => v.Id == vacancy.Id);
+        Assert.Equal(originalPositionProfileId, saved.PositionProfileId);
+    }
+
     private static AssignVacancyPositionProfileHandler handler(
         RecruitmentDbContext db,
         HR.Modules.Employees.Contracts.IPositionProfileReader? positionProfileReader = null,

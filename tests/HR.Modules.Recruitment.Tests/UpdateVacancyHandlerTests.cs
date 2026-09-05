@@ -739,6 +739,78 @@ public class UpdateVacancyHandlerTests
         Assert.Equal(newPositionProfileId, saved.PositionProfileId);
     }
 
+    [Fact]
+    public async Task HandleAsync_Rejects_PositionProfileId_Change_When_Target_Already_Has_A_Live_Vacancy()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var oldPositionProfileId = Guid.NewGuid();
+        var newPositionProfileId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, oldPositionProfileId, "Title", null, Guid.NewGuid(), Now);
+        db.Vacancies.Add(vacancy);
+        var otherVacancy = Vacancy.Create(Guid.NewGuid(), companyId, newPositionProfileId, "Other Vacancy", null, Guid.NewGuid(), Now);
+        db.Vacancies.Add(otherVacancy);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var reader = new FakePositionProfileReader(matchingCompanyId: companyId, matchingPositionProfileId: newPositionProfileId);
+
+        var result = await handler(db, auditPublisher, reader).HandleAsync(
+            new UpdateVacancyRequest
+            {
+                CompanyId         = companyId,
+                VacancyId         = vacancy.Id,
+                PositionProfileId = newPositionProfileId,
+                AdvertTitle       = "Title",
+                HiringManagerId   = vacancy.HiringManagerId,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("already has an open vacancy", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(auditPublisher.Published);
+
+        var saved = await db.Vacancies.SingleAsync(v => v.Id == vacancy.Id);
+        Assert.Equal(oldPositionProfileId, saved.PositionProfileId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_PositionProfileId_Change_When_Only_Other_Vacancy_For_Target_Is_Closed()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var oldPositionProfileId = Guid.NewGuid();
+        var newPositionProfileId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, oldPositionProfileId, "Title", null, Guid.NewGuid(), Now);
+        db.Vacancies.Add(vacancy);
+        var otherVacancy = Vacancy.Create(Guid.NewGuid(), companyId, newPositionProfileId, "Other Vacancy", null, Guid.NewGuid(), Now);
+        otherVacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
+        otherVacancy.Close(Now, DateOnly.FromDateTime(Now.UtcDateTime));
+        db.Vacancies.Add(otherVacancy);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var reader = new FakePositionProfileReader(matchingCompanyId: companyId, matchingPositionProfileId: newPositionProfileId);
+
+        var result = await handler(db, auditPublisher, reader).HandleAsync(
+            new UpdateVacancyRequest
+            {
+                CompanyId         = companyId,
+                VacancyId         = vacancy.Id,
+                PositionProfileId = newPositionProfileId,
+                AdvertTitle       = "Title",
+                HiringManagerId   = vacancy.HiringManagerId,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await db.Vacancies.SingleAsync(v => v.Id == vacancy.Id);
+        Assert.Equal(newPositionProfileId, saved.PositionProfileId);
+    }
+
     private static UpdateVacancyHandler handler(
         RecruitmentDbContext db,
         FakeAuditPublisher? auditPublisher = null,

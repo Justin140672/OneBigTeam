@@ -231,8 +231,18 @@
                 .Select(e => e.PositionProfileId!.Value)
                 .ToHashSet();
 
+            // A position profile can only be recruited against by one live vacancy at a time — the
+            // authoritative check is CreateVacancyHandler's server-side rejection; this is purely a
+            // UX filter so the dropdown doesn't offer a choice the API will refuse. ListVacanciesAsync's
+            // excludeClosed only strips Closed, so Cancelled vacancies are excluded from the set here too.
+            var vacanciesResult = await VacancyService.ListVacanciesAsync(CompanyId, excludeClosed: true);
+            var profileIdsWithLiveVacancy = (vacanciesResult?.Items ?? [])
+                .Where(v => v.Status != "Cancelled")
+                .Select(v => v.PositionProfileId)
+                .ToHashSet();
+
             _positionProfiles = _positionProfiles
-                .Where(p => !activelyHeldProfileIds.Contains(p.Id))
+                .Where(p => !activelyHeldProfileIds.Contains(p.Id) && !profileIdsWithLiveVacancy.Contains(p.Id))
                 .ToList();
         }
 
