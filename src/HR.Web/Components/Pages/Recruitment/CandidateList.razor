@@ -80,7 +80,7 @@
 
     protected override string LoadErrorMessage => "Failed to load candidates.";
 
-    protected override string? GetAddUrl() => $"/companies/{CompanyId}/candidates/new";
+    protected override string? GetAddUrl() => $"/companies/{CompanyId}/candidates/new?origin=list";
     protected override string? GetEditUrl(CandidateListItemModel item) => $"/companies/{CompanyId}/candidates/{item.Id}";
     protected override string? GetViewUrl(CandidateListItemModel item) => $"/companies/{CompanyId}/candidates/{item.Id}/view";
 }

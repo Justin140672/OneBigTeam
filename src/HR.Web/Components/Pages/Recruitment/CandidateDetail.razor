@@ -11,7 +11,8 @@
 <div class="container py-4">
     <SfBreadcrumb Class="mb-3">
         <BreadcrumbItems>
-            <BreadcrumbItem Text="Candidates" Url="@($"/companies/{CompanyId}/candidates")" />
+            <BreadcrumbItem Text="@(string.IsNullOrWhiteSpace(ReturnUrl) && ResolvedOrigin == CandidateReturnDestination.Dashboard ? "Recruitment Dashboard" : "Candidates")"
+                            Url="@(string.IsNullOrWhiteSpace(ReturnUrl) && ResolvedOrigin == CandidateReturnDestination.Dashboard ? OriginListUrl : $"/companies/{CompanyId}/candidates")" />
             <BreadcrumbItem Text="@PageTitle" />
         </BreadcrumbItems>
     </SfBreadcrumb>
@@ -189,6 +190,25 @@
     [Parameter]
     public string? ReturnUrl { get; set; }
 
+    // Which screen launched the Add Candidate editor (Dashboard vs Candidates list), carried as a
+    // whitelisted "origin" query value — NOT an arbitrary URL — so Save/Close returns to the
+    // correct launch point. Unrecognized/missing values safely fall back to the Candidates list.
+    [SupplyParameterFromQuery(Name = "origin")]
+    [Parameter]
+    public string? Origin { get; set; }
+
+    private CandidateReturnDestination ResolvedOrigin => Origin switch
+    {
+        "dashboard" => CandidateReturnDestination.Dashboard,
+        _ => CandidateReturnDestination.CandidatesList
+    };
+
+    private string OriginListUrl => ResolvedOrigin switch
+    {
+        CandidateReturnDestination.Dashboard => "/dashboard/recruitment",
+        _ => $"/companies/{CompanyId}/candidates"
+    };
+
     private GetCandidateResponse? _candidate;
     private string? _actionError;
     private bool _actionBusy;
@@ -218,7 +238,7 @@
 
     protected override string? ListUrl => !string.IsNullOrWhiteSpace(ReturnUrl)
         ? ReturnUrl
-        : $"/companies/{CompanyId}/candidates";
+        : OriginListUrl;
 
     private async Task ConfirmDeactivateAsync()
     {

@@ -14,6 +14,17 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("input[placeholder='First name']", new() { Timeout = 20_000 });
     }
 
+    /// <summary>
+    /// Navigates directly to the create-candidate route with an explicit "?origin=" query value
+    /// (see CandidateReturnDestination / CandidateDetail.razor) — used to test the Save/Close
+    /// return-navigation behavior without going through a launch button.
+    /// </summary>
+    public async Task GoToNewAsync(Guid companyId, string origin)
+    {
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/candidates/new?origin={origin}");
+        await page.WaitForSelectorAsync("input[placeholder='First name']", new() { Timeout = 20_000 });
+    }
+
     public async Task GoToAsync(Guid companyId, Guid candidateId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/candidates/{candidateId}");
@@ -49,6 +60,28 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await page.WaitForURLAsync("**/candidates", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+    }
+
+    /// <summary>
+    /// Clicks Save and waits for whichever return destination the page was launched with (the
+    /// Candidates list or the Recruitment Dashboard) rather than assuming "**/candidates" — see
+    /// <see cref="SaveNewCandidateAsync"/> for the list-only equivalent.
+    /// </summary>
+    public async Task SaveNewCandidateAndWaitForUrlAsync(string urlGlob)
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await page.WaitForURLAsync(urlGlob, new() { Timeout = 30_000 });
+    }
+
+    /// <summary>
+    /// Clicks Close (no unsaved-changes prompt expected) and waits for whichever return
+    /// destination the page was launched with — see <see cref="CloseAndWaitForListAsync"/> for the
+    /// list-only equivalent.
+    /// </summary>
+    public async Task CloseAndWaitForUrlAsync(string urlGlob)
+    {
+        await ClickCloseAsync();
+        await page.WaitForURLAsync(urlGlob, new() { Timeout = 30_000 });
     }
 
     public async Task<bool> HasErrorAsync()
