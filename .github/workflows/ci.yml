@@ -223,7 +223,7 @@ jobs:
           cat artifacts/build-info.json
 
       - name: Upload deployment artefact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deploy-${{ needs.version.outputs.version }}
           path: artifacts/
