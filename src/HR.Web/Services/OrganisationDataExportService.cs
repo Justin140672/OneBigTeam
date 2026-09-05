@@ -18,7 +18,11 @@ public class OrganisationDataExportService(IHttpClientFactory httpClientFactory)
     {
         try
         {
-            var response = await Http.PostAsync(Base(companyId), content: null, cancellationToken);
+            // PostAsync(url, content: null) sends no Content-Type header at all, which FastEndpoints'
+            // JSON body binder rejects with 415 even though this request has no meaningful body
+            // (CompanyId comes from the route) — PostAsJsonAsync with an empty object matches the
+            // same route-bound-only pattern used elsewhere (e.g. ApplicationService.OfferAsync).
+            var response = await Http.PostAsJsonAsync(Base(companyId), new { }, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
