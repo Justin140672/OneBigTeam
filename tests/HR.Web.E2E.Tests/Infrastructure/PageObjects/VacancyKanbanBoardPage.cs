@@ -122,6 +122,40 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
         return int.TryParse(fullDigits, out var fallback) ? fallback : 0;
     }
 
+    /// <summary>
+    /// Resolves the column position of the header text matching <paramref name="stageName"/> — the
+    /// header row and content row share the same column order (ApplicationStatusTransitionRules.
+    /// ColumnOrder), so this index is used to find the matching content cell elsewhere (drag/drop,
+    /// column-membership checks).
+    /// </summary>
+    private async Task<int> GetColumnIndexAsync(string stageName)
+    {
+        var headerCells = Board.Locator(".e-header-cells");
+        var headerCount = await headerCells.CountAsync();
+        for (var i = 0; i < headerCount; i++)
+        {
+            var text = (await headerCells.Nth(i).TextContentAsync()) ?? "";
+            if (text.Contains(stageName, StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+
+        throw new InvalidOperationException($"Could not find a Kanban column header for stage '{stageName}'.");
+    }
+
+    /// <summary>
+    /// Returns true if the card matching <paramref name="candidateNameFragment"/> currently sits in
+    /// the content cell of the column headed by <paramref name="stageName"/> — used to confirm which
+    /// column a card actually landed in after a drag (or after a fresh page load/re-navigation, to
+    /// prove a drag's server-side effect actually persisted rather than being a client-only visual
+    /// move).
+    /// </summary>
+    public async Task<bool> IsCardInColumnAsync(string candidateNameFragment, string stageName)
+    {
+        var index = await GetColumnIndexAsync(stageName);
+        var cell = Board.Locator(".e-content-cells").Nth(index);
+        return await cell.Locator(".kanban-applicant-card").Filter(new() { HasText = candidateNameFragment }).CountAsync() > 0;
+    }
+
     // ── Card content / visual distinction (ticket #71) ───────────────────────────
 
     private ILocator Card(string candidateNameFragment) =>
@@ -186,24 +220,7 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
         if (!await HasColumnHeaderAsync(targetStageName))
             throw new InvalidOperationException($"Could not find a Kanban column header for stage '{targetStageName}'.");
 
-        // The target column's content cell is identified by column position relative to its header
-        // — the header row and content row share the same column order (ApplicationStatusTransitionRules.
-        // ColumnOrder), so the header cell's index is used to find the matching content cell.
-        var headerCells = Board.Locator(".e-header-cells");
-        var headerCount = await headerCells.CountAsync();
-        int targetIndex = -1;
-        for (var i = 0; i < headerCount; i++)
-        {
-            var text = (await headerCells.Nth(i).TextContentAsync()) ?? "";
-            if (text.Contains(targetStageName, StringComparison.OrdinalIgnoreCase))
-            {
-                targetIndex = i;
-                break;
-            }
-        }
-
-        if (targetIndex < 0)
-            throw new InvalidOperationException($"Could not find a Kanban column header for stage '{targetStageName}'.");
+        var targetIndex = await GetColumnIndexAsync(targetStageName);
 
         var contentCells = Board.Locator(".e-content-cells");
         var targetCell = contentCells.Nth(targetIndex);

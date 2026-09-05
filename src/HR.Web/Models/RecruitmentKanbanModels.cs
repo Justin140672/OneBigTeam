@@ -43,6 +43,14 @@ public sealed record KanbanApplicantModel(
 {
     public string CandidateFullName => $"{CandidateFirstName} {CandidateLastName}";
 
+    // Syncfusion's Kanban card engine looks for a field literally named "Id" on the bound record to
+    // track each card's identity internally (its own getting-started samples always include one) —
+    // without it, drag-and-drop has nothing stable to key a dragged card back to once the drop
+    // reflow happens, so drops silently fail to resolve even though the pointer sequence itself
+    // looks fine. ApplicationId is the real per-card identity; this just exposes it under the name
+    // the widget expects.
+    public string Id => ApplicationId.ToString();
+
     // SfKanban's KeyField needs a string — StageId (Guid) is the real identity, this is purely a
     // rendering/wiring convenience for the Kanban column KeyField match.
     //

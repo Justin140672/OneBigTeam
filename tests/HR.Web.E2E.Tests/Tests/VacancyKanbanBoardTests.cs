@@ -133,6 +133,51 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
     }
 
     [Fact]
+    public async Task DraggingCard_MovesApplicationToTargetStage_AndPersistsAcrossReload()
+    {
+        var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
+
+        Assert.True(await kanban.IsCardInColumnAsync(candidateLast, InitialStage),
+            $"Expected the freshly created application to start on '{InitialStage}'");
+        Assert.False(await kanban.IsCardInColumnAsync(candidateLast, NonTerminalStage2),
+            $"Sanity check: the card should not already be on '{NonTerminalStage2}' before dragging");
+
+        await kanban.DragCardToColumnAsync(candidateLast, NonTerminalStage2);
+
+        Assert.True(await kanban.IsCardInColumnAsync(candidateLast, NonTerminalStage2),
+            $"Expected the card for {candidateLast} to appear in the '{NonTerminalStage2}' column after the drag");
+        Assert.False(await kanban.IsCardInColumnAsync(candidateLast, InitialStage),
+            $"Expected the card for {candidateLast} to no longer be in the '{InitialStage}' column after the drag");
+
+        // Re-navigate to the standalone board (a fresh GetRecruitmentKanbanHandler query) to confirm
+        // MoveApplicationStageAsync's effect was actually persisted server-side, rather than only
+        // reflected in the client-side widget state left over from the drag.
+        var vacancyId = ExtractVacancyIdFromUrl(_page.Url);
+        var reloadedKanban = new VacancyKanbanBoardPage(_page, _fixture.WebBaseUrl);
+        await reloadedKanban.GoToStandaloneAsync(AcmeId, vacancyId);
+
+        Assert.True(await reloadedKanban.IsCardInColumnAsync(candidateLast, NonTerminalStage2),
+            $"Expected the move to '{NonTerminalStage2}' to have persisted server-side after a fresh page load");
+        Assert.False(await reloadedKanban.IsCardInColumnAsync(candidateLast, InitialStage),
+            $"Expected the card to no longer be reported on '{InitialStage}' after a fresh page load");
+    }
+
+    /// <summary>
+    /// The standalone Kanban route is /companies/{companyId}/vacancies/{vacancyId}/kanban
+    /// (VacancyKanbanBoardPage.GoToStandaloneAsync) — ArrangeAppliedApplicationAsync leaves the page
+    /// on the Vacancy Detail "Kanban" tab (a different route, VacancyDetail.razor's embedded tab)
+    /// rather than the standalone one, but both render the vacancy id in the URL, so it's extracted
+    /// here to re-navigate via the standalone route for the persistence check.
+    /// </summary>
+    private static Guid ExtractVacancyIdFromUrl(string url)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(url, @"/vacancies/([0-9a-fA-F-]{36})");
+        if (!match.Success)
+            throw new InvalidOperationException($"Could not extract a vacancy id from URL '{url}'.");
+        return Guid.Parse(match.Groups[1].Value);
+    }
+
+    [Fact]
     public async Task RecruitmentDashboard_TogglingBetweenBoardAndList_RemembersBoardSearchFilter()
     {
         var (candidateLast, _) = await ArrangeAppliedApplicationAsync();

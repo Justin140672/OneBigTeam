@@ -171,3 +171,35 @@ public sealed class RecruitmentAccessibilityScanJourneyTests(RecruiterPersonaFix
         await AccessibilityScan.AssertNoSeriousViolationsAsync(_page, "recruitment pipeline report");
     }
 }
+
+/// <summary>
+/// NFR-05: the Company edit page's Profile tab (registered office + trading address fields) is
+/// gated by the "company:manage" policy, which CompanyAdministrator holds but HrAdministrator no
+/// longer does (see <see cref="Tests.CompanyEditCloseBehaviorTests"/>) — so this journey runs
+/// under the CompanyAdministrator-only persona rather than the HR-administrator fixture the rest
+/// of <see cref="AccessibilityScanJourneyTests"/> uses. Added alongside the persistent visible
+/// address field labels (Address Line 1/2, Town/City, County/Region, Postcode) that replaced
+/// placeholder-only labelling.
+/// </summary>
+public sealed class CompanyProfileAccessibilityScanJourneyTests(PriyaShahPersonaFixture fixture)
+    : RoleE2ETestBase<PriyaShahPersonaFixture>(fixture)
+{
+    private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private const string CompanyAdminEmail = "priya.shah@acme.example"; // CompanyAdministrator
+
+    [Fact]
+    public async Task CompanyProfileTab_AddressFields_HasNoSeriousViolations()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenProfileTabAsync();
+
+        // Acme has both a Registered Office and a Trading Address seeded, so both address
+        // sections (and their persistent field labels) are visible on the tab in one scan.
+        await AccessibilityScan.AssertNoSeriousViolationsAsync(_page, "company profile — address fields");
+    }
+}

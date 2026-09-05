@@ -14,14 +14,18 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/edit");
-        await page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync("#company-name", new() { Timeout = 20_000 });
     }
 
     // ── Tab navigation ─────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// The Profile tab is now the only tab (Addresses merged in, Settings removed, Branding
+    /// hidden) — there is no longer a tablist/tab to click. This is a no-op kept so existing
+    /// call sites don't need to change; it just waits for the profile card to be ready.
+    /// </summary>
     public async Task OpenProfileTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Profile" }).ClickAsync();
         await page.WaitForSelectorAsync(".card", new() { Timeout = 15_000 });
     }
 

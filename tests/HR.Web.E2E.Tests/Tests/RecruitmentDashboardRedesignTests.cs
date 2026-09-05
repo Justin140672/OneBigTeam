@@ -152,6 +152,49 @@ public sealed class RecruitmentDashboardRedesignTests(RecruiterPersonaFixture fi
     }
 
     [Fact]
+    public async Task PipelineBoard_DraggingCard_MovesApplicationToTargetStage_AndPersistsAcrossReload()
+    {
+        // RecruitmentStageSeeder.BuildDefaultStages — same seeded stage set VacancyKanbanBoardTests
+        // asserts against ("Application Received", "CV Review", "Interview", "Offer", "Hired",
+        // "Rejected"); a freshly created Application always starts on "Application Received".
+        const string InitialStage      = "Application Received";
+        const string NonTerminalStage2 = "CV Review";
+
+        var (vacancyTitle, candidateLast) = await ArrangeAppliedApplicationAsync();
+
+        var dashboard = new RecruitmentDashboardPage(_page, _fixture.WebBaseUrl);
+        await dashboard.GoToAsync();
+        await dashboard.SelectVacancyAsync(vacancyTitle);
+
+        var kanban = new VacancyKanbanBoardPage(_page, _fixture.WebBaseUrl);
+        await kanban.WaitForLoadedAsync();
+
+        Assert.True(await kanban.IsCardInColumnAsync(candidateLast, InitialStage),
+            $"Expected the freshly created application to start on '{InitialStage}'");
+
+        await kanban.DragCardToColumnAsync(candidateLast, NonTerminalStage2);
+
+        Assert.True(await kanban.IsCardInColumnAsync(candidateLast, NonTerminalStage2),
+            $"Expected the card for {candidateLast} to appear in the '{NonTerminalStage2}' column after the drag");
+        Assert.False(await kanban.IsCardInColumnAsync(candidateLast, InitialStage),
+            $"Expected the card for {candidateLast} to no longer be in the '{InitialStage}' column after the drag");
+
+        // Re-select the same vacancy after a fresh dashboard load to confirm the move persisted
+        // server-side (a new GetRecruitmentKanbanHandler query), not just in the widget's client
+        // state left over from the drag.
+        await dashboard.GoToAsync();
+        await dashboard.SelectVacancyAsync(vacancyTitle);
+
+        var reloadedKanban = new VacancyKanbanBoardPage(_page, _fixture.WebBaseUrl);
+        await reloadedKanban.WaitForLoadedAsync();
+
+        Assert.True(await reloadedKanban.IsCardInColumnAsync(candidateLast, NonTerminalStage2),
+            $"Expected the move to '{NonTerminalStage2}' to have persisted server-side after a fresh dashboard load");
+        Assert.False(await reloadedKanban.IsCardInColumnAsync(candidateLast, InitialStage),
+            $"Expected the card to no longer be reported on '{InitialStage}' after a fresh dashboard load");
+    }
+
+    [Fact]
     public async Task CreateVacancyButton_NavigatesToNewVacancyForm()
     {
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);

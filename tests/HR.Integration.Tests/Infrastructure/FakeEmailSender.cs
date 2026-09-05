@@ -15,5 +15,7 @@ public sealed class FakeEmailSender : IEmailSender
         return Task.CompletedTask;
     }
 
+    public void Clear() => _sent.Clear();
+
     public sealed record SentEmail(string ToEmail, string Subject, string HtmlBody);
 }

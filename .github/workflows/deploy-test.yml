@@ -1,11 +1,14 @@
 name: Deploy - Test
 
-# Auto-deploys every green commit on main to the Test environment, and can be
-# run on demand for any ref. No approval gate (see the GitHub Environment "test").
+# Deploy automatically only after CI finishes successfully.
+# Manual deployment remains available from the Actions screen.
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
+
   workflow_dispatch:
     inputs:
       ref:
@@ -13,12 +16,27 @@ on:
         required: false
         default: ""
 
+permissions:
+  contents: read
+  actions: read
+  deployments: write
+
 jobs:
   deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
     uses: ./.github/workflows/deploy.yml
+
     with:
       environment: test
-      ref: ${{ inputs.ref || '' }}
+      ref: >-
+        ${{ github.event_name == 'workflow_run'
+            && github.event.workflow_run.head_sha
+            || inputs.ref
+            || '' }}
+
     secrets:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_TEST }}
       API_HEALTH_BEARER_TOKEN: ${{ secrets.API_HEALTH_BEARER_TOKEN_TEST }}

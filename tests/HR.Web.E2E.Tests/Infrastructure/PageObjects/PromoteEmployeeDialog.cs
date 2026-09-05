@@ -39,8 +39,10 @@ public sealed class PromoteEmployeeDialog(IPage page)
     /// </summary>
     public async Task<string?> GetActiveStepLabelAsync()
     {
-        var active = Dialog.Locator(".nav-link.active");
-        return (await active.TextContentAsync())?.Trim();
+        var active = Dialog.Locator(".hr-stepper-item--current");
+        var index = (await active.Locator(".hr-stepper-node").TextContentAsync())?.Trim();
+        var label = (await active.Locator(".hr-stepper-label").TextContentAsync())?.Trim();
+        return $"{index}. {label}";
     }
 
     // ── Step 1: Position ────────────────────────────────────────────────────────
@@ -187,7 +189,7 @@ public sealed class PromoteEmployeeDialog(IPage page)
     /// </summary>
     public async Task ClickNextAsync()
     {
-        var activeStepLocator = Dialog.Locator(".nav-link.active");
+        var activeStepLocator = Dialog.Locator(".hr-stepper-item--current");
         var beforeLabel = (await activeStepLocator.TextContentAsync())?.Trim() ?? string.Empty;
 
         await Dialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();

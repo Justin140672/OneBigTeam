@@ -3,7 +3,6 @@
 @inject RecruitmentStageService RecruitmentStageService
 @inject CandidateService CandidateService
 @inject NavigationManager Navigation
-@inject IJSRuntime JS
 
 <div class="vacancy-kanban-board" data-testid="vacancy-kanban-board">
     @if (ShowToolbar)
@@ -124,9 +123,9 @@
 
     private Task LoadAsync() => LoadAsync(showSpinner: true);
 
-    // showSpinner:false is used after a drag-and-drop move — swapping the whole board out for a
-    // spinner on every drop would be jarring, so the refresh happens quietly and the grid just
-    // re-renders with the corrected (or confirmed) card positions once the fresh data arrives.
+    // Full three-way load (Kanban + candidates + stages) — required on initial load since none of
+    // _candidateEmails / _stageOutcomes are populated yet. Drag-and-drop reloads use the lighter
+    // ReloadKanbanOnlyAsync below instead, since candidates/stages don't change when a card moves.
     private async Task LoadAsync(bool showSpinner)
     {
         if (showSpinner) _loading = true;
@@ -166,6 +165,29 @@
         _stageOutcomes = stages.ToDictionary(s => s.Id, s => s.TerminalOutcome);
 
         if (showSpinner) _loading = false;
+    }
+
+    // Kanban-only reload used after drag-and-drop — reuses the already-cached _candidateEmails and
+    // _stageOutcomes dictionaries instead of re-fetching candidates/stages, since neither changes
+    // when a card's stage moves. Swapping the whole board out for a spinner on every drop would be
+    // jarring, so the refresh always happens quietly (no spinner) and the grid just re-renders with
+    // the corrected (or confirmed) card positions once the fresh data arrives.
+    private async Task ReloadKanbanOnlyAsync()
+    {
+        _error = null;
+
+        var kanban = await KanbanService.GetKanbanAsync(CompanyId, VacancyId);
+        if (kanban is null)
+        {
+            _error = "Failed to load the recruitment Kanban board.";
+            _cards = [];
+            _columns = [];
+            return;
+        }
+
+        _vacancyTitle = kanban.VacancyTitle;
+        _columns = kanban.Columns.ToList();
+        _cards = kanban.Columns.SelectMany(c => c.Applicants).ToList();
     }
 
     private RecruitmentStageTerminalOutcome StageOutcome(Guid stageId) =>
@@ -209,45 +231,9 @@
         // List — previously the card click had no memory of where it was opened from.
         var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
 
-        // Remember the page's scroll position (keyed by vacancy, per-tab via sessionStorage) so that
-        // when CandidateDetail's "Close" navigates back here, the board is restored to where the user
-        // was scrolled to instead of resetting to the top — see OnAfterRenderAsync below.
-        try
-        {
-            var scrollY = await JS.InvokeAsync<double>("eval", "window.scrollY");
-            await JS.InvokeVoidAsync("saveScrollPosition", $"kanban-{VacancyId}", scrollY);
-        }
-        catch
-        {
-            // ignore — scroll memory is a nice-to-have, never block navigation on it
-        }
-
         var candidateUrl = $"/companies/{CompanyId}/candidates/{applicant.CandidateId}" +
             $"?returnUrl={Uri.EscapeDataString(returnUrl)}";
         Navigation.NavigateTo(candidateUrl);
-    }
-
-    // Restored once, the first time the board finishes loading after being rendered (not
-    // necessarily on Blazor's firstRender, since that can fire while _loading is still true and the
-    // board hasn't rendered its columns yet).
-    private bool _scrollRestored;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!_loading && !_scrollRestored)
-        {
-            _scrollRestored = true;
-            try
-            {
-                var top = await JS.InvokeAsync<double?>("getScrollPosition", $"kanban-{VacancyId}");
-                if (top is > 0)
-                    await JS.InvokeVoidAsync("window.scrollTo", 0, top.Value);
-            }
-            catch
-            {
-                // ignore — scroll memory is a nice-to-have
-            }
-        }
     }
 
     private Task OnCardClickAsync(CardClickEventArgs<KanbanApplicantModel> args) =>
@@ -259,13 +245,19 @@
     // without any extra bookkeeping. Ticket #99/#101 deleted the whole client-side transition graph
     // (ApplicationStatusTransitionRules) since the server now validates transitions dynamically
     // per-company (arbitrary stage configuration, no fixed pipeline) — there is no equivalent
-    // client-side rule left to pre-check, so every drop is now sent straight to the server and its
-    // 422 response (if any) is surfaced via _error. Regardless of outcome (422 from the server, or
-    // success) the board is always re-fetched from the server afterwards — this is the "revert"
-    // mechanism: the card visually snaps back to its true server-side column because the DataSource
-    // is fully replaced, rather than relying on args.Cancel's own (unconfirmed for this Blazor
-    // wrapper) undo behaviour. args.Cancel is still set on failure as a defensive best-effort in case
-    // the engine also does its own revert.
+    // client-side rule left to pre-check, so every drop is sent straight to the server and its 422
+    // response (if any) is surfaced via _error.
+    //
+    // Unlike an earlier version of this handler, args.Cancel is NOT set unconditionally on every
+    // drop anymore. That unconditional-cancel-and-full-reload approach was a workaround for a real
+    // symptom (a duplicated/stuck card after drop) — but the actual root cause turned out to be that
+    // KanbanApplicantModel had no field named "Id" (see its remarks), which Syncfusion's Kanban
+    // engine needs to reconcile a dragged card against a freshly reloaded DataSource. Without it,
+    // replacing the DataSource after every drop couldn't be matched back to the card mid-drag,
+    // leaving its drag clone stuck floating instead of settling into the target column (reproduced
+    // via DraggingCard_MovesApplicationToTargetStage_AndPersistsAcrossReload). Now that every card
+    // has a stable Id, the widget can complete its own drop normally: we let it, then only correct
+    // the board (via a full reload) if the server actually rejects the move.
     private async Task OnDragStopAsync(Syncfusion.Blazor.Kanban.DragEventArgs<KanbanApplicantModel> args)
     {
         var moved = args.Data?.FirstOrDefault();
@@ -282,28 +274,22 @@
         if (!Guid.TryParse(moved.StageKey, out var targetStageId) || targetStageId == previous.StageId)
             return;
 
-        // Always cancel the widget's own optimistic client-side DOM move — not just on failure.
-        // The reload below is always the sole source of truth for the board's contents (see the
-        // class remarks above), but SfKanban's own internal drag handling was still separately
-        // committing its own DOM mutation for the dropped card on a *successful* move, alongside
-        // Blazor's own re-render off the freshly reloaded DataSource. Because SfKanban manages
-        // some of its drag/column DOM outside normal Blazor diffing, those two updates could each
-        // leave behind a card element — visible as a duplicated candidate card until the next full
-        // page refresh, even though the server-side data was only ever written once. Cancelling
-        // unconditionally means the widget never performs its own DOM move at all; the only visual
-        // update ever comes from the authoritative reload.
-        args.Cancel = true;
-
         var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, moved.ApplicationId, targetStageId);
 
         if (result is null)
         {
             _error = error ?? "Failed to move applicant to the new stage.";
-            await LoadAsync(showSpinner: false);
+            // Server rejected the move — cancel the widget's own optimistic placement and resync
+            // with the server's real (unchanged) state so the card snaps back to where it actually is.
+            args.Cancel = true;
+            await ReloadKanbanOnlyAsync();
             return;
         }
 
         _error = null;
-        await LoadAsync(showSpinner: false);
+        // Success: the widget already placed the card in its target column itself. Still refresh in
+        // the background so stage name/badge/terminal-outcome styling (which the widget doesn't know
+        // about) catch up with the move.
+        await ReloadKanbanOnlyAsync();
     }
 }

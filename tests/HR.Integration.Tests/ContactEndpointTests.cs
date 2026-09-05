@@ -15,18 +15,22 @@ namespace HR.Integration.Tests;
 // Part of the "Integration" collection so ApiWebApplicationFactory's shared Postgres container is
 // started (and its connection string exported) before ContactApiWebApplicationFactory builds its
 // host — the latter no longer runs a container of its own.
+// IClassFixture shares one ContactApiWebApplicationFactory (one host boot + migration run) across
+// every test method in this class, instead of xUnit's default of a new class instance (and thus a
+// new factory, since it was a field initializer) per test method.
 [Collection("Integration")]
-public sealed class ContactEndpointTests : IAsyncLifetime
+public sealed class ContactEndpointTests : IClassFixture<ContactApiWebApplicationFactory>
 {
-    private readonly ContactApiWebApplicationFactory _factory = new();
+    private readonly ContactApiWebApplicationFactory _factory;
 
-    // The shared collection fixture (injected here only to force the collection ordering) has
-    // already started the Postgres container and set ConnectionStrings__hr by the time this runs.
-    public ContactEndpointTests(ApiWebApplicationFactory _) { }
-
-    Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
-
-    async Task IAsyncLifetime.DisposeAsync() => await _factory.DisposeAsync();
+    // ApiWebApplicationFactory is injected only to force collection ordering: the shared collection
+    // fixture has already started the Postgres container and set ConnectionStrings__hr by the time
+    // this runs.
+    public ContactEndpointTests(ContactApiWebApplicationFactory factory, ApiWebApplicationFactory _)
+    {
+        _factory = factory;
+        _factory.EmailSender.Clear();
+    }
 
     private static object ValidContactRequest(
         string name = "Ada Lovelace",
