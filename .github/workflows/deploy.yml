@@ -55,7 +55,7 @@ jobs:
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.sha }}
           fetch-depth: 0
@@ -94,7 +94,7 @@ jobs:
       DEPLOY_SHA: ${{ needs.quality-gate.outputs.sha }}
       RAILWAY_ENV: ${{ inputs.railway_environment || inputs.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.quality-gate.outputs.sha }}
 
