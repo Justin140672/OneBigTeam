@@ -122,12 +122,12 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : HrFavourit
             await login.LoginAsync(LauraEmail);
             await dashboard.GoToAsync();
 
-            var subjects = await dashboard.GetAttentionQueueSubjectsAsync();
+            var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
 
             Assert.True(
-                subjects.Any(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase)),
+                employeeNames.Any(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase)),
                 $"Expected 'Carlos Rivera' to appear in the attention queue. " +
-                $"Subjects found: [{string.Join(", ", subjects)}]");
+                $"Meta text found: [{string.Join(", ", employeeNames)}]");
         }
         finally
         {
@@ -149,8 +149,8 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : HrFavourit
             await login.LoginAsync(LauraEmail);
             await dashboard.GoToAsync();
 
-            var subjects = await dashboard.GetAttentionQueueSubjectsAsync();
-            var carlos = subjects.First(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase));
+            var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
+            var carlos = employeeNames.First(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase));
             await dashboard.ClickAttentionQueueItemAsync(carlos);
 
             // GenerateDueProbationReviewsJob always creates a task for each seeded review, so the

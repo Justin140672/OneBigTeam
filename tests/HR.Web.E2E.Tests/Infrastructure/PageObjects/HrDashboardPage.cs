@@ -166,6 +166,23 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
         return names;
     }
 
+    /// <summary>
+    /// Returns the meta text (".task-widget-meta") of every currently visible queue row, in DOM
+    /// order — "EmployeeName · Category[ · StatusLabel][ · Due d MMM]" (DashboardActionItemModel.
+    /// MetaText). Since the row title now shows the specific task/action title rather than the
+    /// employee name, tests asserting on the employee should read this instead of
+    /// GetAttentionQueueSubjectsAsync.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetAttentionQueueEmployeeNamesAsync()
+    {
+        await WaitForAttentionQueueLoadedAsync();
+        var metas = await AttentionQueueWidget.Locator(".attention-queue-item .task-widget-meta").AllAsync();
+        var names = new List<string>();
+        foreach (var m in metas)
+            names.Add((await m.TextContentAsync())?.Trim() ?? "");
+        return names;
+    }
+
     /// <summary>Returns true once loaded if any queue row for the given subject fragment is marked overdue.</summary>
     public async Task<bool> IsAttentionQueueItemOverdueAsync(string subjectFragment)
     {

@@ -69,8 +69,8 @@
                                     <i class="@i.PriorityIcon" aria-hidden="true"></i>
                                 </span>
                                 <div class="task-widget-content">
-                                    <span class="task-widget-title">@i.Subject</span>
-                                    <span class="task-widget-meta">@i.Category · @i.StatusLabel</span>
+                                    <span class="task-widget-title" title="@i.ActionTitle">@i.ActionTitle</span>
+                                    <span class="task-widget-meta">@i.MetaText</span>
                                 </div>
                                 @if (i.DueLabel is not null)
                                 {
@@ -87,7 +87,7 @@
                                     <i class="@i.PriorityIcon" aria-hidden="true"></i>
                                 </span>
                                 <div class="task-widget-content">
-                                    <span class="task-widget-title">@i.Subject</span>
+                                    <span class="task-widget-title" title="@i.ActionTitle">@i.ActionTitle</span>
                                     <span class="task-widget-meta text-muted">This item can no longer be opened — it may have been completed or removed.</span>
                                 </div>
                             </div>
@@ -169,7 +169,8 @@
             {
                 var (dueLabel, dueCss) = DueBadge(it.DueDate);
                 items.Add(new AttentionItem(
-                    Subject: it.EmployeeName,
+                    ActionTitle: string.IsNullOrWhiteSpace(it.ActionType) ? it.Category : it.ActionType,
+                    EmployeeName: it.EmployeeName,
                     Category: it.Category,
                     StatusLabel: string.IsNullOrWhiteSpace(it.Status) ? it.ActionType : it.Status,
                     DueDate: it.DueDate,
@@ -271,7 +272,8 @@
     }
 
     private sealed record AttentionItem(
-        string Subject,
+        string ActionTitle,
+        string EmployeeName,
         string Category,
         string StatusLabel,
         DateOnly? DueDate,
@@ -287,6 +289,32 @@
         public bool HasTarget => TaskId is not null || !string.IsNullOrWhiteSpace(DeepLinkUrl);
 
         public string ActionLabel => ResolveActionLabel(TaskId, DeepLinkUrl, Category);
+
+        /// <summary>
+        /// Secondary/supporting line under the task title: employee, source category, and (when
+        /// meaningful) status — never repeating "Overdue" alongside the due-badge, and adding the
+        /// exact due date for overdue rows so same-employee/same-title items stay distinguishable.
+        /// </summary>
+        public string MetaText
+        {
+            get
+            {
+                var parts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(EmployeeName)) parts.Add(EmployeeName);
+                if (!string.IsNullOrWhiteSpace(Category)) parts.Add(Category);
+
+                if (!string.IsNullOrWhiteSpace(StatusLabel) &&
+                    !string.Equals(StatusLabel, "Overdue", StringComparison.OrdinalIgnoreCase))
+                {
+                    parts.Add(StatusLabel);
+                }
+
+                if (IsOverdue && DueDate is not null)
+                    parts.Add($"Due {DueDate.Value:d MMM}");
+
+                return string.Join(" · ", parts);
+            }
+        }
 
         public string PriorityCss => IsOverdue ? "critical" : UrgencyRank switch
         {
@@ -314,7 +342,7 @@
         };
 
         public string AccessibleLabel =>
-            $"{PriorityLabel}. {Subject}, {Category}, {StatusLabel}{(DueLabel is null ? "" : $", due {DueLabel}")}. " +
+            $"{PriorityLabel}. {ActionTitle}, {MetaText}{(DueLabel is null ? "" : $", due {DueLabel}")}. " +
             (HasTarget
                 ? $"{ActionLabel}."
                 : "This item can no longer be opened — it may have been completed or removed.");

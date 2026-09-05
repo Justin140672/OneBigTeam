@@ -65,7 +65,7 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(CrossUserFixture fixture)
         // LeaveRequestsWidget's standalone card was folded into ManagerAttentionQueueWidget by
         // the Manager Dashboard redesign, so leave-request rows now live there, filterable by
         // the "Leave request" category text rendered in each row's ".task-widget-meta". ───────
-        var namesBeforeClick = await dashboard.GetAttentionQueueSubjectsAsync("Leave request");
+        var namesBeforeClick = await dashboard.GetAttentionQueueEmployeeNamesAsync("Leave request");
         Assert.Contains(namesBeforeClick, n => n.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
 
         await dashboard.ClickAttentionQueueItemAsync("Tom Williams");

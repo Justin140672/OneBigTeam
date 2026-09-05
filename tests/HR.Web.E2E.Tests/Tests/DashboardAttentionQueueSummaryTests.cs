@@ -160,8 +160,8 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
         {
             await LoginAndOpenAsync();
 
-            var subjects = await dashboard.GetAttentionQueueSubjectsAsync();
-            var carlos = subjects.FirstOrDefault(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase));
+            var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
+            var carlos = employeeNames.FirstOrDefault(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase));
             if (carlos is null)
                 return; // Carlos' review not in this run's top-25 window — nothing to assert here.
 
@@ -247,6 +247,54 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
 
         Assert.Equal(0, await dashboard.GetAttentionQueueSourceWarningCountAsync());
     }
+
+    private static readonly string[] GenericCategoryLabels =
+    {
+        "Employee Tasks Overdue", "Manager Tasks Overdue", "Leave request", "Document review",
+        "Probation review", "Return-to-work review", "Fit note evidence", "HR task",
+    };
+
+    [Fact]
+    public async Task RowTitle_ShowsSpecificActionNotGenericCategory_AndMetaShowsEmployeeOrCategory()
+    {
+        // Title now shows the specific task/action title (e.g. "Complete Return to Work Review",
+        // "Approve Leave Request") rather than a generic category label; the employee/category
+        // detail moved to the meta line.
+        var dashboard = await LoginAndOpenAsync();
+        await dashboard.WaitForAttentionQueueLoadedAsync();
+
+        var titles = await dashboard.GetAttentionQueueSubjectsAsync();
+        var metas  = await dashboard.GetAttentionQueueEmployeeNamesAsync();
+        if (titles.Count == 0)
+            return; // nothing seeded in this run's queue — covered by AllClearState test.
+
+        var specificIndex = titles.ToList().FindIndex(t =>
+            !GenericCategoryLabels.Contains(t, StringComparer.OrdinalIgnoreCase));
+
+        if (specificIndex < 0)
+            return; // every seeded row this run happened to have a title equal to a generic label.
+
+        Assert.False(string.IsNullOrWhiteSpace(metas[specificIndex]));
+    }
+
+    [Fact]
+    public async Task OverdueRow_DoesNotDuplicateOverdueWordInRowText()
+    {
+        var dashboard = await LoginAndOpenAsync();
+        await dashboard.WaitForAttentionQueueLoadedAsync();
+
+        var rows = _page.Locator(".attention-queue-card .attention-queue-item.attention-queue-item--overdue");
+        var count = await rows.CountAsync();
+        if (count == 0)
+            return; // no overdue row in this run's queue.
+
+        var text = (await rows.First.TextContentAsync()) ?? "";
+        var occurrences = System.Text.RegularExpressions.Regex.Matches(
+            text, "Overdue", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Count;
+
+        Assert.True(occurrences <= 1,
+            $"Expected 'Overdue' to appear at most once in the row's visible text, found {occurrences}: '{text}'");
+    }
 }
 
 /// <summary>Manager persona (James Okafor) against "/dashboard/manager".</summary>
@@ -330,8 +378,8 @@ public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFix
         await login.LoginAsync(JamesEmail);
         await dash.GoToAsync();
 
-        var leaveSubjects = await dash.GetAttentionQueueSubjectsAsync("Leave request");
-        Assert.Contains(leaveSubjects, n => n.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
+        var leaveEmployeeNames = await dash.GetAttentionQueueEmployeeNamesAsync("Leave request");
+        Assert.Contains(leaveEmployeeNames, n => n.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
 
         Assert.True(await dash.GetAttentionQueueCountBadgeAsync() > 0);
     }
@@ -422,5 +470,50 @@ public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFix
         await dashboard.WaitForAttentionQueueSourceWarningsClearedAsync();
 
         Assert.Equal(0, await dashboard.GetAttentionQueueSourceWarningCountAsync());
+    }
+
+    private static readonly string[] GenericCategoryLabels =
+    {
+        "Employee Tasks Overdue", "Manager Tasks Overdue", "Leave request", "Document review",
+        "Probation review", "Return-to-work review", "Fit note evidence", "Team task",
+    };
+
+    [Fact]
+    public async Task RowTitle_ShowsSpecificActionNotGenericCategory_AndMetaShowsEmployeeOrCategory()
+    {
+        var dashboard = await LoginAndOpenAsync();
+        await dashboard.WaitForAttentionQueueLoadedAsync();
+
+        var titles = await dashboard.GetAttentionQueueSubjectsAsync();
+        var metas  = await dashboard.GetAttentionQueueEmployeeNamesAsync();
+        if (titles.Count == 0)
+            return; // nothing seeded in this run's queue — covered by AllClearState test.
+
+        var specificIndex = titles.ToList().FindIndex(t =>
+            !GenericCategoryLabels.Contains(t, StringComparer.OrdinalIgnoreCase));
+
+        if (specificIndex < 0)
+            return;
+
+        Assert.False(string.IsNullOrWhiteSpace(metas[specificIndex]));
+    }
+
+    [Fact]
+    public async Task OverdueRow_DoesNotDuplicateOverdueWordInRowText()
+    {
+        var dashboard = await LoginAndOpenAsync();
+        await dashboard.WaitForAttentionQueueLoadedAsync();
+
+        var rows = _page.Locator(".attention-queue-card .attention-queue-item.attention-queue-item--overdue");
+        var count = await rows.CountAsync();
+        if (count == 0)
+            return;
+
+        var text = (await rows.First.TextContentAsync()) ?? "";
+        var occurrences = System.Text.RegularExpressions.Regex.Matches(
+            text, "Overdue", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Count;
+
+        Assert.True(occurrences <= 1,
+            $"Expected 'Overdue' to appear at most once in the row's visible text, found {occurrences}: '{text}'");
     }
 }

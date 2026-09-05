@@ -83,6 +83,29 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
         return names;
     }
 
+    /// <summary>
+    /// Returns the meta text (".task-widget-meta") of every row currently in the attention queue —
+    /// "EmployeeName · Category[ · StatusLabel][ · Due d MMM]" (DashboardActionItemModel.MetaText).
+    /// Since the row title now shows the specific task/action title rather than the employee name,
+    /// tests asserting on the employee should read this instead of GetAttentionQueueSubjectsAsync.
+    /// Pass <paramref name="categoryFilter"/> to scope to one category, same as
+    /// GetAttentionQueueSubjectsAsync.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetAttentionQueueEmployeeNamesAsync(string? categoryFilter = null)
+    {
+        await WaitForAttentionQueueLoadedAsync();
+
+        var rows = categoryFilter is null
+            ? AttentionQueueWidget.Locator(".attention-queue-item")
+            : AttentionQueueWidget.Locator(".attention-queue-item").Filter(new() { HasText = categoryFilter });
+
+        var metas = await rows.Locator(".task-widget-meta").AllAsync();
+        var names = new List<string>();
+        foreach (var m in metas)
+            names.Add((await m.TextContentAsync())?.Trim() ?? "");
+        return names;
+    }
+
     /// <summary>Returns true if the attention-queue row matching <paramref name="subjectFragment"/> is styled overdue.</summary>
     public async Task<bool> IsAttentionQueueItemOverdueAsync(string subjectFragment)
     {
