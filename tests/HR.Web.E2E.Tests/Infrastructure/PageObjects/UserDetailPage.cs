@@ -98,14 +98,4 @@ public sealed class UserDetailPage(IPage page, string baseUrl)
         return names;
     }
 
-    /// <summary>
-    /// Clicks the "View Access Details & History" button and waits for the
-    /// UserAccessDetail.razor page (the "/access-details" route) to finish loading.
-    /// </summary>
-    public async Task OpenAccessDetailsAsync()
-    {
-        await page.GetByRole(AriaRole.Button, new() { Name = "View Access Details & History" }).ClickAsync();
-        await page.WaitForURLAsync("**/access-details", new() { Timeout = 15_000 });
-        await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
-    }
 }

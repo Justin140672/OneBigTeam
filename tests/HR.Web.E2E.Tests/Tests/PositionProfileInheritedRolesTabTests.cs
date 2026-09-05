@@ -15,9 +15,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// suite edits its role defaults (other files only ever select it in a Position Profile dropdown).
 ///
 /// Inherits <see cref="PositionRoleDefaultsSerialTestBase"/> because every test here saves the
-/// full role-defaults list for "QA Engineer" — see that base's remarks for why this must be
-/// serialized against EffectiveAccessViewTests, which mutates a different seeded position profile
-/// via the same read-modify-write-the-whole-list endpoint.
+/// full role-defaults list for "QA Engineer" via the same read-modify-write-the-whole-list
+/// endpoint — see that base's remarks.
 /// </summary>
 public sealed class PositionProfileInheritedRolesTabTests(HrAdminPersonaFixture fixture) : PositionRoleDefaultsSerialTestBase(fixture)
 {

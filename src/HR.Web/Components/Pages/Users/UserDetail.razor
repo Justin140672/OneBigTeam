@@ -115,10 +115,6 @@
                     </div>
                 }
 
-                <div class="d-flex gap-2 mb-4">
-                    <SfButton OnClick="ViewAccessDetails">View Access Details & History</SfButton>
-                </div>
-
                 <SfButton OnClick="BackToList">Close</SfButton>
             </div>
         </div>
@@ -179,8 +175,6 @@
     }
 
     private void BackToList() => Navigation.NavigateTo($"/companies/{CompanyId}/user-administration");
-
-    private void ViewAccessDetails() => Navigation.NavigateTo($"/companies/{CompanyId}/user-administration/{EmployeeId}/access-details");
 
     private async Task ResendInviteAsync()
     {

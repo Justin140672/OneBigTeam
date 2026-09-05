@@ -98,17 +98,6 @@
                             }
                         </Template>
                     </GridColumn>
-                    <GridColumn HeaderText="Permission Override" Width="150" AllowSorting="false" AllowFiltering="false">
-                        <Template>
-                            @{
-                                var row = (context as UserListItemModel)!;
-                            }
-                            @if (row.UserId is not null && _usersWithOverrides.Contains(row.UserId.Value))
-                            {
-                                <span class="badge bg-warning text-dark">Permission Override</span>
-                            }
-                        </Template>
-                    </GridColumn>
                     <GridColumn Field="@nameof(UserListItemModel.InvitationStatus)" HeaderText="Invitation Status" Width="150">
                         <Template>
                             @{
@@ -216,49 +205,10 @@
             tooltip: "Cancel the selected user's pending invitation");
     }
 
-    // Best-effort per-user lookup of which users currently have at least one active permission
-    // override, so the "Permission Override" badge can be shown here as well as on UserDetail —
-    // there's no batch/list-all-overrides endpoint today, only a per-user GET, so this throttles
-    // concurrency rather than firing one request per row unbounded (this list is typically a few
-    // hundred users at most; a true bulk endpoint would be preferable if that grows).
-    private readonly HashSet<Guid> _usersWithOverrides = [];
-    private const int OverrideLookupConcurrency = 8;
-
     protected override async Task<IReadOnlyList<UserListItemModel>?> FetchItemsAsync(string? search)
     {
         var result = await UserAdministrationService.ListAllUsersAsync(CompanyId, search: search);
-        var items = result?.Items;
-
-        _usersWithOverrides.Clear();
-        if (items is { Count: > 0 })
-            await LoadOverrideFlagsAsync(items);
-
-        return items;
-    }
-
-    private async Task LoadOverrideFlagsAsync(List<UserListItemModel> items)
-    {
-        var userIds = items.Where(i => i.UserId is not null).Select(i => i.UserId!.Value).ToList();
-        if (userIds.Count == 0) return;
-
-        using var throttle = new SemaphoreSlim(OverrideLookupConcurrency);
-
-        var tasks = userIds.Select(async userId =>
-        {
-            await throttle.WaitAsync();
-            try
-            {
-                var overrides = await UserAdministrationService.GetRoleOverridesAsync(CompanyId, userId);
-                if (overrides is { Count: > 0 })
-                    _usersWithOverrides.Add(userId);
-            }
-            finally
-            {
-                throttle.Release();
-            }
-        });
-
-        await Task.WhenAll(tasks);
+        return result?.Items;
     }
 
     protected override string LoadErrorMessage => "Failed to load users.";
