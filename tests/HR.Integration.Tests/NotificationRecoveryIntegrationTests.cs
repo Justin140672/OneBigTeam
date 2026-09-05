@@ -84,7 +84,7 @@ public class NotificationRecoveryIntegrationTests
         // is idempotent per notification).
         var backgroundJobClient = Assert.IsType<FakeBackgroundJobClient>(
             verifyScope.ServiceProvider.GetRequiredService<Hangfire.IBackgroundJobClient>());
-        Assert.Contains(backgroundJobClient.CreatedJobs, j => (Guid?)j.Args.ElementAtOrDefault(0) == winningId);
+        Assert.Contains(backgroundJobClient.CreatedJobs, j => j.Args.ElementAtOrDefault(0) is Guid g && g == winningId);
     }
 
     // Reconciliation jobs run twice without error or duplication ------------------------------------
@@ -155,7 +155,7 @@ public class NotificationRecoveryIntegrationTests
         using var verifyScope = _factory.Services.CreateScope();
         var backgroundJobClient = Assert.IsType<FakeBackgroundJobClient>(
             verifyScope.ServiceProvider.GetRequiredService<Hangfire.IBackgroundJobClient>());
-        Assert.Contains(backgroundJobClient.CreatedJobs, j => (Guid?)j.Args.ElementAtOrDefault(0) == notificationId);
+        Assert.Contains(backgroundJobClient.CreatedJobs, j => j.Args.ElementAtOrDefault(0) is Guid g && g == notificationId);
     }
 
     // Orphaned pending delivery row -------------------------------------------------------------
@@ -225,7 +225,7 @@ public class NotificationRecoveryIntegrationTests
         using var verifyScope = _factory.Services.CreateScope();
         var backgroundJobClient = Assert.IsType<FakeBackgroundJobClient>(
             verifyScope.ServiceProvider.GetRequiredService<Hangfire.IBackgroundJobClient>());
-        Assert.DoesNotContain(backgroundJobClient.CreatedJobs, j => (Guid?)j.Args.ElementAtOrDefault(0) == notificationId);
+        Assert.DoesNotContain(backgroundJobClient.CreatedJobs, j => j.Args.ElementAtOrDefault(0) is Guid g && g == notificationId);
     }
 
     // Cancellation --------------------------------------------------------------------------------
