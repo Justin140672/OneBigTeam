@@ -4,7 +4,7 @@
     </div>
     <div class="card-body">
         <div class="mb-4">
-            <label class="form-label fw-semibold" for="company-name">Name</label>
+            <label class="form-label fw-semibold" for="company-name">Name <span class="text-danger">*</span></label>
             <HrTextBox ID="company-name" @bind-Value="Model.Name" Placeholder="Company name" />
             <ValidationMessage For="@(() => Model.Name)" />
         </div>
@@ -22,7 +22,7 @@
                         <h6 class="text-uppercase text-muted small mb-3">@EnumDisplay.Humanize(addr.Type)</h6>
                         <div class="row g-3">
                             <div class="col-12">
-                                <label class="form-label" for="@($"addr-{i}-line1")">Address Line 1</label>
+                                <label class="form-label" for="@($"addr-{i}-line1")">Address Line 1 <span class="text-danger">*</span></label>
                                 <HrTextBox ID="@($"addr-{i}-line1")" @bind-Value="addr.Line1" Placeholder="Line 1" />
                                 <ValidationMessage For="@(() => addr.Line1)" />
                             </div>
@@ -31,7 +31,7 @@
                                 <HrTextBox ID="@($"addr-{i}-line2")" @bind-Value="addr.Line2" Placeholder="Line 2" />
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="@($"addr-{i}-city")">Town/City</label>
+                                <label class="form-label" for="@($"addr-{i}-city")">Town/City <span class="text-danger">*</span></label>
                                 <HrTextBox ID="@($"addr-{i}-city")" @bind-Value="addr.City" Placeholder="City" />
                                 <ValidationMessage For="@(() => addr.City)" />
                             </div>

@@ -108,7 +108,7 @@ else
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <label class="form-label">Position Profile</label>
+                                <label class="form-label">Position Profile <span class="text-danger">*</span></label>
                                 <SfDropDownList @ref="_positionProfileDropdown"
                                                 TValue="Guid?"
                                                 TItem="PositionProfileListItemModel"
@@ -122,9 +122,10 @@ else
                                                          ValueChange="OnPositionProfileChanged"
                                                          Filtering="OnPositionProfileFilteringAsync" />
                                 </SfDropDownList>
+                                <ValidationMessage For="@(() => Model.PositionProfileId)" />
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">Department</label>
+                                <label class="form-label">Department <span class="text-danger">*</span></label>
                                 <SfDropDownList TValue="Guid?"
                                                 TItem="DepartmentListItemModel"
                                                 DataSource="@_departments"
@@ -134,19 +135,20 @@ else
                                                 Enabled="@(!IsViewMode)">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                 </SfDropDownList>
+                                <ValidationMessage For="@(() => Model.DepartmentId)" />
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">Location</label>
+                                <label class="form-label">Location <span class="text-danger">*</span></label>
                                 <SfDropDownList TValue="Guid?"
                                                 TItem="LocationListItemModel"
                                                 DataSource="@_locations"
                                                 @bind-Value="Model.LocationId"
                                                 Placeholder="None"
                                                 AllowFiltering="true"
-                                                ShowClearButton="true"
                                                 Enabled="@(!IsViewMode)">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                 </SfDropDownList>
+                                <ValidationMessage For="@(() => Model.LocationId)" />
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Manager</label>
@@ -723,8 +725,11 @@ else
         [Required(ErrorMessage = "Employment type is required.")]
         public Guid? EmploymentTypeId { get; set; }
         public string Status { get; set; } = "Active";
+        [Required(ErrorMessage = "Department is required.")]
         public Guid? DepartmentId { get; set; }
+        [Required(ErrorMessage = "Location is required.")]
         public Guid? LocationId { get; set; }
+        [Required(ErrorMessage = "Position profile is required.")]
         public Guid? PositionProfileId { get; set; }
         public Guid? ManagerId { get; set; }
         public DateOnly StartDate { get; set; }

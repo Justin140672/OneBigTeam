@@ -39,7 +39,7 @@
                                 <div class="card-body">
                                     <div class="row g-4">
                                         <div class="col-12">
-                                            <label class="form-label fw-semibold">Working Week</label>
+                                            <label class="form-label fw-semibold">Working Week <span class="text-danger">*</span></label>
                                             <div class="d-flex flex-wrap gap-3 mt-1">
                                                 @foreach (var day in AllDays)
                                                 {
@@ -50,22 +50,22 @@
                                             </div>
                                         </div>
                                         <div class="col-md-3">
-                                            <HrNumericField TValue="decimal" Label="Hours Per Day" @bind-Value="Model.HoursPerDay"
+                                            <HrNumericField TValue="decimal" Label="Hours Per Day" Required="true" @bind-Value="Model.HoursPerDay"
                                                             Min="0.5m" Max="24m" Step="0.5" />
                                         </div>
                                         <div class="col-md-3">
                                             <HrDropDownField TValue="int" TItem="MonthItem" Label="Leave Year Start Month"
-                                                             AllowFiltering="false"
+                                                             Required="true" AllowFiltering="false"
                                                              @bind-Value="Model.LeaveYearStartMonth"
                                                              DataSource="@Months" ValueField="Number" TextField="Name"
                                                              HelpText="The month each employee's annual leave allowance resets." />
                                         </div>
                                         <div class="col-md-3">
-                                            <HrNumericField TValue="decimal" Label="Default Holiday Allowance (days)"
+                                            <HrNumericField TValue="decimal" Label="Default Holiday Allowance (days)" Required="true"
                                                             @bind-Value="Model.DefaultHolidayAllowance" Min="0m" Max="365m" />
                                         </div>
                                         <div class="col-md-3">
-                                            <HrNumericField TValue="int" Label="Probation Months"
+                                            <HrNumericField TValue="int" Label="Probation Months" Required="true"
                                                             @bind-Value="Model.ProbationMonths" Min="0" Max="24" />
                                         </div>
                                         <div class="col-12">
@@ -98,11 +98,11 @@
                                                              CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromSickness = v)" />
                                         </div>
                                         <div class="col-md-4">
-                                            <HrNumericField TValue="int" Label="Fit Note Required After (Calendar Days)"
+                                            <HrNumericField TValue="int" Label="Fit Note Required After (Calendar Days)" Required="true"
                                                             @bind-Value="Model.FitNoteRequiredAfterDays" Min="1" />
                                         </div>
                                         <div class="col-md-4">
-                                            <HrNumericField TValue="int" Label="Return-to-Work Review Required After (Working Days)"
+                                            <HrNumericField TValue="int" Label="Return-to-Work Review Required After (Working Days)" Required="true"
                                                             @bind-Value="Model.ReturnToWorkRequiredAfterDays" Min="1" />
                                         </div>
                                     </div>
@@ -129,7 +129,7 @@
                                             <div class="text-muted small text-end">@(Model.DefaultAcknowledgementStatement?.Length ?? 0) / 2000</div>
                                         </div>
                                         <div class="col-md-4">
-                                            <HrNumericField TValue="int" Label="Acknowledgement Reminder Interval (days)"
+                                            <HrNumericField TValue="int" Label="Acknowledgement Reminder Interval (days)" Required="true"
                                                             @bind-Value="Model.AcknowledgementReminderIntervalDays" Min="1" />
                                         </div>
                                     </div>
@@ -162,7 +162,7 @@
                                                                  DataSource="@NoticePeriodUnitOptions" ValueField="Value" TextField="Label" />
                                             </div>
                                             <div class="col-md-4">
-                                                <HrNumericField TValue="int" Label="Length"
+                                                <HrNumericField TValue="int" Label="Length" Required="true"
                                                                 @bind-Value="Model.NoticePeriodLength" Min="1" />
                                             </div>
                                         }
@@ -187,7 +187,7 @@
                                     <div class="row g-4">
                                         <div class="col-md-4">
                                             <HrDropDownField TValue="EmployeeNumberMode" TItem="EmployeeNumberModeOption"
-                                                             Label="Numbering Mode" AllowFiltering="false"
+                                                             Label="Numbering Mode" Required="true" AllowFiltering="false"
                                                              @bind-Value="Model.EmployeeNumberMode"
                                                              DataSource="@EmployeeNumberModeOptions" ValueField="Value" TextField="Label" />
                                         </div>
@@ -198,11 +198,11 @@
                                                              HelpText="Changing the prefix only affects employee numbers assigned in the future — existing employees' numbers are never changed retroactively." />
                                             </div>
                                             <div class="col-md-4">
-                                                <HrNumericField TValue="int" Label="Next Number"
+                                                <HrNumericField TValue="int" Label="Next Number" Required="true"
                                                                 @bind-Value="Model.NextEmployeeNumber" Min="1" />
                                             </div>
                                             <div class="col-md-4">
-                                                <HrNumericField TValue="int" Label="Minimum Numeric Length"
+                                                <HrNumericField TValue="int" Label="Minimum Numeric Length" Required="true"
                                                                 @bind-Value="Model.EmployeeNumberMinimumLength" Min="1" Max="10" />
                                             </div>
                                             <div class="col-12">
@@ -225,7 +225,7 @@
                                     <div class="row g-4">
                                         <div class="col-md-4">
                                             <HrDropDownField TValue="AssetNumberMode" TItem="AssetNumberModeOption"
-                                                             Label="Numbering Mode" AllowFiltering="false"
+                                                             Label="Numbering Mode" Required="true" AllowFiltering="false"
                                                              @bind-Value="Model.AssetNumberMode"
                                                              DataSource="@AssetNumberModeOptions" ValueField="Value" TextField="Label" />
                                         </div>
@@ -235,11 +235,11 @@
                                                 <HrTextField Label="Prefix" @bind-Value="Model.AssetNumberPrefix" Placeholder="Prefix (e.g. AST-)" />
                                             </div>
                                             <div class="col-md-4">
-                                                <HrNumericField TValue="int" Label="Next Number"
+                                                <HrNumericField TValue="int" Label="Next Number" Required="true"
                                                                 @bind-Value="Model.NextAssetNumber" Min="1" />
                                             </div>
                                             <div class="col-md-4">
-                                                <HrNumericField TValue="int" Label="Minimum Numeric Length"
+                                                <HrNumericField TValue="int" Label="Minimum Numeric Length" Required="true"
                                                                 @bind-Value="Model.AssetNumberMinimumLength" Min="1" Max="10" />
                                             </div>
                                             <div class="col-12">
