@@ -1,3 +1,4 @@
+@using System.ComponentModel.DataAnnotations
 @using HR.Modules.Employees.Contracts
 @inject LeaveService LeaveService
 
@@ -14,43 +15,36 @@
                 </div>
             }
 
-            <HrValidationSummary AdditionalErrors="@ValidationErrors" />
-
             @if (Balances.Count == 0)
             {
                 <p class="text-muted mb-0">No leave types are available.</p>
             }
             else
             {
+            <EditForm EditContext="_editContext">
+                <DataAnnotationsValidator />
                 <div class="row g-3">
                     <div class="col-12">
                         <label class="form-label">Leave Type <span class="text-danger">*</span></label>
-                        <SfDropDownList TValue="Guid" TItem="LeaveBalanceItemModel"
+                        <SfDropDownList TValue="Guid?" TItem="LeaveBalanceItemModel"
                                         DataSource="@Balances"
-                                        Value="_leaveTypeId"
+                                        Value="_model.LeaveTypeId"
                                         ValueChanged="OnLeaveTypeChanged"
-                                        Placeholder="Select leave type"
-                                        HtmlAttributes="@LeaveTypeHtmlAttributes">
+                                        Placeholder="Select leave type">
                             <DropDownListFieldSettings Value="LeaveTypeId" Text="LeaveTypeName" />
                         </SfDropDownList>
-                        @if (_leaveTypeError is not null)
-                        {
-                            <div class="invalid-feedback d-block">@_leaveTypeError</div>
-                        }
+                        <ValidationMessage For="@(() => _model.LeaveTypeId)" />
                     </div>
                 </div>
 
                 <div class="row g-3 mt-1">
                     <div class="col-6">
                         <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                        <SfDatePicker TValue="DateTime"
-                                      Value="_startDateTime"
+                        <SfDatePicker TValue="DateTime?"
+                                      Value="_model.StartDate"
                                       ValueChanged="OnStartDateChanged"
                                       Format="dd/MM/yyyy" />
-                        @if (_startDateError is not null)
-                        {
-                            <div class="invalid-feedback d-block">@_startDateError</div>
-                        }
+                        <ValidationMessage For="@(() => _model.StartDate)" />
                         <div class="mt-2">
                             <label class="form-label small text-muted">Start</label>
                             <SfDropDownList TValue="LeaveDayPart" TItem="DayPartChoice"
@@ -63,18 +57,11 @@
                     </div>
                     <div class="col-6">
                         <label class="form-label">End Date <span class="text-danger">*</span></label>
-                        <SfDatePicker TValue="DateTime"
-                                      Value="_endDateTime"
+                        <SfDatePicker TValue="DateTime?"
+                                      Value="_model.EndDate"
                                       ValueChanged="OnEndDateChanged"
                                       Format="dd/MM/yyyy" />
-                        @if (_endDateError is not null)
-                        {
-                            <div class="invalid-feedback d-block">@_endDateError</div>
-                        }
-                        @if (_dateRangeError is not null)
-                        {
-                            <div class="invalid-feedback d-block">@_dateRangeError</div>
-                        }
+                        <ValidationMessage For="@(() => _model.EndDate)" />
                         <div class="mt-2">
                             <label class="form-label small text-muted">End</label>
                             <SfDropDownList TValue="LeaveDayPart" TItem="DayPartChoice"
@@ -90,15 +77,15 @@
                 <div class="row g-3 mt-1">
                     <div class="col-12">
                         <label class="form-label">Reason <span class="text-muted small">(optional)</span></label>
-                        <HrTextBox @bind-Value="_reason" Placeholder="Reason for leave request" />
+                        <HrTextBox @bind-Value="_model.Reason" Placeholder="Reason for leave request" />
                     </div>
                 </div>
 
-                @if (_leaveTypeId != Guid.Empty)
+                @if (_model.LeaveTypeId is { } leaveTypeId && leaveTypeId != Guid.Empty)
                 {
                     var dateInvalid = EndDate < StartDate;
                     var totalDays = dateInvalid ? 0m : CalculateDays();
-                    var selectedBalance = Balances.FirstOrDefault(b => b.LeaveTypeId == _leaveTypeId);
+                    var selectedBalance = Balances.FirstOrDefault(b => b.LeaveTypeId == leaveTypeId);
                     var remainingAfter = !dateInvalid && selectedBalance?.RemainingDays is not null
                         ? selectedBalance.RemainingDays - totalDays
                         : (decimal?)null;
@@ -138,6 +125,7 @@
                         }
                     </div>
                 }
+            </EditForm>
             }
         </Content>
         <FooterTemplate>
@@ -178,36 +166,23 @@
 
     private bool _visible;
 
-    private Guid _leaveTypeId;
-    private DateTime _startDateTime = DateTime.Today;
-    private bool _startDateSet;
+    private readonly RequestLeaveFormModel _model = new();
+    private EditContext _editContext = default!;
     private LeaveDayPart _startPart = LeaveDayPart.FullDay;
-    private DateTime _endDateTime = DateTime.Today;
-    private bool _endDateSet;
     private LeaveDayPart _endPart = LeaveDayPart.FullDay;
-    private string? _reason;
 
     private bool _submitting;
     private string? _submitError;
-    private string? _leaveTypeError;
-    private string? _startDateError;
-    private string? _endDateError;
-    private string? _dateRangeError;
 
-    private DateOnly StartDate => DateOnly.FromDateTime(_startDateTime);
-    private DateOnly EndDate => DateOnly.FromDateTime(_endDateTime);
+    private DateOnly StartDate => DateOnly.FromDateTime(_model.StartDate ?? DateTime.Today);
+    private DateOnly EndDate => DateOnly.FromDateTime(_model.EndDate ?? DateTime.Today);
 
     private bool CanSubmit => !_submitting;
 
-    private IEnumerable<string> ValidationErrors =>
-        new[] { _leaveTypeError, _startDateError, _endDateError, _dateRangeError }
-            .Where(e => !string.IsNullOrWhiteSpace(e))
-            .Select(e => e!);
-
-    private Dictionary<string, object>? LeaveTypeHtmlAttributes =>
-        _leaveTypeError is not null
-            ? new Dictionary<string, object> { ["aria-invalid"] = "true" }
-            : null;
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+    }
 
     protected override void OnParametersSet()
     {
@@ -224,19 +199,14 @@
 
     private void Reset()
     {
-        _leaveTypeId = Guid.Empty;
-        _startDateTime = DateTime.Today;
-        _startDateSet = false;
+        _model.LeaveTypeId = null;
+        _model.StartDate = null;
+        _model.EndDate = null;
+        _model.Reason = null;
         _startPart = LeaveDayPart.FullDay;
-        _endDateTime = DateTime.Today;
-        _endDateSet = false;
         _endPart = LeaveDayPart.FullDay;
-        _reason = null;
         _submitError = null;
-        _leaveTypeError = null;
-        _startDateError = null;
-        _endDateError = null;
-        _dateRangeError = null;
+        _editContext = new EditContext(_model);
     }
 
     private async Task OnDialogClosed() => await OnCancelled.InvokeAsync();
@@ -247,28 +217,24 @@
         await OnCancelled.InvokeAsync();
     }
 
-    private void OnLeaveTypeChanged(Guid v)
+    private void OnLeaveTypeChanged(Guid? v)
     {
-        _leaveTypeId = v;
-        _leaveTypeError = null;
+        _model.LeaveTypeId = v;
+        _editContext.NotifyFieldChanged(_editContext.Field(nameof(RequestLeaveFormModel.LeaveTypeId)));
     }
 
-    private void OnStartDateChanged(DateTime v)
+    private void OnStartDateChanged(DateTime? v)
     {
-        _startDateTime = v;
-        _startDateSet = true;
-        _startDateError = null;
-        _dateRangeError = null;
-        if (_endDateTime < _startDateTime)
-            _endDateTime = _startDateTime;
+        _model.StartDate = v;
+        if (v is not null && _model.EndDate < v)
+            _model.EndDate = v;
+        _editContext.NotifyFieldChanged(_editContext.Field(nameof(RequestLeaveFormModel.StartDate)));
     }
 
-    private void OnEndDateChanged(DateTime v)
+    private void OnEndDateChanged(DateTime? v)
     {
-        _endDateTime = v;
-        _endDateSet = true;
-        _endDateError = null;
-        _dateRangeError = null;
+        _model.EndDate = v;
+        _editContext.NotifyFieldChanged(_editContext.Field(nameof(RequestLeaveFormModel.EndDate)));
     }
     private void OnStartPartChanged(LeaveDayPart v) => _startPart = v;
     private void OnEndPartChanged(LeaveDayPart v) => _endPart = v;
@@ -330,14 +296,7 @@
     {
         if (_submitting) return;
 
-        _leaveTypeError = _leaveTypeId == Guid.Empty ? "Please select a leave type." : null;
-        _startDateError = !_startDateSet ? "Please select a start date." : null;
-        _endDateError   = !_endDateSet   ? "Please select an end date."   : null;
-        _dateRangeError = _startDateSet && _endDateSet && EndDate < StartDate
-            ? "End date must be on or after start date." : null;
-
-        if (_leaveTypeError is not null || _startDateError is not null ||
-            _endDateError is not null || _dateRangeError is not null)
+        if (!_editContext.Validate())
             return;
 
         _submitting = true;
@@ -346,10 +305,10 @@
         var (response, error) = await LeaveService.SubmitLeaveRequestAsync(
             CompanyId, EmployeeId,
             new SubmitLeaveRequestModel(
-                _leaveTypeId,
+                _model.LeaveTypeId!.Value,
                 StartDate, _startPart,
                 EndDate, _endPart,
-                string.IsNullOrWhiteSpace(_reason) ? null : _reason));
+                string.IsNullOrWhiteSpace(_model.Reason) ? null : _model.Reason));
 
         _submitting = false;
 
@@ -366,4 +325,26 @@
 
     private static string FormatDays(decimal days) =>
         $"{days:0.##} {(days == 1m ? "day" : "days")}";
+
+    private sealed class RequestLeaveFormModel : IValidatableObject
+    {
+        [Required(ErrorMessage = "Please select a leave type.")]
+        public Guid? LeaveTypeId { get; set; }
+
+        [Required(ErrorMessage = "Please select a start date.")]
+        public DateTime? StartDate { get; set; }
+
+        [Required(ErrorMessage = "Please select an end date.")]
+        public DateTime? EndDate { get; set; }
+
+        public string? Reason { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (StartDate is not null && EndDate is not null && EndDate < StartDate)
+                yield return new ValidationResult(
+                    "End date must be on or after start date.",
+                    [nameof(EndDate)]);
+        }
+    }
 }

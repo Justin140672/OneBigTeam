@@ -1,5 +1,6 @@
 @page "/companies/{CompanyId:guid}/shared-documents/{DocumentId:guid}"
 @rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
 @inject DocumentService DocumentService
 @inject AppSession Session
 @inject NavigationManager Navigation
@@ -369,11 +370,15 @@
                 acknowledgement tasks, and cancel any outstanding acknowledgement tasks. The document, its
                 versions, and completed acknowledgements are retained. This cannot be undone from here.
             </p>
-            <div class="mb-2">
-                <label class="form-label">Reason <span class="text-danger">*</span></label>
-                <HrTextBox @bind-Value="_archiveReason" Multiline="true" Rows="3" Maxlength="500"
-                           HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "archive-reason" })" />
-            </div>
+            <EditForm EditContext="_archiveEditContext">
+                <DataAnnotationsValidator />
+                <div class="mb-2">
+                    <label class="form-label">Reason <span class="text-danger">*</span></label>
+                    <HrTextBox @bind-Value="_archiveModel.Reason" Multiline="true" Rows="3" Maxlength="500"
+                               HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "archive-reason" })" />
+                    <ValidationMessage For="@(() => _archiveModel.Reason)" />
+                </div>
+            </EditForm>
             @if (!string.IsNullOrEmpty(_archiveError))
             {
                 <div class="alert alert-danger py-2 mb-0">@_archiveError</div>
@@ -453,11 +458,17 @@
     private string? _publishError;
     private bool _archiveConfirmOpen;
     private bool _archiving;
-    private string _archiveReason = string.Empty;
+    private readonly ArchiveDocumentFormModel _archiveModel = new();
+    private EditContext _archiveEditContext = default!;
     private string? _archiveError;
     private bool _expireConfirmOpen;
     private bool _expiring;
     private string? _expireError;
+
+    protected override void OnInitialized()
+    {
+        _archiveEditContext = new EditContext(_archiveModel);
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -524,23 +535,21 @@
     private void CancelArchive()
     {
         _archiveConfirmOpen = false;
-        _archiveReason = string.Empty;
+        _archiveModel.Reason = null;
+        _archiveEditContext = new EditContext(_archiveModel);
         _archiveError = null;
     }
 
     private async Task ConfirmArchiveAsync()
     {
-        if (string.IsNullOrWhiteSpace(_archiveReason))
-        {
-            _archiveError = "A reason is required.";
+        if (!_archiveEditContext.Validate())
             return;
-        }
 
         _archiving = true;
         _archiveError = null;
         StateHasChanged();
 
-        var error = await DocumentService.ArchiveSharedCompanyDocumentAsync(CompanyId, DocumentId, _archiveReason);
+        var error = await DocumentService.ArchiveSharedCompanyDocumentAsync(CompanyId, DocumentId, _archiveModel.Reason!.Trim());
 
         _archiving = false;
 
@@ -551,9 +560,17 @@
         }
 
         _archiveConfirmOpen = false;
-        _archiveReason = string.Empty;
+        _archiveModel.Reason = null;
+        _archiveEditContext = new EditContext(_archiveModel);
         _archiveError = null;
         _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
+    }
+
+    private sealed class ArchiveDocumentFormModel
+    {
+        [Required(ErrorMessage = "A reason is required.")]
+        [MaxLength(500)]
+        public string? Reason { get; set; }
     }
 
     private async Task ConfirmReissueAsync()

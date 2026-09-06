@@ -123,4 +123,47 @@ public sealed class LeaveFormValidationTests(EmployeePersonaFixture fixture) : R
         Assert.True(await _page.Locator(".invalid-feedback").First.IsVisibleAsync(),
             "Expected a validation error when no start date is provided");
     }
+
+    /// <summary>
+    /// Locks in the declarative &lt;EditForm&gt; + DataAnnotationsValidator refactor of
+    /// RequestLeaveForm.razor: submitting with every required field empty keeps the dialog open
+    /// and surfaces a field-level &lt;ValidationMessage&gt;, and once the leave type + dates are
+    /// filled the same dialog submits and closes.
+    /// </summary>
+    [Fact]
+    public async Task SubmitLeaveRequest_EmptyThenCompleted_ShowsFieldError_ThenSubmits()
+    {
+        var reason  = $"E2E-DECL-VALID-{Guid.NewGuid():N}";
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+        await profile.OpenLeaveTabAsync();
+        await profile.ClickRequestLeaveAsync();
+
+        var dialog = _page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" });
+
+        // ── Submit with nothing filled — field-level validation, dialog stays open ──
+        await _page.GetByRole(AriaRole.Button, new() { Name = "Submit Request" }).ClickAsync();
+
+        await _page.WaitForSelectorAsync(".validation-message, .invalid-feedback", new() { Timeout = 5_000 });
+        Assert.True(await dialog.IsVisibleAsync(),
+            "The Request Leave dialog must stay open when required fields are empty");
+        Assert.True(await dialog.Locator(".validation-message, .invalid-feedback").First.IsVisibleAsync(),
+            "Expected a field-level validation message when submitting an empty Request Leave form");
+
+        // ── Fill the required fields — the same dialog now submits and closes ──
+        // Mid-July 2026, Mon–Tue, no UK bank holidays (matches LeaveApprovalTests' window).
+        await profile.FillLeaveRequestAsync("Annual Leave", "13/07/2026", "14/07/2026", reason);
+        await profile.SubmitLeaveRequestAsync();
+
+        Assert.False(await dialog.IsVisibleAsync(),
+            "Expected the Request Leave dialog to close after submitting with all required fields filled");
+
+        await _page.WaitForSelectorAsync("table tbody tr", new() { Timeout = 15_000 });
+        Assert.Equal("Pending", await profile.GetLeaveRequestStatusAsync(reason));
+    }
 }

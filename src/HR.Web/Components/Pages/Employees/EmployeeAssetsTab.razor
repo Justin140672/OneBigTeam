@@ -1,5 +1,6 @@
 @inject AssetService AssetService
 @inject AppSession Session
+@using System.ComponentModel.DataAnnotations
 @using HR.Web.Components.Pages.Assets
 
 @if (_loading)
@@ -70,33 +71,38 @@ else
     <SfDialog Width="480px" IsModal="true" @bind-Visible="_showAssignDialog" Header="Assign Asset">
         <DialogTemplates>
             <Content>
-                <div class="mb-3">
-                    <label class="form-label">Available Asset</label>
-                    <SfDropDownList TValue="Guid?"
-                                   TItem="AvailableAssetItem"
-                                   DataSource="@_availableAssets"
-                                   @bind-Value="_selectedAssetId"
-                                   Placeholder="Select an asset"
-                                   AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="AssetNumber" />
-                        <DropDownListTemplates TItem="AvailableAssetItem">
-                            <ItemTemplate>
-                                @{
-                                    var a = (AvailableAssetItem)context;
-                                }
-                                <span><strong>@a.AssetNumber</strong> — @a.Name @(a.Manufacturer is not null ? $"({a.Manufacturer})" : "")</span>
-                            </ItemTemplate>
-                        </DropDownListTemplates>
-                    </SfDropDownList>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Notes (optional)</label>
-                    <HrTextBox @bind-Value="_assignNotes" Multiline="true" Rows="2" />
-                </div>
-                @if (!string.IsNullOrEmpty(_dialogError))
-                {
-                    <div class="alert alert-danger py-2">@_dialogError</div>
-                }
+                <EditForm EditContext="_assignEditContext">
+                    <DataAnnotationsValidator />
+                    <div class="mb-3">
+                        <label class="form-label">Available Asset <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid?"
+                                       TItem="AvailableAssetItem"
+                                       DataSource="@_availableAssets"
+                                       @bind-Value="_assignModel.AssetId"
+                                       Placeholder="Select an asset"
+                                       AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="AssetNumber" />
+                            <DropDownListTemplates TItem="AvailableAssetItem">
+                                <ItemTemplate Context="ddItem">
+                                    @{
+                                        var a = (AvailableAssetItem)ddItem;
+                                    }
+                                    <span><strong>@a.AssetNumber</strong> — @a.Name @(a.Manufacturer is not null ? $"({a.Manufacturer})" : "")</span>
+                                </ItemTemplate>
+                            </DropDownListTemplates>
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => _assignModel.AssetId)" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes (optional)</label>
+                        <HrTextBox @bind-Value="_assignModel.Notes" Multiline="true" Rows="2" />
+                        <ValidationMessage For="@(() => _assignModel.Notes)" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(_dialogError))
+                    {
+                        <div class="alert alert-danger py-2">@_dialogError</div>
+                    }
+                </EditForm>
             </Content>
         </DialogTemplates>
         <DialogButtons>
@@ -116,29 +122,33 @@ else
     <SfDialog Width="480px" IsModal="true" @bind-Visible="_showReturnDialog" Header="Request Return">
         <DialogTemplates>
             <Content>
-                <div class="mb-3">
-                    <label class="form-label">Asset</label>
-                    <SfDropDownList TValue="Guid?"
-                                   TItem="EmployeeAssetItem"
-                                   DataSource="@_returnableAssets"
-                                   @bind-Value="_selectedReturnAssignmentId"
-                                   Placeholder="Select an asset to return"
-                                   AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="AssetNumber" />
-                        <DropDownListTemplates TItem="EmployeeAssetItem">
-                            <ItemTemplate>
-                                @{
-                                    var a = (EmployeeAssetItem)context;
-                                }
-                                <span><strong>@a.AssetNumber</strong> — @a.Name</span>
-                            </ItemTemplate>
-                        </DropDownListTemplates>
-                    </SfDropDownList>
-                </div>
-                @if (!string.IsNullOrEmpty(_returnDialogError))
-                {
-                    <div class="alert alert-danger py-2">@_returnDialogError</div>
-                }
+                <EditForm EditContext="_returnEditContext">
+                    <DataAnnotationsValidator />
+                    <div class="mb-3">
+                        <label class="form-label">Asset <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid?"
+                                       TItem="EmployeeAssetItem"
+                                       DataSource="@_returnableAssets"
+                                       @bind-Value="_returnModel.AssignmentId"
+                                       Placeholder="Select an asset to return"
+                                       AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="AssetNumber" />
+                            <DropDownListTemplates TItem="EmployeeAssetItem">
+                                <ItemTemplate Context="ddItem">
+                                    @{
+                                        var a = (EmployeeAssetItem)ddItem;
+                                    }
+                                    <span><strong>@a.AssetNumber</strong> — @a.Name</span>
+                                </ItemTemplate>
+                            </DropDownListTemplates>
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => _returnModel.AssignmentId)" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(_returnDialogError))
+                    {
+                        <div class="alert alert-danger py-2">@_returnDialogError</div>
+                    }
+                </EditForm>
             </Content>
         </DialogTemplates>
         <DialogButtons>
@@ -158,17 +168,24 @@ else
     private string? _success;
 
     private bool _showAssignDialog;
-    private Guid? _selectedAssetId;
-    private string? _assignNotes;
+    private readonly AssignAssetFormModel _assignModel = new();
+    private EditContext _assignEditContext = default!;
     private string? _dialogError;
 
     private Guid? _viewedAssetId;
     private bool _viewDialogOpen;
 
     private bool _showReturnDialog;
-    private Guid? _selectedReturnAssignmentId;
+    private readonly ReturnAssetFormModel _returnModel = new();
+    private EditContext _returnEditContext = default!;
     private string? _returnDialogError;
     private bool _returnSaving;
+
+    protected override void OnInitialized()
+    {
+        _assignEditContext = new EditContext(_assignModel);
+        _returnEditContext = new EditContext(_returnModel);
+    }
 
     private IEnumerable<EmployeeAssetItem> _returnableAssets => _assets.Where(a => a.IsAcknowledged);
 
@@ -191,8 +208,9 @@ else
 
     private async Task OpenAssignDialog()
     {
-        _selectedAssetId = null;
-        _assignNotes = null;
+        _assignModel.AssetId = null;
+        _assignModel.Notes = null;
+        _assignEditContext = new EditContext(_assignModel);
         _dialogError = null;
         _availableAssets = await AssetService.ListAvailableAssetsAsync(CompanyId) ?? [];
         _showAssignDialog = true;
@@ -202,15 +220,12 @@ else
 
     private async Task ConfirmAssignAsync()
     {
-        if (_selectedAssetId is null)
-        {
-            _dialogError = "Please select an asset.";
+        if (!_assignEditContext.Validate())
             return;
-        }
 
         var assignedBy = Session.EmployeeId ?? Session.UserId;
         var ok = await AssetService.AssignAssetAsync(
-            CompanyId, _selectedAssetId.Value, EmployeeId, assignedBy, _assignNotes);
+            CompanyId, _assignModel.AssetId!.Value, EmployeeId, assignedBy, _assignModel.Notes);
 
         if (!ok)
         {
@@ -225,7 +240,8 @@ else
 
     private void OpenReturnDialog()
     {
-        _selectedReturnAssignmentId = null;
+        _returnModel.AssignmentId = null;
+        _returnEditContext = new EditContext(_returnModel);
         _returnDialogError = null;
         _showReturnDialog = true;
     }
@@ -241,11 +257,8 @@ else
         if (_returnSaving)
             return;
 
-        if (_selectedReturnAssignmentId is null)
-        {
-            _returnDialogError = "Please select an asset.";
+        if (!_returnEditContext.Validate())
             return;
-        }
 
         _returnDialogError = null;
         _returnSaving = true;
@@ -253,7 +266,7 @@ else
         try
         {
             var requestedBy = Session.EmployeeId ?? Session.UserId;
-            var ok = await AssetService.RequestReturnAsync(CompanyId, _selectedReturnAssignmentId.Value, requestedBy);
+            var ok = await AssetService.RequestReturnAsync(CompanyId, _returnModel.AssignmentId!.Value, requestedBy);
 
             if (!ok)
             {
@@ -269,5 +282,20 @@ else
         {
             _returnSaving = false;
         }
+    }
+
+    private sealed class AssignAssetFormModel
+    {
+        [Required(ErrorMessage = "Please select an asset.")]
+        public Guid? AssetId { get; set; }
+
+        [MaxLength(2000)]
+        public string? Notes { get; set; }
+    }
+
+    private sealed class ReturnAssetFormModel
+    {
+        [Required(ErrorMessage = "Please select an asset.")]
+        public Guid? AssignmentId { get; set; }
     }
 }

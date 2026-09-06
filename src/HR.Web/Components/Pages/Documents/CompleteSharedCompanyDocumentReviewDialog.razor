@@ -1,3 +1,4 @@
+@using System.ComponentModel.DataAnnotations
 @inject DocumentService DocumentService
 
 <SfDialog Visible="IsOpen" IsModal="true" Width="480px" ShowCloseIcon="false">
@@ -31,15 +32,15 @@
                     <dd>@Document.ReviewOwnerName</dd>
                 }
             </dl>
-            <div class="mb-2">
-                <label class="form-label" for="review-notes">Review Notes <span class="text-danger">*</span></label>
-                <HrTextBox @bind-Value="_reviewNotes" Multiline="true" Rows="4" Maxlength="2000"
-                           HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "review-notes" })" />
-                @if (!string.IsNullOrEmpty(_validationError))
-                {
-                    <div class="text-danger small mt-1">@_validationError</div>
-                }
-            </div>
+            <EditForm EditContext="_editContext">
+                <DataAnnotationsValidator />
+                <div class="mb-2">
+                    <label class="form-label" for="review-notes">Review Notes <span class="text-danger">*</span></label>
+                    <HrTextBox @bind-Value="_model.ReviewNotes" Multiline="true" Rows="4" Maxlength="2000"
+                               HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "review-notes" })" />
+                    <ValidationMessage For="@(() => _model.ReviewNotes)" />
+                </div>
+            </EditForm>
             <div class="mb-2">
                 <label class="form-label">Renewed File (optional)</label>
                 <InputFile class="form-control" OnChange="OnFileSelected"
@@ -78,18 +79,23 @@
 
     private bool _wasOpen;
     private bool _saving;
-    private string _reviewNotes = string.Empty;
-    private string? _validationError;
+    private readonly CompleteReviewFormModel _model = new();
+    private EditContext _editContext = default!;
     private string? _error;
     private IBrowserFile? _selectedFile;
     private bool _requiresReacknowledgement;
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+    }
 
     protected override void OnParametersSet()
     {
         if (IsOpen && !_wasOpen)
         {
-            _reviewNotes = string.Empty;
-            _validationError = null;
+            _model.ReviewNotes = null;
+            _editContext = new EditContext(_model);
             _error = null;
             _selectedFile = null;
             _requiresReacknowledgement = false;
@@ -102,20 +108,18 @@
 
     private async Task ConfirmAsync()
     {
-        if (string.IsNullOrWhiteSpace(_reviewNotes))
-        {
-            _validationError = "Review notes are required.";
+        if (!_editContext.Validate())
             return;
-        }
 
-        _validationError = null;
         _saving = true;
         _error = null;
         StateHasChanged();
 
+        var reviewNotes = _model.ReviewNotes!.Trim();
+
         if (_selectedFile is not null)
         {
-            var versionNote = $"Renewed via document review. {_reviewNotes}";
+            var versionNote = $"Renewed via document review. {reviewNotes}";
             var uploadError = await DocumentService.UploadSharedCompanyDocumentVersionAsync(
                 CompanyId, Document!.Id, versionNote,
                 Document?.RequiresAcknowledgement == true && _requiresReacknowledgement,
@@ -129,7 +133,7 @@
             }
         }
 
-        var error = await DocumentService.CompleteSharedCompanyDocumentReviewAsync(CompanyId, Document!.Id, _reviewNotes);
+        var error = await DocumentService.CompleteSharedCompanyDocumentReviewAsync(CompanyId, Document!.Id, reviewNotes);
 
         _saving = false;
 
@@ -139,7 +143,8 @@
             return;
         }
 
-        _reviewNotes = string.Empty;
+        _model.ReviewNotes = null;
+        _editContext = new EditContext(_model);
         _selectedFile = null;
         _requiresReacknowledgement = false;
         _error = null;
@@ -148,11 +153,18 @@
 
     private async Task CancelAsync()
     {
-        _reviewNotes = string.Empty;
-        _validationError = null;
+        _model.ReviewNotes = null;
+        _editContext = new EditContext(_model);
         _error = null;
         _selectedFile = null;
         _requiresReacknowledgement = false;
         await OnCancelled.InvokeAsync();
+    }
+
+    private sealed class CompleteReviewFormModel
+    {
+        [Required(ErrorMessage = "Review notes are required.")]
+        [MaxLength(2000)]
+        public string? ReviewNotes { get; set; }
     }
 }

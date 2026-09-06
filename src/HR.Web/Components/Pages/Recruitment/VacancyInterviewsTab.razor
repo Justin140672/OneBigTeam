@@ -1,3 +1,4 @@
+@using System.ComponentModel.DataAnnotations
 @inject InterviewService InterviewService
 
 <div data-testid="vacancy-interviews-tab">
@@ -68,18 +69,23 @@
 <SfDialog Width="460px" IsModal="true" @bind-Visible="_showOutcomeDialog" Header="Record Interview Outcome" CssClass="record-outcome-dialog">
     <DialogTemplates>
         <Content>
-            <div class="mb-3">
-                <label class="form-label">Outcome <span class="text-danger">*</span></label>
-                <SfDropDownList TValue="string" TItem="string" DataSource="@_outcomeOptions" @bind-Value="_outcome" Placeholder="Select outcome" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Notes (optional)</label>
-                <HrTextBox @bind-Value="_notes" Multiline="true" Rows="3" />
-            </div>
-            @if (_dialogError is not null)
-            {
-                <div class="alert alert-danger py-2">@_dialogError</div>
-            }
+            <EditForm EditContext="_editContext">
+                <DataAnnotationsValidator />
+                <div class="mb-3">
+                    <label class="form-label">Outcome <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="string" TItem="string" DataSource="@_outcomeOptions" @bind-Value="_model.Outcome" Placeholder="Select outcome" />
+                    <ValidationMessage For="@(() => _model.Outcome)" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Notes (optional)</label>
+                    <HrTextBox @bind-Value="_model.Notes" Multiline="true" Rows="3" />
+                    <ValidationMessage For="@(() => _model.Notes)" />
+                </div>
+                @if (_dialogError is not null)
+                {
+                    <div class="alert alert-danger py-2">@_dialogError</div>
+                }
+            </EditForm>
         </Content>
     </DialogTemplates>
     <DialogButtons>
@@ -100,10 +106,24 @@
 
     private bool _showOutcomeDialog;
     private InterviewListItemModel? _activeInterview;
-    private string _outcome = string.Empty;
-    private string? _notes;
+    private readonly RecordOutcomeFormModel _model = new();
+    private EditContext _editContext = default!;
 
     private static readonly string[] _outcomeOptions = ["Passed", "Failed", "NoShow", "Cancelled"];
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+    }
+
+    private sealed class RecordOutcomeFormModel
+    {
+        [Required(ErrorMessage = "Please select an outcome.")]
+        public string? Outcome { get; set; }
+
+        [MaxLength(4000)]
+        public string? Notes { get; set; }
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -132,21 +152,19 @@
     {
         _dialogError = null;
         _activeInterview = row;
-        _outcome = string.Empty;
-        _notes = null;
+        _model.Outcome = null;
+        _model.Notes = null;
+        _editContext = new EditContext(_model);
         _showOutcomeDialog = true;
     }
 
     private async Task ConfirmOutcomeAsync()
     {
-        if (_activeInterview is null || string.IsNullOrWhiteSpace(_outcome))
-        {
-            _dialogError = "Please select an outcome.";
+        if (_activeInterview is null || !_editContext.Validate())
             return;
-        }
 
         var (result, error) = await InterviewService.RecordInterviewOutcomeAsync(
-            CompanyId, VacancyId, _activeInterview.ApplicationId, _activeInterview.Id, _outcome, _notes);
+            CompanyId, VacancyId, _activeInterview.ApplicationId, _activeInterview.Id, _model.Outcome!, _model.Notes);
 
         if (result is null)
         {

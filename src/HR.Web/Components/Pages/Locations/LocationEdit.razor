@@ -50,15 +50,12 @@
                                 <SfDropDownList TValue="Guid?"
                                                 TItem="LocationTypeListItemModel"
                                                 DataSource="@_locationTypes"
-                                                @bind-Value="_locationTypeId"
+                                                @bind-Value="Model.LocationTypeId"
                                                 Placeholder="Select a location type"
                                                 AllowFiltering="true">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                 </SfDropDownList>
-                                @if (_locationTypeError is not null)
-                                {
-                                    <div class="invalid-feedback d-block">@_locationTypeError</div>
-                                }
+                                <ValidationMessage For="@(() => Model.LocationTypeId)" />
                             </div>
                         </div>
                     </div>
@@ -98,8 +95,6 @@
         : IsViewMode ? "View Location" : "Edit Location";
 
     private List<LocationTypeListItemModel> _locationTypes = [];
-    private Guid? _locationTypeId;
-    private string? _locationTypeError;
 
     protected override IEditService<LocationEditModel, Guid> Service => LocationService;
     protected override Guid GetCompanyId() => CompanyId;
@@ -117,24 +112,8 @@
             .Where(t => !string.Equals(t.Name, "Remote", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        _locationTypeId = Model.LocationTypeId == Guid.Empty ? null : Model.LocationTypeId;
-    }
-
-    protected override bool Validate()
-    {
-        _locationTypeError = null;
-
-        Model.LocationTypeId = _locationTypeId ?? Guid.Empty;
-
-        var valid = base.Validate();
-
-        if (_locationTypeId is null || _locationTypeId == Guid.Empty)
-        {
-            _locationTypeError = "Location type is required.";
-            valid = false;
-        }
-
-        return valid;
+        if (Model.LocationTypeId == Guid.Empty)
+            Model.LocationTypeId = null;
     }
 
     protected override string? ListUrl => $"/companies/{CompanyId}/locations";

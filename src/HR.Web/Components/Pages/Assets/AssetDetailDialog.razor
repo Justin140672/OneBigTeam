@@ -1,3 +1,4 @@
+@using System.ComponentModel.DataAnnotations
 @inject AssetService AssetService
 @inject EmployeeService EmployeeService
 @inject AppSession Session
@@ -161,33 +162,38 @@
               CssClass="assign-to-employee-dialog">
         <DialogTemplates>
             <Content>
-                <div class="mb-3">
-                    <label class="form-label">Employee</label>
-                    <SfDropDownList TValue="Guid?"
-                                   TItem="EmployeeListItemModel"
-                                   DataSource="@_employees"
-                                   @bind-Value="_selectedEmployeeId"
-                                   Placeholder="Select an employee"
-                                   AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="FullName" />
-                        <DropDownListTemplates TItem="EmployeeListItemModel">
-                            <ItemTemplate>
-                                @{
-                                    var e = (EmployeeListItemModel)context;
-                                }
-                                <span><strong>@e.FirstName @e.LastName</strong> <span class="text-muted ms-1">@e.WorkEmail</span></span>
-                            </ItemTemplate>
-                        </DropDownListTemplates>
-                    </SfDropDownList>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Notes (optional)</label>
-                    <HrTextBox @bind-Value="_assignNotes" Multiline="true" Rows="2" />
-                </div>
-                @if (!string.IsNullOrEmpty(_dialogError))
-                {
-                    <div class="alert alert-danger py-2">@_dialogError</div>
-                }
+                <EditForm EditContext="_assignEditContext">
+                    <DataAnnotationsValidator />
+                    <div class="mb-3">
+                        <label class="form-label">Employee <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid?"
+                                       TItem="EmployeeListItemModel"
+                                       DataSource="@_employees"
+                                       @bind-Value="_assignModel.EmployeeId"
+                                       Placeholder="Select an employee"
+                                       AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="FullName" />
+                            <DropDownListTemplates TItem="EmployeeListItemModel">
+                                <ItemTemplate Context="ddItem">
+                                    @{
+                                        var e = (EmployeeListItemModel)ddItem;
+                                    }
+                                    <span><strong>@e.FirstName @e.LastName</strong> <span class="text-muted ms-1">@e.WorkEmail</span></span>
+                                </ItemTemplate>
+                            </DropDownListTemplates>
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => _assignModel.EmployeeId)" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes (optional)</label>
+                        <HrTextBox @bind-Value="_assignModel.Notes" Multiline="true" Rows="2" />
+                        <ValidationMessage For="@(() => _assignModel.Notes)" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(_dialogError))
+                    {
+                        <div class="alert alert-danger py-2">@_dialogError</div>
+                    }
+                </EditForm>
             </Content>
         </DialogTemplates>
         <DialogButtons>
@@ -238,8 +244,8 @@
 
     private bool _showAssignDialog;
     private List<EmployeeListItemModel> _employees = [];
-    private Guid? _selectedEmployeeId;
-    private string? _assignNotes;
+    private readonly AssignAssetFormModel _assignModel = new();
+    private EditContext _assignEditContext = default!;
     private string? _dialogError;
 
     private AssetAssignmentItem? _returnTarget;
@@ -293,8 +299,9 @@
 
     private async Task OpenAssignDialog()
     {
-        _selectedEmployeeId = null;
-        _assignNotes = null;
+        _assignModel.EmployeeId = null;
+        _assignModel.Notes = null;
+        _assignEditContext = new EditContext(_assignModel);
         _dialogError = null;
         var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 200);
         _employees = result?.Items ?? [];
@@ -305,15 +312,12 @@
 
     private async Task ConfirmAssignAsync()
     {
-        if (_selectedEmployeeId is null || AssetId is null)
-        {
-            _dialogError = "Please select an employee.";
+        if (AssetId is null || !_assignEditContext.Validate())
             return;
-        }
 
         var assignedBy = Session.EmployeeId ?? Session.UserId;
         var ok = await AssetService.AssignAssetAsync(
-            CompanyId, AssetId.Value, _selectedEmployeeId.Value, assignedBy, _assignNotes);
+            CompanyId, AssetId.Value, _assignModel.EmployeeId!.Value, assignedBy, _assignModel.Notes);
 
         if (!ok)
         {
@@ -358,5 +362,14 @@
         _actionError = null;
 
         await LoadAssignmentsAsync();
+    }
+
+    private sealed class AssignAssetFormModel
+    {
+        [Required(ErrorMessage = "Please select an employee.")]
+        public Guid? EmployeeId { get; set; }
+
+        [MaxLength(2000)]
+        public string? Notes { get; set; }
     }
 }

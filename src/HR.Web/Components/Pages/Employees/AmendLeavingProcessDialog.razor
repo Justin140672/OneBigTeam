@@ -1,3 +1,4 @@
+@using System.ComponentModel.DataAnnotations
 @using HR.Web.Models
 @using HR.Infrastructure.Abstractions
 @inject EmployeeService EmployeeService
@@ -12,45 +13,52 @@
             }
             else
             {
-                <div class="mb-3">
-                    <label class="form-label">Leaving Date <span class="text-danger">*</span></label>
-                    <SfDatePicker TValue="DateOnly?"
-                                  Value="_leavingDate"
-                                  ValueChanged="OnLeavingDateChanged"
-                                  Format="dd/MM/yyyy"
-                                  Placeholder="dd/mm/yyyy" />
-                </div>
-                @if (IsBackdated(_leavingDate))
-                {
+                <EditForm EditContext="_editContext">
+                    <DataAnnotationsValidator />
                     <div class="mb-3">
-                        <SfCheckBox TChecked="bool"
-                                    Label="This leaving date is in the past. Confirming will immediately finalise this employee's departure (status will become Former Employee)."
-                                    Checked="@_confirmBackdatedLeavingDate"
-                                    CheckedChanged="@((bool v) => _confirmBackdatedLeavingDate = v)" />
+                        <label class="form-label">Leaving Date <span class="text-danger">*</span></label>
+                        <SfDatePicker TValue="DateOnly?"
+                                      Value="_model.LeavingDate"
+                                      ValueChanged="OnLeavingDateChanged"
+                                      Format="dd/MM/yyyy"
+                                      Placeholder="dd/mm/yyyy" />
+                        <ValidationMessage For="@(() => _model.LeavingDate)" />
                     </div>
-                }
-                <div class="mb-3">
-                    <label class="form-label">Last Working Day <span class="text-danger">*</span></label>
-                    <SfDatePicker TValue="DateOnly?"
-                                  @bind-Value="_lastWorkingDay"
-                                  Format="dd/MM/yyyy"
-                                  Placeholder="dd/mm/yyyy" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Leaving Reason <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="string"
-                                    TItem="LeavingReasonOption"
-                                    DataSource="@_leavingReasonOptions"
-                                    @bind-Value="_leavingReason"
-                                    Placeholder="Select leaving reason">
-                        <DropDownListFieldSettings Value="Value" Text="Label" />
-                    </SfDropDownList>
-                </div>
+                    @if (IsBackdated(_model.LeavingDate))
+                    {
+                        <div class="mb-3">
+                            <SfCheckBox TChecked="bool"
+                                        Label="This leaving date is in the past. Confirming will immediately finalise this employee's departure (status will become Former Employee)."
+                                        Checked="@_model.ConfirmBackdatedLeavingDate"
+                                        CheckedChanged="@((bool v) => _model.ConfirmBackdatedLeavingDate = v)" />
+                            <ValidationMessage For="@(() => _model.ConfirmBackdatedLeavingDate)" />
+                        </div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label">Last Working Day <span class="text-danger">*</span></label>
+                        <SfDatePicker TValue="DateOnly?"
+                                      @bind-Value="_model.LastWorkingDay"
+                                      Format="dd/MM/yyyy"
+                                      Placeholder="dd/mm/yyyy" />
+                        <ValidationMessage For="@(() => _model.LastWorkingDay)" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Leaving Reason <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="string"
+                                        TItem="LeavingReasonOption"
+                                        DataSource="@_leavingReasonOptions"
+                                        @bind-Value="_model.LeavingReason"
+                                        Placeholder="Select leaving reason">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => _model.LeavingReason)" />
+                    </div>
 
-                @if (!string.IsNullOrEmpty(_globalError))
-                {
-                    <div class="alert alert-danger py-2">@_globalError</div>
-                }
+                    @if (!string.IsNullOrEmpty(_globalError))
+                    {
+                        <div class="alert alert-danger py-2">@_globalError</div>
+                    }
+                </EditForm>
             }
         </Content>
         <FooterTemplate>
@@ -78,10 +86,8 @@
     private bool _submitting;
     private string? _globalError;
 
-    private DateOnly? _leavingDate;
-    private bool _confirmBackdatedLeavingDate;
-    private DateOnly? _lastWorkingDay;
-    private string _leavingReason = string.Empty;
+    private readonly AmendLeavingProcessFormModel _model = new();
+    private EditContext _editContext = default!;
 
     // Same 7 options as StartLeavingProcessDialog._leavingReasonOptions — no clear button/"None"
     // item since this is a required field (see this codebase's convention noted there).
@@ -95,6 +101,11 @@
         new("MutualAgreement", EmployeeLeavingTab.LeavingReasonLabel("MutualAgreement")),
         new("Other",           EmployeeLeavingTab.LeavingReasonLabel("Other")),
     ];
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -112,63 +123,50 @@
         _loading = true;
         _submitting = false;
         _globalError = null;
-        _leavingDate = null;
-        _confirmBackdatedLeavingDate = false;
-        _lastWorkingDay = null;
-        _leavingReason = string.Empty;
+        _model.LeavingDate = null;
+        _model.ConfirmBackdatedLeavingDate = false;
+        _model.LastWorkingDay = null;
+        _model.LeavingReason = null;
 
         var current = await EmployeeService.GetLeavingProcessAsync(CompanyId, EmployeeId);
         if (current is not null)
         {
-            _leavingDate = current.LeavingDate;
-            _lastWorkingDay = current.LastWorkingDay;
-            _leavingReason = current.LeavingReason;
+            _model.LeavingDate = current.LeavingDate;
+            _model.LastWorkingDay = current.LastWorkingDay;
+            _model.LeavingReason = current.LeavingReason;
         }
 
+        _editContext = new EditContext(_model);
         _loading = false;
     }
 
     private void OnLeavingDateChanged(DateOnly? value)
     {
-        _leavingDate = value;
+        _model.LeavingDate = value;
 
         // Don't let a stale confirmation silently carry over once the date no longer needs it.
-        if (!IsBackdated(_leavingDate))
-            _confirmBackdatedLeavingDate = false;
+        if (!IsBackdated(_model.LeavingDate))
+            _model.ConfirmBackdatedLeavingDate = false;
     }
 
     private static bool IsBackdated(DateOnly? date) => date is not null && date < DateOnly.FromDateTime(DateTime.Today);
 
     private async Task ConfirmAsync()
     {
-        if (_leavingDate is null || _lastWorkingDay is null || string.IsNullOrEmpty(_leavingReason))
-        {
-            _globalError = "Please complete all fields before saving.";
-            return;
-        }
+        _globalError = null;
 
-        if (_lastWorkingDay > _leavingDate)
-        {
-            _globalError = "Last working day must be on or before the leaving date.";
+        if (!_editContext.Validate())
             return;
-        }
-
-        if (IsBackdated(_leavingDate) && !_confirmBackdatedLeavingDate)
-        {
-            _globalError = "Please confirm you want to backdate and finalise this employee's departure.";
-            return;
-        }
 
         _submitting = true;
-        _globalError = null;
 
         var request = new AmendLeavingProcessRequest(
             CompanyId,
             EmployeeId,
-            _leavingDate.Value,
-            _lastWorkingDay.Value,
-            _leavingReason,
-            _confirmBackdatedLeavingDate);
+            _model.LeavingDate!.Value,
+            _model.LastWorkingDay!.Value,
+            _model.LeavingReason!,
+            _model.ConfirmBackdatedLeavingDate);
 
         var (result, error) = await EmployeeService.AmendLeavingProcessAsync(CompanyId, EmployeeId, request);
 
@@ -191,4 +189,33 @@
     }
 
     private sealed record LeavingReasonOption(string Value, string Label);
+
+    private sealed class AmendLeavingProcessFormModel : IValidatableObject
+    {
+        [Required(ErrorMessage = "Please select a leaving date.")]
+        public DateOnly? LeavingDate { get; set; }
+
+        public bool ConfirmBackdatedLeavingDate { get; set; }
+
+        [Required(ErrorMessage = "Please select a last working day.")]
+        public DateOnly? LastWorkingDay { get; set; }
+
+        [Required(ErrorMessage = "Please select a leaving reason.")]
+        public string? LeavingReason { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (LeavingDate is not null && LastWorkingDay is not null && LastWorkingDay > LeavingDate)
+                yield return new ValidationResult(
+                    "Last working day must be on or before the leaving date.",
+                    [nameof(LastWorkingDay)]);
+
+            if (LeavingDate is not null
+                && LeavingDate < DateOnly.FromDateTime(DateTime.Today)
+                && !ConfirmBackdatedLeavingDate)
+                yield return new ValidationResult(
+                    "Please confirm you want to backdate and finalise this employee's departure.",
+                    [nameof(ConfirmBackdatedLeavingDate)]);
+        }
+    }
 }

@@ -1,3 +1,4 @@
+@using System.ComponentModel.DataAnnotations
 @inject EmployeeService EmployeeService
 @inject AppSession Session
 
@@ -116,21 +117,20 @@ else
                         <button type="button" class="btn-close" @onclick="@(() => _submitError = null)"></button>
                     </div>
                 }
-                <div>
-                    <label class="pd-label">Your request</label>
-                    <HrTextBox CssClass="@(_notesError is not null ? "is-invalid" : "")"
-                               Multiline="true"
-                               Rows="5"
-                               Maxlength="2000"
-                               Placeholder="e.g. Please update my preferred name to &quot;Alex&quot; and my nationality to British."
-                               HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "pd-notes" })"
-                               @bind-Value="_notes" />
-                    @if (_notesError is not null)
-                    {
-                        <div class="invalid-feedback">@_notesError</div>
-                    }
-                    <div class="pd-char-count">@_notes.Length / 2000</div>
-                </div>
+                <EditForm EditContext="_editContext">
+                    <DataAnnotationsValidator />
+                    <div>
+                        <label class="pd-label">Your request <span class="text-danger">*</span></label>
+                        <HrTextBox Multiline="true"
+                                   Rows="5"
+                                   Maxlength="2000"
+                                   Placeholder="e.g. Please update my preferred name to &quot;Alex&quot; and my nationality to British."
+                                   HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "pd-notes" })"
+                                   @bind-Value="_model.Notes" />
+                        <ValidationMessage For="@(() => _model.Notes)" />
+                        <div class="pd-char-count">@((_model.Notes ?? string.Empty).Length) / 2000</div>
+                    </div>
+                </EditForm>
             </Content>
             <FooterTemplate>
                 <SfButton IsPrimary="true" Disabled="@_submitting" OnClick="SubmitRequestAsync">
@@ -155,9 +155,21 @@ else
     private bool _dialogVisible;
     private bool _submitting;
     private bool _submitted;
-    private string _notes = string.Empty;
-    private string? _notesError;
+    private readonly PersonalDetailsChangeFormModel _model = new();
+    private EditContext _editContext = default!;
     private string? _submitError;
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+    }
+
+    private sealed class PersonalDetailsChangeFormModel
+    {
+        [Required(ErrorMessage = "Please describe the change you'd like to make.")]
+        [StringLength(2000, ErrorMessage = "Notes must be 2000 characters or fewer.")]
+        public string? Notes { get; set; }
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -174,8 +186,8 @@ else
 
     private void OpenDialog()
     {
-        _notes        = string.Empty;
-        _notesError   = null;
+        _model.Notes  = null;
+        _editContext  = new EditContext(_model);
         _submitError  = null;
         _submitted    = false;
         _dialogVisible = true;
@@ -185,31 +197,20 @@ else
 
     private void OnDialogClosed()
     {
-        _notesError  = null;
         _submitError = null;
     }
 
     private async Task SubmitRequestAsync()
     {
-        _notesError  = null;
         _submitError = null;
 
-        if (string.IsNullOrWhiteSpace(_notes))
-        {
-            _notesError = "Please describe the change you'd like to make.";
+        if (!_editContext.Validate())
             return;
-        }
-
-        if (_notes.Length > 2000)
-        {
-            _notesError = "Notes must be 2000 characters or fewer.";
-            return;
-        }
 
         _submitting = true;
 
         var (_, error) = await EmployeeService.RequestPersonalDetailsChangeAsync(
-            CompanyId, EmployeeId, _notes);
+            CompanyId, EmployeeId, _model.Notes!.Trim());
 
         _submitting = false;
 
@@ -221,6 +222,6 @@ else
 
         _dialogVisible = false;
         _submitted     = true;
-        _notes         = string.Empty;
+        _model.Notes   = null;
     }
 }

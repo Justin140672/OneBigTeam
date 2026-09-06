@@ -138,7 +138,7 @@
                         <EditForm EditContext="_replyEditContext" OnValidSubmit="SubmitReplyAsync">
                             <DataAnnotationsValidator />
                             <div class="mb-3">
-                                <label class="form-label">Reply</label>
+                                <label class="form-label">Reply <span class="text-danger">*</span></label>
                                 <HrTextBox @bind-Value="_replyModel.BodyHtml" Multiline="true" CssClass="support-reply-box"
                                            Placeholder="Write a reply…" />
                                 <ValidationMessage For="@(() => _replyModel.BodyHtml)" />
@@ -221,10 +221,7 @@
         _replyError = null;
 
         if (!_replyEditContext.Validate())
-        {
-            _replyError = "Please enter a reply.";
             return;
-        }
 
         _replying = true;
         StateHasChanged();

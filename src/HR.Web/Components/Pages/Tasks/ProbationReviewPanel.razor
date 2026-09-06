@@ -1,3 +1,4 @@
+@using System.ComponentModel.DataAnnotations
 @using HR.Web.Models
 @inject ProbationService ProbationService
 @inject TaskService TaskService
@@ -32,43 +33,49 @@
                     <dd class="col-sm-8">@_review.RecordStartDate.ToString("d MMM yyyy") – @_review.RecordExpectedEndDate.ToString("d MMM yyyy")</dd>
                 </dl>
                 <hr class="my-3" />
-                @if (_review.ReviewType is "FinalDecision")
+            }
+            <EditForm EditContext="_editContext">
+                <DataAnnotationsValidator />
+                @if (_review?.ReviewType is "FinalDecision")
                 {
                     <div class="mb-3">
                         <label class="form-label fw-medium">Outcome <span class="text-danger">*</span></label>
-                        <SfDropDownList TValue="string?" TItem="OutcomeOption"
+                        <SfDropDownList TValue="string" TItem="OutcomeOption"
                                         DataSource="@OutcomeOptions"
-                                        @bind-Value="_outcome"
+                                        @bind-Value="_model.Outcome"
                                         Placeholder="Select outcome…">
                             <DropDownListFieldSettings Value="Value" Text="Label" />
                         </SfDropDownList>
+                        <ValidationMessage For="@(() => _model.Outcome)" />
                     </div>
-                    @if (_outcome == "Extend")
+                    @if (_model.Outcome == "Extend")
                     {
                         <div class="mb-3">
                             <label class="form-label fw-medium">New Probation End Date <span class="text-danger">*</span></label>
-                            <SfDatePicker TValue="DateOnly?" @bind-Value="_extensionDate" Format="dd/MM/yyyy" />
+                            <SfDatePicker TValue="DateOnly?" @bind-Value="_model.ExtensionDate" Format="dd/MM/yyyy" />
+                            <ValidationMessage For="@(() => _model.ExtensionDate)" />
                         </div>
                     }
                 }
-            }
-            <div class="mb-3">
-                <label class="form-label fw-medium">
-                    @NotesLabel(_outcome)
-                    @if (_outcome is "Fail" or "Extend")
-                    {
-                        <span class="text-danger"> *</span>
-                    }
-                    else
-                    {
-                        <span class="text-muted fw-normal"> (optional)</span>
-                    }
-                </label>
-                <HrTextBox @bind-Value="_notes"
-                           Multiline="true"
-                           Rows="3"
-                           Placeholder="@NotesPlaceholder(_outcome)" />
-            </div>
+                <div class="mb-3">
+                    <label class="form-label fw-medium">
+                        @NotesLabel(_model.Outcome)
+                        @if (_model.Outcome is "Fail" or "Extend")
+                        {
+                            <span class="text-danger"> *</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted fw-normal"> (optional)</span>
+                        }
+                    </label>
+                    <HrTextBox @bind-Value="_model.Notes"
+                               Multiline="true"
+                               Rows="3"
+                               Placeholder="@NotesPlaceholder(_model.Outcome)" />
+                    <ValidationMessage For="@(() => _model.Notes)" />
+                </div>
+            </EditForm>
             @if (_error is not null)
             {
                 <div class="alert alert-danger mb-3">@_error</div>
@@ -92,13 +99,47 @@
     [Parameter] public EventCallback OnCompleted { get; set; }
 
     private ProbationReviewDetailModel? _review;
-    private string? _notes;
-    private string? _outcome;
-    private DateOnly? _extensionDate;
+    private readonly ProbationReviewFormModel _model = new();
+    private EditContext _editContext = default!;
     private string? _error;
     private bool _submitting;
     private bool _justCompleted;
     private string? _successOutcome;
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+    }
+
+    private sealed class ProbationReviewFormModel : IValidatableObject
+    {
+        public bool IsFinalDecision { get; set; }
+        public string? Outcome { get; set; }
+        public DateOnly? ExtensionDate { get; set; }
+        public string? Notes { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (IsFinalDecision && string.IsNullOrWhiteSpace(Outcome))
+            {
+                yield return new ValidationResult("An outcome is required for a Final Decision review.", [nameof(Outcome)]);
+                yield break;
+            }
+
+            if (Outcome == "Extend")
+            {
+                if (!ExtensionDate.HasValue)
+                    yield return new ValidationResult("A new probation end date is required when extending.", [nameof(ExtensionDate)]);
+                else if (ExtensionDate <= DateOnly.FromDateTime(DateTime.Today))
+                    yield return new ValidationResult("The new probation end date must be in the future.", [nameof(ExtensionDate)]);
+            }
+
+            if (Outcome is "Fail" or "Extend" && string.IsNullOrWhiteSpace(Notes))
+                yield return new ValidationResult(
+                    Outcome == "Extend" ? "An extension reason is required." : "A reason is required when failing probation.",
+                    [nameof(Notes)]);
+        }
+    }
 
     private static readonly OutcomeOption[] OutcomeOptions =
     [
@@ -115,51 +156,32 @@
 
         if (Task.SourceEntityId.HasValue)
             _review = await ProbationService.GetProbationReviewAsync(CompanyId, Task.SourceEntityId.Value);
+
+        _model.IsFinalDecision = _review?.ReviewType is "FinalDecision";
     }
 
     private async Task CompleteReviewAsync()
     {
         if (_review is null) return;
 
-        if (_review.ReviewType is "FinalDecision" && string.IsNullOrWhiteSpace(_outcome))
-        {
-            _error = "An outcome is required for a Final Decision review.";
+        if (!_editContext.Validate())
             return;
-        }
-
-        if (_outcome == "Extend" && !_extensionDate.HasValue)
-        {
-            _error = "A new probation end date is required when extending.";
-            return;
-        }
-
-        if (_outcome == "Extend" && _extensionDate <= DateOnly.FromDateTime(DateTime.Today))
-        {
-            _error = "The new probation end date must be in the future.";
-            return;
-        }
-
-        if (_outcome is "Fail" or "Extend" && string.IsNullOrWhiteSpace(_notes))
-        {
-            _error = _outcome == "Extend" ? "An extension reason is required." : "A reason is required when failing probation.";
-            return;
-        }
 
         _submitting = true;
         _error = null;
 
-        var outcomeDecision = _outcome == "Extend"
-            ? $"Extend|{_extensionDate!.Value:yyyy-MM-dd}"
-            : string.IsNullOrWhiteSpace(_outcome) ? null : _outcome;
+        var outcomeDecision = _model.Outcome == "Extend"
+            ? $"Extend|{_model.ExtensionDate!.Value:yyyy-MM-dd}"
+            : string.IsNullOrWhiteSpace(_model.Outcome) ? null : _model.Outcome;
 
-        var success = await TaskService.CompleteTaskAsync(CompanyId, Task.Id, outcomeDecision, _notes);
+        var success = await TaskService.CompleteTaskAsync(CompanyId, Task.Id, outcomeDecision, _model.Notes);
 
         _submitting = false;
 
         if (success)
         {
             _justCompleted = true;
-            _successOutcome = _outcome switch
+            _successOutcome = _model.Outcome switch
             {
                 "Pass"   => "Passed",
                 "Fail"   => "Failed",

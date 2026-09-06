@@ -116,67 +116,73 @@
 <SfDialog Width="480px" IsModal="true" @bind-Visible="_showAddDialog" Header="Add Candidate" CssClass="add-application-dialog">
     <DialogTemplates>
         <Content>
-            <div class="mb-3">
-                <label class="form-label">Candidate</label>
-                <SfDropDownList @ref="_candidateDropdown"
-                                TValue="Guid?" TItem="CandidateListItemModel"
-                                DataSource="@_candidates" @bind-Value="_selectedCandidateId"
-                                Placeholder="Select a candidate" AllowFiltering="true">
-                    <DropDownListFieldSettings Value="Id" Text="FullName" />
-                    <DropDownListEvents TValue="Guid?" TItem="CandidateListItemModel" Filtering="OnCandidateFilteringAsync" />
-                    <DropDownListTemplates TItem="CandidateListItemModel">
-                        <ItemTemplate>
-                            @{ var c = (CandidateListItemModel)context; }
-                            <span>@c.FirstName @c.LastName</span>
-                        </ItemTemplate>
-                    </DropDownListTemplates>
-                </SfDropDownList>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Source (optional)</label>
-                <SfDropDownList TValue="string" TItem="SourceOption" DataSource="@_sourceOptions"
-                                @bind-Value="_selectedSource" Placeholder="Select a source"
-                                ValueChange="OnSourceChanged">
-                    <DropDownListFieldSettings Value="Value" Text="Label" />
-                </SfDropDownList>
-            </div>
-            @if (_selectedSource == "ExternalRecruiter")
-            {
+            <EditForm EditContext="_addEditContext">
+                <DataAnnotationsValidator />
                 <div class="mb-3">
-                    <label class="form-label">Recruiter</label>
-                    <SfDropDownList TValue="Guid?" TItem="ExternalRecruiterListItemModel"
-                                    DataSource="@_activeRecruitersForSource" @bind-Value="_selectedSourceRecruiterId"
-                                    Placeholder="Select a recruiter" AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="AgencyName" />
-                        <DropDownListTemplates TItem="ExternalRecruiterListItemModel">
-                            <ItemTemplate>
-                                @{ var r = (ExternalRecruiterListItemModel)context; }
-                                <span>
-                                    @r.AgencyName
-                                    @if (_vacancyAssignedRecruiterId == r.Id)
-                                    {
-                                        <span class="text-muted ms-1">(assigned to this vacancy)</span>
-                                    }
-                                </span>
+                    <label class="form-label">Candidate <span class="text-danger">*</span></label>
+                    <SfDropDownList @ref="_candidateDropdown"
+                                    TValue="Guid?" TItem="CandidateListItemModel"
+                                    DataSource="@_candidates" @bind-Value="_addModel.CandidateId"
+                                    Placeholder="Select a candidate" AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Id" Text="FullName" />
+                        <DropDownListEvents TValue="Guid?" TItem="CandidateListItemModel" Filtering="OnCandidateFilteringAsync" />
+                        <DropDownListTemplates TItem="CandidateListItemModel">
+                            <ItemTemplate Context="ddItem">
+                                @{ var c = (CandidateListItemModel)ddItem; }
+                                <span>@c.FirstName @c.LastName</span>
                             </ItemTemplate>
                         </DropDownListTemplates>
                     </SfDropDownList>
-                    @if (_recruiterNotAssignedWarning)
-                    {
-                        <div class="form-text text-warning-emphasis" data-testid="recruiter-not-assigned-warning">
-                            <i class="fa-solid fa-triangle-exclamation me-1"></i>This recruiter isn't currently assigned to this vacancy.
-                        </div>
-                    }
+                    <ValidationMessage For="@(() => _addModel.CandidateId)" />
                 </div>
-            }
-            <div class="mb-3">
-                <label class="form-label">Notes (optional)</label>
-                <HrTextBox @bind-Value="_addNotes" Multiline="true" Rows="2" />
-            </div>
-            @if (_dialogError is not null)
-            {
-                <div class="alert alert-danger py-2">@_dialogError</div>
-            }
+                <div class="mb-3">
+                    <label class="form-label">Source (optional)</label>
+                    <SfDropDownList TValue="string" TItem="SourceOption" DataSource="@_sourceOptions"
+                                    @bind-Value="_addModel.Source" Placeholder="Select a source"
+                                    ValueChange="OnSourceChanged">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+                @if (_addModel.Source == "ExternalRecruiter")
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Recruiter <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid?" TItem="ExternalRecruiterListItemModel"
+                                        DataSource="@_activeRecruitersForSource" @bind-Value="_addModel.SourceRecruiterId"
+                                        Placeholder="Select a recruiter" AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="AgencyName" />
+                            <DropDownListTemplates TItem="ExternalRecruiterListItemModel">
+                                <ItemTemplate Context="ddItem">
+                                    @{ var r = (ExternalRecruiterListItemModel)ddItem; }
+                                    <span>
+                                        @r.AgencyName
+                                        @if (_vacancyAssignedRecruiterId == r.Id)
+                                        {
+                                            <span class="text-muted ms-1">(assigned to this vacancy)</span>
+                                        }
+                                    </span>
+                                </ItemTemplate>
+                            </DropDownListTemplates>
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => _addModel.SourceRecruiterId)" />
+                        @if (_recruiterNotAssignedWarning)
+                        {
+                            <div class="form-text text-warning-emphasis" data-testid="recruiter-not-assigned-warning">
+                                <i class="fa-solid fa-triangle-exclamation me-1"></i>This recruiter isn't currently assigned to this vacancy.
+                            </div>
+                        }
+                    </div>
+                }
+                <div class="mb-3">
+                    <label class="form-label">Notes (optional)</label>
+                    <HrTextBox @bind-Value="_addModel.Notes" Multiline="true" Rows="2" />
+                    <ValidationMessage For="@(() => _addModel.Notes)" />
+                </div>
+                @if (_dialogError is not null)
+                {
+                    <div class="alert alert-danger py-2">@_dialogError</div>
+                }
+            </EditForm>
         </Content>
     </DialogTemplates>
     <DialogButtons>
@@ -253,105 +259,115 @@
 <SfDialog Width="520px" IsModal="true" @bind-Visible="_showHireDialog" Header="Hire Candidate" CssClass="hire-candidate-dialog">
     <DialogTemplates>
         <Content>
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                    <SfDatePicker TValue="DateOnly?" @bind-Value="_startDate" />
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
-                    <SfDatePicker TValue="DateOnly?" @bind-Value="_dateOfBirth" Format="dd/MM/yyyy" />
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Nationality <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="string" TItem="NationalityListItem"
-                                    DataSource="@_nationalities" @bind-Value="_nationality"
-                                    Placeholder="Select nationality" AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Name" Text="Name" />
-                    </SfDropDownList>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Gender <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="string" TItem="string" DataSource="@_genderOptions" @bind-Value="_gender" Placeholder="Select gender" />
-                    @if (_gender == "Other")
+            <EditForm EditContext="_hireEditContext">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                        <SfDatePicker TValue="DateOnly?" @bind-Value="_hireModel.StartDate" />
+                        <ValidationMessage For="@(() => _hireModel.StartDate)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
+                        <SfDatePicker TValue="DateOnly?" @bind-Value="_hireModel.DateOfBirth" Format="dd/MM/yyyy" />
+                        <ValidationMessage For="@(() => _hireModel.DateOfBirth)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Nationality <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="string" TItem="NationalityListItem"
+                                        DataSource="@_nationalities" @bind-Value="_hireModel.Nationality"
+                                        Placeholder="Select nationality" AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Name" Text="Name" />
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => _hireModel.Nationality)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Gender <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="string" TItem="string" DataSource="@_genderOptions" @bind-Value="_hireModel.Gender" Placeholder="Select gender" />
+                        <ValidationMessage For="@(() => _hireModel.Gender)" />
+                        @if (_hireModel.Gender == "Other")
+                        {
+                            <div class="mt-2">
+                                <HrTextBox @bind-Value="_hireModel.GenderOther" Placeholder="Please specify" />
+                                <ValidationMessage For="@(() => _hireModel.GenderOther)" />
+                            </div>
+                        }
+                    </div>
+                    @if (_hireEmployeeNumberMode == EmployeeNumberMode.Automatic)
                     {
-                        <div class="mt-2">
-                            <HrTextBox @bind-Value="_genderOther" Placeholder="Please specify" />
+                        <div class="col-md-6">
+                            <label class="form-label">Employee Number</label>
+                            <p class="text-muted small mb-0">An employee number will be assigned automatically when this candidate is hired.</p>
                         </div>
                     }
-                </div>
-                @if (_hireEmployeeNumberMode == EmployeeNumberMode.Automatic)
-                {
+                    else
+                    {
+                        <div class="col-md-6">
+                            <label class="form-label">Employee Number <span class="text-danger">*</span></label>
+                            <HrTextBox @bind-Value="_hireModel.EmployeeNumber" Placeholder="e.g. EMP-001" />
+                            <ValidationMessage For="@(() => _hireModel.EmployeeNumber)" />
+                        </div>
+                    }
                     <div class="col-md-6">
-                        <label class="form-label">Employee Number</label>
-                        <p class="text-muted small mb-0">An employee number will be assigned automatically when this candidate is hired.</p>
+                        <label class="form-label">Employment Type <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid?"
+                                        TItem="EmploymentTypeListItemModel"
+                                        DataSource="@_employmentTypes"
+                                        @bind-Value="_hireModel.EmploymentTypeId"
+                                        Placeholder="Select type">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => _hireModel.EmploymentTypeId)" />
                     </div>
-                }
-                else
-                {
                     <div class="col-md-6">
-                        <label class="form-label">Employee Number <span class="text-danger">*</span></label>
-                        <HrTextBox @bind-Value="_employeeNumber" Placeholder="e.g. EMP-001" />
+                        <label class="form-label">Position Profile</label>
+                        <div class="p-2 rounded border bg-light" data-testid="hire-derived-position-profile">@_derivedPositionProfileName</div>
+                        <div class="form-text">Derived from the vacancy — the employee is assigned to this profile (and its department/location) automatically.</div>
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Location</label>
+                        <div class="p-2 rounded border bg-light" data-testid="hire-derived-location">@_derivedLocationName</div>
+                        <div class="form-text">Derived from the vacancy's position profile.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Manager</label>
+                        <SfDropDownList @ref="_hireManagerDropdown"
+                                        TValue="Guid?"
+                                        TItem="ManagerOption"
+                                        DataSource="@_hireManagerOptions"
+                                        @bind-Value="_hireModel.ManagerId"
+                                        Placeholder="None"
+                                        AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                            <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnHireManagerFilteringAsync" />
+                        </SfDropDownList>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Address Line 1</label>
+                        <HrTextBox @bind-Value="_hireModel.AddressLine1" Placeholder="Street address" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Address Line 2</label>
+                        <HrTextBox @bind-Value="_hireModel.AddressLine2" Placeholder="Apartment, suite, etc." />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">City</label>
+                        <HrTextBox @bind-Value="_hireModel.City" Placeholder="e.g. London" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">County / State</label>
+                        <HrTextBox @bind-Value="_hireModel.County" Placeholder="e.g. Greater London" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Post Code</label>
+                        <HrTextBox @bind-Value="_hireModel.PostCode" Placeholder="e.g. SW1A 1AA" />
+                    </div>
+                </div>
+                @if (_dialogError is not null)
+                {
+                    <div class="alert alert-danger py-2 mt-3">@_dialogError</div>
                 }
-                <div class="col-md-6">
-                    <label class="form-label">Employment Type <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="Guid?"
-                                    TItem="EmploymentTypeListItemModel"
-                                    DataSource="@_employmentTypes"
-                                    @bind-Value="_employmentTypeId"
-                                    Placeholder="Select type">
-                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                    </SfDropDownList>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Position Profile</label>
-                    <div class="p-2 rounded border bg-light" data-testid="hire-derived-position-profile">@_derivedPositionProfileName</div>
-                    <div class="form-text">Derived from the vacancy — the employee is assigned to this profile (and its department/location) automatically.</div>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Location</label>
-                    <div class="p-2 rounded border bg-light" data-testid="hire-derived-location">@_derivedLocationName</div>
-                    <div class="form-text">Derived from the vacancy's position profile.</div>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Manager</label>
-                    <SfDropDownList @ref="_hireManagerDropdown"
-                                    TValue="Guid?"
-                                    TItem="ManagerOption"
-                                    DataSource="@_hireManagerOptions"
-                                    @bind-Value="_managerId"
-                                    Placeholder="None"
-                                    AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                        <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnHireManagerFilteringAsync" />
-                    </SfDropDownList>
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Address Line 1</label>
-                    <HrTextBox @bind-Value="_addressLine1" Placeholder="Street address" />
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Address Line 2</label>
-                    <HrTextBox @bind-Value="_addressLine2" Placeholder="Apartment, suite, etc." />
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">City</label>
-                    <HrTextBox @bind-Value="_city" Placeholder="e.g. London" />
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">County / State</label>
-                    <HrTextBox @bind-Value="_county" Placeholder="e.g. Greater London" />
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Post Code</label>
-                    <HrTextBox @bind-Value="_postCode" Placeholder="e.g. SW1A 1AA" />
-                </div>
-            </div>
-            @if (_dialogError is not null)
-            {
-                <div class="alert alert-danger py-2 mt-3">@_dialogError</div>
-            }
+            </EditForm>
         </Content>
     </DialogTemplates>
     <DialogButtons>
@@ -378,8 +394,8 @@
     private bool _showAddDialog;
     private SfDropDownList<Guid?, CandidateListItemModel> _candidateDropdown = default!;
     private List<CandidateListItemModel> _candidates = [];
-    private Guid? _selectedCandidateId;
-    private string? _addNotes;
+    private readonly AddApplicationFormModel _addModel = new();
+    private EditContext _addEditContext = default!;
     private int _candidateFilterRequestId;
 
     // Ticket #78 — application source. Options mirror Domain.ApplicationSource with display-friendly
@@ -394,12 +410,10 @@
         new("JobBoard", "Job Board"),
         new("CareersSite", "Careers Site"),
     ];
-    private string _selectedSource = "Unspecified";
     private List<ExternalRecruiterListItemModel> _activeRecruitersForSource = [];
     // Ticket #81: the removed VacancyRecruiterAssignment table (many-to-many with history) is
     // replaced by this single optional field mirroring Vacancy.AssignedRecruiterId.
     private Guid? _vacancyAssignedRecruiterId;
-    private Guid? _selectedSourceRecruiterId;
 
     // Computed rather than a field updated imperatively in OnSourceRecruiterChanged — that
     // relied on Syncfusion's ValueChange event, which duplicates (and depends on firing in step
@@ -407,8 +421,8 @@
     // keeps _selectedSourceRecruiterId current. Deriving straight from that avoids depending on a
     // second event mechanism at all.
     private bool _recruiterNotAssignedWarning =>
-        _selectedSource == "ExternalRecruiter" &&
-        _selectedSourceRecruiterId is Guid id &&
+        _addModel.Source == "ExternalRecruiter" &&
+        _addModel.SourceRecruiterId is Guid id &&
         id != _vacancyAssignedRecruiterId;
 
     // Per-application Source detail, looked up lazily since ListApplicationsForVacancy's own
@@ -427,6 +441,73 @@
     protected override void OnInitialized()
     {
         _scheduleEditContext = new EditContext(_scheduleModel);
+        _addEditContext = new EditContext(_addModel);
+        _hireEditContext = new EditContext(_hireModel);
+    }
+
+    public sealed class AddApplicationFormModel : IValidatableObject
+    {
+        [Required(ErrorMessage = "Please select a candidate.")]
+        public Guid? CandidateId { get; set; }
+
+        public string Source { get; set; } = "Unspecified";
+
+        public Guid? SourceRecruiterId { get; set; }
+
+        [MaxLength(2000)]
+        public string? Notes { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (Source == "ExternalRecruiter" && SourceRecruiterId is null)
+                yield return new ValidationResult(
+                    "Please select a recruiter, or choose a different source.",
+                    [nameof(SourceRecruiterId)]);
+        }
+    }
+
+    public sealed class HireCandidateFormModel : IValidatableObject
+    {
+        [Required(ErrorMessage = "Please select a start date.")]
+        public DateOnly? StartDate { get; set; }
+
+        [Required(ErrorMessage = "Please select a date of birth.")]
+        public DateOnly? DateOfBirth { get; set; }
+
+        [Required(ErrorMessage = "Please select a nationality.")]
+        public string? Nationality { get; set; }
+
+        [Required(ErrorMessage = "Please select a gender.")]
+        public string? Gender { get; set; }
+
+        [MaxLength(100)]
+        public string? GenderOther { get; set; }
+
+        [MaxLength(50)]
+        public string? EmployeeNumber { get; set; }
+
+        [Required(ErrorMessage = "Please select an employment type.")]
+        public Guid? EmploymentTypeId { get; set; }
+
+        public Guid? ManagerId { get; set; }
+
+        [MaxLength(200)] public string? AddressLine1 { get; set; }
+        [MaxLength(200)] public string? AddressLine2 { get; set; }
+        [MaxLength(100)] public string? City { get; set; }
+        [MaxLength(100)] public string? County { get; set; }
+        [MaxLength(20)] public string? PostCode { get; set; }
+
+        // Set from the company's Employee Number Mode when the dialog opens — drives whether the
+        // manual Employee Number field is required.
+        public bool EmployeeNumberRequired { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (EmployeeNumberRequired && string.IsNullOrWhiteSpace(EmployeeNumber))
+                yield return new ValidationResult(
+                    "Please enter an employee number.",
+                    [nameof(EmployeeNumber)]);
+        }
     }
 
     public sealed class ScheduleInterviewFormModel
@@ -447,22 +528,9 @@
     private bool _showHireDialog;
     private List<NationalityListItem> _nationalities = [];
     private List<EmploymentTypeListItemModel> _employmentTypes = [];
-    private DateOnly? _startDate;
-    private DateOnly? _dateOfBirth;
-    private string _nationality = string.Empty;
-    private string _gender = string.Empty;
-    private string? _genderOther;
-    private string _employeeNumber = string.Empty;
+    private readonly HireCandidateFormModel _hireModel = new();
+    private EditContext _hireEditContext = default!;
     private EmployeeNumberMode _hireEmployeeNumberMode = EmployeeNumberMode.Manual;
-    private Guid? _employmentTypeId;
-    private Guid? _managerId;
-    // Not yet sent to the API — see the HireCandidateRequest UI model's remarks. Captured here so
-    // the fields are ready to wire up once HireCandidate's backend request/handler accepts them.
-    private string? _addressLine1;
-    private string? _addressLine2;
-    private string? _city;
-    private string? _county;
-    private string? _postCode;
     // Derived read-only display fields — populated from the Vacancy's linked Position Profile
     // (GetVacancyResponse) when the Hire dialog opens. The employee is always assigned to this
     // Position Profile (and its Department/Location) automatically by HireCandidateHandler; these are
@@ -575,10 +643,11 @@
     private async Task OpenAddDialog()
     {
         _dialogError = null;
-        _selectedCandidateId = null;
-        _addNotes = null;
-        _selectedSource = "Unspecified";
-        _selectedSourceRecruiterId = null;
+        _addModel.CandidateId = null;
+        _addModel.Notes = null;
+        _addModel.Source = "Unspecified";
+        _addModel.SourceRecruiterId = null;
+        _addEditContext = new EditContext(_addModel);
 
         // ListCandidatesValidator caps PageSize at 100 (InclusiveBetween(1, 100)) — requesting
         // more than that fails FluentValidation validation, and CandidateService.ListCandidatesAsync
@@ -603,10 +672,10 @@
 
     private void OnSourceChanged(ChangeEventArgs<string, SourceOption> args)
     {
-        _selectedSource = args.Value;
-        if (_selectedSource != "ExternalRecruiter")
+        _addModel.Source = args.Value;
+        if (_addModel.Source != "ExternalRecruiter")
         {
-            _selectedSourceRecruiterId = null;
+            _addModel.SourceRecruiterId = null;
         }
     }
 
@@ -633,22 +702,13 @@
 
     private async Task ConfirmAddAsync()
     {
-        if (_selectedCandidateId is null)
-        {
-            _dialogError = "Please select a candidate.";
+        if (!_addEditContext.Validate())
             return;
-        }
-
-        if (_selectedSource == "ExternalRecruiter" && _selectedSourceRecruiterId is null)
-        {
-            _dialogError = "Please select a recruiter, or choose a different source.";
-            return;
-        }
 
         var (created, error) = await ApplicationService.CreateApplicationAsync(
-            CompanyId, VacancyId, _selectedCandidateId.Value, _addNotes,
-            source: _selectedSource == "Unspecified" ? null : _selectedSource,
-            sourceExternalRecruiterId: _selectedSource == "ExternalRecruiter" ? _selectedSourceRecruiterId : null);
+            CompanyId, VacancyId, _addModel.CandidateId!.Value, _addModel.Notes,
+            source: _addModel.Source == "Unspecified" ? null : _addModel.Source,
+            sourceExternalRecruiterId: _addModel.Source == "ExternalRecruiter" ? _addModel.SourceRecruiterId : null);
         if (created is null)
         {
             _dialogError = error;
@@ -774,21 +834,21 @@
     {
         _dialogError = null;
         _activeApplication = row;
-        _startDate = DateOnly.FromDateTime(DateTime.Today);
-        _dateOfBirth = null;
-        _nationality = string.Empty;
-        _gender = string.Empty;
-        _genderOther = null;
-        _employeeNumber = string.Empty;
-        _employmentTypeId = null;
-        _managerId = Guid.Empty;
+        _hireModel.StartDate = DateOnly.FromDateTime(DateTime.Today);
+        _hireModel.DateOfBirth = null;
+        _hireModel.Nationality = null;
+        _hireModel.Gender = null;
+        _hireModel.GenderOther = null;
+        _hireModel.EmployeeNumber = null;
+        _hireModel.EmploymentTypeId = null;
+        _hireModel.ManagerId = Guid.Empty;
+        _hireModel.AddressLine1 = null;
+        _hireModel.AddressLine2 = null;
+        _hireModel.City = null;
+        _hireModel.County = null;
+        _hireModel.PostCode = null;
         _derivedLocationName = string.Empty;
         _derivedPositionProfileName = string.Empty;
-        _addressLine1 = null;
-        _addressLine2 = null;
-        _city = null;
-        _county = null;
-        _postCode = null;
 
         if (_nationalities.Count == 0)
         {
@@ -801,6 +861,8 @@
         // employee is created (here: hired), so there's nothing for the recruiter to enter.
         var hrSettings = await CompanyService.GetHrSettingsAsync(CompanyId);
         _hireEmployeeNumberMode = hrSettings?.EmployeeNumberMode ?? EmployeeNumberMode.Manual;
+        _hireModel.EmployeeNumberRequired = _hireEmployeeNumberMode != EmployeeNumberMode.Automatic;
+        _hireEditContext = new EditContext(_hireModel);
 
         var vacancyTask = VacancyService.GetVacancyAsync(CompanyId, VacancyId);
         var employmentTypeTask = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
@@ -930,26 +992,21 @@
     {
         var employeeNumberRequired = _hireEmployeeNumberMode != EmployeeNumberMode.Automatic;
 
-        if (_activeApplication is null || _startDate is null || _dateOfBirth is null ||
-            string.IsNullOrWhiteSpace(_nationality) || string.IsNullOrWhiteSpace(_gender) ||
-            (employeeNumberRequired && string.IsNullOrWhiteSpace(_employeeNumber)) || _employmentTypeId is null)
-        {
-            _dialogError = "Please complete all required fields.";
+        if (_activeApplication is null || !_hireEditContext.Validate())
             return;
-        }
 
         var request = new HireCandidateRequest(
             CompanyId, VacancyId, _activeApplication.Id,
-            _startDate.Value, _dateOfBirth.Value, _nationality, _gender,
-            string.IsNullOrWhiteSpace(_genderOther) ? null : _genderOther.Trim(),
-            employeeNumberRequired ? _employeeNumber.Trim() : string.Empty, _employmentTypeId.Value,
-            _managerId == Guid.Empty ? null : _managerId,
+            _hireModel.StartDate!.Value, _hireModel.DateOfBirth!.Value, _hireModel.Nationality!, _hireModel.Gender!,
+            string.IsNullOrWhiteSpace(_hireModel.GenderOther) ? null : _hireModel.GenderOther.Trim(),
+            employeeNumberRequired ? _hireModel.EmployeeNumber!.Trim() : string.Empty, _hireModel.EmploymentTypeId!.Value,
+            _hireModel.ManagerId == Guid.Empty ? null : _hireModel.ManagerId,
             // Not yet consumed server-side — see HireCandidateRequest's remarks above.
-            string.IsNullOrWhiteSpace(_addressLine1) ? null : _addressLine1.Trim(),
-            string.IsNullOrWhiteSpace(_addressLine2) ? null : _addressLine2.Trim(),
-            string.IsNullOrWhiteSpace(_city) ? null : _city.Trim(),
-            string.IsNullOrWhiteSpace(_county) ? null : _county.Trim(),
-            string.IsNullOrWhiteSpace(_postCode) ? null : _postCode.Trim());
+            string.IsNullOrWhiteSpace(_hireModel.AddressLine1) ? null : _hireModel.AddressLine1.Trim(),
+            string.IsNullOrWhiteSpace(_hireModel.AddressLine2) ? null : _hireModel.AddressLine2.Trim(),
+            string.IsNullOrWhiteSpace(_hireModel.City) ? null : _hireModel.City.Trim(),
+            string.IsNullOrWhiteSpace(_hireModel.County) ? null : _hireModel.County.Trim(),
+            string.IsNullOrWhiteSpace(_hireModel.PostCode) ? null : _hireModel.PostCode.Trim());
 
         var (result, error) = await ApplicationService.HireCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);
 

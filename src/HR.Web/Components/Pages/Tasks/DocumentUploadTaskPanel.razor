@@ -1,37 +1,46 @@
+@using System.ComponentModel.DataAnnotations
 @using HR.Web.Models
 @inject DocumentService DocumentService
 
 <div class="card" data-testid="document-upload-panel">
     <div class="card-header fw-medium">Upload Document</div>
     <div class="card-body">
-        <div class="row g-3">
-            <div class="col-12">
-                <label class="form-label">Title <span class="text-danger">*</span></label>
-                <HrTextBox @bind-Value="_title" Placeholder="Document title" />
+        <EditForm EditContext="_editContext">
+            <DataAnnotationsValidator />
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label">Title <span class="text-danger">*</span></label>
+                    <HrTextBox @bind-Value="_model.Title" Placeholder="Document title" />
+                    <ValidationMessage For="@(() => _model.Title)" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Issue Date</label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  @bind-Value="_model.IssueDate"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy"
+                                  ShowClearButton="true" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Expiry Date</label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  @bind-Value="_model.ExpiryDate"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy"
+                                  ShowClearButton="true" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">File <span class="text-danger">*</span></label>
+                    <InputFile class="form-control" OnChange="OnFileSelected"
+                               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
+                    <div class="form-text">Accepted: PDF, Word, JPG, PNG. Max 20 MB.</div>
+                    @if (_fileError is not null)
+                    {
+                        <div class="text-danger small mt-1">@_fileError</div>
+                    }
+                </div>
             </div>
-            <div class="col-md-6">
-                <label class="form-label">Issue Date</label>
-                <SfDatePicker TValue="DateOnly?"
-                              @bind-Value="_issueDate"
-                              Format="dd/MM/yyyy"
-                              Placeholder="dd/mm/yyyy"
-                              ShowClearButton="true" />
-            </div>
-            <div class="col-md-6">
-                <label class="form-label">Expiry Date</label>
-                <SfDatePicker TValue="DateOnly?"
-                              @bind-Value="_expiryDate"
-                              Format="dd/MM/yyyy"
-                              Placeholder="dd/mm/yyyy"
-                              ShowClearButton="true" />
-            </div>
-            <div class="col-12">
-                <label class="form-label">File <span class="text-danger">*</span></label>
-                <InputFile class="form-control" OnChange="OnFileSelected"
-                           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
-                <div class="form-text">Accepted: PDF, Word, JPG, PNG. Max 20 MB.</div>
-            </div>
-        </div>
+        </EditForm>
 
         @if (_error is not null)
         {
@@ -56,36 +65,64 @@
     [Parameter, EditorRequired] public TaskDetailModel Task { get; set; } = null!;
     [Parameter] public EventCallback OnCompleted { get; set; }
 
-    private string    _title   = string.Empty;
-    private DateOnly? _issueDate;
-    private DateOnly? _expiryDate;
+    private readonly DocumentUploadFormModel _model = new();
+    private EditContext _editContext = default!;
     private IBrowserFile? _selectedFile;
+    private string? _fileError;
     private bool    _uploading;
     private string? _error;
 
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+    }
+
+    private sealed class DocumentUploadFormModel
+    {
+        [Required(ErrorMessage = "Title is required.")]
+        [MaxLength(200)]
+        public string? Title { get; set; }
+
+        public DateOnly? IssueDate { get; set; }
+        public DateOnly? ExpiryDate { get; set; }
+    }
+
     protected override void OnParametersSet()
     {
-        if (string.IsNullOrEmpty(_title))
-            _title = Task.Title.StartsWith("Upload ", StringComparison.OrdinalIgnoreCase)
+        if (string.IsNullOrEmpty(_model.Title))
+            _model.Title = Task.Title.StartsWith("Upload ", StringComparison.OrdinalIgnoreCase)
                 ? Task.Title["Upload ".Length..]
                 : Task.Title;
     }
 
-    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        _fileError = null;
+    }
 
     private async Task SubmitAsync()
     {
         _error = null;
+        _fileError = null;
 
-        if (string.IsNullOrWhiteSpace(_title)) { _error = "Title is required."; return; }
-        if (_selectedFile is null)             { _error = "Please select a file."; return; }
-        if (!Task.SourceEntityId.HasValue)     { _error = "This task is not linked to a document request."; return; }
+        var valid = _editContext.Validate();
+
+        if (_selectedFile is null)
+        {
+            _fileError = "Please select a file.";
+            valid = false;
+        }
+
+        if (!valid) return;
+
+        if (!Task.SourceEntityId.HasValue) { _error = "This task is not linked to a document request."; return; }
 
         _uploading = true;
         _error = await DocumentService.UploadRequestedDocumentAsync(
             CompanyId, EmployeeId, Task.SourceEntityId.Value,
-            _title, description: null, _issueDate, _expiryDate,
-            _selectedFile);
+            _model.Title!.Trim(), description: null, _model.IssueDate, _model.ExpiryDate,
+            _selectedFile!);
         _uploading = false;
 
         if (_error is not null) return;

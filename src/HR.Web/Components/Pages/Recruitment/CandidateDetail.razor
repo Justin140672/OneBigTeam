@@ -2,6 +2,7 @@
 @page "/companies/{CompanyId:guid}/candidates/{Id:guid}"
 @page "/companies/{CompanyId:guid}/candidates/{Id:guid}/view"
 @rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
 @inject CandidateService CandidateService
 @inject AppSession Session
 @inherits EditPageBase<CandidateEditModel, Guid>
@@ -145,12 +146,13 @@
                 <Header>Deactivate Candidate</Header>
                 <Content>
                     <p>Are you sure you want to deactivate @Model.FirstName @Model.LastName?</p>
-                    <label class="form-label">Reason <span class="text-danger">*</span></label>
-                    <textarea class="form-control" rows="3" @bind="_deactivateReason" placeholder="Explain why this candidate is being deactivated"></textarea>
-                    @if (!string.IsNullOrWhiteSpace(_deactivateReasonError))
-                    {
-                        <div class="text-danger small mt-1">@_deactivateReasonError</div>
-                    }
+                    <EditForm EditContext="_deactivateEditContext">
+                        <DataAnnotationsValidator />
+                        <label class="form-label">Reason <span class="text-danger">*</span></label>
+                        <HrTextBox @bind-Value="_deactivateModel.Reason" Multiline="true" Rows="3"
+                                   Maxlength="1000" Placeholder="Explain why this candidate is being deactivated" />
+                        <ValidationMessage For="@(() => _deactivateModel.Reason)" />
+                    </EditForm>
                 </Content>
                 <FooterTemplate>
                     <SfButton IsPrimary="true" CssClass="e-danger" Disabled="_actionBusy" OnClick="ConfirmDeactivateAsync">
@@ -214,8 +216,14 @@
     private bool _actionBusy;
 
     private bool _showDeactivateDialog;
-    private string _deactivateReason = string.Empty;
-    private string? _deactivateReasonError;
+    private readonly DeactivateCandidateFormModel _deactivateModel = new();
+    private EditContext _deactivateEditContext = default!;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _deactivateEditContext = new EditContext(_deactivateModel);
+    }
 
     private bool _showReactivateDialog;
 
@@ -242,16 +250,13 @@
 
     private async Task ConfirmDeactivateAsync()
     {
-        if (string.IsNullOrWhiteSpace(_deactivateReason))
-        {
-            _deactivateReasonError = "A reason is required.";
+        if (!_deactivateEditContext.Validate())
             return;
-        }
-        _deactivateReasonError = null;
+
         _actionError = null;
         _actionBusy = true;
 
-        var (result, error) = await CandidateService.DeactivateCandidateAsync(CompanyId, Id!.Value, _deactivateReason.Trim());
+        var (result, error) = await CandidateService.DeactivateCandidateAsync(CompanyId, Id!.Value, _deactivateModel.Reason!.Trim());
 
         _actionBusy = false;
 
@@ -262,8 +267,16 @@
         }
 
         _showDeactivateDialog = false;
-        _deactivateReason = string.Empty;
+        _deactivateModel.Reason = null;
+        _deactivateEditContext = new EditContext(_deactivateModel);
         _candidate = await CandidateService.GetCandidateAsync(CompanyId, Id!.Value);
+    }
+
+    private sealed class DeactivateCandidateFormModel
+    {
+        [Required(ErrorMessage = "A reason is required.")]
+        [MaxLength(1000)]
+        public string? Reason { get; set; }
     }
 
     private async Task ConfirmReactivateAsync()

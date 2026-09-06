@@ -113,6 +113,7 @@
                                                 @bind-Value="Model.CompensationSalaryType">
                                     <DropDownListFieldSettings Value="Value" Text="Label" />
                                 </SfDropDownList>
+                                <ValidationMessage For="@(() => Model.CompensationSalaryType)" />
                             </div>
                             <div class="col-6">
                                 <label class="form-label">Salary <span class="text-danger">*</span></label>
@@ -334,24 +335,10 @@
     {
         GlobalError = null;
 
-        if (_step == 1)
+        if ((_step == 1 || _step == 3) && !EditContext.Validate())
         {
-            if (Model.NewPositionProfileId is null || Model.EffectiveDate is null || string.IsNullOrWhiteSpace(Model.Reason))
-            {
-                GlobalError = "Please complete the required fields before continuing.";
-                EditContext.Validate();
-                return;
-            }
-        }
-
-        if (_step == 3 && Model.CreateCompensationChange)
-        {
-            var compError = ValidateCompensation();
-            if (compError is not null)
-            {
-                GlobalError = compError;
-                return;
-            }
+            GlobalError = "Please correct the highlighted fields below.";
+            return;
         }
 
         _step = Math.Min(_step + 1, 4);
@@ -361,34 +348,6 @@
     {
         GlobalError = null;
         _step = Math.Max(_step - 1, 1);
-    }
-
-    private string? ValidateCompensation()
-    {
-        if (string.IsNullOrWhiteSpace(Model.CompensationSalaryType))
-            return "Please select a salary type.";
-        if (Model.CompensationSalary is null || Model.CompensationSalary <= 0)
-            return "Please enter a salary greater than 0.";
-        if (string.IsNullOrWhiteSpace(Model.CompensationCurrency))
-            return "Please enter a currency code.";
-        return null;
-    }
-
-    protected override string? ValidateExtra()
-    {
-        if (Model.NewPositionProfileId is null)
-            return "Please select a new position profile.";
-        if (Model.EffectiveDate is null)
-            return "Please select an effective date.";
-        if (string.IsNullOrWhiteSpace(Model.Reason))
-            return "Please enter a reason.";
-        if (Model.CreateCompensationChange)
-        {
-            var compError = ValidateCompensation();
-            if (compError is not null)
-                return compError;
-        }
-        return null;
     }
 
     protected override async Task<string?> SaveCoreAsync()
@@ -448,7 +407,7 @@
         _awaitingBackdateConfirmation = false;
     }
 
-    public sealed class PromoteEmployeeFormModel
+    public sealed class PromoteEmployeeFormModel : IValidatableObject
     {
         [Required(ErrorMessage = "Please select a new position profile.")]
         public Guid? NewPositionProfileId { get; set; }
@@ -475,5 +434,20 @@
         public decimal? CompensationHoursPerWeek { get; set; }
         public decimal? CompensationFte { get; set; }
         public string? CompensationNotes { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (!CreateCompensationChange)
+                yield break;
+
+            if (string.IsNullOrWhiteSpace(CompensationSalaryType))
+                yield return new ValidationResult("Please select a salary type.", [nameof(CompensationSalaryType)]);
+
+            if (CompensationSalary is null || CompensationSalary <= 0)
+                yield return new ValidationResult("Please enter a salary greater than 0.", [nameof(CompensationSalary)]);
+
+            if (string.IsNullOrWhiteSpace(CompensationCurrency))
+                yield return new ValidationResult("Please enter a currency code.", [nameof(CompensationCurrency)]);
+        }
     }
 }

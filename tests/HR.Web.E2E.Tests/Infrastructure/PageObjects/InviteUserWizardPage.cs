@@ -71,4 +71,57 @@ public sealed class InviteUserWizardPage(IPage page)
         await Dialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
         await page.WaitForTimeoutAsync(250);
     }
+
+    // ── Declarative validation helpers (InviteUserWizard.razor's EditForm + DataAnnotationsValidator) ──
+
+    public Task<bool> IsOpenAsync() => Dialog.IsVisibleAsync();
+
+    /// <summary>Trimmed label of the wizard's currently-active step ("Employee", "Email", "Roles", "Review").</summary>
+    public async Task<string> GetActiveStepLabelAsync() =>
+        (await Dialog.Locator(".hr-stepper-item--current .hr-stepper-label").First.InnerTextAsync()).Trim();
+
+    /// <summary>Text of the first visible field-level &lt;ValidationMessage&gt;, or null if none is shown.</summary>
+    public async Task<string?> GetFieldValidationMessageAsync()
+    {
+        var msg = Dialog.Locator(".validation-message").First;
+        return await msg.IsVisibleAsync() ? (await msg.InnerTextAsync()).Trim() : null;
+    }
+
+    /// <summary>Selects the employee on step 1 without clicking Next (for the missing-field tests).</summary>
+    public Task SelectEmployeeWithoutAdvancingAsync(string employeeName) =>
+        DropDownSelector.SelectAsync(page, Dialog, employeeName);
+
+    /// <summary>Overwrites the step 2 work-email field.</summary>
+    public async Task FillEmailFieldAsync(string email)
+    {
+        var input = Dialog.Locator("input[type='text']").First;
+        await input.FillAsync(email);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    /// <summary>
+    /// Clicks "Next" expecting the wizard NOT to advance (a required/invalid field blocks it),
+    /// waiting for the inline &lt;ValidationMessage&gt; to render.
+    /// </summary>
+    public async Task ClickNextExpectingNoAdvanceAsync()
+    {
+        await Dialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
+        try
+        {
+            await Dialog.Locator(".validation-message").First
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 8_000 });
+        }
+        catch (TimeoutException)
+        {
+            // Caller asserts on the active step label regardless.
+        }
+    }
+
+    /// <summary>Clicks "Next" expecting the wizard to advance to <paramref name="expectedStepLabel"/>.</summary>
+    public async Task ClickNextExpectingAdvanceAsync(string expectedStepLabel)
+    {
+        await Dialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
+        await Assertions.Expect(Dialog.Locator(".hr-stepper-item--current .hr-stepper-label"))
+            .ToHaveTextAsync(expectedStepLabel, new() { Timeout = 8_000 });
+    }
 }

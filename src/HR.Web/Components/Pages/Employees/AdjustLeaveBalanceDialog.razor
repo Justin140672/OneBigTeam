@@ -1,3 +1,4 @@
+@using System.ComponentModel.DataAnnotations
 @using HR.Web.Models
 @inject LeaveService LeaveService
 
@@ -6,44 +7,49 @@
     <DialogTemplates>
         <Header>Adjust @LeaveTypeName Balance</Header>
         <Content>
-            <div class="mb-3">
-                <label class="form-label fw-medium">Current Balance</label>
-                <input class="form-control" readonly value="@FormattedCurrentBalance" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-medium">Adjustment (@(IsToil ? "hours" : "days")) <span class="text-danger">*</span></label>
-                <div data-testid="adjustment-hours-input">
-                    <SfNumericTextBox TValue="decimal?" @bind-Value="_adjustmentValue" ShowSpinButton="false"
-                                      Min="-9999.99m" Max="9999.99m"
-                                      Placeholder="e.g. 7.5 or -3.5" />
+            <EditForm EditContext="_editContext">
+                <DataAnnotationsValidator />
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Current Balance</label>
+                    <input class="form-control" readonly value="@FormattedCurrentBalance" />
                 </div>
-                <div class="form-text">Use a positive value to add @(IsToil ? "hours" : "days"), negative to deduct (max 9,999.99).</div>
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-medium">Reason <span class="text-danger">*</span></label>
-                <SfDropDownList TValue="LeaveBalanceAdjustmentReason" TItem="ReasonChoice"
-                                DataSource="@ReasonOptions"
-                                @bind-Value="_reason">
-                    <DropDownListFieldSettings Value="Value" Text="Label" />
-                </SfDropDownList>
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-medium">Comments</label>
-                <HrTextBox @bind-Value="_comments" Multiline="true" Rows="3" Maxlength="500" Placeholder="Optional comments…" />
-            </div>
-            <div class="mb-3">
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="allowNegativeOverride"
-                           @bind="_allowNegativeOverride" />
-                    <label class="form-check-label" for="allowNegativeOverride">
-                        Allow this adjustment to take the balance below zero
-                    </label>
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Adjustment (@(IsToil ? "hours" : "days")) <span class="text-danger">*</span></label>
+                    <div data-testid="adjustment-hours-input">
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="_model.AdjustmentValue" ShowSpinButton="false"
+                                          Min="-9999.99m" Max="9999.99m"
+                                          Placeholder="e.g. 7.5 or -3.5" />
+                    </div>
+                    <ValidationMessage For="@(() => _model.AdjustmentValue)" />
+                    <div class="form-text">Use a positive value to add @(IsToil ? "hours" : "days"), negative to deduct (max 9,999.99).</div>
                 </div>
-            </div>
-            @if (_error is not null)
-            {
-                <div class="alert alert-danger mt-2 mb-0">@_error</div>
-            }
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Reason <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="LeaveBalanceAdjustmentReason" TItem="ReasonChoice"
+                                    DataSource="@ReasonOptions"
+                                    @bind-Value="_model.Reason">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Comments</label>
+                    <HrTextBox @bind-Value="_model.Comments" Multiline="true" Rows="3" Maxlength="500" Placeholder="Optional comments…" />
+                    <ValidationMessage For="@(() => _model.Comments)" />
+                </div>
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="allowNegativeOverride"
+                               @bind="_model.AllowNegativeOverride" />
+                        <label class="form-check-label" for="allowNegativeOverride">
+                            Allow this adjustment to take the balance below zero
+                        </label>
+                    </div>
+                </div>
+                @if (_error is not null)
+                {
+                    <div class="alert alert-danger mt-2 mb-0">@_error</div>
+                }
+            </EditForm>
         </Content>
         <FooterTemplate>
             <SfButton IsPrimary="true" Disabled="@_submitting" OnClick="SubmitAsync">
@@ -88,20 +94,39 @@
         new(LeaveBalanceAdjustmentReason.Other, "Other"),
     ];
 
-    private decimal? _adjustmentValue;
-    private LeaveBalanceAdjustmentReason _reason = LeaveBalanceAdjustmentReason.Correction;
-    private string? _comments;
-    private bool _allowNegativeOverride;
+    private readonly AdjustLeaveBalanceFormModel _model = new();
+    private EditContext _editContext = default!;
     private string? _error;
     private bool _submitting;
 
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+    }
+
+    private sealed class AdjustLeaveBalanceFormModel : IValidatableObject
+    {
+        [Required(ErrorMessage = "Please enter a non-zero adjustment.")]
+        public decimal? AdjustmentValue { get; set; }
+
+        public LeaveBalanceAdjustmentReason Reason { get; set; } = LeaveBalanceAdjustmentReason.Correction;
+
+        [MaxLength(500)]
+        public string? Comments { get; set; }
+
+        public bool AllowNegativeOverride { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (AdjustmentValue == 0)
+                yield return new ValidationResult("Please enter a non-zero adjustment.", [nameof(AdjustmentValue)]);
+        }
+    }
+
     private async Task SubmitAsync()
     {
-        if (_adjustmentValue is null || _adjustmentValue == 0)
-        {
-            _error = "Please enter a non-zero adjustment.";
+        if (!_editContext.Validate())
             return;
-        }
 
         _submitting = true;
         _error = null;
@@ -110,10 +135,10 @@
             CompanyId, EmployeeId,
             new AdjustLeaveBalanceModel(
                 LeaveTypeId,
-                _adjustmentValue.Value,
-                _reason,
-                string.IsNullOrWhiteSpace(_comments) ? null : _comments,
-                _allowNegativeOverride));
+                _model.AdjustmentValue!.Value,
+                _model.Reason,
+                string.IsNullOrWhiteSpace(_model.Comments) ? null : _model.Comments,
+                _model.AllowNegativeOverride));
 
         _submitting = false;
 
@@ -137,10 +162,11 @@
 
     private void Reset()
     {
-        _adjustmentValue = null;
-        _reason = LeaveBalanceAdjustmentReason.Correction;
-        _comments = null;
-        _allowNegativeOverride = false;
+        _model.AdjustmentValue = null;
+        _model.Reason = LeaveBalanceAdjustmentReason.Correction;
+        _model.Comments = null;
+        _model.AllowNegativeOverride = false;
+        _editContext = new EditContext(_model);
         _error = null;
     }
 }

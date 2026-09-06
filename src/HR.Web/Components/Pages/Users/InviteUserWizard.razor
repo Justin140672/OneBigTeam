@@ -1,8 +1,11 @@
+@using System.ComponentModel.DataAnnotations
 @inject UserAdministrationService UserAdministrationService
 
 <HrWizardDialog IsOpen="IsOpen" Title="Invite User" Steps="_stepLabels" CurrentStep="_step"
-                GlobalError="_error" Busy="_submitting" OnCancelled="CancelAsync">
+                GlobalError="@_error" Busy="_submitting" OnCancelled="CancelAsync">
     <ChildContent>
+        <EditForm EditContext="_editContext">
+            <DataAnnotationsValidator />
             @if (_loading)
             {
                 <HrLoadingIndicator Label="Loading employees…" />
@@ -21,11 +24,12 @@
                         <label class="form-label">Employee <span class="text-danger">*</span></label>
                         <SfDropDownList TValue="Guid?" TItem="InvitableEmployeeModel"
                                         DataSource="@_candidates"
-                                        @bind-Value="_selectedEmployeeId"
+                                        @bind-Value="_model.EmployeeId"
                                         Placeholder="Select an employee"
                                         AllowFiltering="true">
                             <DropDownListFieldSettings Value="EmployeeId" Text="Name" />
                         </SfDropDownList>
+                        <ValidationMessage For="@(() => _model.EmployeeId)" />
                     </div>
                 }
             }
@@ -33,7 +37,8 @@
             {
                 <div class="mb-2">
                     <label class="form-label">Work email <span class="text-danger">*</span></label>
-                    <HrTextBox @bind-Value="_email" Placeholder="name@company.com" />
+                    <HrTextBox @bind-Value="_model.Email" Placeholder="name@company.com" />
+                    <ValidationMessage For="@(() => _model.Email)" />
                     @if (string.IsNullOrWhiteSpace(SelectedCandidate?.WorkEmail))
                     {
                         <div class="form-text">
@@ -77,7 +82,7 @@
                     <dt class="col-sm-4 text-muted fw-normal">Position</dt>
                     <dd class="col-sm-8">@(string.IsNullOrEmpty(SelectedCandidate?.PositionTitle) ? "—" : SelectedCandidate!.PositionTitle)</dd>
                     <dt class="col-sm-4 text-muted fw-normal">Work email</dt>
-                    <dd class="col-sm-8">@_email</dd>
+                    <dd class="col-sm-8">@_model.Email</dd>
                     <dt class="col-sm-4 text-muted fw-normal">Roles</dt>
                     <dd class="col-sm-8">
                         @foreach (var name in AllSelectedRoleNames)
@@ -87,6 +92,7 @@
                     </dd>
                 </dl>
             }
+        </EditForm>
     </ChildContent>
     <FooterContent>
             @* Secondary/navigation actions first, primary/confirming action rightmost. *@
@@ -94,7 +100,7 @@
             <SfButton Disabled="@_submitting" OnClick="CancelAsync">Cancel</SfButton>
             @if (_step < 4)
             {
-                <SfButton IsPrimary="true" Disabled="@(!CanAdvance || _submitting)" OnClick="Next">Next</SfButton>
+                <SfButton IsPrimary="true" Disabled="@_submitting" OnClick="Next">Next</SfButton>
             }
             else
             {
@@ -122,29 +128,42 @@
     private int _step = 1;
 
     private List<InvitableEmployeeModel> _candidates = [];
-    private Guid? _selectedEmployeeId;
-    private string _email = string.Empty;
+    private readonly InviteUserFormModel _model = new();
+    private EditContext _editContext = default!;
     private List<Guid> _selectedAdditionalRoleIds = [];
+
+    private static readonly Dictionary<int, string[]> _stepFields = new()
+    {
+        [1] = [nameof(InviteUserFormModel.EmployeeId)],
+        [2] = [nameof(InviteUserFormModel.Email)],
+    };
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+    }
+
+    private sealed class InviteUserFormModel
+    {
+        [Required(ErrorMessage = "Please select an employee.")]
+        public Guid? EmployeeId { get; set; }
+
+        [Required(ErrorMessage = "Please enter a work email.")]
+        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+        public string? Email { get; set; }
+    }
 
     private readonly List<RoleOption> _additionalRoleOptions =
         SystemRoleOptions.All.Where(r => r.Id != SystemRoleOptions.EmployeeRoleId).ToList();
 
     private InvitableEmployeeModel? SelectedCandidate =>
-        _candidates.FirstOrDefault(c => c.EmployeeId == _selectedEmployeeId);
+        _candidates.FirstOrDefault(c => c.EmployeeId == _model.EmployeeId);
 
     private List<Guid> AllSelectedRoleIds =>
         _selectedAdditionalRoleIds.Prepend(SystemRoleOptions.EmployeeRoleId).Distinct().ToList();
 
     private IEnumerable<string> AllSelectedRoleNames =>
         AllSelectedRoleIds.Select(SystemRoleOptions.NameFor);
-
-    private bool CanAdvance => _step switch
-    {
-        1 => _selectedEmployeeId is not null,
-        2 => !string.IsNullOrWhiteSpace(_email),
-        3 => true,
-        _ => false,
-    };
 
     protected override async Task OnParametersSetAsync()
     {
@@ -162,8 +181,9 @@
     private async Task ResetAsync()
     {
         _step = 1;
-        _selectedEmployeeId = null;
-        _email = string.Empty;
+        _model.EmployeeId = null;
+        _model.Email = null;
+        _editContext = new EditContext(_model);
         _selectedAdditionalRoleIds = [];
         _error = null;
         _submitting = false;
@@ -189,12 +209,16 @@
 
     private void Next()
     {
-        if (!CanAdvance) return;
+        _error = null;
+        _editContext.Validate();
+
+        if (_stepFields.TryGetValue(_step, out var fields) &&
+            fields.Any(f => _editContext.GetValidationMessages(_editContext.Field(f)).Any()))
+            return;
 
         if (_step == 1)
-            _email = SelectedCandidate?.WorkEmail ?? string.Empty;
+            _model.Email = SelectedCandidate?.WorkEmail ?? _model.Email;
 
-        _error = null;
         if (_step < 4) _step++;
     }
 
@@ -206,9 +230,10 @@
 
     private async Task SendAsync()
     {
-        if (_selectedEmployeeId is null || string.IsNullOrWhiteSpace(_email))
+        if (!_editContext.Validate())
         {
-            _error = "Select an employee and enter a work email before sending.";
+            _error = "Please correct the highlighted fields.";
+            _step = _model.EmployeeId is null ? 1 : 2;
             return;
         }
 
@@ -216,7 +241,7 @@
         _error = null;
 
         var (result, error) = await UserAdministrationService.InviteEmployeeUserAsync(
-            CompanyId, _selectedEmployeeId.Value, _email.Trim(), AllSelectedRoleIds);
+            CompanyId, _model.EmployeeId!.Value, _model.Email!.Trim(), AllSelectedRoleIds);
 
         _submitting = false;
 

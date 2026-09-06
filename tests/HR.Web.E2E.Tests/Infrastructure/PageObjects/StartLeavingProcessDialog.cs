@@ -26,8 +26,48 @@ public sealed class StartLeavingProcessDialog(IPage page)
     /// </summary>
     public async Task OpenAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "More actions" }).ClickAsync();
-        await page.GetByRole(AriaRole.Menuitem, new() { Name = "Start offboarding" }).ClickAsync();
+        var moreActionsButton = page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
+        var menuItem = page.GetByRole(AriaRole.Menuitem, new() { Name = "Start offboarding" });
+
+        // The SfDropDownButton's popup (".e-dropdown-popup") is rendered asynchronously after the
+        // click event dispatches — a bare click-then-click race can fire the menu item click before
+        // Syncfusion has actually attached its own click handler to the just-rendered item, silently
+        // swallowing the click and leaving the "Start Leaving Process" dialog never opened. Retry the
+        // whole open sequence (button click + explicit visible-wait on the item) rather than trusting
+        // a single attempt, mirroring the retry patterns already used elsewhere in this suite for the
+        // same class of freshly-mounted-widget race.
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await moreActionsButton.ClickAsync();
+            try
+            {
+                await menuItem.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            }
+            catch (TimeoutException)
+            {
+                // Popup may not have opened (or already closed) — press Escape to reset and retry.
+                await page.Keyboard.PressAsync("Escape");
+                continue;
+            }
+
+            await menuItem.ClickAsync();
+
+            try
+            {
+                await Dialog.WaitForAsync(new() { Timeout = 8_000 });
+                return;
+            }
+            catch (TimeoutException)
+            {
+                // Click may have been swallowed by the popup closing mid-interop-attach — retry.
+            }
+        }
+
+        // Final attempt with the full original timeout, so a genuine failure still surfaces with a
+        // clear, undiminished timeout budget rather than the shorter per-retry ones above.
+        await moreActionsButton.ClickAsync();
+        await menuItem.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+        await menuItem.ClickAsync();
         await Dialog.WaitForAsync(new() { Timeout = 15_000 });
     }
 
@@ -77,6 +117,20 @@ public sealed class StartLeavingProcessDialog(IPage page)
         await page.Keyboard.PressAsync("Control+A");
         await page.Keyboard.PressAsync("Delete");
         await input.FillAsync(ddMMyyyy);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    /// <summary>
+    /// Clears the (auto-computed) Leaving Date on step 2 so the "Please select a leaving date."
+    /// required-field validation can be exercised — step 2 otherwise arrives pre-populated from
+    /// StartLeavingProcessDialog.ComputeProposedLeavingDate.
+    /// </summary>
+    public async Task ClearLeavingDateAsync()
+    {
+        var input = Dialog.Locator(".e-date-wrapper input.e-input").First;
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
         await page.Keyboard.PressAsync("Tab");
     }
 

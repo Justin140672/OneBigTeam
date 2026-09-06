@@ -1,3 +1,4 @@
+@using System.ComponentModel.DataAnnotations
 @using HR.Web.Models
 @using HR.Web.Services
 @inject CompensationService CompensationService
@@ -15,42 +16,49 @@
             </div>
         }
 
-        <div class="row g-3">
-            <div class="col-md-4">
-                <label class="form-label">Adjustment Mode <span class="text-danger">*</span></label>
-                <SfDropDownList TValue="CompensationAdjustmentMode" TItem="AdjustmentModeChoice"
-                                DataSource="@ModeOptions"
-                                @bind-Value="_mode">
-                    <DropDownListFieldSettings Value="Value" Text="Label" />
-                </SfDropDownList>
+        <EditForm EditContext="_editContext">
+            <DataAnnotationsValidator />
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Adjustment Mode <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="CompensationAdjustmentMode" TItem="AdjustmentModeChoice"
+                                    DataSource="@ModeOptions"
+                                    @bind-Value="_model.Mode">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">
+                        @(_model.Mode == CompensationAdjustmentMode.PercentageIncrease ? "Percentage Increase (%)" :
+                          _model.Mode == CompensationAdjustmentMode.FixedAmountIncrease ? "Fixed Amount Increase" :
+                          "New Salary (applies to each row unless edited below)")
+                        <span class="text-danger">*</span>
+                    </label>
+                    <SfNumericTextBox TValue="decimal?" @bind-Value="_model.AdjustmentValue" Min="0" ShowSpinButton="false"
+                                      Placeholder="e.g. 5" />
+                    <ValidationMessage For="@(() => _model.AdjustmentValue)" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Effective Date <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?" @bind-Value="_model.EffectiveDate" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
+                    <ValidationMessage For="@(() => _model.EffectiveDate)" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Reason <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="string" TItem="CompensationChangeReasonChoice"
+                                    DataSource="@ReasonOptions"
+                                    @bind-Value="_model.Reason">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                    <ValidationMessage For="@(() => _model.Reason)" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Notes</label>
+                    <HrTextBox @bind-Value="_model.Notes" Multiline="true" Rows="2" Maxlength="4000" Placeholder="Optional notes…" />
+                    <ValidationMessage For="@(() => _model.Notes)" />
+                </div>
             </div>
-            <div class="col-md-4">
-                <label class="form-label">
-                    @(_mode == CompensationAdjustmentMode.PercentageIncrease ? "Percentage Increase (%)" :
-                      _mode == CompensationAdjustmentMode.FixedAmountIncrease ? "Fixed Amount Increase" :
-                      "New Salary (applies to each row unless edited below)")
-                    <span class="text-danger">*</span>
-                </label>
-                <SfNumericTextBox TValue="decimal?" @bind-Value="_adjustmentValue" Min="0" ShowSpinButton="false"
-                                  Placeholder="e.g. 5" />
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Effective Date <span class="text-danger">*</span></label>
-                <SfDatePicker TValue="DateOnly?" @bind-Value="_effectiveDate" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Reason <span class="text-danger">*</span></label>
-                <SfDropDownList TValue="string" TItem="CompensationChangeReasonChoice"
-                                DataSource="@ReasonOptions"
-                                @bind-Value="_reason">
-                    <DropDownListFieldSettings Value="Value" Text="Label" />
-                </SfDropDownList>
-            </div>
-            <div class="col-12">
-                <label class="form-label">Notes</label>
-                <HrTextBox @bind-Value="_notes" Multiline="true" Rows="2" Maxlength="4000" Placeholder="Optional notes…" />
-            </div>
-        </div>
+        </EditForm>
         <div class="d-flex gap-2 mt-3">
             <SfButton IsPrimary="true" Disabled="@(Employees.Count == 0 || _loadingPreview)" OnClick="BuildPreviewAsync">
                 @if (_loadingPreview)
@@ -160,11 +168,31 @@
         public decimal? PercentageChange { get; set; }
     }
 
-    private CompensationAdjustmentMode _mode = CompensationAdjustmentMode.PercentageIncrease;
-    private decimal? _adjustmentValue;
-    private DateOnly? _effectiveDate = DateOnly.FromDateTime(DateTime.Today);
-    private string _reason = "AnnualReview";
-    private string? _notes;
+    private readonly BulkAdjustmentFormModel _model = new();
+    private EditContext _editContext = default!;
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+    }
+
+    public sealed class BulkAdjustmentFormModel
+    {
+        public CompensationAdjustmentMode Mode { get; set; } = CompensationAdjustmentMode.PercentageIncrease;
+
+        [Required(ErrorMessage = "Please enter an adjustment value.")]
+        [Range(0, 100_000_000, ErrorMessage = "Adjustment value must be zero or greater.")]
+        public decimal? AdjustmentValue { get; set; }
+
+        [Required(ErrorMessage = "Please select an effective date.")]
+        public DateOnly? EffectiveDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+
+        [Required(ErrorMessage = "Please select a reason.")]
+        public string Reason { get; set; } = "AnnualReview";
+
+        [MaxLength(4000)]
+        public string? Notes { get; set; }
+    }
 
     private bool _loadingPreview;
     private bool _applying;
@@ -193,8 +221,9 @@
         _previewRows = [];
         _excludedEmployees = [];
         _globalError = null;
-        _adjustmentValue = null;
-        _notes = null;
+        _model.AdjustmentValue = null;
+        _model.Notes = null;
+        _editContext = new EditContext(_model);
     }
 
     private async Task BuildPreviewAsync()
@@ -203,17 +232,8 @@
         _previewRows = [];
         _excludedEmployees = [];
 
-        if (_adjustmentValue is null)
-        {
-            _globalError = "Please enter an adjustment value.";
+        if (!_editContext.Validate())
             return;
-        }
-
-        if (_effectiveDate is null)
-        {
-            _globalError = "Please select an effective date.";
-            return;
-        }
 
         _loadingPreview = true;
         try
@@ -230,7 +250,7 @@
                     continue;
                 }
 
-                var proposed = CompensationAdjustmentCalculator.CalculateProposedSalary(current.Salary, _mode, _adjustmentValue.Value);
+                var proposed = CompensationAdjustmentCalculator.CalculateProposedSalary(current.Salary, _model.Mode, _model.AdjustmentValue!.Value);
 
                 rows.Add(new PreviewRow
                 {
@@ -268,7 +288,7 @@
 
     private async Task ConfirmApplyAsync()
     {
-        if (_previewRows.Count == 0 || _effectiveDate is null) return;
+        if (_previewRows.Count == 0 || _model.EffectiveDate is null) return;
 
         _globalError = null;
         _applying = true;
@@ -276,10 +296,10 @@
         {
             var request = new BulkApplyCompensationAdjustmentsRequest(
                 CompanyId,
-                _effectiveDate.Value,
-                _reason,
-                string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
-                _mode.ToString(),
+                _model.EffectiveDate.Value,
+                _model.Reason,
+                string.IsNullOrWhiteSpace(_model.Notes) ? null : _model.Notes.Trim(),
+                _model.Mode.ToString(),
                 _previewRows.Select(r => new BulkCompensationAdjustmentItem(
                     r.EmployeeId,
                     r.ProposedSalary,
@@ -298,8 +318,9 @@
 
             _previewRows = [];
             _excludedEmployees = [];
-            _adjustmentValue = null;
-            _notes = null;
+            _model.AdjustmentValue = null;
+            _model.Notes = null;
+            _editContext = new EditContext(_model);
 
             await OnApplied.InvokeAsync();
         }

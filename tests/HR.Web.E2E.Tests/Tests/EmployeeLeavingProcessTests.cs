@@ -249,6 +249,76 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.Contains("last working day", error, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task StartLeavingProcess_WithoutResignationReceivedDate_KeepsWizardOnStep1WithValidationError()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var dialog  = new StartLeavingProcessDialog(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await CreateEmployeeAsync(empList, empEdit, slot: 0);
+
+        await dialog.OpenAsync();
+
+        // Deliberately click Next on step 1 without picking a resignation received date.
+        await dialog.ClickNextAsync();
+
+        Assert.True(await dialog.IsVisibleAsync(),
+            "Expected the Start Leaving Process dialog to stay open when the resignation received date is missing");
+        Assert.Equal("1. Resignation Date", await dialog.GetActiveStepLabelAsync());
+
+        var error = await dialog.GetStepErrorAsync();
+        Assert.False(string.IsNullOrWhiteSpace(error),
+            "Expected an inline validation error inside the Start Leaving Process dialog");
+        Assert.Contains("resignation", error, StringComparison.OrdinalIgnoreCase);
+
+        // Filling the field now lets the wizard advance.
+        await dialog.FillResignationReceivedDateAsync("01/09/2026");
+        await dialog.ClickNextAsync();
+        Assert.Equal("2. Leaving Date", await dialog.GetActiveStepLabelAsync());
+    }
+
+    [Fact]
+    public async Task StartLeavingProcess_WithoutLeavingDate_KeepsWizardOnStep2WithValidationError()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var dialog  = new StartLeavingProcessDialog(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await CreateEmployeeAsync(empList, empEdit, slot: 0);
+
+        await dialog.OpenAsync();
+        await dialog.FillResignationReceivedDateAsync("01/09/2026");
+        await dialog.ClickNextAsync();
+        Assert.Equal("2. Leaving Date", await dialog.GetActiveStepLabelAsync());
+
+        // Step 2 arrives pre-populated with an auto-computed leaving date — clear it, then try to advance.
+        await dialog.ClearLeavingDateAsync();
+        await dialog.ClickNextAsync();
+
+        Assert.True(await dialog.IsVisibleAsync(),
+            "Expected the Start Leaving Process dialog to stay open when the leaving date is missing");
+        Assert.Equal("2. Leaving Date", await dialog.GetActiveStepLabelAsync());
+
+        var error = await dialog.GetStepErrorAsync();
+        Assert.False(string.IsNullOrWhiteSpace(error),
+            "Expected an inline validation error inside the Start Leaving Process dialog");
+        Assert.Contains("leaving date", error, StringComparison.OrdinalIgnoreCase);
+
+        // Re-entering a valid leaving date lets the wizard advance.
+        await dialog.FillLeavingDateAsync("30/09/2026");
+        await dialog.ClickNextAsync();
+        Assert.Equal("3. Last Working Day", await dialog.GetActiveStepLabelAsync());
+    }
+
     // ── Amend / Cancel (Slice 6) ─────────────────────────────────────────────────
     //
     // Every test below first drives a fresh employee through the existing Start Leaving Process

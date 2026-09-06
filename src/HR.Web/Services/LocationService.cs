@@ -53,7 +53,7 @@ public class LocationService(IHttpClientFactory httpClientFactory) : IEditServic
             companyId,
             model.Name.Trim(),
             string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
-            model.LocationTypeId);
+            model.LocationTypeId!.Value);
 
         var (created, error) = await CreateLocationAsync(companyId, request);
         return (created is null ? null : model, error);
@@ -67,7 +67,7 @@ public class LocationService(IHttpClientFactory httpClientFactory) : IEditServic
             id,
             model.Name.Trim(),
             string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
-            model.LocationTypeId);
+            model.LocationTypeId!.Value);
 
         var (updated, error) = await UpdateLocationAsync(companyId, id, request);
         return (updated is null ? null : model, error);

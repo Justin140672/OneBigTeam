@@ -64,5 +64,7 @@ public sealed class LocationEditModel
     [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public Guid LocationTypeId { get; set; }
+
+    [Required(ErrorMessage = "Location type is required.")]
+    public Guid? LocationTypeId { get; set; }
 }
