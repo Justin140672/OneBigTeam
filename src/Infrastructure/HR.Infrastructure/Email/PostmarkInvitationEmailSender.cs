@@ -53,6 +53,15 @@ internal sealed class PostmarkInvitationEmailSender : IInvitationEmailSender
             return false;
         }
 
+        if (PostmarkRecipientGuard.IsUndeliverable(toEmail))
+        {
+            _logger.LogWarning(
+                "Postmark invitation send skipped: recipient domain is a reserved / undeliverable address (To={ToEmail}). " +
+                "A live Postmark token is likely configured in a non-production environment.",
+                SensitiveDataScrubber.MaskEmail(toEmail));
+            return false;
+        }
+
         var productUrl = _configuration["WebApp:BaseUrl"]?.TrimEnd('/') ?? FallbackBaseUrl;
 
         var payload = new

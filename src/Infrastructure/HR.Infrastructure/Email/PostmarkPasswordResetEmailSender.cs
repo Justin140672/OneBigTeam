@@ -54,6 +54,15 @@ internal sealed class PostmarkPasswordResetEmailSender : IPasswordResetEmailSend
             return false;
         }
 
+        if (PostmarkRecipientGuard.IsUndeliverable(toEmail))
+        {
+            _logger.LogWarning(
+                "Postmark password-reset send skipped: recipient domain is a reserved / undeliverable address (To={ToEmail}). " +
+                "A live Postmark token is likely configured in a non-production environment.",
+                SensitiveDataScrubber.MaskEmail(toEmail));
+            return false;
+        }
+
         var productUrl = _configuration["WebApp:BaseUrl"]?.TrimEnd('/') ?? FallbackBaseUrl;
 
         var payload = new

@@ -39,12 +39,12 @@ public class PostmarkEmailSenderTests
         };
         var sender = Build(handler);
 
-        await sender.SendAsync("ada@example.com", "Welcome", "<p>hi</p>");
+        await sender.SendAsync("ada@customer-mail.co", "Welcome", "<p>hi</p>");
 
         var (request, body) = Assert.Single(handler.Requests);
         Assert.Equal(HttpMethod.Post, request.Method);
         Assert.Equal("https://api.postmarkapp.com/email", request.RequestUri!.ToString());
-        Assert.Contains("ada@example.com", body);
+        Assert.Contains("ada@customer-mail.co", body);
         Assert.Contains("no-reply@example.com", body);
         Assert.Contains("outbound", body);
         Assert.Equal("super-secret-server-token", request.Headers.GetValues("X-Postmark-Server-Token").Single());
@@ -66,7 +66,7 @@ public class PostmarkEmailSenderTests
         var sender = Build(handler);
 
         var ex = await Assert.ThrowsAsync<HttpRequestException>(
-            () => sender.SendAsync("ada@example.com", "Welcome", "<p>hi</p>"));
+            () => sender.SendAsync("ada@customer-mail.co", "Welcome", "<p>hi</p>"));
 
         Assert.Equal(status, ex.StatusCode);
         Assert.True((int)ex.StatusCode! is >= 400 and < 500, "4xx must be treated as terminal, not retried");
@@ -88,7 +88,7 @@ public class PostmarkEmailSenderTests
         var sender = Build(handler);
 
         var ex = await Assert.ThrowsAsync<HttpRequestException>(
-            () => sender.SendAsync("ada@example.com", "Welcome", "<p>hi</p>"));
+            () => sender.SendAsync("ada@customer-mail.co", "Welcome", "<p>hi</p>"));
 
         Assert.Equal(status, ex.StatusCode);
         Assert.True((int)ex.StatusCode! >= 500, "5xx must be distinguishable as retryable");
@@ -104,7 +104,7 @@ public class PostmarkEmailSenderTests
         var sender = Build(handler);
 
         var ex = await Assert.ThrowsAsync<HttpRequestException>(
-            () => sender.SendAsync("ada@example.com", "Welcome", "<p>hi</p>"));
+            () => sender.SendAsync("ada@customer-mail.co", "Welcome", "<p>hi</p>"));
 
         Assert.Null(ex.StatusCode); // no HTTP response at all — a transport-level, retryable fault
     }
@@ -118,7 +118,7 @@ public class PostmarkEmailSenderTests
         cts.CancelAfter(TimeSpan.FromMilliseconds(50));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => sender.SendAsync("ada@example.com", "Welcome", "<p>hi</p>", cts.Token));
+            () => sender.SendAsync("ada@customer-mail.co", "Welcome", "<p>hi</p>", cts.Token));
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public class PostmarkEmailSenderTests
         var sender = Build(handler);
 
         var ex = await Assert.ThrowsAsync<HttpRequestException>(
-            () => sender.SendAsync("ada@example.com", "Welcome", "<p>hi</p>"));
+            () => sender.SendAsync("ada@customer-mail.co", "Welcome", "<p>hi</p>"));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, ex.StatusCode);
     }
@@ -152,12 +152,12 @@ public class PostmarkEmailSenderTests
         var sender = Build(handler, logger);
 
         await Assert.ThrowsAsync<HttpRequestException>(
-            () => sender.SendAsync("ada@example.com", "Welcome", TokenBody));
+            () => sender.SendAsync("ada@customer-mail.co", "Welcome", TokenBody));
 
         Assert.DoesNotContain("super-secret-server-token", logger.Text);
         Assert.DoesNotContain("pkce_secret_9f8e7d6c", logger.Text);
         Assert.DoesNotContain("eyJhbGciOiJIUzI1NiJ9", logger.Text);
-        Assert.DoesNotContain("ada@example.com", logger.Text);
+        Assert.DoesNotContain("ada@customer-mail.co", logger.Text);
         // still useful for diagnosis
         Assert.Contains("406", logger.Text);
         Assert.Contains("Inactive recipient", logger.Text);

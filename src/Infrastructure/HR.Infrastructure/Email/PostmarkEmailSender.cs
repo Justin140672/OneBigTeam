@@ -29,6 +29,18 @@ internal sealed class PostmarkEmailSender : IEmailSender
 
     public async Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken ct = default)
     {
+        if (PostmarkRecipientGuard.IsUndeliverable(toEmail))
+        {
+            // Reserved / never-deliverable domain (RFC 2606, or this app's *.example seed personas).
+            // Drop it silently — returning normally (not throwing) so EmailDeliveryJob does not retry
+            // or mark a spurious hard failure. See PostmarkRecipientGuard.
+            _logger.LogWarning(
+                "Postmark send skipped: recipient domain is a reserved / undeliverable address (To={ToEmail}). " +
+                "A live Postmark token is likely configured in a non-production environment.",
+                SensitiveDataScrubber.MaskEmail(toEmail));
+            return;
+        }
+
         var payload = new
         {
             From          = _options.FromEmail,

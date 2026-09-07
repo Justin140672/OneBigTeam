@@ -158,8 +158,17 @@ public static class InfrastructureModule
     private static void AddEmailSender(IServiceCollection services, IConfiguration configuration)
     {
         var postmarkSection = configuration.GetSection("Infrastructure:Postmark");
+        var tokenConfigured = postmarkSection.Exists() && !string.IsNullOrWhiteSpace(postmarkSection["ServerToken"]);
 
-        if (postmarkSection.Exists() && !string.IsNullOrWhiteSpace(postmarkSection["ServerToken"]))
+        // Never wire the live Postmark senders into the Playwright E2E run. That suite boots the real
+        // AppHost with ASPNETCORE_ENVIRONMENT=Development against seeded *.example / *.betacorp.example
+        // personas, so a configured server token would fire real Postmark API calls to reserved-domain
+        // addresses — guaranteed hard bounces that degrade the sending domain's reputation. Mirrors the
+        // existing E2E_TESTING swaps for Stripe (E2eStripeGateway) and Supabase auth (FakeSupabaseAuthGateway).
+        var e2eTesting = string.Equals(
+            Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
+
+        if (tokenConfigured && !e2eTesting)
         {
             services.Configure<PostmarkOptions>(postmarkSection);
             services.Configure<EmailBrandingOptions>(configuration.GetSection("EmailBranding"));

@@ -990,6 +990,7 @@
           "HR.Modules.Employees": "[0.1.0-dev, )",
           "HR.Modules.Identity": "[0.1.0-dev, )",
           "HR.Modules.Leave": "[0.1.0-dev, )",
+          "HR.Modules.Marketing": "[0.1.0-dev, )",
           "HR.Modules.Notifications": "[0.1.0-dev, )",
           "HR.Modules.Offboarding": "[0.1.0-dev, )",
           "HR.Modules.Onboarding": "[0.1.0-dev, )",
@@ -1153,6 +1154,17 @@
           "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",
+          "Microsoft.EntityFrameworkCore": "[10.0.11, )",
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
+        }
+      },
+      "hr.modules.marketing": {
+        "type": "Project",
+        "dependencies": {
+          "FastEndpoints": "[8.2.0, )",
+          "FluentValidation": "[12.1.1, )",
+          "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.SharedKernel": "[0.1.0-dev, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }

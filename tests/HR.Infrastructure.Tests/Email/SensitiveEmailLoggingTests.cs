@@ -102,12 +102,12 @@ public class SensitiveEmailLoggingTests
         var sender = new PostmarkEmailSender(http, options, logger);
 
         await Assert.ThrowsAsync<HttpRequestException>(
-            () => sender.SendAsync("ada@example.com", "Welcome", "<a href=\"https://x/secret?token=abc\">link</a>"));
+            () => sender.SendAsync("ada@customer-mail.co", "Welcome", "<a href=\"https://x/secret?token=abc\">link</a>"));
 
         Assert.DoesNotContain("leaked-signature-value", logger.Text);
         Assert.DoesNotContain("eyJhbGciOiJIUzI1NiJ9", logger.Text);
         Assert.DoesNotContain("leaked_token", logger.Text);
-        Assert.DoesNotContain("ada@example.com", logger.Text);
+        Assert.DoesNotContain("ada@customer-mail.co", logger.Text);
         // still useful for diagnosis: Postmark's own error code/message survive
         Assert.Contains("406", logger.Text);
         Assert.Contains("Inactive recipient", logger.Text);

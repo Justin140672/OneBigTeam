@@ -12,6 +12,7 @@ using HR.Modules.Documents;
 using HR.Modules.Employees;
 using HR.Modules.Identity;
 using HR.Modules.Leave;
+using HR.Modules.Marketing;
 using HR.Modules.Notifications;
 using HR.Modules.Onboarding;
 using HR.Modules.Offboarding;
@@ -69,6 +70,7 @@ builder.Services.AddDocumentsModule(connectionString, builder.Configuration);
 builder.Services.AddEmployeesModule(connectionString, builder.Configuration);
 builder.Services.AddIdentityModule(connectionString, builder.Configuration);
 builder.Services.AddLeaveModule(connectionString);
+builder.Services.AddMarketingModule(connectionString);
 builder.Services.AddNotificationsModule(connectionString);
 builder.Services.AddOnboardingModule(connectionString);
 builder.Services.AddOffboardingModule(connectionString);
@@ -286,6 +288,12 @@ await migrationRunner.RunAsync("leave", app.Services, async sp =>
 {
 	await sp.MigrateLeaveAsync();
 	await sp.SeedLeaveAsync();
+});
+
+await migrationRunner.RunAsync("marketing", app.Services, async sp =>
+{
+	await sp.MigrateMarketingAsync();
+	await sp.SeedMarketingAsync();
 });
 
 await migrationRunner.RunAsync("notifications", app.Services, async sp =>

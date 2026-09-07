@@ -28,6 +28,7 @@ public class ModuleDependencyBoundariesTests
             typeof(HR.Modules.Onboarding.OnboardingModule).Assembly,
             typeof(HR.Modules.Offboarding.OffboardingModule).Assembly,
             typeof(HR.Modules.Support.SupportModule).Assembly,
+            typeof(HR.Modules.Marketing.MarketingModule).Assembly,
         ];
 
     public static TheoryData<Assembly> ModuleAssemblies
