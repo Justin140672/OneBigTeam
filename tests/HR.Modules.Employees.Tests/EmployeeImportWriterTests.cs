@@ -368,4 +368,254 @@ public class EmployeeImportWriterTests
 
         Assert.False(assigned);
     }
+
+    // ---- UpdateEmployeeAsync ----
+
+    private static readonly DateTime SeedNow = new(2026, 1, 2, 9, 0, 0, DateTimeKind.Utc);
+
+    private static Employee SeedExistingEmployee(
+        Guid companyId,
+        string employeeNumber = "EMP-EXISTING",
+        Guid? managerId = null,
+        string? address = null,
+        string? phoneNumber = null,
+        string? city = null,
+        string? postCode = null)
+    {
+        var now = new DateTimeOffset(SeedNow, TimeSpan.Zero);
+        var employee = Employee.Create(
+            Guid.NewGuid(), companyId, "Old", "Name", "old.work@example.com", new DateOnly(2025, 1, 1),
+            hasSystemAccess: false, new DateOnly(1985, 5, 5), "Irish", "Female", employeeNumber,
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+
+        employee.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), managerId, now);
+
+        if (address is not null || phoneNumber is not null || city is not null || postCode is not null)
+        {
+            employee.UpdateContactDetails(
+                "old.personal@example.com", phoneNumber, "01000 000000", address,
+                "Flat 2", city, "Oldshire", postCode, "United Kingdom", now);
+        }
+
+        return employee;
+    }
+
+    private static EmployeeImportCreateRequest BuildUpdateRequest(
+        Guid companyId,
+        Guid? departmentId = null,
+        Guid? locationId = null,
+        Guid? positionProfileId = null,
+        string? address = null,
+        DateOnly? probationEndDate = null,
+        Guid? importSessionId = null,
+        Guid? actorUserId = null) =>
+        new(
+            Guid.NewGuid(),
+            companyId,
+            "Alice",
+            "Smith",
+            PreferredName: "Ali",
+            "alice.new@example.com",
+            PersonalEmail: "alice.personal@example.com",
+            StartDate,
+            DateOfBirth: new DateOnly(1991, 2, 3),
+            Nationality: "British",
+            Gender: "Female",
+            departmentId ?? Guid.NewGuid(),
+            locationId ?? Guid.NewGuid(),
+            Guid.NewGuid(),
+            positionProfileId ?? Guid.NewGuid(),
+            "IGNORED-NUMBER",
+            importSessionId ?? Guid.NewGuid(),
+            actorUserId ?? Guid.NewGuid(),
+            address,
+            probationEndDate);
+
+    [Fact]
+    public async Task UpdateEmployeeAsync_Updates_Profile_And_Organisational_Details()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = SeedExistingEmployee(companyId);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var departmentId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+        var positionProfileId = Guid.NewGuid();
+        var request = BuildUpdateRequest(
+            companyId, departmentId: departmentId, locationId: locationId, positionProfileId: positionProfileId);
+
+        var writer = BuildWriter(context);
+        await writer.UpdateEmployeeAsync(employee.Id, request, CancellationToken.None);
+
+        var saved = await context.Employees.SingleAsync(e => e.Id == employee.Id);
+        Assert.Equal("Alice", saved.FirstName);
+        Assert.Equal("Smith", saved.LastName);
+        Assert.Equal("alice.new@example.com", saved.WorkEmail);
+        Assert.Equal("alice.personal@example.com", saved.PersonalEmail);
+        Assert.Equal(StartDate, saved.StartDate);
+        Assert.Equal("Ali", saved.PreferredName);
+        Assert.Equal(new DateOnly(1991, 2, 3), saved.DateOfBirth);
+        Assert.Equal("British", saved.Nationality);
+        Assert.Equal("Female", saved.Gender);
+        Assert.Equal(departmentId, saved.DepartmentId);
+        Assert.Equal(locationId, saved.LocationId);
+        Assert.Equal(positionProfileId, saved.PositionProfileId);
+    }
+
+    [Fact]
+    public async Task UpdateEmployeeAsync_Preserves_Existing_EmployeeNumber_And_ManagerId()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var employee = SeedExistingEmployee(companyId, employeeNumber: "EMP-KEEP-42", managerId: managerId);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var request = BuildUpdateRequest(companyId);
+        var writer = BuildWriter(context);
+
+        var result = await writer.UpdateEmployeeAsync(employee.Id, request, CancellationToken.None);
+
+        Assert.Equal("EMP-KEEP-42", result.EmployeeNumber);
+        Assert.Equal(managerId, result.ManagerId);
+        var saved = await context.Employees.SingleAsync(e => e.Id == employee.Id);
+        Assert.Equal("EMP-KEEP-42", saved.EmployeeNumber);
+        Assert.Equal(managerId, saved.ManagerId);
+    }
+
+    [Fact]
+    public async Task UpdateEmployeeAsync_Blank_Address_Preserves_Existing_Contact_Details()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = SeedExistingEmployee(
+            companyId, address: "1 Old Street", phoneNumber: "07000 111222", city: "Oldtown", postCode: "OT1 1AA");
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var request = BuildUpdateRequest(companyId, address: "   ");
+        var writer = BuildWriter(context);
+
+        await writer.UpdateEmployeeAsync(employee.Id, request, CancellationToken.None);
+
+        var saved = await context.Employees.SingleAsync(e => e.Id == employee.Id);
+        Assert.Equal("1 Old Street", saved.AddressLine1);
+        Assert.Equal("Flat 2", saved.AddressLine2);
+        Assert.Equal("07000 111222", saved.PhoneNumber);
+        Assert.Equal("01000 000000", saved.HomePhone);
+        Assert.Equal("Oldtown", saved.City);
+        Assert.Equal("Oldshire", saved.County);
+        Assert.Equal("OT1 1AA", saved.PostCode);
+        Assert.Equal("United Kingdom", saved.Country);
+    }
+
+    [Fact]
+    public async Task UpdateEmployeeAsync_Supplied_Address_Updates_Address_But_Preserves_Other_Contact_Fields()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = SeedExistingEmployee(
+            companyId, address: "1 Old Street", phoneNumber: "07000 111222", city: "Oldtown", postCode: "OT1 1AA");
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var request = BuildUpdateRequest(companyId, address: "99 New Avenue");
+        var writer = BuildWriter(context);
+
+        await writer.UpdateEmployeeAsync(employee.Id, request, CancellationToken.None);
+
+        var saved = await context.Employees.SingleAsync(e => e.Id == employee.Id);
+        Assert.Equal("99 New Avenue", saved.AddressLine1);
+        Assert.Equal("Flat 2", saved.AddressLine2);
+        Assert.Equal("07000 111222", saved.PhoneNumber);
+        Assert.Equal("01000 000000", saved.HomePhone);
+        Assert.Equal("Oldtown", saved.City);
+        Assert.Equal("Oldshire", saved.County);
+        Assert.Equal("OT1 1AA", saved.PostCode);
+        Assert.Equal("United Kingdom", saved.Country);
+    }
+
+    [Fact]
+    public async Task UpdateEmployeeAsync_Explicit_ProbationEndDate_Takes_Precedence()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = SeedExistingEmployee(companyId);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var explicitDate = new DateOnly(2026, 12, 25);
+        var request = BuildUpdateRequest(companyId, probationEndDate: explicitDate);
+        var writer = BuildWriter(context, probationDateResolver: new FakeProbationDateResolver(months: 6));
+
+        var result = await writer.UpdateEmployeeAsync(employee.Id, request, CancellationToken.None);
+
+        Assert.Equal(explicitDate, result.ProbationEndDate);
+        var saved = await context.Employees.SingleAsync(e => e.Id == employee.Id);
+        Assert.Equal(explicitDate, saved.ProbationEndDate);
+    }
+
+    [Fact]
+    public async Task UpdateEmployeeAsync_Falls_Back_To_Resolver_When_ProbationEndDate_Null()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = SeedExistingEmployee(companyId);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var request = BuildUpdateRequest(companyId, probationEndDate: null);
+        var writer = BuildWriter(context, probationDateResolver: new FakeProbationDateResolver(months: 4));
+
+        var result = await writer.UpdateEmployeeAsync(employee.Id, request, CancellationToken.None);
+
+        Assert.Equal(StartDate.AddMonths(4), result.ProbationEndDate);
+    }
+
+    [Fact]
+    public async Task UpdateEmployeeAsync_Cannot_Update_Employee_Belonging_To_Another_Company()
+    {
+        await using var context = BuildContext();
+        var seededCompanyId = Guid.NewGuid();
+        var employee = SeedExistingEmployee(seededCompanyId);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var otherCompanyRequest = BuildUpdateRequest(Guid.NewGuid());
+        var writer = BuildWriter(context);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => writer.UpdateEmployeeAsync(employee.Id, otherCompanyRequest, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task UpdateEmployeeAsync_Result_And_Audit_Event_Identify_The_Correct_Employee_And_Import_Session()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = SeedExistingEmployee(companyId);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var importSessionId = Guid.NewGuid();
+        var actorUserId = Guid.NewGuid();
+        var auditPublisher = new FakeAuditPublisher();
+        var request = BuildUpdateRequest(companyId, importSessionId: importSessionId, actorUserId: actorUserId);
+        var writer = BuildWriter(context, auditPublisher);
+
+        var result = await writer.UpdateEmployeeAsync(employee.Id, request, CancellationToken.None);
+
+        Assert.Equal(employee.Id, result.EmployeeId);
+
+        var published = Assert.Single(auditPublisher.Published);
+        var evt = Assert.IsType<EmployeeCreatedAuditEvent>(published);
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(employee.Id, evt.EmployeeId);
+        Assert.Equal(actorUserId, evt.ActorUserId);
+        Assert.Equal("Import", evt.Source);
+        Assert.Equal(importSessionId, evt.ImportSessionId);
+    }
 }
