@@ -788,9 +788,9 @@ public class SubmitLeaveRequestHandlerTests
         // LEAVE-04 wiring: Monthly accrual with an accrual start date of Feb 1 2026 means, by
         // FixedUtcNow (Jun 12 2026), only complete monthly periods Feb1->Mar1->Apr1->May1->Jun1 = 4
         // of the 10 total periods (Feb1..Dec1) in this Jan-Dec policy year have elapsed.
-        // Accrued = 24 * 4/10 = 9.60 - comfortably enough to cover a 5-day request against the
-        // *raw* 24-day entitlement, but the handler must gate on the accrued figure and reject a
-        // 10-day request that exceeds it.
+        // Accrued = 24 * 4/10 = 9.60, floored to the nearest half day = 9.5 - comfortably enough to
+        // cover a 5-day request against the *raw* 24-day entitlement, but the handler must gate on
+        // the accrued figure and reject a 10-day request that exceeds it.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -812,7 +812,7 @@ public class SubmitLeaveRequestHandlerTests
 
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
 
-        // 2026-08-03 (Mon) - 2026-08-14 (Fri, next week) = 10 working days > 9.60 accrued.
+        // 2026-08-03 (Mon) - 2026-08-14 (Fri, next week) = 10 working days > 9.5 accrued.
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id) with
             {
@@ -823,7 +823,7 @@ public class SubmitLeaveRequestHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
-        Assert.Contains("9.6", result.Error.Message);
+        Assert.Contains("9.5", result.Error.Message);
     }
 
     [Fact]

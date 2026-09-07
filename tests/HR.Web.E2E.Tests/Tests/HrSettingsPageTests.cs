@@ -110,10 +110,9 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
             await hrSettings.SelectNoticePeriodPresetAsync("3 months");
             await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
             await hrSettings.SetEmployeeNumberPrefixAsync("STF-");
-            await hrSettings.SetNextEmployeeNumberAsync(15);
             await hrSettings.SetEmployeeNumberMinimumLengthAsync(6);
 
-            await hrSettings.SaveAsync();
+            await SaveAndWaitForRenumberToSettleAsync(hrSettings, "STF-");
             Assert.False(await hrSettings.HasErrorAsync(),
                 "Expected no error after saving representative HR settings fields");
 
@@ -128,8 +127,23 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
             Assert.Equal("3 months", await hrSettings.GetNoticePeriodPresetAsync());
             Assert.Equal("Automatic", await hrSettings.GetEmployeeNumberModeAsync());
             Assert.Equal("STF-", await hrSettings.GetEmployeeNumberPrefixAsync());
-            Assert.Equal(15, await hrSettings.GetNextEmployeeNumberAsync());
             Assert.Equal(6, await hrSettings.GetEmployeeNumberMinimumLengthAsync());
+
+            // NextEmployeeNumber is deliberately NOT asserted above: changing the prefix/minimum
+            // length while in Automatic mode triggers a background renumber
+            // (EmployeeRenumberSideEffectJob, see UpdateHrSettings/Handler.cs) that recalculates
+            // NextEmployeeNumber from the company's actual employee count, overwriting whatever
+            // value was submitted in the same save — asserting a hand-picked number here would be
+            // asserting the wrong (and non-deterministic, race-dependent-on-the-background-job)
+            // behaviour. Verify NextEmployeeNumber's own persistence separately, via a save that
+            // does NOT also change the prefix/minimum length, so no renumber is triggered.
+            await hrSettings.SetNextEmployeeNumberAsync(15);
+            await hrSettings.SaveAsync();
+            Assert.False(await hrSettings.HasErrorAsync(),
+                "Expected no error after saving the next employee number on its own");
+
+            await hrSettings.GoToAsync(BetaCorpId);
+            Assert.Equal(15, await hrSettings.GetNextEmployeeNumberAsync());
         }
         finally
         {
@@ -146,8 +160,12 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
                 await hrSettings.SetEmployeeNumberPrefixAsync(initialPrefix ?? "");
                 await hrSettings.SetNextEmployeeNumberAsync(initialNextNumber ?? 1);
                 await hrSettings.SetEmployeeNumberMinimumLengthAsync(initialMinLength ?? 1);
+                await SaveAndWaitForRenumberToSettleAsync(hrSettings, initialPrefix ?? "");
             }
-            await hrSettings.SaveAsync();
+            else
+            {
+                await hrSettings.SaveAsync();
+            }
         }
     }
 
@@ -221,9 +239,26 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         await login.LoginAsync(CompanyAdminEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/hr-settings");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
+        // Blazor Server's own authorization redirect (NavigateTo, fired from OnInitializedAsync
+        // after the circuit determines the user lacks access) happens entirely over the page's
+        // already-open SignalR connection — no additional HTTP request is made for it. Playwright's
+        // NetworkIdle waits for HTTP network activity to settle, but the long-lived SignalR
+        // websocket never goes away for the life of the page, so NetworkIdle here either times out
+        // outright or (when it does resolve, e.g. against buffered/pooled connections) can resolve
+        // before the redirect's own render has actually landed — either way it's the wrong signal to
+        // wait on for a client-side navigation with no page load. Poll the URL directly instead,
+        // the same way every other post-navigation assertion in this suite avoids NetworkIdle.
+        var deadline = DateTime.UtcNow.AddSeconds(15);
         var finalUrl = _page.Url;
+        while (DateTime.UtcNow < deadline)
+        {
+            finalUrl = _page.Url;
+            if (!finalUrl.TrimEnd('/').EndsWith($"/companies/{AcmeId}/hr-settings", StringComparison.OrdinalIgnoreCase))
+                break;
+            await _page.WaitForTimeoutAsync(200);
+        }
+
         Assert.False(finalUrl.TrimEnd('/').EndsWith($"/companies/{AcmeId}/hr-settings", StringComparison.OrdinalIgnoreCase),
             $"Expected Priya (CompanyAdministrator-only, no IsHrAdministrator) to be redirected away " +
             $"from the HR Settings page, but ended up at: {finalUrl}");
@@ -265,6 +300,51 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
     // EmployeeRenumberSideEffectJobTests and EmployeeRenumberSideEffectEndpointTests.
 
     private static readonly Guid GraceKimEmployeeId = Guid.Parse("30000000-0000-0000-0000-000000000015");
+
+    /// <summary>
+    /// Clicks Save and, if that submission actually triggered the "Renumber existing employees?"
+    /// confirmation (a prefix/minimum-length change while staying in Automatic mode), confirms it
+    /// AND waits for the background job to fully apply before returning — mirroring the polling
+    /// PrefixChange_ShowsRenumberDialog_AndConfirming_RenumbersExistingEmployees already does.
+    /// Without this wait, a caller that immediately performs a second save on the same
+    /// CompanySettings row (whether later in the same test, e.g.
+    /// UpdateRepresentativeFieldsAcrossAllSections_PersistAfterReload's own NextEmployeeNumber-only
+    /// save, or in a completely different test in this serialized class that happens to run right
+    /// after) can submit a stale optimistic-concurrency Version — the job's own update to
+    /// NextEmployeeNumber bumps Version as it completes — and get a spurious "HR settings were
+    /// changed by someone else" conflict that has nothing to do with the field(s) that test is
+    /// actually exercising. This is the real, recurring root cause behind this class's flakiness:
+    /// tests were leaving a still-processing renumber job behind them for the next test (or their
+    /// own next save) to race against, not any defect in the renumber-gating logic itself.
+    /// </summary>
+    private async Task SaveAndWaitForRenumberToSettleAsync(HrSettingsPage hrSettings, string expectedPrefixIfRenumbered)
+    {
+        await hrSettings.ClickSaveAsync();
+        var renumbered = await hrSettings.IsRenumberDialogVisibleAsync();
+        if (renumbered)
+            await hrSettings.ConfirmRenumberAsync();
+        await _page.WaitForSpinnerToClearAsync();
+
+        if (renumbered)
+        {
+            var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+            await empEdit.GoToViewAsync(BetaCorpId, GraceKimEmployeeId);
+
+            var deadline = DateTime.UtcNow.AddSeconds(90);
+            var number = await empEdit.GetEmployeeNumberFieldValueAsync();
+            while (!number.StartsWith(expectedPrefixIfRenumbered, StringComparison.Ordinal) && DateTime.UtcNow < deadline)
+            {
+                await _page.WaitForTimeoutAsync(3_000);
+                await _page.ReloadAsync();
+                number = await empEdit.GetEmployeeNumberFieldValueAsync();
+            }
+        }
+
+        // Mirror HrSettingsPage.SaveAsync's own post-save behaviour — we bypassed it above (and
+        // may have navigated away to the employee edit page while waiting for the job).
+        if (!_page.Url.Contains("/hr-settings", StringComparison.OrdinalIgnoreCase))
+            await hrSettings.GoToAsync(BetaCorpId);
+    }
 
     [Fact]
     public async Task PrefixChange_ShowsRenumberDialog_AndConfirming_RenumbersExistingEmployees()

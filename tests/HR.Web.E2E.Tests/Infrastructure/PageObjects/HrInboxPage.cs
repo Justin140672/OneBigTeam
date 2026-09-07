@@ -7,7 +7,14 @@ public sealed class HrInboxPage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/hr/inbox");
-        await page.WaitForSelectorAsync(".inbox-card, .inbox-empty", new() { Timeout = 20_000 });
+        // EmployeeLifecycleTabVisibilityTests.OffboardingTab_IsHidden_AfterCompletion round-trips
+        // through this page repeatedly (once per outstanding offboarding task, claim-then-complete)
+        // in the same test — a longer, multi-step flow than most other callers of this page object,
+        // giving the underlying Blazor Server render more chances to occasionally still be mid
+        // spinner-to-grid repaint when Playwright's first poll lands. Match the more generous 30s
+        // budget already used for other multi-round-trip pages in this suite rather than the
+        // original 20s.
+        await page.WaitForSelectorAsync(".inbox-card, .inbox-empty", new() { Timeout = 30_000 });
     }
 
     public async Task<bool> IsEmptyAsync() =>

@@ -24,6 +24,35 @@ public sealed class RecruitmentDashboardRedesignTests(RecruiterPersonaFixture fi
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
 
+    // Every test here reads the shared, company-wide Acme recruitment stage list (via the embedded
+    // Kanban board's columns, which are the company's active RecruitmentStage rows — see
+    // GetRecruitmentKanbanHandler). RecruitmentStageManagementTests mutates that exact list
+    // (temporarily deactivating/reactivating "Hired"/"Rejected" as part of its validation-error
+    // coverage) and already serializes against CrossUserVacancyTestBase.GateInstance from outside
+    // that group (different fixture type — RecruiterPersonaFixture, not CrossUserFixture — so it
+    // can't join the group at the type level either). This class was missing that same join, so it
+    // could observe a transiently-deactivated "Hired"/"Rejected" stage (or a stage list mid-reorder)
+    // while RecruitmentStageManagementTests was between its own try/finally guards — join the same
+    // gate directly, mirroring RecruitmentStageManagementTests' and
+    // VacancyKanbanBoardRedesignTests' own IAsyncLifetime overrides.
+    public override async Task InitializeAsync()
+    {
+        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
+        await base.InitializeAsync();
+    }
+
+    public override async Task DisposeAsync()
+    {
+        try
+        {
+            await base.DisposeAsync();
+        }
+        finally
+        {
+            CrossUserVacancyTestBase.GateInstance.Release();
+        }
+    }
+
     [Fact]
     public async Task Dashboard_ShowsHeaderTitleAndSummary_AndKpiTiles_AndNavTabs()
     {

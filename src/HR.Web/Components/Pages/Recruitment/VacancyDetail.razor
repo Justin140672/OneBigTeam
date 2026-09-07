@@ -79,6 +79,12 @@
                     Close Vacancy
                 </SfButton>
             }
+            @if (Session.CanManageRecruitment && _vacancy is not null && _vacancy.Status != "Draft")
+            {
+                <SfButton CssClass="@(CanPublish || CanClose ? null : "ms-auto")" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/vacancies/{Id}/kanban"))">
+                    View Kanban Board
+                </SfButton>
+            }
         </div>
         <p class="text-muted mb-3">Manage this vacancy's details, applications, and interviews.</p>
 
@@ -95,7 +101,7 @@
             <div class="alert alert-danger mb-3">@_publishError</div>
         }
 
-        <SfTab>
+        <SfTab @bind-SelectedItem="_selectedTabIndex">
             <TabItems>
                 <TabItem>
                     <ChildContent><TabHeader Text="Overview" /></ChildContent>
@@ -141,18 +147,6 @@
                             </div>
                         </ContentTemplate>
                     </TabItem>
-
-                    @if (Session.CanManageRecruitment)
-                    {
-                        <TabItem>
-                            <ChildContent><TabHeader Text="Kanban" /></ChildContent>
-                            <ContentTemplate>
-                                <div class="mt-4">
-                                    <VacancyKanbanBoard CompanyId="CompanyId" VacancyId="Id!.Value" @bind-SearchText="_kanbanSearchText" ShowTerminalStages="true" />
-                                </div>
-                            </ContentTemplate>
-                        </TabItem>
-                    }
                 }
             </TabItems>
         </SfTab>
@@ -181,7 +175,9 @@
     private string? _closeError;
     private bool _publishing;
     private string? _publishError;
-    private string _kanbanSearchText = string.Empty;
+
+    // Explicit, server-tracked selected tab for the Overview/Applications/Interviews SfTab above.
+    private int _selectedTabIndex;
 
     private string PageTitle => IsNew ? "Add Vacancy"
         : _vacancy is not null ? _vacancy.EffectiveTitle

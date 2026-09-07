@@ -21,7 +21,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// fresh employee via EnsureEmployeeLoginAsync instead — see that helper's remarks for how a
 /// freshly-created employee gets a real, working login.
 /// </summary>
-public sealed class AssetAcknowledgementTaskTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
+public sealed class AssetAcknowledgementTaskTests(EmployeePersonaFixture fixture) : SupabaseAuthSerialEmployeeTestBase(fixture)
 {
     private static readonly Guid AcmeId              = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId               = Guid.Parse("30000000-0000-0000-0000-000000000004");

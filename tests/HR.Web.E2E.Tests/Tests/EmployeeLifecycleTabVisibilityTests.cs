@@ -231,9 +231,15 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
         // exists anywhere in the UI.
         await empEdit.GoToAsync(AcmeId, employeeId);
 
-        Assert.False(
-            await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
-            "Expected the Offboarding tab to be hidden once the plan is Completed");
+        // Same race documented on EmployeeOnboardingTabTests's equivalent post-completion check:
+        // GoToAsync's own wait condition (the Details tab's combobox) can resolve on an earlier
+        // render pass than the Offboarding tab's own visibility, which depends on its own async
+        // plan-status load — a bare IsSectionTabPresentAsync() snapshot right after navigation can
+        // catch that transient state instead of the settled (hidden) one. Use an auto-retrying
+        // negative assertion instead of a one-shot check.
+        await EmployeeEditPage.SelectOwningGroupAsync(_page, "Offboarding");
+        await Assertions.Expect(EmployeeEditPage.SectionTab(_page, "Offboarding"))
+            .Not.ToBeVisibleAsync(new() { Timeout = 15_000 });
         Assert.False(
             await _page.GetByRole(AriaRole.Button, new() { Name = "Start Offboarding" }).IsVisibleAsync(),
             "Expected no manual 'Start Offboarding' entry point anywhere");

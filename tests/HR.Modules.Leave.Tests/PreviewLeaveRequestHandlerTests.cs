@@ -442,9 +442,10 @@ public class PreviewLeaveRequestHandlerTests
         // LEAVE-04 wiring: Monthly accrual with an accrual start date of Feb 1 2026 means, by Now
         // (Jun 12 2026), only complete monthly periods Feb1->Mar1->Apr1->May1->Jun1 = 4 of the 10
         // total periods (Feb1..Dec1) in this Jan-Dec policy year have elapsed. Accrued = 24 * 4/10
-        // = 9.60. Preview must report this accrued figure - not the raw 24-day entitlement - as
-        // RemainingBalance, and flag WouldExceedBalance for a 10-day request that exceeds the
-        // accrued amount even though it would have fit comfortably within the raw entitlement.
+        // = 9.60, floored to the nearest half day = 9.5. Preview must report this accrued figure -
+        // not the raw 24-day entitlement - as RemainingBalance, and flag WouldExceedBalance for a
+        // 10-day request that exceeds the accrued amount even though it would have fit comfortably
+        // within the raw entitlement.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -466,7 +467,7 @@ public class PreviewLeaveRequestHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(9.60m, result.Value!.RemainingBalance);
-        Assert.True(result.Value.WouldExceedBalance); // 10 requested > 9.60 accrued (though < 24 raw)
+        Assert.Equal(9.5m, result.Value!.RemainingBalance);
+        Assert.True(result.Value.WouldExceedBalance); // 10 requested > 9.5 accrued (though < 24 raw)
     }
 }

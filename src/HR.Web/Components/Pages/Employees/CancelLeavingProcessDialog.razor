@@ -78,11 +78,16 @@
 
     private async Task ConfirmAsync()
     {
+        _globalError = null;
+
         if (!_editContext.Validate())
+        {
+            _globalError = _editContext.GetValidationMessages().FirstOrDefault()
+                ?? "Please correct the highlighted fields below.";
             return;
+        }
 
         _submitting = true;
-        _globalError = null;
 
         var request = new CancelLeavingProcessRequest(CompanyId, EmployeeId, _model.CancellationReason!.Trim());
 

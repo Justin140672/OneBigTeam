@@ -56,19 +56,17 @@ public sealed class AppFixture : IAsyncLifetime
         _playwright = await Playwright.CreateAsync();
         _browser    = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
-            // Headless is now the default — see the E2E speedup plan (2026-08-15). Headless
-            // Chromium treats every page as backgrounded/unfocused (there's no real window to hold
-            // focus), which triggers Chrome's normal power-saving throttling of background-tab
-            // timers — setTimeout/rAF-based work can be delayed to as little as once per second.
-            // Syncfusion's AllowFiltering debounce (and other internal JS timers) rely on exactly
-            // this kind of timer, so filtering/popup state that updates promptly in a headed run
-            // could stall for seconds in headless. The launch args below disable that throttling so
-            // headless behaves like a normal focused tab; verified stable (including
-            // combobox-heavy tests) as part of the same speedup pass, so SlowMo is no longer needed
-            // either. If headless flakiness ever reappears, flip Headless back to false here as a
-            // quick diagnostic, but the throttling args should mean that's no longer necessary.
-            Headless = false,
-            SlowMo = 1000,
+            // Headless=true is a hard requirement, not a preference — this suite runs on a build
+            // server with no display, so Headless=false is not an option there (it's only ever
+            // useful as a local, throwaway diagnostic on a machine that HAS a display). A live
+            // headless run has previously spiked from ~17 failures to 145+, overwhelmingly
+            // Syncfusion combobox/dialog timing races (see memory: E2E headless combobox
+            // flakiness) — the throttling args below help but are not sufficient on their own.
+            // Fix headless reliability at its source (harden the actual page-object interactions —
+            // e.g. DropDownSelector's retry loops — the same way the Kanban drag flakiness was
+            // eventually fixed) rather than flipping this to Headless=false; that "fix" just moves
+            // the failures to whichever environment can't use it.
+            Headless = true,
             Args =
             [
                 "--disable-background-timer-throttling",

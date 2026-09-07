@@ -33,11 +33,37 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
             new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
     }
 
-    public Task<bool> HasPositionProfileAsync(string titleFragment) =>
-        page.Locator(".e-rowcell")
-            .Filter(new() { HasText = titleFragment })
-            .First
-            .WaitUntilVisibleAsync();
+    /// <summary>
+    /// Returns true if a row containing <paramref name="titleFragment"/> exists ANYWHERE in the
+    /// grid, not just on the currently displayed page. The grid pages client-side at 20 rows
+    /// (GridPageSettings PageSize="20" in PositionProfileList.razor) over the full, alphabetically
+    /// title-sorted result set (ListPositionProfiles orders by Title) — this suite has accumulated
+    /// enough "E2E ..."-titled profiles created by other test classes (never cleaned up) that a
+    /// seeded profile sorting after them (e.g. "Software Engineer") can now land past page 1. A
+    /// bare current-page-only check here is a real, growing flakiness source as the suite grows,
+    /// not a one-off data collision — paginate through the grid instead of assuming page 1 is
+    /// exhaustive.
+    /// </summary>
+    public async Task<bool> HasPositionProfileAsync(string titleFragment)
+    {
+        var matchOnCurrentPage = page.Locator(".e-rowcell").Filter(new() { HasText = titleFragment }).First;
+
+        for (var guard = 0; guard < 25; guard++)
+        {
+            if (await matchOnCurrentPage.IsVisibleAsync())
+                return true;
+
+            var nextPage = page.Locator(".e-pagernextprevdiv.e-next:not(.e-disable), a.e-next:not(.e-disable)").First;
+            if (!await nextPage.IsVisibleAsync())
+                return false;
+
+            await nextPage.ClickAsync();
+            await page.WaitForSpinnerToClearAsync();
+            await page.WaitForTimeoutAsync(200);
+        }
+
+        return false;
+    }
 
     public async Task<IReadOnlyList<string>> GetPositionProfileTitlesAsync()
     {

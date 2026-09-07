@@ -20,6 +20,22 @@
    header (app.css) so the Kanban board reads as part of the same design
    system. Replaces an earlier Syncfusion SfKanban-based layout. */
 
+/* The board's own root .vacancy-kanban-board is an ordinary block div with no width/overflow of
+   its own, so its "automatic minimum size" for layout purposes is the max-content width of
+   everything inside it (per the flex/grid sizing spec, overflow: visible — the default — keeps
+   the intrinsic content size as the box's floor). Embedded inside RecruitmentDashboard's page
+   shell (a flex/grid layout ancestor further up the tree), that intrinsic width — six 300px-wide
+   Kanban columns, ~1800px+ — gets reported upward as this box's own minimum width and forces the
+   shell's content column wider than the viewport, which is what actually overflows the document
+   at 375px (not the toolbar controls fixed in an earlier pass, nor .vacancy-kanban-board__columns
+   below, which already has its own overflow-x: auto and — being non-visible overflow — is already
+   exempt from this same intrinsic-sizing rule). min-width: 0 stops that propagation so only this
+   inner scroller, not the whole page, ends up wider than the viewport. */
+.vacancy-kanban-board {
+    min-width: 0;
+    max-width: 100%;
+}
+
 .vacancy-kanban-board__columns {
     display: flex;
     align-items: flex-start;

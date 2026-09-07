@@ -13,7 +13,19 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Carlos's actual line manager and an HrAdministrator. The single-resource probation review
 /// read (GET /probation-reviews/{id}) enforces reporting-chain / HR scope, so the task assignee
 /// (and this test's persona) has to be someone who can genuinely view Carlos's review.
+///
+/// Several tests read the shared seeded task above, and one (<see
+/// cref="TaskView_CompleteReview_ChangesStatusToCompleted"/>) mutates it by completing the
+/// review. xUnit does not guarantee declaration-order execution, so that mutation must be
+/// pinned to run after the read-only tests via <see cref="TestPriorityAttribute"/> +
+/// <see cref="PriorityOrderer"/> — relying on method declaration order (as a stale "Run last"
+/// comment used to) let the mutating test run first non-deterministically, which completed the
+/// task before the read-only tests navigated to it. Completing a task doesn't remove its
+/// `task-view-btn-{id}` row (GetMyTasksHandler has no status filter and shows completed tasks
+/// too), but it can still change other content those tests assert on, so pinning order removes
+/// the whole class of flake rather than relying on incidental behaviour.
 /// </summary>
+[TestCaseOrderer("HR.Web.E2E.Tests.Infrastructure.PriorityOrderer", "HR.Web.E2E.Tests")]
 public sealed class ProbationReviewTaskTests(DavidParkPersonaFixture fixture)
     : RoleE2ETestBase<DavidParkPersonaFixture>(fixture)
 {
@@ -89,8 +101,10 @@ public sealed class ProbationReviewTaskTests(DavidParkPersonaFixture fixture)
             "Expected no 'Complete Probation Review' panel on a non-ProbationReview task");
     }
 
-    // Run last — mutates the seeded task by completing the review.
+    // Runs last — mutates the seeded task by completing the review. Enforced via
+    // TestPriorityAttribute/PriorityOrderer above, not declaration order (see class remarks).
     [Fact]
+    [TestPriority(1)]
     public async Task TaskView_CompleteReview_ChangesStatusToCompleted()
     {
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);

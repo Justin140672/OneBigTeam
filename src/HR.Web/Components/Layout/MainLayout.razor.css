@@ -64,7 +64,7 @@
 }
 
 .top-bar {
-    height: 56px;
+    min-height: 56px;
     background: #ffffff;
     border-bottom: 1px solid var(--hr-gray-200);
     box-shadow: var(--hr-shadow-sm);
@@ -76,11 +76,21 @@
     z-index: 10;
 }
 
+.page-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 1;
+}
+
 .top-bar-actions {
     margin-left: auto;
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
+    flex-shrink: 0;
 }
 
 .top-bar-user {

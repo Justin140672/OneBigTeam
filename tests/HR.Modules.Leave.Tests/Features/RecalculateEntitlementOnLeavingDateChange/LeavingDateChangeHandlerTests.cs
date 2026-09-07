@@ -268,10 +268,11 @@ public class LeavingDateChangeHandlerTests
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        // LeaveEntitlementCalculator.CalculateEntitlement rounds pro-rated entitlement to 2 decimal
-        // places (AwayFromZero) — see its final Math.Round call — so the expectation here must match
-        // that rounding, not the unrounded fraction.
-        Assert.Equal(Math.Round(24m * 181 / 365, 2, MidpointRounding.AwayFromZero), updated.EntitlementDays);
+        // LeaveEntitlementCalculator.CalculateEntitlement rounds pro-rated entitlement to the
+        // nearest half day (AwayFromZero) — see its RoundToNearestHalfDay helper — so the
+        // expectation here must match that rounding, not the unrounded fraction.
+        // 24 * 181 / 365 = 11.8904... rounds to the nearest half day = 12.0
+        Assert.Equal(12.0m, updated.EntitlementDays);
     }
 
     private static LeaveDbContext BuildContext()

@@ -115,7 +115,10 @@
                     </div>
                 }
 
-                <SfButton OnClick="BackToList">Close</SfButton>
+                <div class="d-flex gap-2">
+                    <SfButton OnClick="BackToList">Close</SfButton>
+                    <SfButton CssClass="e-outline" OnClick="OpenAuditHistoryDialog">View Audit History</SfButton>
+                </div>
             </div>
         </div>
 
@@ -128,6 +131,11 @@
                                    OnCancelled="CloseManageRolesDialog"
                                    OnCompleted="OnRolesUpdated" />
         }
+
+        <UserAuditHistoryDialog CompanyId="CompanyId"
+                                EmployeeId="EmployeeId"
+                                IsOpen="_showAuditHistoryDialog"
+                                OnClosed="CloseAuditHistoryDialog" />
     }
 </div>
 
@@ -142,6 +150,7 @@
     private string? _globalSuccess;
     private bool _actionInProgress;
     private bool _showManageRolesDialog;
+    private bool _showAuditHistoryDialog;
 
     private bool _canManage => Session.CanManageUsers;
 
@@ -259,6 +268,10 @@
     }
 
     private void CloseManageRolesDialog() => _showManageRolesDialog = false;
+
+    private void OpenAuditHistoryDialog() => _showAuditHistoryDialog = true;
+
+    private void CloseAuditHistoryDialog() => _showAuditHistoryDialog = false;
 
     private async Task OnRolesUpdated()
     {

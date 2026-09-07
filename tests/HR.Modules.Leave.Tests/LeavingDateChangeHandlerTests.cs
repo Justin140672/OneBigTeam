@@ -38,7 +38,7 @@ public class LeavingDateChangeHandlerTests
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(12.4m, updated.EntitlementDays); // 25 * 181 / 365 = 12.397... rounded to 12.4
+        Assert.Equal(12.5m, updated.EntitlementDays); // 25 * 181 / 365 = 12.397... rounded to nearest half day = 12.5
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class LeavingDateChangeHandlerTests
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(18.7m, updated.EntitlementDays); // 25 * 273 / 365 = 18.6986... rounded to 18.70
+        Assert.Equal(18.5m, updated.EntitlementDays); // 25 * 273 / 365 = 18.6986... rounded to nearest half day = 18.5
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class LeavingDateChangeHandlerTests
             CancellationToken.None);
 
         var reduced = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(12.4m, reduced.EntitlementDays);
+        Assert.Equal(12.5m, reduced.EntitlementDays);
 
         // Cancellation targets the *current* policy year (which, with FixedUtcNow of 2026-06-11,
         // is the same policy year the leaving date fell in).
@@ -141,7 +141,7 @@ public class LeavingDateChangeHandlerTests
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(12.4m, updated.EntitlementDays);
+        Assert.Equal(12.5m, updated.EntitlementDays);
         Assert.Equal(3m, updated.UsedDays);
         Assert.Equal(1m, updated.AdjustmentDays);
     }
@@ -173,9 +173,9 @@ public class LeavingDateChangeHandlerTests
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(0.68m, updated.EntitlementDays); // 25 * 10 / 365 = 0.6849... rounded to 0.68
+        Assert.Equal(0.5m, updated.EntitlementDays); // 25 * 10 / 365 = 0.6849... rounded to nearest half day = 0.5
         Assert.Equal(10m, updated.UsedDays);
-        Assert.Equal(-9.32m, updated.RemainingDays); // 0.68 + 0 - 10
+        Assert.Equal(-9.5m, updated.RemainingDays); // 0.5 + 0 - 10
     }
 
     [Fact]
@@ -291,7 +291,7 @@ public class LeavingDateChangeHandlerTests
         var recalculatedFutureYear = await context.LeaveBalances.SingleAsync(b => b.PolicyYear == futurePolicyYear);
 
         Assert.Equal(25m, untouchedCurrentYear.EntitlementDays);
-        Assert.Equal(12.4m, recalculatedFutureYear.EntitlementDays); // 25 * 181 / 365 = 12.397... rounded to 12.4
+        Assert.Equal(12.5m, recalculatedFutureYear.EntitlementDays); // 25 * 181 / 365 = 12.397... rounded to nearest half day = 12.5
     }
 
     [Fact]
@@ -323,7 +323,7 @@ public class LeavingDateChangeHandlerTests
         await handler.HandleAsync(integrationEvent, CancellationToken.None);
         var afterSecond = await context.LeaveBalances.SingleAsync();
 
-        Assert.Equal(12.4m, afterFirstEntitlement);
+        Assert.Equal(12.5m, afterFirstEntitlement);
         Assert.Equal(afterFirstEntitlement, afterSecond.EntitlementDays);
     }
 
@@ -363,7 +363,7 @@ public class LeavingDateChangeHandlerTests
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(14.66m, updated.EntitlementDays); // 25 * 214 / 365 = 14.657... rounded to 14.66
+        Assert.Equal(14.5m, updated.EntitlementDays); // 25 * 214 / 365 = 14.657... rounded to nearest half day = 14.5
     }
 
     private static LeavingDateChangeHandler BuildHandler(LeaveDbContext context, DateOnly? startDate) =>

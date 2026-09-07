@@ -158,8 +158,11 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : HrFavourit
             await task.WaitForLoadedAsync();
             Assert.Contains("/dashboard/hr", _page.Url);
 
+            // The dialog header shows the task's own title ("{Action} — {EmployeeName}"), not the
+            // queue row's "{EmployeeName} · Due {Date}" meta text used to find/click the row above
+            // — only the employee name is common to both, so that's what we can assert here.
             var title = await task.GetTitleAsync();
-            Assert.Contains(carlos, title, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Carlos", title, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

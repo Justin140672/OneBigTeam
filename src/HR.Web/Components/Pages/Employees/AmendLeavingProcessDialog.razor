@@ -156,7 +156,11 @@
         _globalError = null;
 
         if (!_editContext.Validate())
+        {
+            _globalError = _editContext.GetValidationMessages().FirstOrDefault()
+                ?? "Please correct the highlighted fields below.";
             return;
+        }
 
         _submitting = true;
 

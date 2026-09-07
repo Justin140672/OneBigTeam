@@ -133,7 +133,12 @@ public abstract class CrossUserTenantAndMiscTestBase(CrossUserFixture fixture)
 public abstract class HrSettingsSerialTestBase(HrSettingsSerialFixture fixture)
     : GroupSerializedE2ETestBase<HrSettingsSerialFixture>(fixture)
 {
-    private static readonly SemaphoreSlim GateInstance = new(1, 1);
+    // Exposed publicly (not just via the protected Gate override below) so a class that can't
+    // join this group at the type level — e.g. ApplicationToEmployeeFlowTests, which uses
+    // CrossUserFixture rather than HrSettingsSerialFixture — can still serialize its own
+    // IAsyncLifetime against the same instance directly. See CrossUserVacancyTestBase's own
+    // remarks for the equivalent pattern used by RecruitmentStageManagementTests.
+    public static readonly SemaphoreSlim GateInstance = new(1, 1);
     protected override SemaphoreSlim Gate => GateInstance;
 }
 

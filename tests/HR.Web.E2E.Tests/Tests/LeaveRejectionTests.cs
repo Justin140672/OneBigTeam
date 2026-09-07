@@ -57,7 +57,22 @@ public sealed class LeaveRejectionTests(CrossUserFixture fixture) : CrossUserLea
         // role-agnostic place to find his full assigned-task list.
         await profile.GoToAsync(AcmeId, JamesId);
         await profile.OpenTasksTabAsync();
-        var taskTitles = await profile.GetTaskTitlesAsync();
+
+        // OpenTasksTabAsync's wait only proves the grid rendered SOME state (a row or the
+        // empty-row placeholder) — not that the leave-approval task assigned to James from Tom's
+        // just-submitted request has actually landed in it. That task is created by a server-side
+        // handler reacting to the submission in Step 2, so there is a genuine (if normally brief)
+        // window after navigating here where the grid can legitimately still show its empty state.
+        // Poll by reloading the tab rather than trusting a single read.
+        IReadOnlyList<string> taskTitles = [];
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            taskTitles = await profile.GetTaskTitlesAsync();
+            if (taskTitles.Count > 0) break;
+            await _page.WaitForTimeoutAsync(1_000);
+            await profile.GoToAsync(AcmeId, JamesId);
+            await profile.OpenTasksTabAsync();
+        }
         Assert.Contains(taskTitles, t => t.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase)
                                       || t.Contains("leave", StringComparison.OrdinalIgnoreCase));
 

@@ -212,9 +212,9 @@ public class GetEmployeeLeaveBalanceHandlerTests
     {
         // LEAVE-04 wiring: Monthly accrual with an accrual start date of Feb 1 2026 means, by
         // FixedUtcNow (Jun 8 2026), only complete monthly periods Feb1->Mar1->Apr1->May1->Jun1 = 4
-        // of the 10 total periods (Feb1..Dec1) have elapsed. AccruedDays = 24 * 4/10 = 9.60, and
-        // RemainingDays/RemainingHours must be derived from that accrued figure, not the raw
-        // 24-day EntitlementDays.
+        // of the 10 total periods (Feb1..Dec1) have elapsed. AccruedDays = 24 * 4/10 = 9.60, floored
+        // to the nearest half day = 9.5, and RemainingDays/RemainingHours must be derived from that
+        // accrued figure, not the raw 24-day EntitlementDays.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -239,10 +239,10 @@ public class GetEmployeeLeaveBalanceHandlerTests
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Balances);
         Assert.Equal(24m, item.EntitlementDays);
-        Assert.Equal(9.60m, item.AccruedDays);
+        Assert.Equal(9.5m, item.AccruedDays);
         Assert.True(item.AccruedDays < item.EntitlementDays);
-        Assert.Equal(9.60m, item.RemainingDays); // accrued + 0 adjustment - 0 used
-        Assert.Equal(9.60m * WorkingPattern.Default.HoursPerDay, item.RemainingHours);
+        Assert.Equal(9.5m, item.RemainingDays); // accrued + 0 adjustment - 0 used
+        Assert.Equal(9.5m * WorkingPattern.Default.HoursPerDay, item.RemainingHours);
     }
 
     private static LeaveDbContext BuildContext()

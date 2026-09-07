@@ -29,6 +29,7 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId, Guid employeeId, Guid taskId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}/profile?tab=tasks");
+        await WaitForTaskListLoadedAsync();
 
         var row = page.Locator($"[data-testid='task-view-btn-{taskId}']");
         await row.WaitForAsync(new() { Timeout = 20_000 });
@@ -51,12 +52,40 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     public async Task GoToByTitleAsync(Guid companyId, Guid employeeId, string taskTitle)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}/profile?tab=tasks");
+        await WaitForTaskListLoadedAsync();
 
         var row = page.GetByRole(AriaRole.Button, new() { Name = taskTitle, Exact = true });
         await row.WaitForAsync(new() { Timeout = 20_000 });
         await row.ClickAsync();
 
         await WaitForLoadedAsync();
+    }
+
+    /// <summary>
+    /// Waits for MyProfileTasksTab's own initial data load to finish before looking for any
+    /// specific task row — the tab renders an "hr-loading" spinner (see HrLoadingIndicator) while
+    /// TaskService.GetMyTasksAsync is in flight and only mounts TaskList/HrGrid once that
+    /// completes. Searching for one specific "task-view-btn-{id}" row immediately after
+    /// navigation can land in that pre-data window: Playwright's locator then has to poll through
+    /// the whole spinner-to-grid repaint (a Blazor Server SignalR round-trip plus HrGrid's own
+    /// Syncfusion mount) inside the same wait budget as the row lookup itself, which is the
+    /// documented source of this suite's task-view-btn flakiness. Splitting it into two waits —
+    /// "the tab has finished loading" then "this row exists" — gives each phase its own budget
+    /// instead of racing both in one.
+    /// </summary>
+    private async Task WaitForTaskListLoadedAsync()
+    {
+        try
+        {
+            await page.Locator(".hr-loading").WaitForAsync(
+                new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+        }
+        catch (TimeoutException)
+        {
+            // No spinner ever appeared (data resolved before Playwright's first poll, or this
+            // profile has no tasks at all) — fall through to the row lookup, which will time out
+            // on its own if the list genuinely never rendered.
+        }
     }
 
     /// <summary>

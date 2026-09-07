@@ -369,9 +369,16 @@ else
         // result defensively so the page renders with whatever loaded. Without this, one faulted
         // task propagated out of OnParametersSetAsync, _loading stayed true, and both real users
         // and every MyProfilePage E2E test saw the skeleton until timeout.
+        //
+        // A call that merely HANGS (rather than faults) isn't covered by the try/catch above —
+        // Task.WhenAll only completes once every task does, so one dependency stalled behind, say,
+        // DB connection-pool exhaustion under heavy concurrent load would still pin the skeleton
+        // indefinitely. Bound the overall wait so the page always renders with whatever completed
+        // in time, same "salvage what loaded" philosophy extended to cover stalls, not just faults.
+        var allTasks = Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask, probationTask, onboardingTask, holidaysTask, compensationTask);
         try
         {
-            await Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask, probationTask, onboardingTask, holidaysTask, compensationTask);
+            await Task.WhenAny(allTasks, Task.Delay(TimeSpan.FromSeconds(15)));
         }
         catch
         {

@@ -157,7 +157,7 @@
         new("away", "Away today", p.AwayToday, false, m => m.Where(x => x.OnLeaveToday || x.OffSickToday)),
         new("onleave", "On leave", p.OnLeave, false, m => m.Where(x => x.OnLeaveToday)),
         new("sick", "Sick", p.Sick, false, m => m.Where(x => x.OffSickToday)),
-        new("probation", "In probation", p.InProbation, p.InProbation > 0, m => m.Where(x => x.InProbation)),
+        new("probation", "On probation", p.InProbation, p.InProbation > 0, m => m.Where(x => x.InProbation)),
         new("fitnotes", "Missing fit notes", p.MissingFitNotes, p.MissingFitNotes > 0, m => m.Where(x => x.MissingFitNote)),
     ];
 

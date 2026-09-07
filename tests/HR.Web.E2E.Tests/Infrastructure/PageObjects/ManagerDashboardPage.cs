@@ -32,10 +32,26 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
     }
 
     /// <summary>Returns true if a widget with the given header title is present on the dashboard.</summary>
-    public async Task<bool> HasWidgetAsync(string widgetTitle) =>
-        await page.Locator(".widget-header")
-            .Filter(new() { HasText = widgetTitle })
-            .IsVisibleAsync();
+    public async Task<bool> HasWidgetAsync(string widgetTitle)
+    {
+        // IsVisibleAsync() is an instant, non-retrying check (unlike Playwright's auto-waiting
+        // assertions) — right after GoToAsync (which only waits for ".dashboard-greeting", not for
+        // any specific widget to finish its own async load), a widget that hasn't mounted its
+        // header yet by this exact instant would read as absent even though it's about to appear.
+        // Poll briefly instead of a single snapshot.
+        try
+        {
+            await page.Locator(".widget-header")
+                .Filter(new() { HasText = widgetTitle })
+                .First
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>Waits for the named widget to finish loading (spinner replaced by items/empty state).</summary>
     public async Task WaitForWidgetLoadedAsync(string widgetTitle)
@@ -176,6 +192,23 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
             .ClickAsync();
     }
 
+    /// <summary>
+    /// Clicks the first attention-queue row whose text contains BOTH <paramref name="textFragment"/>
+    /// and <paramref name="categoryFragment"/> — use this (rather than the single-fragment overload)
+    /// whenever the same subject can have more than one open queue item (e.g. an employee with both
+    /// a pending leave request AND an outstanding onboarding/fit-note task), so the click can't land
+    /// on the wrong row just because it happens to sort first.
+    /// </summary>
+    public async Task ClickAttentionQueueItemAsync(string textFragment, string categoryFragment)
+    {
+        await WaitForAttentionQueueLoadedAsync();
+        await AttentionQueueWidget.Locator(".attention-queue-item")
+            .Filter(new() { HasText = textFragment })
+            .Filter(new() { HasText = categoryFragment })
+            .First
+            .ClickAsync();
+    }
+
     // ── Team Status Summary (TeamStatusSummary.razor) ─────────────────────────────────────────
     //
     // Compact metric strip added by the redesign. Tiles are not clickable/filterable (see the
@@ -191,7 +224,7 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
     /// <summary>
     /// Returns the numeric value shown on the Team Status tile whose label (".team-status-label")
     /// exactly matches <paramref name="tileLabel"/> (e.g. "At work", "Away today", "On leave",
-    /// "Sick", "In probation", "Missing fit notes").
+    /// "Sick", "On probation", "Missing fit notes").
     /// </summary>
     public async Task<int> GetTeamStatusValueAsync(string tileLabel)
     {
@@ -249,7 +282,21 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
     public async Task ClickTeamStatusTileAsync(string tileLabel)
     {
         await WaitForTeamStatusLoadedAsync();
-        await TeamStatusTile(tileLabel).ClickAsync();
+        var tile = TeamStatusTile(tileLabel);
+        var wasExpanded = await tile.GetAttributeAsync("aria-expanded") == "true";
+        await tile.ClickAsync();
+
+        // @onclick on a Blazor Server (@rendermode InteractiveServer) component is a SignalR
+        // round-trip: ClickAsync only waits for the DOM click event to dispatch, not for the
+        // server's re-render to come back and flip aria-expanded — reading the attribute
+        // immediately after the click can still observe the pre-click value. Poll for the flip
+        // instead of reading it once.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (await tile.GetAttributeAsync("aria-expanded") == (wasExpanded ? "true" : "false")
+               && DateTime.UtcNow < deadline)
+        {
+            await page.WaitForTimeoutAsync(100);
+        }
     }
 
     /// <summary>

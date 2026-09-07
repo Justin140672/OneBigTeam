@@ -69,8 +69,17 @@ public sealed class EqualityDiversityTab(IPage page)
     public async Task ClearAnswersAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Clear my answers" }).ClickAsync();
-        await page.WaitForSelectorAsync("[data-testid='my-profile-equality-success']",
-            new() { Timeout = 15_000 });
+
+        // The success banner's data-testid is the same element used for both the "saved" and
+        // "cleared" outcomes (MyProfileEqualityDiversityTab.razor's single _successMsg-gated div),
+        // so if a prior SaveAsync already left the banner present in the DOM, a bare
+        // WaitForSelectorAsync here resolves immediately against the STALE "…saved" banner rather
+        // than waiting for the clear round-trip's own re-render — the caller can then read
+        // "Equality and diversity information saved" instead of "…answers cleared". Wait for the
+        // banner's own text to actually contain "cleared" (case-insensitive) instead of merely
+        // waiting for the container element to exist.
+        await Assertions.Expect(page.Locator("[data-testid='my-profile-equality-success'] .ed-success-title"))
+            .ToContainTextAsync("cleared", new() { IgnoreCase = true, Timeout = 15_000 });
     }
 
     /// <summary>

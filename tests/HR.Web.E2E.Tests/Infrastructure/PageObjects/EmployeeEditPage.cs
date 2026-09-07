@@ -100,7 +100,24 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public static async Task<bool> IsSectionTabPresentAsync(IPage page, string sectionName)
     {
         await SelectOwningGroupAsync(page, sectionName);
-        return await SectionTab(page, sectionName).IsVisibleAsync();
+
+        // A bare instant IsVisibleAsync() here can catch a transient render pass: a lifecycle tab's
+        // (Onboarding/Probation/Offboarding) visibility depends on its own async plan-status load
+        // that starts after the page's other "ready" signals (e.g. GoToAsync's Details-tab combobox
+        // wait) have already resolved — under headless timing that load can still be in flight the
+        // instant this method runs right after navigating/creating an employee. Poll briefly for the
+        // tab to appear rather than taking a single snapshot; a genuinely-absent tab still resolves
+        // correctly (just after this short window instead of instantly), so this doesn't change the
+        // outcome for the "tab should NOT be present" assertions elsewhere in this suite.
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (true)
+        {
+            if (await SectionTab(page, sectionName).IsVisibleAsync())
+                return true;
+            if (DateTime.UtcNow >= deadline)
+                return false;
+            await page.WaitForTimeoutAsync(250);
+        }
     }
 
     public async Task GoToNewAsync(Guid companyId)
@@ -190,6 +207,22 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task SelectDropdownAsync(string labelText, string optionText) =>
         DropDownSelector.SelectAsync(page, page.Locator(".col-md-6, .col-md-4").Filter(new() { HasText = labelText }).First, optionText);
 
+    /// <summary>
+    /// Waits until the Syncfusion SfDropDownList identified by nearby label text shows a
+    /// non-blank value. Selecting a Position Profile server-round-trips to auto-populate the
+    /// Department and Location fields (see EmployeeEmploymentTab.OnPositionProfileChanged) — that
+    /// population is a second async step after the dropdown's own ValueChanged commit, so a test
+    /// that immediately saves right after picking a Position Profile can race ahead of it and
+    /// submit with Department/Location still blank. Callers that rely on the auto-population
+    /// (rather than picking Department/Location explicitly) should await this first.
+    /// </summary>
+    public async Task WaitForDropdownPopulatedAsync(string labelText)
+    {
+        var input = page.Locator(".col-md-6, .col-md-4").Filter(new() { HasText = labelText }).First
+            .Locator("span[role='combobox'] input").First;
+        await Microsoft.Playwright.Assertions.Expect(input).Not.ToHaveValueAsync("", new() { Timeout = 10_000 });
+    }
+
     // ── Employee Overview header ────────────────────────────────────────────────
 
     /// <summary>
@@ -203,7 +236,19 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task<string?> GetEmployeeStatusBadgeTextAsync()
     {
         var badge = page.Locator(".badge.rounded-pill").First;
-        return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
+        // A bare instant IsVisibleAsync() right after a navigation/reload can race the badge's
+        // render and return null before it has actually appeared, rather than genuinely reflecting
+        // no badge being present.
+        try
+        {
+            await badge.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
+
+        return (await badge.TextContentAsync())?.Trim();
     }
 
     // ── View mode / Edit mode (2026-08 profile redesign) ────────────────────────
@@ -213,8 +258,25 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public bool IsInViewModeUrl => page.Url.Contains("/view", StringComparison.OrdinalIgnoreCase);
 
-    public Task<bool> IsEditDetailsButtonVisibleAsync() =>
-        page.Locator("[data-testid='edit-details-button']").IsVisibleAsync();
+    // A bare instant IsVisibleAsync() here races the post-navigation render of GoToViewAsync/
+    // ClickAsync-driven route changes — the "Edit details" button only appears once EmployeeEdit
+    // .razor's own data fetch has resolved IsViewMode/CanManageEmployees, which under headless load
+    // can genuinely land a moment after the URL itself has already changed. A bounded wait avoids
+    // reporting "not visible" for a button that's genuinely there a moment later (same rationale as
+    // ClickEditDetailsButtonAsync's own wait below).
+    public async Task<bool> IsEditDetailsButtonVisibleAsync()
+    {
+        try
+        {
+            await page.Locator("[data-testid='edit-details-button']").WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>Clicks "Edit details" and waits for the resulting forceLoad reload to land on the editable route.</summary>
     public async Task ClickEditDetailsButtonAsync()
@@ -244,8 +306,19 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
     }
 
-    public Task<bool> IsBackToEmployeesButtonVisibleAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Back to employees" }).IsVisibleAsync();
+    public async Task<bool> IsBackToEmployeesButtonVisibleAsync()
+    {
+        try
+        {
+            await page.GetByRole(AriaRole.Button, new() { Name = "Back to employees" }).WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     public async Task ClickBackToEmployeesButtonAsync()
     {
@@ -270,8 +343,26 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     // ── "More actions" dropdown (Organisation Chart / Start offboarding) ───────
 
-    public Task<bool> IsMoreActionsMenuVisibleAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "More actions" }).IsVisibleAsync();
+    // A bare instant IsVisibleAsync() here races the same post-navigation employee-data-load
+    // render as the "Edit details" button (see IsEditDetailsButtonVisibleAsync's own remarks
+    // just above for the identical race) — "More actions" only renders once EmployeeEdit.razor's
+    // own async load has resolved Session.CanManageEmployees/_employee, which under headless load
+    // can genuinely land a moment after GoToViewAsync's own (unrelated) combobox-based wait
+    // condition already returned. A bounded wait avoids reporting "not visible" for a button
+    // that's genuinely there a moment later.
+    public async Task<bool> IsMoreActionsMenuVisibleAsync()
+    {
+        try
+        {
+            await page.GetByRole(AriaRole.Button, new() { Name = "More actions" })
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     public Task OpenMoreActionsMenuAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "More actions" }).ClickAsync();
@@ -497,6 +588,8 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     /// </remarks>
     public async Task ClickSaveChangesAsync()
     {
+        var urlBeforeSave = page.Url;
+
         await page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await page.WaitForSpinnerToClearAsync();
 
@@ -505,6 +598,25 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         {
             var message = (await errorBanner.TextContentAsync())?.Trim();
             throw new Exception($"Save failed: {message}");
+        }
+
+        // A successful save on an existing employee doesn't stop here: EmployeeEdit.razor's
+        // OnSavedAsync shows the success banner, waits 700ms, then issues its own forceLoad
+        // navigation (to the employee's "/view" route, or the list when closing) — asynchronously,
+        // well after the spinner above has already cleared. A caller that immediately issues its
+        // own navigation right after this method returns (e.g. GoToAsync to reload and re-check
+        // persisted state) races that in-flight forceLoad: two navigations firing close together
+        // can abort one another client-side (ERR_ABORTED), regardless of which "won" the redirect
+        // destination. Wait for the app's own post-save navigation to actually land before
+        // returning, so callers' subsequent navigations never overlap it.
+        try
+        {
+            await page.WaitForURLAsync(url => url.ToString() != urlBeforeSave, new() { Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            // No navigation happened (e.g. this Save button doesn't redirect in this context) —
+            // nothing to wait for.
         }
     }
 

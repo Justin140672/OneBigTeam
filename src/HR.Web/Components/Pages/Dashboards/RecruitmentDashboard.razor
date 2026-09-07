@@ -136,18 +136,20 @@
                     }
                     <div class="recruitment-dashboard-view-toggle ms-auto" role="group"
                          aria-label="Pipeline view" data-testid="recruitment-view-toggle">
-                        <SfButton CssClass="@("recruitment-dashboard-view-toggle-btn" + (_view == PipelineView.Board ? " e-active" : ""))"
-                                  OnClick="() => SetView(PipelineView.Board)"
-                                  aria-pressed="@(_view == PipelineView.Board ? "true" : "false")"
-                                  data-testid="recruitment-view-board-btn">
+                        <button type="button"
+                                class="@("recruitment-dashboard-view-toggle-btn" + (_view == PipelineView.Board ? " active" : ""))"
+                                @onclick="() => SetView(PipelineView.Board)"
+                                aria-pressed="@(_view == PipelineView.Board ? "true" : "false")"
+                                data-testid="recruitment-view-board-btn">
                             <i class="fa-solid fa-table-columns me-1"></i>Board
-                        </SfButton>
-                        <SfButton CssClass="@("recruitment-dashboard-view-toggle-btn" + (_view == PipelineView.List ? " e-active" : ""))"
-                                  OnClick="() => SetView(PipelineView.List)"
-                                  aria-pressed="@(_view == PipelineView.List ? "true" : "false")"
-                                  data-testid="recruitment-view-list-btn">
+                        </button>
+                        <button type="button"
+                                class="@("recruitment-dashboard-view-toggle-btn" + (_view == PipelineView.List ? " active" : ""))"
+                                @onclick="() => SetView(PipelineView.List)"
+                                aria-pressed="@(_view == PipelineView.List ? "true" : "false")"
+                                data-testid="recruitment-view-list-btn">
                             <i class="fa-solid fa-list me-1"></i>List
-                        </SfButton>
+                        </button>
                     </div>
                 </div>
 

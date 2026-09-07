@@ -23,6 +23,7 @@
             {
             <EditForm EditContext="_editContext">
                 <DataAnnotationsValidator />
+                <HrValidationSummary />
                 <div class="row g-3">
                     <div class="col-12">
                         <label class="form-label">Leave Type <span class="text-danger">*</span></label>
@@ -30,10 +31,11 @@
                                         DataSource="@Balances"
                                         Value="_model.LeaveTypeId"
                                         ValueChanged="OnLeaveTypeChanged"
-                                        Placeholder="Select leave type">
+                                        Placeholder="Select leave type"
+                                        HtmlAttributes="@LeaveTypeHtmlAttributes">
                             <DropDownListFieldSettings Value="LeaveTypeId" Text="LeaveTypeName" />
                         </SfDropDownList>
-                        <ValidationMessage For="@(() => _model.LeaveTypeId)" />
+                        <ValidationMessage For="@(() => _model.LeaveTypeId)" class="invalid-feedback d-block" />
                     </div>
                 </div>
 
@@ -44,7 +46,7 @@
                                       Value="_model.StartDate"
                                       ValueChanged="OnStartDateChanged"
                                       Format="dd/MM/yyyy" />
-                        <ValidationMessage For="@(() => _model.StartDate)" />
+                        <ValidationMessage For="@(() => _model.StartDate)" class="invalid-feedback d-block" />
                         <div class="mt-2">
                             <label class="form-label small text-muted">Start</label>
                             <SfDropDownList TValue="LeaveDayPart" TItem="DayPartChoice"
@@ -61,7 +63,7 @@
                                       Value="_model.EndDate"
                                       ValueChanged="OnEndDateChanged"
                                       Format="dd/MM/yyyy" />
-                        <ValidationMessage For="@(() => _model.EndDate)" />
+                        <ValidationMessage For="@(() => _model.EndDate)" class="invalid-feedback d-block" />
                         <div class="mt-2">
                             <label class="form-label small text-muted">End</label>
                             <SfDropDownList TValue="LeaveDayPart" TItem="DayPartChoice"
@@ -178,6 +180,17 @@
     private DateOnly EndDate => DateOnly.FromDateTime(_model.EndDate ?? DateTime.Today);
 
     private bool CanSubmit => !_submitting;
+
+    // Syncfusion's SfDropDownList doesn't get Blazor's automatic aria-invalid/is-invalid wiring
+    // (that only applies to InputBase-derived components), so this is set manually from the
+    // EditContext's current validation state for the Leave Type field.
+    private Dictionary<string, object> LeaveTypeHtmlAttributes =>
+        new()
+        {
+            ["aria-invalid"] = _editContext.GetValidationMessages(_editContext.Field(nameof(RequestLeaveFormModel.LeaveTypeId))).Any()
+                ? "true"
+                : "false"
+        };
 
     protected override void OnInitialized()
     {

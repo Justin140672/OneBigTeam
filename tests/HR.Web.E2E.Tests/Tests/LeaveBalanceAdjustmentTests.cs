@@ -20,7 +20,9 @@ namespace HR.Web.E2E.Tests.Tests;
 ///     own linked employee/leave-balance record, used for the self-service boundary test.
 ///   - Tom Williams (Employee, tom.williams@acme.example, 30000000-0000-0000-0000-000000000004)
 ///     and Sarah Chen (Company Administrator, 30000000-0000-0000-0000-000000000001) both have
-///     seeded balances (including Annual Leave, Sick Leave and TOIL) for the current policy year.
+///     seeded balances (including Annual Leave, Compassionate Leave and TOIL — "Sick Leave" was
+///     hard-removed as a leave type, see the RemoveSickLeaveType migration) for the current
+///     policy year.
 ///   - James Okafor (Employee + Manager, james.okafor@acme.example,
 ///     30000000-0000-0000-0000-000000000002) holds "leave:approve" but not "leave:manage"/
 ///     "employee:manage" — used for the permission-boundary test.
@@ -154,15 +156,20 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
         await empAdmin.GoToAsync(AcmeId, TomId);
         await empAdmin.OpenLeaveTabAsync();
 
-        // Sick Leave is Standard-behaviour (days-based), but zero is zero regardless of unit, so
-        // no numeric change is needed here to keep exercising the "must be non-zero" validation.
-        await empAdmin.OpenAdjustDialogAsync("Sick Leave");
-        await empAdmin.SubmitAdjustmentAsync("Sick Leave", hours: 0m);
+        // "Sick Leave" was hard-removed as a leave type entirely (see the
+        // RemoveSickLeaveType migration and LeaveTypeDefaultsProvisioner's seed set, which
+        // deliberately excludes it) — sickness is now tracked via its own dedicated Sickness
+        // tab/module, not as a balance-bearing leave type. Compassionate Leave is
+        // Standard-behaviour (days-based) like Sick Leave used to be, but zero is zero
+        // regardless of unit, so no numeric change is needed here to keep exercising the
+        // "must be non-zero" validation.
+        await empAdmin.OpenAdjustDialogAsync("Compassionate Leave");
+        await empAdmin.SubmitAdjustmentAsync("Compassionate Leave", hours: 0m);
 
-        Assert.True(await empAdmin.IsAdjustDialogVisibleAsync("Sick Leave"),
+        Assert.True(await empAdmin.IsAdjustDialogVisibleAsync("Compassionate Leave"),
             "Expected the dialog to stay open after submitting a zero-hours adjustment");
 
-        var error = await empAdmin.GetAdjustDialogErrorAsync("Sick Leave");
+        var error = await empAdmin.GetAdjustDialogErrorAsync("Compassionate Leave");
         Assert.NotNull(error);
         Assert.Contains("non-zero", error, StringComparison.OrdinalIgnoreCase);
     }

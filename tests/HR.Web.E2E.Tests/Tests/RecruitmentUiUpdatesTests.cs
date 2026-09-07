@@ -9,7 +9,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - Vacancy List: "Show active" toggle hides Closed vacancies until switched off, and an
 ///   "Applications" count column is present.
 /// - Vacancy Detail: a Draft-status vacancy (freshly created, before any status transition) hides
-///   the Applications/Interviews/Kanban tabs entirely.
+///   the Applications/Interviews tabs entirely.
 /// - Vacancy Detail's Applications tab: row actions live in the grid's own toolbar, not a per-row
 ///   Actions column.
 /// - External Recruiter edit: "Contact Name" renders on its own full-width row.
@@ -73,7 +73,7 @@ public sealed class RecruitmentUiUpdatesTests(RecruiterPersonaFixture fixture) :
     }
 
     [Fact]
-    public async Task NewDraftVacancy_HidesApplicationsInterviewsAndKanbanTabs()
+    public async Task NewDraftVacancy_HidesApplicationsAndInterviewsTabs()
     {
         var login         = new LoginPage(_page, _fixture.WebBaseUrl);
         var vacancyList   = new VacancyListPage(_page, _fixture.WebBaseUrl);
@@ -101,8 +101,6 @@ public sealed class RecruitmentUiUpdatesTests(RecruiterPersonaFixture fixture) :
             "Did not expect an 'Applications' tab for a Draft-status vacancy");
         Assert.False(await vacancyDetail.HasTabAsync("Interviews"),
             "Did not expect an 'Interviews' tab for a Draft-status vacancy");
-        Assert.False(await vacancyDetail.HasTabAsync("Kanban"),
-            "Did not expect a 'Kanban' tab for a Draft-status vacancy");
     }
 
     [Fact]

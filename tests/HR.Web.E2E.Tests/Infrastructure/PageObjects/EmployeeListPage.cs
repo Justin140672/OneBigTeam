@@ -62,16 +62,21 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         // via a fully isolated single-test run still failing deterministically — not a load/timing
         // flake, a genuine race between two independent OnInitializedAsync tasks that this page
         // object's wait condition doesn't cover. Retry the click rather than trusting one attempt.
+        // Headless Chromium's slower JS interop/round-trip timing (documented at the top of this
+        // file's namespace and in DropDownSelector) can leave that permission check pending for
+        // noticeably longer than a headed run — widen both the attempt count and the per-attempt
+        // budget rather than assuming 5 short attempts always outlast the race.
         var button = page.GetByRole(AriaRole.Button, new() { Name = "Add employee" });
-        for (var attempt = 1; attempt <= 5; attempt++)
+        const int maxAttempts = 8;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
             await button.ClickAsync();
             try
             {
-                await page.WaitForURLAsync("**/employees/new**", new() { Timeout = attempt < 5 ? 2_000 : 10_000 });
+                await page.WaitForURLAsync("**/employees/new**", new() { Timeout = attempt < maxAttempts ? 3_000 : 15_000 });
                 return;
             }
-            catch (TimeoutException) when (attempt < 5)
+            catch (TimeoutException) when (attempt < maxAttempts)
             {
                 // Permission check likely still pending when we clicked — try again.
             }
@@ -168,8 +173,23 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         var item = page.GetByRole(AriaRole.Menuitem, new() { Name = "Selected Employees" });
         await item.WaitForAsync(new() { Timeout = 10_000 });
 
-        var ariaDisabled = await item.GetAttributeAsync("aria-disabled");
-        var hasDisabledClass = (await item.GetAttributeAsync("class"))?.Contains("e-disabled") ?? false;
+        // BulkUpdateMenu's HasSelection is wired from a separate async computation off the grid's
+        // checkbox state (see ClickBulkUpdateAsync's remarks) — poll briefly rather than reading a
+        // single instant snapshot, so a caller who just checked/unchecked a row an instant ago
+        // doesn't observe the menu's stale pre-update disabled state under headless timing.
+        string? ariaDisabled = null;
+        bool hasDisabledClass = false;
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        var previous = (string?)null;
+        while (true)
+        {
+            ariaDisabled = await item.GetAttributeAsync("aria-disabled");
+            hasDisabledClass = (await item.GetAttributeAsync("class"))?.Contains("e-disabled") ?? false;
+            var current = ariaDisabled == "true" || hasDisabledClass ? "disabled" : "enabled";
+            if (previous == current || DateTime.UtcNow >= deadline) break;
+            previous = current;
+            await page.WaitForTimeoutAsync(150);
+        }
 
         await page.Keyboard.PressAsync("Escape");
 
@@ -186,8 +206,61 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     /// </summary>
     public async Task ClickBulkUpdateAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Update selected" }).ClickAsync();
-        await page.GetByRole(AriaRole.Menuitem, new() { Name = "Selected Employees" }).ClickAsync();
+        var button = page.GetByRole(AriaRole.Button, new() { Name = "Update selected" });
+        var popup = page.Locator(".e-dropdown-popup");
+
+        // Same "click may land before Syncfusion's interop listener attaches" race
+        // OpenBulkUpdateMenuItemAsync already guards against — hardened here too since this method
+        // previously clicked the trigger just once.
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            if (await popup.IsVisibleAsync())
+                break;
+
+            await button.ClickAsync();
+            try
+            {
+                await popup.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = attempt < 3 ? 2_000 : 10_000 });
+                break;
+            }
+            catch (TimeoutException) when (attempt < 3)
+            {
+                // Popup never opened — listener likely wasn't bound yet. Try again.
+            }
+        }
+
+        var item = page.GetByRole(AriaRole.Menuitem, new() { Name = "Selected Employees" });
+        await item.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        // BulkUpdateMenu's HasSelection is set from EmployeeList's own _hasSelection, computed
+        // asynchronously off the grid's row-checkbox state — the menu popup itself can render (and
+        // this item paint) a tick before that computation catches up with a selection the test just
+        // made, leaving the item genuinely "e-disabled" for a brief window even though the caller
+        // has already selected rows. Wait for the disabled class to clear before clicking rather
+        // than racing it — clicking a still-disabled/still-settling item is what surfaces as
+        // Playwright's "<ul role='menu'> intercepts pointer events" (the disabled item's own
+        // pointer-events:none defers hit-testing to its parent).
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            var stillDisabled = (await item.GetAttributeAsync("class"))?.Contains("e-disabled") ?? false;
+            if (!stillDisabled) break;
+            await page.WaitForTimeoutAsync(150);
+        }
+
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            try
+            {
+                await item.ClickAsync(new() { Timeout = attempt < 3 ? 5_000 : 15_000 });
+                break;
+            }
+            catch (PlaywrightException) when (attempt < 3)
+            {
+                // Menu/animation still settling — retry against the freshly re-resolved locator.
+            }
+        }
+
         await page.WaitForSelectorAsync(
             "[role='dialog'].bulk-compensation-update-dialog",
             new() { Timeout = 15_000 });
@@ -333,8 +406,46 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await searchInput.PressAsync("Enter");
         // OnSearchChanged debounces 300ms before reloading — wait past that, then for the grid to
         // settle on the filtered result (row or empty state) rather than the pre-search rows.
-        await page.WaitForTimeoutAsync(400);
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        //
+        // RowsRenderedSelector (".e-grid .e-row, .e-grid .e-emptyrow") matches the STALE,
+        // pre-search rows just as readily as freshly-filtered ones — the selector was already
+        // satisfied before this method was ever called, so a bare WaitForSelectorAsync against it
+        // resolves instantly and proves nothing about whether the debounced reload has actually
+        // landed yet. Under headless timing that reload can genuinely take longer than the fixed
+        // 400ms sleep above, leaving callers (e.g. GetResultSummaryTextAsync right after this
+        // returns) reading the unfiltered result set/count. Poll instead until every currently
+        // rendered row's text actually contains the search query (or the grid is showing its empty
+        // state) — the same "wait for the actual outcome, not just element presence" fix applied
+        // elsewhere in this suite (see EqualityDiversityTab.ClearAnswersAsync).
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (true)
+        {
+            await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+
+            if (await page.Locator(".e-grid .e-emptyrow").CountAsync() > 0)
+                break;
+
+            var rows = page.Locator(".e-grid .e-row");
+            var rowCount = await rows.CountAsync();
+            var allMatch = true;
+            for (var i = 0; i < rowCount; i++)
+            {
+                var text = (await rows.Nth(i).TextContentAsync()) ?? "";
+                if (!text.Contains(query, StringComparison.OrdinalIgnoreCase))
+                {
+                    allMatch = false;
+                    break;
+                }
+            }
+
+            if (allMatch)
+                break;
+
+            if (DateTime.UtcNow >= deadline)
+                break;
+
+            await page.WaitForTimeoutAsync(200);
+        }
     }
 
     // ── User Account column (tickets #90/#91 — "User Account" status + Quick Invite) ──────────
@@ -400,13 +511,35 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public async Task<bool> HasInviteUserLinkAsync(string nameFragment)
     {
         await SearchAsync(nameFragment);
-        if (!await AccountActionsButton(nameFragment).First.IsVisibleAsync())
+
+        // The ⋮ actions button/its applicable-actions set (EmployeeList.AccountMenuItems) depends on
+        // the row's User Account status, which — like the status label itself (see
+        // GetUserAccountStatusTextAsync's own remarks) — can still be resolving a moment after the
+        // row itself has rendered. A bare instant IsVisibleAsync() here can read "not yet rendered"
+        // as "not applicable" under headless timing. Poll briefly instead of a single snapshot.
+        try
+        {
+            await AccountActionsButton(nameFragment).First.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
             return false;
+        }
 
         await AccountActionsButton(nameFragment).First.ClickAsync();
         var inviteItem = page.Locator(".e-dropdown-popup li")
             .Filter(new() { HasTextRegex = new Regex(@"^\s*Invite\s*$") });
-        var present = await inviteItem.First.IsVisibleAsync();
+        bool present;
+        try
+        {
+            await inviteItem.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            present = true;
+        }
+        catch (TimeoutException)
+        {
+            present = false;
+        }
         await page.Keyboard.PressAsync("Escape");
         return present;
     }
@@ -473,7 +606,23 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     /// <summary>The "Clear search" button (only rendered while the search box has text).</summary>
     public ILocator ClearSearchButton => page.GetByRole(AriaRole.Button, new() { Name = "Clear search" });
 
-    public async Task<bool> IsClearSearchButtonVisibleAsync() => await ClearSearchButton.IsVisibleAsync();
+    // A bare instant IsVisibleAsync() races the Blazor round-trip that actually renders this button
+    // once the search box's bound value has committed (same class of gap fixed elsewhere in this
+    // page object) — poll briefly for a "should now be visible" check rather than a single snapshot.
+    // When asserting it's ABSENT (e.g. before any search), the short bounded wait below simply times
+    // out and correctly reports false — it never renders regardless of how long this waits.
+    public async Task<bool> IsClearSearchButtonVisibleAsync()
+    {
+        try
+        {
+            await ClearSearchButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Clicks the "Clear search" button and waits for the debounced reload (mirrors SearchAsync's
@@ -482,7 +631,14 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public async Task ClickClearSearchAsync()
     {
         await ClearSearchButton.ClickAsync();
-        await page.WaitForTimeoutAsync(400);
+        // A fixed 400ms sleep assumed the Blazor ValueChanged round-trip that actually clears the
+        // search box's own bound value always lands within that window — under headless timing it
+        // can genuinely take longer, leaving GetSearchBoxValueAsync callers reading the stale
+        // pre-clear text. Poll for the input to actually become empty instead of trusting a fixed
+        // wait (same "wait for the round-trip, not just a timeout" fix applied elsewhere in this
+        // suite — see DropDownSelector/FillLeaveRequestAsync's own remarks).
+        await Assertions.Expect(page.GetByPlaceholder("Search by name, email or employee number"))
+            .ToHaveValueAsync("", new() { Timeout = 5_000 });
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 

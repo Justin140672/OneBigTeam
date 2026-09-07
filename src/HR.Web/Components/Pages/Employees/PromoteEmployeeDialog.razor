@@ -337,7 +337,8 @@
 
         if ((_step == 1 || _step == 3) && !EditContext.Validate())
         {
-            GlobalError = "Please correct the highlighted fields below.";
+            GlobalError = EditContext.GetValidationMessages().FirstOrDefault()
+                ?? "Please correct the highlighted fields below.";
             return;
         }
 

@@ -26,19 +26,34 @@
             }
             else
             {
-                <SfAccumulationChart Title="" Height="280px" Background="transparent">
-                    <AccumulationChartLegendSettings Visible="true" Position="LegendPosition.Right" />
-                    <AccumulationChartSeriesCollection>
-                        <AccumulationChartSeries DataSource="@_data"
-                                                  XName="@nameof(FunnelStage.Label)"
-                                                  YName="@nameof(FunnelStage.Value)"
-                                                  PointColorMapping="@nameof(FunnelStage.Fill)"
-                                                  Type="AccumulationType.Funnel">
-                            <AccumulationDataLabelSettings Visible="true" Name="@nameof(FunnelStage.Value)" />
-                        </AccumulationChartSeries>
-                    </AccumulationChartSeriesCollection>
-                    <AccumulationChartEvents OnPointClick="OnStageClicked" />
-                </SfAccumulationChart>
+                @* HiringPipelineChart mitigation: a chart-only ErrorBoundary keeps a Syncfusion
+                   legend-measurement failure from taking down the whole dashboard circuit for the
+                   user, in addition to the explicit AccumulationChartLegendFont fix below. *@
+                <ErrorBoundary>
+                    <ChildContent>
+                        <SfAccumulationChart Title="" Height="280px" Background="transparent">
+                            <AccumulationChartLegendSettings Visible="true" Position="LegendPosition.Right">
+                                <AccumulationChartLegendFont FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif" />
+                            </AccumulationChartLegendSettings>
+                            <AccumulationChartSeriesCollection>
+                                <AccumulationChartSeries DataSource="@_data"
+                                                          XName="@nameof(FunnelStage.Label)"
+                                                          YName="@nameof(FunnelStage.Value)"
+                                                          PointColorMapping="@nameof(FunnelStage.Fill)"
+                                                          Type="AccumulationType.Funnel">
+                                    <AccumulationDataLabelSettings Visible="true" Name="@nameof(FunnelStage.Value)" />
+                                </AccumulationChartSeries>
+                            </AccumulationChartSeriesCollection>
+                            <AccumulationChartEvents OnPointClick="OnStageClicked" />
+                        </SfAccumulationChart>
+                    </ChildContent>
+                    <ErrorContent>
+                        <div class="widget-empty">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg mb-2"></i>
+                            <p class="mb-0">Unable to display the pipeline chart. See the table below.</p>
+                        </div>
+                    </ErrorContent>
+                </ErrorBoundary>
 
                 @* DSH-07: text alternative for the Syncfusion funnel (SVG has no accessible data). *@
                 <details class="chart-data-table">

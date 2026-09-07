@@ -99,8 +99,8 @@ public class LeaveAccrualCalculatorTests
             policyYearEnd: new DateOnly(2026, 12, 31),
             asOfDate: new DateOnly(2026, 6, 1));
 
-        // 22 * 5/11 = 10.0 exactly.
-        Assert.Equal(10.00m, result);
+        // 22 * 5/11 = 10.0 exactly - already a half-day-aligned value.
+        Assert.Equal(10.0m, result);
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public class LeaveAccrualCalculatorTests
             asOfDate: new DateOnly(2026, 1, 29));
 
         // 26 * 2/26 = 2.00 exactly.
-        Assert.Equal(2.00m, result);
+        Assert.Equal(2.0m, result);
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public class LeaveAccrualCalculatorTests
 
         // Jan1->Feb1 (1), Feb1->Mar1 (2) - 2 periods elapsed out of 11 total.
         // 22 * 2/11 = 4.00 exactly.
-        Assert.Equal(4.00m, result);
+        Assert.Equal(4.0m, result);
     }
 
     [Fact]
@@ -202,7 +202,7 @@ public class LeaveAccrualCalculatorTests
         // (2028-03-01 - 2028-01-01) = 60 days elapsed; 60 / 14 = 4 complete periods (56 days),
         // out of (2028-12-31 - 2028-01-01) = 365 days / 14 = 26 total periods.
         // 26 * 4/26 = 4.00 exactly.
-        Assert.Equal(4.00m, result);
+        Assert.Equal(4.0m, result);
     }
 
     // ── Non-January leave year ──────────────────────────────────────────────────
@@ -221,7 +221,7 @@ public class LeaveAccrualCalculatorTests
 
         // Apr1->May1(1)->Jun1(2)->Jul1(3)->Aug1(4)->Sep1(5): 5 periods elapsed out of 11 total.
         // 22 * 5/11 = 10.00 exactly.
-        Assert.Equal(10.00m, result);
+        Assert.Equal(10.0m, result);
     }
 
     // ── Joiner mid-year ──────────────────────────────────────────────────────────
@@ -230,45 +230,69 @@ public class LeaveAccrualCalculatorTests
     public void Monthly_Joiner_Earns_Full_ProRated_Entitlement_Exactly_By_PolicyYearEnd()
     {
         // Joiner starts Jun 1 2026, mid Jan-Dec policy year; already-pro-rated entitlement passed
-        // in (14.66, as LeaveEntitlementCalculator would produce). Accrual paces across the
-        // joiner's own remaining periods (accrualStartDate to policyYearEnd), never exceeding the
-        // pro-rated figure passed in.
+        // in (14.5, as LeaveEntitlementCalculator would now produce - always half-day-aligned).
+        // Accrual paces across the joiner's own remaining periods (accrualStartDate to
+        // policyYearEnd), never exceeding the pro-rated figure passed in.
         var result = LeaveAccrualCalculator.CalculateAccruedDays(
-            14.66m, AccrualMethod.Monthly,
+            14.5m, AccrualMethod.Monthly,
             accrualStartDate: new DateOnly(2026, 6, 1),
             policyYearEnd: new DateOnly(2026, 12, 31),
             asOfDate: new DateOnly(2026, 12, 31));
 
-        Assert.Equal(14.66m, result);
+        Assert.Equal(14.5m, result);
     }
 
     [Fact]
     public void Monthly_Joiner_Never_Exceeds_ProRated_Entitlement_When_AsOfDate_Is_Past_PolicyYearEnd()
     {
         var result = LeaveAccrualCalculator.CalculateAccruedDays(
-            14.66m, AccrualMethod.Monthly,
+            14.5m, AccrualMethod.Monthly,
             accrualStartDate: new DateOnly(2026, 6, 1),
             policyYearEnd: new DateOnly(2026, 12, 31),
             asOfDate: new DateOnly(2027, 6, 1));
 
-        Assert.Equal(14.66m, result);
+        Assert.Equal(14.5m, result);
     }
 
     // ── Rounding boundary ────────────────────────────────────────────────────────
 
     [Fact]
-    public void Monthly_Rounds_Accrued_Days_Down_To_Two_Decimal_Places()
+    public void Monthly_Rounds_Accrued_Days_Down_To_Nearest_HalfDay()
     {
-        // 25 * 1/3 = 8.3333... must floor to 8.33, not round to 8.33 via banker's/away-from-zero
-        // rounding (which would also give 8.33 here - use a case where rounding up would differ:
-        // 25 * 2/3 = 16.6666... floors to 16.66, not 16.67.
+        // 25 * 2/3 = 16.6666... must floor to the half day below it (16.5), never round up to 17.0.
         var result = LeaveAccrualCalculator.CalculateAccruedDays(
             25m, AccrualMethod.Monthly,
             accrualStartDate: new DateOnly(2026, 1, 1),
             policyYearEnd: new DateOnly(2026, 4, 1), // 3 complete monthly periods total
             asOfDate: new DateOnly(2026, 3, 1)); // 2 periods elapsed
 
-        Assert.Equal(16.66m, result);
+        Assert.Equal(16.5m, result);
+    }
+
+    [Fact]
+    public void Monthly_Rounds_Value_Just_Below_A_HalfDay_Boundary_Down_To_Boundary_Below()
+    {
+        // 10 * 1/3 = 3.3333... floors to 3.0, not up to 3.5.
+        var result = LeaveAccrualCalculator.CalculateAccruedDays(
+            10m, AccrualMethod.Monthly,
+            accrualStartDate: new DateOnly(2026, 1, 1),
+            policyYearEnd: new DateOnly(2026, 4, 1), // 3 complete monthly periods total
+            asOfDate: new DateOnly(2026, 2, 1)); // 1 period elapsed
+
+        Assert.Equal(3.0m, result);
+    }
+
+    [Fact]
+    public void Monthly_Does_Not_Round_Value_Already_Exactly_On_A_HalfDay_Boundary()
+    {
+        // 21 * 1/3 = 7.0 exactly - already on a half-day boundary, must stay unchanged.
+        var result = LeaveAccrualCalculator.CalculateAccruedDays(
+            21m, AccrualMethod.Monthly,
+            accrualStartDate: new DateOnly(2026, 1, 1),
+            policyYearEnd: new DateOnly(2026, 4, 1), // 3 complete monthly periods total
+            asOfDate: new DateOnly(2026, 2, 1)); // 1 period elapsed
+
+        Assert.Equal(7.0m, result);
     }
 
     // ── Joiner with fewer than one full period remaining ────────────────────────
@@ -277,15 +301,15 @@ public class LeaveAccrualCalculatorTests
     public void Monthly_Grants_Full_Entitlement_Immediately_When_Joiner_Has_Less_Than_One_Period_Remaining()
     {
         // Joiner starts Dec 20, policy year ends Dec 31 - fewer than one full monthly accrual
-        // period remains (totalPeriods <= 0), so the full (already pro-rated) entitlement is
-        // granted immediately per the calculator's documented behaviour.
+        // period remains (totalPeriods <= 0), so the full (already pro-rated, half-day-aligned)
+        // entitlement is granted immediately per the calculator's documented behaviour.
         var result = LeaveAccrualCalculator.CalculateAccruedDays(
-            0.68m, AccrualMethod.Monthly,
+            0.5m, AccrualMethod.Monthly,
             accrualStartDate: new DateOnly(2026, 12, 20),
             policyYearEnd: new DateOnly(2026, 12, 31),
             asOfDate: new DateOnly(2026, 12, 20));
 
-        Assert.Equal(0.68m, result);
+        Assert.Equal(0.5m, result);
     }
 
     [Fact]
@@ -294,12 +318,12 @@ public class LeaveAccrualCalculatorTests
         // Only 11 days remain between accrualStartDate and policyYearEnd - fewer than one
         // 14-day fortnightly period.
         var result = LeaveAccrualCalculator.CalculateAccruedDays(
-            0.68m, AccrualMethod.Fortnightly,
+            0.5m, AccrualMethod.Fortnightly,
             accrualStartDate: new DateOnly(2026, 12, 20),
             policyYearEnd: new DateOnly(2026, 12, 31),
             asOfDate: new DateOnly(2026, 12, 20));
 
-        Assert.Equal(0.68m, result);
+        Assert.Equal(0.5m, result);
     }
 
     // ── proRatedEntitlementDays <= 0 short-circuit ──────────────────────────────
@@ -312,6 +336,34 @@ public class LeaveAccrualCalculatorTests
             accrualStartDate: new DateOnly(2026, 1, 1),
             policyYearEnd: new DateOnly(2026, 12, 31),
             asOfDate: new DateOnly(2026, 12, 31));
+
+        Assert.Equal(0m, result);
+    }
+
+    [Fact]
+    public void Returns_Zero_When_ProRatedEntitlementDays_Is_Negative_Regardless_Of_Method()
+    {
+        // Defensive case: a negative pro-rated entitlement should never occur upstream, but the
+        // <= 0 short-circuit must not accidentally let a negative value flow through and be
+        // floored/reported as a small negative balance.
+        var result = LeaveAccrualCalculator.CalculateAccruedDays(
+            -5m, AccrualMethod.Monthly,
+            accrualStartDate: new DateOnly(2026, 1, 1),
+            policyYearEnd: new DateOnly(2026, 12, 31),
+            asOfDate: new DateOnly(2026, 6, 1));
+
+        Assert.Equal(0m, result);
+    }
+
+    [Fact]
+    public void Monthly_Returns_Zero_When_AsOfDate_Equals_AccrualStartDate()
+    {
+        // No complete period has elapsed yet on day one of accrual.
+        var result = LeaveAccrualCalculator.CalculateAccruedDays(
+            24m, AccrualMethod.Monthly,
+            accrualStartDate: new DateOnly(2026, 1, 1),
+            policyYearEnd: new DateOnly(2026, 12, 31),
+            asOfDate: new DateOnly(2026, 1, 1));
 
         Assert.Equal(0m, result);
     }

@@ -36,6 +36,13 @@ function getTheme() {
     return prefersDark() ? 'dark' : 'light';
 }
 
+// Used by MainLayout.razor to correct the sidebar's open/closed state once, right after first
+// render, for a fresh full-page load at a narrow viewport — see its own remarks on why
+// SfSidebar's MediaQuery prop doesn't close this gap on its own for that specific case.
+function matchesMediaQuery(query) {
+    try { return window.matchMedia(query).matches; } catch { return true; }
+}
+
 // Live-follows OS/browser light/dark changes (e.g. Chrome's own appearance setting) for any
 // visitor who hasn't explicitly chosen a theme via the toggle button. Registered once at script
 // load — matchMedia's 'change' event fires whenever the system preference changes while this page

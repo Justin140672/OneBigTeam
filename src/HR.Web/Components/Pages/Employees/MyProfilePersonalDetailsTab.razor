@@ -126,6 +126,7 @@ else
                                    Maxlength="2000"
                                    Placeholder="e.g. Please update my preferred name to &quot;Alex&quot; and my nationality to British."
                                    HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "pd-notes" })"
+                                   CssClass="@(_editContext.GetValidationMessages(_editContext.Field(nameof(PersonalDetailsChangeFormModel.Notes))).Any() ? "is-invalid" : null)"
                                    @bind-Value="_model.Notes" />
                         <ValidationMessage For="@(() => _model.Notes)" />
                         <div class="pd-char-count">@((_model.Notes ?? string.Empty).Length) / 2000</div>

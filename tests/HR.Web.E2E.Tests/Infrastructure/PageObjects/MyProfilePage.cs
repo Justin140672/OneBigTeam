@@ -8,20 +8,51 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId, Guid employeeId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}/profile");
-        // Poll until the circuit is connected and data loaded: grid visible, no skeleton.
+        // Poll until the circuit is connected and data loaded: grid visible, no skeleton. Also
+        // treat a rendered error/guard state (.alert-danger / .alert-warning, e.g. the "you can
+        // only view your own profile" guard or "Unable to load profile details") as settled —
+        // otherwise a genuine error spins the skeleton-free-but-grid-absent state for the entire
+        // timeout budget while surfacing only as a generic "timed out waiting for" failure that
+        // masks the real cause.
         await page.EvaluateAsync(@"() => {
             window._profileReady = false;
+            window._profileError = null;
             const poll = setInterval(() => {
                 if (!document.querySelector('.overview-skeleton') &&
                     document.querySelector('.overview-grid')) {
                     window._profileReady = true;
                     clearInterval(poll);
+                } else if (!document.querySelector('.overview-skeleton')) {
+                    const err = document.querySelector('.alert-danger, .alert-warning');
+                    if (err) {
+                        window._profileError = err.textContent.trim();
+                        clearInterval(poll);
+                    }
                 }
             }, 500);
         }");
-        await page.WaitForFunctionAsync(
-            "window._profileReady === true",
-            null, new PageWaitForFunctionOptions { Timeout = 20_000 });
+        try
+        {
+            // Bumped from 30s: under full-suite parallel load, MyProfileOverviewTab's nine
+            // concurrent self-service API calls (employee/balance/requests/tasks/sickness/
+            // probation/onboarding/holidays/compensation) can legitimately queue behind DB/
+            // connection-pool contention well past 30s — this is the single shared gate for
+            // every MyProfile-route test, so a too-tight budget here fails ~15 unrelated tests
+            // at once under load rather than any one of them having a real defect.
+            await page.WaitForFunctionAsync(
+                "window._profileReady === true || window._profileError !== null",
+                null, new PageWaitForFunctionOptions { Timeout = 60_000 });
+        }
+        catch (TimeoutException ex)
+        {
+            throw new TimeoutException(
+                $"MyProfilePage.GoToAsync timed out waiting for '.overview-grid' " +
+                $"(company={companyId}, employee={employeeId}).", ex);
+        }
+
+        var error = await page.EvaluateAsync<string?>("window._profileError");
+        if (error is not null)
+            throw new InvalidOperationException($"MyProfilePage.GoToAsync: profile rendered an error state instead of the overview grid: \"{error}\"");
     }
 
     /// <summary>Waits for the profile page to load after a redirect (e.g. from "View all" link).</summary>
@@ -544,16 +575,24 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         await dateInputs.Nth(0).ClickAsync();
         await dateInputs.Nth(0).FillAsync(startDate);
         await page.Keyboard.PressAsync("Tab"); // commit the date
-        // Wait for the Blazor round-trip that commits the date into component state
-        // (ValueChanged fires after blur) before touching the next field — otherwise
-        // a fast test runner can click Submit before _startDateSet flips to true.
+        // ToHaveValueAsync below only proves Syncfusion's own JS updated the input's displayed
+        // text — same optimistic-client-update-ahead-of-SignalR-round-trip gap documented in
+        // DropDownSelector's remarks. RequestLeaveForm.razor's SfDatePicker is one-way bound
+        // (Value + ValueChanged, not @bind-Value), so the server-side _model.StartDate is only set
+        // once that round trip actually lands. Submit() calls EditContext.Validate() synchronously
+        // against server-side state, so clicking/keying Submit before that round trip completes
+        // fails the [Required] check silently (no exception surfaces to Playwright — the dialog
+        // just never closes). The fixed pause after each confirmed DOM value gives that round trip
+        // a realistic chance to land before the next field (or Submit) is touched.
         await Assertions.Expect(dateInputs.Nth(0)).ToHaveValueAsync(startDate);
+        await page.WaitForTimeoutAsync(300);
 
         // End date.
         await dateInputs.Nth(1).ClickAsync();
         await dateInputs.Nth(1).FillAsync(endDate);
         await page.Keyboard.PressAsync("Tab");
         await Assertions.Expect(dateInputs.Nth(1)).ToHaveValueAsync(endDate);
+        await page.WaitForTimeoutAsync(300);
 
         // Optional reason.
         if (!string.IsNullOrEmpty(reason))
@@ -561,6 +600,8 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
             var reasonInput = dialog.GetByPlaceholder("Reason for leave request");
             await reasonInput.FillAsync(reason);
             await page.Keyboard.PressAsync("Tab");
+            await Assertions.Expect(reasonInput).ToHaveValueAsync(reason);
+            await page.WaitForTimeoutAsync(300);
         }
     }
 

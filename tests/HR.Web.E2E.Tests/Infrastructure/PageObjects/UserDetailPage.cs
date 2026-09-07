@@ -4,7 +4,8 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 /// <summary>
 /// Interacts with UserDetail.razor ("/companies/{CompanyId}/user-administration/{EmployeeId}")
-/// and the ManageUserRolesDialog.razor it opens via "Manage Roles".
+/// and the ManageUserRolesDialog.razor / UserAuditHistoryDialog.razor it opens via "Manage Roles"
+/// / "View Audit History".
 /// </summary>
 public sealed class UserDetailPage(IPage page, string baseUrl)
 {
@@ -98,4 +99,41 @@ public sealed class UserDetailPage(IPage page, string baseUrl)
         return names;
     }
 
+    private ILocator AuditHistoryDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Audit History" });
+
+    public async Task OpenAuditHistoryDialogAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "View Audit History" }).ClickAsync();
+        await AuditHistoryDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+    }
+
+    public async Task CloseAuditHistoryDialogAsync()
+    {
+        await AuditHistoryDialog.Locator(".audit-history-close-btn").ClickAsync();
+        await AuditHistoryDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
+
+    public async Task<bool> HasAuditHistoryEmptyMessageAsync()
+    {
+        var emptyMessage = AuditHistoryDialog.GetByText("No audit history recorded for this user.");
+        var rows = AuditHistoryDialog.Locator("ul.list-unstyled > li");
+
+        // The dialog loads its data asynchronously right after opening, so wait for whichever
+        // end-state (empty message or at least one row) renders first before checking.
+        try
+        {
+            await Task.WhenAny(
+                emptyMessage.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 }),
+                rows.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 }));
+        }
+        catch (TimeoutException)
+        {
+            // Neither state appeared in time; fall through and report whatever is actually visible.
+        }
+
+        return await emptyMessage.IsVisibleAsync();
+    }
+
+    public async Task<int> GetAuditHistoryCountAsync() =>
+        await AuditHistoryDialog.Locator("ul.list-unstyled > li").CountAsync();
 }

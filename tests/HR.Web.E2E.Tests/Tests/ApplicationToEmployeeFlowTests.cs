@@ -29,6 +29,33 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
 
+    // Candidate_Applies_Interviews_IsOffered_AndHired_BecomesEmployee mutates the single shared
+    // Acme CompanySettings row (Employee Numbering mode) via HrSettingsPage — the same row that
+    // HrSettingsSerialTestBase's group mutates (e.g. HrSettingsPageTests). CrossUserVacancyTestBase's
+    // own gate only serializes this class against other vacancy/recruitment tests, not against that
+    // separate group, so without also taking HrSettingsSerialTestBase's gate the two groups can run
+    // concurrently against the same row — one test's save/reload racing the other's, leaving the
+    // HR Settings page in an inconsistent render state (e.g. the SfTab never finishing mounting,
+    // which manifested as a "Employee Numbering" tab-role timeout). Take both gates, same pattern as
+    // RecruitmentStageManagementTests joining CrossUserVacancyTestBase's gate from outside the group.
+    public override async Task InitializeAsync()
+    {
+        await HrSettingsSerialTestBase.GateInstance.WaitAsync();
+        await base.InitializeAsync();
+    }
+
+    public override async Task DisposeAsync()
+    {
+        try
+        {
+            await base.DisposeAsync();
+        }
+        finally
+        {
+            HrSettingsSerialTestBase.GateInstance.Release();
+        }
+    }
+
     [Fact]
     public async Task Candidate_Applies_Interviews_IsOffered_AndHired_BecomesEmployee()
     {
@@ -153,9 +180,11 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
         // Employee Number and Employment Type are still filled in manually — Department,
         // Location and Position Profile are no longer manual fields as of the "Vacancy - Position
         // Profile relationship" epic: they're derived server-side by HireCandidateHandler from the
-        // Vacancy's own linked Position Profile ("Senior Software Engineer", selected when the
-        // vacancy was created above) and shown read-only in the dialog for confirmation.
-        Assert.Equal("Senior Software Engineer", await vacancyDetail.GetHireDerivedPositionProfileTextAsync());
+        // Vacancy's own linked Position Profile (the unique profile created above via
+        // CreateUniquePositionProfileAsync, not the seeded "Senior Software Engineer" — see that
+        // helper's remarks on why a fresh profile is needed) and shown read-only in the dialog for
+        // confirmation.
+        Assert.Equal(profileTitle, await vacancyDetail.GetHireDerivedPositionProfileTextAsync());
         Assert.Equal("London Office", await vacancyDetail.GetHireDerivedLocationTextAsync());
 
         await vacancyDetail.FillHireEmployeeNumberAsync($"E2E-{unique}");
@@ -183,7 +212,13 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
         finally
         {
             // Restore Acme's known seed default — see the comment above for why this is hardcoded
-            // rather than capture-and-restore. Already logged in as Laura from Step 9.
+            // rather than capture-and-restore. Don't assume Step 9 already switched to Laura: if
+            // any earlier step (1-8) throws, this finally still runs, but while still logged in as
+            // Marcus (Recruiter) — who lacks hr-settings:manage and would silently hang waiting for
+            // the "Employee Numbering" tab to render for an unauthorized page, masking whatever the
+            // real assertion/step failure was (a finally-block exception replaces the original one
+            // propagating from the try). Explicitly (re-)switch to Laura first, unconditionally.
+            await login.SwitchAccountAsync(LauraEmail);
             await hrSettings.GoToAsync(AcmeId);
             await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
             await hrSettings.SaveAsync();
@@ -193,7 +228,7 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
     [Fact]
     public async Task HireCandidateDialog_MissingNewlyRequiredFields_ShowsValidationError_AndDoesNotHire()
     {
-        var (candidateLast, vacancyDetail) = await ArrangeOfferedApplicationAsync();
+        var (candidateLast, vacancyDetail, profileTitle) = await ArrangeOfferedApplicationAsync();
 
         await vacancyDetail.ClickHireForAsync(candidateLast);
         await vacancyDetail.WaitForHireDialogAsync();
@@ -206,7 +241,11 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
             "Expected the manual Location dropdown to no longer exist in the Hire dialog");
         Assert.False(await vacancyDetail.HasHireDropdownLabelAsync("Position Profile"),
             "Expected the manual Position Profile dropdown to no longer exist in the Hire dialog");
-        Assert.Equal("Senior Software Engineer", await vacancyDetail.GetHireDerivedPositionProfileTextAsync());
+        // ArrangeOfferedApplicationAsync creates a fresh, uniquely-named Position Profile for the
+        // vacancy (the seeded "Senior Software Engineer" profile already has a permanently-open
+        // vacancy in seed data — see PositionProfileTestHelpers' remarks), so the derived text here
+        // must be that unique profile's title, not the seeded name.
+        Assert.Equal(profileTitle, await vacancyDetail.GetHireDerivedPositionProfileTextAsync());
         Assert.Equal("London Office", await vacancyDetail.GetHireDerivedLocationTextAsync());
 
         // Fill in the fields that were already required before Employment Type/Employee Number
@@ -239,7 +278,7 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
     /// exercise just the Hire dialog against a fresh Offered application, without duplicating this
     /// multi-step setup inline.
     /// </summary>
-    private async Task<(string CandidateLast, VacancyDetailPage VacancyDetail)> ArrangeOfferedApplicationAsync()
+    private async Task<(string CandidateLast, VacancyDetailPage VacancyDetail, string ProfileTitle)> ArrangeOfferedApplicationAsync()
     {
         var unique         = Guid.NewGuid().ToString("N")[..8];
         var candidateFirst = "E2E";
@@ -302,6 +341,6 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickOfferForAsync(candidateLast);
 
-        return (candidateLast, vacancyDetail);
+        return (candidateLast, vacancyDetail, profileTitle);
     }
 }

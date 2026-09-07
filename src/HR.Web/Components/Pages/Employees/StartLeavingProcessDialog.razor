@@ -220,11 +220,17 @@
 
         _editContext.Validate();
 
-        if (_stepFields.TryGetValue(_step, out var fields) &&
-            fields.Any(f => _editContext.GetValidationMessages(_editContext.Field(f)).Any()))
+        if (_stepFields.TryGetValue(_step, out var fields))
         {
-            _globalError = "Please correct the highlighted fields below.";
-            return;
+            var firstMessage = fields
+                .SelectMany(f => _editContext.GetValidationMessages(_editContext.Field(f)))
+                .FirstOrDefault();
+
+            if (firstMessage is not null)
+            {
+                _globalError = firstMessage;
+                return;
+            }
         }
 
         _step++;
@@ -257,7 +263,8 @@
 
         if (!_editContext.Validate())
         {
-            _globalError = "Please correct the highlighted fields below.";
+            _globalError = _editContext.GetValidationMessages().FirstOrDefault()
+                ?? "Please correct the highlighted fields below.";
             return;
         }
 

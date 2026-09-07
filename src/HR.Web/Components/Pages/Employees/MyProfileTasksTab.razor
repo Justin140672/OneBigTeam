@@ -32,9 +32,25 @@ else
         // See EmployeeTasksTab's identical comment: TaskList/HrGrid has AllowPaging="false" with
         // no "next page" control, so the default pageSize=20 would silently drop tasks past the
         // first page (soonest-due first) with no indication anything is missing.
-        var result = await TaskService.GetMyTasksAsync(CompanyId, pageSize: 200);
-        _tasks = result?.Items ?? [];
-        _loading = false;
+        //
+        // A faulted call here (a transient error, a timeout) must not leave _loading stuck true
+        // forever — same class of bug already fixed in MyProfileOverviewTab.razor's own
+        // OnParametersSetAsync (see its comment), which produced the identical symptom: the E2E
+        // suite's task-view-btn locator timing out because the tab never got past its loading
+        // state.
+        try
+        {
+            var result = await TaskService.GetMyTasksAsync(CompanyId, pageSize: 200);
+            _tasks = result?.Items ?? [];
+        }
+        catch
+        {
+            _tasks = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
         StateHasChanged();
     }
 

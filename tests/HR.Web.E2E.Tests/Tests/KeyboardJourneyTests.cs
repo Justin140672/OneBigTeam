@@ -45,11 +45,43 @@ public sealed class KeyboardJourneyTests(EmployeePersonaFixture fixture)
         await profile.FillLeaveRequestAsync("Annual Leave", start.ToString("dd/MM/yyyy"), end.ToString("dd/MM/yyyy"), reason);
 
         var submit = _page.GetByRole(AriaRole.Button, new() { Name = "Submit Request" });
-        await submit.FocusAsync();
+        var dialog = _page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" });
+
+        // FillLeaveRequestAsync's last field commit (Reason, via Tab) fires an async Blazor Server
+        // round trip (blur -> ValueChanged -> StateHasChanged) that can still be in flight the
+        // instant this method starts — if it re-renders the Submit button element (e.g. its
+        // Disabled binding briefly re-evaluating) after FocusAsync() below but before the keyboard
+        // Enter is dispatched, Blazor swaps in a fresh DOM node that never actually received focus,
+        // silently swallowing the keypress with no popup/error to retry on (a plain single
+        // FocusAsync+PressAsync pair has nothing to detect that with). Poll for the button to
+        // actually hold document focus before pressing Enter, re-focusing on each attempt so a
+        // stale reference from an earlier re-render can't linger.
+        var focused = false;
+        for (var attempt = 0; attempt < 10 && !focused; attempt++)
+        {
+            await submit.FocusAsync();
+            focused = await submit.EvaluateAsync<bool>("el => el === document.activeElement");
+            if (!focused)
+                await _page.WaitForTimeoutAsync(200);
+        }
+        Assert.True(focused, "Expected the 'Submit Request' button to hold keyboard focus before pressing Enter");
+
         await _page.Keyboard.PressAsync("Enter");
 
-        await _page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" })
-            .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        try
+        {
+            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            // The Enter keypress can still land in the same re-render gap described above even
+            // after confirming focus (a StateHasChanged triggered by the Enter's own keydown
+            // handling, immediately followed by another render swapping the node again) — retry
+            // once, re-focusing and re-pressing, before treating this as a genuine failure.
+            await submit.FocusAsync();
+            await _page.Keyboard.PressAsync("Enter");
+            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        }
     }
 
     [Fact]

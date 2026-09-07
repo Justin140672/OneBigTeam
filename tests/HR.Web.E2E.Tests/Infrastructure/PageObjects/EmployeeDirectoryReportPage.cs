@@ -309,15 +309,43 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
         // the field's value round-trips server-side, which needs a blur/change, not just FillAsync.
         await page.Keyboard.PressAsync("Tab");
         await page.GetByRole(AriaRole.Button, new() { Name = "Save Name" }).ClickAsync();
+
+        // ClickAsync only proves the click was dispatched — ConfirmRenameAsync
+        // (ReportFilterPanel.razor) is an async server round trip (rename call, then a full
+        // LoadSavedViewsAsync refetch of the saved-views list) that keeps running well after the
+        // click handler returns to the DOM. A caller that immediately reads the dropdown's options
+        // (a bare, non-retrying read — see GetSavedViewOptionTextsAsync) can win that race and see
+        // the pre-rename list. Wait for the rename row itself to disappear (_showRename flips back
+        // to false only once the round trip — including the refetch — has completed) as the
+        // completion signal before returning.
+        await page.GetByPlaceholder("View name").WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
     /// <summary>Clicks "Set Default" for the currently selected saved view.</summary>
-    public Task SetSelectedViewAsDefaultAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Set Default" }).ClickAsync();
+    public async Task SetSelectedViewAsDefaultAsync()
+    {
+        var button = page.GetByRole(AriaRole.Button, new() { Name = "Set Default" });
+        await button.ClickAsync();
+        // SetDefaultAsync (ReportFilterPanel.razor) round-trips (set-default call, then a full
+        // LoadSavedViewsAsync refetch) after the click returns — same race as RenameSelectedViewAsync
+        // above. Once it completes, "Set Default" becomes Disabled (the now-default view can't be
+        // re-set), which doubles as a reliable completion signal here.
+        await Assertions.Expect(button).ToBeDisabledAsync(new() { Timeout = 10_000 });
+    }
 
     /// <summary>Clicks "Delete" for the currently selected saved view.</summary>
-    public Task DeleteSelectedViewAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Delete", Exact = true }).ClickAsync();
+    public async Task DeleteSelectedViewAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Delete", Exact = true }).ClickAsync();
+        // DeleteSelectedViewAsync (ReportFilterPanel.razor) round-trips (delete call, then a full
+        // LoadSavedViewsAsync refetch) after the click returns — same race as the two methods
+        // above. Once it completes, _selectedView is cleared, which hides the entire
+        // Rename/Set Default/Delete button group (see the razor's `@if (_selectedView is not
+        // null)`) — a reliable signal the refetch (and therefore the dropdown's data source) is
+        // now up to date.
+        await page.GetByRole(AriaRole.Button, new() { Name = "Delete", Exact = true })
+            .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
 
     /// <summary>
     /// The saved-views error banner text (ReportFilterPanel.razor's own alert-danger, distinct

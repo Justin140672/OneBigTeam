@@ -1,0 +1,67 @@
+@using HR.Web.Models
+@inject UserAdministrationService UserAdministrationService
+
+<SfDialog Visible="IsOpen" IsModal="true" Width="600px" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleClosed" />
+    <DialogTemplates>
+        <Header>Audit History</Header>
+        <Content>
+            @if (_loading)
+            {
+                <HrLoadingIndicator Label="Loading audit history…" />
+            }
+            else if (_items.Count == 0)
+            {
+                <p class="text-muted mb-0">No audit history recorded for this user.</p>
+            }
+            else
+            {
+                <ul class="list-unstyled mb-0">
+                    @foreach (var entry in _items)
+                    {
+                        <li class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span class="fw-semibold">@entry.EventType</span>
+                                <span class="text-muted small">@entry.OccurredAt.ToString("dd MMM yyyy HH:mm")</span>
+                            </div>
+                            <div>@entry.Summary</div>
+                            @if (!string.IsNullOrEmpty(entry.PerformedBy))
+                            {
+                                <div class="text-muted small">By @entry.PerformedBy</div>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton CssClass="audit-history-close-btn" OnClick="HandleClosed">Close</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    private bool _loading = true;
+    private List<UserAuditHistoryItemModel> _items = [];
+    private bool _wasOpen;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && !_wasOpen)
+        {
+            _loading = true;
+            var history = await UserAdministrationService.GetAuditHistoryAsync(CompanyId, EmployeeId);
+            _items = history?.Items ?? [];
+            _loading = false;
+        }
+
+        _wasOpen = IsOpen;
+    }
+
+    private async Task HandleClosed() => await OnClosed.InvokeAsync();
+}

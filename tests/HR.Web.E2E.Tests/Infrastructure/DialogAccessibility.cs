@@ -19,7 +19,20 @@ public static class DialogAccessibility
     {
         await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
-        Assert.True(await IsFocusInsideAsync(page, dialog),
+        // Syncfusion's Dialog moves initial focus onto its first focusable element from a
+        // post-open/animation-end callback, not synchronously with the dialog becoming visible.
+        // Headless Chromium has no real OS window focus and can schedule/paint that callback a beat
+        // later than a headed run does, so a single immediate check here is a headless-specific
+        // race rather than a real focus-trap gap. Poll briefly before asserting.
+        var focusInsideOnOpen = false;
+        var openFocusDeadline = DateTime.UtcNow.AddSeconds(3);
+        while (DateTime.UtcNow < openFocusDeadline)
+        {
+            focusInsideOnOpen = await IsFocusInsideAsync(page, dialog);
+            if (focusInsideOnOpen) break;
+            await page.WaitForTimeoutAsync(100);
+        }
+        Assert.True(focusInsideOnOpen,
             "Expected keyboard focus to be inside the dialog when it opened.");
 
         // Walk forward through the dialog's focusable controls; focus must never escape to <body>.

@@ -414,6 +414,13 @@ else
     {
         NavigationManager.LocationChanged += OnLocationChanged;
 
+        // InitialiseAsync now only awaits identity (see its own remarks) and kicks off secondary
+        // enrichment (branding, settings, etc.) in the background — subscribe so this layout
+        // re-renders once that lands, the same pattern AdminQuickNav already uses for the same
+        // reason, since this component reads several enrichment-only fields (CompanyName,
+        // PrimaryLogoUrl/SmallLogoUrl) directly in its own markup.
+        Session.Changed += OnSessionChanged;
+
         await Session.InitialiseAsync();
 
         var companyId = Session.CompanyId;
@@ -655,9 +662,51 @@ else
     // render until it succeeds makes this self-healing regardless of exactly when the circuit
     // finishes connecting.
     private bool _themeSynced;
+    private bool _sidebarSynced;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!_sidebarSynced)
+        {
+            try
+            {
+                // SidebarOpen defaults to true (below), and SfSidebar's own MediaQuery is meant to
+                // correct that responsively for narrow viewports — but on a fresh full-page load
+                // (as opposed to a live window resize, which Syncfusion's own listener handles
+                // fine), the server-rendered first paint shows the sidebar already open and
+                // pushing its full 280px width before any client-side correction has a chance to
+                // run, which is exactly the kind of SSR/hydration-timing gap this Syncfusion
+                // component's own MediaQuery doesn't close on its own. Explicitly check the
+                // viewport here and correct once, the same self-healing "retry until the circuit
+                // is ready" pattern as the theme sync below.
+                var isDesktopWidth = await JS.InvokeAsync<bool>("matchesMediaQuery", "(min-width: 768px)");
+                _sidebarSynced = true;
+
+                if (!isDesktopWidth && SidebarOpen)
+                {
+                    SidebarOpen = false;
+                    StateHasChanged();
+                }
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit not ready yet — leave _sidebarSynced false so the next render retries.
+            }
+            catch (Exception)
+            {
+                // An unhandled exception in OnAfterRenderAsync is fatal to the whole Blazor Server
+                // circuit, and this runs on EVERY page load app-wide via MainLayout — a purely
+                // cosmetic sidebar-width correction must never be allowed to take down the entire
+                // page (or the app's perceived performance/stability, if the circuit has to
+                // reconnect) over something as brittle as a JS interop call's exact exception type.
+                // Unlike the JSDisconnectedException case above (genuinely transient — the circuit
+                // just isn't ready yet), mark this synced anyway so a persistently failing call
+                // (e.g. the JS function itself broken) doesn't retry on every single render for
+                // the rest of the page's lifetime.
+                _sidebarSynced = true;
+            }
+        }
+
         if (_themeSynced)
             return;
 
@@ -692,8 +741,11 @@ else
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
         => InvokeAsync(StateHasChanged);
 
+    private void OnSessionChanged() => InvokeAsync(StateHasChanged);
+
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
+        Session.Changed -= OnSessionChanged;
     }
 }

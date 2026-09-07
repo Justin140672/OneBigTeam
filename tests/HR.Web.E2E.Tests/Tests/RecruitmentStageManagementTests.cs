@@ -514,6 +514,25 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
                 activeWithOutcome.Add(name);
         }
 
+        // Self-heal against exactly the contamination the finally block below now guards
+        // against going forward: if an earlier run (predating that guard) left this shared
+        // company with zero active stages for this terminal outcome, reactivate one of the
+        // existing (inactive) stages with that outcome rather than failing outright — every
+        // Kanban test on this shared company depends on there being an active Hired/Rejected
+        // stage/column.
+        if (activeWithOutcome.Count == 0)
+        {
+            foreach (var name in allNames.Distinct())
+            {
+                if (await stageList.GetTerminalOutcomeAsync(name) == terminalOutcome)
+                {
+                    await stageList.ActivateAsync(name);
+                    activeWithOutcome.Add(name);
+                    break;
+                }
+            }
+        }
+
         Assert.True(activeWithOutcome.Count > 0,
             $"Expected at least one active recruitment stage with terminal outcome '{terminalOutcome}' to exist");
 
@@ -544,6 +563,20 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
         {
             foreach (var extra in temporarilyDeactivated)
                 await stageList.ActivateAsync(extra);
+
+            // Safety net: `target` itself is expected to be rejected by the server and remain
+            // active, so it's deliberately never added to temporarilyDeactivated above. But if that
+            // expectation is ever wrong (a genuine server-side regression that lets the "only active
+            // terminal stage" deactivation through, or the UI assertion above throws before fully
+            // confirming state), target would be left permanently deactivated with no cleanup path —
+            // which then starves every other test expecting an active "Hired"/"Rejected" stage/Kanban
+            // column for this shared Acme company (see VacancyKanbanBoardRedesignTests' "Could not
+            // find a Kanban column for stage 'Hired'" failures downstream of this class in the same
+            // serialization group). Re-navigate and reactivate it if it somehow ended up inactive.
+            await stageList.GoToAsync(AcmeId);
+            await stageList.ShowInactiveAsync();
+            if (!await stageList.IsActiveAsync(target))
+                await stageList.ActivateAsync(target);
         }
     }
 }

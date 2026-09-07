@@ -318,6 +318,7 @@ public static class DocumentsModule
         services.AddScoped<IWorkloadActionProvider, MissingRequiredEmployeeDocumentsWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, EmployeeDocumentsExpiringSoonWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, CompanyDocumentAcknowledgementsOutstandingWorkloadActionProvider>();
+        services.AddScoped<IWorkloadActionProvider, SharedCompanyDocumentReviewsDueWorkloadActionProvider>();
 
         // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
         services.AddScoped<IOnboardingTaskDefinition, ReviewCompanyDocumentsTask>();

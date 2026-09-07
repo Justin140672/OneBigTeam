@@ -992,8 +992,15 @@
     {
         var employeeNumberRequired = _hireEmployeeNumberMode != EmployeeNumberMode.Automatic;
 
-        if (_activeApplication is null || !_hireEditContext.Validate())
+        if (_activeApplication is null)
             return;
+
+        if (!_hireEditContext.Validate())
+        {
+            _dialogError = _hireEditContext.GetValidationMessages().FirstOrDefault()
+                ?? "Please correct the highlighted fields below.";
+            return;
+        }
 
         var request = new HireCandidateRequest(
             CompanyId, VacancyId, _activeApplication.Id,

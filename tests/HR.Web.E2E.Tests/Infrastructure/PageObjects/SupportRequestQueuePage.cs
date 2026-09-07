@@ -4,7 +4,9 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 /// <summary>
 /// Page object for SupportRequestQueue.razor (/companies/{companyId}/support/admin/queue) —
-/// the staff-only grid of support requests with a per-row required status dropdown.
+/// the staff-only grid of support requests. Status is a plain read-only, humanized text cell;
+/// per the page's own banner ("Ticket status can only be changed by support staff in the Admin
+/// app."), there is no per-row status control here any more.
 /// </summary>
 public sealed class SupportRequestQueuePage(IPage page, string baseUrl)
 {
@@ -31,21 +33,28 @@ public sealed class SupportRequestQueuePage(IPage page, string baseUrl)
         DropDownSelector.SelectAsync(page, page.Locator(".support-status-filter"), status);
 
     /// <summary>
-    /// Changes the status dropdown embedded in the row matching <paramref name="referenceOrTitleFragment"/>.
-    /// The row's own dropdown is scoped via the row locator so this works regardless of position.
+    /// True if the row matching <paramref name="referenceOrTitleFragment"/> shows
+    /// <paramref name="statusText"/> as its Status cell's plain text (see
+    /// SupportRequestQueue.razor's Status column Template — EnumDisplay.Humanize(row.Status),
+    /// no dropdown).
     /// </summary>
-    public async Task ChangeStatusAsync(string referenceOrTitleFragment, string newStatus)
+    public async Task<bool> HasStatusTextAsync(string referenceOrTitleFragment, string statusText)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
-        var row = page.Locator(".e-row")
-            .Filter(new() { HasText = referenceOrTitleFragment })
-            .First;
-        await DropDownSelector.SelectAsync(page, row, newStatus);
-        // ChangeStatusAsync in the razor page reloads the grid on success; wait for the
-        // spinner (if any) used elsewhere in this suite to clear before asserting further.
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        var row = page.Locator(".e-row").Filter(new() { HasText = referenceOrTitleFragment }).First;
+        return await row.Locator(".e-rowcell").Filter(new() { HasText = statusText }).First.WaitUntilVisibleAsync();
+    }
+
+    /// <summary>
+    /// True if the row matching <paramref name="referenceOrTitleFragment"/> still has an
+    /// editable status dropdown (span[role='combobox']) — expected to always be false now that
+    /// status can only be changed by support staff in the Admin app.
+    /// </summary>
+    public async Task<bool> HasStatusDropdownAsync(string referenceOrTitleFragment)
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        var row = page.Locator(".e-row").Filter(new() { HasText = referenceOrTitleFragment }).First;
+        return await row.Locator("span[role='combobox']").First.IsVisibleAsync();
     }
 
     public Task<bool> HasActionErrorAsync() =>

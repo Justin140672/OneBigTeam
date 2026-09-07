@@ -108,20 +108,18 @@
     //
     // IMPORTANT for any embedding site: this parameter's default is "hide terminal columns," which
     // is only correct for RecruitmentDashboard.razor's own "Show Hired / Rejected columns"
-    // checkbox-driven usage. VacancyDetail.razor's Kanban tab and the standalone VacancyKanbanPage
-    // route both predate this parameter and have no toggle of their own — they must always pass
-    // ShowTerminalStages="true" explicitly to preserve their original "show every configured
-    // stage, including Hired/Rejected" behaviour. Omitting it there silently drops the Hired/
-    // Rejected columns entirely (not just hides applicants in them) — this exact regression broke
-    // VacancyKanbanBoardTests.Board_RendersOneColumnPerConfiguredStage_InDisplayOrder_
-    // IncludingEmptyColumns when this parameter was first introduced.
+    // checkbox-driven usage. The standalone VacancyKanbanPage route predates this parameter and has
+    // no toggle of its own — it must always pass ShowTerminalStages="true" explicitly to preserve
+    // its original "show every configured stage, including Hired/Rejected" behaviour. Omitting it
+    // there silently drops the Hired/Rejected columns entirely (not just hides applicants in them)
+    // — this exact regression broke VacancyKanbanBoardTests.Board_RendersOneColumnPerConfiguredStage_
+    // InDisplayOrder_IncludingEmptyColumns when this parameter was first introduced.
     [Parameter] public bool ShowTerminalStages { get; set; }
 
     // UI-only toggle — when the board is embedded in a page that already renders its own search
     // box / vacancy context above the board (RecruitmentDashboard.razor's unified toolbar row),
     // the board's own internal toolbar would be a redundant duplicate. Defaults to true so
-    // standalone callers (VacancyDetail's Kanban tab, VacancyKanbanPage) keep their existing
-    // toolbar unchanged.
+    // standalone callers (VacancyKanbanPage) keep their existing toolbar unchanged.
     [Parameter] public bool ShowToolbar { get; set; } = true;
 
     private bool _loading = true;
@@ -270,9 +268,9 @@
     private async Task OpenApplicant(KanbanApplicantModel applicant)
     {
         // Carry a returnUrl so CandidateDetail.razor's "Close" button comes back to wherever this
-        // board is actually embedded (the standalone Kanban route, the Vacancy Detail tab, or the
-        // Recruitment Dashboard's Board view) instead of always falling back to the plain Candidate
-        // List — previously the card click had no memory of where it was opened from.
+        // board is actually embedded (the standalone Kanban route, or the Recruitment Dashboard's
+        // Board view) instead of always falling back to the plain Candidate List — previously the
+        // card click had no memory of where it was opened from.
         var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
 
         var candidateUrl = $"/companies/{CompanyId}/candidates/{applicant.CandidateId}" +

@@ -58,7 +58,7 @@
             }
             @if (!string.IsNullOrEmpty(_error))
             {
-                <div class="alert alert-danger py-2 mb-0">@_error</div>
+                <div class="text-danger small mt-1">@_error</div>
             }
         </Content>
         <FooterTemplate>
@@ -108,8 +108,14 @@
 
     private async Task ConfirmAsync()
     {
+        _error = null;
+
         if (!_editContext.Validate())
+        {
+            _error = _editContext.GetValidationMessages().FirstOrDefault()
+                ?? "Please correct the highlighted fields below.";
             return;
+        }
 
         _saving = true;
         _error = null;

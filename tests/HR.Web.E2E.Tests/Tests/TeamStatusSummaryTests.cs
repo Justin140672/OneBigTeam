@@ -8,14 +8,18 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (src/HR.Web/Components/Pages/Dashboards/TeamStatusSummary.razor), reached via
 /// "/dashboard/manager". The widget now calls one authoritative endpoint and renders six
 /// action tiles as &lt;button&gt; elements with aria-expanded ("At work", "Away today",
-/// "On leave", "Sick", "In probation", "Missing fit notes"), a team-size count in the header,
+/// "On leave", "Sick", "On probation", "Missing fit notes"), a team-size count in the header,
 /// and an inline drill-down panel per tile whose row count always equals the tile's number
 /// (summary/drill-down parity).
 ///
 /// Uses the same seeded manager persona the other manager-dashboard tests use — James Okafor
 /// (james.okafor@acme.example, ManagerPersonaFixture default). Assertions are kept resilient to
-/// org-chart seed drift (parity / >= / contains rather than hard-coded totals), so the
-/// "In probation" tile is expected to list him for this login.
+/// org-chart seed drift (parity / >= / contains rather than hard-coded totals). James's only
+/// direct report, Tom Williams, has a fixed 2023 hire date, so his probation period has long
+/// since lapsed and "On probation" is expected to be 0 here. Instead, SicknessModule's dev seed
+/// gives Tom a currently-open sickness record with a pending fit-note evidence request computed
+/// relative to "now" (see SeedSicknessAsync), which keeps the "Missing fit notes" tile reliably
+/// non-zero for James's team regardless of when the seed runs or what day of the week it is.
 /// </summary>
 public sealed class TeamStatusSummaryTests(ManagerPersonaFixture fixture)
     : RoleE2ETestBase<ManagerPersonaFixture>(fixture)
@@ -24,7 +28,7 @@ public sealed class TeamStatusSummaryTests(ManagerPersonaFixture fixture)
 
     private static readonly string[] ExpectedTileLabels =
     [
-        "At work", "Away today", "On leave", "Sick", "In probation", "Missing fit notes",
+        "At work", "Away today", "On leave", "Sick", "On probation", "Missing fit notes",
     ];
 
     private async Task<ManagerDashboardPage> LoginAndOpenDashboardAsync()
@@ -111,17 +115,17 @@ public sealed class TeamStatusSummaryTests(ManagerPersonaFixture fixture)
     [Fact]
     public async Task InProbationTile_DrilldownRowCount_MatchesHeadline()
     {
-        // Whichever manager persona this fixture logs in as, the "In probation" headline count
+        // Whichever manager persona this fixture logs in as, the "On probation" headline count
         // must always equal the number of rows in its drill-down panel (DSH-05 summary/drill-down
         // parity — both come from the same payload). We assert parity rather than a specific
         // seeded probationer because which manager's reporting sub-tree contains an active
         // probation record depends on the org-chart seed.
         var dashboard = await LoginAndOpenDashboardAsync();
 
-        var probationCount = await dashboard.GetTeamStatusValueAsync("In probation");
+        var probationCount = await dashboard.GetTeamStatusValueAsync("On probation");
 
-        await dashboard.ClickTeamStatusTileAsync("In probation");
-        Assert.True(await dashboard.TeamStatusTileIsExpandedAsync("In probation"));
+        await dashboard.ClickTeamStatusTileAsync("On probation");
+        Assert.True(await dashboard.TeamStatusTileIsExpandedAsync("On probation"));
 
         var names = await dashboard.GetTeamStatusDrilldownNamesAsync();
         Assert.Equal(probationCount, names.Count);

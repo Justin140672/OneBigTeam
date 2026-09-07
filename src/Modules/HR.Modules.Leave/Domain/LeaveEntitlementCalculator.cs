@@ -49,6 +49,14 @@ internal static class LeaveEntitlementCalculator
 
         var proRated = fullYearEntitlementDays * remainingDays / totalDaysInYear;
 
-        return Math.Round(proRated, 2, MidpointRounding.AwayFromZero);
+        return RoundToNearestHalfDay(proRated);
     }
+
+    /// <summary>
+    /// Leave is only ever bookable in half-day units (see <see cref="LeaveDayPart"/>), so pro-rated
+    /// entitlement is rounded to the nearest 0.5 day (round-half-away-from-zero at the 0.5 boundary)
+    /// rather than left as an arbitrary decimal fraction.
+    /// </summary>
+    internal static decimal RoundToNearestHalfDay(decimal value) =>
+        Math.Round(value * 2m, MidpointRounding.AwayFromZero) / 2m;
 }

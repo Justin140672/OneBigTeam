@@ -55,8 +55,16 @@ public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : S
         // from My Profile, not only in response to an HR request) — this replaced the older
         // EmployeeDocumentsTab.razor-based tab, whose bulk Upload button was admin-only and never
         // rendered for EmployeeSelfUpload. Each "Requested" row in the Document Requests table
-        // still gets its own contextual "Upload" button too — Tom has exactly one open request
-        // (Passport) — so 2 "Upload" buttons should be visible in total: 1 bulk + 1 per-request.
+        // still gets its own contextual "Upload" button too.
+        //
+        // Tom's seeded Passport request is NOT the only outstanding request he can end up with —
+        // Tom Williams is a widely-reused persona, and other test classes (EmployeeDocumentsTabTests
+        // requests "Driving Licence", DocumentUploadTaskTests requests "Certificate") add their own
+        // permanent, never-cleared document requests for him on the shared E2E database. Asserting a
+        // hard-coded total of 2 assumed Passport would forever be Tom's only open request, which
+        // stopped holding once those other classes' requests accumulated. Assert the actual
+        // relationship instead — exactly 1 bulk button plus 1 per currently-"Requested" row — so
+        // this test keeps passing regardless of how many other requests Tom has picked up.
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
@@ -70,8 +78,19 @@ public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : S
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
+        var requestRows = _page.Locator("[data-testid='my-profile-document-requests-section'] tbody tr");
+        var requestRowCount = await requestRows.CountAsync();
+        var uploadButtonsInRequests = 0;
+        for (var i = 0; i < requestRowCount; i++)
+        {
+            if (await requestRows.Nth(i).GetByRole(AriaRole.Button, new() { Name = "Upload" }).IsVisibleAsync())
+                uploadButtonsInRequests++;
+        }
+
         var uploadBtns = _page.GetByRole(AriaRole.Button, new() { Name = "Upload" });
-        Assert.Equal(2, await uploadBtns.CountAsync());
+        Assert.Equal(1 + uploadButtonsInRequests, await uploadBtns.CountAsync());
+        Assert.True(uploadButtonsInRequests >= 1,
+            "Expected at least one per-request 'Upload' button for Tom's outstanding Passport request");
     }
 
     [Fact]

@@ -21,13 +21,26 @@ public sealed class ReportChartAccessibilityTests(HrAdminPersonaFixture fixture)
     : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private const string LauraEmail = "laura.bennett@acme.example";
+    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator — no Recruiter role
+    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter — no HrAdministrator role
 
-    private async Task LoginAsync()
+    // The recruitment-pipeline and vacancy-performance report pages guard their data on
+    // Session.CanViewRecruitmentReports (permission "reporting:view-recruitment"), which is
+    // Recruiter-only — Laura (HR Administrator) does not hold it and would be bounced to
+    // /access-denied before the grid ever renders (same precedent as RecruitmentPipelineReportTests
+    // and VacancyPerformanceReportTests). The sickness report is gated on CanViewHrReports instead,
+    // which Laura does hold.
+    private static string LoginEmailFor(string reportSlug) => reportSlug switch
+    {
+        "recruitment-pipeline" or "vacancy-performance" => MarcusEmail,
+        _ => LauraEmail,
+    };
+
+    private async Task LoginAsync(string email)
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(email);
     }
 
     [Theory]
@@ -36,7 +49,7 @@ public sealed class ReportChartAccessibilityTests(HrAdminPersonaFixture fixture)
     [InlineData("vacancy-performance")]
     public async Task ReportCharts_ProvideTextAlternative(string reportSlug)
     {
-        await LoginAsync();
+        await LoginAsync(LoginEmailFor(reportSlug));
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/reporting/{reportSlug}");
         await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 20_000 });
 

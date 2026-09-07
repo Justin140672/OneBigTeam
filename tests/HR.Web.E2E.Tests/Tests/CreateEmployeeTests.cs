@@ -409,9 +409,22 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
 
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
+
+        // Employee Number only renders (and is only required) in Manual numbering mode — see
+        // EmployeeEdit.razor's field. Set it explicitly rather than assuming Acme's current mode,
+        // same reasoning as CreateEmployee_WhenCompanyModeIsManual_...'s own remarks: this is a
+        // shared company-wide setting other tests in this suite can leave in Automatic mode, in
+        // which case the field never renders at all, nothing is validated, the save just succeeds,
+        // and no ".validation-message" ever appears — timing out instead of failing clearly.
+        await hrSettings.GoToAsync(AcmeId);
+        await hrSettings.SelectEmployeeNumberModeAsync("Manual");
+        await hrSettings.SaveAsync();
+        Assert.False(await hrSettings.HasErrorAsync(),
+            "Expected no error after switching the company's numbering mode to Manual");
 
         await empEdit.GoToNewAsync(AcmeId);
 

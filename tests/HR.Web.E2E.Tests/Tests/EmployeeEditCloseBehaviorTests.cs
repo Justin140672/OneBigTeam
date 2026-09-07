@@ -140,8 +140,25 @@ public sealed class EmployeeEditCloseBehaviorTests(HrAdminPersonaFixture fixture
         await empEdit.GoToAsync(AcmeId, MarcusId);
         await empEdit.OpenEmploymentTabAsync();
 
-        var newNumber = $"E2E-SAVE-{Guid.NewGuid().ToString("N")[..6].ToUpper()}";
-        await empEdit.FillEmployeeNumberAsync(newNumber);
+        // HR Notes rather than Employee Number — see
+        // Close_ExistingEmployee_EmploymentTabEditOnly_StillShowsConfirmDialog's remarks: Employee
+        // Number is only rendered while the shared Acme company's Employee Numbering Mode happens
+        // to be "Manual", a global setting other tests running concurrently toggle. Worse than a
+        // simple "field not rendered" race for THIS test specifically: filling Employee Number
+        // while Manual, then having a concurrent test flip the company to Automatic before Save
+        // actually runs, made the server reject the update (a manually-set number no longer being
+        // valid under Automatic numbering) — the Employment tab's own SaveAsync then returned that
+        // error as GlobalError instead of navigating, which is exactly the "save silently fails
+        // validation and never navigates" failure mode that left this test hanging for the full
+        // 40s "**/employees" navigation timeout instead of failing fast with a useful message.
+        var newNotes = $"E2E-SAVE-{Guid.NewGuid().ToString("N")[..8]}";
+        var notesField = _page.GetByPlaceholder("Optional internal notes visible to HR only");
+        await notesField.ClickAsync();
+        await _page.Keyboard.PressAsync("Control+A");
+        await _page.Keyboard.PressAsync("Delete");
+        await notesField.PressSequentiallyAsync(newNotes, new() { Delay = 30 });
+        await _page.Keyboard.PressAsync("Tab");
+        await _page.WaitForTimeoutAsync(300);
 
         await empEdit.ClickCloseAsync();
         Assert.True(await empEdit.IsUnsavedChangesDialogVisibleAsync());
@@ -151,6 +168,6 @@ public sealed class EmployeeEditCloseBehaviorTests(HrAdminPersonaFixture fixture
 
         await empEdit.GoToAsync(AcmeId, MarcusId);
         await empEdit.OpenEmploymentTabAsync();
-        Assert.Equal(newNumber, await _page.GetByPlaceholder("e.g. EMP-001").InputValueAsync());
+        Assert.Equal(newNotes, await _page.GetByPlaceholder("Optional internal notes visible to HR only").InputValueAsync());
     }
 }

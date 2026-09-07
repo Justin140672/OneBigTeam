@@ -27,11 +27,26 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
 
     // ── Working Week ─────────────────────────────────────────────────────────
 
+    // Ported from CompanyEditPage's equivalent — SfCheckBox renders the checkbox <input> and its
+    // <label> as siblings inside a shared ".e-checkbox-wrapper" (the label does NOT wrap the
+    // input), same structural convention as every other SfCheckBox helper in this file (see
+    // IsExcludePublicHolidaysFromSicknessCheckedAsync etc. below).
     public async Task<bool> IsWorkingDayCheckedAsync(string dayName)
     {
-        var label = page.Locator("label").Filter(new() { HasText = dayName }).First;
-        var checkbox = label.Locator("input[type='checkbox']");
-        return await checkbox.IsCheckedAsync();
+        // Working Week lives on the first ("Working & Leave") tab — every field accessor for a
+        // later tab (Sickness/Document Acknowledgement/Leaving Process/Employee Numbering/Asset
+        // Numbering) explicitly switches to its own tab first, but this one and its siblings below
+        // (Hours Per Day, Default Holiday Allowance, Probation Months, Leave Year Start Month, the
+        // two Working & Leave checkboxes) never did, silently relying on "Working & Leave" already
+        // being the active tab — true only immediately after GoToAsync, and false the moment any
+        // other tab-switching accessor has run first (e.g. reading/writing Employee Numbering
+        // fields then coming back to toggle "Saturday"). SfTab only renders the active tab's
+        // ContentTemplate, so the checkbox/input genuinely isn't in the DOM in that case — the
+        // exact "Timeout ... waiting for .e-checkbox-wrapper Filter('Saturday')" failure. Switch
+        // explicitly, same as every other tab's accessors.
+        await SwitchToTabAsync("Working & Leave");
+        var wrapper = page.Locator(".e-checkbox-wrapper").Filter(new() { HasText = dayName }).First;
+        return await wrapper.Locator("input[type='checkbox']").IsCheckedAsync();
     }
 
     public async Task SetWorkingDayAsync(string dayName, bool isChecked)
@@ -39,8 +54,8 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         var current = await IsWorkingDayCheckedAsync(dayName);
         if (current != isChecked)
         {
-            var label = page.Locator("label").Filter(new() { HasText = dayName }).First;
-            await label.ClickAsync();
+            var wrapper = page.Locator(".e-checkbox-wrapper").Filter(new() { HasText = dayName }).First;
+            await wrapper.Locator("label").ClickAsync();
         }
     }
 
@@ -100,41 +115,57 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
 
     // ── Regional/core numeric + dropdown fields ─────────────────────────────────
 
-    public async Task SetHoursPerDayAsync(decimal hours) =>
+    public async Task SetHoursPerDayAsync(decimal hours)
+    {
+        await SwitchToTabAsync("Working & Leave");
         await FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-3", "Hours Per Day"), hours.ToString("0.#"), hours);
+    }
 
     public async Task<decimal> GetHoursPerDayAsync()
     {
+        await SwitchToTabAsync("Working & Leave");
         var input = NumericBoxByLabel(".col-md-3", "Hours Per Day");
         var value = await input.InputValueAsync();
         return decimal.Parse(value);
     }
 
-    public async Task SetDefaultHolidayAllowanceAsync(decimal days) =>
+    public async Task SetDefaultHolidayAllowanceAsync(decimal days)
+    {
+        await SwitchToTabAsync("Working & Leave");
         await FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-3", "Default Holiday Allowance (days)"), days.ToString("0.#"), days);
+    }
 
     public async Task<decimal> GetDefaultHolidayAllowanceAsync()
     {
+        await SwitchToTabAsync("Working & Leave");
         var input = NumericBoxByLabel(".col-md-3", "Default Holiday Allowance (days)");
         var value = await input.InputValueAsync();
         return decimal.Parse(value);
     }
 
-    public async Task SetProbationMonthsAsync(int months) =>
+    public async Task SetProbationMonthsAsync(int months)
+    {
+        await SwitchToTabAsync("Working & Leave");
         await FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-3", "Probation Months"), months.ToString(), months);
+    }
 
     public async Task<int> GetProbationMonthsAsync()
     {
+        await SwitchToTabAsync("Working & Leave");
         var input = NumericBoxByLabel(".col-md-3", "Probation Months");
         var value = await input.InputValueAsync();
         return int.Parse(value);
     }
 
-    public Task SelectLeaveYearStartMonthAsync(string monthName) =>
-        DropDownSelector.SelectAsync(page, page.Locator(".col-md-3").Filter(new() { HasText = "Leave Year Start Month" }).First, monthName);
+    public async Task SelectLeaveYearStartMonthAsync(string monthName)
+    {
+        await SwitchToTabAsync("Working & Leave");
+        await DropDownSelector.SelectAsync(page, page.Locator(".col-md-3").Filter(new() { HasText = "Leave Year Start Month" }).First, monthName);
+    }
 
     public async Task<string> GetLeaveYearStartMonthAsync()
     {
+        await SwitchToTabAsync("Working & Leave");
         var group = page.Locator(".col-md-3")
             .Filter(new() { HasText = "Leave Year Start Month" })
             .First;
@@ -162,6 +193,7 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
 
     public async Task<bool> IsExcludePublicHolidaysFromLeaveCheckedAsync()
     {
+        await SwitchToTabAsync("Working & Leave");
         var wrapper = page.Locator(".e-checkbox-wrapper")
             .Filter(new() { HasText = "Exclude public holidays from leave" });
         return await wrapper.Locator("input[type='checkbox']").IsCheckedAsync();
@@ -180,6 +212,7 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
 
     public async Task<bool> IsDisplaySalaryOnEmployeeProfileCheckedAsync()
     {
+        await SwitchToTabAsync("Working & Leave");
         var wrapper = page.Locator(".e-checkbox-wrapper")
             .Filter(new() { HasText = "Display salary to employees on their profile" });
         return await wrapper.Locator("input[type='checkbox']").IsCheckedAsync();
@@ -337,9 +370,23 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
     // one flat card — GoToAsync always lands on the first tab, and SfTab only renders the active
     // tab's content, so every accessor for a field on a non-first tab must activate that tab first
     // (the same way MyProfilePage.OpenTasksTabAsync does for its tabs).
-    private Task SwitchToTabAsync(string tabName) =>
+    private async Task SwitchToTabAsync(string tabName)
+    {
         // Not Exact: SfTab headers can carry an error-icon span that perturbs the accessible name.
-        page.GetByRole(AriaRole.Tab, new() { Name = tabName }).First.ClickAsync();
+        var tab = page.GetByRole(AriaRole.Tab, new() { Name = tabName }).First;
+
+        // SfTab (OverflowMode.Scrollable) renders every header up front, but under real page load
+        // (this is frequently the very first interactive action after GoToAsync's own render-ready
+        // wait) the tab header row can still be mid-hydration when a bare ClickAsync's default 30s
+        // actionability wait starts polling — and a header sitting past the initially-visible
+        // scroll width needs to actually be scrolled into view before Playwright will consider it
+        // clickable. Wait for it to attach explicitly (separately from the click's own actionability
+        // wait, so a slow-to-attach header doesn't eat into the same 30s budget the click below
+        // needs for its own visible/stable/enabled checks) and scroll it into view first.
+        await tab.WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 30_000 });
+        await tab.ScrollIntoViewIfNeededAsync();
+        await tab.ClickAsync();
+    }
 
     private Task SwitchToEmployeeNumberingTabAsync() => SwitchToTabAsync("Employee Numbering");
 

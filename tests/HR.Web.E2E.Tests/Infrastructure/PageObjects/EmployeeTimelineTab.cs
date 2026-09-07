@@ -30,10 +30,43 @@ public sealed class EmployeeTimelineTab(IPage page)
         // single strip. Select the group first when it's present.
         var activityGroup = page.Locator(".employee-profile-groups > .e-tab-header")
             .GetByRole(AriaRole.Tab, new() { Name = "Activity", Exact = true });
-        if (await activityGroup.CountAsync() > 0)
-            await activityGroup.ClickAsync();
+        var timelineTab = page.GetByRole(AriaRole.Tab, new() { Name = "Timeline" });
 
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Timeline" }).ClickAsync();
+        // A bare instant CountAsync() here races EmployeeEdit.razor's own post-navigation render
+        // of the ".employee-profile-groups" strip (only mounted once the page's async employee
+        // load resolves) — under headless load this check can fire and see zero groups a moment
+        // before they exist, silently skipping the "Activity" group click entirely and leaving
+        // the subsequent "Timeline" tab wait below looking for a tab that was never selected into
+        // view. MyProfile (which has no groups at all) still resolves this the same way since the
+        // locator itself simply never appears there. Same race class as
+        // EmployeeEditPage.NavigateToSectionAsync's own groupTab wait, just duplicated here rather
+        // than reused.
+        try
+        {
+            await page.Locator(".employee-profile-groups > .e-tab-header")
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        }
+        catch (TimeoutException)
+        {
+            // No groups strip at all (e.g. MyProfile's flat layout) — fall through to the direct
+            // "Timeline" tab wait below.
+        }
+
+        if (await activityGroup.CountAsync() > 0)
+        {
+            await activityGroup.ClickAsync();
+            // The inner ".employee-profile-sections" strip (which contains the "Timeline" tab) is
+            // only rendered once the "Activity" group is selected — a bare click-then-click here can
+            // fire before that inner strip has mounted, matching the "group tab click only proves the
+            // click dispatched, not that the section strip re-rendered" race already documented on
+            // EmployeeEditPage.NavigateToSectionAsync. Wait for it explicitly rather than relying on
+            // GetByRole's own actionability retry alone.
+            await page.Locator(".employee-profile-sections > .e-tab-header")
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        }
+
+        await timelineTab.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        await timelineTab.ClickAsync();
         await page.WaitForSelectorAsync(
             "[data-testid='employee-timeline'], .hr-empty-state",
             new() { Timeout = 15_000 });

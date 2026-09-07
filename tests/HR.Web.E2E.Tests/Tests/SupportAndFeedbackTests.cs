@@ -73,8 +73,15 @@ public sealed class SupportAndFeedbackTests(HrAdminPersonaFixture fixture) : Rol
             $"Expected the new support request '{title}' to appear in My Submissions");
     }
 
+    // NOTE: This used to drive a per-row status dropdown in the staff queue
+    // (SupportRequestQueuePage.ChangeStatusAsync). Per SupportRequestQueue.razor's own banner
+    // ("Ticket status can only be changed by support staff in the Admin app.") and its
+    // IsAddDisabled/Status-column comments, that capability was deliberately removed — status is
+    // now a plain read-only, humanized text cell (EnumDisplay.Humanize) with no dropdown at all.
+    // Updated to assert the current, correct behavior: a staff persona can see a newly-submitted
+    // request's status in the queue, but there is no control to change it from here.
     [Fact]
-    public async Task StaffPersona_CanUpdateRequestStatus_FromQueue()
+    public async Task StaffPersona_SeesRequestStatus_InQueue_ButCannotChangeIt()
     {
         var title = $"E2E Queue Status {Guid.NewGuid().ToString("N")[..8]}";
 
@@ -96,14 +103,14 @@ public sealed class SupportAndFeedbackTests(HrAdminPersonaFixture fixture) : Rol
         Assert.True(await queue.HasRequestAsync(title),
             $"Expected the submitted request '{title}' to appear in the staff queue");
 
-        // The dropdown now displays humanized text ("Under Review") via ItemTemplate/ValueTemplate
-        // — see SupportRequestQueue.razor — even though the bound Value/DataSource are still the
-        // raw enum strings; DropDownSelector.SelectAsync matches on the same text a user actually
-        // sees in the popup, so pass the humanized label here.
-        await queue.ChangeStatusAsync(title, "Under Review");
-
-        Assert.False(await queue.HasActionErrorAsync(),
-            "Expected no error after updating the request's status");
+        // A freshly-submitted request starts life as SupportRequestStatus.Submitted (see
+        // SupportRequest.cs's constructor) — humanized to "Submitted", shown as plain text, not
+        // an editable control.
+        Assert.True(await queue.HasStatusTextAsync(title, "Submitted"),
+            $"Expected the queue row for '{title}' to show its status ('Submitted') as plain text");
+        Assert.False(await queue.HasStatusDropdownAsync(title),
+            $"Did not expect an editable status dropdown in the staff queue row for '{title}' — " +
+            "status can only be changed by support staff in the Admin app");
     }
 
     [Fact]

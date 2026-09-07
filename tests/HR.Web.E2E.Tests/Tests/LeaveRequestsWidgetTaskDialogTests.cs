@@ -68,7 +68,10 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(CrossUserFixture fixture)
         var namesBeforeClick = await dashboard.GetAttentionQueueEmployeeNamesAsync("Leave request");
         Assert.Contains(namesBeforeClick, n => n.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
 
-        await dashboard.ClickAttentionQueueItemAsync("Tom Williams");
+        // Scope the click to the "Leave request" row specifically — Tom may also have other
+        // open attention-queue items (onboarding, fit notes, etc.) that would otherwise win the
+        // single-fragment ".First" match just by sorting ahead of the leave request row.
+        await dashboard.ClickAttentionQueueItemAsync("Tom Williams", "Leave request");
 
         // ── Step 4: The Task view dialog opens in place — no navigation away from the
         // dashboard, unlike the "already actioned" fallback. ────────────────────────────
@@ -116,10 +119,28 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(CrossUserFixture fixture)
         var jamesId = Guid.Parse("30000000-0000-0000-0000-000000000002");
         await profile.GoToAsync(AcmeId, jamesId);
         await profile.OpenTasksTabAsync();
-        var taskTitles = await profile.GetTaskTitlesAsync();
-        var reviewTitle = taskTitles.First(t => t.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
 
-        await profile.ClickTaskAsync(reviewTitle);
+        // Every "Review leave request" task for Tom carries the identical title "Review leave
+        // request — Tom Williams" (see LeaveRequestedHandler) — matching on title alone is
+        // ambiguous whenever James has more than one open review for Tom at once, which is
+        // exactly what happens here: the sibling ClickingPendingLeaveRequest_... test (which runs
+        // first in this class and deliberately leaves its own Tom Williams review task open — see
+        // its own remarks) leaves an earlier-due-date stale task sitting in James's queue, and
+        // TaskList/GetMyTasks sort soonest-due-first, so a bare title match would resolve to that
+        // stale task instead of the one just created for THIS request. Disambiguate by also
+        // matching the row's rendered date-range description, which is unique per request.
+        // The Due Date column renders via GridColumn Format="d" (the runtime's short date
+        // pattern), not a "14 Sep"-style string — the exact separator/order depends on the
+        // active culture (e.g. "14/09/2026" for en-GB, "09/14/2026" under the invariant culture
+        // ASP.NET Core defaults to without explicit localization config), so match either day/
+        // month ordering rather than assuming one.
+        var row = _page.Locator(".e-row")
+            .Filter(new() { HasText = "Tom Williams" })
+            .Filter(new() { HasTextRegex = new Regex(@"14[/\-.]0?9[/\-.]2026|0?9[/\-.]14[/\-.]2026|14\s*Sep|Sep\s*14") });
+        await row.WaitForAsync(new() { Timeout = 15_000 });
+        await row.Locator(".task-title").ClickAsync();
+        await _page.WaitForSelectorAsync("[role='dialog'].task-view-dialog", new() { Timeout = 15_000 });
+
         await task.WaitForLoadedAsync();
         await task.ApproveAsync();
         await task.CloseAsync();

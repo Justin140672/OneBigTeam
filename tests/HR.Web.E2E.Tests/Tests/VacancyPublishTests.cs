@@ -21,7 +21,7 @@ public sealed class VacancyPublishTests(RecruiterPersonaFixture fixture) : RoleE
     private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
-    public async Task NewDraftVacancy_ShowsPublishButton_AndHidesApplicationsInterviewsKanbanTabs()
+    public async Task NewDraftVacancy_ShowsPublishButton_AndHidesApplicationsInterviewsTabs()
     {
         var login         = new LoginPage(_page, _fixture.WebBaseUrl);
         var vacancyList   = new VacancyListPage(_page, _fixture.WebBaseUrl);
@@ -51,11 +51,10 @@ public sealed class VacancyPublishTests(RecruiterPersonaFixture fixture) : RoleE
         // "_vacancy.Status != 'Draft'" gate).
         Assert.False(await vacancyDetail.HasTabAsync("Applications"));
         Assert.False(await vacancyDetail.HasTabAsync("Interviews"));
-        Assert.False(await vacancyDetail.HasTabAsync("Kanban"));
     }
 
     [Fact]
-    public async Task PublishVacancy_MovesDraftToOpen_AndRevealsApplicationsInterviewsKanbanTabs()
+    public async Task PublishVacancy_MovesDraftToOpen_AndRevealsApplicationsInterviewsTabs()
     {
         var login         = new LoginPage(_page, _fixture.WebBaseUrl);
         var vacancyList   = new VacancyListPage(_page, _fixture.WebBaseUrl);
@@ -86,7 +85,6 @@ public sealed class VacancyPublishTests(RecruiterPersonaFixture fixture) : RoleE
 
         Assert.True(await vacancyDetail.HasTabAsync("Applications"));
         Assert.True(await vacancyDetail.HasTabAsync("Interviews"));
-        Assert.True(await vacancyDetail.HasTabAsync("Kanban"));
 
         // The Vacancy List's "Show active" filter (item #11) should now surface it too.
         await vacancyList.GoToAsync(AcmeId);

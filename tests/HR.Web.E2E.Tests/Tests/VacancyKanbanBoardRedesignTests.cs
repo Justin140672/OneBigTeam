@@ -225,8 +225,8 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
 
     /// <summary>
     /// Same shape as VacancyKanbanBoardTests.ExtractVacancyIdFromUrl — extracts the vacancy id from
-    /// either the standalone Kanban route or the Vacancy Detail "Kanban" tab route, both of which
-    /// carry it in the same URL segment.
+    /// the current URL (Vacancy Detail or the standalone Kanban route both carry it in the same URL
+    /// segment).
     /// </summary>
     private static Guid ExtractVacancyIdFromUrl(string url)
     {
@@ -239,18 +239,16 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
     /// <summary>
     /// Same shape as VacancyKanbanBoardTests.ArrangeAppliedApplicationAsync — creates a fresh
     /// candidate and vacancy, adds the candidate's application (leaving it on the seeded initial
-    /// stage), then opens the vacancy's Kanban tab. Returns the candidate's (unique) last name and
-    /// the ready-to-use board page object.
+    /// stage), then navigates to the vacancy's standalone Kanban board. Returns the candidate's
+    /// (unique) last name and the ready-to-use board page object.
     /// </summary>
     private async Task<(string CandidateLast, VacancyKanbanBoardPage Kanban)> ArrangeAppliedApplicationAsync()
     {
         var (vacancyTitle, candidateLast) = await ArrangeAppliedApplicationForDashboardAsync();
 
-        var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
-        await vacancyDetail.OpenKanbanTabAsync();
-
+        var vacancyId = ExtractVacancyIdFromUrl(_page.Url);
         var kanban = new VacancyKanbanBoardPage(_page, _fixture.WebBaseUrl);
-        await kanban.WaitForLoadedAsync();
+        await kanban.GoToStandaloneAsync(AcmeId, vacancyId);
 
         return (candidateLast, kanban);
     }

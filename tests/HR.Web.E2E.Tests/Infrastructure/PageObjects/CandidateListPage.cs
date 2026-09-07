@@ -32,14 +32,36 @@ public sealed class CandidateListPage(IPage page, string baseUrl)
             new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
     }
 
+    /// <summary>
+    /// Returns true if a row containing <paramref name="nameFragment"/> exists ANYWHERE in the
+    /// grid, not just on the currently displayed page. CandidateList.razor has no search box and
+    /// pages client-side at 20 rows (GridPageSettings PageSize="20") — this suite has accumulated
+    /// enough "E2E ..." candidates created by other test classes (never cleaned up) that a seeded
+    /// candidate can land past page 1. Same pagination-aware reasoning as
+    /// PositionProfileListPage.HasPositionProfileAsync — paginate through the grid instead of
+    /// assuming page 1 is exhaustive.
+    /// </summary>
     public async Task<bool> HasCandidateAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
-        return await page.Locator(".e-rowcell")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .WaitUntilVisibleAsync();
+        var matchOnCurrentPage = page.Locator(".e-rowcell").Filter(new() { HasText = nameFragment }).First;
+
+        for (var guard = 0; guard < 25; guard++)
+        {
+            if (await matchOnCurrentPage.IsVisibleAsync())
+                return true;
+
+            var nextPage = page.Locator(".e-pagernextprevdiv.e-next:not(.e-disable), a.e-next:not(.e-disable)").First;
+            if (!await nextPage.IsVisibleAsync())
+                return false;
+
+            await nextPage.ClickAsync();
+            await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+            await page.WaitForTimeoutAsync(200);
+        }
+
+        return false;
     }
 
     public async Task ClickCandidateAsync(string nameFragment)

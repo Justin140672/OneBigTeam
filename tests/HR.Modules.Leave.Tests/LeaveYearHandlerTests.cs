@@ -276,7 +276,8 @@ public class LeaveYearHandlerTests
         var balance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(2026, balance.PolicyYear);
         // Leave year for policy year 2026 (April start) runs 2026-04-01 to 2027-03-31. StartDate
-        // 2026-06-01 is mid-year, so entitlement is pro-rated: 25 * 304/365 = 20.8219 -> 20.82.
-        Assert.Equal(20.82m, balance.EntitlementDays);
+        // 2026-06-01 is mid-year, so entitlement is pro-rated: 25 * 304/365 = 20.8219, rounded to
+        // the nearest half day = 21.0.
+        Assert.Equal(21.0m, balance.EntitlementDays);
     }
 }

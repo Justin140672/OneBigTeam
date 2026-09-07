@@ -46,13 +46,21 @@
             return;
         }
 
-        var lastDashboard = await JS.InvokeAsync<string>("getLastDashboard");
+        // Getting Started always wins over a remembered dashboard preference — otherwise a stale
+        // "lastDashboard" value left in localStorage from a previous login in the same browser
+        // (e.g. a different company, or this same user before their checklist was reset) would
+        // silently skip the checklist for what should be a guaranteed first landing.
+        var targetUrl = Session.LandingUrl;
+        if (targetUrl != "/getting-started")
+        {
+            var lastDashboard = await JS.InvokeAsync<string>("getLastDashboard");
 
-        // Fall back to the priority-ordered LandingUrl when there's no stored preference, or the
-        // stored dashboard is no longer one the user is authorized for (e.g. a role was removed).
-        var targetUrl = !string.IsNullOrEmpty(lastDashboard) && Session.IsDashboardAvailable(lastDashboard)
-            ? AppSession.DashboardUrl(lastDashboard) ?? Session.LandingUrl
-            : Session.LandingUrl;
+            // Fall back to the priority-ordered LandingUrl when there's no stored preference, or
+            // the stored dashboard is no longer one the user is authorized for (e.g. a role was
+            // removed).
+            if (!string.IsNullOrEmpty(lastDashboard) && Session.IsDashboardAvailable(lastDashboard))
+                targetUrl = AppSession.DashboardUrl(lastDashboard) ?? targetUrl;
+        }
 
         Navigation.NavigateTo(targetUrl, replace: true);
     }

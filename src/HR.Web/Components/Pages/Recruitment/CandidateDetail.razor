@@ -151,7 +151,7 @@
                         <label class="form-label">Reason <span class="text-danger">*</span></label>
                         <HrTextBox @bind-Value="_deactivateModel.Reason" Multiline="true" Rows="3"
                                    Maxlength="1000" Placeholder="Explain why this candidate is being deactivated" />
-                        <ValidationMessage For="@(() => _deactivateModel.Reason)" />
+                        <ValidationMessage For="@(() => _deactivateModel.Reason)" class="text-danger small" />
                     </EditForm>
                 </Content>
                 <FooterTemplate>

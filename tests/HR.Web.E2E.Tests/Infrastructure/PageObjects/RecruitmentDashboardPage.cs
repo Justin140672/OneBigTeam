@@ -56,7 +56,17 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
 
     private ILocator TabButton(Tab tab) => page.Locator($"[data-testid='recruitment-tab-{tab.ToString().ToLowerInvariant()}']");
 
-    public Task SwitchToTabAsync(Tab tab) => TabButton(tab).ClickAsync();
+    // A plain ClickAsync() only proves the click was dispatched — the "active" class swap and the
+    // resulting content swap both come from a subsequent Blazor Server render pass over the same
+    // SignalR round trip, which is not guaranteed to have landed by the time this returns. A caller
+    // that immediately calls IsTabActiveAsync() (a bare, non-retrying attribute read) right after
+    // can race that render and see the PREVIOUS tab's state. Wait for the class swap here so every
+    // caller of SwitchToTabAsync gets a tab that has genuinely already become active.
+    public async Task SwitchToTabAsync(Tab tab)
+    {
+        await TabButton(tab).ClickAsync();
+        await Assertions.Expect(TabButton(tab)).ToHaveClassAsync(new Regex("active"), new() { Timeout = 10_000 });
+    }
 
     public async Task<bool> IsTabActiveAsync(Tab tab) =>
         (await TabButton(tab).GetAttributeAsync("class"))?.Contains("active") ?? false;
@@ -97,15 +107,49 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
         await page.WaitForTimeoutAsync(300);
     }
 
-    public Task SwitchToBoardViewAsync() => page.Locator("[data-testid='recruitment-view-board-btn']").ClickAsync();
+    // A plain ClickAsync() only proves the click was dispatched — the "aria-pressed" swap on both
+    // buttons (RecruitmentDashboard.razor's `_view == PipelineView.X ? "true" : "false"`) comes from
+    // the resulting Blazor Server render pass over the same round trip, not the click event itself.
+    // A caller that immediately reads aria-pressed right after (a bare, non-retrying
+    // GetAttributeAsync — see VacancyKanbanBoardRedesignTests) can race that render and observe the
+    // PREVIOUS view's state. Wait for the swap here so both toggle methods hand back a page that has
+    // genuinely already re-rendered.
+    public async Task SwitchToBoardViewAsync()
+    {
+        var button = page.Locator("[data-testid='recruitment-view-board-btn']");
+        await button.ClickAsync();
+        await Assertions.Expect(button).ToHaveAttributeAsync("aria-pressed", "true", new() { Timeout = 10_000 });
+    }
 
-    public Task SwitchToListViewAsync() => page.Locator("[data-testid='recruitment-view-list-btn']").ClickAsync();
+    public async Task SwitchToListViewAsync()
+    {
+        var button = page.Locator("[data-testid='recruitment-view-list-btn']");
+        await button.ClickAsync();
+        await Assertions.Expect(button).ToHaveAttributeAsync("aria-pressed", "true", new() { Timeout = 10_000 });
+    }
 
     // ── Header action buttons ────────────────────────────────────────────────
 
     public Task ClickCreateVacancyAsync() => page.Locator("[data-testid='recruitment-dashboard-create-vacancy-btn']").ClickAsync();
 
     public Task ClickAddCandidateAsync() => page.Locator("[data-testid='recruitment-dashboard-add-candidate-btn']").ClickAsync();
+
+    /// <summary>
+    /// Locates the widget CARD whose header carries the given title, scoped to an exact
+    /// ".widget-title" match rather than a loose HasText-on-the-whole-card filter. The always-
+    /// visible top KPI summary row above the tabs is itself a ".widget-card" and includes a
+    /// "Stale vacancies" tile label (RecruitmentSummaryTile), which a bare
+    /// `.widget-card".Filter(HasText: "Stale Vacancies")` also matches (Playwright's HasText string
+    /// filter is a case-insensitive substring match) — and since that summary card sits earlier in
+    /// the DOM than the real "Stale Vacancies" widget card under the Activity tab, ".First" would
+    /// resolve to the WRONG card, one that never contains ".task-widget-item"/".widget-empty",
+    /// causing callers to time out waiting on it. Scoping to ".widget-header .widget-title" with an
+    /// exact match keeps this to the one widget card that actually owns that title.
+    /// </summary>
+    private ILocator WidgetCard(string widgetTitle) =>
+        page.Locator(".widget-card")
+            .Filter(new() { Has = page.Locator(".widget-header .widget-title", new() { HasText = widgetTitle }) })
+            .First;
 
     /// <summary>Returns true if a widget with the given header title is present on the dashboard.
     /// Widgets live under the Activity tab (RecruitmentSummaryWidget, UpcomingInterviewsWidget,
@@ -115,16 +159,28 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
     public async Task<bool> HasWidgetAsync(string widgetTitle)
     {
         await EnsureTabForWidgetAsync(widgetTitle);
-        return await page.Locator(".widget-header")
-            .Filter(new() { HasText = widgetTitle })
-            .IsVisibleAsync();
+
+        // EnsureTabForWidgetAsync's own tab switch now waits for the tab BUTTON's "active" class,
+        // but the widget cards underneath are a separate render pass still catching up — a bare
+        // instant IsVisibleAsync() immediately afterward can still race that and report a widget as
+        // absent a moment before it mounts. Poll rather than a single snapshot.
+        try
+        {
+            await WidgetCard(widgetTitle).Locator(".widget-header")
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
     }
 
     /// <summary>Waits for the named widget to finish loading (spinner replaced by items/empty state).</summary>
     public async Task WaitForWidgetLoadedAsync(string widgetTitle)
     {
         await EnsureTabForWidgetAsync(widgetTitle);
-        var widget = page.Locator(".widget-card").Filter(new() { HasText = widgetTitle }).First;
+        var widget = WidgetCard(widgetTitle);
         await widget.Locator(".task-widget-item, .widget-empty").First.WaitForAsync(new() { Timeout = 15_000 });
     }
 

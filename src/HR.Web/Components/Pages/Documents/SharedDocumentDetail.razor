@@ -542,8 +542,14 @@
 
     private async Task ConfirmArchiveAsync()
     {
+        _archiveError = null;
+
         if (!_archiveEditContext.Validate())
+        {
+            _archiveError = _archiveEditContext.GetValidationMessages().FirstOrDefault()
+                ?? "Please correct the highlighted fields below.";
             return;
+        }
 
         _archiving = true;
         _archiveError = null;

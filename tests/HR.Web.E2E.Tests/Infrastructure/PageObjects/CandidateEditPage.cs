@@ -179,15 +179,18 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         page.GetByRole(AriaRole.Button, new() { Name = "Reactivate", Exact = true }).ClickAsync();
 
     // The deactivate dialog is a plain custom SfDialog (not HrConfirmDialog) with a header of
-    // "Deactivate Candidate" and a <textarea class="form-control"> reason field — there is no
-    // data-testid or role='dialog' name to anchor to besides the header text, so it's scoped via
-    // :has-text on the dialog container the same way CandidateEditPage's UnsavedChangesDialog is.
+    // "Deactivate Candidate" and an HrTextBox (Multiline="true") reason field, which renders as a
+    // bare <textarea> with Syncfusion's own classes (no Bootstrap "form-control") — matches the
+    // convention used elsewhere in this suite for HrTextBox Multiline fields (e.g.
+    // SharedDocumentDetailPage's AcknowledgementStatementTextArea). There is no data-testid or
+    // role='dialog' name to anchor to besides the header text, so it's scoped via :has-text on the
+    // dialog container the same way CandidateEditPage's UnsavedChangesDialog is.
     private ILocator DeactivateDialog => page.Locator("[role='dialog']:has-text('Deactivate Candidate')");
 
     public Task<bool> IsDeactivateDialogVisibleAsync() => DeactivateDialog.WaitUntilVisibleAsync();
 
     public Task FillDeactivateReasonAsync(string reason) =>
-        DeactivateDialog.Locator("textarea.form-control").FillAsync(reason);
+        DeactivateDialog.Locator("textarea").FillAsync(reason);
 
     /// <summary>
     /// Clicks the dialog's "Deactivate" confirm button without waiting for the dialog to close —

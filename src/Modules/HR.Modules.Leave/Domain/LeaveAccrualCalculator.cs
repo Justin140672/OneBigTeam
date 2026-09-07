@@ -33,10 +33,10 @@ namespace HR.Modules.Leave.Domain;
 ///     reduced total* across *their own remaining periods*, not a full calendar year of periods.
 ///
 /// Rounding rule (documented per LEAVE-04): accrued days for Monthly/Fortnightly are rounded DOWN
-/// (floored) to 2 decimal places - matching the numeric(6,2) precision already used for
-/// leave_balances.entitlement_days/leave_types default entitlement - so an employee is never shown
-/// or allowed to book more leave than they have strictly earned as of today. Full/upfront accrual
-/// (None/Annual) is not rounded since it is simply the already-rounded stored entitlement.
+/// (floored) to the nearest half day - matching the half-day booking granularity used elsewhere
+/// (see <see cref="LeaveDayPart"/>) - so an employee is never shown or allowed to book more leave
+/// than they have strictly earned as of today. Full/upfront accrual (None/Annual) is not rounded
+/// since it is simply the already-rounded stored entitlement.
 /// </summary>
 internal static class LeaveAccrualCalculator
 {
@@ -86,7 +86,7 @@ internal static class LeaveAccrualCalculator
 
         var accrued = entitlement * periodsElapsed / totalPeriods;
 
-        return RoundDown(accrued);
+        return RoundDownToHalfDay(accrued);
     }
 
     private static int CountCompletePeriods(DateOnly from, DateOnly to, int? periodMonths, int? periodDays)
@@ -115,5 +115,11 @@ internal static class LeaveAccrualCalculator
         return (to.DayNumber - from.DayNumber) / periodDays!.Value;
     }
 
-    private static decimal RoundDown(decimal value) => Math.Floor(value * 100m) / 100m;
+    /// <summary>
+    /// Leave is only ever bookable in half-day units (see <see cref="LeaveDayPart"/>), so accrued
+    /// days are floored to the nearest 0.5 day rather than an arbitrary decimal fraction - this
+    /// keeps the "never show/allow more than strictly earned" guarantee documented above while
+    /// matching the half-day granularity used elsewhere.
+    /// </summary>
+    private static decimal RoundDownToHalfDay(decimal value) => Math.Floor(value * 2m) / 2m;
 }

@@ -71,8 +71,20 @@ public sealed class SharedDocumentUploadTests(ParallelBlankPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(ManagerEmail);
 
-        await _page.GotoAsync(_fixture.WebBaseUrl + "/companies/00000000-0000-0000-0000-000000000001/shared-documents");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        var target = _fixture.WebBaseUrl + "/companies/00000000-0000-0000-0000-000000000001/shared-documents";
+        await _page.GotoAsync(target);
+
+        // The deny guard is a client-side Blazor NavigateTo(replace: true) fired only once
+        // AppSession's api/me permission fetch resolves over the SignalR circuit — NetworkIdle
+        // after the initial GET does not reliably observe that (same reasoning documented in
+        // AdministrativeRoleSeparationTests/AdminAccessAssertions.AssertDeniedAsync). Poll the URL
+        // instead of trusting NetworkIdle plus an instant assert, which under headless timing can
+        // read the URL before the redirect has actually landed.
+        try
+        {
+            await _page.WaitForURLAsync(u => !u.Contains("/shared-documents"), new() { Timeout = 25_000 });
+        }
+        catch (TimeoutException) { /* fall through to assert on the resulting URL */ }
 
         // IsHrAdministrator-only page guard redirects away — James (Employee+Manager) must not
         // land on or see the Shared Documents page.

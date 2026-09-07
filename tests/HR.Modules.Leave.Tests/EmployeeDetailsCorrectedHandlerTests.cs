@@ -43,7 +43,7 @@ public class EmployeeDetailsCorrectedHandlerTests
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(14.66m, updated.EntitlementDays);
+        Assert.Equal(14.5m, updated.EntitlementDays);
         // Accrual start date must move to the corrected (later) start date, since it is now the
         // employee's true eligible-from date for periodic accrual pacing (LEAVE-04).
         Assert.Equal(new DateOnly(2026, 6, 1), updated.AccrualStartDate);

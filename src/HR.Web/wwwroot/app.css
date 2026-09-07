@@ -886,6 +886,31 @@ html[data-theme="dark"] .card-header {
     gap: 8px;
     padding: 14px 16px;
     border-bottom: 1px solid var(--hr-gray-100);
+    min-width: 0;
+}
+
+.widget-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* flex-shrink:0 keeps this link from being squeezed to nothing by the sibling .widget-title's own
+   shrink-to-ellipsis behaviour, but a handful of these links carry a longer, more specific label
+   than the generic "View all" (e.g. HeadcountByDepartmentChart's "View all employees" — kept
+   deliberately verbose for a11y, see HrDashboardTests) which can still overflow a 375px viewport
+   on its own. Letting the link itself truncate with an ellipsis below its natural width is safe:
+   the full text remains the DOM/accessible name for assistive tech and exact-match locators
+   (Playwright's GetByRole(Name:) reads the accessible name, not the rendered/clipped text), only
+   the visual rendering is capped. */
+.widget-view-all {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .widget-icon {
@@ -1952,6 +1977,16 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
 .dashboard-analytics-grid > *,
 .dashboard-overview-row > *,
 .dashboard-grid-3col > * {
+    min-width: 0;
+}
+
+/* Bootstrap's .row is a flex container, and its .col-* children default to min-width:auto —
+   below lg (where col-lg-8/col-lg-4 fall back to full-width stacking) that leaves each column's
+   min-width driven by its widest unbreakable inner content (e.g. a long widget-header title/link
+   that never wraps), which can force the column — and the whole page — wider than the mobile
+   viewport (DSH-07 horizontal-overflow gate: HR dashboard's "Needs your attention" row at 375px).
+   Same fix as the grid rule above, generalised to any dashboard-section's Bootstrap row. */
+.dashboard-section > .row > [class*="col-"] {
     min-width: 0;
 }
 

@@ -55,8 +55,20 @@ public sealed class UnauthorizedAccessTests(EmployeePersonaFixture fixture) : Ro
         await login.LoginAsync(TomEmail);
 
         // ── Step 2: Attempt to navigate to the HR Inbox ───────────────────────
-        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/hr/inbox");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        var target = $"{_fixture.WebBaseUrl}/companies/{AcmeId}/hr/inbox";
+        await _page.GotoAsync(target);
+
+        // If the page redirects away, that redirect is a client-side Blazor NavigateTo fired only
+        // once AppSession's api/me permission fetch resolves over the SignalR circuit —
+        // NetworkIdle after the initial GET does not reliably observe that under headless timing
+        // (same reasoning as AdministrativeRoleSeparationTests/SharedDocumentUploadTests). Give a
+        // redirect a bounded chance to land before reading the URL/content below; if it never
+        // redirects at all (the in-page access-denied-content branch), this wait is a no-op.
+        try
+        {
+            await _page.WaitForURLAsync(u => !u.Contains("/hr/inbox"), new() { Timeout = 25_000 });
+        }
+        catch (TimeoutException) { /* fall through — may still be a valid in-page deny */ }
 
         // ── Step 3: The app must NOT show HR inbox content ────────────────────
         // It should redirect to login, show an access-denied alert, or render a different page.

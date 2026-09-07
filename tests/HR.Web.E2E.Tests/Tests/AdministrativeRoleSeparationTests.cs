@@ -53,9 +53,16 @@ internal static class AdminAccessAssertions
         var target = Target(webBaseUrl, routeSuffix);
         await page.GotoAsync(target);
 
+        // The deny redirect only fires once AppSession.InitialiseAsync's api/me round trip has
+        // resolved on the freshly-established circuit (see AppSession's own remarks on the
+        // fast/slow init split) — under headless Chromium that circuit/SignalR handshake plus the
+        // permission fetch can genuinely take longer than a headed run's timing happened to allow
+        // for, particularly under parallel test load. Widen the wait rather than trusting a budget
+        // calibrated against headed timing; this affects only how long the test waits before
+        // asserting, not the guard/permission logic itself.
         try
         {
-            await page.WaitForURLAsync(u => u.Split('?')[0].TrimEnd('/') != target, new() { Timeout = 15_000 });
+            await page.WaitForURLAsync(u => u.Split('?')[0].TrimEnd('/') != target, new() { Timeout = 25_000 });
         }
         catch (TimeoutException) { /* fall through to assert on the resulting URL */ }
 

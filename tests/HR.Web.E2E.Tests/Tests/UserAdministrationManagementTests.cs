@@ -221,7 +221,7 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
     }
 
     [Fact]
-    public async Task UserDetail_ShowsAccountDetailsAndAllowsRoleEditing()
+    public async Task UserDetail_ShowsAccountDetailsAndAuditHistory()
     {
         var login  = new LoginPage(_page, _fixture.WebBaseUrl);
         var list   = new UserAdministrationListPage(_page, _fixture.WebBaseUrl);
@@ -231,22 +231,64 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
 
         await list.GoToAsync(AcmeId);
         // David Park is a seeded active account not otherwise edited by this test class — Marcus
-        // Diallo is mutated by ManageRoles_UpdatesUsersRoles below, and reusing him here would
-        // collide with that test's own role assertions.
+        // Diallo is mutated by ManageRoles_UpdatesUsersRoles below, and reusing him here would make
+        // the "starts with no audit history" assertion order-dependent on that other test.
         await list.OpenUserDetailAsync("David Park");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
 
         Assert.Equal("Active", await detail.GetAccountStatusAsync());
 
+        // The end-of-test revert below only prevents THIS test from leaving stale state for a
+        // FUTURE run — it can't undo contamination already sitting in a persistent/shared dev
+        // database from a run that happened before that revert step existed (or from a run that
+        // died between the "add Manager" and "remove Manager" steps). Actively clear the Manager
+        // role here, before the real assertions, so the test is self-healing against whatever
+        // state the database happens to already be in, rather than just trusting a previous run's
+        // cleanup to have worked.
+        var neededPreCleanup = (await detail.GetRoleNamesAsync()).Contains("Manager");
+        if (neededPreCleanup)
+        {
+            await detail.OpenManageRolesDialogAsync();
+            await detail.ToggleRolesAndSaveAsync(["Manager"]);
+        }
+
         var rolesBefore = await detail.GetRoleNamesAsync();
         Assert.DoesNotContain("Manager", rolesBefore);
+
+        // Seeded dev personas carry no audit trail of their own (seeding bypasses the normal
+        // audit-event flow), so the empty-history state is expected here — an actual edit is
+        // what should produce the first entry. Skip this specific assertion if the pre-cleanup
+        // step above just had to remove a stale Manager role itself — that toggle legitimately
+        // produced its own audit entry, so the account is no longer in the pristine "never
+        // touched" state this assertion is checking for.
+        await detail.OpenAuditHistoryDialogAsync();
+        if (!neededPreCleanup)
+        {
+            Assert.True(await detail.HasAuditHistoryEmptyMessageAsync(),
+                "Expected a freshly seeded account to start with no audit history");
+        }
+        await detail.CloseAuditHistoryDialogAsync();
 
         await detail.OpenManageRolesDialogAsync();
         await detail.ToggleRolesAndSaveAsync(["Manager"]);
         Assert.Equal("Roles updated.", await detail.GetSuccessMessageAsync());
 
         Assert.Contains("Manager", await detail.GetRoleNamesAsync());
+
+        await detail.OpenAuditHistoryDialogAsync();
+        Assert.False(await detail.HasAuditHistoryEmptyMessageAsync(),
+            "Expected the account to have at least one audit history entry after a roles edit");
+        Assert.True(await detail.GetAuditHistoryCountAsync() > 0,
+            "Expected the roles edit to produce a visible audit history entry");
+        await detail.CloseAuditHistoryDialogAsync();
+
+        // Revert the Manager role toggle so this test remains idempotent across repeated runs
+        // against a persistent/shared dev database (David Park must start each run without
+        // Manager, per the "rolesBefore" assertion above).
+        await detail.OpenManageRolesDialogAsync();
+        await detail.ToggleRolesAndSaveAsync(["Manager"]);
+        Assert.DoesNotContain("Manager", await detail.GetRoleNamesAsync());
     }
 
     [Fact]

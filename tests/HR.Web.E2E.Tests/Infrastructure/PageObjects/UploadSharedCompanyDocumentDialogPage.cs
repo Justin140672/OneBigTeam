@@ -145,9 +145,12 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
         var error = Dialog.Locator(".alert-danger");
         // ValidateExtra's error only renders after the click handler's state update completes —
         // checking IsVisibleAsync() immediately after ClickUploadAsync can race that render tick.
+        // Bumped 5s -> 10s: under higher concurrent load the Blazor Server round trip for this
+        // click can genuinely take longer than 5s (same load-timing theory as the dashboard
+        // navigation timeout bump elsewhere in this suite).
         try
         {
-            await error.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            await error.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         }
         catch (TimeoutException)
         {

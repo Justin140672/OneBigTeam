@@ -125,8 +125,14 @@
 
     private async Task SubmitAsync()
     {
+        _error = null;
+
         if (!_editContext.Validate())
+        {
+            _error = _editContext.GetValidationMessages().FirstOrDefault()
+                ?? "Please correct the highlighted fields below.";
             return;
+        }
 
         _submitting = true;
         _error = null;

@@ -33,6 +33,36 @@ namespace HR.Web.E2E.Tests.Tests;
 /// </summary>
 public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
+    // HrAdministrator_LandingOnRoot_RedirectsToGettingStarted below (via ProvisionFreshCompanyAdminAsync)
+    // calls the real /api/dev/persona/register endpoint, which — per its own remarks — makes a real,
+    // network-dependent call to Supabase's Admin API to seed a genuinely loggable user (unlike most
+    // other E2E auth paths, which are faked under E2E_TESTING=true). Every other test class that makes
+    // this kind of real Supabase call is serialized against SupabaseAuthGate.Instance (see
+    // SupabaseAuthSerialBlankTestBase/SupabaseAuthSerialEmployeeTestBase's own remarks on concurrent
+    // real Supabase logins timing out under contention) — this class was missing that, so its one real
+    // network call could run concurrently with every other class's, spiking latency generally on the
+    // shared web app under load and manifesting as this specific test's otherwise-unexplained 30s
+    // navigation timeout. This class can't derive from either serial base directly (different fixture —
+    // HrAdminPersonaFixture, needed by its other tests), so it joins the same static gate manually,
+    // same pattern as RecruitmentStageManagementTests joining CrossUserVacancyTestBase's gate.
+    public override async Task InitializeAsync()
+    {
+        await SupabaseAuthGate.Instance.WaitAsync();
+        await base.InitializeAsync();
+    }
+
+    public override async Task DisposeAsync()
+    {
+        try
+        {
+            await base.DisposeAsync();
+        }
+        finally
+        {
+            SupabaseAuthGate.Instance.Release();
+        }
+    }
+
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     // Laura has the HrAdministrator role (CanManageEmployees true) — same persona used by
@@ -103,7 +133,28 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
         await login.GoToAsync();
         await login.LoginAsync(email);
 
-        await _page.WaitForURLAsync(new Regex("/getting-started"), new() { Timeout = 15_000 });
+        // The auto-created Company Administrator employee from signup has
+        // RequiresInitialEmployeeSetup = true, so MainLayout blocks the entire app shell (including
+        // Home.razor's own OnAfterRenderAsync redirect) behind the "Complete your employee profile"
+        // dialog (EmployeeCompletionDialog.razor) until it's filled in — see AppSession.cs's remarks
+        // on RequiresInitialEmployeeSetup. The getting-started redirect only fires once that's done.
+        var completionDialog = new EmployeeCompletionDialogPage(_page);
+        await completionDialog.WaitForVisibleAsync();
+        await completionDialog.FillAllRequiredFieldsAsync(
+            dobDdMMyyyy: "02/01/1990",
+            nationality: "British",
+            gender: "Female",
+            addressLine1: "1 Test Street",
+            city: "London",
+            postcode: "SW1A 1AA");
+        await completionDialog.SaveAndWaitForCloseAsync();
+
+        // AppSession.InitialiseAsync() fires several awaited HTTP calls (me/employee/onboarding/
+        // subscription) plus a JS interop round-trip (getLastDashboard) before Home.razor's
+        // OnAfterRenderAsync ever calls NavigateTo — under a busy/loaded run this chain can genuinely
+        // take longer than a casual budget, same class of under-load slowness documented on several
+        // other navigation waits across this suite. Bumped from 15s to 30s.
+        await _page.WaitForURLAsync(new Regex("/getting-started"), new() { Timeout = 30_000 });
         Assert.Contains("/getting-started", _page.Url);
     }
 

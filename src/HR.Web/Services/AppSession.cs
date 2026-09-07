@@ -183,7 +183,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     {
         if (IsLoaded) return;
 
-        _inFlight ??= InitialiseCoreAsync();
+        _inFlight ??= LoadIdentityAsync();
         try
         {
             await _inFlight;
@@ -194,9 +194,22 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
         }
 
         Changed?.Invoke();
+
+        // Best-effort secondary enrichment (branding, settings, onboarding checklist, subscription
+        // status) used to run inline here, awaited before this method returned — meaning every
+        // page's very first render (MainLayout's OnInitializedAsync awaits InitialiseAsync
+        // directly) stayed blocked on it despite IsLoaded already being true and identity/
+        // permissions already being live, because Blazor only re-renders once an awaited lifecycle
+        // method's Task actually completes, not when a field changes mid-method. A single slow
+        // secondary call was enough to pin literally every page in the app on its loading gate.
+        // Fire it in the background instead, so the caller (and every page waiting on it) unblocks
+        // as soon as identity resolves; Changed fires again once enrichment actually lands, for any
+        // already-rendered component that wants to pick up the richer data.
+        if (IsLoaded)
+            _ = LoadEnrichmentAsync();
     }
 
-    private async Task InitialiseCoreAsync()
+    private async Task LoadIdentityAsync()
     {
         if (IsLoaded) return;
 
@@ -232,22 +245,43 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
         IsManager = me.IsManager;
         IsRecruiter = me.IsRecruiter;
 
-        // Identity + permissions are the only session state the app shell and every page's
-        // permission guard actually need to render correctly. Mark the session loaded now, so a
-        // slow or failing *secondary* enrichment call (branding, settings, onboarding checklist,
-        // subscription status — several of which are HR-admin-only) can never leave MainLayout
-        // stuck on its "Loading…" gate and, with it, every route guard inert. The enrichment below
-        // is best-effort and its failures were already meant to be swallowed (see each
-        // *OrNullAsync helper) — widened here so a non-HttpRequestException (a timeout /
-        // TaskCanceledException, a serialization error) can't take session init down either.
-        IsLoaded = true;
+        // Employee data (EmployeeId above all) stays in this fast, blocking phase rather than
+        // moving to the background LoadEnrichmentAsync below — several pages (MyProfile/
+        // MyProfileOverviewTab's own "you can only view your own profile" guard, chief among them)
+        // read Session.EmployeeId for an authorization decision on their very first render, and
+        // none of those pages subscribe to Session.Changed to correct themselves later, so a null
+        // EmployeeId at that first check would wrongly and permanently deny access for the whole
+        // page's lifetime. This is one single call (not the six-way fan-out below), so it doesn't
+        // reintroduce the multi-call blocking problem LoadEnrichmentAsync exists to avoid.
+        var employee = await GetEmployeeOrNullAsync(me.CompanyId);
+        if (employee is not null)
+        {
+            EmployeeId          = employee.EmployeeId;
+            FirstName           = employee.FirstName;
+            LastName            = employee.LastName;
+            JobTitle            = employee.JobTitle;
+            WorkingDaysOverride = employee.WorkingDaysOverride;
+            HoursPerDayOverride = employee.HoursPerDayOverride;
+            ProfileImageUrl     = employee.ProfileImageUrl;
+            RequiresInitialEmployeeSetup = employee.RequiresInitialSetup;
+        }
 
+        // Identity + permissions (+ employee, above) are the only session state the app shell and
+        // every page's permission guard actually need to render correctly. Mark the session loaded
+        // now — the secondary enrichment (branding, settings, onboarding checklist, subscription
+        // status — several of which are HR-admin-only) runs separately, in the background (see
+        // LoadEnrichmentAsync/InitialiseAsync), so a slow or failing secondary call can never
+        // leave MainLayout stuck on its "Loading…" gate and, with it, every route guard inert.
+        IsLoaded = true;
+    }
+
+    private async Task LoadEnrichmentAsync()
+    {
         try
         {
-            var companyTask    = GetCompanyOrNullAsync(me.CompanyId);
-            var settingsTask   = GetCompanySettingsOrNullAsync(me.CompanyId);
-            var hrSettingsTask = GetHrSettingsOrNullAsync(me.CompanyId);
-            var employeeTask   = GetEmployeeOrNullAsync(me.CompanyId);
+            var companyTask    = GetCompanyOrNullAsync(CompanyId);
+            var settingsTask   = GetCompanySettingsOrNullAsync(CompanyId);
+            var hrSettingsTask = GetHrSettingsOrNullAsync(CompanyId);
 
             // OBT-IAM-09: only HR Administrators and holders of the onboarding:view permission
             // are granted the onboarding:view policy; everyone else gets a 403, so skip the call
@@ -255,17 +289,16 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
             // longer holds onboarding:view (see RolePermissionConfiguration), so CanViewOnboarding
             // (permission-derived, computed from PermissionIds set just above) correctly excludes
             // it — CanManageCompany (role-derived) previously did not.
-            var onboardingTask = me.IsHrAdministrator || CanViewOnboarding
+            var onboardingTask = IsHrAdministrator || CanViewOnboarding
                 ? GetOnboardingChecklistOrNullAsync()
                 : Task.FromResult<GetCompanyOnboardingChecklistResponse?>(null);
             var subscriptionTask = GetSubscriptionStatusOrNullAsync();
 
-            await Task.WhenAll(companyTask, settingsTask, hrSettingsTask, employeeTask, onboardingTask, subscriptionTask);
+            await Task.WhenAll(companyTask, settingsTask, hrSettingsTask, onboardingTask, subscriptionTask);
 
             var company      = await companyTask;
             var settings     = await settingsTask;
             var hrSettings   = await hrSettingsTask;
-            var employee     = await employeeTask;
             var onboarding   = await onboardingTask;
             var subscription = await subscriptionTask;
 
@@ -304,18 +337,6 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
             ExcludePublicHolidaysFromLeave = hrSettings.ExcludePublicHolidaysFromLeave;
             DisplaySalaryOnEmployeeProfile = hrSettings.DisplaySalaryOnEmployeeProfile;
         }
-
-        if (employee is not null)
-        {
-            EmployeeId          = employee.EmployeeId;
-            FirstName           = employee.FirstName;
-            LastName            = employee.LastName;
-            JobTitle            = employee.JobTitle;
-            WorkingDaysOverride = employee.WorkingDaysOverride;
-            HoursPerDayOverride = employee.HoursPerDayOverride;
-            ProfileImageUrl     = employee.ProfileImageUrl;
-            RequiresInitialEmployeeSetup = employee.RequiresInitialSetup;
-            }
         }
         catch
         {
@@ -323,6 +344,11 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
             // block) are already live and IsLoaded is already true. Never let a secondary call
             // failing block or unwind session initialisation.
         }
+
+        // Fires whether enrichment succeeded or was swallowed above — any already-rendered
+        // component subscribed to this (see the event's own remarks) gets a chance to pick up
+        // whatever richer data actually landed.
+        Changed?.Invoke();
     }
 
     // A signed-in user isn't always linked to an Employee record (e.g. a Company Administrator

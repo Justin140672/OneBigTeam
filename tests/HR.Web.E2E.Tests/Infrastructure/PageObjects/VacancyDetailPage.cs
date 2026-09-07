@@ -102,12 +102,15 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         var group = page.Locator(".col-md-8").Filter(new() { HasText = "Position Profile" }).First;
         await group.Locator("span[role='combobox']").First.ClickAsync();
         await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        // Same populated-before-reading guard as DropDownSelector.SelectAsync — the popup container
+        // can become visible a tick before its item list actually renders.
+        await page.Locator(".e-popup.e-ddl:visible .e-list-item:not(.e-hide)").First.WaitForAsync(new() { Timeout = 10_000 });
     }
 
     /// <summary>Reads the visible option titles from the (currently open) Position Profile dropdown popup.</summary>
     public async Task<IReadOnlyList<string>> GetPositionProfileDropdownOptionsAsync()
     {
-        var items = await page.Locator(".e-popup.e-ddl:visible .e-list-item").AllAsync();
+        var items = await page.Locator(".e-popup.e-ddl:visible .e-list-item:not(.e-hide)").AllAsync();
         var titles = new List<string>();
         foreach (var item in items)
             titles.Add((await item.TextContentAsync())?.Trim() ?? "");
@@ -581,17 +584,43 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     public async Task PublishVacancyAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Publish Vacancy" }).ClickAsync();
-        await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Publish Vacancy" }))
-            .Not.ToBeVisibleAsync(new() { Timeout = 15_000 });
+        // Callers reach this right after ClickVacancyAsync's own post-navigation wait, which is
+        // satisfied by the tab strip/Position Profile combobox — not specifically by
+        // VacancyDetail.razor's own data fetch that gates CanPublish and renders this button. Under
+        // headless load that fetch can genuinely take longer than a headed run's timing masked, so
+        // wait for the button to actually appear (rather than relying on ClickAsync's own
+        // actionability wait alone, which some Playwright/Blazor render races can still slip past)
+        // before clicking it.
+        var publishButton = page.GetByRole(AriaRole.Button, new() { Name = "Publish Vacancy" });
+        try
+        {
+            await publishButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
+        }
+        catch (TimeoutException)
+        {
+            // Some arrange flows reach this page via a client-side SPA navigation preceded by
+            // several other round trips (e.g. creating a position profile via an account-switch
+            // dance, then navigating back through the vacancy list) rather than a single direct
+            // load — under headless/CI load that's more opportunity for VacancyDetail.razor's own
+            // CanPublish-gating data fetch to land in a stale/partially-hydrated render than the
+            // 30s budget above otherwise accounts for. A full reload forces a fresh fetch from
+            // scratch rather than continuing to wait on whatever render pass is already stuck.
+            await page.ReloadAsync();
+            await page.WaitForSelectorAsync(".e-tab, span[role='combobox']", new() { Timeout = 20_000 });
+            await publishButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
+        }
+        await publishButton.ClickAsync();
+        await Assertions.Expect(publishButton).Not.ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     // ── Tabs ──────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// True if a tab with the exact given name (e.g. "Applications"/"Interviews"/"Kanban") is
-    /// present — these are hidden entirely for a Draft-status vacancy (VacancyDetail.razor's
-    /// "_vacancy is not null &amp;&amp; _vacancy.Status != "Draft"" gate), not just disabled.
+    /// True if a tab with the exact given name (e.g. "Applications"/"Interviews") is present —
+    /// these are hidden entirely for a Draft-status vacancy (VacancyDetail.razor's "_vacancy is not
+    /// null &amp;&amp; _vacancy.Status != "Draft"" gate), not just disabled. The embedded "Kanban"
+    /// tab was removed entirely; the standalone Kanban board is reached via a "View Kanban Board"
+    /// button instead (see VacancyKanbanBoardPage.GoToStandaloneAsync).
     /// </summary>
     public Task<bool> HasTabAsync(string name) =>
         page.GetByRole(AriaRole.Tab, new() { Name = name, Exact = true }).IsVisibleAsync();
@@ -606,17 +635,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Interviews" }).ClickAsync();
         await page.WaitForSelectorAsync("[data-testid='vacancy-interviews-tab']", new() { Timeout = 15_000 });
-    }
-
-    /// <summary>
-    /// Opens the "Kanban" tab (embeds VacancyKanbanBoard.razor inline — see "Recruitment Kanban"
-    /// tickets #69-#73). Waits for the board's own data-testid, not just the tab becoming active,
-    /// since the board does its own async load once mounted.
-    /// </summary>
-    public async Task OpenKanbanTabAsync()
-    {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Kanban" }).ClickAsync();
-        await page.WaitForSelectorAsync("[data-testid='vacancy-kanban-board']", new() { Timeout = 15_000 });
     }
 
     // ── Applications tab: Add Candidate ──────────────────────────────────────────

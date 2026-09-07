@@ -36,9 +36,9 @@ public class LeaveBalanceTests
         var balance = CreateBalance(20m, new DateOnly(2026, 1, 1));
         var later = Now.AddDays(1);
 
-        balance.RecalculateEntitlement(14.66m, new DateOnly(2026, 6, 1), later);
+        balance.RecalculateEntitlement(14.5m, new DateOnly(2026, 6, 1), later);
 
-        Assert.Equal(14.66m, balance.EntitlementDays);
+        Assert.Equal(14.5m, balance.EntitlementDays);
         Assert.Equal(new DateOnly(2026, 6, 1), balance.AccrualStartDate);
         Assert.Equal(later, balance.UpdatedAt);
     }
@@ -50,7 +50,7 @@ public class LeaveBalanceTests
         balance.Adjust(2m, Now);
         balance.RecordUsage(3m, Now);
 
-        balance.RecalculateEntitlement(14.66m, new DateOnly(2026, 6, 1), Now);
+        balance.RecalculateEntitlement(14.5m, new DateOnly(2026, 6, 1), Now);
 
         Assert.Equal(2m, balance.AdjustmentDays);
         Assert.Equal(3m, balance.UsedDays);

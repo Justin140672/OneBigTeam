@@ -165,10 +165,8 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
 
     /// <summary>
     /// The standalone Kanban route is /companies/{companyId}/vacancies/{vacancyId}/kanban
-    /// (VacancyKanbanBoardPage.GoToStandaloneAsync) — ArrangeAppliedApplicationAsync leaves the page
-    /// on the Vacancy Detail "Kanban" tab (a different route, VacancyDetail.razor's embedded tab)
-    /// rather than the standalone one, but both render the vacancy id in the URL, so it's extracted
-    /// here to re-navigate via the standalone route for the persistence check.
+    /// (VacancyKanbanBoardPage.GoToStandaloneAsync); the vacancy id is extracted from the current
+    /// URL so it can be re-navigated to for the persistence check.
     /// </summary>
     private static Guid ExtractVacancyIdFromUrl(string url)
     {
@@ -186,18 +184,25 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
         Assert.True(await kanban.HasCardForNameAsync(candidateLast),
             "Expected the freshly created application's card to be visible before withdrawal");
 
+        // ArrangeAppliedApplicationAsync leaves the browser on the standalone Kanban route (the
+        // embedded "Kanban" tab on Vacancy Detail was removed — see VacancyKanbanBoardPage's class
+        // remarks), so the vacancy id must be captured HERE, before navigating away to Vacancy
+        // Detail to withdraw via the Applications tab, then back to the standalone board again.
+        var vacancyId = ExtractVacancyIdFromUrl(_page.Url);
+
         // Withdraw via the Applications tab (VacancyApplicationsTab's grid toolbar), then return to
-        // the Kanban tab — GetRecruitmentKanbanHandler still returns a withdrawn application under
-        // its current stage (there's no dedicated "Withdrawn" column, see its remarks), but
-        // VacancyKanbanBoard.FilteredCards now excludes any card with IsWithdrawn from the board
-        // entirely, since a withdrawn application can never be moved (MoveApplicationStageHandler
-        // rejects it) and showing an undraggable card there only confused what dragging it should do.
+        // the standalone Kanban board — GetRecruitmentKanbanHandler still returns a withdrawn
+        // application under its current stage (there's no dedicated "Withdrawn" column, see its
+        // remarks), but VacancyKanbanBoard.FilteredCards now excludes any card with IsWithdrawn from
+        // the board entirely, since a withdrawn application can never be moved
+        // (MoveApplicationStageHandler rejects it) and showing an undraggable card there only
+        // confused what dragging it should do.
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
+        await vacancyDetail.GoToAsync(AcmeId, vacancyId);
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickWithdrawForAsync(candidateLast);
 
-        await vacancyDetail.OpenKanbanTabAsync();
-        await kanban.WaitForLoadedAsync();
+        await kanban.GoToStandaloneAsync(AcmeId, vacancyId);
 
         Assert.False(await kanban.HasCardForNameAsync(candidateLast),
             "Expected the withdrawn application's card to no longer appear anywhere on the board");
@@ -245,8 +250,8 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
 
     /// <summary>
     /// Creates a fresh candidate and vacancy, adds the candidate's application (leaving it on the
-    /// seeded initial stage), then opens the vacancy's Kanban tab. Returns the candidate's (unique)
-    /// last name and the ready-to-use board page object.
+    /// seeded initial stage), then navigates to the vacancy's standalone Kanban board. Returns the
+    /// candidate's (unique) last name and the ready-to-use board page object.
     /// </summary>
     private string? _vacancyTitle;
 
@@ -299,10 +304,9 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
 
         Assert.Equal(InitialStage, await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
-        await vacancyDetail.OpenKanbanTabAsync();
-
+        var vacancyId = ExtractVacancyIdFromUrl(_page.Url);
         var kanban = new VacancyKanbanBoardPage(_page, _fixture.WebBaseUrl);
-        await kanban.WaitForLoadedAsync();
+        await kanban.GoToStandaloneAsync(AcmeId, vacancyId);
 
         return (candidateLast, kanban);
     }

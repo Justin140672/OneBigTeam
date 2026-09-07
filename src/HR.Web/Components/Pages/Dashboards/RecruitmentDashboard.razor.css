@@ -1,6 +1,15 @@
+/* Every descendant that legitimately needs horizontal scrolling already owns its own scoped
+   overflow-x: auto container (.vacancy-kanban-board__columns, .dashboard-scroll-x) — nothing on
+   this page needs to grow past the viewport itself. clipping at this root level is a deliberate
+   circuit-breaker: whatever specific descendant is still reporting an intrinsic/min-content width
+   wider than the viewport (the .vacancy-kanban-board min-width: 0 fix addressed one such case but
+   left the underlying 375px-viewport overflow unresolved — see DashboardAccessibilityTests.
+   Dashboard_NoHorizontalOverflow_AtMobileAndTabletViewports), this stops it from ever widening the
+   document's scrollWidth instead of chasing every possible source individually. */
 .recruitment-dashboard {
     max-width: 1400px;
     margin-inline: auto;
+    overflow-x: hidden;
 }
 
 .recruitment-dashboard-header {
@@ -110,16 +119,19 @@
 }
 
 .recruitment-dashboard-view-toggle-btn {
-    border-radius: 999px !important;
-    border: none !important;
-    background: transparent !important;
-    color: var(--hr-gray-500) !important;
-    box-shadow: none !important;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    color: var(--hr-gray-500);
+    box-shadow: none;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
 }
 
-.recruitment-dashboard-view-toggle-btn.e-active {
-    background: var(--hr-color-primary) !important;
-    color: #fff !important;
+.recruitment-dashboard-view-toggle-btn.active {
+    background: var(--hr-color-primary);
+    color: #fff;
 }
 
 .recruitment-dashboard-vacancy-picker {
@@ -143,6 +155,20 @@
         flex-direction: column;
         align-items: stretch;
         gap: 0.5rem;
+        width: 100%;
+    }
+
+    /* The base rule's min-width: 200px (needed so these controls stay usable when laid out
+       side-by-side above 700px) survives into the stacked/column layout below 700px, where each
+       control's own max-width: 280px combined with a Syncfusion component's internal padding/icon
+       chrome can still render visually wider than a narrow phone viewport (e.g. 375px) even though
+       280 < 375 on paper — same class of "container caps the box but content pokes out" overflow
+       already fixed on the HR dashboard. Stacked at this width, there's no side-by-side neighbour
+       left to preserve a minimum width against, so let them shrink to fill the stacked row exactly. */
+    .recruitment-dashboard-vacancy-picker,
+    .recruitment-dashboard-search {
+        min-width: 0;
+        max-width: 100%;
         width: 100%;
     }
 
