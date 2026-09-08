@@ -48,8 +48,12 @@ public sealed class EmployeeDirectoryPage(IPage page, string baseUrl)
     public async Task SearchAsync(string term)
     {
         await SearchBox.FillAsync(term);
+        // SfTextBox raises ValueChange on the native "change" event (blur), not on the "input" event
+        // FillAsync dispatches — press Tab to blur and actually trigger OnSearchChanged.
+        await SearchBox.PressAsync("Tab");
         // search-on-change fires a Blazor re-render; wait for the resulting list to settle rather
         // than an arbitrary pause.
+        await page.WaitForTimeoutAsync(400);
         await page.WaitForSelectorAsync(
             "[data-testid='directory-employee-card'], :text('No employees found')",
             new() { Timeout = 15_000 });

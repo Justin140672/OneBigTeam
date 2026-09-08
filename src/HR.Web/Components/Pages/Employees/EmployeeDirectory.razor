@@ -105,6 +105,8 @@
                             </div>
                         </div>
                         <dl class="directory-detail-dl">
+                            <dt>Position</dt>
+                            <dd>@(_detail.PositionTitle ?? "—")</dd>
                             <dt>Preferred Name</dt>
                             <dd>@(string.IsNullOrWhiteSpace(_detail.PreferredName) ? "—" : _detail.PreferredName)</dd>
                             <dt>Department</dt>
