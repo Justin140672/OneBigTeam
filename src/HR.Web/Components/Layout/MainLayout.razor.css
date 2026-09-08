@@ -315,7 +315,8 @@
     overflow-y: auto;
 }
 
-.notif-empty {
+.notif-empty,
+.notif-loading {
     padding: 32px 16px;
     text-align: center;
     color: var(--hr-gray-400);

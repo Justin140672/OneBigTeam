@@ -8,16 +8,50 @@ retryButton.addEventListener("click", retry);
 const resumeButton = document.getElementById("components-resume-button");
 resumeButton.addEventListener("click", resume);
 
+let autoRecoverTimer = null;
+
 function handleReconnectStateChanged(event) {
     if (event.detail.state === "show") {
         reconnectModal.showModal();
     } else if (event.detail.state === "hide") {
+        clearTimeout(autoRecoverTimer);
         reconnectModal.close();
     } else if (event.detail.state === "failed") {
         document.addEventListener("visibilitychange", retryWhenDocumentBecomesVisible);
+        // The stock handler only retries once the document next becomes visible — which never
+        // happens for an already-visible tab (a headless E2E browser, or a foreground window the
+        // user never left), so the modal just sits there forever after a transient circuit drop.
+        // Kick off a few bounded background retries and, failing those, reload the page so the
+        // session recovers on its own rather than requiring a manual "Retry" click.
+        scheduleAutoRecover(1);
     } else if (event.detail.state === "rejected") {
         location.reload();
     }
+}
+
+function scheduleAutoRecover(attempt) {
+    clearTimeout(autoRecoverTimer);
+    if (attempt > 4) {
+        location.reload();
+        return;
+    }
+    autoRecoverTimer = setTimeout(async () => {
+        try {
+            const successful = await Blazor.reconnect();
+            if (successful) {
+                reconnectModal.close();
+                return;
+            }
+            const resumed = await Blazor.resumeCircuit();
+            if (resumed) {
+                reconnectModal.close();
+                return;
+            }
+        } catch {
+            // still unreachable — fall through to the next attempt
+        }
+        scheduleAutoRecover(attempt + 1);
+    }, 2000 * attempt);
 }
 
 async function retry() {

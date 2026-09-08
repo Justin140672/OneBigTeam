@@ -1,5 +1,6 @@
 @page "/roadmap"
 @using HR.Marketing.Services
+@inject MarketingContentService MarketingContent
 
 <SeoHead Title="HR Software Product Roadmap | One Big Team"
          Description="See what's coming next to One Big Team, including AI-powered position profiles, employee webhooks and an AI help assistant." />
@@ -17,41 +18,26 @@
             </div>
         </section>
 
-        <section class="section">
-            <div class="section-inner">
-                <div class="section-heading">
-                    <h2>Coming soon</h2>
+        @foreach (var group in groups)
+        {
+            <section class="section">
+                <div class="section-inner">
+                    <div class="section-heading">
+                        <h2>@group.Label</h2>
+                    </div>
+                    <div class="card-grid">
+                        @foreach (var item in group.Items)
+                        {
+                            <div class="card">
+                                <span class="card-icon" aria-hidden="true"><Icon Name="@item.IconName" /></span>
+                                <h3>@item.Title</h3>
+                                <p>@item.Description</p>
+                            </div>
+                        }
+                    </div>
                 </div>
-                <div class="card-grid">
-                    @foreach (var feature in ComingSoonFeatures)
-                    {
-                        <div class="card">
-                            <span class="card-icon" aria-hidden="true"><Icon Name="@feature.IconName" /></span>
-                            <h3>@feature.Title</h3>
-                            <p>@feature.Description</p>
-                        </div>
-                    }
-                </div>
-            </div>
-        </section>
-
-        <section class="section">
-            <div class="section-inner">
-                <div class="section-heading">
-                    <h2>Planned</h2>
-                </div>
-                <div class="card-grid">
-                    @foreach (var feature in PlannedFeatures)
-                    {
-                        <div class="card">
-                            <span class="card-icon" aria-hidden="true"><Icon Name="@feature.IconName" /></span>
-                            <h3>@feature.Title</h3>
-                            <p>@feature.Description</p>
-                        </div>
-                    }
-                </div>
-            </div>
-        </section>
+            </section>
+        }
 
         <section class="section roadmap-disclaimer-section">
             <div class="section-inner">
@@ -66,13 +52,27 @@
 <SiteFooter />
 
 @code {
-    private static readonly IReadOnlyList<UpcomingFeatureInfo> ComingSoonFeatures =
-        UpcomingFeatureCatalog.All
-            .Where(feature => feature.Status == UpcomingFeatureStatus.ComingSoon)
-            .ToList();
+    // Delivery-status buckets rendered in this order; sections with no items are omitted entirely.
+    private static readonly (string Status, string Label)[] Buckets =
+    [
+        ("Available", "Available now"),
+        ("ComingSoon", "Coming soon"),
+        ("Planned", "Planned"),
+        ("Exploring", "Exploring"),
+    ];
 
-    private static readonly IReadOnlyList<UpcomingFeatureInfo> PlannedFeatures =
-        UpcomingFeatureCatalog.All
-            .Where(feature => feature.Status == UpcomingFeatureStatus.Planned)
+    private IReadOnlyList<RoadmapGroup> groups = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var content = await MarketingContent.GetContentAsync();
+        groups = Buckets
+            .Select(bucket => new RoadmapGroup(
+                bucket.Label,
+                content.Roadmap.Where(item => string.Equals(item.DeliveryStatus, bucket.Status, StringComparison.OrdinalIgnoreCase)).ToList()))
+            .Where(group => group.Items.Count > 0)
             .ToList();
+    }
+
+    private sealed record RoadmapGroup(string Label, IReadOnlyList<MarketingRoadmapContent> Items);
 }

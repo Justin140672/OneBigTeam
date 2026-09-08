@@ -191,7 +191,11 @@ else
                                         }
                                     </div>
                                     <div class="notif-list">
-                                        @if (_notifications.Count == 0)
+                                        @if (_notifLoading)
+                                        {
+                                            <div class="notif-loading">Loading…</div>
+                                        }
+                                        else if (_notifications.Count == 0)
                                         {
                                             <div class="notif-empty">No notifications</div>
                                         }
@@ -341,6 +345,7 @@ else
     private int _unreadCount;
     private List<NotificationDto> _notifications = [];
     private bool _notifOpen;
+    private bool _notifLoading;
     private bool _helpOpen;
 
     private Guid? _selectedTaskId;
@@ -451,30 +456,60 @@ else
         _menuItems["UserAdministration"] = $"/companies/{companyId}/user-administration";
         _menuItems["SupportQueue"] = $"/companies/{companyId}/support/admin/queue";
 
+        // Both of the following are best-effort UI enrichment (the unread-count badge and the
+        // dev-only persona switcher). Neither must ever be able to fault OnInitializedAsync — a
+        // throw here is NOT caught by the ErrorBoundary around @Body (that only wraps page
+        // content, not this layout's own lifecycle), so an unguarded timeout under a loaded
+        // server takes down the whole circuit ("Something went wrong") on every page that uses
+        // this layout. Same best-effort pattern AppSession.InitialiseAsync already applies to its
+        // secondary enrichment calls.
         await LoadUnreadCountAsync();
 
         if (Env.IsDevelopment())
         {
-            _personas = await DevAuth.GetPersonasAsync();
-            _personaOptions = _personas.Select(p => new PersonaOption(p.UserId, $"{p.Name} ({p.JobTitle})")).ToList();
+            try
+            {
+                _personas = await DevAuth.GetPersonasAsync();
+                _personaOptions = _personas.Select(p => new PersonaOption(p.UserId, $"{p.Name} ({p.JobTitle})")).ToList();
+            }
+            catch
+            {
+                // Dev persona switcher is a convenience only — never fatal.
+            }
         }
     }
 
     private async Task LoadUnreadCountAsync()
     {
         if (!Session.EmployeeId.HasValue) return;
-        _unreadCount = await NotificationService.GetUnreadCountAsync(Session.CompanyId);
+        try
+        {
+            _unreadCount = await NotificationService.GetUnreadCountAsync(Session.CompanyId);
+        }
+        catch
+        {
+            // Badge count is best-effort — a failed/timed-out fetch must not crash the layout.
+            _unreadCount = 0;
+        }
     }
 
     private async Task LoadNotificationsAsync()
     {
         if (!Session.EmployeeId.HasValue) return;
         _notifPageNumber = 1;
-        var result = await NotificationService.GetAsync(Session.CompanyId, _notifPageNumber, NotifPageSize);
-        if (result is null) return;
-        _unreadCount = result.UnreadCount;
-        _notifications = result.Items;
-        _notifHasMore = result.PageNumber < result.TotalPages;
+        _notifLoading = true;
+        try
+        {
+            var result = await NotificationService.GetAsync(Session.CompanyId, _notifPageNumber, NotifPageSize);
+            if (result is null) return;
+            _unreadCount = result.UnreadCount;
+            _notifications = result.Items;
+            _notifHasMore = result.PageNumber < result.TotalPages;
+        }
+        finally
+        {
+            _notifLoading = false;
+        }
     }
 
     // NOT-06: appends the next page to the existing list rather than replacing it, so the user can

@@ -1,5 +1,6 @@
 @page "/features"
 @using HR.Marketing.Services
+@inject MarketingContentService MarketingContent
 
 <SeoHead Title="HR Software Features for SMEs | One Big Team"
          Description="Explore HR software for employee management, leave, absence, recruitment, documents, workflows, reminders and reporting." />
@@ -19,9 +20,8 @@
     <section class="section pricing-section">
         <div class="section-inner section-inner-wide">
             <div class="card-grid">
-                @for (var i = 0; i < FeatureCatalog.All.Count; i++)
+                @foreach (var feature in features)
                 {
-                    var feature = FeatureCatalog.All[i];
                     <a class="card" href="/features/@feature.Slug">
                         <span class="card-icon" aria-hidden="true"><Icon Name="@feature.IconName" /></span>
                         <h3>@feature.Title</h3>
@@ -44,3 +44,13 @@
 </main>
 
 <SiteFooter />
+
+@code {
+    private IReadOnlyList<MarketingFeatureContent> features = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var content = await MarketingContent.GetContentAsync();
+        features = content.Features;
+    }
+}

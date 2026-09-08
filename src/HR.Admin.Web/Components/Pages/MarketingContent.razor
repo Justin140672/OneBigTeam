@@ -1,0 +1,414 @@
+@page "/marketing-content"
+@inject MarketingContentAdminService MarketingContentAdminService
+
+<PageTitle>Marketing Content — Admin Portal</PageTitle>
+
+<h1>Marketing Content</h1>
+<p class="admin-actions-intro">
+    Product features and roadmap items shown on the public marketing website. Unpublished items stay
+    private regardless of their delivery status. Changes are recorded in the audit log and appear on
+    the marketing site within a few minutes.
+</p>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_content is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to manage marketing content, or it couldn't be loaded.
+    </div>
+}
+else
+{
+    @if (_error is not null)
+    {
+        <ul class="admin-action-error"><li>@_error</li></ul>
+    }
+    @if (_saved)
+    {
+        <p class="admin-action-success">Saved.</p>
+    }
+
+    <section class="details-panel admin-actions-panel">
+        <h2>Features</h2>
+        <table class="admin-table">
+            <thead>
+                <tr><th>Order</th><th>Title</th><th>Slug</th><th>Delivery</th><th>Published</th><th></th></tr>
+            </thead>
+            <tbody>
+                @for (var i = 0; i < _content.Features.Count; i++)
+                {
+                    var index = i;
+                    var feature = _content.Features[index];
+                    <tr>
+                        <td>
+                            <SfButton Disabled="index == 0" OnClick="@(() => MoveFeature(index, -1))">↑</SfButton>
+                            <SfButton Disabled="index == _content.Features.Count - 1" OnClick="@(() => MoveFeature(index, 1))">↓</SfButton>
+                        </td>
+                        <td>@feature.Title</td>
+                        <td><code>@feature.Slug</code></td>
+                        <td>@Humanize(feature.DeliveryStatus)</td>
+                        <td>@(feature.IsPublished ? "Yes" : "No")</td>
+                        <td>
+                            <SfButton OnClick="@(() => EditFeature(feature))">Edit</SfButton>
+                            <SfButton OnClick="@(() => ToggleFeaturePublication(feature))">
+                                @(feature.IsPublished ? "Unpublish" : "Publish")
+                            </SfButton>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="admin-actions-buttons">
+            <SfButton OnClick="@(() => EditFeature(null))">+ Add feature</SfButton>
+        </div>
+    </section>
+
+    @if (_editingFeature is not null)
+    {
+        <section class="details-panel admin-actions-panel">
+            <h2>@(_editingFeatureId is null ? "New feature" : "Edit feature")</h2>
+            <div class="admin-action-field">
+                <label>Slug <span class="text-danger">*</span></label>
+                <SfTextBox @bind-Value="_editingFeature.Slug" Placeholder="employee-management" />
+            </div>
+            <div class="admin-action-field">
+                <label>Title <span class="text-danger">*</span></label>
+                <SfTextBox @bind-Value="_editingFeature.Title" />
+            </div>
+            <div class="admin-action-field">
+                <label>Icon name <span class="text-danger">*</span></label>
+                <SfTextBox @bind-Value="_editingFeature.IconName" Placeholder="users" />
+            </div>
+            <div class="admin-action-field">
+                <label>Summary <span class="text-danger">*</span></label>
+                <SfTextBox @bind-Value="_editingFeature.Summary" Multiline="true" />
+            </div>
+            <div class="admin-action-field">
+                <label>Intro</label>
+                <SfTextBox @bind-Value="_editingFeature.Intro" Multiline="true" />
+            </div>
+            <div class="admin-action-field">
+                <label>Detailed content</label>
+                <SfTextBox @bind-Value="_editingFeature.DetailedContent" Multiline="true" />
+            </div>
+            <div class="admin-action-field">
+                <label>Benefits (one per line)</label>
+                <SfTextBox @bind-Value="_editingFeature.BenefitsText" Multiline="true" />
+            </div>
+            <div class="admin-action-field">
+                <label>YouTube ID</label>
+                <SfTextBox @bind-Value="_editingFeature.YouTubeId" />
+            </div>
+            <div class="admin-action-field">
+                <label>Delivery status</label>
+                <select @bind="_editingFeature.DeliveryStatus" class="admin-select">
+                    @foreach (var status in DeliveryStatuses)
+                    {
+                        <option value="@status">@Humanize(status)</option>
+                    }
+                </select>
+            </div>
+            <div class="admin-actions-buttons">
+                <SfButton IsPrimary="true" Disabled="_saving" OnClick="SaveFeatureAsync">Save feature</SfButton>
+                <SfButton Disabled="_saving" OnClick="@(() => _editingFeature = null)">Cancel</SfButton>
+            </div>
+        </section>
+    }
+
+    <section class="details-panel admin-actions-panel">
+        <h2>Roadmap</h2>
+        <table class="admin-table">
+            <thead>
+                <tr><th>Order</th><th>Title</th><th>Delivery</th><th>Published</th><th></th></tr>
+            </thead>
+            <tbody>
+                @for (var i = 0; i < _content.Roadmap.Count; i++)
+                {
+                    var index = i;
+                    var item = _content.Roadmap[index];
+                    <tr>
+                        <td>
+                            <SfButton Disabled="index == 0" OnClick="@(() => MoveRoadmap(index, -1))">↑</SfButton>
+                            <SfButton Disabled="index == _content.Roadmap.Count - 1" OnClick="@(() => MoveRoadmap(index, 1))">↓</SfButton>
+                        </td>
+                        <td>@item.Title</td>
+                        <td>@Humanize(item.DeliveryStatus)</td>
+                        <td>@(item.IsPublished ? "Yes" : "No")</td>
+                        <td>
+                            <SfButton OnClick="@(() => EditRoadmap(item))">Edit</SfButton>
+                            <SfButton OnClick="@(() => ToggleRoadmapPublication(item))">
+                                @(item.IsPublished ? "Unpublish" : "Publish")
+                            </SfButton>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="admin-actions-buttons">
+            <SfButton OnClick="@(() => EditRoadmap(null))">+ Add roadmap item</SfButton>
+        </div>
+    </section>
+
+    @if (_editingRoadmap is not null)
+    {
+        <section class="details-panel admin-actions-panel">
+            <h2>@(_editingRoadmapId is null ? "New roadmap item" : "Edit roadmap item")</h2>
+            <div class="admin-action-field">
+                <label>Title <span class="text-danger">*</span></label>
+                <SfTextBox @bind-Value="_editingRoadmap.Title" />
+            </div>
+            <div class="admin-action-field">
+                <label>Description <span class="text-danger">*</span></label>
+                <SfTextBox @bind-Value="_editingRoadmap.Description" Multiline="true" />
+            </div>
+            <div class="admin-action-field">
+                <label>Icon name <span class="text-danger">*</span></label>
+                <SfTextBox @bind-Value="_editingRoadmap.IconName" />
+            </div>
+            <div class="admin-action-field">
+                <label>Delivery status</label>
+                <select @bind="_editingRoadmap.DeliveryStatus" class="admin-select">
+                    @foreach (var status in DeliveryStatuses)
+                    {
+                        <option value="@status">@Humanize(status)</option>
+                    }
+                </select>
+            </div>
+            <div class="admin-actions-buttons">
+                <SfButton IsPrimary="true" Disabled="_saving" OnClick="SaveRoadmapAsync">Save roadmap item</SfButton>
+                <SfButton Disabled="_saving" OnClick="@(() => _editingRoadmap = null)">Cancel</SfButton>
+            </div>
+        </section>
+    }
+}
+
+@code {
+    private static readonly string[] DeliveryStatuses = ["Available", "ComingSoon", "Planned", "Exploring"];
+
+    private AdminMarketingContentModel? _content;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _saved;
+    private string? _error;
+
+    private FeatureEditModel? _editingFeature;
+    private Guid? _editingFeatureId;
+    private RoadmapEditModel? _editingRoadmap;
+    private Guid? _editingRoadmapId;
+
+    private sealed class FeatureEditModel
+    {
+        public string Slug = "";
+        public string IconName = "";
+        public string Title = "";
+        public string Summary = "";
+        public string Intro = "";
+        public string? DetailedContent;
+        public string BenefitsText = "";
+        public string? YouTubeId;
+        public string DeliveryStatus = "Available";
+        public int DisplayOrder;
+    }
+
+    private sealed class RoadmapEditModel
+    {
+        public string Title = "";
+        public string Description = "";
+        public string IconName = "";
+        public string DeliveryStatus = "Planned";
+        public int DisplayOrder;
+    }
+
+    private static string Humanize(string status) => status switch
+    {
+        "ComingSoon" => "Coming soon",
+        _ => status,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+        _loading = false;
+    }
+
+    private async Task ReloadAsync()
+    {
+        _content = await MarketingContentAdminService.GetContentOrNullAsync();
+    }
+
+    private void ResetBanners()
+    {
+        _error = null;
+        _saved = false;
+    }
+
+    private async Task<bool> ApplyAsync(MarketingMutationResult result)
+    {
+        if (result.Succeeded)
+        {
+            _saved = true;
+            _error = null;
+            await ReloadAsync();
+            return true;
+        }
+
+        _error = result.Errors is { Count: > 0 } ? string.Join(" ", result.Errors) : "Could not save marketing content.";
+        return false;
+    }
+
+    private void EditFeature(AdminMarketingFeatureModel? feature)
+    {
+        ResetBanners();
+        _editingRoadmap = null;
+        _editingFeatureId = feature?.Id;
+        _editingFeature = feature is null
+            ? new FeatureEditModel { DisplayOrder = _content?.Features.Count ?? 0 }
+            : new FeatureEditModel
+            {
+                Slug = feature.Slug,
+                IconName = feature.IconName,
+                Title = feature.Title,
+                Summary = feature.Summary,
+                Intro = feature.Intro,
+                DetailedContent = feature.DetailedContent,
+                BenefitsText = string.Join(Environment.NewLine, feature.Benefits),
+                YouTubeId = feature.YouTubeId,
+                DeliveryStatus = feature.DeliveryStatus,
+                DisplayOrder = feature.DisplayOrder,
+            };
+    }
+
+    private async Task SaveFeatureAsync()
+    {
+        if (_editingFeature is null)
+            return;
+
+        _saving = true;
+        try
+        {
+            var benefits = _editingFeature.BenefitsText
+                .Split('\n')
+                .Select(b => b.Trim())
+                .Where(b => b.Length > 0)
+                .ToList();
+
+            MarketingMutationResult result;
+            if (_editingFeatureId is null)
+            {
+                result = await MarketingContentAdminService.CreateFeatureAsync(new CreateMarketingFeatureRequest(
+                    _editingFeature.Slug.Trim(), _editingFeature.IconName.Trim(), _editingFeature.Title.Trim(),
+                    _editingFeature.Summary.Trim(), _editingFeature.Intro.Trim(),
+                    string.IsNullOrWhiteSpace(_editingFeature.DetailedContent) ? null : _editingFeature.DetailedContent,
+                    benefits, string.IsNullOrWhiteSpace(_editingFeature.YouTubeId) ? null : _editingFeature.YouTubeId.Trim(),
+                    _editingFeature.DisplayOrder, _editingFeature.DeliveryStatus));
+            }
+            else
+            {
+                result = await MarketingContentAdminService.UpdateFeatureAsync(new UpdateMarketingFeatureRequest(
+                    _editingFeatureId.Value, _editingFeature.Slug.Trim(), _editingFeature.IconName.Trim(),
+                    _editingFeature.Title.Trim(), _editingFeature.Summary.Trim(), _editingFeature.Intro.Trim(),
+                    string.IsNullOrWhiteSpace(_editingFeature.DetailedContent) ? null : _editingFeature.DetailedContent,
+                    benefits, string.IsNullOrWhiteSpace(_editingFeature.YouTubeId) ? null : _editingFeature.YouTubeId.Trim(),
+                    _editingFeature.DisplayOrder, _editingFeature.DeliveryStatus));
+            }
+
+            if (await ApplyAsync(result))
+                _editingFeature = null;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ToggleFeaturePublication(AdminMarketingFeatureModel feature)
+    {
+        ResetBanners();
+        await ApplyAsync(await MarketingContentAdminService.SetFeaturePublicationAsync(feature.Id, !feature.IsPublished));
+    }
+
+    private async Task MoveFeature(int index, int delta)
+    {
+        if (_content is null)
+            return;
+
+        ResetBanners();
+        var ids = _content.Features.Select(f => f.Id).ToList();
+        var target = index + delta;
+        if (target < 0 || target >= ids.Count)
+            return;
+        (ids[index], ids[target]) = (ids[target], ids[index]);
+        await ApplyAsync(await MarketingContentAdminService.ReorderFeaturesAsync(ids));
+    }
+
+    private void EditRoadmap(AdminMarketingRoadmapModel? item)
+    {
+        ResetBanners();
+        _editingFeature = null;
+        _editingRoadmapId = item?.Id;
+        _editingRoadmap = item is null
+            ? new RoadmapEditModel { DisplayOrder = _content?.Roadmap.Count ?? 0 }
+            : new RoadmapEditModel
+            {
+                Title = item.Title,
+                Description = item.Description,
+                IconName = item.IconName,
+                DeliveryStatus = item.DeliveryStatus,
+                DisplayOrder = item.DisplayOrder,
+            };
+    }
+
+    private async Task SaveRoadmapAsync()
+    {
+        if (_editingRoadmap is null)
+            return;
+
+        _saving = true;
+        try
+        {
+            MarketingMutationResult result;
+            if (_editingRoadmapId is null)
+            {
+                result = await MarketingContentAdminService.CreateRoadmapItemAsync(new CreateMarketingRoadmapItemRequest(
+                    _editingRoadmap.Title.Trim(), _editingRoadmap.Description.Trim(), _editingRoadmap.IconName.Trim(),
+                    _editingRoadmap.DeliveryStatus, _editingRoadmap.DisplayOrder));
+            }
+            else
+            {
+                result = await MarketingContentAdminService.UpdateRoadmapItemAsync(new UpdateMarketingRoadmapItemRequest(
+                    _editingRoadmapId.Value, _editingRoadmap.Title.Trim(), _editingRoadmap.Description.Trim(),
+                    _editingRoadmap.IconName.Trim(), _editingRoadmap.DeliveryStatus, _editingRoadmap.DisplayOrder));
+            }
+
+            if (await ApplyAsync(result))
+                _editingRoadmap = null;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ToggleRoadmapPublication(AdminMarketingRoadmapModel item)
+    {
+        ResetBanners();
+        await ApplyAsync(await MarketingContentAdminService.SetRoadmapItemPublicationAsync(item.Id, !item.IsPublished));
+    }
+
+    private async Task MoveRoadmap(int index, int delta)
+    {
+        if (_content is null)
+            return;
+
+        ResetBanners();
+        var ids = _content.Roadmap.Select(r => r.Id).ToList();
+        var target = index + delta;
+        if (target < 0 || target >= ids.Count)
+            return;
+        (ids[index], ids[target]) = (ids[target], ids[index]);
+        await ApplyAsync(await MarketingContentAdminService.ReorderRoadmapItemsAsync(ids));
+    }
+}

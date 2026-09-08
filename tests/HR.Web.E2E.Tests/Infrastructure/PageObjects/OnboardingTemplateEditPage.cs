@@ -77,27 +77,35 @@ public sealed class OnboardingTemplateEditPage(IPage page, string baseUrl)
         // click landing in that gap is silently swallowed: no exception, no expanded row, nothing
         // to retry on for a single ClickAsync + WaitForAsync pair. Hovering first (forcing a real
         // mouse move rather than a synthetic click at coordinates) and pausing gives that
-        // OnAfterRenderAsync interop round trip a realistic chance to finish before the real click,
-        // matching DropDownSelector's mitigation for the same class of race. Retry the click
-        // itself, not just the wait, using "aria-expanded" (rather than the placeholder, which
-        // won't exist until the panel has genuinely rendered) as the per-attempt signal that this
-        // specific click landed.
+        // OnAfterRenderAsync interop round trip a realistic chance to finish before the real click.
         await firstDisclosure.HoverAsync(new() { Timeout = 10_000 });
         await page.WaitForTimeoutAsync(350);
 
-        for (var attempt = 1; attempt <= 5; attempt++)
+        // Per-attempt signal is the "Task title" input actually rendering (i.e. the expand round
+        // trip completed) — NOT the button's aria-expanded attribute. OnboardingTemplateEdit.razor
+        // binds `aria-expanded="@expanded"` with a bool, which Blazor renders as a bare valueless
+        // attribute when true (never the string "true"), so `[aria-expanded='true']` matched
+        // nothing and the loop always exhausted its retries. `.task-item.expanded` (a plain string
+        // class) would also work; the placeholder is the thing the caller actually needs.
+        var taskTitleInput = page.GetByPlaceholder("Task title");
+        for (var attempt = 1; attempt <= 8; attempt++)
         {
-            await firstDisclosure.ClickAsync(new() { Force = attempt == 5 });
+            // Re-check BEFORE clicking again: ToggleExpand() flips the row both ways, so a click
+            // that landed but rendered slowly under load would otherwise be undone by the next
+            // attempt's click (expand → collapse → …), leaving the row shut on an even count.
+            if (await taskTitleInput.CountAsync() > 0)
+                break;
+
+            await firstDisclosure.ClickAsync(new() { Force = attempt >= 6 });
             try
             {
-                await page.Locator(".task-disclosure[aria-expanded='true']").First
-                    .WaitForAsync(new() { Timeout = attempt < 5 ? 3_000 : 10_000 });
+                await taskTitleInput.First.WaitForAsync(new() { Timeout = attempt < 8 ? 3_000 : 10_000 });
                 break;
             }
-            catch (TimeoutException) when (attempt < 5)
+            catch (TimeoutException) when (attempt < 8)
             {
                 // Click didn't register — pause to let interop catch up, then try again.
-                await page.WaitForTimeoutAsync(300);
+                await page.WaitForTimeoutAsync(400);
             }
         }
 

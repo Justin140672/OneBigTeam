@@ -1003,9 +1003,26 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task FillAddCompensationEffectiveFromAsync(string ddMMyyyy)
     {
         var input = page.Locator(".add-compensation-dialog .e-date-wrapper input.e-input").First;
-        await input.ClickAsync();
-        await input.FillAsync(ddMMyyyy);
-        await page.Keyboard.PressAsync("Tab");
+        // SfDatePicker commits Model.EffectiveFrom on blur, over a Blazor Server round-trip. Under a
+        // loaded server that commit can lag behind the caller's next action — the dialog then fails
+        // DataAnnotations ("Please correct the highlighted fields") on submit even though the field
+        // looks filled. Verify the value actually landed in the input and retry the fill if not
+        // (same philosophy as FillNumericAndVerifyAsync).
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await input.ClickAsync();
+            await input.FillAsync("");
+            await input.FillAsync(ddMMyyyy);
+            await page.Keyboard.PressAsync("Tab");
+            await page.WaitForTimeoutAsync(200);
+
+            var actual = await input.InputValueAsync();
+            if (!string.IsNullOrWhiteSpace(actual) && actual.Contains(ddMMyyyy[^4..]))
+                return;
+
+            if (attempt < 3)
+                await page.WaitForTimeoutAsync(250);
+        }
     }
 
     public Task SelectAddCompensationSalaryTypeAsync(string salaryType) =>
@@ -1020,15 +1037,80 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task FillAddCompensationCurrencyAsync(string value)
     {
-        await page.Locator(".add-compensation-dialog").GetByPlaceholder("e.g. GBP").FillAsync(value);
-        await page.Keyboard.PressAsync("Tab");
+        // HrTextBox commits Model.Currency on blur over a Blazor Server round-trip — same lag-under-
+        // load risk as the Effective From date above. Verify + retry so submit doesn't fail
+        // DataAnnotations with the field looking filled.
+        var input = page.Locator(".add-compensation-dialog").GetByPlaceholder("e.g. GBP");
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await input.FillAsync(value);
+            await page.Keyboard.PressAsync("Tab");
+            await page.WaitForTimeoutAsync(200);
+
+            if ((await input.InputValueAsync()).Trim().Equals(value, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (attempt < 3)
+                await page.WaitForTimeoutAsync(250);
+        }
     }
 
     public async Task SubmitAddCompensationDialogAsync()
     {
-        await page.Locator(".add-compensation-dialog .e-footer-content button:has-text('Add')").ClickAsync();
-        await page.Locator("[role='dialog'].add-compensation-dialog").WaitForAsync(
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        var dialog = page.Locator("[role='dialog'].add-compensation-dialog");
+        var addButton = page.Locator(".add-compensation-dialog .e-footer-content button:has-text('Add')");
+
+        // A single click on the SfDialog footer button can land in the render-vs-circuit-ready gap
+        // (documented for Syncfusion interop throughout this suite) and be silently swallowed —
+        // the dialog then just sits there visible until the caller's Hidden wait times out. Retry
+        // the click, re-checking for the dialog actually closing each time. If a genuine server/
+        // validation error came back instead, surface it rather than burning the whole retry
+        // budget on a submit that will never succeed.
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            if (await dialog.CountAsync() == 0)
+                break;
+
+            await addButton.ClickAsync();
+            try
+            {
+                await dialog.WaitForAsync(new()
+                {
+                    State = WaitForSelectorState.Hidden,
+                    Timeout = attempt < 5 ? 3_000 : 10_000,
+                });
+                break;
+            }
+            catch (TimeoutException) when (attempt < 5)
+            {
+                if (await HasAddCompensationDialogErrorAsync())
+                {
+                    var message = (await page.Locator(".add-compensation-dialog .alert-danger").First.TextContentAsync())?.Trim() ?? "";
+
+                    // "Please correct the highlighted fields" is EditDialogBase's DataAnnotations
+                    // failure. The fields ARE filled in the DOM — a blur-committed value just hasn't
+                    // round-tripped to the bound model yet under load. Re-blur every field to force
+                    // the commit and retry, rather than failing the test on a transient race.
+                    if (message.Contains("correct the highlighted", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await ReblurAddCompensationFieldsAsync();
+                        await page.WaitForTimeoutAsync(400);
+                        continue;
+                    }
+
+                    // Any other message is a real server/business rejection — surface it.
+                    throw new InvalidOperationException($"Add Compensation dialog rejected the submit: {message}");
+                }
+
+                await page.WaitForTimeoutAsync(400);
+            }
+        }
+
+        if (await dialog.CountAsync() > 0 && await HasAddCompensationDialogErrorAsync())
+        {
+            var message = (await page.Locator(".add-compensation-dialog .alert-danger").First.TextContentAsync())?.Trim();
+            throw new InvalidOperationException($"Add Compensation dialog never accepted the submit: {message}");
+        }
 
         // Same "dialog closing doesn't prove the grid's own reload has landed" race as
         // SubmitEditCompensationDialogAsync above — callers that immediately read/act on the
@@ -1041,6 +1123,31 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public Task<bool> HasAddCompensationDialogErrorAsync() =>
         page.Locator(".add-compensation-dialog .alert-danger").IsVisibleAsync();
+
+    /// <summary>
+    /// Re-focuses then blurs each editable field in the Add Compensation dialog, forcing every
+    /// blur-committed Syncfusion/HrTextBox binding to flush its DOM value into the bound model.
+    /// Used to recover from a transient "correct the highlighted fields" validation failure where
+    /// the value is visibly present but hasn't round-tripped yet under a loaded server.
+    /// </summary>
+    private async Task ReblurAddCompensationFieldsAsync()
+    {
+        var fields = new[]
+        {
+            page.Locator(".add-compensation-dialog .e-date-wrapper input.e-input").First,
+            page.Locator(".add-compensation-dialog input.e-numerictextbox").First,
+            page.Locator(".add-compensation-dialog").GetByPlaceholder("e.g. GBP"),
+        };
+
+        foreach (var field in fields)
+        {
+            if (await field.CountAsync() == 0)
+                continue;
+            await field.ClickAsync();
+            await page.Keyboard.PressAsync("Tab");
+            await page.WaitForTimeoutAsync(150);
+        }
+    }
 
     public ILocator CompensationHistoryRow(string effectiveFromFragment) =>
         page.Locator("[data-testid='compensation-history-grid'] .e-row").Filter(new() { HasText = effectiveFromFragment });

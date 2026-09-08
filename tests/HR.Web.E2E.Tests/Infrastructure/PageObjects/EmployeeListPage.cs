@@ -67,6 +67,11 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         // noticeably longer than a headed run — widen both the attempt count and the per-attempt
         // budget rather than assuming 5 short attempts always outlast the race.
         var button = page.GetByRole(AriaRole.Button, new() { Name = "Add employee" });
+        // On a cold server run the toolbar can take noticeably longer than Playwright's default
+        // actionability timeout to paint (first-hit JIT + circuit connect), so the very first
+        // ClickAsync below would otherwise fail outright "waiting for GetByRole(...Add employee)".
+        // Wait for the button to attach explicitly, with a budget that covers a cold start.
+        await button.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60_000 });
         const int maxAttempts = 8;
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -192,6 +197,17 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         }
 
         await page.Keyboard.PressAsync("Escape");
+        // Leave the menu in a definitively-closed state — the very next caller
+        // (ClickBulkUpdateAsync) re-opens the same SfDropDownButton, and re-clicking its trigger
+        // while Syncfusion still thinks the popup is open just toggles it shut again.
+        try
+        {
+            await page.Locator(".e-dropdown-popup").WaitForAsync(
+                new() { State = WaitForSelectorState.Hidden, Timeout = 3_000 });
+        }
+        catch (TimeoutException)
+        {
+        }
 
         return ariaDisabled == "true" || hasDisabledClass;
     }
@@ -208,29 +224,39 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     {
         var button = page.GetByRole(AriaRole.Button, new() { Name = "Update selected" });
         var popup = page.Locator(".e-dropdown-popup");
+        // Target the item by its stable DOM id rather than role+name — a just-rebuilt
+        // SfDropDownButton Items list (HasSelection flipped as the two rows were checked) can leave
+        // the popup rendering with a stale/empty item set for a beat, and #id resolves against
+        // whichever render eventually wins. See OpenBulkUpdateMenuItemAsync's remarks.
+        var item = page.Locator("#hr-bulk-selected");
 
-        // Same "click may land before Syncfusion's interop listener attaches" race
-        // OpenBulkUpdateMenuItemAsync already guards against — hardened here too since this method
-        // previously clicked the trigger just once.
-        for (var attempt = 1; attempt <= 3; attempt++)
+        // Start from a definitively-closed menu: a re-click on an SfDropDownButton Syncfusion still
+        // considers open just toggles it shut, and the previous IsBulkUpdateButtonDisabledAsync
+        // call left it mid-close.
+        if (await popup.IsVisibleAsync())
         {
-            if (await popup.IsVisibleAsync())
-                break;
+            await page.Keyboard.PressAsync("Escape");
+            try { await popup.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 3_000 }); }
+            catch (TimeoutException) { }
+        }
 
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
             await button.ClickAsync();
             try
             {
-                await popup.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = attempt < 3 ? 2_000 : 10_000 });
+                await popup.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = attempt < 5 ? 2_500 : 10_000 });
+                await item.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = attempt < 5 ? 2_500 : 10_000 });
                 break;
             }
-            catch (TimeoutException) when (attempt < 3)
+            catch (TimeoutException) when (attempt < 5)
             {
-                // Popup never opened — listener likely wasn't bound yet. Try again.
+                // Popup never opened (listener not bound yet) or opened with an empty/stale item
+                // list (Items rebuild race) — reset to closed and try again.
+                await page.Keyboard.PressAsync("Escape");
+                await page.WaitForTimeoutAsync(400);
             }
         }
-
-        var item = page.GetByRole(AriaRole.Menuitem, new() { Name = "Selected Employees" });
-        await item.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
         // BulkUpdateMenu's HasSelection is set from EmployeeList's own _hasSelection, computed
         // asynchronously off the grid's row-checkbox state — the menu popup itself can render (and

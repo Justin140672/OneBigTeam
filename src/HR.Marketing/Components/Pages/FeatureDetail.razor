@@ -1,5 +1,6 @@
 @page "/features/{Slug}"
 @using HR.Marketing.Services
+@inject MarketingContentService MarketingContent
 
 @if (feature is null)
 {
@@ -94,18 +95,19 @@ else
     [Parameter] public string Slug { get; set; } = "";
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
 
-    private FeatureInfo? feature;
-    private List<FeatureInfo> relatedFeatures = [];
+    private MarketingFeatureContent? feature;
+    private List<MarketingFeatureContent> relatedFeatures = [];
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
-        FeatureCatalog.TryGet(Slug, out feature);
+        var content = await MarketingContent.GetContentAsync();
+        feature = content.Features.FirstOrDefault(f => string.Equals(f.Slug, Slug, StringComparison.OrdinalIgnoreCase));
         if (feature is null && HttpContext is not null)
         {
             HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
         }
         relatedFeatures = feature is null
             ? []
-            : FeatureCatalog.All.Where(f => f.Slug != feature.Slug).Take(3).ToList();
+            : content.Features.Where(f => f.Slug != feature.Slug).Take(3).ToList();
     }
 }

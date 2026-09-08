@@ -15,6 +15,11 @@ builder.Services.AddSingleton<IMarketingAnalytics, LoggingMarketingAnalytics>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<SubscriptionPricingProvider>();
 
+// Managed marketing content (features + roadmap) served from HR.Modules.Marketing via HR.Api.
+// Singleton so the service can retain a last-known-good copy for graceful degradation; it caches
+// successful responses for 5 minutes (see MarketingContentService).
+builder.Services.AddSingleton<MarketingContentService>();
+
 // Named client for the server-side "Start free trial" signup proxy (SignUp.razor) — calls
 // HR.Api directly from the server, so the browser never needs cross-origin access to the API.
 builder.Services.AddHttpClient("hrapi", c =>
@@ -64,15 +69,16 @@ app.MapGet("/robots.txt", (HttpRequest request) =>
     return Results.Text($"User-agent: *\nAllow: /\n\nSitemap: {origin}/sitemap.xml\n", "text/plain");
 });
 
-app.MapGet("/sitemap.xml", (HttpRequest request) =>
+app.MapGet("/sitemap.xml", async (HttpRequest request, MarketingContentService marketingContent) =>
 {
     var origin = $"{request.Scheme}://{request.Host}";
+    var content = await marketingContent.GetContentAsync(request.HttpContext.RequestAborted);
     var paths = new[]
     {
         "", "features", "pricing", "contact", "roadmap", "security", "privacy-policy",
         "subprocessors", "terms-of-service", "cookie-policy", "acceptable-use-policy",
         "data-processing-agreement"
-    }.Concat(FeatureCatalog.All.Select(feature => $"features/{feature.Slug}"));
+    }.Concat(content.Features.Select(feature => $"features/{feature.Slug}"));
 
     var xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
         .AppendLine("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
