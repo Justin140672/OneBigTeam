@@ -811,6 +811,48 @@ public class UpdateVacancyHandlerTests
         Assert.Equal(newPositionProfileId, saved.PositionProfileId);
     }
 
+    [Fact]
+    public async Task HandleAsync_Sets_IsAdvertisedInternally_True_Then_Toggles_It_Off()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Title", null, Guid.NewGuid(), Now);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var on = await handler(db).HandleAsync(
+            new UpdateVacancyRequest
+            {
+                CompanyId              = companyId,
+                VacancyId              = vacancy.Id,
+                AdvertTitle            = "Title",
+                HiringManagerId        = vacancy.HiringManagerId,
+                IsAdvertisedInternally = true,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(on.IsSuccess);
+        Assert.True(on.Value!.IsAdvertisedInternally);
+        Assert.True((await db.Vacancies.SingleAsync()).IsAdvertisedInternally);
+
+        var off = await handler(db).HandleAsync(
+            new UpdateVacancyRequest
+            {
+                CompanyId              = companyId,
+                VacancyId              = vacancy.Id,
+                AdvertTitle            = "Title",
+                HiringManagerId        = vacancy.HiringManagerId,
+                IsAdvertisedInternally = false,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(off.IsSuccess);
+        Assert.False(off.Value!.IsAdvertisedInternally);
+        Assert.False((await db.Vacancies.SingleAsync()).IsAdvertisedInternally);
+    }
+
     private static UpdateVacancyHandler handler(
         RecruitmentDbContext db,
         FakeAuditPublisher? auditPublisher = null,

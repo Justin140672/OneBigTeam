@@ -57,7 +57,8 @@ public record GetVacancyResponse(
     string EffectiveTitle,
     string? EffectiveLocation,
     int ApplicationCount,
-    bool CanChangePositionProfile);
+    bool CanChangePositionProfile,
+    bool IsAdvertisedInternally = false);
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
 
@@ -67,7 +68,8 @@ public record CreateVacancyRequest(
     string? AdvertTitle,
     string? AdvertDescription,
     Guid HiringManagerId,
-    Guid? AssignedRecruiterId = null);
+    Guid? AssignedRecruiterId = null,
+    bool IsAdvertisedInternally = false);
 
 public record CreateVacancyResponse(
     Guid Id,
@@ -94,7 +96,8 @@ public record UpdateVacancyRequest(
     Guid HiringManagerId,
     Guid? AssignedRecruiterId = null,
     bool IsAuthorisedCorrection = false,
-    string? CorrectionReason = null);
+    string? CorrectionReason = null,
+    bool IsAdvertisedInternally = false);
 
 public record UpdateVacancyResponse(
     Guid Id,
@@ -168,6 +171,10 @@ public sealed class VacancyEditModel
     // VacancyDetail.razor.
     public bool IsAuthorisedCorrection { get; set; }
     public string? CorrectionReason { get; set; }
+
+    // VAC: when set, the vacancy is surfaced in the employee-facing Internal Vacancies list on My
+    // Profile while it is open.
+    public bool IsAdvertisedInternally { get; set; }
 }
 
 // ── DASHBOARD: HIRING PIPELINE SUMMARY ──────────────────────────────────────────

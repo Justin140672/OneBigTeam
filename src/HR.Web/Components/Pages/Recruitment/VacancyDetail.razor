@@ -557,6 +557,14 @@
                             <label class="form-label">Advert Description</label>
                             <HrTextBox @bind-Value="Model.AdvertDescription" Multiline="true" Rows="4" Readonly="@IsViewMode" />
                         </div>
+                        <div class="col-12">
+                            <SfCheckBox TChecked="bool" ID="isAdvertisedInternally"
+                                        data-testid="vacancy-advertise-internally"
+                                        Label="Advertise this vacancy to employees"
+                                        @bind-Checked="Model.IsAdvertisedInternally"
+                                        Disabled="@IsViewMode" />
+                            <div class="form-text">Shows the vacancy in the internal vacancy list on employees' My Profile while it is open.</div>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -9,6 +9,7 @@
 @inject ProbationService ProbationService
 @inject OnboardingService OnboardingService
 @inject CompensationService CompensationService
+@inject InternalVacancyService InternalVacancyService
 @inject AppSession Session
 @inject NavigationManager Navigation
 
@@ -276,6 +277,15 @@ else
                         <span class="action-btn-label">Employee Directory</span>
                         <i class="fa-solid fa-chevron-right action-btn-chevron"></i>
                     </button>
+                    @if (_hasInternalVacancies)
+                    {
+                        <button class="action-btn action-btn--vacancies" data-testid="internal-vacancies-action"
+                                @onclick="NavigateToInternalVacancies">
+                            <span class="action-btn-icon"><i class="fa-solid fa-briefcase"></i></span>
+                            <span class="action-btn-label">Internal Vacancies</span>
+                            <i class="fa-solid fa-chevron-right action-btn-chevron"></i>
+                        </button>
+                    }
                 </div>
             </div>
             @* Hidden for a plain Employee (no elevated/manager+ role) — mirrors TeamReportsWidget's
@@ -331,6 +341,7 @@ else
     private MyProbationStatusModel? _probationStatus;
     private MyOnboardingStatusModel? _onboardingStatus;
     private CurrentCompensationModel? _currentCompensation;
+    private bool _hasInternalVacancies;
 
     // Backing data for the "Request Leave" quick-action dialog, rendered directly on this tab
     // so it opens on top of whatever tab the user is currently viewing instead of forcing a
@@ -367,6 +378,7 @@ else
         var probationTask  = ProbationService.GetMyProbationStatusAsync(CompanyId);
         var onboardingTask = OnboardingService.GetMyOnboardingStatusAsync(CompanyId);
         var holidaysTask   = PublicHolidayService.ListAsync(CompanyId);
+        var vacanciesTask  = InternalVacancyService.ListAsync(Session.CompanyId, null);
         var compensationTask = Session.DisplaySalaryOnEmployeeProfile
             ? CompensationService.GetCurrentCompensationAsync(CompanyId, EmployeeId)
             : Task.FromResult<CurrentCompensationModel?>(null);
@@ -382,7 +394,7 @@ else
         // DB connection-pool exhaustion under heavy concurrent load would still pin the skeleton
         // indefinitely. Bound the overall wait so the page always renders with whatever completed
         // in time, same "salvage what loaded" philosophy extended to cover stalls, not just faults.
-        var allTasks = Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask, probationTask, onboardingTask, holidaysTask, compensationTask);
+        var allTasks = Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask, probationTask, onboardingTask, holidaysTask, compensationTask, vacanciesTask);
         try
         {
             await Task.WhenAny(allTasks, Task.Delay(TimeSpan.FromSeconds(15)));
@@ -399,6 +411,7 @@ else
         _onboardingStatus = Result(onboardingTask);
         _currentCompensation = Result(compensationTask);
         _publicHolidays = Result(holidaysTask)?.Items.Select(h => h.Date).ToList() ?? [];
+        _hasInternalVacancies = Result(vacanciesTask)?.Items.Count > 0;
 
         ApplyLeaveData(Result(balanceTask), Result(requestsTask));
 
@@ -454,6 +467,9 @@ else
 
     private void NavigateToDirectory() =>
         Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/directory");
+
+    private void NavigateToInternalVacancies() =>
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/internal-vacancies");
 
     private async Task OnSicknessRecordedAsync()
     {

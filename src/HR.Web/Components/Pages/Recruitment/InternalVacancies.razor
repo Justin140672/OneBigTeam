@@ -1,0 +1,166 @@
+@page "/companies/{CompanyId:guid}/internal-vacancies"
+@rendermode InteractiveServer
+@inject AppSession Session
+@inject NavigationManager Navigation
+@inject InternalVacancyService InternalVacancyService
+
+<PageTitle>Internal Vacancies</PageTitle>
+
+@if (_authorized)
+{
+    <div class="container py-4">
+        <h1 class="mb-1">Internal Vacancies</h1>
+        <p class="text-muted mb-4">Open roles currently advertised to employees.</p>
+
+        <div class="vacancy-filters">
+            <SfTextBox @bind-Value="_search"
+                       Placeholder="Search by title…"
+                       CssClass="vacancy-search-box"
+                       data-testid="internal-vacancy-search"
+                       ValueChange="OnSearchChanged" />
+        </div>
+
+        @if (_loading)
+        {
+            <HrLoadingIndicator Label="Loading vacancies…" />
+        }
+        else if (_items.Count == 0)
+        {
+            <div class="vacancy-empty">
+                <i class="fa-solid fa-briefcase"></i>
+                <p>No internal vacancies are currently advertised.</p>
+            </div>
+        }
+        else
+        {
+            <div class="vacancy-grid">
+                @foreach (var vacancy in _items)
+                {
+                    <div class="vacancy-card" role="button" tabindex="0"
+                         data-testid="internal-vacancy-card"
+                         @onclick="@(() => OpenDetailAsync(vacancy.Id))"
+                         @onkeydown="@(e => OnCardKeyDown(e, vacancy.Id))">
+                        <span class="vacancy-card-title">@vacancy.Title</span>
+                        <span class="vacancy-card-meta">
+                            @(vacancy.DepartmentName ?? "—") · @(vacancy.Location ?? "—")
+                        </span>
+                        @if (vacancy.ClosingDate is not null)
+                        {
+                            <span class="vacancy-card-closing">Closes @vacancy.ClosingDate.Value.ToString("d MMMM yyyy")</span>
+                        }
+                    </div>
+                }
+            </div>
+            <p class="text-muted mt-3 mb-0">@_items.Count vacancy(s)</p>
+        }
+    </div>
+
+    <SfDialog Visible="_detailVisible" IsModal="true" Width="520px" ShowCloseIcon="true"
+              CssClass="vacancy-detail-dialog">
+        <DialogEvents Closed="CloseDetail" />
+        <DialogTemplates>
+            <Header>Vacancy</Header>
+            <Content>
+                @if (_detailLoading)
+                {
+                    <HrLoadingIndicator Label="Loading…" />
+                }
+                else if (_detail is null)
+                {
+                    <p class="text-muted mb-0">Unable to load this vacancy.</p>
+                }
+                else
+                {
+                    <div class="vacancy-detail" data-testid="internal-vacancy-detail">
+                        <div class="vacancy-detail-title">@_detail.Title</div>
+                        <dl class="vacancy-detail-dl">
+                            <dt>Department</dt>
+                            <dd>@(_detail.DepartmentName ?? "—")</dd>
+                            <dt>Location</dt>
+                            <dd>@(_detail.Location ?? "—")</dd>
+                            @if (!string.IsNullOrWhiteSpace(_detail.EmploymentType))
+                            {
+                                <dt>Employment Type</dt>
+                                <dd>@_detail.EmploymentType</dd>
+                            }
+                            @if (_detail.ClosingDate is not null)
+                            {
+                                <dt>Closing Date</dt>
+                                <dd>@_detail.ClosingDate.Value.ToString("d MMMM yyyy")</dd>
+                            }
+                        </dl>
+                        <div class="vacancy-detail-description-label">Description</div>
+                        <div class="vacancy-detail-description">@(string.IsNullOrWhiteSpace(_detail.Description) ? "—" : _detail.Description)</div>
+                    </div>
+                }
+            </Content>
+        </DialogTemplates>
+        <DialogButtons>
+            <DialogButton Content="Close" OnClick="CloseDetail" />
+        </DialogButtons>
+    </SfDialog>
+}
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private bool _authorized;
+    private bool _loading = true;
+    private string? _search;
+
+    private List<InternalVacancyListItem> _items = [];
+
+    private bool _detailVisible;
+    private bool _detailLoading;
+    private InternalVacancyDetail? _detail;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _authorized = false;
+        await Session.InitialiseAsync();
+
+        if (Session.CompanyId != CompanyId)
+        {
+            Navigation.NavigateTo("/", replace: true);
+            return;
+        }
+
+        _authorized = true;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var result = await InternalVacancyService.ListAsync(CompanyId, _search);
+        _items = result?.Items ?? [];
+        _loading = false;
+    }
+
+    private async Task OnSearchChanged(Syncfusion.Blazor.Inputs.ChangedEventArgs args)
+    {
+        _search = args.Value;
+        await LoadAsync();
+    }
+
+    private async Task OnCardKeyDown(KeyboardEventArgs e, Guid id)
+    {
+        if (e.Key is "Enter" or " ")
+            await OpenDetailAsync(id);
+    }
+
+    private async Task OpenDetailAsync(Guid id)
+    {
+        _detail = null;
+        _detailVisible = true;
+        _detailLoading = true;
+        _detail = await InternalVacancyService.GetAsync(CompanyId, id);
+        _detailLoading = false;
+    }
+
+    private void CloseDetail()
+    {
+        _detailVisible = false;
+        _detail = null;
+    }
+}

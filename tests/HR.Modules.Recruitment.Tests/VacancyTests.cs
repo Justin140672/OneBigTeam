@@ -252,7 +252,7 @@ public class VacancyTests
         var hiringManagerId = Guid.NewGuid();
         var later = Now.AddDays(1);
 
-        vacancy.UpdateDetails("  New Title  ", "  New Description  ", hiringManagerId, null, later);
+        vacancy.UpdateDetails("  New Title  ", "  New Description  ", hiringManagerId, null, isAdvertisedInternally: false, later);
 
         Assert.Equal("New Title", vacancy.AdvertTitle);
         Assert.Equal("New Description", vacancy.AdvertDescription);
@@ -268,7 +268,7 @@ public class VacancyTests
     {
         var vacancy = CreateVacancy();
 
-        vacancy.UpdateDetails(advertTitle, "Description", Guid.NewGuid(), null, Now.AddDays(1));
+        vacancy.UpdateDetails(advertTitle, "Description", Guid.NewGuid(), null, isAdvertisedInternally: false, Now.AddDays(1));
 
         Assert.Null(vacancy.AdvertTitle);
     }
@@ -279,7 +279,7 @@ public class VacancyTests
         var vacancy = CreateVacancy();
         Assert.NotNull(vacancy.AdvertTitle);
 
-        vacancy.UpdateDetails(null, vacancy.AdvertDescription, vacancy.HiringManagerId, null, Now.AddDays(1));
+        vacancy.UpdateDetails(null, vacancy.AdvertDescription, vacancy.HiringManagerId, null, isAdvertisedInternally: false, Now.AddDays(1));
 
         Assert.Null(vacancy.AdvertTitle);
     }
@@ -310,7 +310,7 @@ public class VacancyTests
         var vacancy = CreateVacancy();
         var recruiterId = Guid.NewGuid();
 
-        vacancy.UpdateDetails(vacancy.AdvertTitle, vacancy.AdvertDescription, vacancy.HiringManagerId, recruiterId, Now.AddDays(1));
+        vacancy.UpdateDetails(vacancy.AdvertTitle, vacancy.AdvertDescription, vacancy.HiringManagerId, recruiterId, isAdvertisedInternally: false, Now.AddDays(1));
 
         Assert.Equal(recruiterId, vacancy.AssignedRecruiterId);
     }
@@ -319,9 +319,9 @@ public class VacancyTests
     public void UpdateDetails_Clears_AssignedRecruiterId_To_Null()
     {
         var vacancy = CreateVacancy();
-        vacancy.UpdateDetails(vacancy.AdvertTitle, vacancy.AdvertDescription, vacancy.HiringManagerId, Guid.NewGuid(), Now.AddDays(1));
+        vacancy.UpdateDetails(vacancy.AdvertTitle, vacancy.AdvertDescription, vacancy.HiringManagerId, Guid.NewGuid(), isAdvertisedInternally: false, Now.AddDays(1));
 
-        vacancy.UpdateDetails(vacancy.AdvertTitle, vacancy.AdvertDescription, vacancy.HiringManagerId, null, Now.AddDays(2));
+        vacancy.UpdateDetails(vacancy.AdvertTitle, vacancy.AdvertDescription, vacancy.HiringManagerId, null, isAdvertisedInternally: false, Now.AddDays(2));
 
         Assert.Null(vacancy.AssignedRecruiterId);
     }
@@ -388,5 +388,49 @@ public class VacancyTests
 
         Assert.Equal(secondApprover, vacancy.ApprovedByUserId);
         Assert.Equal(Now.AddDays(2), vacancy.ApprovedAt);
+    }
+
+    // Internal vacancies: IsAdvertisedInternally flag.
+
+    [Fact]
+    public void Create_Defaults_IsAdvertisedInternally_To_False()
+    {
+        var vacancy = CreateVacancy();
+
+        Assert.False(vacancy.IsAdvertisedInternally);
+    }
+
+    [Fact]
+    public void Create_Sets_IsAdvertisedInternally_When_True()
+    {
+        var vacancy = Vacancy.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "Senior Software Engineer", "Description", Guid.NewGuid(), Now,
+            assignedRecruiterId: null, isAdvertisedInternally: true);
+
+        Assert.True(vacancy.IsAdvertisedInternally);
+    }
+
+    [Fact]
+    public void UpdateDetails_Sets_IsAdvertisedInternally_True()
+    {
+        var vacancy = CreateVacancy();
+
+        vacancy.UpdateDetails(vacancy.AdvertTitle, vacancy.AdvertDescription, vacancy.HiringManagerId, null, isAdvertisedInternally: true, Now.AddDays(1));
+
+        Assert.True(vacancy.IsAdvertisedInternally);
+    }
+
+    [Fact]
+    public void UpdateDetails_Clears_IsAdvertisedInternally_Back_To_False()
+    {
+        var vacancy = Vacancy.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "Senior Software Engineer", "Description", Guid.NewGuid(), Now,
+            assignedRecruiterId: null, isAdvertisedInternally: true);
+
+        vacancy.UpdateDetails(vacancy.AdvertTitle, vacancy.AdvertDescription, vacancy.HiringManagerId, null, isAdvertisedInternally: false, Now.AddDays(1));
+
+        Assert.False(vacancy.IsAdvertisedInternally);
     }
 }

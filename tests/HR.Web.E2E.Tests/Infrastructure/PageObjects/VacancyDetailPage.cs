@@ -501,6 +501,24 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public Task ClickSaveButtonAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
 
+    // ── "Advertise this vacancy to employees" checkbox (Internal Vacancies feature) ──
+    // SfCheckBox ID="isAdvertisedInternally" bound to Model.IsAdvertisedInternally, in the
+    // "Recruitment Advert Details" card (data-testid="vacancy-advertise-internally"). Drive it by
+    // its input ID — same pattern as the authorised-correction checkbox above (SfCheckBox forwards
+    // its ID onto the underlying input; Check/UncheckAsync handle the Syncfusion visual wrapper).
+    private ILocator AdvertiseInternallyCheckbox => page.Locator("#isAdvertisedInternally");
+
+    public Task<bool> IsAdvertiseInternallyCheckedAsync() => AdvertiseInternallyCheckbox.IsCheckedAsync();
+
+    public async Task SetAdvertiseInternallyAsync(bool value)
+    {
+        await AdvertiseInternallyCheckbox.WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 15_000 });
+        if (value)
+            await AdvertiseInternallyCheckbox.CheckAsync();
+        else
+            await AdvertiseInternallyCheckbox.UncheckAsync();
+    }
+
     public async Task<bool> HasErrorAsync()
     {
         try

@@ -34,6 +34,11 @@ internal sealed class Vacancy
     public VacancyStatus Status { get; private set; }
     public Guid HiringManagerId { get; private set; }
 
+    // When true, this vacancy is advertised to the company's own employees via the internal
+    // vacancy list on My Profile. Recruitment users control this flag on the create/edit screen.
+    // A vacancy is only visible to employees when this is true AND Status == Open.
+    public bool IsAdvertisedInternally { get; private set; }
+
     // The external recruitment agency (ExternalRecruiter) assigned to run this vacancy, if any.
     // Nullable — a vacancy may have no agency assigned. Per explicit product-direction scope
     // correction (ticket #81), this used to be a Guid? FK to an internal Employee (mirroring
@@ -65,7 +70,8 @@ internal sealed class Vacancy
         string? advertDescription,
         Guid hiringManagerId,
         DateTimeOffset now,
-        Guid? assignedRecruiterId = null) => new()
+        Guid? assignedRecruiterId = null,
+        bool isAdvertisedInternally = false) => new()
     {
         Id                 = id,
         CompanyId          = companyId,
@@ -75,6 +81,7 @@ internal sealed class Vacancy
         Status             = VacancyStatus.Draft,
         HiringManagerId    = hiringManagerId,
         AssignedRecruiterId = assignedRecruiterId,
+        IsAdvertisedInternally = isAdvertisedInternally,
         CreatedAt          = now,
         UpdatedAt          = now,
     };
@@ -84,12 +91,14 @@ internal sealed class Vacancy
         string? advertDescription,
         Guid hiringManagerId,
         Guid? assignedRecruiterId,
+        bool isAdvertisedInternally,
         DateTimeOffset now)
     {
         AdvertTitle        = string.IsNullOrWhiteSpace(advertTitle) ? null : advertTitle.Trim();
         AdvertDescription  = string.IsNullOrWhiteSpace(advertDescription) ? null : advertDescription.Trim();
         HiringManagerId    = hiringManagerId;
         AssignedRecruiterId = assignedRecruiterId;
+        IsAdvertisedInternally = isAdvertisedInternally;
         UpdatedAt          = now;
     }
 

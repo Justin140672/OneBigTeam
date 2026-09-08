@@ -15,6 +15,7 @@ internal sealed record GetVacancyResponse(
     VacancyStatus Status,
     Guid HiringManagerId,
     Guid? AssignedRecruiterId,
+    bool IsAdvertisedInternally,
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt,

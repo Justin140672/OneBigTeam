@@ -511,6 +511,30 @@ public class UpdateVacancyEndpointTests
         Assert.Contains("Vacancy was created against the wrong position profile.", auditRecord.MetadataJson);
     }
 
+    [Fact]
+    public async Task Put_Vacancy_Sets_Then_Unsets_IsAdvertisedInternally()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(companyId);
+        var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
+        var vacancyId = await SeedVacancyAsync(companyId, referenceData.PositionProfileId);
+        var hiringManagerId = Guid.NewGuid();
+
+        var onResponse = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/vacancies/{vacancyId}",
+            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, isAdvertisedInternally = true });
+        Assert.Equal(HttpStatusCode.OK, onResponse.StatusCode);
+        using (var onDoc = System.Text.Json.JsonDocument.Parse(await onResponse.Content.ReadAsStringAsync()))
+            Assert.True(onDoc.RootElement.GetProperty("isAdvertisedInternally").GetBoolean());
+
+        var offResponse = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/vacancies/{vacancyId}",
+            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, isAdvertisedInternally = false });
+        Assert.Equal(HttpStatusCode.OK, offResponse.StatusCode);
+        using (var offDoc = System.Text.Json.JsonDocument.Parse(await offResponse.Content.ReadAsStringAsync()))
+            Assert.False(offDoc.RootElement.GetProperty("isAdvertisedInternally").GetBoolean());
+    }
+
     private sealed record VacancyPayload(
         Guid Id,
         Guid CompanyId,

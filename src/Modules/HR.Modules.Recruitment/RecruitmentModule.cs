@@ -29,6 +29,8 @@ using HR.Modules.Recruitment.Features.GetStaleVacancies;
 using HR.Modules.Recruitment.Features.GetVacanciesNeedingPositionProfileReview;
 using HR.Modules.Recruitment.Features.GetUpcomingInterviews;
 using HR.Modules.Recruitment.Features.GetVacancy;
+using HR.Modules.Recruitment.Features.GetInternalVacancy;
+using HR.Modules.Recruitment.Features.ListInternalVacancies;
 using HR.Modules.Recruitment.Features.HireCandidate;
 using HR.Modules.Recruitment.Features.ListApplicationsForVacancy;
 using HR.Modules.Recruitment.Features.ListCandidateDocuments;
@@ -102,6 +104,12 @@ public static class RecruitmentModule
         services.AddScoped<IValidator<CreateVacancyRequest>, CreateVacancyValidator>();
 
         services.AddScoped<GetVacancyHandler>();
+
+        services.AddScoped<ListInternalVacanciesHandler>();
+        services.AddScoped<IValidator<ListInternalVacanciesRequest>, ListInternalVacanciesValidator>();
+
+        services.AddScoped<GetInternalVacancyHandler>();
+        services.AddScoped<IValidator<GetInternalVacancyRequest>, GetInternalVacancyValidator>();
 
         services.AddScoped<ListVacanciesHandler>();
         services.AddScoped<IValidator<ListVacanciesRequest>, ListVacanciesValidator>();

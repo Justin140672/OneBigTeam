@@ -69,6 +69,7 @@ builder.Services.AddScoped<LocationTypeService>();
 builder.Services.AddScoped<LocationService>();
 builder.Services.AddScoped<EmployeeService>();
 builder.Services.AddScoped<EmployeeDirectoryService>();
+builder.Services.AddScoped<InternalVacancyService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<InviteService>();
 builder.Services.AddScoped<PositionProfileService>();

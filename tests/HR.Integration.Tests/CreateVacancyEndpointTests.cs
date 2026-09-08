@@ -378,6 +378,33 @@ public class CreateVacancyEndpointTests
         Assert.Null(payload!.AssignedRecruiterId);
     }
 
+    [Fact]
+    public async Task Post_Vacancies_Persists_IsAdvertisedInternally_True_And_Returns_It()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(companyId);
+        var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
+        {
+            companyId,
+            positionProfileId = referenceData.PositionProfileId,
+            advertTitle = "Senior Software Engineer",
+            hiringManagerId = Guid.NewGuid(),
+            isAdvertisedInternally = true
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var created = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.True(created.RootElement.GetProperty("isAdvertisedInternally").GetBoolean());
+        var id = created.RootElement.GetProperty("id").GetGuid();
+
+        var getResponse = await client.GetAsync($"/api/companies/{companyId}/vacancies/{id}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        using var fetched = JsonDocument.Parse(await getResponse.Content.ReadAsStringAsync());
+        Assert.True(fetched.RootElement.GetProperty("isAdvertisedInternally").GetBoolean());
+    }
+
     private sealed record VacancyPayload(
         Guid Id,
         Guid CompanyId,

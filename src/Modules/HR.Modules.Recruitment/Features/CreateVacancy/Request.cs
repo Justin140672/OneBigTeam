@@ -8,4 +8,5 @@ internal sealed record CreateVacancyRequest
     public string? AdvertDescription { get; init; }
     public Guid HiringManagerId { get; init; }
     public Guid? AssignedRecruiterId { get; init; }
+    public bool IsAdvertisedInternally { get; init; }
 }

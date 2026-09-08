@@ -13,6 +13,9 @@ internal sealed record UpdateVacancyRequest
     public Guid HiringManagerId { get; init; }
     public Guid? AssignedRecruiterId { get; init; }
 
+    // Whether the vacancy is advertised to the company's own employees (internal vacancy list).
+    public bool IsAdvertisedInternally { get; init; }
+
     // Authorised correction escape hatch: when the baseline change-control check
     // (UpdateVacancyHandler.CanChangePositionProfile) would otherwise reject a Position Profile
     // change (vacancy published and/or has applications), setting this flag together with a

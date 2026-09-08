@@ -1,0 +1,138 @@
+.vacancy-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.vacancy-search-box {
+    max-width: 320px;
+}
+
+/* ── Card grid ───────────────────────────────────────── */
+
+.vacancy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.vacancy-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.vacancy-card:hover,
+.vacancy-card:focus-visible {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+    outline: none;
+}
+
+.vacancy-card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.vacancy-card-meta {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.vacancy-card-closing {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--hr-color-primary);
+}
+
+/* ── Empty state ─────────────────────────────────────── */
+
+.vacancy-empty {
+    text-align: center;
+    padding: 48px 16px;
+    color: #6b7280;
+}
+
+.vacancy-empty i {
+    font-size: 2rem;
+    margin-bottom: 12px;
+}
+
+/* ── Detail dialog ───────────────────────────────────── */
+
+.vacancy-detail-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 16px;
+}
+
+.vacancy-detail-dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 16px;
+    row-gap: 8px;
+    margin: 0 0 16px;
+    align-items: baseline;
+}
+
+.vacancy-detail-dl dt {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.vacancy-detail-dl dd {
+    font-size: 0.875rem;
+    color: #111827;
+    margin: 0;
+    word-break: break-word;
+}
+
+.vacancy-detail-description-label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 6px;
+}
+
+.vacancy-detail-description {
+    font-size: 0.875rem;
+    color: #111827;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* ── Dark mode ───────────────────────────────────────── */
+
+html[data-theme="dark"] .vacancy-card {
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .vacancy-card-title,
+html[data-theme="dark"] .vacancy-detail-title,
+html[data-theme="dark"] .vacancy-detail-dl dd,
+html[data-theme="dark"] .vacancy-detail-description {
+    color: var(--hr-gray-50);
+}
+
+html[data-theme="dark"] .vacancy-card-meta,
+html[data-theme="dark"] .vacancy-detail-dl dt,
+html[data-theme="dark"] .vacancy-detail-description-label {
+    color: var(--hr-gray-300);
+}

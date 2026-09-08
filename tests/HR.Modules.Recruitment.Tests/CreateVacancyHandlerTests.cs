@@ -416,6 +416,51 @@ public class CreateVacancyHandlerTests
         Assert.Equal(6, await db.RecruitmentStages.CountAsync(s => s.CompanyId == companyId));
     }
 
+    [Fact]
+    public async Task HandleAsync_Defaults_IsAdvertisedInternally_To_False()
+    {
+        await using var db = BuildContext();
+
+        var result = await handler(db).HandleAsync(
+            new CreateVacancyRequest
+            {
+                CompanyId         = Guid.NewGuid(),
+                PositionProfileId = Guid.NewGuid(),
+                AdvertTitle       = "Backend Engineer",
+                HiringManagerId   = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.IsAdvertisedInternally);
+
+        var saved = await db.Vacancies.SingleAsync();
+        Assert.False(saved.IsAdvertisedInternally);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Persists_And_Returns_IsAdvertisedInternally_True()
+    {
+        await using var db = BuildContext();
+
+        var result = await handler(db).HandleAsync(
+            new CreateVacancyRequest
+            {
+                CompanyId              = Guid.NewGuid(),
+                PositionProfileId      = Guid.NewGuid(),
+                AdvertTitle            = "Backend Engineer",
+                HiringManagerId        = Guid.NewGuid(),
+                IsAdvertisedInternally = true,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsAdvertisedInternally);
+
+        var saved = await db.Vacancies.SingleAsync();
+        Assert.True(saved.IsAdvertisedInternally);
+    }
+
     private static CreateVacancyHandler handler(RecruitmentDbContext db, HR.Modules.Employees.Contracts.IPositionProfileReader? positionProfileReader = null) =>
         new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), new HR.Modules.Recruitment.Services.RecruitmentStageSeeder(db));
 
