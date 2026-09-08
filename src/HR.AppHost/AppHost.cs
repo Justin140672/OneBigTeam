@@ -5,6 +5,16 @@ var isE2ETesting = string.Equals(
 	"true",
 	StringComparison.OrdinalIgnoreCase);
 
+// Ticket 1 — block production test authentication. E2E_TESTING enables fake auth and test doubles
+// across the orchestrated services; it must never be honoured outside local/CI E2E runs, which
+// execute as Development. Fail fast rather than silently launch a test-auth-enabled topology.
+if (isE2ETesting && !string.Equals(builder.Environment.EnvironmentName, "Development", StringComparison.OrdinalIgnoreCase))
+{
+	throw new InvalidOperationException(
+		$"E2E_TESTING=true is not permitted in the '{builder.Environment.EnvironmentName}' environment. "
+		+ "Test authentication is only allowed under Development. Refusing to start.");
+}
+
 // Pinned to the standard Postgres port rather than Aspire's dynamic port allocation — on this
 // machine, Windows/Hyper-V reserves large chunks of the ephemeral port range (see
 // `netsh interface ipv4 show excludedportrange protocol=tcp`), and Aspire's dynamic picker

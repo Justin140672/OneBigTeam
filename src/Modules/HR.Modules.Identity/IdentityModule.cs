@@ -254,6 +254,10 @@ public static class IdentityModule
     public static IApplicationBuilder UseIdentityModule(this IApplicationBuilder app)
     {
         app.UseMiddleware<SupabaseCurrentUserResolutionMiddleware>();
+        // Ticket 1: reject already-authenticated requests whose account has since been disabled
+        // (manual disablement or automatic offboarding). Runs before RequireTenantMiddleware and
+        // authorization so a disabled token cannot reach any protected handler.
+        app.UseMiddleware<DisabledAccountMiddleware>();
         app.UseMiddleware<RequireTenantMiddleware>();
         app.UseMiddleware<TenantRouteAuthorizationMiddleware>();
         return app;

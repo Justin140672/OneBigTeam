@@ -55,6 +55,17 @@ var connectionString = builder.Configuration.GetConnectionString("hr")
 // dedicated Postgres — this isn't shared across unrelated services.
 var isE2ETestingRun = string.Equals(
 	Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
+
+// Ticket 1 — block production test authentication. E2E_TESTING swaps in fake Supabase auth, a
+// non-secret JWT signing key and other test doubles (see IdentityModule / ConfigureSupabaseJwtBearer
+// below). That plumbing must never be reachable in a real deployment, so fail fast at startup:
+// the flag is only ever legitimately set by the local/CI E2E fixture, which runs as Development.
+if (isE2ETestingRun && !builder.Environment.IsDevelopment())
+{
+	throw new InvalidOperationException(
+		$"E2E_TESTING=true is not permitted in the '{builder.Environment.EnvironmentName}' environment. "
+		+ "Test authentication is only allowed under Development. Refusing to start.");
+}
 // Under the E2E run this one api instance is shared across up to 15 concurrent Playwright circuits,
 // so give the pool a higher ceiling and a warmer floor (the AppHost lifts Postgres' own
 // max_connections to 500 to stay clear of this). A normal deployment keeps the more conservative
