@@ -1,0 +1,157 @@
+.directory-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.directory-search-box {
+    max-width: 320px;
+}
+
+.directory-filter {
+    max-width: 220px;
+}
+
+/* ── Card grid ───────────────────────────────────────── */
+
+.directory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.directory-card {
+    display: flex;
+    gap: 14px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.directory-card:hover,
+.directory-card:focus-visible {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+    outline: none;
+}
+
+.directory-card-avatar {
+    flex-shrink: 0;
+}
+
+.directory-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.directory-card-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.directory-card-position {
+    font-size: 0.85rem;
+    color: #374151;
+}
+
+.directory-card-meta {
+    font-size: 0.78rem;
+    color: #6b7280;
+}
+
+.directory-card-email {
+    font-size: 0.8rem;
+    color: var(--hr-color-primary);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.directory-card-email:hover {
+    text-decoration: underline;
+}
+
+/* ── Empty state ─────────────────────────────────────── */
+
+.directory-empty {
+    text-align: center;
+    padding: 48px 16px;
+    color: #6b7280;
+}
+
+.directory-empty i {
+    font-size: 2rem;
+    margin-bottom: 12px;
+}
+
+/* ── Detail dialog ───────────────────────────────────── */
+
+.directory-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.directory-detail-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.directory-detail-position {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.directory-detail-dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 16px;
+    row-gap: 8px;
+    margin: 0;
+    align-items: baseline;
+}
+
+.directory-detail-dl dt {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.directory-detail-dl dd {
+    font-size: 0.875rem;
+    color: #111827;
+    margin: 0;
+    word-break: break-word;
+}
+
+/* ── Dark mode ───────────────────────────────────────── */
+
+html[data-theme="dark"] .directory-card {
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .directory-card-name,
+html[data-theme="dark"] .directory-detail-name,
+html[data-theme="dark"] .directory-detail-dl dd {
+    color: var(--hr-gray-50);
+}
+
+html[data-theme="dark"] .directory-card-meta,
+html[data-theme="dark"] .directory-detail-dl dt {
+    color: var(--hr-gray-300);
+}

@@ -1,0 +1,250 @@
+@page "/companies/{CompanyId:guid}/employees/directory"
+@rendermode InteractiveServer
+@inject AppSession Session
+@inject NavigationManager Navigation
+@inject EmployeeDirectoryService DirectoryService
+
+<PageTitle>Employee Directory</PageTitle>
+
+@if (_authorized)
+{
+    <div class="container py-4">
+        <h1 class="mb-1">Employee Directory</h1>
+        <p class="text-muted mb-4">Find colleagues across the organisation.</p>
+
+        <div class="directory-filters">
+            <SfTextBox @bind-Value="_search"
+                       Placeholder="Search by name…"
+                       CssClass="directory-search-box"
+                       data-testid="directory-search"
+                       ValueChange="OnSearchChanged" />
+
+            <SfDropDownList TValue="string" TItem="FilterOption"
+                            DataSource="_departmentOptions"
+                            @bind-Value="_departmentValue"
+                            AllowFiltering="true"
+                            CssClass="directory-filter">
+                <DropDownListFieldSettings Value="Value" Text="Text" />
+                <DropDownListEvents TValue="string" TItem="FilterOption" ValueChange="OnFilterChanged" />
+            </SfDropDownList>
+
+            <SfDropDownList TValue="string" TItem="FilterOption"
+                            DataSource="_locationOptions"
+                            @bind-Value="_locationValue"
+                            AllowFiltering="true"
+                            CssClass="directory-filter">
+                <DropDownListFieldSettings Value="Value" Text="Text" />
+                <DropDownListEvents TValue="string" TItem="FilterOption" ValueChange="OnFilterChanged" />
+            </SfDropDownList>
+        </div>
+
+        @if (_loading)
+        {
+            <HrLoadingIndicator Label="Loading directory…" />
+        }
+        else if (_items.Count == 0)
+        {
+            <div class="directory-empty">
+                <i class="fa-solid fa-user-slash"></i>
+                <p>No employees found</p>
+            </div>
+        }
+        else
+        {
+            <div class="directory-grid">
+                @foreach (var emp in _items)
+                {
+                    <div class="directory-card" role="button" tabindex="0"
+                         data-testid="directory-employee-card"
+                         @onclick="@(() => OpenDetailAsync(emp.Id))"
+                         @onkeydown="@(e => OnCardKeyDown(e, emp.Id))">
+                        <div class="directory-card-avatar">
+                            <ProfilePhotoAvatar PhotoUrl="@emp.ProfilePhotoUrl" Initials="@emp.Initials" SizePx="56" />
+                        </div>
+                        <div class="directory-card-body">
+                            <span class="directory-card-name">@emp.DisplayName</span>
+                            <span class="directory-card-position">@(emp.PositionTitle ?? "—")</span>
+                            <span class="directory-card-meta">
+                                @(emp.DepartmentName ?? "—") · @(emp.LocationName ?? "—")
+                            </span>
+                            @if (!string.IsNullOrWhiteSpace(emp.WorkEmail))
+                            {
+                                <a href="mailto:@emp.WorkEmail" class="directory-card-email"
+                                   @onclick:stopPropagation="true">@emp.WorkEmail</a>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+            <p class="text-muted mt-3 mb-0">@_totalCount employee(s)</p>
+        }
+    </div>
+
+    <SfDialog Visible="_detailVisible" IsModal="true" Width="480px" ShowCloseIcon="true"
+              CssClass="directory-detail-dialog">
+        <DialogEvents Closed="CloseDetail" />
+        <DialogTemplates>
+            <Header>Employee</Header>
+            <Content>
+                @if (_detailLoading)
+                {
+                    <HrLoadingIndicator Label="Loading…" />
+                }
+                else if (_detail is null)
+                {
+                    <p class="text-muted mb-0">Unable to load this employee.</p>
+                }
+                else
+                {
+                    <div class="directory-detail" data-testid="directory-detail">
+                        <div class="directory-detail-header">
+                            <ProfilePhotoAvatar PhotoUrl="@_detail.ProfilePhotoUrl" Initials="@_detail.Initials" SizePx="72" />
+                            <div>
+                                <div class="directory-detail-name">@_detail.DisplayName</div>
+                                <div class="directory-detail-position">@(_detail.PositionTitle ?? "—")</div>
+                            </div>
+                        </div>
+                        <dl class="directory-detail-dl">
+                            <dt>Preferred Name</dt>
+                            <dd>@(string.IsNullOrWhiteSpace(_detail.PreferredName) ? "—" : _detail.PreferredName)</dd>
+                            <dt>Department</dt>
+                            <dd>@(_detail.DepartmentName ?? "—")</dd>
+                            <dt>Location</dt>
+                            <dd>@(_detail.LocationName ?? "—")</dd>
+                            <dt>Work Email</dt>
+                            <dd>
+                                @if (!string.IsNullOrWhiteSpace(_detail.WorkEmail))
+                                {
+                                    <a href="mailto:@_detail.WorkEmail">@_detail.WorkEmail</a>
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                            </dd>
+                            <dt>Work Phone</dt>
+                            <dd>@(string.IsNullOrWhiteSpace(_detail.WorkPhone) ? "—" : _detail.WorkPhone)</dd>
+                            <dt>Start Date</dt>
+                            <dd>@(_detail.StartDate.HasValue ? _detail.StartDate.Value.ToString("d MMMM yyyy") : "—")</dd>
+                            <dt>Manager</dt>
+                            <dd>@(_detail.ManagerFullName ?? "—")</dd>
+                        </dl>
+                    </div>
+                }
+            </Content>
+        </DialogTemplates>
+        <DialogButtons>
+            <DialogButton Content="Close" OnClick="CloseDetail" />
+        </DialogButtons>
+    </SfDialog>
+}
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private bool _authorized;
+    private bool _loading = true;
+
+    private string? _search;
+    private string _departmentValue = "";
+    private string _locationValue = "";
+
+    private List<EmployeeDirectoryListItem> _items = [];
+    private int _totalCount;
+
+    private List<FilterOption> _departmentOptions = [];
+    private List<FilterOption> _locationOptions = [];
+
+    private bool _detailVisible;
+    private bool _detailLoading;
+    private EmployeeDirectoryDetail? _detail;
+
+    private const int PageSize = 60;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _authorized = false;
+        await Session.InitialiseAsync();
+
+        if (Session.CompanyId != CompanyId)
+        {
+            Navigation.NavigateTo("/", replace: true);
+            return;
+        }
+
+        _authorized = true;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+
+        Guid? departmentId = Guid.TryParse(_departmentValue, out var d) ? d : null;
+        Guid? locationId = Guid.TryParse(_locationValue, out var l) ? l : null;
+
+        var result = await DirectoryService.ListAsync(
+            CompanyId, _search, departmentId, locationId, 1, PageSize);
+
+        _items = result?.Items ?? [];
+        _totalCount = result?.TotalCount ?? _items.Count;
+
+        // Populate the filter dropdowns from the distinct departments/locations present in results,
+        // but only when unfiltered so the option lists don't collapse to the current selection.
+        if (departmentId is null && locationId is null && string.IsNullOrWhiteSpace(_search))
+        {
+            _departmentOptions = BuildOptions("All departments",
+                _items.Where(i => i.DepartmentId is not null)
+                      .Select(i => (i.DepartmentId!.Value, i.DepartmentName ?? "")));
+            _locationOptions = BuildOptions("All locations",
+                _items.Where(i => i.LocationId is not null)
+                      .Select(i => (i.LocationId!.Value, i.LocationName ?? "")));
+        }
+
+        _loading = false;
+    }
+
+    private static List<FilterOption> BuildOptions(string allLabel, IEnumerable<(Guid Id, string Name)> source)
+    {
+        var options = new List<FilterOption> { new("", allLabel) };
+        options.AddRange(source
+            .DistinctBy(x => x.Id)
+            .OrderBy(x => x.Name)
+            .Select(x => new FilterOption(x.Id.ToString(), x.Name)));
+        return options;
+    }
+
+    private async Task OnSearchChanged(Syncfusion.Blazor.Inputs.ChangedEventArgs args)
+    {
+        _search = args.Value;
+        await LoadAsync();
+    }
+
+    private async Task OnFilterChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, FilterOption> args)
+    {
+        await LoadAsync();
+    }
+
+    private async Task OnCardKeyDown(KeyboardEventArgs e, Guid id)
+    {
+        if (e.Key is "Enter" or " ")
+            await OpenDetailAsync(id);
+    }
+
+    private async Task OpenDetailAsync(Guid id)
+    {
+        _detail = null;
+        _detailVisible = true;
+        _detailLoading = true;
+        _detail = await DirectoryService.GetAsync(CompanyId, id);
+        _detailLoading = false;
+    }
+
+    private void CloseDetail()
+    {
+        _detailVisible = false;
+        _detail = null;
+    }
+
+    public record FilterOption(string Value, string Text);
+}

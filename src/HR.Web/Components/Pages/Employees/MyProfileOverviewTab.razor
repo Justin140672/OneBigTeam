@@ -10,6 +10,7 @@
 @inject OnboardingService OnboardingService
 @inject CompensationService CompensationService
 @inject AppSession Session
+@inject NavigationManager Navigation
 
 @if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
 {
@@ -269,6 +270,12 @@ else
                         <span class="action-btn-label">View Tasks</span>
                         <i class="fa-solid fa-chevron-right action-btn-chevron"></i>
                     </button>
+                    <button class="action-btn action-btn--directory" data-testid="employee-directory-action"
+                            @onclick="NavigateToDirectory">
+                        <span class="action-btn-icon"><i class="fa-solid fa-address-book"></i></span>
+                        <span class="action-btn-label">Employee Directory</span>
+                        <i class="fa-solid fa-chevron-right action-btn-chevron"></i>
+                    </button>
                 </div>
             </div>
             @* Hidden for a plain Employee (no elevated/manager+ role) — mirrors TeamReportsWidget's
@@ -444,6 +451,9 @@ else
         await Task.WhenAll(balanceTask, requestsTask);
         ApplyLeaveData(await balanceTask, await requestsTask);
     }
+
+    private void NavigateToDirectory() =>
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/directory");
 
     private async Task OnSicknessRecordedAsync()
     {

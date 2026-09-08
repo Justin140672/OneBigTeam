@@ -315,6 +315,7 @@
 .action-btn--sickness .action-btn-icon   { background: #fee2e2; color: #dc2626; }
 .action-btn--documents .action-btn-icon  { background: var(--hr-color-primary-subtle); color: var(--hr-color-primary); }
 .action-btn--tasks .action-btn-icon      { background: #ede9fe; color: #7c3aed; }
+.action-btn--directory .action-btn-icon  { background: #e0f2fe; color: #0284c7; }
 
 @media (max-width: 900px) {
     .overview-actions {
