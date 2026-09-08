@@ -33,7 +33,11 @@ public sealed class EmployeeDirectoryPage(IPage page, string baseUrl)
 
     public ILocator Heading => page.GetByRole(AriaRole.Heading, new() { Name = "Employee Directory" });
 
-    private ILocator SearchBox => page.Locator("[data-testid='directory-search'] input");
+    // Syncfusion SfTextBox splats arbitrary attributes (data-testid) straight onto its underlying
+    // <input>, not onto a wrapper — so match the input directly, with the descendant form as a
+    // fallback in case a future control wraps it.
+    private ILocator SearchBox => page.Locator(
+        "input[data-testid='directory-search'], [data-testid='directory-search'] input").First;
 
     private ILocator Cards => page.Locator("[data-testid='directory-employee-card']");
 

@@ -44,11 +44,11 @@ public sealed class EmployeeDirectoryTests(EmployeePersonaFixture fixture) : Rol
 
         await _page.Locator("[data-testid='employee-directory-action']").ClickAsync();
 
-        await _page.WaitForURLAsync("**/employees/directory", new() { Timeout = 15_000 });
-        Assert.Contains("/employees/directory", _page.Url);
-
+        // The quick action navigates via NavigationManager within the live circuit; wait on the
+        // destination page actually rendering rather than a URL glob (which can race the SPA nav).
         await directory.WaitForInteractiveAsync();
         await Assertions.Expect(directory.Heading).ToBeVisibleAsync();
+        Assert.Contains("/employees/directory", _page.Url);
     }
 
     [Fact]
