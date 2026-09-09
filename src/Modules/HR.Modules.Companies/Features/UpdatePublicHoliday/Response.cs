@@ -6,4 +6,5 @@ internal sealed record UpdatePublicHolidayResponse(
     DateOnly Date,
     string Name,
     string CountryCode,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    int Version);

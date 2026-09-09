@@ -27,6 +27,7 @@ internal sealed class GetDepartmentHandler(EmployeesDbContext dbContext)
             department.Description,
             department.ParentDepartmentId,
             department.ManagerEmployeeId,
-            department.IsActive));
+            department.IsActive,
+            department.Version));
     }
 }

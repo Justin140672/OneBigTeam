@@ -8,8 +8,13 @@ namespace HR.Modules.Recruitment.Domain;
 /// <see cref="SetActiveStatus"/> is the only supported removal path, so historical
 /// Application.CurrentStageId references always remain resolvable.
 /// </summary>
-internal sealed class RecruitmentStage
+internal sealed class RecruitmentStage : HR.SharedKernel.IVersionedAggregate
 {
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
+
     private RecruitmentStage() { }
 
     public Guid Id { get; private set; }
@@ -47,6 +52,7 @@ internal sealed class RecruitmentStage
         IsTerminal      = isTerminal,
         TerminalOutcome = isTerminal ? terminalOutcome : RecruitmentStageTerminalOutcome.None,
         Purpose         = isTerminal ? null : purpose,
+        Version         = 1,
         CreatedAt       = now,
         UpdatedAt       = now,
     };

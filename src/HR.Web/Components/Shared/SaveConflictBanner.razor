@@ -1,0 +1,23 @@
+@* Ticket 2: shared optimistic-concurrency conflict banner. Rendered by edit screens when a save
+   was rejected with HTTP 409 / code "concurrency". Takes precedence over the generic error alert
+   (GlobalError) — see EmployeeEdit / MyProfileContactDetailsTab markup. *@
+@if (Visible)
+{
+    <div class="alert alert-warning save-conflict-banner mb-3" role="alert">
+        <div class="save-conflict-banner__message">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>@Message</span>
+        </div>
+        <SfButton CssClass="e-small" OnClick="OnReload" Disabled="@Disabled">Reload latest values</SfButton>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback OnReload { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter]
+    public string Message { get; set; } =
+        "Someone else changed these details while you were editing. Your changes have not been saved.";
+}

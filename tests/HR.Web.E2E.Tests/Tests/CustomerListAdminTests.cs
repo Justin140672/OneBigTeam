@@ -33,6 +33,7 @@ public sealed class CustomerListAdminTests(EmployeePersonaFixture fixture) : Rol
 
         Assert.False(await list.IsErrorBannerVisibleAsync(),
             "Expected the allow-listed admin to see the customer grid, not the error banner");
+        await list.SearchAsync("Acme Corporation");
         Assert.True(await list.HasCompanyAsync("Acme Corporation"),
             "Expected the seeded Acme Corporation row in the customer list");
     }
@@ -47,6 +48,7 @@ public sealed class CustomerListAdminTests(EmployeePersonaFixture fixture) : Rol
         await login.LoginAsync(AllowListedAdminEmail);
 
         await list.GoToAsync();
+        await list.SearchAsync("Acme Corporation");
         Assert.True(await list.HasCompanyAsync("Acme Corporation"));
 
         // Debounced (300ms) SfTextBox search — see CustomerList.razor's OnSearchChanged. SfTextBox's

@@ -187,6 +187,14 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
         await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
+
+        // QA Engineer's Department/Location auto-populate from the Position Profile selection via a
+        // second async server round trip (EmployeeEmploymentTab.OnPositionProfileChanged) — wait for
+        // it to land before saving, or Save can race ahead with both fields still blank and fail
+        // mandatory-field validation. Matches CompensationTab_ShowsEmptyState_ForEmployeeWithNoCompensationRecord.
+        await empEdit.WaitForDropdownPopulatedAsync("Department");
+        await empEdit.WaitForDropdownPopulatedAsync("Location");
+
         await empEdit.SaveNewEmployeeAsync();
 
         await empList.ClickEmployeeAsync(lastName);

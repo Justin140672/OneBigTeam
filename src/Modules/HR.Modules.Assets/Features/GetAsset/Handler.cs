@@ -35,6 +35,7 @@ internal sealed class GetAssetHandler(AssetsDbContext db)
             asset.Status.ToString(),
             asset.CreatedAt,
             asset.UpdatedAt,
-            categoryName));
+            categoryName,
+            asset.Version));
     }
 }

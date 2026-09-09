@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Leave.Domain;
 
-internal sealed class LeavePolicy
+internal sealed class LeavePolicy : IVersionedAggregate
 {
     private LeavePolicy() { }
 
@@ -22,6 +24,11 @@ internal sealed class LeavePolicy
     public bool IsDefault { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public static LeavePolicy Create(
         Guid id,
@@ -45,6 +52,7 @@ internal sealed class LeavePolicy
             RequiresApproval = requiresApproval,
             IsActive = true,
             IsDefault = isDefault,
+            Version = 1,
             CreatedAt = now,
             UpdatedAt = now
         };

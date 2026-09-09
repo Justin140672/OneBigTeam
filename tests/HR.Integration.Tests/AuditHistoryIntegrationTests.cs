@@ -147,7 +147,8 @@ public class AuditHistoryIntegrationTests
                 addressLine1 = "1 Audit Test Street",
                 city = "London",
                 postCode = "SW1A 1AA",
-                country = "United Kingdom"
+                country = "United Kingdom",
+                expectedVersion = await GetMyContactVersionAsync(employeeClient, companyId)
             });
         updateResp.EnsureSuccessStatusCode();
 
@@ -183,7 +184,8 @@ public class AuditHistoryIntegrationTests
                 workEmail = $"audit.tester.{Guid.NewGuid():N}@example.com",
                 startDate = "2026-01-01",
                 gender = "Female",
-                hasSystemAccess = true
+                hasSystemAccess = true,
+                expectedVersion = await GetEmployeeVersionAsync(hrAdminClient, companyId, employeeId)
             });
         updateResp.EnsureSuccessStatusCode();
 
@@ -231,7 +233,8 @@ public class AuditHistoryIntegrationTests
                 workEmail = $"audit.tester.{Guid.NewGuid():N}@example.com",
                 startDate = "2026-01-01",
                 gender = "Female",
-                hasSystemAccess = true
+                hasSystemAccess = true,
+                expectedVersion = await GetEmployeeVersionAsync(hrAdminClient, companyId, employeeId)
             });
         updateResp.EnsureSuccessStatusCode();
 
@@ -274,7 +277,8 @@ public class AuditHistoryIntegrationTests
                 startDate = "2026-01-01",
                 gender = "Female",
                 hasSystemAccess = true,
-                correlationId
+                correlationId,
+                expectedVersion = await GetEmployeeVersionAsync(hrAdminClient, companyId, employeeId)
             });
         profileResp.EnsureSuccessStatusCode();
 
@@ -287,7 +291,8 @@ public class AuditHistoryIntegrationTests
                 status = "Active",
                 startDate = "2026-01-01",
                 employeeNumber = "EMP-CORR-9999",
-                correlationId
+                correlationId,
+                expectedVersion = await GetEmployeeVersionAsync(hrAdminClient, companyId, employeeId)
             });
         employmentResp.EnsureSuccessStatusCode();
 
@@ -419,7 +424,8 @@ public class AuditHistoryIntegrationTests
                 departmentId,
                 locationId,
                 defaultLeavePolicyId = leavePolicyId,
-                title = newTitle
+                title = newTitle,
+                expectedVersion = 1
             });
         updateResp.EnsureSuccessStatusCode();
 
@@ -1164,6 +1170,22 @@ public class AuditHistoryIntegrationTests
 
         return (departmentId, locationId, positionProfileId, employmentTypeId);
     }
+
+    private static async Task<int> GetEmployeeVersionAsync(HttpClient client, Guid companyId, Guid id)
+    {
+        var r = await client.GetAsync($"/api/companies/{companyId}/employees/{id}");
+        r.EnsureSuccessStatusCode();
+        return (await r.Content.ReadFromJsonAsync<VersionPayload>())!.Version;
+    }
+
+    private static async Task<int> GetMyContactVersionAsync(HttpClient client, Guid companyId)
+    {
+        var r = await client.GetAsync($"/api/companies/{companyId}/employees/me/contact-details");
+        r.EnsureSuccessStatusCode();
+        return (await r.Content.ReadFromJsonAsync<VersionPayload>())!.Version;
+    }
+
+    private sealed record VersionPayload(int Version);
 
     private sealed record IdPayload(Guid Id);
 

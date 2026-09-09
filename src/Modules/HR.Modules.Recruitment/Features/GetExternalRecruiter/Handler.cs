@@ -31,6 +31,7 @@ internal sealed class GetExternalRecruiterHandler(RecruitmentDbContext db)
             recruiter.Notes,
             recruiter.IsActive,
             recruiter.CreatedAt,
-            recruiter.UpdatedAt));
+            recruiter.UpdatedAt,
+            recruiter.Version));
     }
 }

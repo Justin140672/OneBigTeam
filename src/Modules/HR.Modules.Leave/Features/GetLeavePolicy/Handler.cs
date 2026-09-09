@@ -39,6 +39,7 @@ internal sealed class GetLeavePolicyHandler
             policy.RequiresApproval,
             policy.IsActive,
             policy.IsDefault,
-            policy.CreatedAt));
+            policy.CreatedAt,
+            policy.Version));
     }
 }

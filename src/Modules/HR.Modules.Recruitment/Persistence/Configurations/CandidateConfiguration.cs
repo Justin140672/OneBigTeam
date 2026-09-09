@@ -73,6 +73,12 @@ internal sealed class CandidateConfiguration : IEntityTypeConfiguration<Candidat
         builder.Property(c => c.PurgedByUserId)
             .HasColumnName("purged_by_user_id");
 
+        builder.Property(c => c.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

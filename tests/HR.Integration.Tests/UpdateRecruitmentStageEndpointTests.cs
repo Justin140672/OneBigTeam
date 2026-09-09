@@ -52,7 +52,7 @@ public class UpdateRecruitmentStageEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{Guid.NewGuid()}/recruitment-stages/{Guid.NewGuid()}",
-            new { name = "Renamed", isTerminal = false, terminalOutcome = "None" });
+            new { name = "Renamed", isTerminal = false, terminalOutcome = "None", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -66,7 +66,7 @@ public class UpdateRecruitmentStageEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{stageIds[0]}",
-            new { companyId, recruitmentStageId = stageIds[0], name = "Renamed", isTerminal = false, terminalOutcome = "None" });
+            new { companyId, recruitmentStageId = stageIds[0], name = "Renamed", isTerminal = false, terminalOutcome = "None", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -80,7 +80,7 @@ public class UpdateRecruitmentStageEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{stageIds[0]}",
-            new { companyId, recruitmentStageId = stageIds[0], name = "First Screen", isTerminal = false, terminalOutcome = "None" });
+            new { companyId, recruitmentStageId = stageIds[0], name = "First Screen", isTerminal = false, terminalOutcome = "None", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<StagePayload>();
@@ -96,7 +96,7 @@ public class UpdateRecruitmentStageEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{Guid.NewGuid()}",
-            new { companyId, recruitmentStageId = Guid.NewGuid(), name = "Renamed", isTerminal = false, terminalOutcome = "None" });
+            new { companyId, recruitmentStageId = Guid.NewGuid(), name = "Renamed", isTerminal = false, terminalOutcome = "None", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -110,7 +110,7 @@ public class UpdateRecruitmentStageEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{stageIds[0]}",
-            new { companyId, recruitmentStageId = stageIds[0], name = "CV Review", isTerminal = false, terminalOutcome = "None" });
+            new { companyId, recruitmentStageId = stageIds[0], name = "CV Review", isTerminal = false, terminalOutcome = "None", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }

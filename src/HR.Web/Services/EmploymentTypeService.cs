@@ -2,7 +2,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class EmploymentTypeService(IHttpClientFactory httpClientFactory) : IEditService<EmploymentTypeEditModel, Guid>
+public class EmploymentTypeService(IHttpClientFactory httpClientFactory)
+    : IEditService<EmploymentTypeEditModel, Guid>, IConcurrencyAwareEditService<EmploymentTypeEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -29,7 +30,37 @@ public class EmploymentTypeService(IHttpClientFactory httpClientFactory) : IEdit
         {
             Name = existing.Name,
             Description = existing.Description,
+            Version = existing.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces the stale-save 409.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, EmploymentTypeEditModel model, int? expectedVersion)
+    {
+        var request = new UpdateEmploymentTypeRequest(
+            companyId, id, model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/employment-types/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateEmploymentTypeResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                body?.Error ?? "An employment type with that name already exists.", body?.Code == "concurrency");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return ApiSaveResult.Fail("Employment type not found.");
+
+        return ApiSaveResult.Fail(body?.Error ?? "Failed to update employment type.");
     }
 
     async Task<(EmploymentTypeEditModel? Result, string? Error)> IEditService<EmploymentTypeEditModel, Guid>.CreateAsync(
@@ -46,7 +77,8 @@ public class EmploymentTypeService(IHttpClientFactory httpClientFactory) : IEdit
         Guid companyId, Guid id, EmploymentTypeEditModel model)
     {
         var request = new UpdateEmploymentTypeRequest(
-            companyId, id, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim());
+            companyId, id, model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), model.Version);
 
         var (updated, error) = await UpdateAsync(companyId, id, request);
         return (updated is null ? null : model, error);
@@ -109,5 +141,5 @@ public class EmploymentTypeService(IHttpClientFactory httpClientFactory) : IEdit
         return body?.Error ?? "Failed to deactivate employment type.";
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

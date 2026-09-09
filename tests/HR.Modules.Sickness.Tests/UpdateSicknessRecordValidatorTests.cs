@@ -14,7 +14,8 @@ public class UpdateSicknessRecordValidatorTests
         Id = Guid.NewGuid(),
         CategoryId = Guid.NewGuid(),
         StartDate = new DateOnly(2026, 7, 1),
-        StartDayPart = SicknessDayPart.FullDay
+        StartDayPart = SicknessDayPart.FullDay,
+        ExpectedVersion = 1
     };
 
     [Fact]

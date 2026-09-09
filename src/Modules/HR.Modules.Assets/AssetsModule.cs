@@ -39,7 +39,7 @@ public static class AssetsModule
         AddFeatureServices(services);
 
         services.AddDbContext<AssetsDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "assets")));
 
         return services;

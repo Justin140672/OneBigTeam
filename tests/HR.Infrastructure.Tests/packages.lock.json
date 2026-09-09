@@ -429,8 +429,8 @@
       "hr.sharedkernel": {
         "type": "Project",
         "dependencies": {
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.11, )",
-          "Microsoft.Extensions.Logging.Abstractions": "[10.0.11, )"
+          "FluentValidation": "[12.1.1, )",
+          "Microsoft.EntityFrameworkCore": "[10.0.11, )"
         }
       },
       "ClosedXML": {
@@ -445,6 +445,12 @@
           "RBush.Signed": "4.0.0",
           "SixLabors.Fonts": "[1.0.0, 3.0.0)"
         }
+      },
+      "FluentValidation": {
+        "type": "CentralTransitive",
+        "requested": "[12.1.1, )",
+        "resolved": "12.1.1",
+        "contentHash": "EPpkIe1yh1a0OXyC100oOA8WMbZvqUu5plwhvYcb7oSELfyUZzfxV48BLhvs3kKo4NwG7MGLNgy1RJiYtT8Dpw=="
       },
       "Hangfire.AspNetCore": {
         "type": "CentralTransitive",

@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using FluentValidation;
 using Hangfire;
 using HR.Modules.Recruitment.Domain;
@@ -83,7 +84,7 @@ public static class RecruitmentModule
         services.AddScoped<IWorkloadActionProvider, VacanciesAwaitingActionWorkloadActionProvider>();
 
         services.AddDbContext<RecruitmentDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "recruitment")));
 
         return services;

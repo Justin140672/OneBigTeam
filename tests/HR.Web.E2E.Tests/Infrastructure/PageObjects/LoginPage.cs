@@ -23,7 +23,18 @@ public sealed class LoginPage(IPage page, string baseUrl)
 
     public async Task GoToAsync()
     {
-        await page.GotoAsync($"{baseUrl}/login");
+        // WaitUntil=Commit (not the Playwright default of Load): the app's host page pulls in
+        // third-party resources — the Google Fonts stylesheet, the jsDelivr Bootstrap CSS — whose
+        // "load" can stall for tens of seconds under a full parallel headless run (15 circuits all
+        // warming the same shared app), which surfaced as "Timeout 30000ms navigating to /login
+        // waiting until 'load'" across dozens of unrelated classes even though the login form itself
+        // was already interactive. We only need the navigation to commit; the loop below then polls
+        // for the real readiness signal (form field or app shell) on its own generous deadline.
+        await page.GotoAsync($"{baseUrl}/login", new()
+        {
+            WaitUntil = WaitUntilState.Commit,
+            Timeout = 60_000,
+        });
 
         // Either the login form renders (fresh/unauthenticated context) or, if this context was
         // built from a role fixture's storageState (see RolePersonaFixtureBase), the app redirects
@@ -63,7 +74,7 @@ public sealed class LoginPage(IPage page, string baseUrl)
             // persona while this specific test wants an outlier persona, e.g. an access-denied
             // check). Clear the session and fall through to a login for the requested persona.
             await page.Context.ClearCookiesAsync();
-            await page.GotoAsync($"{baseUrl}/login");
+            await page.GotoAsync($"{baseUrl}/login", new() { WaitUntil = WaitUntilState.Commit, Timeout = 60_000 });
             await page.WaitForSelectorAsync("[placeholder='you@example.com']", new() { Timeout = 30_000 });
         }
 
@@ -111,7 +122,7 @@ public sealed class LoginPage(IPage page, string baseUrl)
         if (await page.Locator(AuthenticatedSelector).First.IsVisibleAsync())
         {
             await page.Context.ClearCookiesAsync();
-            await page.GotoAsync($"{baseUrl}/login");
+            await page.GotoAsync($"{baseUrl}/login", new() { WaitUntil = WaitUntilState.Commit, Timeout = 60_000 });
             await page.WaitForSelectorAsync("[placeholder='you@example.com']", new() { Timeout = 30_000 });
         }
 
@@ -193,8 +204,7 @@ public sealed class LoginPage(IPage page, string baseUrl)
     {
         // In dev mode, persona switcher is an SfDropDownList in the topbar — we don't have a
         // userId mapping from an email here, so this always falls back to cookie-based login.
-        await page.GotoAsync($"{baseUrl}/login");
-        await page.WaitForURLAsync($"{baseUrl}/login");
+        await page.GotoAsync($"{baseUrl}/login", new() { WaitUntil = WaitUntilState.Commit, Timeout = 60_000 });
         await LoginAsync(email, password);
     }
 

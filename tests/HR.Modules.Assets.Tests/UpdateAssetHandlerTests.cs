@@ -60,6 +60,7 @@ public class UpdateAssetHandlerTests
             AssetNumber = "ASSET-UPDATED",
             CategoryId = categoryId,
             Name = "Updated Laptop",
+            ExpectedVersion = 1,
             Manufacturer = "Dell",
             Model = "XPS 15",
             SerialNumber = "SN999",
@@ -91,6 +92,7 @@ public class UpdateAssetHandlerTests
             AssetNumber = "ASSET-001",
             CategoryId = categoryId,
             Name = "Laptop",
+            ExpectedVersion = 1,
             Manufacturer = null,
             Model = null,
             SerialNumber = null,
@@ -120,7 +122,8 @@ public class UpdateAssetHandlerTests
             Id = assetId,
             AssetNumber = "ASSET-001",
             CategoryId = categoryId,
-            Name = "Laptop"
+            Name = "Laptop",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -211,7 +214,8 @@ public class UpdateAssetHandlerTests
             Id = assetId,
             AssetNumber = "ASSET-001", // same number, same asset — no conflict
             CategoryId = categoryId,
-            Name = "Updated Name"
+            Name = "Updated Name",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -280,7 +284,8 @@ public class UpdateAssetHandlerTests
             Id = assetId,
             AssetNumber = "ASSET-SAVED",
             CategoryId = categoryId,
-            Name = "Saved Laptop"
+            Name = "Saved Laptop",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         var saved = await db.Assets.SingleAsync(a => a.Id == assetId);

@@ -229,6 +229,7 @@ public class ListOnboardingTemplatesForPositionProfileEndpointTests
                 id = templateId,
                 name = "Standard Onboarding",
                 description,
+                expectedVersion = 1,
                 tasks = taskTitles.Select((title, index) => new
                 {
                     id = (Guid?)null,

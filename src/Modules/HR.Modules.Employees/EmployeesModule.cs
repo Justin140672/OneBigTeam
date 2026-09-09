@@ -131,7 +131,7 @@ public static class EmployeesModule
         }
 
         services.AddDbContext<EmployeesDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "employees")));
 
         return services;
@@ -252,6 +252,10 @@ public static class EmployeesModule
 
         services.AddScoped<UpdateEmploymentDetailsHandler>();
         services.AddScoped<IValidator<UpdateEmploymentDetailsRequest>, UpdateEmploymentDetailsValidator>();
+
+        services.AddScoped<Features.UpdateEmployeeProfileAndEmployment.UpdateEmployeeProfileAndEmploymentHandler>();
+        services.AddScoped<IValidator<Features.UpdateEmployeeProfileAndEmployment.UpdateEmployeeProfileAndEmploymentRequest>,
+            Features.UpdateEmployeeProfileAndEmployment.UpdateEmployeeProfileAndEmploymentValidator>();
 
         services.AddScoped<AssignManagerHandler>();
         services.AddScoped<IValidator<AssignManagerRequest>, AssignManagerValidator>();
@@ -479,6 +483,7 @@ public static class EmployeesModule
             (39, "SeedOffboardConfA", false), (40, "SeedOffboardConfB", false), (41, "SeedOffboardConfC", false), (42, "SeedOffboardConfD", false),
             (43, "SeedOnboardTabA", false), (44, "SeedOnboardTabB", false), (45, "SeedOnboardTabC", false),
             (46, "SeedOnboardTabD", false), (47, "SeedOnboardTabE", false), (48, "SeedOnboardTabF", false),
+            (49, "SeedConcurrencyAdmin", false), (50, "SeedConcurrencySelf", false),
         };
 
         return Array.ConvertAll(defs, d => (

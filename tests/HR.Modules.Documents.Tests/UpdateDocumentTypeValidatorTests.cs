@@ -14,7 +14,8 @@ public class UpdateDocumentTypeValidatorTests
             CompanyId      = Guid.NewGuid(),
             DocumentTypeId = Guid.NewGuid(),
             Name           = "Contract",
-            Description    = "Employment contracts"
+            Description    = "Employment contracts",
+            ExpectedVersion = 1
         });
 
         Assert.True(result.IsValid);
@@ -27,7 +28,8 @@ public class UpdateDocumentTypeValidatorTests
         {
             CompanyId      = Guid.NewGuid(),
             DocumentTypeId = Guid.NewGuid(),
-            Name           = "Contract"
+            Name           = "Contract",
+            ExpectedVersion = 1
         });
 
         Assert.True(result.IsValid);

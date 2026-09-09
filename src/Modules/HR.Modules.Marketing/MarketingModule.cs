@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using FluentValidation;
 
 using HR.Modules.Marketing.Domain;
@@ -27,7 +28,7 @@ public static class MarketingModule
         AddFeatureServices(services);
 
         services.AddDbContext<MarketingDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "marketing")));
 
         return services;

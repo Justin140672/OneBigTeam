@@ -45,7 +45,14 @@ internal sealed class UpdateInterviewHandler(RecruitmentDbContext db, IClock clo
             request.Location,
             now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            interview,
+            request.ExpectedVersion,
+            "This interview was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateInterviewResponse>(saveResult.Error);
 
         return Result.Success(new UpdateInterviewResponse(
             interview.Id,
@@ -58,6 +65,7 @@ internal sealed class UpdateInterviewHandler(RecruitmentDbContext db, IClock clo
             interview.Outcome,
             interview.Notes,
             interview.CreatedAt,
-            interview.UpdatedAt));
+            interview.UpdatedAt,
+            interview.Version));
     }
 }

@@ -16,6 +16,7 @@ public class UpdateLeaveTypeValidatorTests
         DefaultEntitlementDays = 25,
         AccrualMethod = AccrualMethod.Monthly,
         Behaviour = LeaveTypeBehaviour.Standard,
+        ExpectedVersion = 1,
     };
 
     [Fact]
@@ -96,5 +97,14 @@ public class UpdateLeaveTypeValidatorTests
     public void Validate_CodeExactly20Characters_Passes()
     {
         Assert.True(Validator.Validate(ValidRequest() with { Code = new string('x', 20) }).IsValid);
+    }
+
+    [Fact]
+    public void Validate_NullExpectedVersion_Fails()
+    {
+        var result = Validator.Validate(ValidRequest() with { ExpectedVersion = null });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateLeaveTypeRequest.ExpectedVersion)
+            && e.ErrorMessage.Contains("concurrency version is required"));
     }
 }

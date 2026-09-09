@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -17,7 +18,7 @@ internal sealed class EmployeesDbContextFactory : IDesignTimeDbContextFactory<Em
             ?? "Host=localhost;Port=5432;Database=hr;Username=postgres;Password=postgres";
 
         var optionsBuilder = new DbContextOptionsBuilder<EmployeesDbContext>();
-        optionsBuilder.UseNpgsql(connectionString, npgsql =>
+        optionsBuilder.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
             npgsql.MigrationsHistoryTable("__ef_migrations_history", "employees"));
 
         return new EmployeesDbContext(optionsBuilder.Options);

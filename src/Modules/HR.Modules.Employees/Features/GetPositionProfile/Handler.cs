@@ -65,6 +65,7 @@ internal sealed class GetPositionProfileHandler
             profile.DefaultLeavePolicyId,
             profile.OnboardingTemplateId,
             profile.IsActive,
+            profile.Version,
             profile.CreatedAt,
             profile.UpdatedAt,
             requiredDocuments,

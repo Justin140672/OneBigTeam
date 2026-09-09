@@ -9,7 +9,8 @@ public class UpdateRecruitmentStageValidatorTests
 
     private static UpdateRecruitmentStageRequest Valid(bool isTerminal = false, RecruitmentStagePurpose? purpose = null) =>
         new(Guid.NewGuid(), Guid.NewGuid(), "Interview", isTerminal,
-            isTerminal ? RecruitmentStageTerminalOutcome.Hired : RecruitmentStageTerminalOutcome.None, purpose);
+            isTerminal ? RecruitmentStageTerminalOutcome.Hired : RecruitmentStageTerminalOutcome.None, purpose,
+            ExpectedVersion: 1);
 
     [Fact]
     public void Passes_When_Purpose_Is_Null()

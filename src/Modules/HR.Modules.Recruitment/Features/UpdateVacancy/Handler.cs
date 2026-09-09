@@ -131,7 +131,14 @@ internal sealed class UpdateVacancyHandler(
             request.IsAdvertisedInternally,
             now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            vacancy,
+            request.ExpectedVersion,
+            "This vacancy was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateVacancyResponse>(saveResult.Error);
 
         var after = new VacancyAuditSnapshot(
             vacancy.AdvertTitle,
@@ -179,7 +186,8 @@ internal sealed class UpdateVacancyHandler(
             vacancy.OpenedAt,
             vacancy.ClosedAt,
             vacancy.CreatedAt,
-            vacancy.UpdatedAt));
+            vacancy.UpdatedAt,
+            vacancy.Version));
     }
 
     /// <summary>

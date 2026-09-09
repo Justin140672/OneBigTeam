@@ -83,7 +83,14 @@ internal sealed class UpdateCompanyHandler
                 now), now);
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
+            company,
+            request.ExpectedVersion,
+            "This company was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateCompanyResponse>(saveResult.Error);
 
         return Result.Success(new UpdateCompanyResponse(
             company.Id,
@@ -102,6 +109,7 @@ internal sealed class UpdateCompanyHandler
                     address.PostalCode,
                     address.CountryCode))
                 .OrderBy(address => address.Type)
-                .ToArray()));
+                .ToArray(),
+            company.Version));
     }
 }

@@ -7,4 +7,7 @@ internal sealed record UpdateLocationRequest
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
     public Guid LocationTypeId { get; init; }
+
+    // Ticket 2 (optimistic concurrency) — required; validator rejects a null/missing value.
+    public int? ExpectedVersion { get; init; }
 }

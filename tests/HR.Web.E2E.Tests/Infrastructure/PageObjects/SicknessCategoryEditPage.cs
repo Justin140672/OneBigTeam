@@ -28,11 +28,26 @@ public sealed class SicknessCategoryEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
+    // The post-save navigation back to the list is a forceLoad (EditPageBase.NavigateToList) whose
+    // "load" event waits on every Syncfusion CSS/font/script resource — under maxParallelThreads=15
+    // that routinely outlasts a plain WaitForURLAsync (default waitUntil: "Load"), surfacing as
+    // "waiting for navigation to **/sickness-categories until Load". Wait on "Commit" instead and
+    // let the grid-row wait be the real readiness gate — same fix as the login flow / EmploymentType.
+    private static readonly PageWaitForURLOptions CommitNav = new()
+    {
+        Timeout = 30_000,
+        WaitUntil = WaitUntilState.Commit,
+    };
+
+    private async Task WaitForListGridAsync() =>
+        await page.WaitForSelectorAsync(
+            ".e-grid .e-row, .e-grid .e-emptyrow, .alert-danger", new() { Timeout = 30_000 });
+
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        await page.WaitForURLAsync("**/sickness-categories", new() { Timeout = 15_000 });
-        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+        await page.WaitForURLAsync("**/sickness-categories", CommitNav);
+        await WaitForListGridAsync();
     }
 
     public async Task<bool> HasErrorAsync()
@@ -62,15 +77,15 @@ public sealed class SicknessCategoryEditPage(IPage page, string baseUrl)
     public async Task ConfirmDiscardChangesAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
-        await page.WaitForURLAsync("**/sickness-categories", new() { Timeout = 15_000 });
-        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+        await page.WaitForURLAsync("**/sickness-categories", CommitNav);
+        await WaitForListGridAsync();
     }
 
     public async Task ConfirmSaveFromUnsavedChangesDialogAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-        await page.WaitForURLAsync("**/sickness-categories", new() { Timeout = 15_000 });
-        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+        await page.WaitForURLAsync("**/sickness-categories", CommitNav);
+        await WaitForListGridAsync();
     }
 
     public Task CancelUnsavedChangesDialogAsync() =>
@@ -79,7 +94,7 @@ public sealed class SicknessCategoryEditPage(IPage page, string baseUrl)
     public async Task CloseAndWaitForListAsync()
     {
         await ClickCloseAsync();
-        await page.WaitForURLAsync("**/sickness-categories", new() { Timeout = 15_000 });
-        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+        await page.WaitForURLAsync("**/sickness-categories", CommitNav);
+        await WaitForListGridAsync();
     }
 }

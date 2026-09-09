@@ -56,9 +56,13 @@ public class UpdateCompanyEndpointTests
         // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
         var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Update Test {Guid.NewGuid():N}", companyId: tenantId);
 
+        var currentVersion = (await (await client.GetAsync($"/api/companies/{createdCompanyId}"))
+            .Content.ReadFromJsonAsync<UpdateCompanyPayload>())!.Version;
+
         var response = await client.PutAsJsonAsync($"/api/companies/{createdCompanyId}", new
         {
             name = "Updated Company",
+            expectedVersion = currentVersion,
             addresses = new[]
             {
                 new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", postalCode = (string?)"SW1A 1AA", countryCode = "GB" },
@@ -107,6 +111,7 @@ public class UpdateCompanyEndpointTests
         bool IsActive,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
+        int Version,
         IReadOnlyCollection<CompanyAddressPayload> Addresses);
 
     private sealed record CompanyAddressPayload(

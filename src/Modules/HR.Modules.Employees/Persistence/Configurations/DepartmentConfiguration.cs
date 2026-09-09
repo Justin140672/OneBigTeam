@@ -39,6 +39,12 @@ internal sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departm
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(d => d.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(d => d.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

@@ -80,6 +80,70 @@ public sealed class ContactDetailsTab(IPage page)
     public async Task ClickSaveAsync() =>
         await page.GetByRole(AriaRole.Button, new() { Name = "Save Changes" }).ClickAsync();
 
+    // ── Optimistic-concurrency conflict banner (Ticket 2) ─────────────────────
+    // MyProfileContactDetailsTab.razor renders the shared <SaveConflictBanner> component: a single
+    // `div.alert.alert-warning.save-conflict-banner[role='alert']` containing a "Reload latest
+    // values" Syncfusion button, distinct from the generic red `.alert-danger` GlobalError alert.
+    // Scope on the component's own `.save-conflict-banner` class (+ role='alert'), not the shared
+    // Bootstrap `.alert-warning` alone, and additionally require the "Reload latest values" action
+    // so no unrelated warning alert can satisfy strict mode. Match on structure, not text: on a
+    // real 409 the razor overrides the component's default Message with its own copy.
+    private ILocator ConcurrencyWarningBanner =>
+        page.Locator(".save-conflict-banner[role='alert']")
+            .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
+
+    /// <summary>
+    /// Clicks Save and waits for the optimistic-concurrency warning banner to appear — i.e. the
+    /// save was rejected because the record changed since it was loaded. The caller's entered
+    /// values are intentionally left untouched in the form.
+    /// </summary>
+    public async Task ClickSaveExpectingConflictAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save Changes" }).ClickAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+    }
+
+    public Task<bool> IsConcurrencyWarningVisibleAsync() =>
+        ConcurrencyWarningBanner.IsVisibleAsync();
+
+    /// <summary>Clicks "Reload latest values" in the concurrency banner and waits for it to clear.</summary>
+    public async Task ClickReloadLatestValuesAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+    }
+
+    /// <summary>
+    /// Bug fix (b): clears the required "Address Line 1" field and blurs it so the EditContext
+    /// re-validates and reports a message. EditSectionBase.OnValidationStateChanged then drops any
+    /// standing concurrency banner. Waits for the field-level validation message to confirm the
+    /// invalid state registered (this tab renders <c>.validation-message</c>, not <c>.is-invalid</c>).
+    /// </summary>
+    public async Task MakeFormInvalidAsync()
+    {
+        // A bare FillAsync("") on the Syncfusion-backed HrTextBox doesn't drive its interop, so the
+        // EditContext never sees the field change and no validation fires. Clear it "for real" —
+        // focus, select-all, Delete — then Tab to commit the blur, the same technique the fill
+        // helpers in this codebase use for these inputs.
+        var input = page.GetByPlaceholder("Street address");
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        await page.WaitForTimeoutAsync(150);
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForTimeoutAsync(300);
+        await page.Locator(".validation-message").First.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+    }
+
+    public async Task<string?> GetMobilePhoneValueAsync()
+    {
+        var input = page.GetByPlaceholder("e.g. 07700 900000");
+        return await input.IsVisibleAsync() ? (await input.InputValueAsync()).Trim() : null;
+    }
+
     public async Task<bool> IsSuccessBannerVisibleAsync() =>
         await page.Locator(".cd-success-banner").IsVisibleAsync();
 

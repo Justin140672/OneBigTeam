@@ -72,7 +72,15 @@ internal sealed class UpdateLocationHandler
             request.LocationTypeId,
             now);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict.
+        var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
+            location,
+            request.ExpectedVersion,
+            "This location was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateLocationResponse>(saveResult.Error);
 
         return Result.Success(new UpdateLocationResponse(
             location.Id,
@@ -81,6 +89,7 @@ internal sealed class UpdateLocationHandler
             location.Description,
             location.LocationTypeId,
             location.IsActive,
-            location.UpdatedAt));
+            location.UpdatedAt,
+            location.Version));
     }
 }

@@ -40,4 +40,5 @@ internal sealed record GetVacancyResponse(
     // Baseline "safely changeable" rule from UpdateVacancyHandler.CanChangePositionProfile: true only
     // while the vacancy is Draft and has zero applications. The "Prevent Invalid Position Profile
     // Changes" story is expected to layer an authorised override on top of this for the UI as well.
-    bool CanChangePositionProfile);
+    bool CanChangePositionProfile,
+    int Version);

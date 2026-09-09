@@ -22,7 +22,7 @@ public class UpdateRecruitmentStageHandlerTests
 
         // "Offer" is a non-terminal active stage; try to make it terminal Hired while "Hired" already is.
         var result = await Handler(db).HandleAsync(
-            new UpdateRecruitmentStageRequest(companyId, stages.Offer.Id, "Offer", true, RecruitmentStageTerminalOutcome.Hired),
+            new UpdateRecruitmentStageRequest(companyId, stages.Offer.Id, "Offer", true, RecruitmentStageTerminalOutcome.Hired, ExpectedVersion: 1),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -65,7 +65,7 @@ public class UpdateRecruitmentStageHandlerTests
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
-            new UpdateRecruitmentStageRequest(companyId, stages.Hired.Id, "Hired", true, RecruitmentStageTerminalOutcome.Hired),
+            new UpdateRecruitmentStageRequest(companyId, stages.Hired.Id, "Hired", true, RecruitmentStageTerminalOutcome.Hired, ExpectedVersion: 1),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -83,7 +83,7 @@ public class UpdateRecruitmentStageHandlerTests
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
-            new UpdateRecruitmentStageRequest(companyId, stages.Offer.Id, "Offer", true, RecruitmentStageTerminalOutcome.Hired),
+            new UpdateRecruitmentStageRequest(companyId, stages.Offer.Id, "Offer", true, RecruitmentStageTerminalOutcome.Hired, ExpectedVersion: 1),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -104,7 +104,7 @@ public class UpdateRecruitmentStageHandlerTests
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
-            new UpdateRecruitmentStageRequest(companyId, extra.Id, "Archived Outcome", true, RecruitmentStageTerminalOutcome.Hired),
+            new UpdateRecruitmentStageRequest(companyId, extra.Id, "Archived Outcome", true, RecruitmentStageTerminalOutcome.Hired, ExpectedVersion: 1),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -123,7 +123,7 @@ public class UpdateRecruitmentStageHandlerTests
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
-            new UpdateRecruitmentStageRequest(companyId, stages.Hired.Id, "Hired", true, RecruitmentStageTerminalOutcome.Hired),
+            new UpdateRecruitmentStageRequest(companyId, stages.Hired.Id, "Hired", true, RecruitmentStageTerminalOutcome.Hired, ExpectedVersion: 1),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -144,7 +144,7 @@ public class UpdateRecruitmentStageHandlerTests
             targetId = stages.CvReview.Id;
 
             var result = await Handler(db, audit).HandleAsync(
-                new UpdateRecruitmentStageRequest(companyId, targetId, "Screening", false, RecruitmentStageTerminalOutcome.None, RecruitmentStagePurpose.Interview),
+                new UpdateRecruitmentStageRequest(companyId, targetId, "Screening", false, RecruitmentStageTerminalOutcome.None, RecruitmentStagePurpose.Interview, ExpectedVersion: 1),
                 CancellationToken.None);
 
             Assert.True(result.IsSuccess);

@@ -10,4 +10,5 @@ internal sealed record UpdateMyContactDetailsResponse(
     string? City,
     string? County,
     string? PostCode,
-    string? Country);
+    string? Country,
+    int Version);

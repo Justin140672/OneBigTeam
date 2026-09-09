@@ -22,7 +22,8 @@ public class UpdateDocumentTypeHandlerTests
                 CompanyId      = companyId,
                 DocumentTypeId = typeId,
                 Name           = "Employment Contract",
-                Description    = "Updated description"
+                Description    = "Updated description",
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 
@@ -47,7 +48,8 @@ public class UpdateDocumentTypeHandlerTests
                 CompanyId      = companyId,
                 DocumentTypeId = typeId,
                 Name           = "Contract",
-                Description    = null
+                Description    = null,
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 
@@ -67,7 +69,8 @@ public class UpdateDocumentTypeHandlerTests
                 CompanyId      = companyId,
                 DocumentTypeId = typeId,
                 Name           = "Contract",
-                Description    = "Now with a description"
+                Description    = "Now with a description",
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 
@@ -173,7 +176,8 @@ public class UpdateDocumentTypeHandlerTests
                 CompanyId      = companyId,
                 DocumentTypeId = typeId,
                 Name           = "  Passport  ",
-                Description    = "  Some description  "
+                Description    = "  Some description  ",
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 
@@ -194,7 +198,8 @@ public class UpdateDocumentTypeHandlerTests
                 CompanyId      = companyId,
                 DocumentTypeId = typeId,
                 Name           = "Contract",
-                Description    = "   "
+                Description    = "   ",
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 

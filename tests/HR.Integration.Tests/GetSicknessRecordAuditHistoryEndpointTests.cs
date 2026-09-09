@@ -94,7 +94,7 @@ public class GetSicknessRecordAuditHistoryEndpointTests
         // Second mutation -> a second audit event on the same entity.
         var updateResp = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/{recordId}",
-            new { companyId, employeeId, id = recordId, categoryId, startDate = "2026-06-02", startDayPart = 0, notes = "amended" });
+            new { companyId, employeeId, id = recordId, categoryId, startDate = "2026-06-02", startDayPart = 0, notes = "amended", expectedVersion = 1 });
         updateResp.EnsureSuccessStatusCode();
 
         var response = await client.GetAsync(Url(companyId, recordId));

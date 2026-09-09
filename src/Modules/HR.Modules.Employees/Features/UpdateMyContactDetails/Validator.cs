@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Features.UpdateMyContactDetails;
 
@@ -27,5 +28,9 @@ internal sealed class UpdateMyContactDetailsValidator : AbstractValidator<Update
 
         RuleFor(r => r.Country)
             .NotEmpty().WithMessage("Country is required.");
+
+        // Ticket 2: a loaded concurrency version is mandatory on this protected update.
+        RuleFor(r => r.ExpectedVersion)
+            .RequireLoadedVersion();
     }
 }

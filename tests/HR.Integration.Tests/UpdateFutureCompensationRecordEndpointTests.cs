@@ -85,7 +85,8 @@ public class UpdateFutureCompensationRecordEndpointTests
                 salary = 65000m,
                 currency = "GBP",
                 notes = "Updated via PUT.",
-                reason = "AnnualReview"
+                reason = "AnnualReview",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -118,7 +119,8 @@ public class UpdateFutureCompensationRecordEndpointTests
                 salaryType = "Annual",
                 salary = 60000m,
                 currency = "GBP",
-                reason = "AnnualReview"
+                reason = "AnnualReview",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -158,7 +160,8 @@ public class UpdateFutureCompensationRecordEndpointTests
                 salaryType = "Annual",
                 salary = 65000m,
                 currency = "GBP",
-                reason = "AnnualReview"
+                reason = "AnnualReview",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);

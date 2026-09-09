@@ -23,4 +23,5 @@ internal sealed record UpdatePositionProfileResponse(
     Guid DefaultLeavePolicyId,
     Guid? OnboardingTemplateId,
     bool IsActive,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

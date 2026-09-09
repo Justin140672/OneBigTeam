@@ -18,6 +18,7 @@ public class UpdateInterviewValidatorTests
             InterviewId           = Guid.NewGuid(),
             InterviewerEmployeeId = Guid.NewGuid(),
             ScheduledAt           = ScheduledAt,
+            ExpectedVersion       = 1,
         });
 
         Assert.True(result.IsValid);

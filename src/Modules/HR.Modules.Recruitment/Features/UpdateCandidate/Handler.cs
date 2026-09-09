@@ -53,7 +53,14 @@ internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clo
             request.ResumeUrl,
             now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            candidate,
+            request.ExpectedVersion,
+            "This candidate was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateCandidateResponse>(saveResult.Error);
 
         var after = new CandidateAuditSnapshot(
             candidate.FirstName,
@@ -75,6 +82,7 @@ internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clo
             candidate.Phone,
             candidate.ResumeUrl,
             candidate.CreatedAt,
-            candidate.UpdatedAt));
+            candidate.UpdatedAt,
+            candidate.Version));
     }
 }

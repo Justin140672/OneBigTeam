@@ -2,7 +2,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class AssetCategoryService(IHttpClientFactory httpClientFactory) : IEditService<AssetCategoryEditModel, Guid>
+public class AssetCategoryService(IHttpClientFactory httpClientFactory)
+    : IEditService<AssetCategoryEditModel, Guid>, IConcurrencyAwareEditService<AssetCategoryEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -81,7 +82,37 @@ public class AssetCategoryService(IHttpClientFactory httpClientFactory) : IEditS
         {
             Name = existing.Name,
             Description = existing.Description,
+            Version = existing.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces the stale-save 409.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, AssetCategoryEditModel model, int? expectedVersion)
+    {
+        var request = new UpdateAssetCategoryRequest(
+            companyId, id, model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/asset-categories/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateAssetCategoryResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                body?.Error ?? "An asset category with that name already exists.", body?.Code == "concurrency");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return ApiSaveResult.Fail("Asset category not found.");
+
+        return ApiSaveResult.Fail(body?.Error ?? "Failed to update asset category.");
     }
 
     async Task<(AssetCategoryEditModel? Result, string? Error)> IEditService<AssetCategoryEditModel, Guid>.CreateAsync(
@@ -104,5 +135,5 @@ public class AssetCategoryService(IHttpClientFactory httpClientFactory) : IEditS
         return (updated is null ? null : model, error);
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

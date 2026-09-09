@@ -687,7 +687,8 @@ public class GetEmployeeEndpointTests
                 status = "Active",
                 startDate = "2026-01-01",
                 noticePeriodUnitOverride = "Weeks",
-                noticePeriodLengthOverride = 3
+                noticePeriodLengthOverride = 3,
+                expectedVersion = 1
             });
         putResponse.EnsureSuccessStatusCode();
 

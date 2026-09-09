@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using HR.Web.Services;
 
 namespace HR.Web.Models;
 
@@ -58,7 +59,9 @@ public record UpdateAssetRequest(
     string? Model,
     string? SerialNumber,
     DateOnly? PurchaseDate,
-    decimal? PurchasePrice);
+    decimal? PurchasePrice,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdateAssetResponse(
     Guid Id,
@@ -73,10 +76,12 @@ public record UpdateAssetResponse(
     decimal? PurchasePrice,
     string Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
-public sealed class AssetEditModel
+public sealed class AssetEditModel : IHasVersion
 {
+    public int Version { get; set; }
     [Required(ErrorMessage = "Asset number is required.")]
     public string AssetNumber { get; set; } = string.Empty;
     [Required(ErrorMessage = "Category is required.")]
@@ -141,4 +146,5 @@ public sealed record AssetDetailModel(
     string Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    string? CategoryName);
+    string? CategoryName,
+    int Version = 0);

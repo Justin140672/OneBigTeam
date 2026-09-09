@@ -15,8 +15,12 @@ public class GetOrganisationChartEndpointTests
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator);
+            // CreateEmployeeAsync GETs the employee (policy role:employee) to round-trip the
+            // concurrency version before activating via the employment PUT.
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]
@@ -144,6 +148,10 @@ public class GetOrganisationChartEndpointTests
 
         if (activate)
         {
+            var versionResp = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}");
+            versionResp.EnsureSuccessStatusCode();
+            var version = (await versionResp.Content.ReadFromJsonAsync<EmployeeVersionPayload>())!.Version;
+
             var employmentResponse = await client.PutAsJsonAsync(
                 $"/api/companies/{companyId}/employees/{employeeId}/employment",
                 new
@@ -157,7 +165,8 @@ public class GetOrganisationChartEndpointTests
                     locationId,
                     positionProfileId,
                     managerId,
-                    startDate = "2026-01-01"
+                    startDate = "2026-01-01",
+                    expectedVersion = version
                 });
             employmentResponse.EnsureSuccessStatusCode();
         }
@@ -173,6 +182,8 @@ public class GetOrganisationChartEndpointTests
     }
 
     private sealed record IdPayload(Guid Id);
+
+    private sealed record EmployeeVersionPayload(int Version);
 
     private sealed record OrganisationChartItemPayload(
         Guid EmployeeId, string Name, string JobTitle, string Department, Guid? ManagerId,

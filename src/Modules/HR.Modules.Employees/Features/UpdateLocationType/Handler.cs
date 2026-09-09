@@ -25,9 +25,18 @@ internal sealed class UpdateLocationTypeHandler(EmployeesDbContext db, IClock cl
                 Error.Conflict($"A location type named '{request.Name}' already exists."));
 
         entity.Update(request.Name, request.Description, new DateTimeOffset(clock.UtcNow, TimeSpan.Zero));
-        await db.SaveChangesAsync(cancellationToken);
+
+        // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict.
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            entity,
+            request.ExpectedVersion,
+            "This location type was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateLocationTypeResponse>(saveResult.Error);
 
         return Result.Success(new UpdateLocationTypeResponse(
-            entity.Id, entity.CompanyId, entity.Name, entity.Description, entity.IsActive, entity.UpdatedAt));
+            entity.Id, entity.CompanyId, entity.Name, entity.Description, entity.IsActive, entity.UpdatedAt, entity.Version));
     }
 }

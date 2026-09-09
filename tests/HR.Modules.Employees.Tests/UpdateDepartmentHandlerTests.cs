@@ -27,7 +27,8 @@ public class UpdateDepartmentHandlerTests
             {
                 CompanyId = companyId,
                 Id = dept.Id,
-                Name = "Platform Engineering"
+                Name = "Platform Engineering",
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 
@@ -58,7 +59,8 @@ public class UpdateDepartmentHandlerTests
                 Id = child.Id,
                 Name = "Platform",
                 Description = "Core platform team",
-                ParentDepartmentId = parent.Id
+                ParentDepartmentId = parent.Id,
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 
@@ -86,7 +88,8 @@ public class UpdateDepartmentHandlerTests
                 CompanyId = companyId,
                 Id = dept.Id,
                 Name = "Engineering",
-                ManagerEmployeeId = managerId
+                ManagerEmployeeId = managerId,
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 
@@ -184,7 +187,8 @@ public class UpdateDepartmentHandlerTests
                 CompanyId = companyId,
                 Id = dept.Id,
                 Name = "Engineering",
-                Description = "Updated description"
+                Description = "Updated description",
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 

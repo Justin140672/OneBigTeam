@@ -27,7 +27,10 @@
         <h1 class="mb-1">@PageTitle</h1>
         <p class="text-muted mb-4">Set the job title, department, and required documents for this position.</p>
 
-        @if (!string.IsNullOrEmpty(GlobalError))
+        <SaveConflictBanner Visible="SaveConflict" Disabled="@Saving" OnReload="ReloadLatestValuesAsync"
+                            Message="Someone else changed this position profile while you were editing. Your changes have not been saved." />
+
+        @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
         {
             <div class="alert alert-danger">@GlobalError</div>
         }
@@ -205,6 +208,10 @@
         : Model.Title.Trim().Length > 0 ? Model.Title.Trim()
         : IsViewMode ? "View Position Profile" : "Edit Position Profile";
 
+    // Ticket 2: optimistic-concurrency token loaded with the profile, sent as ExpectedVersion on
+    // save and refreshed from a successful update. Drives the shared <SaveConflictBanner>.
+    private int? _loadedVersion;
+
     private List<DepartmentListItemModel> _departments = [];
     private List<LocationListItemModel> _locations = [];
     private List<LeavePolicyListItemModel> _leavePolicies = [];
@@ -280,6 +287,7 @@
                 }
 
                 _assignedEmployees = profile.AssignedEmployees ?? [];
+                _loadedVersion = profile.Version;
             }
 
             // Inherited-role defaults are edited on the "Inherited Roles" tab but persisted by this
@@ -359,11 +367,15 @@
                 Model.DefaultLeavePolicyId!.Value,
                 Model.OnboardingTemplateId == Guid.Empty ? null : Model.OnboardingTemplateId,
                 NoticePeriodUnitOverride: noticePeriodUnitOverride,
-                NoticePeriodLengthOverride: noticePeriodLengthOverride);
+                NoticePeriodLengthOverride: noticePeriodLengthOverride,
+                ExpectedVersion: _loadedVersion);
 
-            var (success, error) = await PositionProfileService.UpdatePositionProfileAsync(CompanyId, Id!.Value, request);
-            if (!success)
-                return error ?? "Failed to update position profile.";
+            var saveResult = await PositionProfileService.UpdatePositionProfileWithConcurrencyAsync(CompanyId, Id!.Value, request);
+            SaveConflict = saveResult.IsConcurrencyConflict;
+            if (!saveResult.Success)
+                return saveResult.ErrorMessage ?? "Failed to update position profile.";
+            if (saveResult.NewVersion is { } newVersion)
+                _loadedVersion = newVersion;
 
             // Persist the Inherited Roles tab's selection as part of the same Save. Employee is
             // implicit and never stored. Idempotent PUT of the whole list.
@@ -470,4 +482,8 @@
     </div>;
 
     protected override string? ListUrl => $"/companies/{CompanyId}/position-profiles";
+
+    // Ticket 2: concurrency-conflict recovery for the shared <SaveConflictBanner>. Re-runs the full
+    // load, which repopulates the form fields and _loadedVersion from the latest server state.
+    protected override Task ReloadServerStateAsync() => LoadAsync();
 }

@@ -129,7 +129,8 @@ public class LeavingProcessLifecycleEndToEndTests
                 employeeId,
                 leavingDate = LeavingDate.AddDays(31).ToString("yyyy-MM-dd"),
                 lastWorkingDay = LeavingDate.AddDays(30).ToString("yyyy-MM-dd"),
-                leavingReason = "MutualAgreement"
+                leavingReason = "MutualAgreement",
+                expectedVersion = 1
             });
         amendResp.EnsureSuccessStatusCode();
 

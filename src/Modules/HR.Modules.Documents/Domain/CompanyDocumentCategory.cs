@@ -1,3 +1,5 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Documents.Domain;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace HR.Modules.Documents.Domain;
 /// "Handbook") — mirrors <see cref="DocumentType"/>'s shape/lifecycle so categories can be
 /// managed per company rather than hard-coded.
 /// </summary>
-internal sealed class CompanyDocumentCategory
+internal sealed class CompanyDocumentCategory : IVersionedAggregate
 {
     private CompanyDocumentCategory() { }
 
@@ -15,6 +17,11 @@ internal sealed class CompanyDocumentCategory
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public static CompanyDocumentCategory Create(
         Guid id,
@@ -26,6 +33,7 @@ internal sealed class CompanyDocumentCategory
         CompanyId = companyId,
         Name      = name.Trim(),
         IsActive  = true,
+        Version   = 1,
         CreatedAt = now,
         UpdatedAt = now,
     };

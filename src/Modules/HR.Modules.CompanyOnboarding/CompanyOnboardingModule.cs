@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Modules.CompanyOnboarding.Features.DismissOnboardingChecklist;
 using HR.Modules.CompanyOnboarding.Features.GetOnboardingChecklist;
 using HR.Modules.CompanyOnboarding.Features.MarkOnboardingTaskComplete;
@@ -18,7 +19,7 @@ public static class CompanyOnboardingModule
         AddFeatureServices(services);
 
         services.AddDbContext<CompanyOnboardingDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "company_onboarding")));
 
         return services;

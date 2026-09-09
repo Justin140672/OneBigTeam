@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Employees.Domain;
 
-internal sealed class Compensation
+internal sealed class Compensation : IVersionedAggregate
 {
     private Compensation() { }
 
@@ -19,6 +21,11 @@ internal sealed class Compensation
     public Guid CreatedBy { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // Ticket 2: application-managed optimistic-concurrency token, mapped .IsConcurrencyToken().
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public static Compensation Create(
         Guid id,
@@ -49,6 +56,7 @@ internal sealed class Compensation
             Notes = notes,
             Reason = reason,
             CreatedBy = createdBy,
+            Version = 1,
             CreatedAt = now,
             UpdatedAt = now
         };

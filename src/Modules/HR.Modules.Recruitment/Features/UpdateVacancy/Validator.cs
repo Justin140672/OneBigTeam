@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.SharedKernel;
 
 namespace HR.Modules.Recruitment.Features.UpdateVacancy;
 
@@ -6,6 +7,9 @@ internal sealed class UpdateVacancyValidator : AbstractValidator<UpdateVacancyRe
 {
     public UpdateVacancyValidator()
     {
+        // Ticket 2 item 3: a loaded concurrency version is mandatory on this protected update.
+        RuleFor(r => r.ExpectedVersion).RequireLoadedVersion();
+
         RuleFor(r => r.CompanyId)
             .NotEmpty();
 

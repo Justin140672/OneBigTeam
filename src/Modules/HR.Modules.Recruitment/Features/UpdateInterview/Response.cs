@@ -13,4 +13,5 @@ internal sealed record UpdateInterviewResponse(
     InterviewOutcome Outcome,
     string? Notes,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

@@ -8,4 +8,6 @@ internal sealed record UpdateExternalRecruiterRequest(
     string? ContactEmail,
     string? ContactTelephone,
     string? Website,
-    string? Notes);
+    string? Notes,
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    int? ExpectedVersion = null);

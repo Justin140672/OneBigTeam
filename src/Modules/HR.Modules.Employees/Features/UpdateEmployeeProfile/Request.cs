@@ -39,4 +39,10 @@ internal sealed record UpdateEmployeeProfileRequest
     // generates one Guid and passes it into both this request and UpdateEmploymentDetailsRequest
     // so GetEmployeeAuditHistoryHandler can merge the two resulting audit rows into a single item.
     public Guid? CorrelationId { get; init; }
+
+    // Ticket 2 (optimistic concurrency): the Employee.Version the client loaded before editing.
+    // Required (see Validator.RequireLoadedVersion) — a save is rejected with HTTP 409
+    // (Error.Concurrency) if the record has since been changed by anyone else, and rejected with
+    // HTTP 422 if omitted. Nullable only for model-binding; the validator forbids null.
+    public int? ExpectedVersion { get; init; }
 }

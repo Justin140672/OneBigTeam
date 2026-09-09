@@ -38,6 +38,12 @@ internal sealed class Endpoint(UpdateExternalRecruiterHandler handler, ICurrentU
                 return;
             }
 
+            if (result.Error.Code == "concurrency")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(businessError));
+                return;
+            }
+
             await Send.ResultAsync(TypedResults.UnprocessableEntity(businessError));
             return;
         }

@@ -27,6 +27,20 @@ public sealed class PublicHolidayListPage(IPage page, string baseUrl)
         await page.WaitForURLAsync("**/public-holidays/new**", new() { Timeout = 15_000 });
     }
 
+    /// <summary>
+    /// Opens the edit page for a holiday by clicking its name link
+    /// (<c>&lt;a href="/companies/{id}/public-holidays/{holidayId}"&gt;</c> in the Name column) and
+    /// waits for the edit route + date picker to render.
+    /// </summary>
+    public async Task ClickHolidayAsync(string nameFragment)
+    {
+        await page.Locator(".e-grid a").Filter(new() { HasText = nameFragment }).First.ClickAsync();
+        await page.WaitForURLAsync(
+            new System.Text.RegularExpressions.Regex(@"/public-holidays/[0-9a-fA-F-]{36}$"),
+            new() { Timeout = 15_000 });
+        await page.WaitForSelectorAsync(".e-date-wrapper", new() { Timeout = 20_000 });
+    }
+
     public Task<bool> HasHolidayAsync(string nameFragment) =>
         page.Locator(".e-rowcell")
             .Filter(new() { HasText = nameFragment })

@@ -62,11 +62,21 @@ internal sealed class OfferCandidateHandler(
             return Result.Failure<OfferCandidateResponse>(
                 Error.Validation($"Cannot make an offer for an application already on the terminal stage '{currentStage.Name}'."));
 
-        var offerStage = await db.RecruitmentStages
+        // Prefer the stage the company has explicitly flagged as its Offer stage
+        // (RecruitmentStagePurpose.Offer) — this is the same signal the offer metrics use. Only
+        // when no stage carries that flag do we fall back to the heuristic "last non-terminal
+        // stage by DisplayOrder". The fallback is fragile: any later-ordered non-terminal stage
+        // (a "Reference Check" inserted after Offer, or — in test runs — a leftover ad-hoc stage
+        // whose cleanup did not complete) would otherwise silently hijack the offer transition.
+        var activeNonTerminalStages = await db.RecruitmentStages
             .AsNoTracking()
-            .Where(s => s.CompanyId == request.CompanyId && s.IsActive)
+            .Where(s => s.CompanyId == request.CompanyId && s.IsActive && !s.IsTerminal)
             .OrderByDescending(s => s.DisplayOrder)
-            .FirstOrDefaultAsync(s => !s.IsTerminal, cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        var offerStage = activeNonTerminalStages
+            .FirstOrDefault(s => s.Purpose == RecruitmentStagePurpose.Offer)
+            ?? activeNonTerminalStages.FirstOrDefault();
 
         if (offerStage is null)
             return Result.Failure<OfferCandidateResponse>(

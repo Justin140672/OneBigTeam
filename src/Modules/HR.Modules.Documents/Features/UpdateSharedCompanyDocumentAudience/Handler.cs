@@ -61,7 +61,15 @@ internal sealed class UpdateSharedCompanyDocumentAudienceHandler(
             db.SharedCompanyDocumentAudienceRules.AddRange(ruleBuildResult.Value!);
 
             document.Touch(updatedBy, now);
-            await db.SaveChangesAsync(cancellationToken);
+
+            var saveResult = await db.SaveChangesWithConcurrencyAsync(
+                document,
+                request.ExpectedVersion,
+                "This document was changed by someone else since you opened it. Reload the latest details and try again.",
+                cancellationToken);
+
+            if (saveResult.IsFailure)
+                return Result.Failure<UpdateSharedCompanyDocumentAudienceResponse>(saveResult.Error);
 
             var afterDescription = await audienceDescriber.DescribeAsync(
                 request.CompanyId,
@@ -85,7 +93,16 @@ internal sealed class UpdateSharedCompanyDocumentAudienceHandler(
                 request.AudienceLocationIds,
                 request.AudiencePositionProfileIds,
                 request.AudienceEmployeeIds,
-                afterDescription));
+                afterDescription,
+                document.Version));
+        }
+
+        // No audience change to persist, but still honour the optimistic-concurrency contract: a
+        // caller working from a stale version must be told to reload rather than silently no-op.
+        if (request.ExpectedVersion is { } expectedVersion && expectedVersion != document.Version)
+        {
+            return Result.Failure<UpdateSharedCompanyDocumentAudienceResponse>(
+                Error.Concurrency("This document was changed by someone else since you opened it. Reload the latest details and try again."));
         }
 
         var description = await audienceDescriber.DescribeAsync(
@@ -101,6 +118,7 @@ internal sealed class UpdateSharedCompanyDocumentAudienceHandler(
             request.AudienceLocationIds,
             request.AudiencePositionProfileIds,
             request.AudienceEmployeeIds,
-            description));
+            description,
+            document.Version));
     }
 }

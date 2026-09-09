@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using HR.Web.Services;
 
 namespace HR.Web.Models;
 
@@ -131,7 +132,8 @@ public sealed record GetLeavePolicyResponse(
     bool AllowNegativeBalance,
     bool IsActive,
     bool IsDefault,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    int Version = 0);
 
 public record CreateLeavePolicyRequest(
     Guid CompanyId,
@@ -159,7 +161,9 @@ public record UpdateLeavePolicyRequest(
     string? Description,
     int CarryOverDays,
     bool AllowNegativeBalance,
-    bool IsDefault);
+    bool IsDefault,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdateLeavePolicyResponse(
     Guid Id,
@@ -170,10 +174,12 @@ public record UpdateLeavePolicyResponse(
     bool AllowNegativeBalance,
     bool IsActive,
     bool IsDefault,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
-public sealed class LeavePolicyEditModel
+public sealed class LeavePolicyEditModel : IHasVersion
 {
+    public int Version { get; set; }
     [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }

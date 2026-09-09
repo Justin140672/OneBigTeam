@@ -6,4 +6,5 @@ internal sealed record UpdateSharedCompanyDocumentAcknowledgementSettingsRespons
     bool RequiresAcknowledgement,
     DateOnly? AcknowledgementDueDate,
     string? AcknowledgementStatement,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

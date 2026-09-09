@@ -21,13 +21,13 @@ public class AmendLeavingProcessHandlerTests
 
     private static AmendLeavingProcessRequest BuildRequest(
         Guid companyId, Guid employeeId, DateOnly? leavingDate = null, bool confirmBackdatedLeavingDate = false) =>
-        new(
+        new AmendLeavingProcessRequest(
             companyId,
             employeeId,
             LeavingDate: leavingDate ?? new DateOnly(2026, 9, 1),
             LastWorkingDay: (leavingDate ?? new DateOnly(2026, 9, 1)).AddDays(-1),
             LeavingReason.MutualAgreement,
-            confirmBackdatedLeavingDate);
+            confirmBackdatedLeavingDate) { ExpectedVersion = 1 };
 
     // Builds a real EmployeeDepartureFinalizer from the same Fakes passed to the handler so
     // assertions on auditPublisher state after a confirmed-backdated HandleAsync call cover both

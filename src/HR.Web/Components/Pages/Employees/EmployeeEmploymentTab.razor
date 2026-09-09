@@ -19,7 +19,7 @@
 }
 else
 {
-    @if (!string.IsNullOrEmpty(GlobalError))
+    @if (!string.IsNullOrEmpty(GlobalError) && !SaveConflict)
     {
         <div class="alert alert-danger mb-3">@GlobalError</div>
     }
@@ -348,6 +348,11 @@ else
     // (the default) whenever this tab is saved on its own, so its audit entry stays separate.
     public Guid? CorrelationId { get; set; }
 
+    // Ticket 2: optimistic concurrency is handled by EditSectionBase — LoadedVersion is captured
+    // in LoadAsync, ExpectedVersionOverride is set by EmployeeEdit.razor to the token returned by
+    // the profile save that runs first in the combined Save, SaveConflict is raised by
+    // ApplySaveResult, and ReloadLatestValuesAsync(rebaseline: true) is the conflict recovery.
+
     // Called by EmployeeEdit.razor's SaveCoreAsync (via its @ref to this component) immediately
     // before calling SaveAsync(), whenever the user also changed Department/Location on the
     // Employee/Profile tab. Model.DepartmentId/LocationId here are loaded once when this tab
@@ -506,6 +511,7 @@ else
 
         var employee = await EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
         _employee = employee;
+        LoadedVersion = employee?.Version;
         if (employee is not null)
             PopulateModel(employee);
         RebuildStatusOptions();
@@ -625,6 +631,38 @@ else
 
     protected override async Task<string?> SaveCoreAsync()
     {
+        var p = GetEmploymentPortion();
+
+        var request = new UpdateEmploymentDetailsRequest(
+            CompanyId,
+            EmployeeId,
+            p.EmployeeNumber,
+            p.EmploymentTypeId,
+            p.Status,
+            p.DepartmentId,
+            p.LocationId,
+            p.PositionProfileId,
+            p.ManagerId,
+            p.StartDate,
+            p.ContinuousServiceDate,
+            p.ProbationEndDate,
+            p.LeavingDate,
+            p.WorkingDaysOverride,
+            p.HoursPerDayOverride,
+            p.Notes,
+            NoticePeriodUnitOverride: p.NoticePeriodUnitOverride,
+            NoticePeriodLengthOverride: p.NoticePeriodLengthOverride,
+            CorrelationId: CorrelationId,
+            ExpectedVersion: ExpectedVersionForSave);
+
+        var result = await EmployeeService.UpdateEmploymentDetailsAsync(CompanyId, EmployeeId, request);
+        return ApplySaveResult(result, "Failed to save employment details.");
+    }
+
+    // Item 5: the Employment tab's current field values, so EmployeeEdit.razor can fold them into a
+    // single atomic profile+employment save. Mirrors exactly what SaveCoreAsync would send.
+    public EmploymentPortion GetEmploymentPortion()
+    {
         WorkingDays? workingDaysOverride = null;
         decimal? hoursPerDayOverride = null;
 
@@ -636,12 +674,7 @@ else
             hoursPerDayOverride = Model.HoursPerDay;
         }
 
-        NoticePeriodUnit? noticePeriodUnitOverride = Model.OverrideNoticePeriod ? Model.NoticePeriodUnit : null;
-        int? noticePeriodLengthOverride = Model.OverrideNoticePeriod ? Model.NoticePeriodLength : null;
-
-        var request = new UpdateEmploymentDetailsRequest(
-            CompanyId,
-            EmployeeId,
+        return new EmploymentPortion(
             string.IsNullOrWhiteSpace(Model.EmployeeNumber) ? null : Model.EmployeeNumber.Trim(),
             Model.EmploymentTypeId,
             Model.Status,
@@ -653,17 +686,41 @@ else
             Model.ContinuousServiceDate,
             Model.ProbationEndDate,
             Model.LeavingDate,
+            Model.OverrideNoticePeriod ? Model.NoticePeriodUnit : null,
+            Model.OverrideNoticePeriod ? Model.NoticePeriodLength : null,
             workingDaysOverride,
             hoursPerDayOverride,
-            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
-            NoticePeriodUnitOverride: noticePeriodUnitOverride,
-            NoticePeriodLengthOverride: noticePeriodLengthOverride,
-            CorrelationId: CorrelationId);
-
-        var (success, error) = await EmployeeService.UpdateEmploymentDetailsAsync(CompanyId, EmployeeId, request);
-
-        return success ? null : error ?? "Failed to save employment details.";
+            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim());
     }
+
+    // Item 5: EmployeeEdit's single Save reads GetEmploymentPortion() directly instead of calling
+    // this section's SaveAsync(), so it must run this section's DataAnnotations validation itself.
+    public bool ValidateSection() => EditContext.Validate();
+
+    // Item 5: adopt the version returned by the combined save and clear unsaved-change tracking.
+    public void AdoptSavedVersion(int? version)
+    {
+        LoadedVersion = version;
+        ResetBaseline();
+    }
+
+    public sealed record EmploymentPortion(
+        string? EmployeeNumber,
+        Guid? EmploymentTypeId,
+        string Status,
+        Guid? DepartmentId,
+        Guid? LocationId,
+        Guid? PositionProfileId,
+        Guid? ManagerId,
+        DateOnly StartDate,
+        DateOnly? ContinuousServiceDate,
+        DateOnly? ProbationEndDate,
+        DateOnly? LeavingDate,
+        NoticePeriodUnit? NoticePeriodUnitOverride,
+        int? NoticePeriodLengthOverride,
+        WorkingDays? WorkingDaysOverride,
+        decimal? HoursPerDayOverride,
+        string? Notes);
 
     private async Task OnPositionProfileChanged(ChangeEventArgs<Guid?, PositionProfileListItemModel> args)
     {

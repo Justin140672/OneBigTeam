@@ -128,7 +128,7 @@ public class UpdateMyContactDetailsEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{Guid.NewGuid()}/employees/me/contact-details",
-            new { addressLine1 = "1 Test St", city = "London", postCode = "SW1A 1AA", country = "UK" });
+            new { addressLine1 = "1 Test St", city = "London", postCode = "SW1A 1AA", country = "UK", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -156,6 +156,9 @@ public class UpdateMyContactDetailsEndpointTests
     {
         var (client, companyId, _) = await CreateEmployeeAsync(ContactUser2);
 
+        var version = (await client.GetFromJsonAsync<ContactDetailsPayload>(
+            $"/api/companies/{companyId}/employees/me/contact-details"))!.Version;
+
         var updateResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/me/contact-details",
             new
@@ -168,7 +171,8 @@ public class UpdateMyContactDetailsEndpointTests
                 city          = "Manchester",
                 county        = "Greater Manchester",
                 postCode      = "M1 1AA",
-                country       = "United Kingdom"
+                country       = "United Kingdom",
+                expectedVersion = version
             });
 
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
@@ -290,5 +294,6 @@ public class UpdateMyContactDetailsEndpointTests
         string? City,
         string? County,
         string? PostCode,
-        string? Country);
+        string? Country,
+        int Version);
 }

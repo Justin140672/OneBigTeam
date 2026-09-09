@@ -79,7 +79,14 @@ internal sealed class UpdateMyContactDetailsHandler
             request.Country,
             now);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
+            employee,
+            request.ExpectedVersion,
+            "Your contact details were changed elsewhere since you opened this page. Reload the latest values and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateMyContactDetailsResponse>(saveResult.Error);
 
         var after = new ContactDetailsSnapshot(
             employee.PersonalEmail,
@@ -106,6 +113,7 @@ internal sealed class UpdateMyContactDetailsHandler
             employee.City,
             employee.County,
             employee.PostCode,
-            employee.Country));
+            employee.Country,
+            employee.Version));
     }
 }

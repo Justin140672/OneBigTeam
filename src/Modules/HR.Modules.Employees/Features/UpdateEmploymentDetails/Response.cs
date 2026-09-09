@@ -25,4 +25,5 @@ internal sealed record UpdateEmploymentDetailsResponse(
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
     string? Notes,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

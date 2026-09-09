@@ -57,6 +57,12 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
             .HasColumnName("version_number")
             .IsRequired();
 
+        builder.Property(d => d.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(d => d.Status)
             .HasColumnName("status")
             .HasConversion<string>()

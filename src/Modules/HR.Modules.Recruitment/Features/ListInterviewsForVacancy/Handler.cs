@@ -28,7 +28,8 @@ internal sealed class ListInterviewsForVacancyHandler(RecruitmentDbContext db)
                 i.DurationMinutes,
                 i.Location,
                 i.Outcome,
-                i.Notes))
+                i.Notes,
+                i.Version))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new ListInterviewsForVacancyResponse(items));

@@ -32,6 +32,7 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
                 RequiresAcknowledgement = true,
                 AcknowledgementDueDate  = new DateOnly(2027, 1, 1),
                 AcknowledgementStatement = "I confirm I have read the updated expenses policy.",
+                ExpectedVersion = 1,
             },
             updatedBy, CancellationToken.None);
 
@@ -65,6 +66,7 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
                 CompanyId               = companyId,
                 DocumentId              = doc.Id,
                 RequiresAcknowledgement = false,
+                ExpectedVersion = 1,
             },
             Guid.NewGuid(), CancellationToken.None);
 
@@ -124,6 +126,7 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
                 DocumentId              = doc.Id,
                 RequiresAcknowledgement = true,
                 AcknowledgementDueDate  = new DateOnly(2027, 1, 1),
+                ExpectedVersion = 1,
             },
             updatedBy, CancellationToken.None);
 
@@ -214,6 +217,7 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
                 RequiresAcknowledgement  = true,
                 AcknowledgementDueDate   = new DateOnly(2027, 1, 1),
                 AcknowledgementStatement = "Original statement",
+                ExpectedVersion = 1,
             },
             Guid.NewGuid(), CancellationToken.None);
 
@@ -243,6 +247,7 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
                 RequiresAcknowledgement  = true,
                 AcknowledgementDueDate   = new DateOnly(2027, 6, 1),
                 AcknowledgementStatement = "Original statement",
+                ExpectedVersion = 1,
             },
             Guid.NewGuid(), CancellationToken.None);
 
@@ -273,6 +278,7 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
                 RequiresAcknowledgement  = true,
                 AcknowledgementDueDate   = new DateOnly(2027, 1, 1),
                 AcknowledgementStatement = "A brand new statement",
+                ExpectedVersion = 1,
             },
             Guid.NewGuid(), CancellationToken.None);
 
@@ -306,6 +312,7 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
                 CompanyId               = companyId,
                 DocumentId              = doc.Id,
                 RequiresAcknowledgement = false,
+                ExpectedVersion = 1,
             },
             Guid.NewGuid(), CancellationToken.None);
 

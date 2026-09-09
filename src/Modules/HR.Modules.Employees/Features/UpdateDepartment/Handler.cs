@@ -81,7 +81,15 @@ internal sealed class UpdateDepartmentHandler
             request.ManagerEmployeeId,
             now);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict.
+        var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
+            department,
+            request.ExpectedVersion,
+            "This department was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateDepartmentResponse>(saveResult.Error);
 
         return Result.Success(new UpdateDepartmentResponse(
             department.Id,
@@ -91,6 +99,7 @@ internal sealed class UpdateDepartmentHandler
             department.ParentDepartmentId,
             department.ManagerEmployeeId,
             department.IsActive,
-            department.UpdatedAt));
+            department.UpdatedAt,
+            department.Version));
     }
 }

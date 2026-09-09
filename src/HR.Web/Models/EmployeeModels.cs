@@ -109,7 +109,9 @@ public record GetEmployeeResponse(
     bool ShowLeavingTab,
     NoticePeriodUnit EffectiveNoticePeriodUnit,
     int EffectiveNoticePeriodLength,
-    string EffectiveNoticePeriodSource);
+    string EffectiveNoticePeriodSource,
+    // Ticket 2: optimistic-concurrency token echoed back on the next employee edit save.
+    int Version = 0);
 
 // Ordered from the top of the org down to the employee's immediate manager; does not include
 // the employee themselves.
@@ -228,7 +230,10 @@ public record UpdateEmployeeProfileRequest(
     // Optional — see UpdateEmploymentDetailsRequest.CorrelationId's remarks. Lets
     // EmployeeEdit.razor's combined Save merge this profile update with the Employment tab's
     // update into a single audit history entry.
-    Guid? CorrelationId = null);
+    Guid? CorrelationId = null,
+    // Ticket 2: the Employee.Version loaded before editing. When set, the save is rejected with a
+    // concurrency conflict if the record changed in the meantime.
+    int? ExpectedVersion = null);
 
 public record UpdateEmployeeProfileResponse(
     Guid Id,
@@ -241,7 +246,8 @@ public record UpdateEmployeeProfileResponse(
     string? PersonalEmail,
     DateOnly StartDate,
     string Status,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
 
@@ -303,7 +309,8 @@ public sealed record GetMyContactDetailsResponse(
     string? City,
     string? County,
     string? PostCode,
-    string? Country);
+    string? Country,
+    int Version = 0);
 
 public sealed record UpdateMyContactDetailsRequest(
     Guid CompanyId,
@@ -315,7 +322,8 @@ public sealed record UpdateMyContactDetailsRequest(
     string City,
     string? County,
     string PostCode,
-    string Country);
+    string Country,
+    int? ExpectedVersion = null);
 
 // ── EMERGENCY CONTACTS ────────────────────────────────────────────────────────
 
@@ -370,7 +378,53 @@ public record UpdateEmploymentDetailsRequest(
     // GetEmployeeAuditHistoryHandler can merge the two resulting audit rows into a single entry.
     // Left null (the default) by EmployeeEmploymentTab.SaveAsync's other callers, if any, so their
     // audit entries remain separate exactly as before.
-    Guid? CorrelationId = null);
+    Guid? CorrelationId = null,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
+
+// Item 5: atomic combined Employee Profile + Employment save. One request, one version guarding
+// the shared Employee aggregate, one merged audit entry.
+public record UpdateEmployeeProfileAndEmploymentRequest(
+    Guid CompanyId,
+    Guid Id,
+    string FirstName,
+    string LastName,
+    string? PreferredName,
+    string WorkEmail,
+    string? PersonalEmail,
+    DateOnly? DateOfBirth,
+    string? Nationality,
+    string? Gender,
+    string? GenderOther,
+    string? PhoneNumber,
+    string? HomePhone,
+    string? AddressLine1,
+    string? AddressLine2,
+    string? City,
+    string? County,
+    string? PostCode,
+    string? Country,
+    bool HasSystemAccess,
+    string? EmployeeNumber,
+    Guid? EmploymentTypeId,
+    string Status,
+    Guid? DepartmentId,
+    Guid? LocationId,
+    Guid? PositionProfileId,
+    Guid? ManagerId,
+    DateOnly StartDate,
+    DateOnly? ContinuousServiceDate,
+    DateOnly? ProbationEndDate,
+    DateOnly? LeavingDate,
+    NoticePeriodUnit? NoticePeriodUnitOverride,
+    int? NoticePeriodLengthOverride,
+    WorkingDays? WorkingDaysOverride,
+    decimal? HoursPerDayOverride,
+    string? Notes,
+    Guid? CorrelationId = null,
+    int? ExpectedVersion = null);
+
+public record UpdateEmployeeProfileAndEmploymentResponse(int Version = 0);
 
 // ── LEAVING PROCESS ────────────────────────────────────────────────────────────
 
@@ -406,7 +460,9 @@ public sealed record LeavingProcessResponse(
     int NoticePeriodLength,
     string NoticeSource,
     string LeavingReason,
-    string Status);
+    string Status,
+    // Ticket 2: optimistic-concurrency token.
+    int Version = 0);
 
 public sealed record AmendLeavingProcessRequest(
     Guid CompanyId,
@@ -414,7 +470,9 @@ public sealed record AmendLeavingProcessRequest(
     DateOnly LeavingDate,
     DateOnly LastWorkingDay,
     string LeavingReason,
-    bool ConfirmBackdatedLeavingDate = false);
+    bool ConfirmBackdatedLeavingDate = false,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public sealed record AmendLeavingProcessResponse(
     Guid Id,
@@ -428,7 +486,9 @@ public sealed record AmendLeavingProcessResponse(
     string NoticeSource,
     string LeavingReason,
     string Status,
-    bool OffboardingAlreadyStarted);
+    bool OffboardingAlreadyStarted,
+    // Ticket 2: optimistic-concurrency token after the update.
+    int Version = 0);
 
 public sealed record CancelLeavingProcessRequest(
     Guid CompanyId,

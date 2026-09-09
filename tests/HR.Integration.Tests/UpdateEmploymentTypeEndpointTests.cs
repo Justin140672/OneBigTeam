@@ -14,8 +14,11 @@ public class UpdateEmploymentTypeEndpointTests
     public UpdateEmploymentTypeEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     private async Task<HttpClient> AdminClient(Guid companyId)
@@ -24,7 +27,16 @@ public class UpdateEmploymentTypeEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.Employee, companyId);
         return client;
+    }
+
+    private static async Task<int> GetVersionAsync(HttpClient client, Guid companyId, Guid id)
+    {
+        var resp = await client.GetAsync($"/api/companies/{companyId}/employment-types");
+        resp.EnsureSuccessStatusCode();
+        var payload = (await resp.Content.ReadFromJsonAsync<ListPayload>())!;
+        return payload.Items.Single(i => i.Id == id).Version;
     }
 
     [Fact]
@@ -54,14 +66,16 @@ public class UpdateEmploymentTypeEndpointTests
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<EmploymentTypePayload>();
         Assert.NotNull(created);
+        var version = await GetVersionAsync(client, companyId, created!.Id);
 
         var updateResponse = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/employment-types/{created!.Id}", new
+            $"/api/companies/{companyId}/employment-types/{created.Id}", new
             {
                 companyId,
                 id = created.Id,
                 name = "Fixed-Term Contract",
-                description = "Time-limited contract"
+                description = "Time-limited contract",
+                expectedVersion = version
             });
 
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
@@ -83,7 +97,8 @@ public class UpdateEmploymentTypeEndpointTests
             {
                 companyId,
                 id = Guid.NewGuid(),
-                name = "Permanent"
+                name = "Permanent",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -108,17 +123,21 @@ public class UpdateEmploymentTypeEndpointTests
         create2.EnsureSuccessStatusCode();
         var second = await create2.Content.ReadFromJsonAsync<EmploymentTypePayload>();
         Assert.NotNull(second);
+        var version = await GetVersionAsync(client, companyId, second!.Id);
 
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/employment-types/{second!.Id}", new
+            $"/api/companies/{companyId}/employment-types/{second.Id}", new
             {
                 companyId,
                 id = second.Id,
-                name = "Permanent"
+                name = "Permanent",
+                expectedVersion = version
             });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
+
+    private sealed record ListPayload(IReadOnlyList<EmploymentTypePayload> Items);
 
     private sealed record EmploymentTypePayload(
         Guid Id,
@@ -126,5 +145,6 @@ public class UpdateEmploymentTypeEndpointTests
         string Name,
         string? Description,
         bool IsActive,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        int Version);
 }

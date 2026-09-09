@@ -8,4 +8,6 @@ internal sealed record UpdateRecruitmentStageRequest(
     string Name,
     bool IsTerminal,
     RecruitmentStageTerminalOutcome TerminalOutcome,
-    RecruitmentStagePurpose? Purpose = null);
+    RecruitmentStagePurpose? Purpose = null,
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    int? ExpectedVersion = null);

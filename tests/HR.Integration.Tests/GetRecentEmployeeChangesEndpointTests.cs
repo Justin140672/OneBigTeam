@@ -86,7 +86,8 @@ public class GetRecentEmployeeChangesEndpointTests
                 workEmail = $"audrey.tester.{Guid.NewGuid():N}@example.com",
                 startDate = "2026-01-01",
                 gender = "Female",
-                hasSystemAccess = true
+                hasSystemAccess = true,
+                expectedVersion = 1
             });
         updateResp.EnsureSuccessStatusCode();
 

@@ -229,7 +229,15 @@ internal sealed class UpdateEmploymentDetailsHandler
             now);
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict.
+        var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
+            employee,
+            request.ExpectedVersion,
+            "This employee's details were changed by someone else since you opened them. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateEmploymentDetailsResponse>(saveResult.Error);
 
         var employmentDetailsAfter = new EmploymentDetailsSnapshot(
             employee.EmployeeNumber,
@@ -289,6 +297,7 @@ internal sealed class UpdateEmploymentDetailsHandler
             employee.WorkingDaysOverride,
             employee.HoursPerDayOverride,
             employee.Notes,
-            employee.UpdatedAt));
+            employee.UpdatedAt,
+            employee.Version));
     }
 }

@@ -47,7 +47,14 @@ internal sealed class UpdatePublicHolidayHandler
             request.Name.Trim(),
             request.CountryCode.Trim().ToUpperInvariant());
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
+            holiday,
+            request.ExpectedVersion,
+            "This public holiday was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdatePublicHolidayResponse>(saveResult.Error);
 
         return Result.Success(new UpdatePublicHolidayResponse(
             holiday.Id,
@@ -55,6 +62,7 @@ internal sealed class UpdatePublicHolidayHandler
             holiday.Date,
             holiday.Name,
             holiday.CountryCode,
-            holiday.CreatedAt));
+            holiday.CreatedAt,
+            holiday.Version));
     }
 }

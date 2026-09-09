@@ -3,7 +3,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class AssetService(IHttpClientFactory httpClientFactory) : IEditService<AssetEditModel, Guid>
+public sealed class AssetService(IHttpClientFactory httpClientFactory)
+    : IEditService<AssetEditModel, Guid>, IConcurrencyAwareEditService<AssetEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -168,7 +169,39 @@ public sealed class AssetService(IHttpClientFactory httpClientFactory) : IEditSe
             SerialNumber = response.SerialNumber,
             PurchaseDate = response.PurchaseDate,
             PurchasePrice = response.PurchasePrice,
+            Version = response.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces the stale-save 409.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, AssetEditModel model, int? expectedVersion)
+    {
+        var request = new UpdateAssetRequest(
+            companyId, id, model.AssetNumber.Trim(), model.CategoryId!.Value, model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Manufacturer) ? null : model.Manufacturer.Trim(),
+            string.IsNullOrWhiteSpace(model.Model) ? null : model.Model.Trim(),
+            string.IsNullOrWhiteSpace(model.SerialNumber) ? null : model.SerialNumber.Trim(),
+            model.PurchaseDate, model.PurchasePrice, expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/assets/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateAssetResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                body?.Error ?? "An asset with that number already exists.", body?.Code == "concurrency");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return ApiSaveResult.Fail("Asset not found.");
+
+        return ApiSaveResult.Fail(body?.Error ?? "Failed to update asset.");
     }
 
     async Task<(AssetEditModel? Result, string? Error)> IEditService<AssetEditModel, Guid>.CreateAsync(
@@ -199,5 +232,5 @@ public sealed class AssetService(IHttpClientFactory httpClientFactory) : IEditSe
         return (updated is null ? null : model, error);
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

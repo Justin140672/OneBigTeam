@@ -72,6 +72,12 @@ internal sealed class LeaveTypeConfiguration : IEntityTypeConfiguration<LeaveTyp
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(t => t.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(t => t.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

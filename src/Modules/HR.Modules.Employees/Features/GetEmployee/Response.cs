@@ -59,7 +59,9 @@ internal sealed record GetEmployeeResponse(
     bool ShowLeavingTab,
     NoticePeriodUnit EffectiveNoticePeriodUnit,
     int EffectiveNoticePeriodLength,
-    NoticePeriodSource EffectiveNoticePeriodSource);
+    NoticePeriodSource EffectiveNoticePeriodSource,
+    // Ticket 2: optimistic-concurrency token to echo back on the next employee edit save.
+    int Version);
 
 // Ordered from the top of the org (no manager) down to the employee's immediate manager;
 // does not include the employee themselves.

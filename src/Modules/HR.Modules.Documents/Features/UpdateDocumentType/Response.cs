@@ -7,4 +7,5 @@ internal sealed record UpdateDocumentTypeResponse(
     string? Description,
     bool IsActive,
     bool AllowEmployeeUpload,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

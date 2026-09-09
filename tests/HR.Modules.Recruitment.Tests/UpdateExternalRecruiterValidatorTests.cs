@@ -10,7 +10,7 @@ public class UpdateExternalRecruiterValidatorTests
     public void Validate_Passes_For_Valid_Request()
     {
         var result = _validator.Validate(new UpdateExternalRecruiterRequest(
-            Guid.NewGuid(), Guid.NewGuid(), "Acme Recruiting", null, null, null, null, null));
+            Guid.NewGuid(), Guid.NewGuid(), "Acme Recruiting", null, null, null, null, null, ExpectedVersion: 1));
 
         Assert.True(result.IsValid);
     }

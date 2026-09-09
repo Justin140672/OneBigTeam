@@ -33,7 +33,10 @@ public record InterviewListItemModel(
     int? DurationMinutes,
     string? Location,
     string Outcome,
-    string? Notes);
+    string? Notes,
+    // Ticket 2: optimistic-concurrency token. HR.Web has no interview-edit (PUT) screen today
+    // (only Schedule and Record-Outcome, both POSTs), so this is carried for contract parity only.
+    int Version = 0);
 
 // ── SCHEDULE ──────────────────────────────────────────────────────────────────
 

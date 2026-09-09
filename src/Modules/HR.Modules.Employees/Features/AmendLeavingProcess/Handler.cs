@@ -67,7 +67,16 @@ internal sealed class AmendLeavingProcessHandler(
 
         leavingProcess.Amend(request.LeavingDate, request.LastWorkingDay, request.LeavingReason, now);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict, so the
+        // audit/integration events and departure finalisation below only run on a successful save.
+        var saveResult = await dbContext.SaveChangesWithConcurrencyAsync(
+            leavingProcess,
+            request.ExpectedVersion,
+            "This leaving process was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<AmendLeavingProcessResponse>(saveResult.Error);
 
         var after = new LeavingProcessSnapshot(
             leavingProcess.ResignationReceivedDate,
@@ -123,6 +132,7 @@ internal sealed class AmendLeavingProcessHandler(
             leavingProcess.NoticeSource.ToString(),
             leavingProcess.LeavingReason.ToString(),
             leavingProcess.Status.ToString(),
-            offboardingAlreadyStarted));
+            offboardingAlreadyStarted,
+            leavingProcess.Version));
     }
 }

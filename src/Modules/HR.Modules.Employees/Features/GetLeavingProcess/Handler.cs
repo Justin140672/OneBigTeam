@@ -30,6 +30,7 @@ internal sealed class GetLeavingProcessHandler(EmployeesDbContext dbContext)
             leavingProcess.NoticePeriodLength,
             leavingProcess.NoticeSource.ToString(),
             leavingProcess.LeavingReason.ToString(),
-            leavingProcess.Status.ToString()));
+            leavingProcess.Status.ToString(),
+            leavingProcess.Version));
     }
 }

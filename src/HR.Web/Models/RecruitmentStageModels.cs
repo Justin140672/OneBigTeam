@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using HR.Web.Services;
 
 namespace HR.Web.Models;
 
@@ -31,7 +32,9 @@ public sealed record RecruitmentStageListItem(
     bool IsActive,
     bool IsTerminal,
     RecruitmentStageTerminalOutcome TerminalOutcome,
-    RecruitmentStagePurpose? Purpose = null);
+    RecruitmentStagePurpose? Purpose = null,
+    // Ticket 2: optimistic-concurrency token.
+    int Version = 0);
 
 public sealed record CreateRecruitmentStageRequest(
     Guid CompanyId,
@@ -58,7 +61,9 @@ public sealed record UpdateRecruitmentStageRequest(
     string Name,
     bool IsTerminal,
     RecruitmentStageTerminalOutcome TerminalOutcome,
-    RecruitmentStagePurpose? Purpose = null);
+    RecruitmentStagePurpose? Purpose = null,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public sealed record UpdateRecruitmentStageResponse(
     Guid Id,
@@ -68,7 +73,8 @@ public sealed record UpdateRecruitmentStageResponse(
     bool IsActive,
     bool IsTerminal,
     RecruitmentStageTerminalOutcome TerminalOutcome,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
 public sealed record ReorderRecruitmentStagesRequest(Guid CompanyId, IReadOnlyList<Guid> OrderedStageIds);
 
@@ -91,8 +97,10 @@ public sealed record GetRecruitmentStageUsageResponse(
     int ActiveVacancyCount,
     IReadOnlyList<string> VacancyLabels);
 
-public sealed class RecruitmentStageEditModel
+public sealed class RecruitmentStageEditModel : IHasVersion
 {
+    public int Version { get; set; }
+
     [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
 

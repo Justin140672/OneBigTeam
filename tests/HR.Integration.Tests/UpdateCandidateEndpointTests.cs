@@ -54,7 +54,7 @@ public class UpdateCandidateEndpointTests
 
     private static object Body(Guid companyId, Guid candidateId, string first = "Emily", string last = "Clarke-Jones",
         string email = "emily.updated@example.com") =>
-        new { companyId, candidateId, firstName = first, lastName = last, email, phone = "+44 7700 900123" };
+        new { companyId, candidateId, firstName = first, lastName = last, email, phone = "+44 7700 900123", expectedVersion = 1 };
 
     [Fact]
     public async Task Put_Candidate_Returns_Unauthorized_For_Anonymous_Request()

@@ -11,7 +11,8 @@ public class UpdateSicknessCategoryValidatorTests
         CompanyId = Guid.NewGuid(),
         Id = Guid.NewGuid(),
         Name = "Cold",
-        DisplayOrder = 1
+        DisplayOrder = 1,
+        ExpectedVersion = 1
     };
 
     [Fact]

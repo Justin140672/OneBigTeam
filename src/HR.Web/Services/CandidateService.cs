@@ -4,7 +4,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class CandidateService(IHttpClientFactory httpClientFactory) : IEditService<CandidateEditModel, Guid>
+public sealed class CandidateService(IHttpClientFactory httpClientFactory)
+    : IEditService<CandidateEditModel, Guid>, IConcurrencyAwareEditService<CandidateEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -91,7 +92,37 @@ public sealed class CandidateService(IHttpClientFactory httpClientFactory) : IEd
             Email = response.Email,
             Phone = response.Phone,
             ResumeUrl = response.ResumeUrl,
+            Version = response.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces a stale-save 409.
+    // The recruitment API returns no "code" on its 409 body, so ANY 409 from this endpoint is
+    // treated as a save conflict.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, CandidateEditModel model, int? expectedVersion)
+    {
+        var request = new UpdateCandidateRequest(
+            companyId, id, model.FirstName.Trim(), model.LastName.Trim(), model.Email.Trim(),
+            string.IsNullOrWhiteSpace(model.Phone) ? null : model.Phone.Trim(),
+            string.IsNullOrWhiteSpace(model.ResumeUrl) ? null : model.ResumeUrl.Trim(),
+            expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/candidates/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateCandidateResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        if (response.StatusCode == HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                await ReadErrorAsync(response, "Someone else changed this candidate while you were editing.")
+                    ?? "Someone else changed this candidate while you were editing.",
+                isConcurrencyConflict: true);
+
+        return ApiSaveResult.Fail(await ReadErrorAsync(response, "Failed to update candidate.") ?? "Failed to update candidate.");
     }
 
     async Task<(CandidateEditModel? Result, string? Error)> IEditService<CandidateEditModel, Guid>.CreateAsync(Guid companyId, CandidateEditModel model)

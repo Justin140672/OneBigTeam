@@ -22,7 +22,7 @@ internal sealed class ListDocumentTypesHandler(DocumentsDbContext db)
 
         var items = await query
             .OrderBy(dt => dt.Name)
-            .Select(dt => new DocumentTypeListItem(dt.Id, dt.Name, dt.Description, dt.IsActive, dt.AllowEmployeeUpload))
+            .Select(dt => new DocumentTypeListItem(dt.Id, dt.Name, dt.Description, dt.IsActive, dt.AllowEmployeeUpload, dt.Version))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new ListDocumentTypesResponse(items));

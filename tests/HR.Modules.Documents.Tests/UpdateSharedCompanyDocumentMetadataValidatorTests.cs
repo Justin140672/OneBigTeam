@@ -20,6 +20,7 @@ public class UpdateSharedCompanyDocumentMetadataValidatorTests
             ReviewFrequency             = reviewFrequency,
             CustomReviewFrequencyMonths = customReviewFrequencyMonths,
             ReviewDate                  = reviewDate,
+            ExpectedVersion             = 1,
         };
 
     [Fact]

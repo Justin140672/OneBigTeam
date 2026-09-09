@@ -2,7 +2,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class SicknessCategoryService(IHttpClientFactory httpClientFactory) : IEditService<SicknessCategoryEditModel, Guid>
+public class SicknessCategoryService(IHttpClientFactory httpClientFactory)
+    : IEditService<SicknessCategoryEditModel, Guid>, IConcurrencyAwareEditService<SicknessCategoryEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -89,7 +90,35 @@ public class SicknessCategoryService(IHttpClientFactory httpClientFactory) : IEd
         {
             Name = existing.Name,
             DisplayOrder = existing.DisplayOrder,
+            Version = existing.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces the stale-save 409.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, SicknessCategoryEditModel model, int? expectedVersion)
+    {
+        var request = new UpdateSicknessCategoryRequest(
+            companyId, id, model.Name.Trim(), model.DisplayOrder, expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/sickness-categories/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateSicknessCategoryResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                body?.Error ?? "A sickness category with that name already exists.", body?.Code == "concurrency");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return ApiSaveResult.Fail("Sickness category not found.");
+
+        return ApiSaveResult.Fail(body?.Error ?? "Failed to update sickness category.");
     }
 
     async Task<(SicknessCategoryEditModel? Result, string? Error)> IEditService<SicknessCategoryEditModel, Guid>.CreateAsync(
@@ -108,5 +137,5 @@ public class SicknessCategoryService(IHttpClientFactory httpClientFactory) : IEd
         return (updated is null ? null : model, error);
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

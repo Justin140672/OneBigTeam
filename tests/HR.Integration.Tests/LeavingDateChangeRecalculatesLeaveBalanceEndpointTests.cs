@@ -118,7 +118,8 @@ public class LeavingDateChangeRecalculatesLeaveBalanceEndpointTests
                 employeeId,
                 leavingDate = laterLeavingDate.ToString("yyyy-MM-dd"),
                 lastWorkingDay = laterLeavingDate.AddDays(-1).ToString("yyyy-MM-dd"),
-                leavingReason = "Resignation"
+                leavingReason = "Resignation",
+                expectedVersion = 1
             });
         amendResp.EnsureSuccessStatusCode();
 

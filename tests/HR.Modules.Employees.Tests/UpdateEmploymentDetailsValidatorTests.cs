@@ -17,7 +17,8 @@ public class UpdateEmploymentDetailsValidatorTests
         EmployeeNumber = "EMP-001",
         EmploymentTypeId = Guid.NewGuid(),
         Status = EmploymentStatus.Active,
-        StartDate = new DateOnly(2026, 1, 1)
+        StartDate = new DateOnly(2026, 1, 1),
+        ExpectedVersion = 1
     };
 
     [Fact]
@@ -25,6 +26,14 @@ public class UpdateEmploymentDetailsValidatorTests
     {
         var result = _validator.Validate(ValidRequest());
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_ExpectedVersion_Is_Null()
+    {
+        var result = _validator.Validate(ValidRequest() with { ExpectedVersion = null });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.ExpectedVersion));
     }
 
     [Fact]

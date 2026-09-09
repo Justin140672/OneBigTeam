@@ -1,7 +1,12 @@
 namespace HR.Modules.Recruitment.Domain;
 
-internal sealed class Candidate
+internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
 {
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
+
     private Candidate() { }
 
     public Guid Id { get; private set; }
@@ -46,6 +51,7 @@ internal sealed class Candidate
         Phone      = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim(),
         ResumeUrl  = string.IsNullOrWhiteSpace(resumeUrl) ? null : resumeUrl.Trim(),
         IsActive   = true,
+        Version    = 1,
         CreatedAt  = now,
         UpdatedAt  = now,
     };

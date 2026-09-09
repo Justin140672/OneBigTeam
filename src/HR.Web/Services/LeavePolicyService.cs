@@ -2,7 +2,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class LeavePolicyService(IHttpClientFactory httpClientFactory) : IEditService<LeavePolicyEditModel, Guid>
+public class LeavePolicyService(IHttpClientFactory httpClientFactory)
+    : IEditService<LeavePolicyEditModel, Guid>, IConcurrencyAwareEditService<LeavePolicyEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -44,7 +45,37 @@ public class LeavePolicyService(IHttpClientFactory httpClientFactory) : IEditSer
             CarryOverDays = response.CarryOverDays,
             AllowNegativeBalance = response.AllowNegativeBalance,
             IsDefault = response.IsDefault,
+            Version = response.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces the stale-save 409.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, LeavePolicyEditModel model, int? expectedVersion)
+    {
+        var request = new UpdateLeavePolicyRequest(
+            companyId, id, model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            model.CarryOverDays, model.AllowNegativeBalance, model.IsDefault, expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/leave-policies/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateLeavePolicyResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                body?.Error ?? "A leave policy with that name already exists.", body?.Code == "concurrency");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return ApiSaveResult.Fail("Leave policy not found.");
+
+        return ApiSaveResult.Fail(body?.Error ?? "Failed to update leave policy.");
     }
 
     async Task<(LeavePolicyEditModel? Result, string? Error)> IEditService<LeavePolicyEditModel, Guid>.CreateAsync(
@@ -127,5 +158,5 @@ public class LeavePolicyService(IHttpClientFactory httpClientFactory) : IEditSer
         return body?.Error ?? "Failed to set default leave policy.";
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

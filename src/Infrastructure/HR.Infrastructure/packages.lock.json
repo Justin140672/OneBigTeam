@@ -446,7 +446,17 @@
         }
       },
       "hr.sharedkernel": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "FluentValidation": "[12.1.1, )",
+          "Microsoft.EntityFrameworkCore": "[10.0.11, )"
+        }
+      },
+      "FluentValidation": {
+        "type": "CentralTransitive",
+        "requested": "[12.1.1, )",
+        "resolved": "12.1.1",
+        "contentHash": "EPpkIe1yh1a0OXyC100oOA8WMbZvqUu5plwhvYcb7oSELfyUZzfxV48BLhvs3kKo4NwG7MGLNgy1RJiYtT8Dpw=="
       },
       "Hangfire.Core": {
         "type": "CentralTransitive",

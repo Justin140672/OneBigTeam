@@ -2,7 +2,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class LeaveTypeService(IHttpClientFactory httpClientFactory) : IEditService<LeaveTypeEditModel, Guid>
+public class LeaveTypeService(IHttpClientFactory httpClientFactory)
+    : IEditService<LeaveTypeEditModel, Guid>, IConcurrencyAwareEditService<LeaveTypeEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -34,7 +35,36 @@ public class LeaveTypeService(IHttpClientFactory httpClientFactory) : IEditServi
             Behaviour = existing.Behaviour,
             HasBalance = existing.HasBalance,
             IsSystem = existing.IsSystem,
+            Version = existing.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces the stale-save 409.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, LeaveTypeEditModel model, int? expectedVersion)
+    {
+        var request = new UpdateLeaveTypeRequest(
+            companyId, id, model.Name.Trim(), model.Code.Trim().ToUpperInvariant(),
+            model.DefaultEntitlementDays, model.AccrualMethod, model.Behaviour, model.HasBalance, expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/leave-types/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateLeaveTypeResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                body?.Error ?? "A leave type with that code already exists.", body?.Code == "concurrency");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return ApiSaveResult.Fail("Leave type not found.");
+
+        return ApiSaveResult.Fail(body?.Error ?? "Failed to update leave type.");
     }
 
     async Task<(LeaveTypeEditModel? Result, string? Error)> IEditService<LeaveTypeEditModel, Guid>.CreateAsync(
@@ -116,5 +146,5 @@ public class LeaveTypeService(IHttpClientFactory httpClientFactory) : IEditServi
         return body?.Error ?? "Failed to deactivate leave type.";
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

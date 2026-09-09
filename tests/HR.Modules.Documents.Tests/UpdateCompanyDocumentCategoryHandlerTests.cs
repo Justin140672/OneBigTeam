@@ -22,6 +22,7 @@ public class UpdateCompanyDocumentCategoryHandlerTests
                 CompanyId  = companyId,
                 CategoryId = categoryId,
                 Name       = "Handbook",
+                ExpectedVersion = 1,
             },
             CancellationToken.None);
 
@@ -45,6 +46,7 @@ public class UpdateCompanyDocumentCategoryHandlerTests
                 CompanyId  = companyId,
                 CategoryId = categoryId,
                 Name       = "Policy",
+                ExpectedVersion = 1,
             },
             CancellationToken.None);
 
@@ -106,6 +108,7 @@ public class UpdateCompanyDocumentCategoryHandlerTests
                 CompanyId  = Guid.NewGuid(), // different company
                 CategoryId = categoryId,
                 Name       = "Handbook",
+                ExpectedVersion = 1,
             },
             CancellationToken.None);
 
@@ -150,6 +153,7 @@ public class UpdateCompanyDocumentCategoryHandlerTests
                 CompanyId  = companyId,
                 CategoryId = categoryId,
                 Name       = "  Handbook  ",
+                ExpectedVersion = 1,
             },
             CancellationToken.None);
 

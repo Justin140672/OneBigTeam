@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -12,7 +13,7 @@ internal sealed class MarketingDbContextFactory : IDesignTimeDbContextFactory<Ma
             ?? "Host=localhost;Port=5432;Database=hr;Username=postgres;Password=postgres";
 
         var optionsBuilder = new DbContextOptionsBuilder<MarketingDbContext>();
-        optionsBuilder.UseNpgsql(connectionString, npgsql =>
+        optionsBuilder.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
             npgsql.MigrationsHistoryTable("__ef_migrations_history", "marketing"));
 
         return new MarketingDbContext(optionsBuilder.Options);

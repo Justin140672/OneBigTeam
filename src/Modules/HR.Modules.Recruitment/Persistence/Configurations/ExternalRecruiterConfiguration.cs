@@ -49,6 +49,12 @@ internal sealed class ExternalRecruiterConfiguration : IEntityTypeConfiguration<
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(r => r.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(r => r.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

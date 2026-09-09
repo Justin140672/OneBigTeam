@@ -24,7 +24,8 @@ internal sealed class GetMyContactDetailsHandler(EmployeesDbContext dbContext)
                 e.City,
                 e.County,
                 e.PostCode,
-                e.Country))
+                e.Country,
+                e.Version))
             .SingleOrDefaultAsync(cancellationToken);
 
         if (result is null)

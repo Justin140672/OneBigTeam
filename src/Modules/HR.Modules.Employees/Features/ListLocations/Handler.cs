@@ -33,7 +33,8 @@ internal sealed class ListLocationsHandler
                 l.Id,
                 l.Name,
                 l.LocationTypeId,
-                l.IsActive))
+                l.IsActive,
+                l.Version))
             .ToList();
 
         return Result.Success(new ListLocationsResponse(items));

@@ -79,6 +79,12 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(p => p.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(p => p.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

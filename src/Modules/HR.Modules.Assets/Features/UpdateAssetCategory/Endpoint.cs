@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Assets.Features.UpdateAssetCategory;
@@ -17,7 +18,7 @@ internal sealed class Endpoint(UpdateAssetCategoryHandler handler)
         var result = await handler.HandleAsync(request, cancellationToken);
         if (result.IsFailure)
         {
-            await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
         await Send.ResultAsync(TypedResults.Ok(result.Value));

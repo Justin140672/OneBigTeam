@@ -46,7 +46,9 @@ public record GetPositionProfileResponse(
     IReadOnlyList<PositionProfileRequiredAssetModel> RequiredAssets,
     NoticePeriodUnit? NoticePeriodUnitOverride = null,
     int? NoticePeriodLengthOverride = null,
-    IReadOnlyList<PositionProfileAssignedEmployeeModel>? AssignedEmployees = null);
+    IReadOnlyList<PositionProfileAssignedEmployeeModel>? AssignedEmployees = null,
+    // Ticket 2: optimistic-concurrency token.
+    int Version = 0);
 
 public record PositionProfileAssignedEmployeeModel(
     Guid EmployeeId,
@@ -231,7 +233,9 @@ public record UpdatePositionProfileRequest(
     Guid DefaultLeavePolicyId,
     Guid? OnboardingTemplateId,
     NoticePeriodUnit? NoticePeriodUnitOverride = null,
-    int? NoticePeriodLengthOverride = null);
+    int? NoticePeriodLengthOverride = null,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdatePositionProfileResponse(
     Guid Id,
@@ -240,4 +244,5 @@ public record UpdatePositionProfileResponse(
     string Title,
     string? Description,
     bool IsActive,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);

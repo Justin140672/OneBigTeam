@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using HR.Web.Services;
 
 namespace HR.Web.Models;
 
@@ -16,7 +17,8 @@ public record LeaveTypeListItemModel(
     bool HasBalance,
     bool IsSystem,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
 public record CreateLeaveTypeRequest(
     Guid CompanyId,
@@ -49,7 +51,9 @@ public record UpdateLeaveTypeRequest(
     int DefaultEntitlementDays,
     string AccrualMethod,
     string Behaviour,
-    bool HasBalance = true);
+    bool HasBalance = true,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdateLeaveTypeResponse(
     Guid Id,
@@ -62,10 +66,13 @@ public record UpdateLeaveTypeResponse(
     bool IsActive,
     bool HasBalance,
     bool IsSystem,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
-public sealed class LeaveTypeEditModel
+public sealed class LeaveTypeEditModel : IHasVersion
 {
+    public int Version { get; set; }
+
     [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
     [Required(ErrorMessage = "Code is required.")]

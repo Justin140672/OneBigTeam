@@ -112,6 +112,13 @@ public static class SeededE2eEmployees
         P(46, "SeedOnboardTabD"), P(47, "SeedOnboardTabE"), P(48, "SeedOnboardTabF"),
     ];
 
+    // ── Optimistic-concurrency conflict UI (Ticket 2) ───────────────────────
+    // ConcurrencyAdmin: HR-admin editor test — two admin browser tabs on the same employee.
+    // ConcurrencySelf: self-service Contact Details test — needs a runtime Supabase login via
+    // the dev ensure-employee-login endpoint (its Employee row is seeded, its login is not).
+    public static readonly Pooled ConcurrencyAdmin = P(49, "SeedConcurrencyAdmin");
+    public static readonly Pooled ConcurrencySelf  = P(50, "SeedConcurrencySelf");
+
     /// <summary>Every pool member, for callers that just need to enumerate them.</summary>
     public static IEnumerable<Pooled> All()
     {
@@ -129,5 +136,7 @@ public static class SeededE2eEmployees
         foreach (var p in OffboardingTab) yield return p;
         foreach (var p in OffboardingConfirmation) yield return p;
         foreach (var p in OnboardingTab) yield return p;
+        yield return ConcurrencyAdmin;
+        yield return ConcurrencySelf;
     }
 }

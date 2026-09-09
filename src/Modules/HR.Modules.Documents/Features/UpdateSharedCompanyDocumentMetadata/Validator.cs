@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.SharedKernel;
 using HR.Modules.Documents.Domain;
 
 namespace HR.Modules.Documents.Features.UpdateSharedCompanyDocumentMetadata;
@@ -7,6 +8,9 @@ internal sealed class UpdateSharedCompanyDocumentMetadataValidator : AbstractVal
 {
     public UpdateSharedCompanyDocumentMetadataValidator()
     {
+        // Ticket 2 item 3: a loaded concurrency version is mandatory on this protected update.
+        RuleFor(r => r.ExpectedVersion).RequireLoadedVersion();
+
         RuleFor(r => r.CompanyId)
             .NotEmpty();
 

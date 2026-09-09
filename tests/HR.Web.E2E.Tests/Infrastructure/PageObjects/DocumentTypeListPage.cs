@@ -22,6 +22,13 @@ public sealed class DocumentTypeListPage(IPage page, string baseUrl)
         await page.WaitForURLAsync("**/document-types/new**", new() { Timeout = 15_000 });
     }
 
+    /// <summary>The href of the grid row link whose text contains <paramref name="nameFragment"/> (e.g. "/companies/{id}/document-types/{id}").</summary>
+    public async Task<string> GetRowHrefAsync(string nameFragment)
+    {
+        var href = await page.Locator(".e-rowcell a").Filter(new() { HasText = nameFragment }).First.GetAttributeAsync("href");
+        return href ?? throw new InvalidOperationException($"No document-type row link found for '{nameFragment}'.");
+    }
+
     public async Task<bool> HasItemAsync(string nameFragment) =>
         await page.Locator(".e-rowcell")
             .Filter(new() { HasText = nameFragment })

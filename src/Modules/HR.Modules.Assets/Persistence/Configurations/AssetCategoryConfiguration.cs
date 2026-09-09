@@ -33,6 +33,12 @@ internal sealed class AssetCategoryConfiguration : IEntityTypeConfiguration<Asse
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(c => c.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

@@ -30,4 +30,7 @@ internal sealed record UpdateEmploymentDetailsRequest
     // Same CorrelationId mechanism as UpdateEmployeeProfileRequest — optional, defaults to null so
     // EmployeeEmploymentTab.SaveAsync's standalone callers are unaffected.
     public Guid? CorrelationId { get; init; }
+
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
 }

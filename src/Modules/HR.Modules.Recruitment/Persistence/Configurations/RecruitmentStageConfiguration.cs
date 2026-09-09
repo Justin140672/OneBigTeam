@@ -48,6 +48,12 @@ internal sealed class RecruitmentStageConfiguration : IEntityTypeConfiguration<R
             .HasConversion<string>()
             .HasMaxLength(20);
 
+        builder.Property(s => s.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(s => s.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

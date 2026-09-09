@@ -36,6 +36,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
                 CategoryId    = newCategory.Id,
                 EffectiveDate = new DateOnly(2026, 9, 1),
                 ReviewDate    = new DateOnly(2027, 9, 1),
+                ExpectedVersion = 1,
             },
             updatedBy, CancellationToken.None);
 
@@ -225,6 +226,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
                 DocumentId = doc.Id,
                 Title      = "New Title",
                 CategoryId = category.Id,
+                ExpectedVersion = 1,
             },
             updatedBy, CancellationToken.None);
 
@@ -286,6 +288,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
                 EffectiveDate   = doc.EffectiveDate,
                 ReviewDate      = doc.ReviewDate,
                 ReviewFrequency = SharedCompanyDocumentReviewFrequency.Monthly,
+                ExpectedVersion = 1,
             },
             Guid.NewGuid(), CancellationToken.None);
 
@@ -315,6 +318,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
                 Title                 = "Title",
                 CategoryId            = category.Id,
                 ReviewOwnerEmployeeId = reviewOwnerId,
+                ExpectedVersion       = 1,
             },
             Guid.NewGuid(), CancellationToken.None);
 
@@ -348,6 +352,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
                 Title                 = "Title",
                 CategoryId            = category.Id,
                 ReviewOwnerEmployeeId = null,
+                ExpectedVersion       = 1,
             },
             Guid.NewGuid(), CancellationToken.None);
 
@@ -409,6 +414,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
                 EffectiveDate         = doc.EffectiveDate,
                 ReviewDate            = doc.ReviewDate,
                 ReviewOwnerEmployeeId = reviewOwnerId,
+                ExpectedVersion       = 1,
             },
             Guid.NewGuid(), CancellationToken.None);
 
@@ -446,6 +452,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
                 Title           = "Title",
                 CategoryId      = category.Id,
                 ReviewFrequency = SharedCompanyDocumentReviewFrequency.None,
+                ExpectedVersion = 1,
             },
             Guid.NewGuid(), CancellationToken.None);
 

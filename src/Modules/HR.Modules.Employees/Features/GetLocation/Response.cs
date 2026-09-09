@@ -6,4 +6,5 @@ internal sealed record GetLocationResponse(
     string Name,
     string? Description,
     Guid LocationTypeId,
-    bool IsActive);
+    bool IsActive,
+    int Version);

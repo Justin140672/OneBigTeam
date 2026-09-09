@@ -28,7 +28,7 @@ internal sealed class Endpoint(UpdateCandidateHandler handler)
                 return;
             }
 
-            if (result.Error.Code == "conflict")
+            if (result.Error.Code is "conflict" or "concurrency")
             {
                 await Send.ResultAsync(TypedResults.Conflict(businessError));
                 return;

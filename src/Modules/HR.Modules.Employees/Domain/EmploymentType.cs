@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Employees.Domain;
 
-internal sealed class EmploymentType
+internal sealed class EmploymentType : IVersionedAggregate
 {
     private EmploymentType() { }
 
@@ -12,6 +14,11 @@ internal sealed class EmploymentType
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
+
     public static EmploymentType Create(Guid id, Guid companyId, string name, string? description, DateTimeOffset now) =>
         new()
         {
@@ -20,6 +27,7 @@ internal sealed class EmploymentType
             Name        = name,
             Description = description,
             IsActive    = true,
+            Version     = 1,
             CreatedAt   = now,
             UpdatedAt   = now,
         };

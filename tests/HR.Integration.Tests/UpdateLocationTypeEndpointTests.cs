@@ -14,8 +14,11 @@ public class UpdateLocationTypeEndpointTests
     public UpdateLocationTypeEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     private async Task<HttpClient> AdminClient(Guid companyId)
@@ -24,7 +27,16 @@ public class UpdateLocationTypeEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.Employee, companyId);
         return client;
+    }
+
+    private static async Task<int> GetVersionAsync(HttpClient client, Guid companyId, Guid id)
+    {
+        var resp = await client.GetAsync($"/api/companies/{companyId}/location-types");
+        resp.EnsureSuccessStatusCode();
+        var payload = (await resp.Content.ReadFromJsonAsync<ListPayload>())!;
+        return payload.Items.Single(i => i.Id == id).Version;
     }
 
     [Fact]
@@ -54,14 +66,16 @@ public class UpdateLocationTypeEndpointTests
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<LocationTypePayload>();
         Assert.NotNull(created);
+        var version = await GetVersionAsync(client, companyId, created!.Id);
 
         var updateResponse = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/location-types/{created!.Id}", new
+            $"/api/companies/{companyId}/location-types/{created.Id}", new
             {
                 companyId,
                 id = created.Id,
                 name = "Head Office",
-                description = "Main corporate office"
+                description = "Main corporate office",
+                expectedVersion = version
             });
 
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
@@ -83,7 +97,8 @@ public class UpdateLocationTypeEndpointTests
             {
                 companyId,
                 id = Guid.NewGuid(),
-                name = "Office"
+                name = "Office",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -108,17 +123,21 @@ public class UpdateLocationTypeEndpointTests
         create2.EnsureSuccessStatusCode();
         var second = await create2.Content.ReadFromJsonAsync<LocationTypePayload>();
         Assert.NotNull(second);
+        var version = await GetVersionAsync(client, companyId, second!.Id);
 
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/location-types/{second!.Id}", new
+            $"/api/companies/{companyId}/location-types/{second.Id}", new
             {
                 companyId,
                 id = second.Id,
-                name = "Office"
+                name = "Office",
+                expectedVersion = version
             });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
+
+    private sealed record ListPayload(IReadOnlyList<LocationTypePayload> Items);
 
     private sealed record LocationTypePayload(
         Guid Id,
@@ -126,5 +145,6 @@ public class UpdateLocationTypeEndpointTests
         string Name,
         string? Description,
         bool IsActive,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        int Version);
 }

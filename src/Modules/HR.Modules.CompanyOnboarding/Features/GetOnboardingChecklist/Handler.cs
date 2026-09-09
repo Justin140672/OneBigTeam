@@ -31,10 +31,7 @@ internal sealed class GetOnboardingChecklistHandler(
             dbContext.Progress.Add(progress);
         }
 
-        var existingCompletions = await dbContext.TaskCompletions
-            .Where(t => t.CompanyId == companyId)
-            .ToListAsync(cancellationToken);
-        var completionsByKey = existingCompletions.ToDictionary(t => t.TaskKey);
+        var completionsByKey = await EnsureCompletionRowsAsync(companyId, now, cancellationToken);
 
         var items = new List<OnboardingTaskItemResponse>();
 
@@ -43,12 +40,7 @@ internal sealed class GetOnboardingChecklistHandler(
             var liveComputedCompleted = await task.IsCompletedAsync(companyId, cancellationToken);
             var linkUrl = await task.GetLinkUrlAsync(companyId, cancellationToken);
 
-            if (!completionsByKey.TryGetValue(task.Key, out var completion))
-            {
-                completion = CompanyOnboardingTaskCompletion.Create(Guid.NewGuid(), companyId, task.Key, now);
-                dbContext.TaskCompletions.Add(completion);
-                completionsByKey[task.Key] = completion;
-            }
+            var completion = completionsByKey[task.Key];
 
             // Sticky: a manual completion (e.g. via MarkOnboardingTaskComplete, used for
             // "Download the Employee import template") is never reverted by a later checklist
@@ -89,4 +81,63 @@ internal sealed class GetOnboardingChecklistHandler(
 
         return Result.Success(response);
     }
+
+    /// <summary>
+    /// Lazily materialises a <see cref="CompanyOnboardingTaskCompletion"/> row for every registry
+    /// task, returning the full set keyed by task key. This GET is hit concurrently (dashboard +
+    /// getting-started widget, multiple tabs/circuits), so a plain read-then-insert races: two
+    /// callers both see a missing row and both INSERT, the second violating
+    /// <c>IX_task_completions_company_id_task_key</c> and 500-ing the request. Insert the missing
+    /// rows in their own SaveChanges; if a concurrent caller won the race (23505), swallow it,
+    /// re-read, and carry on — the row now exists either way. Status updates happen on the caller's
+    /// own SaveChanges afterwards.
+    /// </summary>
+    private async Task<Dictionary<string, CompanyOnboardingTaskCompletion>> EnsureCompletionRowsAsync(
+        Guid companyId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var byKey = (await dbContext.TaskCompletions
+                .Where(t => t.CompanyId == companyId)
+                .ToListAsync(cancellationToken))
+            .ToDictionary(t => t.TaskKey);
+
+        var missing = registry.Tasks
+            .Where(task => !byKey.ContainsKey(task.Key))
+            .Select(task => CompanyOnboardingTaskCompletion.Create(Guid.NewGuid(), companyId, task.Key, now))
+            .ToList();
+
+        if (missing.Count == 0)
+            return byKey;
+
+        dbContext.TaskCompletions.AddRange(missing);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            // A concurrent request inserted (some of) these first. Detach our losing inserts and
+            // re-read the now-complete set.
+            foreach (var row in missing)
+                dbContext.Entry(row).State = EntityState.Detached;
+
+            return (await dbContext.TaskCompletions
+                    .Where(t => t.CompanyId == companyId)
+                    .ToListAsync(cancellationToken))
+                .ToDictionary(t => t.TaskKey);
+        }
+
+        foreach (var row in missing)
+            byKey[row.TaskKey] = row;
+
+        return byKey;
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException exception) =>
+        exception.InnerException is { } inner
+        && inner.GetType().Name == "PostgresException"
+        && string.Equals(
+            inner.GetType().GetProperty("SqlState")?.GetValue(inner) as string,
+            "23505",
+            StringComparison.Ordinal);
 }

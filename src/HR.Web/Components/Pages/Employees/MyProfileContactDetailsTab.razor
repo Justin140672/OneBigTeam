@@ -29,7 +29,12 @@ else
         </div>
     }
 
-    @if (GlobalError is not null)
+    <SaveConflictBanner Visible="SaveConflict"
+                        Disabled="@_saving"
+                        OnReload="ReloadLatestClickedAsync"
+                        Message="Someone else changed your details while you were editing. Your changes have not been saved." />
+
+    @if (!SaveConflict && GlobalError is not null)
     {
         <div class="alert alert-danger alert-dismissible mb-3">
             @GlobalError
@@ -57,7 +62,7 @@ else
 
                 <div class="cd-field-group">
                     <label class="cd-label">Personal Email</label>
-                    <input class="form-control" type="email" @bind="Model.PersonalEmail" placeholder="e.g. name@personal.com" maxlength="320" />
+                    <HrTextBox @bind-Value="Model.PersonalEmail" Type="InputType.Email" Placeholder="e.g. name@personal.com" Maxlength="320" />
                     <ValidationMessage For="@(() => Model.PersonalEmail)" />
                 </div>
 
@@ -66,31 +71,31 @@ else
 
                 <div class="cd-field-group">
                     <label class="cd-label">Address Line 1 <span class="cd-required">*</span></label>
-                    <input class="form-control" @bind="Model.AddressLine1" placeholder="Street address" maxlength="200" />
+                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" Maxlength="200" />
                     <ValidationMessage For="@(() => Model.AddressLine1)" />
                 </div>
 
                 <div class="cd-field-group">
                     <label class="cd-label">Address Line 2</label>
-                    <input class="form-control" @bind="Model.AddressLine2" placeholder="Apartment, suite, etc." maxlength="200" />
+                    <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." Maxlength="200" />
                 </div>
 
                 <div class="cd-field-row">
                     <div class="cd-field-group">
                         <label class="cd-label">City <span class="cd-required">*</span></label>
-                        <input class="form-control" @bind="Model.City" placeholder="e.g. London" maxlength="100" />
+                        <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" Maxlength="100" />
                         <ValidationMessage For="@(() => Model.City)" />
                     </div>
                     <div class="cd-field-group">
                         <label class="cd-label">County / State</label>
-                        <input class="form-control" @bind="Model.County" placeholder="e.g. Greater London" maxlength="100" />
+                        <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" Maxlength="100" />
                     </div>
                 </div>
 
                 <div class="cd-field-row">
                     <div class="cd-field-group">
                         <label class="cd-label">Post Code <span class="cd-required">*</span></label>
-                        <input class="form-control" @bind="Model.PostCode" placeholder="e.g. SW1A 1AA" maxlength="20" />
+                        <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" Maxlength="20" />
                         <ValidationMessage For="@(() => Model.PostCode)" />
                     </div>
                     @* Country is not shown — UK-only for now. Model.Country defaults to "United
@@ -103,11 +108,13 @@ else
                 <div class="cd-field-row">
                     <div class="cd-field-group">
                         <label class="cd-label">Mobile / Work Phone</label>
-                        <input class="form-control" type="tel" @bind="Model.PhoneNumber" placeholder="e.g. 07700 900000" maxlength="30" />
+                        <HrTextBox @bind-Value="Model.PhoneNumber" Type="InputType.Tel" Placeholder="e.g. 07700 900000" Maxlength="30" />
+                        <ValidationMessage For="@(() => Model.PhoneNumber)" />
                     </div>
                     <div class="cd-field-group">
                         <label class="cd-label">Home Phone</label>
-                        <input class="form-control" type="tel" @bind="Model.HomePhone" placeholder="e.g. 01234 567890" maxlength="30" />
+                        <HrTextBox @bind-Value="Model.HomePhone" Type="InputType.Tel" Placeholder="e.g. 01234 567890" Maxlength="30" />
+                        <ValidationMessage For="@(() => Model.HomePhone)" />
                     </div>
                 </div>
 
@@ -145,6 +152,7 @@ else
         if (details is not null)
         {
             _workEmail = details.WorkEmail;
+            LoadedVersion = details.Version;
             Model.PersonalEmail = details.PersonalEmail;
             Model.PhoneNumber = details.PhoneNumber;
             Model.HomePhone = details.HomePhone;
@@ -166,6 +174,16 @@ else
         _saving = false;
     }
 
+    // Concurrency-conflict recovery: explicit user reload — adopt the latest server values and
+    // re-baseline unsaved-changes tracking (rebaseline: true). The base handles the re-fetch,
+    // version refresh and clearing the banner.
+    private async Task ReloadLatestClickedAsync()
+    {
+        _saving = true;
+        await ReloadLatestValuesAsync(rebaseline: true);
+        _saving = false;
+    }
+
     protected override async Task<string?> SaveCoreAsync()
     {
         var request = new UpdateMyContactDetailsRequest(
@@ -178,11 +196,11 @@ else
             Model.City.Trim(),
             string.IsNullOrWhiteSpace(Model.County)        ? null : Model.County.Trim(),
             Model.PostCode.Trim(),
-            Model.Country.Trim());
+            Model.Country.Trim(),
+            ExpectedVersion: ExpectedVersionForSave);
 
-        var (success, errorMsg) = await EmployeeService.UpdateMyContactDetailsAsync(CompanyId, request);
-
-        return success ? null : errorMsg ?? "Failed to save contact details.";
+        var result = await EmployeeService.UpdateMyContactDetailsAsync(CompanyId, request);
+        return ApplySaveResult(result, "Failed to save contact details.");
     }
 
     public sealed class ContactDetailsFormModel

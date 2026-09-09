@@ -66,7 +66,13 @@ public sealed class AppFixture : IAsyncLifetime
             // e.g. DropDownSelector's retry loops — the same way the Kanban drag flakiness was
             // eventually fixed) rather than flipping this to Headless=false; that "fix" just moves
             // the failures to whichever environment can't use it.
-            Headless = true,
+            // Local diagnostic only: E2E_HEADED=1 to watch a run (with a slow-mo delay). NEVER commit
+            // a headed/slow-mo default — the suite's reliability contract is headless at
+            // maxParallelThreads=15, and the build server has no display.
+            Headless = !string.Equals(
+                Environment.GetEnvironmentVariable("E2E_HEADED"), "1", StringComparison.Ordinal),
+            SlowMo = string.Equals(
+                Environment.GetEnvironmentVariable("E2E_HEADED"), "1", StringComparison.Ordinal) ? 250 : 0,
             Args =
             [
                 "--disable-background-timer-throttling",

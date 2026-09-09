@@ -9,6 +9,16 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <!-- Ticket 2: base-code optimistic-concurrency save helper (EF Core) and Result-&gt;IResult
+         translator (ASP.NET Core). Kept here so there is one implementation, not one per module. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <!-- Ticket 2 item 3: shared FluentValidation rule requiring a loaded concurrency version
+         on every protected update request. -->
+    <PackageReference Include="FluentValidation" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>

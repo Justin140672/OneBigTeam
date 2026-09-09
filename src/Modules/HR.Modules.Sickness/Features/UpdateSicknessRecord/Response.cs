@@ -18,4 +18,5 @@ internal sealed record UpdateSicknessRecordResponse(
     string? Notes,
     decimal? TotalDays,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

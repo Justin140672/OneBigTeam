@@ -54,6 +54,7 @@ public class UpdateInterviewEndpointTests
             scheduledAt,
             durationMinutes,
             location = "Room 2",
+            expectedVersion = 1,
         };
 
     [Fact]

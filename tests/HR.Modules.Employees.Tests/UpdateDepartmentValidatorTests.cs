@@ -80,9 +80,27 @@ public class UpdateDepartmentValidatorTests
             Name = "Engineering",
             Description = "Builds the product",
             ParentDepartmentId = Guid.NewGuid(),
-            ManagerEmployeeId = Guid.NewGuid()
+            ManagerEmployeeId = Guid.NewGuid(),
+            ExpectedVersion = 1
         });
 
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_ExpectedVersion_Is_Null()
+    {
+        var validator = new UpdateDepartmentValidator();
+
+        var result = validator.Validate(new UpdateDepartmentRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            Id = Guid.NewGuid(),
+            Name = "Engineering",
+            ExpectedVersion = null
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateDepartmentRequest.ExpectedVersion));
     }
 }

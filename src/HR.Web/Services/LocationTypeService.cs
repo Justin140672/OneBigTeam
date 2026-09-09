@@ -2,7 +2,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class LocationTypeService(IHttpClientFactory httpClientFactory) : IEditService<LocationTypeEditModel, Guid>
+public class LocationTypeService(IHttpClientFactory httpClientFactory)
+    : IEditService<LocationTypeEditModel, Guid>, IConcurrencyAwareEditService<LocationTypeEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -29,7 +30,37 @@ public class LocationTypeService(IHttpClientFactory httpClientFactory) : IEditSe
         {
             Name = existing.Name,
             Description = existing.Description,
+            Version = existing.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces the stale-save 409.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, LocationTypeEditModel model, int? expectedVersion)
+    {
+        var request = new UpdateLocationTypeRequest(
+            companyId, id, model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/location-types/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateLocationTypeResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                body?.Error ?? "A location type with that name already exists.", body?.Code == "concurrency");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return ApiSaveResult.Fail("Location type not found.");
+
+        return ApiSaveResult.Fail(body?.Error ?? "Failed to update location type.");
     }
 
     async Task<(LocationTypeEditModel? Result, string? Error)> IEditService<LocationTypeEditModel, Guid>.CreateAsync(
@@ -46,7 +77,8 @@ public class LocationTypeService(IHttpClientFactory httpClientFactory) : IEditSe
         Guid companyId, Guid id, LocationTypeEditModel model)
     {
         var request = new UpdateLocationTypeRequest(
-            companyId, id, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim());
+            companyId, id, model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), model.Version);
 
         var (updated, error) = await UpdateAsync(companyId, id, request);
         return (updated is null ? null : model, error);
@@ -109,5 +141,5 @@ public class LocationTypeService(IHttpClientFactory httpClientFactory) : IEditSe
         return body?.Error ?? "Failed to deactivate location type.";
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

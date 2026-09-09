@@ -42,7 +42,7 @@ public static class ProbationModule
         services.AddScoped<IWorkloadActionProvider, Services.OverdueProbationReviewsWorkloadActionProvider>();
 
         services.AddDbContext<ProbationDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "probation")));
 
         return services;

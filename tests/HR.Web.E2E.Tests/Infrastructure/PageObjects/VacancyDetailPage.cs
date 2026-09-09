@@ -540,6 +540,61 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public Task<string> GetTitleAsync() =>
         page.GetByPlaceholder("e.g. Senior Software Engineer").InputValueAsync();
 
+    /// <summary>The vacancy entity id parsed out of the current edit/view URL (/vacancies/{id}[/view]).</summary>
+    public Guid GetIdFromUrl() => UrlIdParser.LastGuid(page.Url);
+
+    // ── Advert Title field — mutated field for concurrency tests ─────────────────
+    // Click-focus / select-all / delete / type-for-real / Tab-to-commit, matching
+    // DocumentTypeEditPage.SetDescriptionAsync, so the typed value actually round-trips to the
+    // Blazor-bound model on an existing vacancy.
+    public async Task SetAdvertTitleAsync(string value)
+    {
+        var input = page.GetByPlaceholder("e.g. Senior Software Engineer");
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        await page.WaitForTimeoutAsync(150);
+        if (value.Length > 0)
+            await input.PressSequentiallyAsync(value, new() { Delay = 30 });
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForTimeoutAsync(300);
+    }
+
+    public async Task<string> WaitForAdvertTitleAsync(string expected)
+    {
+        var input = page.GetByPlaceholder("e.g. Senior Software Engineer");
+        await Assertions.Expect(input).ToHaveValueAsync(expected, new() { Timeout = 15_000 });
+        return await input.InputValueAsync();
+    }
+
+    // ── Optimistic-concurrency conflict banner (shared SaveConflictBanner via EditPageBase) ──
+    private ILocator ConcurrencyWarningBanner =>
+        page.Locator(".save-conflict-banner[role='alert']")
+            .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
+
+    /// <summary>
+    /// Clicks the Overview tab's Save on an existing vacancy and waits for the optimistic-concurrency
+    /// banner — i.e. the save was rejected (HTTP 409) because the vacancy changed since this form
+    /// loaded it. A conflicted save stays on the edit page (no navigation to the list).
+    /// </summary>
+    public async Task SaveExpectingConflictAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+    }
+
+    public Task<bool> IsConcurrencyWarningVisibleAsync() =>
+        ConcurrencyWarningBanner.IsVisibleAsync();
+
+    public async Task ClickReloadLatestValuesAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+        await page.WaitForTimeoutAsync(300);
+    }
+
     // ── Close / unsaved-changes prompt (EditPageBase) ────────────────────────────
     // Same shared UnsavedChangesDialog.razor component used by every EditPageBase-derived
     // page (see DepartmentEditPage.cs for the representative test coverage of this behavior).

@@ -18,6 +18,19 @@ public sealed class OnboardingTemplateListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 20_000 });
     }
 
+    public async Task ClickNewAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
+        await page.WaitForURLAsync("**/onboarding-templates/new**", new() { Timeout = 15_000 });
+    }
+
+    /// <summary>The href of the grid row link whose text contains <paramref name="nameFragment"/>.</summary>
+    public async Task<string> GetRowHrefAsync(string nameFragment)
+    {
+        var href = await page.Locator(".e-rowcell a").Filter(new() { HasText = nameFragment }).First.GetAttributeAsync("href");
+        return href ?? throw new InvalidOperationException($"No onboarding-template row link found for '{nameFragment}'.");
+    }
+
     public async Task<bool> HasItemAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });

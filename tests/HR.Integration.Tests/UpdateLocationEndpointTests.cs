@@ -14,8 +14,11 @@ public class UpdateLocationEndpointTests
     public UpdateLocationEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     private async Task<HttpClient> AuthenticatedClient(Guid companyId)
@@ -24,7 +27,15 @@ public class UpdateLocationEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, companyId);
         return client;
+    }
+
+    private static async Task<int> GetVersionAsync(HttpClient client, Guid companyId, Guid id)
+    {
+        var resp = await client.GetAsync($"/api/companies/{companyId}/locations/{id}");
+        resp.EnsureSuccessStatusCode();
+        return (await resp.Content.ReadFromJsonAsync<LocationPayload>())!.Version;
     }
 
     private static async Task<Guid> CreateLocationTypeAsync(HttpClient client, Guid companyId, string name = "Office")
@@ -77,7 +88,7 @@ public class UpdateLocationEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/locations/{Guid.NewGuid()}",
-            new { companyId, id = Guid.NewGuid(), name = "Head Office", locationTypeId });
+            new { companyId, id = Guid.NewGuid(), name = "Head Office", locationTypeId, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -90,6 +101,7 @@ public class UpdateLocationEndpointTests
 
         var locationTypeId = await CreateLocationTypeAsync(client, companyId);
         var location = await CreateLocationAsync(client, companyId, locationTypeId);
+        var version = await GetVersionAsync(client, companyId, location.Id);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/locations/{location.Id}",
@@ -99,7 +111,8 @@ public class UpdateLocationEndpointTests
                 id = location.Id,
                 name = "Regional Office",
                 description = "Updated description",
-                locationTypeId
+                locationTypeId,
+                expectedVersion = version
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -121,6 +134,7 @@ public class UpdateLocationEndpointTests
         var originalTypeId = await CreateLocationTypeAsync(client, companyId, "Office");
         var newTypeId = await CreateLocationTypeAsync(client, companyId, "Warehouse");
         var location = await CreateLocationAsync(client, companyId, originalTypeId);
+        var version = await GetVersionAsync(client, companyId, location.Id);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/locations/{location.Id}",
@@ -129,7 +143,8 @@ public class UpdateLocationEndpointTests
                 companyId,
                 id = location.Id,
                 name = location.Name,
-                locationTypeId = newTypeId
+                locationTypeId = newTypeId,
+                expectedVersion = version
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -147,6 +162,7 @@ public class UpdateLocationEndpointTests
 
         var locationTypeId = await CreateLocationTypeAsync(client, companyId);
         var location = await CreateLocationAsync(client, companyId, locationTypeId);
+        var version = await GetVersionAsync(client, companyId, location.Id);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/locations/{location.Id}",
@@ -155,7 +171,8 @@ public class UpdateLocationEndpointTests
                 companyId,
                 id = location.Id,
                 name = location.Name,
-                locationTypeId = Guid.NewGuid()
+                locationTypeId = Guid.NewGuid(),
+                expectedVersion = version
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -170,10 +187,11 @@ public class UpdateLocationEndpointTests
         var locationTypeId = await CreateLocationTypeAsync(client, companyId);
         await CreateLocationAsync(client, companyId, locationTypeId, "Head Office");
         var second = await CreateLocationAsync(client, companyId, locationTypeId, "Branch Office");
+        var version = await GetVersionAsync(client, companyId, second.Id);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/locations/{second.Id}",
-            new { companyId, id = second.Id, name = "Head Office", locationTypeId });
+            new { companyId, id = second.Id, name = "Head Office", locationTypeId, expectedVersion = version });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -187,5 +205,6 @@ public class UpdateLocationEndpointTests
         string? Description,
         Guid LocationTypeId,
         bool IsActive,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        int Version);
 }

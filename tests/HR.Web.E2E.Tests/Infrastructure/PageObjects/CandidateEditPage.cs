@@ -119,6 +119,70 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
     public Task<string> GetFirstNameAsync() =>
         page.GetByPlaceholder("First name").InputValueAsync();
 
+    /// <summary>The candidate entity id parsed out of the current edit/view URL (/candidates/{id}[/view]).</summary>
+    public Guid GetIdFromUrl() => UrlIdParser.LastGuid(page.Url);
+
+    // ── Phone field (optional HrTextBox) — mutated field for concurrency tests ────
+    // Click-focus / select-all / delete / type-for-real / Tab-to-commit — the same technique
+    // CompanyEditPage.SetFirstAddressLine1Async / DocumentTypeEditPage.SetDescriptionAsync use so
+    // the typed value actually round-trips to the Blazor-bound model.
+    public async Task SetPhoneAsync(string value)
+    {
+        var input = page.GetByPlaceholder("e.g. 07700 900000");
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        await page.WaitForTimeoutAsync(150);
+        if (value.Length > 0)
+            await input.PressSequentiallyAsync(value, new() { Delay = 30 });
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForTimeoutAsync(300);
+    }
+
+    public Task<string> GetPhoneAsync() =>
+        page.GetByPlaceholder("e.g. 07700 900000").InputValueAsync();
+
+    public async Task<string> WaitForPhoneAsync(string expected)
+    {
+        var input = page.GetByPlaceholder("e.g. 07700 900000");
+        await Assertions.Expect(input).ToHaveValueAsync(expected, new() { Timeout = 15_000 });
+        return await input.InputValueAsync();
+    }
+
+    /// <summary>Clicks Save on an existing candidate and waits for the redirect back to the list.</summary>
+    public async Task SaveAndWaitForListAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await page.WaitForURLAsync("**/candidates", new() { Timeout = 30_000 });
+        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+    }
+
+    // ── Optimistic-concurrency conflict banner (shared SaveConflictBanner via EditPageBase) ──
+    // Scope on the component's own `.save-conflict-banner` class (+ role='alert') and additionally
+    // require the "Reload latest values" action so an unrelated warning alert can never satisfy
+    // strict mode. Match on structure, not text.
+    private ILocator ConcurrencyWarningBanner =>
+        page.Locator(".save-conflict-banner[role='alert']")
+            .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
+
+    public async Task SaveExpectingConflictAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+    }
+
+    public Task<bool> IsConcurrencyWarningVisibleAsync() =>
+        ConcurrencyWarningBanner.IsVisibleAsync();
+
+    public async Task ClickReloadLatestValuesAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+        await page.WaitForTimeoutAsync(300);
+    }
+
     // ── Close / unsaved-changes prompt (EditPageBase) ────────────────────────────
 
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");

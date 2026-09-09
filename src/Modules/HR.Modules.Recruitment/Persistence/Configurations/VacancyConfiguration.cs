@@ -81,6 +81,12 @@ internal sealed class VacancyConfiguration : IEntityTypeConfiguration<Vacancy>
         builder.Property(v => v.ApprovedByUserId)
             .HasColumnName("approved_by_user_id");
 
+        builder.Property(v => v.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(v => v.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

@@ -87,7 +87,8 @@ public class UpdateSicknessRecordEndpointTests
                 categoryId = newCategoryId,
                 startDate = "2026-07-02",
                 startDayPart = 0,
-                notes = "Updated"
+                notes = "Updated",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -134,7 +135,8 @@ public class UpdateSicknessRecordEndpointTests
                 id = Guid.NewGuid(),
                 categoryId,
                 startDate = "2026-07-01",
-                startDayPart = 0
+                startDayPart = 0,
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -158,7 +160,8 @@ public class UpdateSicknessRecordEndpointTests
                 id = recordId,
                 categoryId = Guid.NewGuid(), // non-existent
                 startDate = "2026-07-01",
-                startDayPart = 0
+                startDayPart = 0,
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);

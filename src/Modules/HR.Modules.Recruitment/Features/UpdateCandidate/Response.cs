@@ -9,4 +9,5 @@ internal sealed record UpdateCandidateResponse(
     string? Phone,
     string? ResumeUrl,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

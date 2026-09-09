@@ -26,6 +26,28 @@ public abstract class EditPageBase : ComponentBase, IDisposable
     protected string? SuccessMsg { get; set; }
     protected bool ShowUnsavedChangesDialog { get; set; }
 
+    // ── Optimistic concurrency (Ticket 2) ────────────────────────────────────────
+    // True when the last save was rejected by the API with HTTP 409 / code "concurrency" (the
+    // record, or one of this page's child sections' records, changed elsewhere since it was
+    // loaded). A SaveCoreAsync implementation sets this from an ApiSaveResult.IsConcurrencyConflict
+    // (or a child EditSectionBase.SaveConflict). Drives the shared <SaveConflictBanner>, which
+    // takes precedence over GlobalError in the markup.
+    protected bool SaveConflict { get; set; }
+
+    // Wired to <SaveConflictBanner OnReload="...">. Re-fetches server state (ReloadServerStateAsync)
+    // and clears the conflict banner. Whether the user's in-progress edits are preserved or
+    // replaced is the override's decision — the explicit "Reload latest values" action adopts the
+    // server values and re-baselines unsaved-changes tracking.
+    protected async Task ReloadLatestValuesAsync()
+    {
+        await ReloadServerStateAsync();
+        SaveConflict = false;
+        GlobalError = null;
+        StateHasChanged();
+    }
+
+    protected virtual Task ReloadServerStateAsync() => Task.CompletedTask;
+
     // The list page to return to on Close, and to navigate to after a successful save (unless
     // OnSavedAsync is overridden). Leave null for pages that should stay put after saving.
     protected virtual string? ListUrl => null;
@@ -167,6 +189,7 @@ public abstract class EditPageBase : ComponentBase, IDisposable
     {
         GlobalError = null;
         SuccessMsg = null;
+        SaveConflict = false;
 
         if (!Validate())
         {
@@ -332,7 +355,7 @@ public abstract class EditPageBase : ComponentBase, IDisposable
         _pendingNavigationUri = null;
     }
 
-    public void Dispose() => _locationChangingRegistration?.Dispose();
+    public virtual void Dispose() => _locationChangingRegistration?.Dispose();
 }
 
 /// <summary>
@@ -351,7 +374,25 @@ public abstract class EditPageBase<TModel> : EditPageBase where TModel : class, 
     protected override void OnInitialized()
     {
         EditContext = new EditContext(Model);
+        EditContext.OnValidationStateChanged += OnValidationStateChanged;
         base.OnInitialized();
+    }
+
+    public override void Dispose()
+    {
+        EditContext.OnValidationStateChanged -= OnValidationStateChanged;
+        base.Dispose();
+    }
+
+    private void OnValidationStateChanged(object? sender, ValidationStateChangedEventArgs e)
+    {
+        // Bug fix (b): once the form is invalid again after a conflict, drop the stale conflict
+        // banner so it doesn't linger next to the validation errors.
+        if (SaveConflict && EditContext.GetValidationMessages().Any())
+        {
+            SaveConflict = false;
+            StateHasChanged();
+        }
     }
 
     protected override bool Validate() => EditContext.Validate();
@@ -381,6 +422,11 @@ public abstract class EditPageBase<TModel, TKey> : EditPageBase<TModel>
 
     protected virtual bool IsNew => GetId() is null;
 
+    // Ticket 2: the optimistic-concurrency token the current Model was loaded at, read straight off
+    // the model when it (and its service) opt into concurrency. Sent as the expected version on the
+    // next save and refreshed from every successful update — see SaveCoreAsync below.
+    protected int? LoadedVersion => Model is IHasVersion v ? v.Version : null;
+
     protected override async Task LoadAsync()
     {
         if (!IsNew)
@@ -395,12 +441,39 @@ public abstract class EditPageBase<TModel, TKey> : EditPageBase<TModel>
     // Hook for whatever a page needs beyond its own entity (e.g. a parent-picker dropdown list).
     protected virtual Task OnLoadedAsync() => Task.CompletedTask;
 
+    // Ticket 2: concurrency-conflict recovery for the shared <SaveConflictBanner>. Re-fetches the
+    // entity from the server, repopulating Model (including its version) in place.
+    protected override async Task ReloadServerStateAsync()
+    {
+        if (IsNew) return;
+        var loaded = await Service.GetByIdAsync(GetCompanyId(), GetId()!.Value);
+        if (loaded is not null) CopyProperties(loaded, Model);
+        await OnLoadedAsync();
+    }
+
     protected override async Task<string?> SaveCoreAsync()
     {
-        var (result, error) = IsNew
-            ? await Service.CreateAsync(GetCompanyId(), Model)
-            : await Service.UpdateAsync(GetCompanyId(), GetId()!.Value, Model);
+        if (IsNew)
+        {
+            var (created, createError) = await Service.CreateAsync(GetCompanyId(), Model);
+            return created is not null ? null : createError ?? "Failed to save.";
+        }
 
+        // Ticket 2: when the service round-trips a version, send the loaded token and surface a
+        // stale-save 409 as SaveConflict (drives the shared <SaveConflictBanner>).
+        if (Service is IConcurrencyAwareEditService<TModel, TKey> concurrencyAware)
+        {
+            var saveResult = await concurrencyAware.UpdateAsync(
+                GetCompanyId(), GetId()!.Value, Model, LoadedVersion);
+            SaveConflict = saveResult.IsConcurrencyConflict;
+            if (!saveResult.Success)
+                return saveResult.ErrorMessage ?? "Failed to save.";
+            if (saveResult.NewVersion is { } newVersion && Model is IHasVersion hasVersion)
+                hasVersion.Version = newVersion;
+            return null;
+        }
+
+        var (result, error) = await Service.UpdateAsync(GetCompanyId(), GetId()!.Value, Model);
         return result is not null ? null : error ?? "Failed to save.";
     }
 

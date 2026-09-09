@@ -77,6 +77,30 @@ public class OnboardingTemplateService(IHttpClientFactory httpClientFactory)
         return (null, "Failed to update onboarding template.");
     }
 
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces the stale-save 409.
+    public async Task<ApiSaveResult> UpdateWithConcurrencyAsync(
+        Guid companyId, Guid id, UpdateOnboardingTemplateRequest request)
+    {
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/onboarding-templates/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateOnboardingTemplateResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                body?.Error ?? "An onboarding template with that name already exists.", body?.Code == "concurrency");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return ApiSaveResult.Fail("Onboarding template not found.");
+
+        return ApiSaveResult.Fail(body?.Error ?? "Failed to update onboarding template.");
+    }
+
     public async Task<string?> DeactivateAsync(Guid companyId, Guid id)
     {
         var response = await Http.DeleteAsync($"api/companies/{companyId}/onboarding-templates/{id}");
@@ -91,5 +115,5 @@ public class OnboardingTemplateService(IHttpClientFactory httpClientFactory)
         return body?.Error ?? "Failed to deactivate onboarding template.";
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

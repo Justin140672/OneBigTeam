@@ -49,7 +49,8 @@ internal sealed class GetCompanyHandler
             new GetCompanyBrandingResponse(
                 branding?.PrimaryLogoUrl,
                 branding?.SmallLogoUrl,
-                branding?.EmailLogoUrl));
+                branding?.EmailLogoUrl),
+            company.Version);
 
         return Result.Success(response);
     }

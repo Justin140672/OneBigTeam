@@ -95,7 +95,7 @@ public static class CompaniesModule
         services.Configure<StripeOptions>(configuration.GetSection("Stripe"));
 
         services.AddDbContext<CompaniesDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "companies")));
 
         // System Health Dashboard (Platform Monitoring epic) — "database" proxies overall Postgres

@@ -79,7 +79,16 @@ internal sealed class UpdateSicknessRecordHandler(
             request.Notes,
             now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict, so the
+        // audit event below only runs on a successful save.
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            record,
+            request.ExpectedVersion,
+            "This sickness record was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateSicknessRecordResponse>(saveResult.Error);
 
         await auditPublisher.PublishAsync(new SicknessUpdatedAuditEvent(
             record.CompanyId,
@@ -112,6 +121,7 @@ internal sealed class UpdateSicknessRecordHandler(
             record.Notes,
             record.TotalDays,
             record.CreatedAt,
-            record.UpdatedAt));
+            record.UpdatedAt,
+            record.Version));
     }
 }

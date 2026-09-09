@@ -150,7 +150,16 @@ internal sealed class UpdatePositionProfileHandler
             request.NoticePeriodUnitOverride,
             request.NoticePeriodLengthOverride);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict, so the
+        // audit/integration events below only run on a successful save.
+        var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
+            profile,
+            request.ExpectedVersion,
+            "This position profile was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdatePositionProfileResponse>(saveResult.Error);
 
         var after = new PositionProfileSnapshot(
             profile.DepartmentId,
@@ -195,6 +204,7 @@ internal sealed class UpdatePositionProfileHandler
             profile.DefaultLeavePolicyId,
             profile.OnboardingTemplateId,
             profile.IsActive,
-            profile.UpdatedAt));
+            profile.UpdatedAt,
+            profile.Version));
     }
 }

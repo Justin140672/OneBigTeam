@@ -14,4 +14,5 @@ internal sealed record GetAssetResponse(
     string Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    string? CategoryName);
+    string? CategoryName,
+    int Version);

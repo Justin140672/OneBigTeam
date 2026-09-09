@@ -39,6 +39,12 @@ internal sealed class Endpoint(UpdateVacancyHandler handler, ICurrentUser curren
                 return;
             }
 
+            if (result.Error.Code == "concurrency")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(businessError));
+                return;
+            }
+
             await Send.ResultAsync(TypedResults.BadRequest(businessError));
             return;
         }

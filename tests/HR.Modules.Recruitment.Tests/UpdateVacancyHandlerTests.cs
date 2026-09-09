@@ -31,6 +31,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId         = companyId,
                 VacancyId         = vacancy.Id,
+                ExpectedVersion   = 1,
                 AdvertTitle       = "New Title",
                 AdvertDescription = "Updated description",
                 HiringManagerId   = newHiringManagerId,
@@ -73,6 +74,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId           = companyId,
                 VacancyId           = vacancy.Id,
+                ExpectedVersion     = 1,
                 AdvertTitle         = "New Title",
                 HiringManagerId     = Guid.NewGuid(),
                 AssignedRecruiterId = recruiter.Id,
@@ -107,6 +109,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId           = companyId,
                 VacancyId           = vacancy.Id,
+                ExpectedVersion     = 1,
                 AdvertTitle         = "New Title",
                 HiringManagerId     = vacancy.HiringManagerId,
                 AssignedRecruiterId = recruiter.Id,
@@ -143,6 +146,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId           = companyId,
                 VacancyId           = vacancy.Id,
+                ExpectedVersion     = 1,
                 AdvertTitle         = "New Title",
                 HiringManagerId     = vacancy.HiringManagerId,
                 AssignedRecruiterId = recruiter.Id,
@@ -176,6 +180,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId           = companyId,
                 VacancyId           = vacancy.Id,
+                ExpectedVersion     = 1,
                 AdvertTitle         = "Old Title",
                 HiringManagerId     = vacancy.HiringManagerId,
                 AssignedRecruiterId = null,
@@ -226,6 +231,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId       = companyId,
                 VacancyId       = vacancy.Id,
+                ExpectedVersion = 1,
                 AdvertTitle     = null,
                 HiringManagerId = vacancy.HiringManagerId,
             },
@@ -260,6 +266,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId       = companyId,
                 VacancyId       = vacancy.Id,
+                ExpectedVersion = 1,
                 AdvertTitle     = "New Advert Title",
                 HiringManagerId = vacancy.HiringManagerId,
             },
@@ -292,6 +299,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId       = companyId,
                 VacancyId       = vacancy.Id,
+                ExpectedVersion = 1,
                 AdvertTitle     = null,
                 HiringManagerId = vacancy.HiringManagerId,
             },
@@ -320,6 +328,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId       = companyId,
                 VacancyId       = vacancy.Id,
+                ExpectedVersion = 1,
                 AdvertTitle     = null,
                 HiringManagerId = vacancy.HiringManagerId,
             },
@@ -365,6 +374,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId         = companyId,
                 VacancyId         = vacancy.Id,
+                ExpectedVersion   = 1,
                 PositionProfileId = newPositionProfileId,
                 AdvertTitle       = "Title",
                 HiringManagerId   = vacancy.HiringManagerId,
@@ -407,6 +417,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId         = companyId,
                 VacancyId         = vacancy.Id,
+                ExpectedVersion   = 1,
                 PositionProfileId = newPositionProfileId,
                 AdvertTitle       = "Title",
                 HiringManagerId   = vacancy.HiringManagerId,
@@ -442,6 +453,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId         = companyId,
                 VacancyId         = vacancy.Id,
+                ExpectedVersion   = 1,
                 PositionProfileId = newPositionProfileId,
                 AdvertTitle       = "Title",
                 HiringManagerId   = vacancy.HiringManagerId,
@@ -478,6 +490,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId         = companyId,
                 VacancyId         = vacancy.Id,
+                ExpectedVersion   = 1,
                 PositionProfileId = newPositionProfileId,
                 AdvertTitle       = "Title",
                 HiringManagerId   = vacancy.HiringManagerId,
@@ -510,6 +523,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId         = companyId,
                 VacancyId         = vacancy.Id,
+                ExpectedVersion   = 1,
                 PositionProfileId = positionProfileId,
                 AdvertTitle       = "New Title",
                 HiringManagerId   = vacancy.HiringManagerId,
@@ -541,6 +555,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId         = companyId,
                 VacancyId         = vacancy.Id,
+                ExpectedVersion   = 1,
                 PositionProfileId = null,
                 AdvertTitle       = "New Title",
                 HiringManagerId   = vacancy.HiringManagerId,
@@ -576,6 +591,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId             = companyId,
                 VacancyId             = vacancy.Id,
+                ExpectedVersion       = 1,
                 PositionProfileId     = newPositionProfileId,
                 AdvertTitle           = "Title",
                 HiringManagerId       = vacancy.HiringManagerId,
@@ -621,6 +637,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId              = companyId,
                 VacancyId              = vacancy.Id,
+                ExpectedVersion        = 1,
                 PositionProfileId      = newPositionProfileId,
                 AdvertTitle            = "Title",
                 HiringManagerId        = vacancy.HiringManagerId,
@@ -661,6 +678,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId              = companyId,
                 VacancyId              = vacancy.Id,
+                ExpectedVersion        = 1,
                 PositionProfileId      = newPositionProfileId,
                 AdvertTitle            = "Title",
                 HiringManagerId        = vacancy.HiringManagerId,
@@ -719,6 +737,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId              = companyId,
                 VacancyId              = vacancy.Id,
+                ExpectedVersion        = 1,
                 PositionProfileId      = newPositionProfileId,
                 AdvertTitle            = "Original Advert Title",
                 AdvertDescription      = "Original Advert Description",
@@ -760,6 +779,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId         = companyId,
                 VacancyId         = vacancy.Id,
+                ExpectedVersion   = 1,
                 PositionProfileId = newPositionProfileId,
                 AdvertTitle       = "Title",
                 HiringManagerId   = vacancy.HiringManagerId,
@@ -799,6 +819,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId         = companyId,
                 VacancyId         = vacancy.Id,
+                ExpectedVersion   = 1,
                 PositionProfileId = newPositionProfileId,
                 AdvertTitle       = "Title",
                 HiringManagerId   = vacancy.HiringManagerId,
@@ -825,6 +846,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId              = companyId,
                 VacancyId              = vacancy.Id,
+                ExpectedVersion        = 1,
                 AdvertTitle            = "Title",
                 HiringManagerId        = vacancy.HiringManagerId,
                 IsAdvertisedInternally = true,
@@ -841,6 +863,7 @@ public class UpdateVacancyHandlerTests
             {
                 CompanyId              = companyId,
                 VacancyId              = vacancy.Id,
+                ExpectedVersion        = 2,
                 AdvertTitle            = "Title",
                 HiringManagerId        = vacancy.HiringManagerId,
                 IsAdvertisedInternally = false,

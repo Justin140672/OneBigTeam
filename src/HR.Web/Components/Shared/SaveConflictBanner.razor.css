@@ -1,0 +1,12 @@
+.save-conflict-banner {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.save-conflict-banner__message {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}

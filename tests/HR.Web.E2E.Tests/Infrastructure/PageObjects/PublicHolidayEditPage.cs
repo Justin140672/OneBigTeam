@@ -36,6 +36,22 @@ public sealed class PublicHolidayEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
+    public async Task GoToEditAsync(Guid companyId, Guid id)
+    {
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/public-holidays/{id}");
+        await page.WaitForSelectorAsync(".e-date-wrapper", new() { Timeout = 20_000 });
+    }
+
+    /// <summary>Extracts the holiday GUID from the current /public-holidays/{id} edit URL.</summary>
+    public Guid CurrentHolidayId()
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(
+            page.Url, @"/public-holidays/(?<id>[0-9a-fA-F-]{36})");
+        if (!match.Success)
+            throw new InvalidOperationException($"Not on a public holiday edit URL: {page.Url}");
+        return Guid.Parse(match.Groups["id"].Value);
+    }
+
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
@@ -43,6 +59,43 @@ public sealed class PublicHolidayEditPage(IPage page, string baseUrl)
         await page.WaitForURLAsync("**/public-holidays", new() { Timeout = 15_000 });
         // With prerender:false the circuit connects after navigation, wait for the grid.
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+    }
+
+    // ── Optimistic-concurrency conflict banner (Ticket 2) ─────────────────────
+    // PublicHolidayEdit.razor renders the shared <SaveConflictBanner> — a single
+    // `div.alert.alert-warning.save-conflict-banner[role='alert']` with the razor's own
+    // "Someone else changed this public holiday…" message and a "Reload latest values" Syncfusion
+    // button. Scope on the component's own `.save-conflict-banner` class (+ role='alert') and
+    // additionally require the "Reload latest values" action so an unrelated warning alert can
+    // never satisfy strict mode. Match on structure, not text.
+    private ILocator ConcurrencyWarningBanner =>
+        page.Locator(".save-conflict-banner[role='alert']")
+            .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
+
+    /// <summary>
+    /// Clicks Save and waits for the optimistic-concurrency banner to appear — i.e. the save was
+    /// rejected (HTTP 409) because the holiday changed since this form loaded it. A conflicted save
+    /// stays on the edit page (no navigation to the list).
+    /// </summary>
+    public async Task SaveExpectingConflictAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+    }
+
+    public Task<bool> IsConcurrencyWarningVisibleAsync() =>
+        ConcurrencyWarningBanner.IsVisibleAsync();
+
+    /// <summary>Clicks "Reload latest values" in the concurrency banner and waits for it to clear.</summary>
+    public async Task ClickReloadLatestValuesAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+        // The reload round-trips the service Get before repopulating the model; give the re-bound
+        // values a beat to land before callers read them.
+        await page.WaitForTimeoutAsync(300);
     }
 
     public async Task<bool> HasErrorAsync()

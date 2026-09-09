@@ -18,6 +18,7 @@ public class UpdateOnboardingTemplateEndpointTests
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdministratorUserId, SystemRoles.CompanyAdministrator);
         }).GetAwaiter().GetResult();
     }
@@ -28,7 +29,15 @@ public class UpdateOnboardingTemplateEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.Employee, companyId);
         return client;
+    }
+
+    private static async Task<int> GetVersionAsync(HttpClient client, Guid companyId, Guid id)
+    {
+        var resp = await client.GetAsync($"/api/companies/{companyId}/onboarding-templates/{id}");
+        resp.EnsureSuccessStatusCode();
+        return (await resp.Content.ReadFromJsonAsync<OnboardingTemplateDetailPayload>())!.Version;
     }
 
     private async Task<HttpClient> CompanyAdministratorClient(Guid companyId)
@@ -76,7 +85,7 @@ public class UpdateOnboardingTemplateEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/onboarding-templates/{template.Id}",
-            new { companyId, id = template.Id, name = "Updated Name", tasks = Array.Empty<object>() });
+            new { companyId, id = template.Id, name = "Updated Name", tasks = Array.Empty<object>(), expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -89,7 +98,7 @@ public class UpdateOnboardingTemplateEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/onboarding-templates/{Guid.NewGuid()}",
-            new { companyId, id = Guid.NewGuid(), name = "Standard Onboarding", tasks = Array.Empty<object>() });
+            new { companyId, id = Guid.NewGuid(), name = "Standard Onboarding", tasks = Array.Empty<object>(), expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -100,6 +109,7 @@ public class UpdateOnboardingTemplateEndpointTests
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
         var template = await CreateTemplateAsync(client, companyId, "Standard Onboarding");
+        var version = await GetVersionAsync(client, companyId, template.Id);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/onboarding-templates/{template.Id}",
@@ -109,6 +119,7 @@ public class UpdateOnboardingTemplateEndpointTests
                 id = template.Id,
                 name = "Engineering Onboarding",
                 description = "Onboarding checklist for engineering new hires",
+                expectedVersion = version,
                 tasks = new object[]
                 {
                     new
@@ -168,6 +179,7 @@ public class UpdateOnboardingTemplateEndpointTests
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
         var template = await CreateTemplateAsync(client, companyId, "Standard Onboarding");
+        var version = await GetVersionAsync(client, companyId, template.Id);
 
         var firstUpdate = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/onboarding-templates/{template.Id}",
@@ -176,6 +188,7 @@ public class UpdateOnboardingTemplateEndpointTests
                 companyId,
                 id = template.Id,
                 name = "Standard Onboarding",
+                expectedVersion = version,
                 tasks = new object[]
                 {
                     new
@@ -191,6 +204,7 @@ public class UpdateOnboardingTemplateEndpointTests
                 }
             });
         firstUpdate.EnsureSuccessStatusCode();
+        var versionAfterFirst = (await firstUpdate.Content.ReadFromJsonAsync<OnboardingTemplateDetailPayload>())!.Version;
 
         var secondUpdate = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/onboarding-templates/{template.Id}",
@@ -199,6 +213,7 @@ public class UpdateOnboardingTemplateEndpointTests
                 companyId,
                 id = template.Id,
                 name = "Standard Onboarding",
+                expectedVersion = versionAfterFirst,
                 tasks = new object[]
                 {
                     new
@@ -229,10 +244,11 @@ public class UpdateOnboardingTemplateEndpointTests
 
         await CreateTemplateAsync(client, companyId, "Standard Onboarding");
         var second = await CreateTemplateAsync(client, companyId, "Executive Onboarding");
+        var version = await GetVersionAsync(client, companyId, second.Id);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/onboarding-templates/{second.Id}",
-            new { companyId, id = second.Id, name = "Standard Onboarding", tasks = Array.Empty<object>() });
+            new { companyId, id = second.Id, name = "Standard Onboarding", tasks = Array.Empty<object>(), expectedVersion = version });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -243,6 +259,7 @@ public class UpdateOnboardingTemplateEndpointTests
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
         var template = await CreateTemplateAsync(client, companyId, "Standard Onboarding");
+        var version = await GetVersionAsync(client, companyId, template.Id);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/onboarding-templates/{template.Id}",
@@ -252,6 +269,7 @@ public class UpdateOnboardingTemplateEndpointTests
                 id = template.Id,
                 name = "Standard Onboarding",
                 description = "Updated description only",
+                expectedVersion = version,
                 tasks = Array.Empty<object>()
             });
 
@@ -323,6 +341,7 @@ public class UpdateOnboardingTemplateEndpointTests
         string? Description,
         bool IsActive,
         DateTimeOffset UpdatedAt,
+        int Version,
         List<OnboardingTemplateTaskPayload> Tasks);
 
     private sealed record OnboardingTemplateTaskPayload(

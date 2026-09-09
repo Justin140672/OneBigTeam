@@ -20,7 +20,8 @@ public class UpdateMyContactDetailsHandlerTests
         AddressLine1 = "1 Test Street",
         City = "London",
         PostCode = "SW1A 1AA",
-        Country = "United Kingdom"
+        Country = "United Kingdom",
+        ExpectedVersion = 1
     };
 
     [Fact]

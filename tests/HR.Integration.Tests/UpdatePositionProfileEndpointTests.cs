@@ -130,6 +130,7 @@ public class UpdatePositionProfileEndpointTests
             {
                 companyId,
                 id = created.Id,
+                expectedVersion = 1,
                 departmentId,
                 locationId,
                 defaultLeavePolicyId = leavePolicyId,
@@ -160,6 +161,7 @@ public class UpdatePositionProfileEndpointTests
             {
                 companyId,
                 id = Guid.NewGuid(),
+                expectedVersion = 1,
                 departmentId,
                 locationId,
                 defaultLeavePolicyId = leavePolicyId,
@@ -184,6 +186,7 @@ public class UpdatePositionProfileEndpointTests
             {
                 companyId,
                 id = profileB.Id,
+                expectedVersion = 1,
                 departmentId,
                 locationId,
                 defaultLeavePolicyId = leavePolicyId,
@@ -209,6 +212,7 @@ public class UpdatePositionProfileEndpointTests
             {
                 companyId = companyB,
                 id = created.Id,
+                expectedVersion = 1,
                 departmentId,
                 locationId,
                 defaultLeavePolicyId = leavePolicyId,
@@ -231,6 +235,7 @@ public class UpdatePositionProfileEndpointTests
             {
                 companyId,
                 id = created.Id,
+                expectedVersion = 1,
                 departmentId = Guid.Empty,
                 locationId,
                 defaultLeavePolicyId = leavePolicyId,
@@ -253,6 +258,7 @@ public class UpdatePositionProfileEndpointTests
             {
                 companyId,
                 id = created.Id,
+                expectedVersion = 1,
                 departmentId,
                 locationId = Guid.Empty,
                 defaultLeavePolicyId = leavePolicyId,
@@ -275,6 +281,7 @@ public class UpdatePositionProfileEndpointTests
             {
                 companyId,
                 id = created.Id,
+                expectedVersion = 1,
                 departmentId,
                 locationId,
                 defaultLeavePolicyId = Guid.Empty,
@@ -297,6 +304,7 @@ public class UpdatePositionProfileEndpointTests
             {
                 companyId,
                 id = created.Id,
+                expectedVersion = 1,
                 departmentId,
                 locationId,
                 defaultLeavePolicyId = leavePolicyId,
@@ -326,6 +334,7 @@ public class UpdatePositionProfileEndpointTests
             {
                 companyId,
                 id = created.Id,
+                expectedVersion = 1,
                 departmentId,
                 locationId,
                 defaultLeavePolicyId = leavePolicyId,
@@ -340,6 +349,7 @@ public class UpdatePositionProfileEndpointTests
             {
                 companyId,
                 id = created.Id,
+                expectedVersion = 2,
                 departmentId,
                 locationId,
                 defaultLeavePolicyId = leavePolicyId,
@@ -367,6 +377,7 @@ public class UpdatePositionProfileEndpointTests
             {
                 companyId,
                 id = created.Id,
+                expectedVersion = 1,
                 departmentId,
                 locationId,
                 defaultLeavePolicyId = leavePolicyId,
@@ -390,6 +401,7 @@ public class UpdatePositionProfileEndpointTests
             {
                 companyId,
                 id = created.Id,
+                expectedVersion = 1,
                 departmentId,
                 locationId,
                 defaultLeavePolicyId = leavePolicyId,

@@ -36,6 +36,7 @@ internal sealed class GetSicknessRecordHandler(SicknessDbContext db)
             record.Notes,
             record.TotalDays,
             record.CreatedAt,
-            record.UpdatedAt));
+            record.UpdatedAt,
+            record.Version));
     }
 }

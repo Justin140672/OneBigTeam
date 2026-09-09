@@ -231,8 +231,41 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         }
     }
 
-    // Returns null on success, or an error message string on failure.
-    public async Task<string?> UpdateSharedCompanyDocumentMetadataAsync(
+    // Ticket 2: shared parser — reads the round-tripped version on success and the
+    // { error, code: "concurrency" } envelope that flags a stale-save 409.
+    private static async Task<ApiSaveResult> ReadSaveResultAsync(
+        HttpResponseMessage response, string fallbackError, CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            try
+            {
+                var ok = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (ok.ValueKind == JsonValueKind.Object
+                    && ok.TryGetProperty("version", out var versionProp)
+                    && versionProp.TryGetInt32(out var version))
+                    return ApiSaveResult.Ok(version);
+            }
+            catch { }
+
+            return ApiSaveResult.Ok(null);
+        }
+
+        string? error = null;
+        string? code = null;
+        try
+        {
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+            if (body.TryGetProperty("error", out var errorProp)) error = errorProp.GetString();
+            if (body.TryGetProperty("code", out var codeProp)) code = codeProp.GetString();
+        }
+        catch { }
+
+        return ApiSaveResult.Fail(error ?? $"{fallbackError} ({(int)response.StatusCode}).", code == "concurrency");
+    }
+
+    // Ticket 2: returns an ApiSaveResult carrying the new version and the stale-save 409 flag.
+    public async Task<ApiSaveResult> UpdateSharedCompanyDocumentMetadataAsync(
         Guid companyId,
         Guid documentId,
         string title,
@@ -243,70 +276,51 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         string reviewFrequency = "None",
         int? customReviewFrequencyMonths = null,
         Guid? reviewOwnerEmployeeId = null,
+        int? expectedVersion = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
             var request = new UpdateSharedCompanyDocumentMetadataRequest(
                 companyId, documentId, title, description, categoryId, effectiveDate, reviewDate,
-                reviewFrequency, customReviewFrequencyMonths, reviewOwnerEmployeeId);
+                reviewFrequency, customReviewFrequencyMonths, reviewOwnerEmployeeId, expectedVersion);
 
             var response = await Http.PutAsJsonAsync(
                 $"api/companies/{companyId}/shared-documents/{documentId}", request, cancellationToken);
 
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Update failed ({(int)response.StatusCode}).";
+            return await ReadSaveResultAsync(response, "Update failed", cancellationToken);
         }
         catch (Exception ex)
         {
-            return ex.Message;
+            return ApiSaveResult.Fail(ex.Message);
         }
     }
 
-    // Returns null on success, or an error message string on failure.
-    public async Task<string?> UpdateSharedCompanyDocumentAudienceAsync(
+    // Ticket 2: returns an ApiSaveResult carrying the new version and the stale-save 409 flag.
+    public async Task<ApiSaveResult> UpdateSharedCompanyDocumentAudienceAsync(
         Guid companyId,
         Guid documentId,
         IReadOnlyList<Guid> audienceDepartmentIds,
         IReadOnlyList<Guid> audienceLocationIds,
         IReadOnlyList<Guid> audiencePositionProfileIds,
         IReadOnlyList<Guid> audienceEmployeeIds,
+        int? expectedVersion = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
             var request = new UpdateSharedCompanyDocumentAudienceRequest(
-                companyId, documentId, audienceDepartmentIds, audienceLocationIds, audiencePositionProfileIds, audienceEmployeeIds);
+                companyId, documentId, audienceDepartmentIds, audienceLocationIds, audiencePositionProfileIds,
+                audienceEmployeeIds, expectedVersion);
 
             var response = await Http.PutAsJsonAsync(
                 $"api/companies/{companyId}/shared-documents/{documentId}/audience", request, cancellationToken);
 
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Update failed ({(int)response.StatusCode}).";
+            return await ReadSaveResultAsync(response, "Update failed", cancellationToken);
         }
         catch (Exception ex)
         {
-            return ex.Message;
+            return ApiSaveResult.Fail(ex.Message);
         }
     }
 
@@ -466,39 +480,30 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         }
     }
 
-    // Returns null on success, or an error message string on failure.
-    public async Task<string?> UpdateSharedCompanyDocumentAcknowledgementSettingsAsync(
+    // Ticket 2: returns an ApiSaveResult carrying the new version and the stale-save 409 flag.
+    public async Task<ApiSaveResult> UpdateSharedCompanyDocumentAcknowledgementSettingsAsync(
         Guid companyId,
         Guid documentId,
         bool requiresAcknowledgement,
         DateOnly? acknowledgementDueDate,
         string? acknowledgementStatement,
+        int? expectedVersion = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
             var request = new UpdateSharedCompanyDocumentAcknowledgementSettingsRequest(
-                companyId, documentId, requiresAcknowledgement, acknowledgementDueDate, acknowledgementStatement);
+                companyId, documentId, requiresAcknowledgement, acknowledgementDueDate, acknowledgementStatement,
+                expectedVersion);
 
             var response = await Http.PutAsJsonAsync(
                 $"api/companies/{companyId}/shared-documents/{documentId}/acknowledgement-settings", request, cancellationToken);
 
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Update failed ({(int)response.StatusCode}).";
+            return await ReadSaveResultAsync(response, "Update failed", cancellationToken);
         }
         catch (Exception ex)
         {
-            return ex.Message;
+            return ApiSaveResult.Fail(ex.Message);
         }
     }
 

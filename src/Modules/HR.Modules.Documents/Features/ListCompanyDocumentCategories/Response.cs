@@ -5,4 +5,5 @@ internal sealed record ListCompanyDocumentCategoriesResponse(IReadOnlyList<Compa
 internal sealed record CompanyDocumentCategoryListItem(
     Guid Id,
     string Name,
-    bool IsActive);
+    bool IsActive,
+    int Version);

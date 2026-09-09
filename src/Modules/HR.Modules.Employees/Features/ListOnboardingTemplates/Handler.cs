@@ -30,7 +30,8 @@ internal sealed class ListOnboardingTemplatesHandler(
                 t.Name,
                 t.Description,
                 t.IsActive,
-                t.Tasks.Count(task => task.IsActive)))
+                t.Tasks.Count(task => task.IsActive),
+                t.Version))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new ListOnboardingTemplatesResponse(items));

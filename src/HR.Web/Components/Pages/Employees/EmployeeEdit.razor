@@ -377,7 +377,12 @@
             </div>
         }
 
-        @if (!string.IsNullOrEmpty(GlobalError))
+        <SaveConflictBanner Visible="SaveConflict"
+                            Disabled="@Saving"
+                            OnReload="ReloadLatestValuesAsync"
+                            Message="Someone else changed this employee's details while you were editing. Your changes have not been saved." />
+
+        @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
         {
             <div class="alert alert-danger mb-3">@GlobalError</div>
         }
@@ -390,7 +395,13 @@
                     <ChildContent><TabHeader Text="Overview" /></ChildContent>
                     <ContentTemplate>
                         <div class="employee-profile-section-wrap" role="region" aria-label="Overview sub-sections">
-                        <SfTab @bind-SelectedItem="OverviewTab" CssClass="employee-profile-sections mt-2">
+                        @* LoadOn=Init: render Details, Employment and the other Overview sub-panels
+                           up front and keep them mounted. The default (Dynamic) destroys the
+                           inactive panel's content on every sub-tab switch, which silently discards
+                           unsaved edits in the section you just left — and breaks the atomic
+                           profile+employment save (Ticket 2 item 5), whose whole point is editing
+                           both halves before one combined Save. *@
+                        <SfTab @bind-SelectedItem="OverviewTab" LoadOn="ContentLoad.Init" CssClass="employee-profile-sections mt-2">
                             <TabItems>
 
                 <TabItem>
@@ -1095,45 +1106,7 @@
         {
             _employee = await EmployeeService.GetEmployeeAsync(CompanyId, Id!.Value);
             if (_employee is not null)
-            {
-                Model.FirstName = _employee.FirstName;
-                Model.LastName = _employee.LastName;
-                Model.PreferredName = _employee.PreferredName ?? string.Empty;
-                Model.WorkEmail = _employee.WorkEmail;
-                Model.PersonalEmail = _employee.PersonalEmail;
-                Model.StartDate = _employee.StartDate;
-                Model.DateOfBirth = _employee.DateOfBirth;
-                Model.Nationality = _employee.Nationality ?? string.Empty;
-                Model.Gender = _employee.Gender ?? string.Empty;
-                Model.GenderOther    = _employee.GenderOther    ?? string.Empty;
-                Model.PhoneNumber    = _employee.PhoneNumber    ?? string.Empty;
-                Model.HomePhone      = _employee.HomePhone      ?? string.Empty;
-                Model.AddressLine1   = _employee.AddressLine1   ?? string.Empty;
-                Model.AddressLine2   = _employee.AddressLine2   ?? string.Empty;
-                Model.City           = _employee.City           ?? string.Empty;
-                Model.County         = _employee.County         ?? string.Empty;
-                Model.PostCode       = _employee.PostCode       ?? string.Empty;
-                Model.Country        = string.IsNullOrWhiteSpace(_employee.Country) ? "United Kingdom" : _employee.Country;
-                Model.HasSystemAccess = _employee.HasSystemAccess;
-                // Not shown on this tab (owned by the Employment tab's own model/form), but
-                // EmployeeProfileEditModel is validated as a whole via the shared EditContext, so
-                // these must still be populated here or Save on the Details tab would fail
-                // DataAnnotations validation for an existing employee.
-                Model.EmployeeNumber = _employee.EmployeeNumber ?? string.Empty;
-                Model.EmploymentTypeId = _employee.EmploymentTypeId;
-                Model.DepartmentId = _employee.DepartmentId;
-                Model.LocationId = _employee.LocationId;
-                Model.PositionProfileId = _employee.PositionProfileId;
-
-                // The employee profile response is the single source of truth for lifecycle tab
-                // visibility — these rules live server-side (GetEmployeeHandler) precisely so
-                // this page doesn't have to re-derive them from separately-fetched plan/record
-                // statuses.
-                _showProbationTab = _employee.ShowProbationTab;
-                _showOnboardingTab = _employee.ShowOnboardingTab;
-                _showOffboardingTab = _employee.ShowOffboardingTab;
-                _showLeavingTab = _employee.ShowLeavingTab;
-            }
+                PopulateFromEmployee(_employee);
 
             var uri = new Uri(Navigation.Uri);
             if (uri.Query.Contains("invited=true") && _employee is not null)
@@ -1176,6 +1149,67 @@
         }
 
         BuildMoreActionsItems();
+    }
+
+    // Repopulates the Details-tab model + lifecycle tab-visibility flags from a freshly fetched
+    // employee. Shared by the initial load and the concurrency-conflict "Reload latest values"
+    // affordance below.
+    private void PopulateFromEmployee(GetEmployeeResponse employee)
+    {
+        _employee = employee;
+        Model.FirstName = employee.FirstName;
+        Model.LastName = employee.LastName;
+        Model.PreferredName = employee.PreferredName ?? string.Empty;
+        Model.WorkEmail = employee.WorkEmail;
+        Model.PersonalEmail = employee.PersonalEmail;
+        Model.StartDate = employee.StartDate;
+        Model.DateOfBirth = employee.DateOfBirth;
+        Model.Nationality = employee.Nationality ?? string.Empty;
+        Model.Gender = employee.Gender ?? string.Empty;
+        Model.GenderOther = employee.GenderOther ?? string.Empty;
+        Model.PhoneNumber = employee.PhoneNumber ?? string.Empty;
+        Model.HomePhone = employee.HomePhone ?? string.Empty;
+        Model.AddressLine1 = employee.AddressLine1 ?? string.Empty;
+        Model.AddressLine2 = employee.AddressLine2 ?? string.Empty;
+        Model.City = employee.City ?? string.Empty;
+        Model.County = employee.County ?? string.Empty;
+        Model.PostCode = employee.PostCode ?? string.Empty;
+        Model.Country = string.IsNullOrWhiteSpace(employee.Country) ? "United Kingdom" : employee.Country;
+        Model.HasSystemAccess = employee.HasSystemAccess;
+        // Not shown on this tab (owned by the Employment tab's own model/form), but
+        // EmployeeProfileEditModel is validated as a whole via the shared EditContext, so these
+        // must still be populated here or Save on the Details tab would fail DataAnnotations
+        // validation for an existing employee.
+        Model.EmployeeNumber = employee.EmployeeNumber ?? string.Empty;
+        Model.EmploymentTypeId = employee.EmploymentTypeId;
+        Model.DepartmentId = employee.DepartmentId;
+        Model.LocationId = employee.LocationId;
+        Model.PositionProfileId = employee.PositionProfileId;
+
+        // The employee profile response is the single source of truth for lifecycle tab
+        // visibility — these rules live server-side (GetEmployeeHandler).
+        _showProbationTab = employee.ShowProbationTab;
+        _showOnboardingTab = employee.ShowOnboardingTab;
+        _showOffboardingTab = employee.ShowOffboardingTab;
+        _showLeavingTab = employee.ShowLeavingTab;
+    }
+
+    // Concurrency-conflict recovery hook (base ReloadLatestValuesAsync, wired to the shared
+    // <SaveConflictBanner>). Re-fetch the employee (same load path as init), repopulate the
+    // Details form + the Employment tab, and re-baseline unsaved-changes tracking. This is the
+    // explicit "show me what changed" action, so the user's unsaved edits are replaced with the
+    // latest server values (the banner itself leaves their input untouched until they click).
+    protected override async Task ReloadServerStateAsync()
+    {
+        var refreshed = await EmployeeService.GetEmployeeAsync(CompanyId, Id!.Value);
+        if (refreshed is not null)
+            PopulateFromEmployee(refreshed);
+
+        if (_employmentTab is not null)
+            await _employmentTab.ReloadLatestValuesAsync(rebaseline: true);
+
+        CaptureBaseline();
+        _employmentTab?.ResetBaseline();
     }
 
     // Restores the last-active section from localStorage on first render (JS interop isn't
@@ -1393,35 +1427,25 @@
         }
         else
         {
-            // Working pattern override is owned by the Employment tab's own save (below);
-            // pass through the value already on the employee so this call doesn't touch it.
-            var workingDaysOverride = _employee?.WorkingDaysOverride;
-            var hoursPerDayOverride = _employee?.HoursPerDayOverride;
+            // Item 5: profile + employment are one Employee aggregate row, so they are saved in a
+            // single transactional request guarded by one concurrency version. A conflict on
+            // either half rolls the whole save back — there is no "profile saved, employment
+            // failed" partial state and the banner/version stay accurate. One CorrelationId still
+            // produces one merged Employee Audit History entry.
+            if (_employmentTab is not null && !_employmentTab.ValidateSection())
+                return "Please fix the highlighted errors on the Employment tab.";
 
-            // Ticket: "merge Employee + Employment tab audit entries when saved together". This
-            // page's single Save button calls both UpdateEmployeeProfileAsync and (below)
-            // _employmentTab.SaveAsync() as one user action, so both requests share the same
-            // freshly generated CorrelationId — letting GetEmployeeAuditHistoryHandler combine
-            // the two resulting audit rows into a single history entry.
             var correlationId = Guid.NewGuid();
+            var employment = _employmentTab?.GetEmploymentPortion();
 
-            var request = new UpdateEmployeeProfileRequest(
+            var request = new UpdateEmployeeProfileAndEmploymentRequest(
                 CompanyId,
                 Id!.Value,
-                Model.DepartmentId,
-                Model.LocationId,
-                Model.PositionProfileId,
                 Model.FirstName,
                 Model.LastName,
                 string.IsNullOrWhiteSpace(Model.PreferredName)  ? null : Model.PreferredName.Trim(),
                 Model.WorkEmail,
                 Model.PersonalEmail,
-                // Start Date is no longer editable on the Details tab (item 37 — it now lives
-                // exclusively on the Employment tab, same as Department/Location above). This is
-                // just the unedited value populated at load time (see PopulateModel below); the
-                // Employment tab's own save runs second (below) and always has the final say, the
-                // same pattern already used for the shared working-pattern fields.
-                Model.StartDate,
                 Model.DateOfBirth,
                 string.IsNullOrWhiteSpace(Model.Nationality)    ? null : Model.Nationality.Trim(),
                 string.IsNullOrWhiteSpace(Model.Gender)         ? null : Model.Gender.Trim(),
@@ -1435,44 +1459,47 @@
                 string.IsNullOrWhiteSpace(Model.PostCode)       ? null : Model.PostCode.Trim(),
                 string.IsNullOrWhiteSpace(Model.Country)        ? null : Model.Country.Trim(),
                 Model.HasSystemAccess,
-                workingDaysOverride,
-                hoursPerDayOverride,
-                CorrelationId: correlationId);
+                // Ticket 2 follow-up: when the Employment tab has been loaded this session
+                // (employment is not null) its values are authoritative, INCLUDING deliberate
+                // nulls (manager removed, dates/notes cleared, overrides unchecked). Only fall
+                // back to the loaded _employee/Model snapshot when the tab was never opened, so
+                // the employment half is submitted unchanged. Note: NOT '??' — that would
+                // silently resurrect stale values for every intentional clear.
+                employment is not null ? employment.EmployeeNumber : _employee?.EmployeeNumber,
+                employment is not null ? employment.EmploymentTypeId : _employee?.EmploymentTypeId,
+                employment?.Status ?? _employee?.Status ?? "Active",
+                employment is not null ? employment.DepartmentId : Model.DepartmentId,
+                employment is not null ? employment.LocationId : Model.LocationId,
+                employment is not null ? employment.PositionProfileId : Model.PositionProfileId,
+                employment is not null ? employment.ManagerId : _employee?.ManagerId,
+                employment?.StartDate ?? Model.StartDate,
+                employment is not null ? employment.ContinuousServiceDate : _employee?.ContinuousServiceDate,
+                employment is not null ? employment.ProbationEndDate : _employee?.ProbationEndDate,
+                employment is not null ? employment.LeavingDate : _employee?.LeavingDate,
+                employment is not null ? employment.NoticePeriodUnitOverride : _employee?.NoticePeriodUnitOverride,
+                employment is not null ? employment.NoticePeriodLengthOverride : _employee?.NoticePeriodLengthOverride,
+                employment is not null ? employment.WorkingDaysOverride : _employee?.WorkingDaysOverride,
+                employment is not null ? employment.HoursPerDayOverride : _employee?.HoursPerDayOverride,
+                employment is not null ? employment.Notes : _employee?.Notes,
+                CorrelationId: correlationId,
+                // Ticket 2: optimistic concurrency — reject the save if this employee changed
+                // (via any screen) since it was loaded into this editor.
+                ExpectedVersion: _employee?.Version);
 
-            var (success, conflictMessage) = await EmployeeService.UpdateEmployeeProfileAsync(CompanyId, Id!.Value, request);
+            var result = await EmployeeService.UpdateEmployeeProfileAndEmploymentAsync(CompanyId, Id!.Value, request);
 
-            if (!success)
-                return conflictMessage;
-
-            // Save Employment tab's data (including any working pattern override change) second,
-            // so it has the final say over the shared working-pattern fields. Pass the same
-            // correlationId through so its audit event merges with the profile update above.
-            //
-            // Department/Location are NOT edited on this (Employee/Profile) tab for an existing
-            // employee — that section of the form only renders in the IsNew (create) branch above
-            // (see the "else if (IsNew)" block). This tab's Model.DepartmentId/LocationId are only
-            // ever populated once at load time (from _employee.DepartmentId/LocationId, purely so
-            // EmployeeProfileEditModel's shared EditContext still validates), and never change from
-            // user interaction here.
-            //
-            // Previously this called _employmentTab.SyncSharedAssignmentFields(Model.DepartmentId,
-            // Model.LocationId) unconditionally, on the theory that Department/Location were edited
-            // on this tab and the Employment tab's own independent copy of those fields (set from
-            // its Position Profile picker — see EmployeeEmploymentTab.OnPositionProfileChanged) was
-            // the stale one. That's backwards for the current UI: this tab's copy is the one that's
-            // always stale, so the unconditional sync was clobbering whatever Department/Location
-            // change the user had just made on the Employment tab with the original pre-edit
-            // values, silently reverting it on every save (and since EmploymentDetailsSnapshot
-            // doesn't track Department/Location, the revert never showed up in the audit trail
-            // either). The Employment tab already owns and saves its own Department/Location, so no
-            // sync is needed here.
-            if (_employmentTab is not null)
+            if (!result.Success)
             {
-                _employmentTab.CorrelationId = correlationId;
-                var employmentError = await _employmentTab.SaveAsync();
-                if (employmentError is not null)
-                    return employmentError;
+                SaveConflict = result.IsConcurrencyConflict;
+                return result.ErrorMessage;
             }
+
+            // One commit — adopt the new version on both the page and the Employment tab so a
+            // follow-up edit in the same session doesn't falsely trip the concurrency check.
+            SaveConflict = false;
+            if (result.NewVersion is { } v && _employee is not null)
+                _employee = _employee with { Version = v };
+            _employmentTab?.AdoptSavedVersion(result.NewVersion);
 
             // Existing employee — return to viewing the employee just updated, not the list.
             _redirectUrl = $"/companies/{CompanyId}/employees/{Id}/view";

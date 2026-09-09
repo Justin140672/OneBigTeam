@@ -11,12 +11,21 @@ public class UpdateEmploymentTypeValidatorTests
         CompanyId = Guid.NewGuid(),
         Id = Guid.NewGuid(),
         Name = "Full Time",
+        ExpectedVersion = 1,
     };
 
     [Fact]
     public void Validate_ValidRequest_Passes()
     {
         Assert.True(Validator.Validate(ValidRequest()).IsValid);
+    }
+
+    [Fact]
+    public void Validate_NullExpectedVersion_Fails()
+    {
+        var result = Validator.Validate(ValidRequest() with { ExpectedVersion = null });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentTypeRequest.ExpectedVersion));
     }
 
     [Fact]

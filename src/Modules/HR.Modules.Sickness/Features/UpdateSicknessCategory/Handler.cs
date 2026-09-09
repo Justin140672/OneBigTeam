@@ -30,7 +30,16 @@ internal sealed class UpdateSicknessCategoryHandler(SicknessDbContext db, IClock
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
         category.Update(request.Name, request.DisplayOrder, category.IsActive, now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict, so the
+        // audit event below only runs on a successful save.
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            category,
+            request.ExpectedVersion,
+            "This sickness category was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateSicknessCategoryResponse>(saveResult.Error);
 
         await auditPublisher.PublishAsync(new SicknessCategoryUpdatedAuditEvent(
             category.CompanyId,
@@ -45,6 +54,6 @@ internal sealed class UpdateSicknessCategoryHandler(SicknessDbContext db, IClock
             now), cancellationToken);
 
         return Result.Success(new UpdateSicknessCategoryResponse(
-            category.Id, category.CompanyId, category.Name, category.IsActive, category.DisplayOrder, category.CreatedAt, category.UpdatedAt));
+            category.Id, category.CompanyId, category.Name, category.IsActive, category.DisplayOrder, category.CreatedAt, category.UpdatedAt, category.Version));
     }
 }

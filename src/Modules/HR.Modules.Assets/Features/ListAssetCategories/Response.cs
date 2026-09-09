@@ -7,4 +7,5 @@ internal sealed record ListAssetCategoriesResponse(
     string? Description,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

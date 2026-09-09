@@ -66,7 +66,7 @@ public sealed class CompensationService(IHttpClientFactory httpClientFactory)
         return (null, "Failed to create compensation record.");
     }
 
-    public async Task<(UpdateFutureCompensationRecordResponse? Result, string? Error)> UpdateFutureCompensationRecordAsync(
+    public async Task<UpdateFutureCompensationResult> UpdateFutureCompensationRecordAsync(
         Guid companyId, Guid employeeId, Guid id, UpdateFutureCompensationRecordRequest request)
     {
         var response = await Http.PutAsJsonAsync(
@@ -75,16 +75,21 @@ public sealed class CompensationService(IHttpClientFactory httpClientFactory)
         if (response.IsSuccessStatusCode)
         {
             var updated = await response.Content.ReadFromJsonAsync<UpdateFutureCompensationRecordResponse>();
-            return (updated, null);
+            return new(updated, null);
         }
 
         if (response.StatusCode is System.Net.HttpStatusCode.Conflict or System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.BadRequest)
         {
             var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (null, body?.Error ?? "Failed to update compensation record.");
+            // Ticket 2: distinguish an optimistic-concurrency 409 ({ code: "concurrency" }) from a
+            // plain business conflict so the edit dialog can show the SaveConflictBanner. Mirrors
+            // EmployeeService.UpdateEmploymentDetailsAsync.
+            var isConcurrency = response.StatusCode == System.Net.HttpStatusCode.Conflict
+                                && body?.Code == "concurrency";
+            return new(null, body?.Error ?? "Failed to update compensation record.", isConcurrency);
         }
 
-        return (null, "Failed to update compensation record.");
+        return new(null, "Failed to update compensation record.");
     }
 
     public async Task<(bool Success, string? Error)> DeleteFutureCompensationRecordAsync(
@@ -176,6 +181,21 @@ public sealed class CompensationService(IHttpClientFactory httpClientFactory)
         return (null, "Failed to import compensation changes.", null);
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
     private sealed record RowErrorsEnvelope(IReadOnlyList<CompensationImportRowError>? Errors);
+}
+
+// Ticket 2: result of a future-dated compensation update. Deconstructs to (Result, Error) so
+// existing call sites keep working, while IsConcurrencyConflict lets the edit dialog raise the
+// shared SaveConflictBanner on a stale-version 409.
+public sealed record UpdateFutureCompensationResult(
+    UpdateFutureCompensationRecordResponse? Result,
+    string? Error,
+    bool IsConcurrencyConflict = false)
+{
+    public void Deconstruct(out UpdateFutureCompensationRecordResponse? result, out string? error)
+    {
+        result = Result;
+        error = Error;
+    }
 }

@@ -10,4 +10,7 @@ internal sealed record UpdateInterviewRequest
     public DateTimeOffset ScheduledAt { get; init; }
     public int? DurationMinutes { get; init; }
     public string? Location { get; init; }
+
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
 }

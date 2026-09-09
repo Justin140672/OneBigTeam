@@ -67,7 +67,16 @@ internal sealed class UpdateLeavePolicyHandler(LeaveDbContext dbContext, IClock 
             request.RequiresApproval,
             now);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict, so the
+        // audit event below only runs on a successful save.
+        var saveResult = await dbContext.SaveChangesWithConcurrencyAsync(
+            policy,
+            request.ExpectedVersion,
+            "This leave policy was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateLeavePolicyResponse>(saveResult.Error);
 
         await auditPublisher.PublishAsync(new LeavePolicyUpdatedAuditEvent(
             policy.CompanyId,
@@ -95,6 +104,7 @@ internal sealed class UpdateLeavePolicyHandler(LeaveDbContext dbContext, IClock 
             policy.RequiresApproval,
             policy.IsActive,
             policy.IsDefault,
-            policy.UpdatedAt));
+            policy.UpdatedAt,
+            policy.Version));
     }
 }

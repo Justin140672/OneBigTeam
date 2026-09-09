@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using FluentValidation;
 using Hangfire;
 using HR.Modules.Support.Domain;
@@ -24,7 +25,7 @@ public static class SupportModule
         AddFeatureServices(services);
 
         services.AddDbContext<SupportDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "support")));
 
         return services;

@@ -40,11 +40,20 @@ internal sealed class Endpoint(UpdateSharedCompanyDocumentAcknowledgementSetting
 
         if (result.IsFailure)
         {
-            var error = new { error = result.Error.Message };
+            // Include `code` so the client can distinguish a stale-save 409 (code "concurrency")
+            // from a plain conflict and raise the shared <SaveConflictBanner> — matches the
+            // { error, code } envelope ProblemResults.FromError emits for every other Ticket 2 endpoint.
+            var error = new { error = result.Error.Message, code = result.Error.Code };
 
             if (result.Error.Code == "not_found")
             {
                 await Send.ResultAsync(TypedResults.NotFound(error));
+                return;
+            }
+
+            if (result.Error.Code == "concurrency")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(error));
                 return;
             }
 

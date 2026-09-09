@@ -24,4 +24,7 @@ internal sealed record UpdateVacancyRequest
     // UpdateVacancyValidator. Ignored entirely when PositionProfileId is unchanged.
     public bool IsAuthorisedCorrection { get; init; }
     public string? CorrectionReason { get; init; }
+
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
 }

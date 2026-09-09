@@ -19,7 +19,7 @@ internal sealed class ListAssetCategoriesHandler(AssetsDbContext db)
             .OrderBy(c => c.Name)
             .Select(c => new ListAssetCategoriesResponse(
                 c.Id, c.CompanyId, c.Name, c.Description,
-                c.IsActive, c.CreatedAt, c.UpdatedAt))
+                c.IsActive, c.CreatedAt, c.UpdatedAt, c.Version))
             .ToListAsync(cancellationToken);
     }
 }

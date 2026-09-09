@@ -45,7 +45,16 @@ internal sealed class UpdateFutureCompensationRecordHandler(
             request.Reason,
             now);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency. Nothing is committed on conflict, so no audit event
+        // is published for a rejected save.
+        var saveResult = await dbContext.SaveChangesWithConcurrencyAsync(
+            record,
+            request.ExpectedVersion,
+            "This compensation record was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateFutureCompensationRecordResponse>(saveResult.Error);
 
         await auditEventPublisher.PublishAsync(
             new CompensationRecordUpdatedAuditEvent(
@@ -68,6 +77,7 @@ internal sealed class UpdateFutureCompensationRecordHandler(
             record.Reason.ToString(),
             record.CreatedBy,
             record.CreatedAt,
-            record.UpdatedAt));
+            record.UpdatedAt,
+            record.Version));
     }
 }

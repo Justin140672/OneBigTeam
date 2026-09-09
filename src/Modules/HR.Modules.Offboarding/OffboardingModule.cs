@@ -25,7 +25,7 @@ public static class OffboardingModule
     public static IServiceCollection AddOffboardingModule(this IServiceCollection services, string connectionString)
     {
         services.AddDbContext<OffboardingDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "offboarding")));
 
         services.AddScoped<ITaskCompletionAction, CompleteOffboardingTaskFromTaskAction>();

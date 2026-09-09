@@ -31,7 +31,10 @@ public sealed record CompensationHistoryItemModel(
     string Reason,
     Guid CreatedBy,
     string CreatedByName,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    // Ticket 2 (optimistic concurrency): the Compensation.Version this row was loaded at. Sent
+    // back as ExpectedVersion when editing a future-dated record.
+    int Version = 0);
 
 public sealed record GetCompensationHistoryResponse(IReadOnlyList<CompensationHistoryItemModel> Items);
 
@@ -96,7 +99,10 @@ public sealed record UpdateFutureCompensationRecordRequest(
     decimal? HoursPerWeek,
     decimal? FTE,
     string? Notes,
-    string Reason);
+    string Reason,
+    // Ticket 2 (optimistic concurrency): the Version the client loaded before editing. Null keeps
+    // last-writer-wins behaviour.
+    int? ExpectedVersion = null);
 
 public sealed record UpdateFutureCompensationRecordResponse(
     Guid Id,
@@ -113,7 +119,8 @@ public sealed record UpdateFutureCompensationRecordResponse(
     string Reason,
     Guid CreatedBy,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
 // ── BULK ADJUSTMENT ─────────────────────────────────────────────────────────
 

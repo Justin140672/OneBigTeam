@@ -47,7 +47,7 @@ public class UpdateAssetCategoryEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/asset-categories/{Guid.NewGuid()}",
-            new { companyId, id = Guid.NewGuid(), name = "Electronics" });
+            new { companyId, id = Guid.NewGuid(), name = "Electronics", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -74,7 +74,8 @@ public class UpdateAssetCategoryEndpointTests
                 companyId,
                 id = category.Id,
                 name = "Consumer Electronics",
-                description = "Phones, laptops, and accessories"
+                description = "Phones, laptops, and accessories",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -105,7 +106,7 @@ public class UpdateAssetCategoryEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/asset-categories/{category!.Id}",
-            new { companyId, id = category.Id, name = string.Empty });
+            new { companyId, id = category.Id, name = string.Empty, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -117,5 +118,6 @@ public class UpdateAssetCategoryEndpointTests
         string? Description,
         bool IsActive,
         DateTimeOffset CreatedAt,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        int Version);
 }

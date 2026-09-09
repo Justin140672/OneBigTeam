@@ -17,7 +17,8 @@ public class UpdateCompanyValidatorTests
     {
         CompanyId = Guid.NewGuid(),
         Name = "Acme Corp",
-        Addresses = [ValidAddress()]
+        Addresses = [ValidAddress()],
+        ExpectedVersion = 1
     };
 
     [Fact]
@@ -171,5 +172,15 @@ public class UpdateCompanyValidatorTests
     {
         var v = new UpdateCompanyValidator();
         Assert.True(v.Validate(ValidRequest()).IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_ExpectedVersion_Is_Null()
+    {
+        var v = new UpdateCompanyValidator();
+        var result = v.Validate(ValidRequest() with { ExpectedVersion = null });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateCompanyRequest.ExpectedVersion)
+            && e.ErrorMessage.Contains("concurrency version is required"));
     }
 }

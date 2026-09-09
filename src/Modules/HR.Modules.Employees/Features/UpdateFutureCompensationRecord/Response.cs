@@ -15,4 +15,5 @@ internal sealed record UpdateFutureCompensationRecordResponse(
     string Reason,
     Guid CreatedBy,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

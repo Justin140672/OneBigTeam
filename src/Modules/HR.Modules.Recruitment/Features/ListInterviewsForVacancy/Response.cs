@@ -15,4 +15,5 @@ internal sealed record InterviewListItem(
     int? DurationMinutes,
     string? Location,
     InterviewOutcome Outcome,
-    string? Notes);
+    string? Notes,
+    int Version);

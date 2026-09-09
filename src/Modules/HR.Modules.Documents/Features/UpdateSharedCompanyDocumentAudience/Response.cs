@@ -7,4 +7,5 @@ internal sealed record UpdateSharedCompanyDocumentAudienceResponse(
     IReadOnlyList<Guid> AudienceLocationIds,
     IReadOnlyList<Guid> AudiencePositionProfileIds,
     IReadOnlyList<Guid> AudienceEmployeeIds,
-    string AudienceDescription);
+    string AudienceDescription,
+    int Version);

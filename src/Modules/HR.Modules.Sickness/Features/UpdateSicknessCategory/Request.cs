@@ -7,6 +7,9 @@ internal sealed record UpdateSicknessCategoryRequest
     public string Name { get; init; } = string.Empty;
     public int DisplayOrder { get; init; }
 
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
+
     // SICK-06: populated by the endpoint from the authenticated user's resolved identity — never
     // bound from the client body.
     internal Guid? ActorEmployeeId { get; init; }

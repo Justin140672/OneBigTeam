@@ -80,6 +80,7 @@ internal sealed class GetEmployeeHandler
                 e.Notes,
                 e.CreatedAt,
                 e.UpdatedAt,
+                e.Version,
                 DepartmentName = _dbContext.Departments
                     .Where(d => d.Id == e.DepartmentId)
                     .Select(d => d.Name)
@@ -216,7 +217,8 @@ internal sealed class GetEmployeeHandler
             showLeavingTab,
             effectiveNoticePeriod.Unit,
             effectiveNoticePeriod.Length,
-            effectiveNoticePeriod.Source));
+            effectiveNoticePeriod.Source,
+            result.Version));
     }
 
     // Walks the ManagerId chain from the employee's own manager up to the root, using an

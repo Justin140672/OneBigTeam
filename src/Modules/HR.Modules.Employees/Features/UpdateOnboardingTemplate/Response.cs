@@ -10,6 +10,7 @@ internal sealed record UpdateOnboardingTemplateResponse(
     string? Description,
     bool IsActive,
     DateTimeOffset UpdatedAt,
+    int Version,
     IReadOnlyList<UpdateOnboardingTemplateTaskResult> Tasks);
 
 internal sealed record UpdateOnboardingTemplateTaskResult(

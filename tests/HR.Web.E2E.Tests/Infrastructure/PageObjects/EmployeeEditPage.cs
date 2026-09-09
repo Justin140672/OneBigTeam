@@ -341,6 +341,59 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return await banner.IsVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
     }
 
+    // ── Optimistic-concurrency conflict banner (Ticket 2) ─────────────────────
+    // EmployeeEdit.razor renders the shared <SaveConflictBanner> component, whose root markup is a
+    // single `div.alert.alert-warning.save-conflict-banner[role='alert']` containing a
+    // "Reload latest values" Syncfusion button — distinct from the generic red `.alert-danger`
+    // GlobalError alert. Scope on the component's own `.save-conflict-banner` class (+ the
+    // role='alert' attribute) rather than the shared Bootstrap `.alert-warning` class alone, and
+    // additionally require the "Reload latest values" action so an unrelated warning alert can
+    // never satisfy strict mode. Match on structure, not text: on a real 409 the razor overrides
+    // the component's default Message with its own friendly copy, so a text filter would be brittle.
+    private ILocator ConcurrencyWarningBanner =>
+        page.Locator(".save-conflict-banner[role='alert']")
+            .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
+
+    /// <summary>
+    /// Clicks the single page-level Save and waits for the optimistic-concurrency warning banner
+    /// to appear — i.e. the save was rejected because the employee changed since it was loaded.
+    /// Does NOT expect (or wait for) a navigation, since a conflicted save stays on the edit page.
+    /// </summary>
+    public async Task ClickSaveExpectingConflictAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await page.WaitForSpinnerToClearAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+    }
+
+    public Task<bool> IsConcurrencyWarningVisibleAsync() =>
+        ConcurrencyWarningBanner.IsVisibleAsync();
+
+    /// <summary>Clicks "Reload latest values" in the concurrency banner and waits for the banner to clear.</summary>
+    public async Task ClickReloadLatestValuesAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+    }
+
+    /// <summary>
+    /// Bug fix (b): clears the required Details-tab "Last Name" field and blurs it, driving the
+    /// EditContext into an invalid state. EditPageBase.OnValidationStateChanged then drops any
+    /// standing concurrency banner. Waits for the field's own validation message to confirm the
+    /// invalid state actually registered before returning.
+    /// </summary>
+    public async Task MakeDetailsFormInvalidAsync()
+    {
+        var lastName = page.GetByLabel("Last Name").First;
+        await lastName.ClickAsync();
+        await lastName.FillAsync("");
+        await page.Keyboard.PressAsync("Tab");
+        await page.Locator(".validation-message").First.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
     // ── "More actions" dropdown (Organisation Chart / Start offboarding) ───────
 
     // A bare instant IsVisibleAsync() here races the same post-navigation employee-data-load
@@ -427,6 +480,36 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public Task FillTextFieldByIdAsync(string fieldLabel, string value) =>
         page.GetByLabel(fieldLabel).First.FillAsync(value);
+
+    private ILocator PreferredNameField => page.GetByPlaceholder("Defaults to first name");
+
+    /// <summary>
+    /// Switches to the Details section (Overview group → Details) so the Preferred Name field is in
+    /// the active — visible — tab panel. Callers that also touch the Employment tab (e.g. the atomic
+    /// profile+employment concurrency test) leave a different section active, and SfTab keeps
+    /// inactive panels in the DOM but hidden, so a bare FillAsync/InputValueAsync on the
+    /// Preferred Name field would auto-wait for visibility and time out. Mirrors
+    /// <see cref="SwitchToEmploymentSectionAsync"/>.
+    /// </summary>
+    private async Task SwitchToDetailsSectionAsync()
+    {
+        await NavigateToSectionAsync(page, "Details");
+        await PreferredNameField.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+    }
+
+    /// <summary>Sets the Details-tab "Preferred Name" field (placeholder "Defaults to first name"). Switches to the Details section first.</summary>
+    public async Task FillPreferredNameAsync(string value)
+    {
+        await SwitchToDetailsSectionAsync();
+        await PreferredNameField.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public async Task<string> GetPreferredNameValueAsync()
+    {
+        await SwitchToDetailsSectionAsync();
+        return await PreferredNameField.InputValueAsync();
+    }
 
     /// <summary>True if the "Fields marked * are required." explanatory note is visible on the Details tab.</summary>
     public async Task<bool> HasRequiredFieldsNoteAsync()
@@ -516,6 +599,50 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             // DropDownSelector.SelectAsync call will surface the actual failure with its own
             // (equally cold-start-aware) retry logic.
         }
+    }
+
+    /// <summary>
+    /// Switches to the Employment section (Overview group → Employment) without the heavier
+    /// dropdown cold-start warm-up <see cref="OpenEmploymentTabAsync"/> performs — used by tests
+    /// that only need to reach the "HR Notes" text field, not the comboboxes further down.
+    /// </summary>
+    public async Task SwitchToEmploymentSectionAsync()
+    {
+        await NavigateToSectionAsync(page, "Employment");
+        await page.WaitForSelectorAsync(".card-header:has-text('Employment Details')", new() { Timeout = 15_000 });
+    }
+
+    private ILocator EmploymentNotesField =>
+        page.GetByPlaceholder("Optional internal notes visible to HR only");
+
+    /// <summary>
+    /// Fills the Employment tab's "HR Notes" field (EmployeeEmploymentTab.razor, bound to
+    /// Model.Notes). Switches to the Employment section first.
+    /// </summary>
+    public async Task FillEmploymentNotesAsync(string value)
+    {
+        await SwitchToEmploymentSectionAsync();
+        await EmploymentNotesField.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        // HrTextBox is a Syncfusion multiline SfTextBox: a bare FillAsync sets the DOM value but its
+        // ValueChanged/@bind-Value doesn't always fire, so Model.Notes stays empty and the atomic
+        // save submits nothing. Type for real, then Tab to force the change/blur commit — the same
+        // technique the other Syncfusion-backed fill helpers in this page object use.
+        await EmploymentNotesField.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        await page.WaitForTimeoutAsync(150);
+        if (value.Length > 0)
+            await EmploymentNotesField.PressSequentiallyAsync(value, new() { Delay = 15 });
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForTimeoutAsync(300);
+    }
+
+    /// <summary>Reads the current value of the Employment tab's "HR Notes" field. Switches to the Employment section first.</summary>
+    public async Task<string> GetEmploymentNotesValueAsync()
+    {
+        await SwitchToEmploymentSectionAsync();
+        await EmploymentNotesField.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        return await EmploymentNotesField.InputValueAsync();
     }
 
     /// <summary>

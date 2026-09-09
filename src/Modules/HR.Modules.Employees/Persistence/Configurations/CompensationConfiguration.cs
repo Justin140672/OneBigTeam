@@ -77,6 +77,12 @@ internal sealed class CompensationConfiguration : IEntityTypeConfiguration<Compe
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property(c => c.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.HasIndex(c => c.CompanyId);
         builder.HasIndex(c => new { c.CompanyId, c.EmployeeId });
     }

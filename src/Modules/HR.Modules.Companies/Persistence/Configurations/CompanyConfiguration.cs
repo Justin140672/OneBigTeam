@@ -27,6 +27,12 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(c => c.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

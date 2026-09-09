@@ -43,7 +43,8 @@ internal sealed class GetCompensationHistoryHandler(EmployeesDbContext dbContext
                 c.Reason.ToString(),
                 c.CreatedBy,
                 creatorNames.TryGetValue(c.CreatedBy, out var name) ? name : "Unknown",
-                c.CreatedAt))
+                c.CreatedAt,
+                c.Version))
             .ToList();
 
         return Result.Success(new GetCompensationHistoryResponse(items));

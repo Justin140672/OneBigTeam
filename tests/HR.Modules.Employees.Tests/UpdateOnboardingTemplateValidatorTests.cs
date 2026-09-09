@@ -13,6 +13,7 @@ public class UpdateOnboardingTemplateValidatorTests
         CompanyId = Guid.NewGuid(),
         Id = Guid.NewGuid(),
         Name = "Standard Onboarding",
+        ExpectedVersion = 1,
         Tasks =
         [
             new UpdateOnboardingTemplateTaskItem(null, "Set up laptop", null, TaskPriority.Medium, OnboardingTemplateTaskAssignTo.Unassigned, 0, 0),
@@ -25,6 +26,14 @@ public class UpdateOnboardingTemplateValidatorTests
         var result = _validator.Validate(ValidRequest());
 
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_ExpectedVersion_Is_Null()
+    {
+        var result = _validator.Validate(ValidRequest() with { ExpectedVersion = null });
+
+        Assert.False(result.IsValid);
     }
 
     [Fact]

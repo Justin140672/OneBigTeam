@@ -10,4 +10,5 @@ internal sealed record UpdateLeavePolicyResponse(
     bool RequiresApproval,
     bool IsActive,
     bool IsDefault,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

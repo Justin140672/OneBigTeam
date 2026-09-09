@@ -31,7 +31,8 @@ public class UpdateLeavePolicyHandlerTests
                 Name = "New Name",
                 Description = "New desc",
                 CarryOverDays = 10,
-                AllowNegativeBalance = true
+                AllowNegativeBalance = true,
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 
@@ -138,7 +139,8 @@ public class UpdateLeavePolicyHandlerTests
                 CompanyId = companyId,
                 PolicyId = policy.Id,
                 Name = "Same Name",
-                CarryOverDays = 10
+                CarryOverDays = 10,
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 
@@ -199,7 +201,8 @@ public class UpdateLeavePolicyHandlerTests
                 PolicyId = policy.Id,
                 Name = "New Name",
                 CarryOverDays = 7,
-                IsDefault = false
+                IsDefault = false,
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 
@@ -229,7 +232,8 @@ public class UpdateLeavePolicyHandlerTests
                 CompanyId = companyId,
                 PolicyId = target.Id,
                 Name = "Target",
-                IsDefault = true
+                IsDefault = true,
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 
@@ -264,7 +268,8 @@ public class UpdateLeavePolicyHandlerTests
                 Description = "New desc",
                 CarryOverDays = 10,
                 AllowNegativeBalance = true,
-                ActorEmployeeId = actorId
+                ActorEmployeeId = actorId,
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 

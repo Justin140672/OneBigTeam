@@ -7,4 +7,5 @@ internal sealed record UpdateLocationResponse(
     string? Description,
     Guid LocationTypeId,
     bool IsActive,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

@@ -7,4 +7,7 @@ internal sealed record UpdatePublicHolidayRequest
     public DateOnly Date { get; init; }
     public string Name { get; init; } = string.Empty;
     public string CountryCode { get; init; } = string.Empty;
+
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
 }

@@ -14,4 +14,8 @@ internal sealed record UpdateFutureCompensationRecordRequest
     public decimal? FTE { get; init; }
     public string? Notes { get; init; }
     public CompensationChangeReason Reason { get; init; }
+
+    // Ticket 2 (optimistic concurrency): the Compensation.Version the client loaded before editing.
+    // Optional/nullable so callers that don't send it keep last-writer-wins behaviour.
+    public int? ExpectedVersion { get; init; }
 }

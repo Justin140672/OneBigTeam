@@ -26,6 +26,11 @@ public abstract class EditDialogBase<TModel> : ComponentBase where TModel : clas
     protected string? GlobalError { get; set; }
     protected bool ShowUnsavedChangesDialog { get; set; }
 
+    // Ticket 2 (optimistic concurrency): true when the last save was rejected with HTTP 409 /
+    // code "concurrency". Drives the shared <SaveConflictBanner>, which takes precedence over the
+    // generic GlobalError alert. A SaveCoreAsync implementation sets this from the service result.
+    protected bool SaveConflict { get; set; }
+
     private string? _baselineSnapshot;
 
     // DialogEvents.Closed fires for EVERY close — including one this class itself just drove via
@@ -81,6 +86,7 @@ public abstract class EditDialogBase<TModel> : ComponentBase where TModel : clas
     protected async Task SubmitAsync()
     {
         GlobalError = null;
+        SaveConflict = false;
 
         if (!EditContext.Validate())
         {

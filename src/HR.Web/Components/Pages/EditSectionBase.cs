@@ -1,5 +1,7 @@
+using System.Reflection;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using HR.Web.Services;
 
 namespace HR.Web.Components.Pages;
 
@@ -9,7 +11,7 @@ namespace HR.Web.Components.Pages;
 /// single Save button, rather than a submit button of its own. Owns a single
 /// <typeparamref name="TModel"/> validated via <see cref="EditContext"/>/DataAnnotations.
 /// </summary>
-public abstract class EditSectionBase<TModel> : ComponentBase where TModel : class, new()
+public abstract class EditSectionBase<TModel> : ComponentBase, IDisposable where TModel : class, new()
 {
     protected TModel Model { get; } = new();
     protected EditContext EditContext { get; private set; } = default!;
@@ -17,6 +19,81 @@ public abstract class EditSectionBase<TModel> : ComponentBase where TModel : cla
     protected bool IsLoading { get; set; } = true;
     protected string? GlobalError { get; set; }
     protected string? SuccessMsg { get; set; }
+
+    // ── Optimistic concurrency (Ticket 2) ────────────────────────────────────────
+    // The version this section's Model was loaded at. Set it in LoadAsync from the GET response;
+    // it is sent as ExpectedVersion on save (see ExpectedVersionForSave) and refreshed from every
+    // successful Update* response by ApplySaveResult.
+    protected int? LoadedVersion { get; set; }
+
+    // Set by an orchestrating parent that runs a chained save (e.g. EmployeeEdit saves the profile
+    // first, then this tab) and needs this save to send the token produced by the first call
+    // rather than the now-stale one loaded with the page.
+    public int? ExpectedVersionOverride { get; set; }
+
+    protected int? ExpectedVersionForSave => ExpectedVersionOverride ?? LoadedVersion;
+
+    // True when the last save was rejected by the API with HTTP 409 / code "concurrency" — i.e.
+    // the record changed elsewhere since it was loaded. Drives the shared <SaveConflictBanner>.
+    public bool SaveConflict { get; private set; }
+
+    // One-liner for a SaveCoreAsync implementation: records the conflict state, refreshes
+    // LoadedVersion on success, and returns null (success) or the error message to surface.
+    protected string? ApplySaveResult(ApiSaveResult result, string? fallbackError = null)
+    {
+        SaveConflict = result.IsConcurrencyConflict;
+        if (result.Success)
+        {
+            if (result.NewVersion is { } v) LoadedVersion = v;
+            return null;
+        }
+        return result.ErrorMessage ?? fallbackError ?? "Failed to save.";
+    }
+
+    // Concurrency-conflict recovery. Re-fetches server state via LoadAsync (which repopulates
+    // Model + LoadedVersion) and clears the conflict banner. By default the user's in-progress
+    // edits are preserved — only an explicit user-driven reload passes rebaseline: true to adopt
+    // the server values and reset the unsaved-changes tracking.
+    public async Task ReloadLatestValuesAsync(bool rebaseline = false)
+    {
+        var preservedEdits = rebaseline
+            ? null
+            : System.Text.Json.JsonSerializer.Serialize(Model);
+
+        await LoadAsync();
+
+        if (preservedEdits is not null)
+            RestoreModelState(preservedEdits);
+        else
+            CaptureBaseline();
+
+        SaveConflict = false;
+        GlobalError = null;
+        StateHasChanged();
+    }
+
+    private void RestoreModelState(string json)
+    {
+        var restored = System.Text.Json.JsonSerializer.Deserialize<TModel>(json);
+        if (restored is null) return;
+        foreach (var prop in typeof(TModel).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (prop.CanRead && prop.CanWrite)
+                prop.SetValue(Model, prop.GetValue(restored));
+        }
+    }
+
+    private void OnValidationStateChanged(object? sender, ValidationStateChangedEventArgs e)
+    {
+        // Bug fix (b): once the form is invalid again after a conflict (the user edited a field to
+        // an invalid value before re-saving), drop the stale conflict banner so it doesn't linger
+        // alongside the validation errors.
+        if (SaveConflict && EditContext.GetValidationMessages().Any())
+        {
+            SaveConflict = false;
+            StateHasChanged();
+        }
+    }
 
     private string? _baselineSnapshot;
     private object? _loadedKey;
@@ -35,8 +112,11 @@ public abstract class EditSectionBase<TModel> : ComponentBase where TModel : cla
     protected override void OnInitialized()
     {
         EditContext = new EditContext(Model);
+        EditContext.OnValidationStateChanged += OnValidationStateChanged;
         base.OnInitialized();
     }
+
+    public void Dispose() => EditContext.OnValidationStateChanged -= OnValidationStateChanged;
 
     // Blazor invokes OnParametersSetAsync every time the parent re-renders, not only when a
     // parameter value actually changes — so without this guard, an unrelated parent StateHasChanged
@@ -78,6 +158,7 @@ public abstract class EditSectionBase<TModel> : ComponentBase where TModel : cla
     {
         GlobalError = null;
         SuccessMsg = null;
+        SaveConflict = false;
         StateHasChanged();
 
         if (!EditContext.Validate())

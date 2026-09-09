@@ -1,7 +1,12 @@
 namespace HR.Modules.Recruitment.Domain;
 
-internal sealed class Interview
+internal sealed class Interview : HR.SharedKernel.IVersionedAggregate
 {
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
+
     private Interview() { }
 
     public Guid Id { get; private set; }
@@ -34,6 +39,7 @@ internal sealed class Interview
         DurationMinutes       = durationMinutes,
         Location              = string.IsNullOrWhiteSpace(location) ? null : location.Trim(),
         Outcome               = InterviewOutcome.Pending,
+        Version               = 1,
         CreatedAt             = now,
         UpdatedAt             = now,
     };

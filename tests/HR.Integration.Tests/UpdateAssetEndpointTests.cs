@@ -78,7 +78,8 @@ public class UpdateAssetEndpointTests
                 id = Guid.NewGuid(),
                 assetNumber = "ASSET-001",
                 categoryId = category.Id,
-                name = "Ghost"
+                name = "Ghost",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -105,7 +106,8 @@ public class UpdateAssetEndpointTests
                 model = "XPS 15",
                 serialNumber = "SN999",
                 purchaseDate = "2025-03-01",
-                purchasePrice = 2000.00m
+                purchasePrice = 2000.00m,
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -139,7 +141,8 @@ public class UpdateAssetEndpointTests
                 id = asset.Id,
                 assetNumber = "ASSET-001",
                 categoryId = category.Id,
-                name = string.Empty
+                name = string.Empty,
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -161,7 +164,8 @@ public class UpdateAssetEndpointTests
                 id = asset.Id,
                 assetNumber = string.Empty,
                 categoryId = category.Id,
-                name = "Laptop"
+                name = "Laptop",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -185,7 +189,8 @@ public class UpdateAssetEndpointTests
                 id = asset1.Id,
                 assetNumber = "ASSET-002",
                 categoryId = category.Id,
-                name = "Laptop"
+                name = "Laptop",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -213,7 +218,8 @@ public class UpdateAssetEndpointTests
                 id = asset.Id,
                 assetNumber = "ASSET-001",
                 categoryId = otherCategory.Id,
-                name = "Laptop"
+                name = "Laptop",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -241,5 +247,6 @@ public class UpdateAssetEndpointTests
         decimal? PurchasePrice,
         string Status,
         DateTimeOffset CreatedAt,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        int Version);
 }

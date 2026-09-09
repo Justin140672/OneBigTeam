@@ -1,16 +1,21 @@
 using System.ComponentModel.DataAnnotations;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Contracts;
+using HR.Web.Services;
 
 namespace HR.Web.Models;
 
 // Name and Addresses are saved together via a single UpdateCompanyRequest, so they share one
 // model/EditContext (owned by CompanyEdit) even though they're shown on separate tabs.
-public sealed class CompanyDetailsEditModel
+public sealed class CompanyDetailsEditModel : IHasVersion
 {
     [Required, MaxLength(200)]
     public string Name { get; set; } = string.Empty;
     public List<CompanyAddressEditModel> Addresses { get; set; } = [];
+
+    // Ticket 2: optimistic-concurrency token loaded with the company, sent as ExpectedVersion on
+    // save and refreshed from the save response.
+    public int Version { get; set; }
 }
 
 public sealed class CompanyAddressEditModel

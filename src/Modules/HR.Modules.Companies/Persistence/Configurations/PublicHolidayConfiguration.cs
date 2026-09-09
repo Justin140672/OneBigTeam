@@ -34,6 +34,12 @@ internal sealed class PublicHolidayConfiguration : IEntityTypeConfiguration<Publ
             .HasMaxLength(10)
             .IsRequired();
 
+        builder.Property(h => h.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(h => h.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

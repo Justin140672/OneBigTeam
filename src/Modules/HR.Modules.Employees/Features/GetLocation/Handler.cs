@@ -26,6 +26,7 @@ internal sealed class GetLocationHandler(EmployeesDbContext dbContext)
             location.Name,
             location.Description,
             location.LocationTypeId,
-            location.IsActive));
+            location.IsActive,
+            location.Version));
     }
 }

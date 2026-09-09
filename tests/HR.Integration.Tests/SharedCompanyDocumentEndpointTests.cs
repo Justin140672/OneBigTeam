@@ -835,7 +835,7 @@ public class SharedCompanyDocumentEndpointTests
         using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.PutAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}",
-            new { Title = "New Title", CategoryId = categoryId });
+            new { Title = "New Title", CategoryId = categoryId, ExpectedVersion = 2 });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -859,6 +859,7 @@ public class SharedCompanyDocumentEndpointTests
                 CategoryId    = categoryId,
                 EffectiveDate = new DateOnly(2026, 9, 1),
                 ReviewDate    = new DateOnly(2027, 9, 1),
+                ExpectedVersion = 2,
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -886,6 +887,7 @@ public class SharedCompanyDocumentEndpointTests
                 ReviewFrequency             = "Custom",
                 CustomReviewFrequencyMonths = 6,
                 ReviewDate                  = new DateOnly(2027, 1, 1),
+                ExpectedVersion             = 2,
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -915,6 +917,7 @@ public class SharedCompanyDocumentEndpointTests
                 Title                 = "Updated Policy Title",
                 CategoryId            = categoryId,
                 ReviewOwnerEmployeeId = Guid.NewGuid(),
+                ExpectedVersion       = 2,
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -937,6 +940,7 @@ public class SharedCompanyDocumentEndpointTests
                 Title           = "Updated Policy Title",
                 CategoryId      = categoryId,
                 ReviewFrequency = "Monthly",
+                ExpectedVersion = 2,
             });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -963,7 +967,7 @@ public class SharedCompanyDocumentEndpointTests
         // id that belongs to company B.
         var response = await clientA.PutAsJsonAsync(
             $"/api/companies/{companyA}/shared-documents/{doc!.Id}",
-            new { Title = "Title", CategoryId = categoryInB });
+            new { Title = "Title", CategoryId = categoryInB, ExpectedVersion = 2 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -987,7 +991,7 @@ public class SharedCompanyDocumentEndpointTests
 
         var response = await clientB.PutAsJsonAsync(
             $"/api/companies/{companyB}/shared-documents/{doc!.Id}",
-            new { Title = "Title", CategoryId = categoryInB });
+            new { Title = "Title", CategoryId = categoryInB, ExpectedVersion = 2 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -1030,7 +1034,7 @@ public class SharedCompanyDocumentEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/audience",
-            new { AudienceDepartmentIds = new[] { departmentId } });
+            new { AudienceDepartmentIds = new[] { departmentId }, ExpectedVersion = 2 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<AudiencePayload>();
@@ -1050,7 +1054,7 @@ public class SharedCompanyDocumentEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/audience",
-            new { AudienceDepartmentIds = new[] { Guid.NewGuid() } });
+            new { AudienceDepartmentIds = new[] { Guid.NewGuid() }, ExpectedVersion = 2 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -1072,7 +1076,7 @@ public class SharedCompanyDocumentEndpointTests
         using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.PutAsJsonAsync(
             $"/api/companies/{companyB}/shared-documents/{doc!.Id}/audience",
-            new { });
+            new { ExpectedVersion = 2 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -1173,7 +1177,7 @@ public class SharedCompanyDocumentEndpointTests
 
         await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/acknowledgement-settings",
-            new { RequiresAcknowledgement = true, AcknowledgementStatement = "I confirm I have read this." });
+            new { RequiresAcknowledgement = true, AcknowledgementStatement = "I confirm I have read this.", ExpectedVersion = 2 });
 
         var response = await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/publish", EmptyJson());
 
@@ -1219,7 +1223,7 @@ public class SharedCompanyDocumentEndpointTests
         using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.PutAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/acknowledgement-settings",
-            new { RequiresAcknowledgement = true, AcknowledgementDueDate = "2027-01-01" });
+            new { RequiresAcknowledgement = true, AcknowledgementDueDate = "2027-01-01", ExpectedVersion = 2 });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -1241,6 +1245,7 @@ public class SharedCompanyDocumentEndpointTests
                 RequiresAcknowledgement = true,
                 AcknowledgementDueDate = "2027-01-01",
                 AcknowledgementStatement = "I confirm I have read the updated expenses policy.",
+                ExpectedVersion = 2,
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -1264,7 +1269,7 @@ public class SharedCompanyDocumentEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/acknowledgement-settings",
-            new { RequiresAcknowledgement = false });
+            new { RequiresAcknowledgement = false, ExpectedVersion = 2 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -1286,7 +1291,7 @@ public class SharedCompanyDocumentEndpointTests
         using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.PutAsJsonAsync(
             $"/api/companies/{companyB}/shared-documents/{doc!.Id}/acknowledgement-settings",
-            new { RequiresAcknowledgement = false });
+            new { RequiresAcknowledgement = false, ExpectedVersion = 2 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }

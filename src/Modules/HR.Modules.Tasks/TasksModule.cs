@@ -32,7 +32,7 @@ public static class TasksModule
         AddFeatureServices(services);
 
         services.AddDbContext<TasksDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "tasks")));
 
         return services;

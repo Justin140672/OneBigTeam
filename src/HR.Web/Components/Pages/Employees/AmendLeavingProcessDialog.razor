@@ -54,7 +54,10 @@
                         <ValidationMessage For="@(() => _model.LeavingReason)" />
                     </div>
 
-                    @if (!string.IsNullOrEmpty(_globalError))
+                    <SaveConflictBanner Visible="_saveConflict" Disabled="@_submitting" OnReload="ReloadLatestAsync"
+                                        Message="Someone else changed this leaving process while you were editing. Your changes have not been saved." />
+
+                    @if (!_saveConflict && !string.IsNullOrEmpty(_globalError))
                     {
                         <div class="alert alert-danger py-2">@_globalError</div>
                     }
@@ -85,6 +88,11 @@
     private bool _loading;
     private bool _submitting;
     private string? _globalError;
+
+    // Ticket 2: optimistic-concurrency token loaded with the current leaving-process values, sent as
+    // ExpectedVersion on save; _saveConflict drives the shared <SaveConflictBanner>.
+    private int? _loadedVersion;
+    private bool _saveConflict;
 
     private readonly AmendLeavingProcessFormModel _model = new();
     private EditContext _editContext = default!;
@@ -123,6 +131,7 @@
         _loading = true;
         _submitting = false;
         _globalError = null;
+        _saveConflict = false;
         _model.LeavingDate = null;
         _model.ConfirmBackdatedLeavingDate = false;
         _model.LastWorkingDay = null;
@@ -134,6 +143,7 @@
             _model.LeavingDate = current.LeavingDate;
             _model.LastWorkingDay = current.LastWorkingDay;
             _model.LeavingReason = current.LeavingReason;
+            _loadedVersion = current.Version;
         }
 
         _editContext = new EditContext(_model);
@@ -151,9 +161,16 @@
 
     private static bool IsBackdated(DateOnly? date) => date is not null && date < DateOnly.FromDateTime(DateTime.Today);
 
+    private async Task ReloadLatestAsync()
+    {
+        await LoadCurrentValuesAsync();
+        StateHasChanged();
+    }
+
     private async Task ConfirmAsync()
     {
         _globalError = null;
+        _saveConflict = false;
 
         if (!_editContext.Validate())
         {
@@ -170,21 +187,23 @@
             _model.LeavingDate!.Value,
             _model.LastWorkingDay!.Value,
             _model.LeavingReason!,
-            _model.ConfirmBackdatedLeavingDate);
+            _model.ConfirmBackdatedLeavingDate,
+            _loadedVersion);
 
-        var (result, error) = await EmployeeService.AmendLeavingProcessAsync(CompanyId, EmployeeId, request);
+        var saveResult = await EmployeeService.AmendLeavingProcessAsync(CompanyId, EmployeeId, request);
 
         _submitting = false;
 
-        if (result is null)
+        if (saveResult.Result is null)
         {
             // Left open (rather than closing) so the user can fix whatever the server rejected —
             // same convention as StartLeavingProcessDialog.ConfirmAsync.
-            _globalError = error ?? "Failed to amend the leaving process.";
+            _saveConflict = saveResult.IsConcurrencyConflict;
+            _globalError = saveResult.Error ?? "Failed to amend the leaving process.";
             return;
         }
 
-        await OnCompleted.InvokeAsync(result.OffboardingAlreadyStarted);
+        await OnCompleted.InvokeAsync(saveResult.Result.OffboardingAlreadyStarted);
     }
 
     private async Task CancelAsync()

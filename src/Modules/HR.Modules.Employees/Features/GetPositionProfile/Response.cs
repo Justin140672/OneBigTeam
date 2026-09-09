@@ -23,6 +23,7 @@ internal sealed record GetPositionProfileResponse(
     Guid? DefaultLeavePolicyId,
     Guid? OnboardingTemplateId,
     bool IsActive,
+    int Version,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     IReadOnlyList<RequiredDocumentItem> RequiredDocuments,

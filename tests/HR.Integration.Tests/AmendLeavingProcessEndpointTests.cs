@@ -94,7 +94,8 @@ public class AmendLeavingProcessEndpointTests
                 employeeId,
                 leavingDate = AmendedLeavingDate.ToString("yyyy-MM-dd"),
                 lastWorkingDay = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
-                leavingReason = "MutualAgreement"
+                leavingReason = "MutualAgreement",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -120,7 +121,8 @@ public class AmendLeavingProcessEndpointTests
                 employeeId,
                 leavingDate = AmendedLeavingDate.ToString("yyyy-MM-dd"),
                 lastWorkingDay = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
-                leavingReason = "MutualAgreement"
+                leavingReason = "MutualAgreement",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -162,7 +164,8 @@ public class AmendLeavingProcessEndpointTests
                 employeeId,
                 leavingDate = AmendedLeavingDate.ToString("yyyy-MM-dd"),
                 lastWorkingDay = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
-                leavingReason = "MutualAgreement"
+                leavingReason = "MutualAgreement",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -188,7 +191,8 @@ public class AmendLeavingProcessEndpointTests
                 employeeId,
                 leavingDate = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
                 lastWorkingDay = AmendedLeavingDate.ToString("yyyy-MM-dd"),
-                leavingReason = "MutualAgreement"
+                leavingReason = "MutualAgreement",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -215,7 +219,8 @@ public class AmendLeavingProcessEndpointTests
                 employeeId,
                 leavingDate = AmendedLeavingDate.ToString("yyyy-MM-dd"),
                 lastWorkingDay = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
-                leavingReason = "MutualAgreement"
+                leavingReason = "MutualAgreement",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -241,7 +246,8 @@ public class AmendLeavingProcessEndpointTests
                 employeeId,
                 leavingDate = AmendedLeavingDate.ToString("yyyy-MM-dd"),
                 lastWorkingDay = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
-                leavingReason = "MutualAgreement"
+                leavingReason = "MutualAgreement",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -265,7 +271,8 @@ public class AmendLeavingProcessEndpointTests
                 employeeId,
                 leavingDate = AmendedLeavingDate.ToString("yyyy-MM-dd"),
                 lastWorkingDay = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
-                leavingReason = "MutualAgreement"
+                leavingReason = "MutualAgreement",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -291,7 +298,8 @@ public class AmendLeavingProcessEndpointTests
                 employeeId,
                 leavingDate = "2020-01-01",
                 lastWorkingDay = "2019-12-31",
-                leavingReason = "MutualAgreement"
+                leavingReason = "MutualAgreement",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -329,7 +337,8 @@ public class AmendLeavingProcessEndpointTests
                 leavingDate = "2020-01-01",
                 lastWorkingDay = "2019-12-31",
                 leavingReason = "MutualAgreement",
-                confirmBackdatedLeavingDate = true
+                confirmBackdatedLeavingDate = true,
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

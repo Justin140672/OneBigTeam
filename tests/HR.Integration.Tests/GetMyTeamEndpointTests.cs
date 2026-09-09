@@ -58,6 +58,10 @@ public class GetMyTeamEndpointTests
 
     private async Task ActivateAsync(HttpClient admin, Guid companyId, Guid employeeId)
     {
+        var versionResp = await admin.GetAsync($"/api/companies/{companyId}/employees/{employeeId}");
+        versionResp.EnsureSuccessStatusCode();
+        var version = (await versionResp.Content.ReadFromJsonAsync<VersionPayload>())!.Version;
+
         var response = await admin.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/employment",
             new
@@ -67,10 +71,13 @@ public class GetMyTeamEndpointTests
                 employeeNumber = $"EMP-{Guid.NewGuid():N}",
                 employmentTypeId = (Guid?)null,
                 status = "Active",
-                startDate = "2026-01-01"
+                startDate = "2026-01-01",
+                expectedVersion = version
             });
         response.EnsureSuccessStatusCode();
     }
+
+    private sealed record VersionPayload(int Version);
 
     private async Task AssignManagerAsync(HttpClient admin, Guid companyId, Guid employeeId, Guid managerId)
     {

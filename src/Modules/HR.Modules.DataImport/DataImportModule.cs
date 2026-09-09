@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using FluentValidation;
 using HR.Modules.DataImport.Features.ConfirmImportSession;
 using HR.Modules.DataImport.Features.DownloadImportTemplate;
@@ -57,7 +58,7 @@ public static class DataImportModule
         services.AddScoped<IValidator<DownloadImportTemplateRequest>, DownloadImportTemplateValidator>();
 
         services.AddDbContext<DataImportDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "data_import")));
 
         return services;

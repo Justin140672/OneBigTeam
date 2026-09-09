@@ -25,7 +25,8 @@ public class UpdateSicknessCategoryHandlerTests
             CompanyId = companyId,
             Id = categoryId,
             Name = "New Name",
-            DisplayOrder = 5
+            DisplayOrder = 5,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -54,7 +55,8 @@ public class UpdateSicknessCategoryHandlerTests
             CompanyId = companyId,
             Id = categoryId,
             Name = "Cold",
-            DisplayOrder = 0
+            DisplayOrder = 0,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -143,7 +145,8 @@ public class UpdateSicknessCategoryHandlerTests
             CompanyId = companyId,
             Id = categoryId,
             Name = "Cold", // same name, same record — ok
-            DisplayOrder = 3
+            DisplayOrder = 3,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -164,7 +167,8 @@ public class UpdateSicknessCategoryHandlerTests
             CompanyId = companyId,
             Id = categoryId,
             Name = "Flu Updated",
-            DisplayOrder = 1
+            DisplayOrder = 1,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -191,7 +195,8 @@ public class UpdateSicknessCategoryHandlerTests
             Id = categoryId,
             Name = "New Name",
             DisplayOrder = 5,
-            ActorEmployeeId = actorId
+            ActorEmployeeId = actorId,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);

@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Employees.Domain;
 
-internal sealed class Location
+internal sealed class Location : IVersionedAggregate
 {
     private Location() { }
 
@@ -12,6 +14,11 @@ internal sealed class Location
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public static Location Create(
         Guid id,
@@ -29,6 +36,7 @@ internal sealed class Location
             Name = name,
             Description = description,
             IsActive = true,
+            Version = 1,
             CreatedAt = now,
             UpdatedAt = now,
         };

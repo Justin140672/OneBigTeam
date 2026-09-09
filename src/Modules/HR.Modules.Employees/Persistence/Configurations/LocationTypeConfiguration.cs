@@ -33,6 +33,12 @@ internal sealed class LocationTypeConfiguration : IEntityTypeConfiguration<Locat
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(e => e.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

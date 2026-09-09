@@ -44,6 +44,7 @@ internal sealed class GetOnboardingTemplateHandler(EmployeesDbContext dbContext)
             template.IsActive,
             template.CreatedAt,
             template.UpdatedAt,
+            template.Version,
             tasks));
     }
 }

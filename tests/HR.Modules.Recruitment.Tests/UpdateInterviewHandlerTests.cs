@@ -40,6 +40,7 @@ public class UpdateInterviewHandlerTests
                 ScheduledAt           = newScheduledAt,
                 DurationMinutes       = 60,
                 Location              = "Office - Room 3",
+                ExpectedVersion       = 1,
             },
             CancellationToken.None);
 

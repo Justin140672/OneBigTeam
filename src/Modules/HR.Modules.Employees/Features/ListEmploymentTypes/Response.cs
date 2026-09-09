@@ -9,4 +9,5 @@ internal sealed record EmploymentTypeItem(
     string? Description,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

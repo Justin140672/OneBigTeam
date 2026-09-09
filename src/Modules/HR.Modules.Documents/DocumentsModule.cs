@@ -84,7 +84,7 @@ public static class DocumentsModule
         AddProfilePhotoServices(services, configuration);
 
         services.AddDbContext<DocumentsDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "documents")));
 
         return services;

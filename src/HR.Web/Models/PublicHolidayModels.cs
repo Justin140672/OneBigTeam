@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using HR.Web.Services;
 
 namespace HR.Web.Models;
 
@@ -12,7 +13,9 @@ public record PublicHolidayListItemModel(
     DateOnly Date,
     string Name,
     string CountryCode,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    // Ticket 2: optimistic-concurrency token surfaced by the list (no dedicated GetById endpoint).
+    int Version = 0)
 {
     public int Year => Date.Year;
 }
@@ -40,7 +43,9 @@ public record UpdatePublicHolidayRequest(
     Guid Id,
     DateOnly Date,
     string Name,
-    string CountryCode);
+    string CountryCode,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdatePublicHolidayResponse(
     Guid Id,
@@ -48,12 +53,15 @@ public record UpdatePublicHolidayResponse(
     DateOnly Date,
     string Name,
     string CountryCode,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    int Version = 0);
 
 // ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
-public sealed class PublicHolidayEditModel
+public sealed class PublicHolidayEditModel : IHasVersion
 {
+    public int Version { get; set; }
+
     [Required(ErrorMessage = "Please select a date.")]
     public DateTime? Date { get; set; }
     [Required(ErrorMessage = "Name is required.")]

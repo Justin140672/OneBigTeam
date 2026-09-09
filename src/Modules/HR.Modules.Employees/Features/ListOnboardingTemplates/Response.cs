@@ -7,4 +7,5 @@ internal sealed record OnboardingTemplateListItem(
     string Name,
     string? Description,
     bool IsActive,
-    int TaskCount);
+    int TaskCount,
+    int Version);

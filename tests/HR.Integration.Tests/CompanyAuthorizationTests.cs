@@ -118,13 +118,19 @@ public class CompanyAuthorizationTests
         var companyId = await CreateCompanyAsync(tenantId);
         using var client = await ClientFor(tenantId, CompanyAdminUser);
 
+        // Ticket 2: UpdateCompany now requires the loaded concurrency version. The seeder creates
+        // then renames the company, so read the current version back rather than assuming it.
+        var current = await client.GetFromJsonAsync<System.Text.Json.JsonElement>($"/api/companies/{companyId}");
+        var expectedVersion = current.GetProperty("version").GetInt32();
+
         var response = await client.PutAsJsonAsync($"/api/companies/{companyId}", new
         {
             name = "Updated By Company Admin",
             addresses = new[]
             {
                 new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
-            }
+            },
+            expectedVersion
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

@@ -13,7 +13,8 @@ public class UpdateFutureCompensationRecordValidatorTests
         SalaryType = SalaryType.Annual,
         Salary = 45000m,
         Currency = "GBP",
-        Reason = CompensationChangeReason.Correction
+        Reason = CompensationChangeReason.Correction,
+        ExpectedVersion = 1
     };
 
     [Fact]
@@ -99,5 +100,15 @@ public class UpdateFutureCompensationRecordValidatorTests
             Notes = "Corrected salary figure"
         });
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_ExpectedVersion_Is_Null()
+    {
+        var v = new UpdateFutureCompensationRecordValidator();
+        var result = v.Validate(ValidRequest() with { ExpectedVersion = null });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateFutureCompensationRecordRequest.ExpectedVersion)
+            && e.ErrorMessage.Contains("concurrency version is required"));
     }
 }

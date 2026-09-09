@@ -31,6 +31,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alicia",
                 LastName = "Jones",
                 WorkEmail = "alicia.jones@example.com",
@@ -76,6 +77,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alicia",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
@@ -128,6 +130,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 LocationId = location.Id,
                 FirstName = "Alice",
                 LastName = "Smith",
@@ -162,6 +165,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "Alice.SMITH@EXAMPLE.COM",
@@ -214,6 +218,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = Guid.NewGuid(),
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
@@ -245,6 +250,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = emp1.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "bob@example.com",  // taken by emp2
@@ -275,6 +281,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alicia",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",  // same email, same employee
@@ -305,6 +312,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
@@ -339,6 +347,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
@@ -373,6 +382,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 LocationId = newLocationId,
                 FirstName = "Alice",
                 LastName = "Smith",
@@ -409,6 +419,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 PositionProfileId = newPositionId,
                 FirstName = "Alice",
                 LastName = "Smith",
@@ -443,6 +454,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alicia",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
@@ -481,6 +493,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
@@ -514,6 +527,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
@@ -545,6 +559,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
@@ -576,6 +591,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
@@ -607,6 +623,7 @@ public class UpdateEmployeeProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = employee.Id,
+                ExpectedVersion = 1,
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",

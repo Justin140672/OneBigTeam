@@ -1,4 +1,5 @@
 using HR.Modules.Employees.Contracts;
+using HR.SharedKernel;
 namespace HR.Modules.Documents.Domain;
 
 /// <summary>
@@ -8,9 +9,15 @@ namespace HR.Modules.Documents.Domain;
 /// EF Core global query filter in this codebase, so tenant isolation is enforced per-handler,
 /// the same convention used everywhere else here.
 /// </summary>
-internal sealed class SharedCompanyDocument : IScannableFile
+internal sealed class SharedCompanyDocument : IScannableFile, IVersionedAggregate
 {
     private SharedCompanyDocument() { }
+
+    // Explicit, persisted optimistic-concurrency token (Ticket 2) — distinct from VersionNumber,
+    // which is the uploaded-file revision number. See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public Guid Id { get; private set; }
     public Guid CompanyId { get; private set; }
@@ -117,6 +124,7 @@ internal sealed class SharedCompanyDocument : IScannableFile
         FileName                 = fileName.Trim(),
         FileSize                 = fileSize,
         ContentType              = contentType.Trim(),
+        Version                  = 1,
         VersionNumber            = 1,
         Status                   = SharedCompanyDocumentStatus.Draft,
         EffectiveDate            = effectiveDate,

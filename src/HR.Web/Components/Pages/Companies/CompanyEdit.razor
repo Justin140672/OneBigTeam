@@ -26,7 +26,10 @@
         </div>
         <p class="text-muted mb-4">Manage this company's profile and addresses.</p>
 
-        @if (!string.IsNullOrEmpty(GlobalError))
+        <SaveConflictBanner Visible="SaveConflict" Disabled="@Saving" OnReload="ReloadLatestValuesAsync"
+                            Message="Someone else changed this company while you were editing. Your changes have not been saved." />
+
+        @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
         {
             <div class="alert alert-danger">@GlobalError</div>
         }
@@ -86,10 +89,20 @@
             return;
         }
 
+        await LoadCompanyIntoModelAsync();
+    }
+
+    // Ticket 2: concurrency-conflict recovery for <SaveConflictBanner> — re-fetches the company
+    // (including its version) and repopulates the model in place.
+    protected override Task ReloadServerStateAsync() => LoadCompanyIntoModelAsync();
+
+    private async Task LoadCompanyIntoModelAsync()
+    {
         _company = await CompanyService.GetCompanyAsync(Id);
         if (_company is not null)
         {
             Model.Name = _company.Name;
+            Model.Version = _company.Version;
             Model.Addresses = _company.Addresses.Select(a => new CompanyAddressEditModel
             {
                 Type = a.Type,
@@ -115,9 +128,13 @@
             Model.Addresses.Select(a => new UpdateCompanyAddressRequest(
                 a.Type, a.Line1, a.Line2, a.City, a.Region, a.PostalCode, a.CountryCode)).ToList());
 
-        var (companyResult, companyError) = await CompanyService.UpdateCompanyAsync(Id, profileReq);
-        if (companyResult is null)
-            return companyError ?? "Failed to save company profile.";
+        var result = await CompanyService.UpdateCompanyAsync(Id, profileReq, Model.Version);
+        SaveConflict = result.IsConcurrencyConflict;
+        if (!result.Success)
+            return result.ErrorMessage ?? "Failed to save company profile.";
+
+        if (result.NewVersion is { } newVersion)
+            Model.Version = newVersion;
 
         return null;
     }

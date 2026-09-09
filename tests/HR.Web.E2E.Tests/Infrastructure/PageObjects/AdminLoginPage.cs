@@ -19,7 +19,11 @@ public sealed class AdminLoginPage(IPage page, string baseUrl)
 
     public async Task GoToAsync()
     {
-        await page.GotoAsync($"{baseUrl}/login");
+        // WaitUntil=Commit rather than Playwright's default Load: the Admin Portal host page pulls
+        // in third-party CSS (Google Fonts, jsDelivr Bootstrap) whose "load" can stall for tens of
+        // seconds under a full parallel headless run, surfacing as "Timeout 30000ms navigating to
+        // /login waiting until 'load'". The explicit form-field wait below is the real readiness gate.
+        await page.GotoAsync($"{baseUrl}/login", new() { WaitUntil = WaitUntilState.Commit, Timeout = 60_000 });
         await page.WaitForSelectorAsync("[placeholder='you@example.com']", new() { Timeout = 30_000 });
     }
 

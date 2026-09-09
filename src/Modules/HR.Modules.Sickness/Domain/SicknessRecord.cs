@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Sickness.Domain;
 
-internal sealed class SicknessRecord
+internal sealed class SicknessRecord : IVersionedAggregate
 {
     private SicknessRecord() { }
 
@@ -20,6 +22,11 @@ internal sealed class SicknessRecord
     public decimal? TotalDays { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public static SicknessRecord Create(
         Guid id,
@@ -49,6 +56,7 @@ internal sealed class SicknessRecord
             TotalDays = totalDays,
             EvidenceStatus = evidenceStatus,
             Notes = notes,
+            Version = 1,
             CreatedAt = now,
             UpdatedAt = now
         };

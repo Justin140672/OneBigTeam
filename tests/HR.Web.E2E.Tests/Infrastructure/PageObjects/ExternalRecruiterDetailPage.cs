@@ -60,6 +60,59 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
     public Task<string> GetAgencyNameAsync() =>
         page.GetByPlaceholder("e.g. Acme Recruiting").InputValueAsync();
 
+    /// <summary>The recruiter entity id parsed out of the current edit/view URL (/external-recruiters/{id}[/view]).</summary>
+    public Guid GetIdFromUrl() => UrlIdParser.LastGuid(page.Url);
+
+    // ── Contact Name field (optional) — mutated field for concurrency tests ─────
+    // Deliberately NOT the Agency Name field: blurring that triggers the soft duplicate-name
+    // check. Click-focus / select-all / delete / type-for-real / Tab-to-commit, matching
+    // DocumentTypeEditPage.SetDescriptionAsync, so the typed value actually round-trips.
+    public async Task SetContactNameAsync(string value)
+    {
+        var input = page.GetByPlaceholder("Primary contact");
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        await page.WaitForTimeoutAsync(150);
+        if (value.Length > 0)
+            await input.PressSequentiallyAsync(value, new() { Delay = 30 });
+        await page.Keyboard.PressAsync("Tab");
+        await page.WaitForTimeoutAsync(300);
+    }
+
+    public Task<string> GetContactNameAsync() =>
+        page.GetByPlaceholder("Primary contact").InputValueAsync();
+
+    public async Task<string> WaitForContactNameAsync(string expected)
+    {
+        var input = page.GetByPlaceholder("Primary contact");
+        await Assertions.Expect(input).ToHaveValueAsync(expected, new() { Timeout = 15_000 });
+        return await input.InputValueAsync();
+    }
+
+    // ── Optimistic-concurrency conflict banner (shared SaveConflictBanner via EditPageBase) ──
+    private ILocator ConcurrencyWarningBanner =>
+        page.Locator(".save-conflict-banner[role='alert']")
+            .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
+
+    public async Task SaveExpectingConflictAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+    }
+
+    public Task<bool> IsConcurrencyWarningVisibleAsync() =>
+        ConcurrencyWarningBanner.IsVisibleAsync();
+
+    public async Task ClickReloadLatestValuesAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+        await page.WaitForTimeoutAsync(300);
+    }
+
     /// <summary>
     /// Blurs the Agency Name field (tabbing to the next field) — required to trigger the
     /// non-blocking duplicate-agency-name check (ExternalRecruiterDetail.razor's OnAgencyNameBlurAsync).

@@ -12,4 +12,5 @@ internal sealed record GetLeavingProcessResponse(
     int NoticePeriodLength,
     string NoticeSource,
     string LeavingReason,
-    string Status);
+    string Status,
+    int Version);

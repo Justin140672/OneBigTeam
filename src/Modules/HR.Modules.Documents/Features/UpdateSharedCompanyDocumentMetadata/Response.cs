@@ -14,4 +14,5 @@ internal sealed record UpdateSharedCompanyDocumentMetadataResponse(
     int? CustomReviewFrequencyMonths,
     Guid? ReviewOwnerEmployeeId,
     Guid UpdatedBy,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

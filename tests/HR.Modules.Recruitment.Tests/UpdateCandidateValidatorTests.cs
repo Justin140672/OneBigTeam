@@ -16,6 +16,7 @@ public class UpdateCandidateValidatorTests
             FirstName   = "Emma",
             LastName    = "Clarke",
             Email       = "emma.clarke@example.com",
+            ExpectedVersion = 1,
         });
 
         Assert.True(result.IsValid);

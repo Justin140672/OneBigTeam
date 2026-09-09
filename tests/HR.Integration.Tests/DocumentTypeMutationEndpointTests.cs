@@ -57,7 +57,7 @@ public class DocumentTypeMutationEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/document-types/{unknownId}",
-            new { companyId, documentTypeId = unknownId, name = "Ghost", allowEmployeeUpload = false });
+            new { companyId, documentTypeId = unknownId, name = "Ghost", allowEmployeeUpload = false, expectedVersion = 1 });
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -81,7 +81,8 @@ public class DocumentTypeMutationEndpointTests
                 documentTypeId     = created.Id,
                 name               = "Updated Name",
                 description        = "A description",
-                allowEmployeeUpload = true
+                allowEmployeeUpload = true,
+                expectedVersion    = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, updateResp.StatusCode);
@@ -111,7 +112,7 @@ public class DocumentTypeMutationEndpointTests
         // Try to rename Beta to Alpha
         var conflictResp = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/document-types/{beta!.Id}",
-            new { companyId, documentTypeId = beta.Id, name = "Type Alpha", allowEmployeeUpload = false });
+            new { companyId, documentTypeId = beta.Id, name = "Type Alpha", allowEmployeeUpload = false, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Conflict, conflictResp.StatusCode);
     }

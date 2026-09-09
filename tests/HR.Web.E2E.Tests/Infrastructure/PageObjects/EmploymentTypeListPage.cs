@@ -33,6 +33,13 @@ public sealed class EmploymentTypeListPage(IPage page, string baseUrl)
             .WaitUntilVisibleAsync();
     }
 
+    /// <summary>The href of the grid row link whose text contains <paramref name="nameFragment"/>.</summary>
+    public async Task<string> GetRowHrefAsync(string nameFragment)
+    {
+        var href = await page.Locator(".e-rowcell a").Filter(new() { HasText = nameFragment }).First.GetAttributeAsync("href");
+        return href ?? throw new InvalidOperationException($"No employment-type row link found for '{nameFragment}'.");
+    }
+
     public async Task DeactivateAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });

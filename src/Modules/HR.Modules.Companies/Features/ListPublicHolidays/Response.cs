@@ -8,4 +8,5 @@ internal sealed record PublicHolidayItem(
     DateOnly Date,
     string Name,
     string CountryCode,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    int Version);

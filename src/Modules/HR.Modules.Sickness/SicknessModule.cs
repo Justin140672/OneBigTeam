@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Modules.Tasks.Contracts;
 using Hangfire;
 using HR.Modules.Sickness.Domain;
@@ -43,7 +44,7 @@ public static class SicknessModule
         services.AddScoped<IWorkloadActionProvider, SicknessPendingActionsWorkloadActionProvider>();
 
         services.AddDbContext<SicknessDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "sickness")));
 
         return services;

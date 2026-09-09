@@ -52,6 +52,7 @@ public class GetOnboardingTemplateEndpointTests
                 id = template.Id,
                 name = template.Name,
                 description = template.Description,
+                expectedVersion = 1,
                 tasks = new object[]
                 {
                     new

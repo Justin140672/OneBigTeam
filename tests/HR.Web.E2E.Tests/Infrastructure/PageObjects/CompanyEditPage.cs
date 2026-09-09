@@ -56,6 +56,60 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
         }
     }
 
+    /// <summary>
+    /// Clicks Save and waits for the inline "Company saved successfully." banner — CompanyEdit's
+    /// own Save button intentionally stays on the page (no list to navigate to) and shows this
+    /// <c>.alert-success</c> banner instead.
+    /// </summary>
+    public async Task SaveExpectingSuccessAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await page.WaitForSpinnerToClearAsync();
+        await page.Locator(".alert-success").First.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+    }
+
+    public Task<bool> IsSaveSuccessVisibleAsync() =>
+        page.Locator(".alert-success").First.IsVisibleAsync();
+
+    // ── Optimistic-concurrency conflict banner (Ticket 2) ─────────────────────
+    // CompanyEdit.razor renders the shared <SaveConflictBanner> — a single
+    // `div.alert.alert-warning.save-conflict-banner[role='alert']` carrying the razor's own
+    // "Someone else changed this company…" message and a "Reload latest values" Syncfusion button.
+    // Scope on the component's own `.save-conflict-banner` class (+ role='alert') rather than the
+    // shared Bootstrap `.alert-warning`, and additionally require the "Reload latest values" action
+    // so an unrelated warning alert can never satisfy strict mode. Match on structure, not text.
+    private ILocator ConcurrencyWarningBanner =>
+        page.Locator(".save-conflict-banner[role='alert']")
+            .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
+
+    /// <summary>
+    /// Clicks Save and waits for the optimistic-concurrency banner to appear — i.e. the save was
+    /// rejected (HTTP 409) because the company changed since this form loaded it. Does not expect a
+    /// navigation; a conflicted save stays on the edit page.
+    /// </summary>
+    public async Task SaveExpectingConflictAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await page.WaitForSpinnerToClearAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+    }
+
+    public Task<bool> IsConcurrencyWarningVisibleAsync() =>
+        ConcurrencyWarningBanner.IsVisibleAsync();
+
+    /// <summary>Clicks "Reload latest values" in the concurrency banner and waits for it to clear.</summary>
+    public async Task ClickReloadLatestValuesAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
+        await ConcurrencyWarningBanner.WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+        // The reload round-trips CompanyService.GetCompanyAsync before repopulating the model;
+        // give the re-bound values a beat to land before callers read them.
+        await page.WaitForTimeoutAsync(300);
+    }
+
     /// <summary>Fills the company Name field on the Profile tab.</summary>
     public async Task FillCompanyNameInputAsync(string value)
     {

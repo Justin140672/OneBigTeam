@@ -14,8 +14,11 @@ public class UpdateDepartmentEndpointTests
     public UpdateDepartmentEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     private async Task<HttpClient> AuthenticatedClient(Guid companyId)
@@ -24,7 +27,15 @@ public class UpdateDepartmentEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, companyId);
         return client;
+    }
+
+    private static async Task<int> GetVersionAsync(HttpClient client, Guid companyId, Guid id)
+    {
+        var resp = await client.GetAsync($"/api/companies/{companyId}/departments/{id}");
+        resp.EnsureSuccessStatusCode();
+        return (await resp.Content.ReadFromJsonAsync<DeptPayload>())!.Version;
     }
 
     [Fact]
@@ -47,7 +58,7 @@ public class UpdateDepartmentEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/departments/{Guid.NewGuid()}",
-            new { companyId, id = Guid.NewGuid(), name = "Engineering" });
+            new { companyId, id = Guid.NewGuid(), name = "Engineering", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -66,15 +77,17 @@ public class UpdateDepartmentEndpointTests
         created.EnsureSuccessStatusCode();
         var dept = await created.Content.ReadFromJsonAsync<DeptPayload>();
         Assert.NotNull(dept);
+        var version = await GetVersionAsync(client, companyId, dept!.Id);
 
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/departments/{dept!.Id}",
+            $"/api/companies/{companyId}/departments/{dept.Id}",
             new
             {
                 companyId,
                 id = dept.Id,
                 name = "Platform Engineering",
-                description = "Builds the core platform"
+                description = "Builds the core platform",
+                expectedVersion = version
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -110,16 +123,18 @@ public class UpdateDepartmentEndpointTests
         childResp.EnsureSuccessStatusCode();
         var child = await childResp.Content.ReadFromJsonAsync<DeptPayload>();
         Assert.NotNull(child);
+        var version = await GetVersionAsync(client, companyId, child!.Id);
 
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/departments/{child!.Id}",
+            $"/api/companies/{companyId}/departments/{child.Id}",
             new
             {
                 companyId,
                 id = child.Id,
                 name = "Platform",
                 parentDepartmentId = parent!.Id,
-                managerEmployeeId = managerId
+                managerEmployeeId = managerId,
+                expectedVersion = version
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -141,10 +156,11 @@ public class UpdateDepartmentEndpointTests
             new { companyId, name = "People" });
         var second = await secondResp.Content.ReadFromJsonAsync<DeptPayload>();
         Assert.NotNull(second);
+        var version = await GetVersionAsync(client, companyId, second!.Id);
 
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/departments/{second!.Id}",
-            new { companyId, id = second.Id, name = "Engineering" });
+            $"/api/companies/{companyId}/departments/{second.Id}",
+            new { companyId, id = second.Id, name = "Engineering", expectedVersion = version });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -157,5 +173,6 @@ public class UpdateDepartmentEndpointTests
         Guid? ParentDepartmentId,
         Guid? ManagerEmployeeId,
         bool IsActive,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        int Version);
 }

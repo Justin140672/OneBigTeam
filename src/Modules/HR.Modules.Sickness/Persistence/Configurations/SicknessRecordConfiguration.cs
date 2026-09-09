@@ -76,6 +76,12 @@ internal sealed class SicknessRecordConfiguration : IEntityTypeConfiguration<Sic
             .HasColumnName("total_days")
             .HasPrecision(5, 1);
 
+        builder.Property(r => r.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(r => r.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

@@ -2,7 +2,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class PublicHolidayService(IHttpClientFactory httpClientFactory) : IEditService<PublicHolidayEditModel, Guid>
+public class PublicHolidayService(IHttpClientFactory httpClientFactory)
+    : IEditService<PublicHolidayEditModel, Guid>, IConcurrencyAwareEditService<PublicHolidayEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -72,7 +73,36 @@ public class PublicHolidayService(IHttpClientFactory httpClientFactory) : IEditS
             Date = existing.Date.ToDateTime(TimeOnly.MinValue),
             Name = existing.Name,
             CountryCode = existing.CountryCode,
+            Version = existing.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces the stale-save 409.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, PublicHolidayEditModel model, int? expectedVersion)
+    {
+        var request = new UpdatePublicHolidayRequest(
+            companyId, id, DateOnly.FromDateTime(model.Date!.Value), model.Name.Trim(),
+            model.CountryCode.Trim().ToUpperInvariant(), expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/public-holidays/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdatePublicHolidayResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                body?.Error ?? "A public holiday on that date already exists.", body?.Code == "concurrency");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return ApiSaveResult.Fail("Public holiday not found.");
+
+        return ApiSaveResult.Fail(body?.Error ?? "Failed to update public holiday.");
     }
 
     async Task<(PublicHolidayEditModel? Result, string? Error)> IEditService<PublicHolidayEditModel, Guid>.CreateAsync(
@@ -95,5 +125,5 @@ public class PublicHolidayService(IHttpClientFactory httpClientFactory) : IEditS
         return (updated is null ? null : model, error);
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

@@ -79,7 +79,7 @@ public class AmendLeavingProcessOffboardingSyncTests
 
     private static async Task<HttpResponseMessage> AmendLeavingProcessAsync(
         HttpClient client, Guid companyId, Guid employeeId, DateOnly leavingDate, DateOnly lastWorkingDay,
-        bool confirmBackdated = false)
+        bool confirmBackdated = false, int expectedVersion = 1)
     {
         return await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
@@ -90,7 +90,8 @@ public class AmendLeavingProcessOffboardingSyncTests
                 leavingDate = leavingDate.ToString("yyyy-MM-dd"),
                 lastWorkingDay = lastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "MutualAgreement",
-                confirmBackdatedLeavingDate = confirmBackdated
+                confirmBackdatedLeavingDate = confirmBackdated,
+                expectedVersion
             });
     }
 
@@ -222,7 +223,7 @@ public class AmendLeavingProcessOffboardingSyncTests
         // Second amendment carrying the identical dates/reason — the underlying LeavingProcess
         // amendment itself is idempotent in effect (same values persisted again), and the
         // downstream offboarding reschedule must remain a stable no-op: dates unchanged.
-        var secondAmendResponse = await AmendLeavingProcessAsync(client, companyId, employeeId, newLeavingDate, newLastWorkingDay);
+        var secondAmendResponse = await AmendLeavingProcessAsync(client, companyId, employeeId, newLeavingDate, newLastWorkingDay, expectedVersion: 2);
         Assert.Equal(HttpStatusCode.OK, secondAmendResponse.StatusCode);
 
         var overviewAfterSecond = await GetOffboardingOverviewAsync(client, companyId, employeeId);

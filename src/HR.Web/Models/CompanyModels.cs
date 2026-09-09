@@ -13,7 +13,9 @@ public record GetCompanyResponse(
     bool IsActive,
     DateTime CreatedAt,
     List<GetCompanyAddressResponse> Addresses,
-    GetCompanyBrandingResponse? Branding);
+    GetCompanyBrandingResponse? Branding,
+    // Ticket 2: optimistic-concurrency token for the company aggregate.
+    int Version = 0);
 
 public record GetCompanyBrandingResponse(
     string? PrimaryLogoUrl,
@@ -35,7 +37,9 @@ public record GetCompanyAddressResponse(
 public record UpdateCompanyRequest(
     Guid Id,
     string Name,
-    List<UpdateCompanyAddressRequest> Addresses);
+    List<UpdateCompanyAddressRequest> Addresses,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdateCompanyAddressRequest(
     string Type,
@@ -47,7 +51,7 @@ public record UpdateCompanyAddressRequest(
     string? CountryCode);
 
 // Generic response envelope used for PUT /api/companies/{id}
-public record UpdateCompanyResponse(Guid Id, string Name, bool IsActive);
+public record UpdateCompanyResponse(Guid Id, string Name, bool IsActive, int Version = 0);
 
 // ── SETTINGS (Company Administrator territory — profile/regional only) ────────
 

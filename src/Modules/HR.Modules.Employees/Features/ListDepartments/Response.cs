@@ -7,4 +7,5 @@ internal sealed record DepartmentListItem(
     string Name,
     Guid? ParentDepartmentId,
     Guid? ManagerEmployeeId,
-    bool IsActive);
+    bool IsActive,
+    int Version);

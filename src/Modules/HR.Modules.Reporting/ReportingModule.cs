@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using FluentValidation;
 using HR.Modules.Reporting.Features.AddReportFavourite;
 using HR.Modules.Reporting.Features.DeleteReportView;
@@ -65,7 +66,7 @@ public static class ReportingModule
         AddFeatureServices(services);
 
         services.AddDbContext<ReportingDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "reporting")));
 
         return services;

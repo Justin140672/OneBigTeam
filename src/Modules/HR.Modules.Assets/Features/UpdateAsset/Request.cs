@@ -12,4 +12,7 @@ internal sealed record UpdateAssetRequest
     public string? SerialNumber { get; init; }
     public DateOnly? PurchaseDate { get; init; }
     public decimal? PurchasePrice { get; init; }
+
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
 }

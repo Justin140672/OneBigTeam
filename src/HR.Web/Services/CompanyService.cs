@@ -40,6 +40,30 @@ public class CompanyService(IHttpClientFactory httpClientFactory)
         return (null, await ExtractErrorMessageAsync(response));
     }
 
+    // Ticket 2: concurrency-aware company profile save — sends the loaded version and surfaces a
+    // stale-save 409 ({ error, code: "concurrency" }) so CompanyEdit can raise <SaveConflictBanner>.
+    public async Task<ApiSaveResult> UpdateCompanyAsync(Guid id, UpdateCompanyRequest request, int? expectedVersion)
+    {
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{id}", request with { ExpectedVersion = expectedVersion });
+
+        if (response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadFromJsonAsync<UpdateCompanyResponse>();
+            return ApiSaveResult.Ok(body?.Version);
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return ApiSaveResult.Fail(
+                body?.Error ?? "This company was changed by someone else while you were editing.",
+                body?.Code == "concurrency");
+        }
+
+        return ApiSaveResult.Fail(await ExtractErrorMessageAsync(response));
+    }
+
     // FastEndpoints' own automatic request-validation failures (FluentValidation rules that
     // fail before the handler even runs — e.g. UpdateCompanyValidator) return a different shape
     // than this app's handler-level business errors ({ "error": "..." }): a dictionary of field
@@ -57,7 +81,7 @@ public class CompanyService(IHttpClientFactory httpClientFactory)
         return body?.Error ?? "Failed to save company profile.";
     }
 
-    private sealed record ErrorEnvelope(string? Error, Dictionary<string, string[]>? Errors);
+    private sealed record ErrorEnvelope(string? Error, Dictionary<string, string[]>? Errors, string? Code = null);
 
     public async Task<UpdateCompanySettingsResponse?> UpdateCompanySettingsAsync(Guid id, UpdateCompanySettingsRequest request)
     {

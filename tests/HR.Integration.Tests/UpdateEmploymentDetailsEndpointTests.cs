@@ -25,6 +25,12 @@ public class UpdateEmploymentDetailsEndpointTests
             await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, User4, SystemRoles.HrAdministrator);
+            // GetVersionAsync GETs the employee record (policy role:employee) to round-trip the
+            // concurrency version, so these users also need the Employee role.
+            await TestRoleSeeder.AssignRoleAsync(factory, User1, SystemRoles.Employee);
+            await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.Employee);
+            await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.Employee);
+            await TestRoleSeeder.AssignRoleAsync(factory, User4, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 
@@ -35,7 +41,7 @@ public class UpdateEmploymentDetailsEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{Guid.NewGuid()}/employees/{Guid.NewGuid()}/employment",
-            new { employeeNumber = "EMP-001", employmentTypeId = (Guid?)null, status = "Active", startDate = "2026-01-01" });
+            new { employeeNumber = "EMP-001", employmentTypeId = (Guid?)null, status = "Active", startDate = "2026-01-01", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -61,7 +67,8 @@ public class UpdateEmploymentDetailsEndpointTests
                 employmentTypeId = (Guid?)null,
                 status = "Active",
                 startDate = "2026-01-15",
-                continuousServiceDate = "2026-01-15"
+                continuousServiceDate = "2026-01-15",
+                expectedVersion = await GetVersionAsync(client, companyId, employee.Id)
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -148,7 +155,8 @@ public class UpdateEmploymentDetailsEndpointTests
                 status = "Active",
                 startDate = "2026-01-15",
                 noticePeriodUnitOverride = "Weeks",
-                noticePeriodLengthOverride = 4
+                noticePeriodLengthOverride = 4,
+                expectedVersion = await GetVersionAsync(client, companyId, employee.Id)
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -236,7 +244,8 @@ public class UpdateEmploymentDetailsEndpointTests
                 employeeNumber = "EMP-TAKEN",
                 employmentTypeId = (Guid?)null,
                 status = "Active",
-                startDate = "2026-01-15"
+                startDate = "2026-01-15",
+                expectedVersion = await GetVersionAsync(client, companyId, employee2.Id)
             });
         Assert.Equal(HttpStatusCode.OK, setNumberResponse.StatusCode);
 
@@ -249,7 +258,8 @@ public class UpdateEmploymentDetailsEndpointTests
                 employeeNumber = "EMP-TAKEN",
                 employmentTypeId = (Guid?)null,
                 status = "Active",
-                startDate = "2026-01-15"
+                startDate = "2026-01-15",
+                expectedVersion = await GetVersionAsync(client, companyId, employee1.Id)
             });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -322,7 +332,8 @@ public class UpdateEmploymentDetailsEndpointTests
                 firstName = "Test",
                 lastName = "Employee",
                 workEmail = $"test.{Guid.NewGuid():N}@example.com",
-                startDate = "2026-01-15"
+                startDate = "2026-01-15",
+                expectedVersion = await GetVersionAsync(client, companyId, employee.Id)
             });
         Assert.Equal(HttpStatusCode.OK, profileResponse.StatusCode);
 
@@ -339,7 +350,8 @@ public class UpdateEmploymentDetailsEndpointTests
                 employeeNumber = "EMP-001",
                 employmentTypeId = (Guid?)null,
                 status = "Active",
-                startDate = "2026-01-15"
+                startDate = "2026-01-15",
+                expectedVersion = await GetVersionAsync(client, companyId, employee.Id)
             });
         Assert.Equal(HttpStatusCode.OK, employmentResponse.StatusCode);
 
@@ -372,11 +384,79 @@ public class UpdateEmploymentDetailsEndpointTests
                 employeeNumber = "EMP-001",
                 employmentTypeId = (Guid?)null,
                 status = "Active",
-                startDate = "2026-01-15"
+                startDate = "2026-01-15",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Put_Employment_Returns_UnprocessableEntity_When_ExpectedVersion_Is_Missing_And_Writes_Nothing()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User4.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User4, SystemRoles.HrAdministrator, companyId);
+
+        var employee = await CreateEmployeeAsync(client, companyId);
+        var versionBefore = await GetVersionAsync(client, companyId, employee.Id);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employee.Id}/employment",
+            new
+            {
+                companyId,
+                id = employee.Id,
+                employeeNumber = "EMP-NOVER",
+                employmentTypeId = (Guid?)null,
+                status = "Active",
+                startDate = "2026-01-15"
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(versionBefore, await GetVersionAsync(client, companyId, employee.Id));
+    }
+
+    [Fact]
+    public async Task Put_Employment_Returns_Conflict_When_ExpectedVersion_Is_Stale()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
+
+        var employee = await CreateEmployeeAsync(client, companyId);
+        var staleVersion = await GetVersionAsync(client, companyId, employee.Id);
+
+        object Body() => new
+        {
+            companyId,
+            id = employee.Id,
+            employeeNumber = "EMP-001",
+            employmentTypeId = (Guid?)null,
+            status = "Active",
+            startDate = "2026-01-15",
+            expectedVersion = staleVersion
+        };
+
+        var first = await client.PutAsJsonAsync($"/api/companies/{companyId}/employees/{employee.Id}/employment", Body());
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        var stale = await client.PutAsJsonAsync($"/api/companies/{companyId}/employees/{employee.Id}/employment", Body());
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+    }
+
+    private static async Task<int> GetVersionAsync(HttpClient client, Guid companyId, Guid id)
+    {
+        var r = await client.GetAsync($"/api/companies/{companyId}/employees/{id}");
+        r.EnsureSuccessStatusCode();
+        return (await r.Content.ReadFromJsonAsync<VersionPayload>())!.Version;
+    }
+
+    private sealed record VersionPayload(int Version);
 
     private static async Task<EmployeeRef> CreateEmployeeAsync(HttpClient client, Guid companyId)
     {

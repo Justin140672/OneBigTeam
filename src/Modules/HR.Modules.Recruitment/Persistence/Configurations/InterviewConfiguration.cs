@@ -49,6 +49,12 @@ internal sealed class InterviewConfiguration : IEntityTypeConfiguration<Intervie
             .HasColumnName("notes")
             .HasMaxLength(2000);
 
+        builder.Property(i => i.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(i => i.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

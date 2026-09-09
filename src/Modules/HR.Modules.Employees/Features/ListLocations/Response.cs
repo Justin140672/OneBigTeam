@@ -6,4 +6,5 @@ internal sealed record LocationListItem(
     Guid Id,
     string Name,
     Guid LocationTypeId,
-    bool IsActive);
+    bool IsActive,
+    int Version);

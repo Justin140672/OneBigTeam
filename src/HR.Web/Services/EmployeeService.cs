@@ -196,28 +196,62 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         }
     }
 
-    public async Task<(bool Success, string? ConflictMessage)> UpdateEmployeeProfileAsync(
+    public async Task<ApiSaveResult> UpdateEmployeeProfileAsync(
         Guid companyId, Guid id, UpdateEmployeeProfileRequest request)
     {
         var response = await Http.PutAsJsonAsync(
             $"api/companies/{companyId}/employees/{id}/profile", request);
 
         if (response.IsSuccessStatusCode)
-            return (true, null);
+        {
+            var ok = await response.Content.ReadFromJsonAsync<UpdateEmployeeProfileResponse>(HrApiJsonOptions.Default);
+            return ApiSaveResult.Ok(ok?.Version);
+        }
 
         if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
             var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (false, body?.Error ?? "A conflict occurred.");
+            return ApiSaveResult.Fail(body?.Error ?? "A conflict occurred.", body?.Code == "concurrency");
         }
 
         if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
         {
             var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (false, body?.Error ?? "Validation failed.");
+            return ApiSaveResult.Fail(body?.Error ?? "Validation failed.");
         }
 
-        return (false, "Failed to save profile.");
+        return ApiSaveResult.Fail("Failed to save profile.");
+    }
+
+    // Item 5: atomic combined save for the Employee Edit screen (profile + employment in one
+    // transaction, one version guarding the shared Employee aggregate).
+    public async Task<ApiSaveResult> UpdateEmployeeProfileAndEmploymentAsync(
+        Guid companyId, Guid id, UpdateEmployeeProfileAndEmploymentRequest request)
+    {
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/employees/{id}/profile-and-employment", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var ok = await response.Content.ReadFromJsonAsync<UpdateEmployeeProfileAndEmploymentResponse>(HrApiJsonOptions.Default);
+            return ApiSaveResult.Ok(ok?.Version);
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return ApiSaveResult.Fail(body?.Error ?? "A conflict occurred.", body?.Code == "concurrency");
+        }
+
+        var raw = await response.Content.ReadAsStringAsync();
+
+        if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
+            return ApiSaveResult.Fail(businessMessage);
+
+        if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
+            return ApiSaveResult.Fail(string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
+
+        return ApiSaveResult.Fail($"Failed to save employee ({(int)response.StatusCode} {response.StatusCode}).");
     }
 
     public async Task<(bool Success, string? Error)> CompleteInitialSetupAsync(
@@ -298,7 +332,7 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
-    public async Task<(bool Success, string? Error)> UpdateMyContactDetailsAsync(
+    public async Task<ApiSaveResult> UpdateMyContactDetailsAsync(
         Guid companyId,
         UpdateMyContactDetailsRequest request,
         CancellationToken cancellationToken = default)
@@ -309,24 +343,33 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
                 $"api/companies/{companyId}/employees/me/contact-details", request, cancellationToken);
 
             if (response.IsSuccessStatusCode)
-                return (true, null);
+            {
+                var ok = await response.Content.ReadFromJsonAsync<GetMyContactDetailsResponse>(HrApiJsonOptions.Default, cancellationToken);
+                return ApiSaveResult.Ok(ok?.Version);
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>(cancellationToken);
+                return ApiSaveResult.Fail(body?.Error ?? "A conflict occurred.", body?.Code == "concurrency");
+            }
 
             if (response.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
             {
                 var body = await response.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(cancellationToken);
                 var first = body?.Errors?.Values.SelectMany(v => v).FirstOrDefault();
-                return (false, first ?? "Validation failed.");
+                return ApiSaveResult.Fail(first ?? "Validation failed.");
             }
 
             if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
             {
                 var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>(cancellationToken);
-                return (false, body?.Error ?? "Validation failed.");
+                return ApiSaveResult.Fail(body?.Error ?? "Validation failed.");
             }
 
-            return (false, "Failed to save contact details.");
+            return ApiSaveResult.Fail("Failed to save contact details.");
         }
-        catch { return (false, "An unexpected error occurred."); }
+        catch { return ApiSaveResult.Fail("An unexpected error occurred."); }
     }
 
     public async Task<GetEmergencyContactsResponse?> GetMyEmergencyContactsAsync(
@@ -451,14 +494,23 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
-    public async Task<(bool Success, string? Error)> UpdateEmploymentDetailsAsync(
+    public async Task<ApiSaveResult> UpdateEmploymentDetailsAsync(
         Guid companyId, Guid id, UpdateEmploymentDetailsRequest request)
     {
         var response = await Http.PutAsJsonAsync(
             $"api/companies/{companyId}/employees/{id}/employment", request);
 
         if (response.IsSuccessStatusCode)
-            return (true, null);
+        {
+            var ok = await response.Content.ReadFromJsonAsync<EmploymentDetailsSaveBody>(HrApiJsonOptions.Default);
+            return ApiSaveResult.Ok(ok?.Version);
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return ApiSaveResult.Fail(body?.Error ?? "A conflict occurred.", body?.Code == "concurrency");
+        }
 
         // The endpoint sends { error: "..." } for business-rule failures (not-found, conflict, a
         // plain validation rejection like "Cannot set employment status to Draft."). But FluentValidation
@@ -470,13 +522,15 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         var raw = await response.Content.ReadAsStringAsync();
 
         if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
-            return (false, businessMessage);
+            return ApiSaveResult.Fail(businessMessage);
 
         if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
-            return (false, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
+            return ApiSaveResult.Fail(string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
 
-        return (false, $"Failed to save employment details ({(int)response.StatusCode} {response.StatusCode}).");
+        return ApiSaveResult.Fail($"Failed to save employment details ({(int)response.StatusCode} {response.StatusCode}).");
     }
+
+    private sealed record EmploymentDetailsSaveBody(int Version);
 
     private static T? TryDeserialize<T>(string json) where T : class
     {
@@ -553,7 +607,7 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         }
     }
 
-    public async Task<(AmendLeavingProcessResponse? Result, string? Error)> AmendLeavingProcessAsync(
+    public async Task<AmendLeavingProcessResult> AmendLeavingProcessAsync(
         Guid companyId, Guid employeeId, AmendLeavingProcessRequest request)
     {
         var response = await Http.PutAsJsonAsync(
@@ -562,21 +616,28 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         if (response.IsSuccessStatusCode)
         {
             var amended = await response.Content.ReadFromJsonAsync<AmendLeavingProcessResponse>(HrApiJsonOptions.Default);
-            return (amended, null);
+            return new(amended, null, false, amended?.Version);
         }
 
         // Same reasoning as StartLeavingProcessAsync above — 404 (no in-progress leaving process)/409
         // (other business conflict) send the { error } shape, but FluentValidation failures short-circuit
         // with FastEndpoints' own 422 { statusCode, message, errors } shape instead.
         var raw = await response.Content.ReadAsStringAsync();
+        var envelope = TryDeserialize<ErrorEnvelope>(raw);
 
-        if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
-            return (null, businessMessage);
+        // Ticket 2: distinguish an optimistic-concurrency 409 ({ code: "concurrency" }) so the dialog
+        // can raise the shared <SaveConflictBanner> rather than a generic error.
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict && envelope?.Code == "concurrency")
+            return new(null, envelope.Error
+                ?? "Someone else changed this leaving process while you were editing.", true);
+
+        if (envelope?.Error is { } businessMessage)
+            return new(null, businessMessage);
 
         if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
-            return (null, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
+            return new(null, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
 
-        return (null, $"Failed to amend leaving process ({(int)response.StatusCode} {response.StatusCode}).");
+        return new(null, $"Failed to amend leaving process ({(int)response.StatusCode} {response.StatusCode}).");
     }
 
     public async Task<(CancelLeavingProcessResponse? Result, string? Error)> CancelLeavingProcessAsync(
@@ -664,5 +725,34 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         catch { return (false, "An unexpected error occurred."); }
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
+}
+
+// Ticket 2: unified save outcome for concurrency-aware API calls. IsConcurrencyConflict is true
+// only when the API rejected the save with a 409 whose code is "concurrency" (the record changed
+// since it was loaded) — as opposed to a plain business conflict such as a duplicate email.
+// NewVersion carries the post-save optimistic-concurrency token so a caller performing a second
+// sequential save (EmployeeEdit.razor saves the profile then the employment tab) can send the
+// fresh token. Consumed by EditSectionBase/EditPageBase via ApplySaveResult.
+public sealed record ApiSaveResult(bool Success, string? ErrorMessage, bool IsConcurrencyConflict, int? NewVersion)
+{
+    public static ApiSaveResult Ok(int? newVersion) => new(true, null, false, newVersion);
+    public static ApiSaveResult Fail(string message, bool isConcurrencyConflict = false)
+        => new(false, message, isConcurrencyConflict, null);
+}
+
+// Ticket 2: result of an Amend Leaving Process call. Deconstructs to (Result, Error) so the
+// existing call site keeps working, while IsConcurrencyConflict lets the dialog raise the shared
+// SaveConflictBanner on a stale-version 409. Mirrors CompensationService.UpdateFutureCompensationResult.
+public sealed record AmendLeavingProcessResult(
+    AmendLeavingProcessResponse? Result,
+    string? Error,
+    bool IsConcurrencyConflict = false,
+    int? NewVersion = null)
+{
+    public void Deconstruct(out AmendLeavingProcessResponse? result, out string? error)
+    {
+        result = Result;
+        error = Error;
+    }
 }

@@ -19,7 +19,7 @@ internal sealed class ListLocationTypesHandler(EmployeesDbContext db)
 
         var items = await query
             .OrderBy(e => e.Name)
-            .Select(e => new LocationTypeItem(e.Id, e.CompanyId, e.Name, e.Description, e.IsActive, e.CreatedAt, e.UpdatedAt))
+            .Select(e => new LocationTypeItem(e.Id, e.CompanyId, e.Name, e.Description, e.IsActive, e.CreatedAt, e.UpdatedAt, e.Version))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new ListLocationTypesResponse(items));

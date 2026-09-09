@@ -34,7 +34,8 @@ internal sealed class ListDepartmentsHandler
                 d.Name,
                 d.ParentDepartmentId,
                 d.ManagerEmployeeId,
-                d.IsActive))
+                d.IsActive,
+                d.Version))
             .ToList();
 
         return Result.Success(new ListDepartmentsResponse(items));

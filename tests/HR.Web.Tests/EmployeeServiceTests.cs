@@ -135,10 +135,10 @@ public class EmployeeServiceTests
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, new { }));
         var service = new EmployeeService(factory);
 
-        var (success, error) = await service.UpdateEmployeeProfileAsync(Guid.NewGuid(), Guid.NewGuid(), SampleUpdateRequest());
+        var result = await service.UpdateEmployeeProfileAsync(Guid.NewGuid(), Guid.NewGuid(), SampleUpdateRequest());
 
-        Assert.True(success);
-        Assert.Null(error);
+        Assert.True(result.Success);
+        Assert.Null(result.ErrorMessage);
     }
 
     [Fact]
@@ -147,10 +147,10 @@ public class EmployeeServiceTests
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.BadRequest, new { error = "'not a postcode' is not a valid postcode." }));
         var service = new EmployeeService(factory);
 
-        var (success, error) = await service.UpdateEmployeeProfileAsync(Guid.NewGuid(), Guid.NewGuid(), SampleUpdateRequest());
+        var result = await service.UpdateEmployeeProfileAsync(Guid.NewGuid(), Guid.NewGuid(), SampleUpdateRequest());
 
-        Assert.False(success);
-        Assert.Equal("'not a postcode' is not a valid postcode.", error);
+        Assert.False(result.Success);
+        Assert.Equal("'not a postcode' is not a valid postcode.", result.ErrorMessage);
     }
 
     [Fact]
@@ -159,10 +159,23 @@ public class EmployeeServiceTests
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { error = "A conflict occurred." }));
         var service = new EmployeeService(factory);
 
-        var (success, error) = await service.UpdateEmployeeProfileAsync(Guid.NewGuid(), Guid.NewGuid(), SampleUpdateRequest());
+        var result = await service.UpdateEmployeeProfileAsync(Guid.NewGuid(), Guid.NewGuid(), SampleUpdateRequest());
 
-        Assert.False(success);
-        Assert.Equal("A conflict occurred.", error);
+        Assert.False(result.Success);
+        Assert.Equal("A conflict occurred.", result.ErrorMessage);
+        Assert.False(result.IsConcurrencyConflict);
+    }
+
+    [Fact]
+    public async Task UpdateEmployeeProfileAsync_Flags_ConcurrencyConflict_When_Api_Returns_Conflict_With_Concurrency_Code()
+    {
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { error = "Changed by someone else.", code = "concurrency" }));
+        var service = new EmployeeService(factory);
+
+        var result = await service.UpdateEmployeeProfileAsync(Guid.NewGuid(), Guid.NewGuid(), SampleUpdateRequest());
+
+        Assert.False(result.Success);
+        Assert.True(result.IsConcurrencyConflict);
     }
 
     // ── UpdateMyContactDetailsAsync ──────────────────────────────────────────────
@@ -173,12 +186,12 @@ public class EmployeeServiceTests
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, new { }));
         var service = new EmployeeService(factory);
 
-        var (success, error) = await service.UpdateMyContactDetailsAsync(
+        var result = await service.UpdateMyContactDetailsAsync(
             Guid.NewGuid(),
             new UpdateMyContactDetailsRequest(Guid.NewGuid(), null, null, null, "1 Test Street", null, "London", null, "SW1A 1AA", "United Kingdom"));
 
-        Assert.True(success);
-        Assert.Null(error);
+        Assert.True(result.Success);
+        Assert.Null(result.ErrorMessage);
     }
 
     [Fact]
@@ -188,12 +201,12 @@ public class EmployeeServiceTests
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.UnprocessableEntity, new { errors }));
         var service = new EmployeeService(factory);
 
-        var (success, error) = await service.UpdateMyContactDetailsAsync(
+        var result = await service.UpdateMyContactDetailsAsync(
             Guid.NewGuid(),
             new UpdateMyContactDetailsRequest(Guid.NewGuid(), null, null, null, "1 Test Street", null, "London", null, "", "United Kingdom"));
 
-        Assert.False(success);
-        Assert.Equal("Post code is required.", error);
+        Assert.False(result.Success);
+        Assert.Equal("Post code is required.", result.ErrorMessage);
     }
 
     [Fact]
@@ -202,12 +215,12 @@ public class EmployeeServiceTests
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.BadRequest, new { error = "'12345' is not a valid mobile number." }));
         var service = new EmployeeService(factory);
 
-        var (success, error) = await service.UpdateMyContactDetailsAsync(
+        var result = await service.UpdateMyContactDetailsAsync(
             Guid.NewGuid(),
             new UpdateMyContactDetailsRequest(Guid.NewGuid(), null, "12345", null, "1 Test Street", null, "London", null, "SW1A 1AA", "United Kingdom"));
 
-        Assert.False(success);
-        Assert.Equal("'12345' is not a valid mobile number.", error);
+        Assert.False(result.Success);
+        Assert.Equal("'12345' is not a valid mobile number.", result.ErrorMessage);
     }
 
     [Fact]
@@ -216,12 +229,12 @@ public class EmployeeServiceTests
         var factory = BuildFactory(new ThrowingHandler());
         var service = new EmployeeService(factory);
 
-        var (success, error) = await service.UpdateMyContactDetailsAsync(
+        var result = await service.UpdateMyContactDetailsAsync(
             Guid.NewGuid(),
             new UpdateMyContactDetailsRequest(Guid.NewGuid(), null, null, null, "1 Test Street", null, "London", null, "SW1A 1AA", "United Kingdom"));
 
-        Assert.False(success);
-        Assert.Equal("An unexpected error occurred.", error);
+        Assert.False(result.Success);
+        Assert.Equal("An unexpected error occurred.", result.ErrorMessage);
     }
 
     // ── AddMyEmergencyContactAsync ───────────────────────────────────────────────

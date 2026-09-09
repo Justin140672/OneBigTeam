@@ -44,6 +44,7 @@ public class UpdateSharedCompanyDocumentAudienceHandlerTests
                 CompanyId             = companyId,
                 DocumentId            = doc.Id,
                 AudienceDepartmentIds = [departmentId],
+                ExpectedVersion = 1,
             },
             updatedBy, CancellationToken.None);
 
@@ -81,6 +82,7 @@ public class UpdateSharedCompanyDocumentAudienceHandlerTests
                 CompanyId             = companyId,
                 DocumentId            = doc.Id,
                 AudienceDepartmentIds = [newDeptId],
+                ExpectedVersion = 1,
             },
             Guid.NewGuid(), CancellationToken.None);
 
@@ -103,7 +105,7 @@ public class UpdateSharedCompanyDocumentAudienceHandlerTests
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
-            new UpdateSharedCompanyDocumentAudienceRequest { CompanyId = companyId, DocumentId = doc.Id },
+            new UpdateSharedCompanyDocumentAudienceRequest { CompanyId = companyId, DocumentId = doc.Id, ExpectedVersion = 1 },
             Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -173,6 +175,7 @@ public class UpdateSharedCompanyDocumentAudienceHandlerTests
                 CompanyId             = companyId,
                 DocumentId            = doc.Id,
                 AudienceDepartmentIds = [departmentId],
+                ExpectedVersion = 1,
             },
             updatedBy, CancellationToken.None);
 

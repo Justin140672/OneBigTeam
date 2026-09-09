@@ -31,7 +31,8 @@ public class UpdateLeaveTypeHandlerTests
             Code = "ANNUAL",
             DefaultEntitlementDays = 28,
             AccrualMethod = AccrualMethod.Monthly,
-            Behaviour = LeaveTypeBehaviour.Standard
+            Behaviour = LeaveTypeBehaviour.Standard,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -116,7 +117,8 @@ public class UpdateLeaveTypeHandlerTests
             Code = "ANNUAL",
             DefaultEntitlementDays = 28,
             AccrualMethod = AccrualMethod.Monthly,
-            Behaviour = LeaveTypeBehaviour.Standard
+            Behaviour = LeaveTypeBehaviour.Standard,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -154,7 +156,8 @@ public class UpdateLeaveTypeHandlerTests
             Code = "ANNUAL",
             DefaultEntitlementDays = 30,
             AccrualMethod = AccrualMethod.Monthly,
-            Behaviour = LeaveTypeBehaviour.Standard
+            Behaviour = LeaveTypeBehaviour.Standard,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -189,7 +192,8 @@ public class UpdateLeaveTypeHandlerTests
             Code = "COMPASSIONATE",
             DefaultEntitlementDays = 5,
             AccrualMethod = AccrualMethod.None,
-            Behaviour = LeaveTypeBehaviour.Standard
+            Behaviour = LeaveTypeBehaviour.Standard,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -251,7 +255,8 @@ public class UpdateLeaveTypeHandlerTests
             DefaultEntitlementDays = 28,
             AccrualMethod = AccrualMethod.Monthly,
             Behaviour = LeaveTypeBehaviour.Standard,
-            ActorEmployeeId = actorId
+            ActorEmployeeId = actorId,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);

@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Companies.Domain;
 
-internal sealed class PublicHoliday
+internal sealed class PublicHoliday : IVersionedAggregate
 {
     private PublicHoliday() { }
 
@@ -10,6 +12,11 @@ internal sealed class PublicHoliday
     public string Name { get; private set; } = string.Empty;
     public string CountryCode { get; private set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; private set; }
+
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public static PublicHoliday Create(
         Guid id,
@@ -26,6 +33,7 @@ internal sealed class PublicHoliday
             Date = date,
             Name = name,
             CountryCode = countryCode,
+            Version = 1,
             CreatedAt = now
         };
     }

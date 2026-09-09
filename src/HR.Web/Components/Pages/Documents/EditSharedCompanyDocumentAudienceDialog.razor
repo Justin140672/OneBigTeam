@@ -6,7 +6,9 @@
     <DialogTemplates>
         <Header>Edit Document Audience</Header>
         <Content>
-            @if (!string.IsNullOrEmpty(GlobalError))
+            <SaveConflictBanner Visible="SaveConflict" Disabled="@Saving" OnReload="ReloadLatestAsync"
+                                Message="Someone else changed this document while you were editing. Your changes have not been saved." />
+            @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
             {
                 <div class="alert alert-danger alert-dismissible mb-3">
                     @GlobalError
@@ -112,9 +114,14 @@
     // rendered immediately and then backed by the lists this method loads.
     private bool _audienceDataLoaded;
 
+    // Ticket 2: optimistic-concurrency token loaded with the document, sent as ExpectedVersion on save.
+    private int? _loadedVersion;
+
     protected override async Task OnOpenedAsync()
     {
         GlobalError = null;
+        SaveConflict = false;
+        _loadedVersion = Document?.Version;
         _audienceDataLoaded = false;
 
         // Independent calls fired concurrently rather than awaited one at a time — see
@@ -147,10 +154,29 @@
         if (Document is null)
             return "No document selected.";
 
-        return await DocumentService.UpdateSharedCompanyDocumentAudienceAsync(
+        var result = await DocumentService.UpdateSharedCompanyDocumentAudienceAsync(
             CompanyId, Document.Id,
             Model.AudienceDepartmentIds, Model.AudienceLocationIds,
-            Model.AudiencePositionProfileIds, Model.AudienceEmployeeIds);
+            Model.AudiencePositionProfileIds, Model.AudienceEmployeeIds,
+            _loadedVersion);
+
+        SaveConflict = result.IsConcurrencyConflict;
+        if (result.Success && result.NewVersion is { } v) _loadedVersion = v;
+        return result.Success ? null : result.ErrorMessage ?? "Failed to update audience.";
+    }
+
+    // Ticket 2: re-fetch the document and re-populate the form at the latest version.
+    private async Task ReloadLatestAsync()
+    {
+        if (Document is not null)
+        {
+            var fresh = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, Document.Id);
+            if (fresh is not null) Document = fresh;
+        }
+        await OnOpenedAsync();
+        SaveConflict = false;
+        GlobalError = null;
+        StateHasChanged();
     }
 
     protected override void ResetForm()

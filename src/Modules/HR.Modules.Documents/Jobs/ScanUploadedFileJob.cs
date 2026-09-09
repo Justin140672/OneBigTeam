@@ -64,11 +64,24 @@ internal sealed class ScanUploadedFileJob(
 
         try
         {
-            var httpClient = httpClientFactory.CreateClient();
-            var downloadUrl = await GetDownloadUrlAsync(targetType, target.StorageKey, CancellationToken.None);
+            // The no-op scanner (E2E / local without ClamAV — see DocumentsModule) never inspects
+            // the bytes, so downloading them first is pure cost and, worse, a hard failure point:
+            // the E2E document storage's download URL isn't a reachable HTTP endpoint, so
+            // GetStreamAsync throws "connection refused" and every upload's scan job burns all 5
+            // retries and marks the file Failed. Skip straight to a clean result in that case.
+            VirusScanResult scanResult;
+            if (virusScanner is NoOpVirusScanService)
+            {
+                scanResult = await virusScanner.ScanAsync(System.IO.Stream.Null, target.FileName, CancellationToken.None);
+            }
+            else
+            {
+                var httpClient = httpClientFactory.CreateClient();
+                var downloadUrl = await GetDownloadUrlAsync(targetType, target.StorageKey, CancellationToken.None);
 
-            await using var content = await httpClient.GetStreamAsync(downloadUrl, CancellationToken.None);
-            var scanResult = await virusScanner.ScanAsync(content, target.FileName, CancellationToken.None);
+                await using var content = await httpClient.GetStreamAsync(downloadUrl, CancellationToken.None);
+                scanResult = await virusScanner.ScanAsync(content, target.FileName, CancellationToken.None);
+            }
 
             now = clock.UtcNowOffset();
 

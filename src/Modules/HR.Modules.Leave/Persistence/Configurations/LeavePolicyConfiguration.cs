@@ -53,6 +53,12 @@ internal sealed class LeavePolicyConfiguration : IEntityTypeConfiguration<LeaveP
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(p => p.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(p => p.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

@@ -45,6 +45,13 @@ public sealed class DepartmentListPage(IPage page, string baseUrl)
             .WaitUntilVisibleAsync();
     }
 
+    /// <summary>The href of the grid row link whose text contains <paramref name="nameFragment"/>.</summary>
+    public async Task<string> GetRowHrefAsync(string nameFragment)
+    {
+        var href = await page.Locator(".e-rowcell a").Filter(new() { HasText = nameFragment }).First.GetAttributeAsync("href");
+        return href ?? throw new InvalidOperationException($"No department row link found for '{nameFragment}'.");
+    }
+
     public async Task<IReadOnlyList<string>> GetDepartmentNamesAsync()
     {
         var cells = await page.Locator(".e-rowcell a").AllAsync();

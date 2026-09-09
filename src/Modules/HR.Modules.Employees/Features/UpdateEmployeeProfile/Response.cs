@@ -14,4 +14,5 @@ internal sealed record UpdateEmployeeProfileResponse(
     DateOnly StartDate,
     EmploymentStatus Status,
     bool HasSystemAccess,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

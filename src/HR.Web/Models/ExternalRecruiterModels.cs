@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using HR.Web.Services;
 
 namespace HR.Web.Models;
 
@@ -37,7 +38,9 @@ public record GetExternalRecruiterResponse(
     string? Notes,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    // Ticket 2: optimistic-concurrency token.
+    int Version = 0);
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
 
@@ -73,7 +76,9 @@ public record UpdateExternalRecruiterRequest(
     string? ContactEmail,
     string? ContactTelephone,
     string? Website,
-    string? Notes);
+    string? Notes,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdateExternalRecruiterResponse(
     Guid Id,
@@ -86,7 +91,8 @@ public record UpdateExternalRecruiterResponse(
     string? Notes,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
 // ── ACTIVE STATUS ─────────────────────────────────────────────────────────────
 
@@ -129,8 +135,10 @@ public sealed record GetExternalRecruiterUsageResponse(
 
 // ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
-public sealed class ExternalRecruiterEditModel
+public sealed class ExternalRecruiterEditModel : IHasVersion
 {
+    public int Version { get; set; }
+
     [Required(ErrorMessage = "Agency name is required.")]
     public string AgencyName { get; set; } = string.Empty;
     public string? ContactName { get; set; }

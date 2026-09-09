@@ -1,9 +1,10 @@
 using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure.Abstractions;
+using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Domain;
 
-internal sealed class OnboardingTemplate
+internal sealed class OnboardingTemplate : IVersionedAggregate
 {
     private readonly List<OnboardingTemplateTask> _tasks = [];
 
@@ -16,6 +17,11 @@ internal sealed class OnboardingTemplate
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public IReadOnlyList<OnboardingTemplateTask> Tasks => _tasks.AsReadOnly();
 
@@ -33,6 +39,7 @@ internal sealed class OnboardingTemplate
             Name = name,
             Description = description,
             IsActive = true,
+            Version = 1,
             CreatedAt = now,
             UpdatedAt = now,
         };

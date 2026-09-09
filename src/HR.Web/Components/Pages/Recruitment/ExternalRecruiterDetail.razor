@@ -31,7 +31,10 @@
         </div>
         <p class="text-muted mb-4">Record the recruitment agency's contact details.</p>
 
-        @if (!string.IsNullOrEmpty(GlobalError))
+        <SaveConflictBanner Visible="SaveConflict" Disabled="@Saving" OnReload="ReloadLatestValuesAsync"
+                            Message="Someone else changed this external recruiter while you were editing. Your changes have not been saved." />
+
+        @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
         {
             <div class="alert alert-danger">@GlobalError</div>
         }

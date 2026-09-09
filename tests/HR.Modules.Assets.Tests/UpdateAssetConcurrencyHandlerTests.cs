@@ -1,0 +1,118 @@
+using HR.Modules.Assets.Features.CreateAsset;
+using HR.Modules.Assets.Features.CreateAssetCategory;
+using HR.Modules.Assets.Features.UpdateAsset;
+using HR.Modules.Assets.Persistence;
+using HR.Modules.Assets.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+
+namespace HR.Modules.Assets.Tests;
+
+// Ticket 2 (optimistic concurrency rollout): Asset.Version coverage for UpdateAsset. Two DbContext
+// instances over the same EF InMemory database; context B saves first (bumping the store's
+// Version), then the handler under test saves against context A with a stale ExpectedVersion,
+// raising DbUpdateConcurrencyException exactly as real Postgres would. UpdateAsset publishes no
+// audit/integration events, so the stale path only asserts that nothing was committed.
+public class UpdateAssetConcurrencyHandlerTests
+{
+    private static readonly DateTime FixedUtcNow = new(2026, 9, 8, 10, 0, 0, DateTimeKind.Utc);
+
+    private static DbContextOptions<AssetsDbContext> Options(string dbName)
+        => new DbContextOptionsBuilder<AssetsDbContext>().UseInMemoryDatabase(dbName).Options;
+
+    private static async Task<(string DbName, Guid CompanyId, Guid CategoryId, Guid AssetId)> SeedAsync()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var companyId = Guid.NewGuid();
+
+        await using var seed = new AssetsDbContext(Options(dbName));
+        var categoryResult = await new CreateAssetCategoryHandler(seed, new FakeClock(FixedUtcNow))
+            .HandleAsync(new CreateAssetCategoryRequest { CompanyId = companyId, Name = "Electronics" }, CancellationToken.None);
+        var categoryId = categoryResult.Value!.Id;
+
+        var assetResult = await new CreateAssetHandler(
+                seed, new FakeClock(FixedUtcNow), new FakeAuditPublisher(),
+                new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator())
+            .HandleAsync(new CreateAssetRequest
+            {
+                CompanyId = companyId,
+                AssetNumber = "ASSET-001",
+                CategoryId = categoryId,
+                Name = "Laptop"
+            }, CancellationToken.None);
+
+        return (dbName, companyId, categoryId, assetResult.Value!.Id);
+    }
+
+    private static UpdateAssetRequest Request(Guid companyId, Guid categoryId, Guid assetId, int? expectedVersion, string name = "Laptop")
+        => new()
+        {
+            CompanyId = companyId,
+            Id = assetId,
+            AssetNumber = "ASSET-001",
+            CategoryId = categoryId,
+            Name = name,
+            ExpectedVersion = expectedVersion,
+        };
+
+    [Fact]
+    public async Task Matching_ExpectedVersion_Succeeds_And_Bumps_Version()
+    {
+        var (dbName, companyId, categoryId, assetId) = await SeedAsync();
+
+        await using var db = new AssetsDbContext(Options(dbName));
+        var result = await new UpdateAssetHandler(db, new FakeClock(FixedUtcNow))
+            .HandleAsync(Request(companyId, categoryId, assetId, expectedVersion: 1, name: "Renamed"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value!.Version);
+        Assert.Equal("Renamed", result.Value.Name);
+
+        await using var verify = new AssetsDbContext(Options(dbName));
+        Assert.Equal(2, (await verify.Assets.SingleAsync()).Version);
+    }
+
+    [Fact]
+    public async Task Null_ExpectedVersion_Is_Rejected_As_Concurrency_And_Writes_Nothing()
+    {
+        var (dbName, companyId, categoryId, assetId) = await SeedAsync();
+
+        await using var db = new AssetsDbContext(Options(dbName));
+        var result = await new UpdateAssetHandler(db, new FakeClock(FixedUtcNow))
+            .HandleAsync(Request(companyId, categoryId, assetId, expectedVersion: null, name: "Second"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("concurrency", result.Error.Code);
+
+        await using var verify = new AssetsDbContext(Options(dbName));
+        var saved = await verify.Assets.SingleAsync();
+        Assert.Equal("Laptop", saved.Name);
+        Assert.Equal(1, saved.Version);
+    }
+
+    [Fact]
+    public async Task Stale_ExpectedVersion_Returns_Concurrency_Failure_And_Leaves_Row_Unchanged()
+    {
+        var (dbName, companyId, categoryId, assetId) = await SeedAsync();
+
+        await using var ctxA = new AssetsDbContext(Options(dbName));
+        await ctxA.Assets.SingleAsync();
+
+        await using (var ctxB = new AssetsDbContext(Options(dbName)))
+        {
+            var winner = await new UpdateAssetHandler(ctxB, new FakeClock(FixedUtcNow))
+                .HandleAsync(Request(companyId, categoryId, assetId, expectedVersion: 1, name: "Winner"), CancellationToken.None);
+            Assert.True(winner.IsSuccess);
+        }
+
+        var result = await new UpdateAssetHandler(ctxA, new FakeClock(FixedUtcNow))
+            .HandleAsync(Request(companyId, categoryId, assetId, expectedVersion: 1, name: "Loser"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("concurrency", result.Error.Code);
+
+        await using var verify = new AssetsDbContext(Options(dbName));
+        var saved = await verify.Assets.SingleAsync();
+        Assert.Equal("Winner", saved.Name);
+        Assert.Equal(2, saved.Version);
+    }
+}

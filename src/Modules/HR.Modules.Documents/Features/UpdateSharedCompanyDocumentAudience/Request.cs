@@ -11,4 +11,7 @@ internal sealed class UpdateSharedCompanyDocumentAudienceRequest
     public Guid[] AudienceLocationIds { get; init; } = [];
     public Guid[] AudiencePositionProfileIds { get; init; } = [];
     public Guid[] AudienceEmployeeIds { get; init; } = [];
+
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
 }

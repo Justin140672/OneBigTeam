@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Assets.Domain;
 
-internal sealed class Asset
+internal sealed class Asset : IVersionedAggregate
 {
     private Asset() { }
 
@@ -17,6 +19,11 @@ internal sealed class Asset
     public AssetStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public static Asset Create(
         Guid id,
@@ -44,6 +51,7 @@ internal sealed class Asset
             PurchaseDate = purchaseDate,
             PurchasePrice = purchasePrice,
             Status = AssetStatus.Available,
+            Version = 1,
             CreatedAt = now,
             UpdatedAt = now
         };

@@ -5,7 +5,7 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Domain;
 
-internal sealed class Employee
+internal sealed class Employee : IVersionedAggregate
 {
     private Employee() { }
 
@@ -69,6 +69,16 @@ internal sealed class Employee
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). A plain application-managed int
+    // column mapped .IsConcurrencyToken() — matching the CompanySettings.Version / CustomerSubscription.Version
+    // convention elsewhere in the solution rather than EF's provider-generated IsRowVersion()/Postgres xmin.
+    // Every user-facing edit handler sets the loaded value as the EF OriginalValue and calls
+    // IncrementVersion() before SaveChangesAsync; a stale save then affects 0 rows and raises
+    // DbUpdateConcurrencyException.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
+
     public static Employee Create(
         Guid id,
         Guid companyId,
@@ -108,6 +118,7 @@ internal sealed class Employee
             DepartmentId = departmentId,
             LocationId = locationId,
             PositionProfileId = positionProfileId,
+            Version = 1,
             CreatedAt = now,
             UpdatedAt = now,
         };

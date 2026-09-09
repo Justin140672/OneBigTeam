@@ -5,4 +5,5 @@ internal sealed record UpdateCompanyDocumentCategoryResponse(
     Guid CompanyId,
     string Name,
     bool IsActive,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

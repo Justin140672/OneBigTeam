@@ -33,10 +33,18 @@ internal sealed class UpdateAssetCategoryHandler(AssetsDbContext db, IClock cloc
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
         category.Update(newName, request.Description, now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency (base-code helper).
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            category,
+            request.ExpectedVersion,
+            "This asset category was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateAssetCategoryResponse>(saveResult.Error);
 
         return Result.Success(new UpdateAssetCategoryResponse(
             category.Id, category.CompanyId, category.Name, category.Description,
-            category.IsActive, category.CreatedAt, category.UpdatedAt));
+            category.IsActive, category.CreatedAt, category.UpdatedAt, category.Version));
     }
 }

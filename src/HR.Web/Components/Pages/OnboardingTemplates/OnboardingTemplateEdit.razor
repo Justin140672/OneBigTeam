@@ -21,7 +21,10 @@
         <h1 class="mb-1">@PageTitle</h1>
         <p class="text-muted mb-4">Define the name and the onboarding checklist tasks for this template.</p>
 
-        @if (!string.IsNullOrEmpty(GlobalError))
+        <SaveConflictBanner Visible="SaveConflict" Disabled="@Saving" OnReload="ReloadLatestValuesAsync"
+                            Message="Someone else changed this onboarding template while you were editing. Your changes have not been saved — reloading the latest version will replace your unsaved edits to this template, including your checklist changes." />
+
+        @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
         {
             <div class="alert alert-danger">@GlobalError</div>
         }
@@ -210,22 +213,28 @@
             {
                 Model.Name = template.Name;
                 Model.Description = template.Description;
-                Model.Tasks = template.Tasks
-                    .OrderBy(t => t.DisplayOrder)
-                    .Select(t => new OnboardingTemplateTaskEditModel
-                    {
-                        Id = t.Id,
-                        Title = t.Title,
-                        Description = t.Description,
-                        Priority = t.Priority,
-                        AssignTo = t.AssignTo,
-                        DueDaysAfterStart = t.DueDaysAfterStart,
-                        DisplayOrder = t.DisplayOrder,
-                    })
-                    .ToList();
+                Model.Version = template.Version;
+                Model.Tasks = MapTasks(template);
             }
         }
     }
+
+    // Shared task mapping used by both LoadAsync and ReloadServerStateAsync so a conflict-reload
+    // rebuilds the checklist exactly as the initial load does (no drift between the two paths).
+    private static List<OnboardingTemplateTaskEditModel> MapTasks(GetOnboardingTemplateResponse template)
+        => template.Tasks
+            .OrderBy(t => t.DisplayOrder)
+            .Select(t => new OnboardingTemplateTaskEditModel
+            {
+                Id = t.Id,
+                Title = t.Title,
+                Description = t.Description,
+                Priority = t.Priority,
+                AssignTo = t.AssignTo,
+                DueDaysAfterStart = t.DueDaysAfterStart,
+                DisplayOrder = t.DisplayOrder,
+            })
+            .ToList();
 
     private readonly Dictionary<int, ElementReference> _upRefs = new();
     private readonly Dictionary<int, ElementReference> _downRefs = new();
@@ -341,18 +350,33 @@
             if (created is null)
                 return createError ?? "Failed to create onboarding template.";
 
+            // A brand-new template is persisted at Version 1 (OnboardingTemplate.Create). The
+            // checklist is written via the same protected update endpoint, which now mandates an
+            // ExpectedVersion (Ticket 2) — send 1 so this immediate follow-up save isn't rejected
+            // as a stale write, and adopt the returned version so a subsequent edit on this same
+            // page (before any navigation) carries the right token.
             if (taskItems.Count == 0)
+            {
+                Model.Version = 1;
                 return null;
+            }
 
             var updateRequest = new UpdateOnboardingTemplateRequest(
                 CompanyId,
                 created.Id,
                 created.Name,
                 created.Description,
-                taskItems);
+                taskItems,
+                ExpectedVersion: 1);
 
-            var (_, updateError) = await OnboardingTemplateService.UpdateAsync(CompanyId, created.Id, updateRequest);
-            return updateError;
+            var followUpResult = await OnboardingTemplateService.UpdateWithConcurrencyAsync(
+                CompanyId, created.Id, updateRequest);
+            SaveConflict = followUpResult.IsConcurrencyConflict;
+            if (!followUpResult.Success)
+                return followUpResult.ErrorMessage ?? "Failed to save onboarding template.";
+            if (followUpResult.NewVersion is { } createdVersion)
+                Model.Version = createdVersion;
+            return null;
         }
         else
         {
@@ -361,10 +385,42 @@
                 Id!.Value,
                 Model.Name.Trim(),
                 string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
-                taskItems);
+                taskItems,
+                Model.Version);
 
-            var (updated, error) = await OnboardingTemplateService.UpdateAsync(CompanyId, Id!.Value, request);
-            return updated is not null ? null : error ?? "Failed to save onboarding template.";
+            // Ticket 2: send the loaded version and surface a stale-save 409 via the shared banner.
+            // The user's unsaved task-list edits stay in Model.Tasks — only the banner is raised.
+            var result = await OnboardingTemplateService.UpdateWithConcurrencyAsync(CompanyId, Id!.Value, request);
+            SaveConflict = result.IsConcurrencyConflict;
+            if (!result.Success)
+                return result.ErrorMessage ?? "Failed to save onboarding template.";
+            if (result.NewVersion is { } newVersion)
+                Model.Version = newVersion;
+            return null;
+        }
+    }
+
+    // Ticket 2 follow-up: concurrency-conflict recovery for the shared <SaveConflictBanner>.
+    // Reload the COMPLETE server template — name, description, version AND the checklist — so the
+    // editor can't keep the other person's version alongside a stale task list and silently
+    // overwrite their checklist changes on the next save. This is the explicit "reload latest
+    // values" action, so the user's unsaved edits (including task edits) are replaced.
+    protected override async Task ReloadServerStateAsync()
+    {
+        if (IsNew) return;
+        var template = await OnboardingTemplateService.GetOnboardingTemplateAsync(CompanyId, Id!.Value);
+        if (template is not null)
+        {
+            Model.Name = template.Name;
+            Model.Description = template.Description;
+            Model.Version = template.Version;
+            Model.Tasks = MapTasks(template);
+
+            // The old task list is gone — drop references into it and re-baseline so the page
+            // isn't left falsely dirty (base ReloadLatestValuesAsync does not call this).
+            _expandedTask = null;
+            _pendingFocusIndex = null;
+            CaptureBaseline();
         }
     }
 

@@ -13,4 +13,5 @@ internal sealed record UpdateAssetResponse(
     decimal? PurchasePrice,
     string Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

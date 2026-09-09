@@ -14,4 +14,5 @@ internal sealed record GetCandidateResponse(
     Guid? DeactivatedByUserId,
     string? DeactivationReason,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

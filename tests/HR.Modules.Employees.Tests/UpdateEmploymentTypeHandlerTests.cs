@@ -28,7 +28,8 @@ public class UpdateEmploymentTypeHandlerTests
             CompanyId = companyId,
             Id = entity.Id,
             Name = "Fixed-Term Contract",
-            Description = "Time-limited"
+            Description = "Time-limited",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);

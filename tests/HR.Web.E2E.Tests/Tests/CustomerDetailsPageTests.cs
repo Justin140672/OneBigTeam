@@ -129,6 +129,7 @@ public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : R
         await login.LoginAsync(AllowListedAdminEmail);
 
         await list.GoToAsync();
+        await list.SearchAsync("Acme Corporation");
         Assert.True(await list.HasCompanyAsync("Acme Corporation"),
             "Expected the seeded Acme Corporation row to appear in the customer list");
 

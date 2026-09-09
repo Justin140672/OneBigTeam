@@ -19,7 +19,7 @@ internal sealed class ListCompanyDocumentCategoriesHandler(DocumentsDbContext db
 
         var items = await query
             .OrderBy(c => c.Name)
-            .Select(c => new CompanyDocumentCategoryListItem(c.Id, c.Name, c.IsActive))
+            .Select(c => new CompanyDocumentCategoryListItem(c.Id, c.Name, c.IsActive, c.Version))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new ListCompanyDocumentCategoriesResponse(items));

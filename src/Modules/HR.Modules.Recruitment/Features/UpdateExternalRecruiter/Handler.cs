@@ -42,7 +42,14 @@ internal sealed class UpdateExternalRecruiterHandler(
             request.Notes,
             now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            recruiter,
+            request.ExpectedVersion,
+            "This external recruiter was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateExternalRecruiterResponse>(saveResult.Error);
 
         var after = new ExternalRecruiterAuditSnapshot(
             recruiter.AgencyName,
@@ -67,6 +74,7 @@ internal sealed class UpdateExternalRecruiterHandler(
             recruiter.Notes,
             recruiter.IsActive,
             recruiter.CreatedAt,
-            recruiter.UpdatedAt));
+            recruiter.UpdatedAt,
+            recruiter.Version));
     }
 }

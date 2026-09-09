@@ -6,12 +6,12 @@ namespace HR.Modules.Employees.Tests;
 public class AmendLeavingProcessValidatorTests
 {
     private static AmendLeavingProcessRequest ValidRequest() =>
-        new(
+        new AmendLeavingProcessRequest(
             Guid.NewGuid(),
             Guid.NewGuid(),
             LeavingDate: new DateOnly(2026, 8, 1),
             LastWorkingDay: new DateOnly(2026, 7, 31),
-            LeavingReason.Resignation);
+            LeavingReason.Resignation) { ExpectedVersion = 1 };
 
     [Fact]
     public void Validate_Passes_For_Valid_Request()

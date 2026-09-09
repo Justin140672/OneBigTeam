@@ -15,7 +15,7 @@ internal sealed class ListPublicHolidaysHandler(CompaniesDbContext dbContext)
             .AsNoTracking()
             .Where(h => h.CompanyId == request.CompanyId)
             .OrderBy(h => h.Date)
-            .Select(h => new PublicHolidayItem(h.Id, h.CompanyId, h.Date, h.Name, h.CountryCode, h.CreatedAt))
+            .Select(h => new PublicHolidayItem(h.Id, h.CompanyId, h.Date, h.Name, h.CountryCode, h.CreatedAt, h.Version))
             .ToListAsync(cancellationToken);
 
         return new ListPublicHolidaysResponse(items);

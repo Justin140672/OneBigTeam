@@ -59,7 +59,15 @@ internal sealed class UpdateRecruitmentStageHandler(
 
         var now = clock.UtcNowOffset();
         stage.UpdateDetails(trimmedName, request.IsTerminal, request.TerminalOutcome, now, request.Purpose);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            stage,
+            request.ExpectedVersion,
+            "This recruitment stage was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateRecruitmentStageResponse>(saveResult.Error);
 
         var after = new RecruitmentStageAuditSnapshot(stage.Name, stage.IsTerminal, stage.TerminalOutcome, stage.Purpose);
 
@@ -76,6 +84,7 @@ internal sealed class UpdateRecruitmentStageHandler(
             stage.IsTerminal,
             stage.TerminalOutcome,
             stage.Purpose,
-            stage.UpdatedAt));
+            stage.UpdatedAt,
+            stage.Version));
     }
 }

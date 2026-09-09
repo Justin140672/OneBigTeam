@@ -62,7 +62,8 @@ public class UpdateSicknessCategoryEndpointTests
                 companyId,
                 id = category.Id,
                 name = "Influenza",
-                displayOrder = 5
+                displayOrder = 5,
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -94,7 +95,7 @@ public class UpdateSicknessCategoryEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/sickness-categories/{category!.Id}",
-            new { companyId, id = category.Id, name = string.Empty, displayOrder = 1 });
+            new { companyId, id = category.Id, name = string.Empty, displayOrder = 1, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -107,7 +108,7 @@ public class UpdateSicknessCategoryEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/sickness-categories/{Guid.NewGuid()}",
-            new { companyId, id = Guid.NewGuid(), name = "Flu", displayOrder = 1 });
+            new { companyId, id = Guid.NewGuid(), name = "Flu", displayOrder = 1, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -138,7 +139,7 @@ public class UpdateSicknessCategoryEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/sickness-categories/{secondCategory!.Id}",
-            new { companyId, id = secondCategory.Id, name = "Flu", displayOrder = 2 });
+            new { companyId, id = secondCategory.Id, name = "Flu", displayOrder = 2, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }

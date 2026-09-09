@@ -58,7 +58,7 @@ public class UpdateExternalRecruiterEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/external-recruiters/{recruiterId}",
-            new { companyId, externalRecruiterId = recruiterId, agencyName = "Updated Name" });
+            new { companyId, externalRecruiterId = recruiterId, agencyName = "Updated Name", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<RecruiterPayload>();
@@ -74,7 +74,7 @@ public class UpdateExternalRecruiterEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/external-recruiters/{Guid.NewGuid()}",
-            new { companyId, externalRecruiterId = Guid.NewGuid(), agencyName = "Updated Name" });
+            new { companyId, externalRecruiterId = Guid.NewGuid(), agencyName = "Updated Name", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -88,7 +88,7 @@ public class UpdateExternalRecruiterEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/external-recruiters/{recruiterId}",
-            new { companyId, externalRecruiterId = recruiterId, agencyName = string.Empty });
+            new { companyId, externalRecruiterId = recruiterId, agencyName = string.Empty, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -104,7 +104,7 @@ public class UpdateExternalRecruiterEndpointTests
         using var mismatchedClient = await AuthenticatedClient(differentCompany);
         var response = await mismatchedClient.PutAsJsonAsync(
             $"/api/companies/{companyId}/external-recruiters/{recruiterId}",
-            new { companyId, externalRecruiterId = recruiterId, agencyName = "Updated Name" });
+            new { companyId, externalRecruiterId = recruiterId, agencyName = "Updated Name", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

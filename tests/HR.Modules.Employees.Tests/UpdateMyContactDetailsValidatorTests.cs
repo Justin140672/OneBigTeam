@@ -10,8 +10,18 @@ public class UpdateMyContactDetailsValidatorTests
         AddressLine1 = "1 Test Street",
         City = "London",
         PostCode = "SW1A 1AA",
-        Country = "United Kingdom"
+        Country = "United Kingdom",
+        ExpectedVersion = 1
     };
+
+    [Fact]
+    public void Validate_Fails_When_ExpectedVersion_Is_Null()
+    {
+        var v = new UpdateMyContactDetailsValidator();
+        var result = v.Validate(ValidRequest() with { ExpectedVersion = null });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateMyContactDetailsRequest.ExpectedVersion));
+    }
 
     [Fact]
     public void Validate_Fails_When_AddressLine1_Is_Empty()
@@ -150,7 +160,8 @@ public class UpdateMyContactDetailsValidatorTests
             City = "Manchester",
             County = "Greater Manchester",
             PostCode = "M1 1AA",
-            Country = "United Kingdom"
+            Country = "United Kingdom",
+            ExpectedVersion = 1
         });
         Assert.True(result.IsValid);
     }

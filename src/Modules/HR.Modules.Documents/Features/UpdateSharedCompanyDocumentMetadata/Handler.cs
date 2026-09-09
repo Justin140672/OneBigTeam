@@ -95,7 +95,14 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
             updatedBy,
             now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            document,
+            request.ExpectedVersion,
+            "This document was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateSharedCompanyDocumentMetadataResponse>(saveResult.Error);
 
         if (hasChanges)
         {
@@ -135,6 +142,7 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
             document.CustomReviewFrequencyMonths,
             document.ReviewOwnerEmployeeId,
             document.UpdatedBy,
-            document.UpdatedAt));
+            document.UpdatedAt,
+            document.Version));
     }
 }

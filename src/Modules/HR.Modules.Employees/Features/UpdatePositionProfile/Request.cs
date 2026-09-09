@@ -23,4 +23,7 @@ internal sealed record UpdatePositionProfileRequest
     public SalaryType? SalaryType { get; init; }
     public Guid DefaultLeavePolicyId { get; init; }
     public Guid? OnboardingTemplateId { get; init; }
+
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
 }

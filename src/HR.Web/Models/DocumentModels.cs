@@ -56,7 +56,9 @@ public record DocumentTypeListItemModel(
     string Name,
     string? Description,
     bool IsActive,
-    bool AllowEmployeeUpload);
+    bool AllowEmployeeUpload,
+    // Ticket 2: optimistic-concurrency token carried on the list item (no dedicated GetById endpoint).
+    int Version = 0);
 
 public record CreateDocumentTypeRequest(Guid CompanyId, string Name, string? Description, bool AllowEmployeeUpload);
 
@@ -69,7 +71,14 @@ public record CreateDocumentTypeResponse(
     bool AllowEmployeeUpload,
     DateTimeOffset CreatedAt);
 
-public record UpdateDocumentTypeRequest(Guid CompanyId, Guid DocumentTypeId, string Name, string? Description, bool AllowEmployeeUpload);
+public record UpdateDocumentTypeRequest(
+    Guid CompanyId,
+    Guid DocumentTypeId,
+    string Name,
+    string? Description,
+    bool AllowEmployeeUpload,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdateDocumentTypeResponse(
     Guid Id,
@@ -78,10 +87,13 @@ public record UpdateDocumentTypeResponse(
     string? Description,
     bool IsActive,
     bool AllowEmployeeUpload,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
-public sealed class DocumentTypeEditModel
+public sealed class DocumentTypeEditModel : HR.Web.Services.IHasVersion
 {
+    public int Version { get; set; }
+
     [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
@@ -147,7 +159,10 @@ public sealed record SharedCompanyDocumentDueForReviewItem(
 
 public sealed record CompanyDocumentCategoryListResponse(IReadOnlyList<CompanyDocumentCategoryItem> Items);
 
-public sealed record CompanyDocumentCategoryItem(Guid Id, string Name, bool IsActive);
+// Ticket 2: Version carried for contract parity. Document categories have no HR.Web edit screen
+// today (managed elsewhere), so there is no matching update request/response DTO to add
+// ExpectedVersion to — see the note in the Ticket 2 UI rollout summary.
+public sealed record CompanyDocumentCategoryItem(Guid Id, string Name, bool IsActive, int Version = 0);
 
 public sealed record SharedCompanyDocumentListResponse(
     IReadOnlyList<SharedCompanyDocumentListItem> Items,
@@ -236,7 +251,9 @@ public sealed record SharedCompanyDocumentDetailResponse(
     Guid? LastReviewedByEmployeeId,
     string? LastReviewedByName,
     string? LastReviewNotes,
-    IReadOnlyList<SharedCompanyDocumentReviewHistoryModel> ReviewHistory);
+    IReadOnlyList<SharedCompanyDocumentReviewHistoryModel> ReviewHistory,
+    // Ticket 2: optimistic-concurrency token — last field of the detail response.
+    int Version = 0);
 
 public sealed record AcknowledgementProgressModel(
     int AcknowledgedCount,
@@ -316,7 +333,9 @@ public sealed record UpdateSharedCompanyDocumentMetadataRequest(
     DateOnly? ReviewDate,
     string ReviewFrequency,
     int? CustomReviewFrequencyMonths,
-    Guid? ReviewOwnerEmployeeId);
+    Guid? ReviewOwnerEmployeeId,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public sealed record UpdateSharedCompanyDocumentMetadataResponseModel(
     Guid Id,
@@ -332,7 +351,8 @@ public sealed record UpdateSharedCompanyDocumentMetadataResponseModel(
     int? CustomReviewFrequencyMonths,
     Guid? ReviewOwnerEmployeeId,
     Guid UpdatedBy,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
 public sealed record UpdateSharedCompanyDocumentAudienceRequest(
     Guid CompanyId,
@@ -340,7 +360,9 @@ public sealed record UpdateSharedCompanyDocumentAudienceRequest(
     IReadOnlyList<Guid> AudienceDepartmentIds,
     IReadOnlyList<Guid> AudienceLocationIds,
     IReadOnlyList<Guid> AudiencePositionProfileIds,
-    IReadOnlyList<Guid> AudienceEmployeeIds);
+    IReadOnlyList<Guid> AudienceEmployeeIds,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public sealed record UpdateSharedCompanyDocumentAudienceResponseModel(
     Guid Id,
@@ -349,7 +371,8 @@ public sealed record UpdateSharedCompanyDocumentAudienceResponseModel(
     IReadOnlyList<Guid> AudienceLocationIds,
     IReadOnlyList<Guid> AudiencePositionProfileIds,
     IReadOnlyList<Guid> AudienceEmployeeIds,
-    string AudienceDescription);
+    string AudienceDescription,
+    int Version = 0);
 
 public sealed record PublishSharedCompanyDocumentResponseModel(
     Guid Id,
@@ -365,7 +388,9 @@ public sealed record UpdateSharedCompanyDocumentAcknowledgementSettingsRequest(
     Guid DocumentId,
     bool RequiresAcknowledgement,
     DateOnly? AcknowledgementDueDate,
-    string? AcknowledgementStatement);
+    string? AcknowledgementStatement,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public sealed record ArchiveSharedCompanyDocumentRequest(
     Guid CompanyId,
@@ -399,7 +424,8 @@ public sealed record UpdateSharedCompanyDocumentAcknowledgementSettingsResponseM
     bool RequiresAcknowledgement,
     DateOnly? AcknowledgementDueDate,
     string? AcknowledgementStatement,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
 public enum DocumentExpiryStatus
 {

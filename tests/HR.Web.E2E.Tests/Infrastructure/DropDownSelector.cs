@@ -128,13 +128,41 @@ public static class DropDownSelector
         }
         var popup = popupId is not null ? page.Locator($"#{popupId}") : openPopup;
 
-        await popup.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        // The open loop above confirmed the popup became visible at least once, but Syncfusion can
+        // toggle it straight back shut — a same-frame open/close when the combobox re-renders while
+        // the interop is still settling (headless timing). aria-owns is then never set (popupId
+        // stays null) and the unscoped wait below just burns its budget on a popup that is closed,
+        // surfacing as "waiting for Locator(\".e-popup.e-ddl:visible\") to be visible". If the popup
+        // isn't visible here, re-open it (Escape to a known-closed state first) and re-read
+        // aria-owns — up to a few times — before falling through to the item wait.
+        for (var reopen = 1; reopen <= 3; reopen++)
+        {
+            if (await popup.First.IsVisibleAsync()) break;
+
+            await page.Keyboard.PressAsync("Escape");
+            await page.WaitForTimeoutAsync(300);
+            await combobox.ClickAsync(new() { Timeout = finalOpenTimeout });
+            try
+            {
+                await openPopup.First.WaitForAsync(new()
+                {
+                    State = WaitForSelectorState.Visible,
+                    Timeout = finalOpenTimeout,
+                });
+            }
+            catch (PlaywrightException) when (reopen < 3) { continue; }
+
+            popupId ??= await combobox.GetAttributeAsync("aria-owns");
+            popup = popupId is not null ? page.Locator($"#{popupId}") : openPopup;
+        }
+
+        await popup.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = finalOpenTimeout });
 
         // The popup container can become visible a tick before its item list is actually populated
         // (a separate JS render pass) — wait for at least one genuinely-selectable (non-hidden)
         // item to exist before filtering/clicking, not just any ".e-list-item" node (Syncfusion can
         // render placeholder/hidden items into the DOM before the real list settles).
-        await popup.Locator(".e-list-item:not(.e-hide)").First.WaitForAsync(new() { Timeout = 10_000 });
+        await popup.Locator(".e-list-item:not(.e-hide)").First.WaitForAsync(new() { Timeout = finalOpenTimeout });
 
         // Standard (non-server-filtered) comboboxes render their full item list into the popup up
         // front, so the matching item is normally already there. Server-loading comboboxes (the

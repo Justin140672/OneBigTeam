@@ -45,7 +45,15 @@ internal sealed class UpdateAssetHandler(AssetsDbContext db, IClock clock)
             request.PurchasePrice,
             now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency (base-code helper).
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            asset,
+            request.ExpectedVersion,
+            "This asset was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateAssetResponse>(saveResult.Error);
 
         return Result.Success(new UpdateAssetResponse(
             asset.Id,
@@ -60,6 +68,7 @@ internal sealed class UpdateAssetHandler(AssetsDbContext db, IClock clock)
             asset.PurchasePrice,
             asset.Status.ToString(),
             asset.CreatedAt,
-            asset.UpdatedAt));
+            asset.UpdatedAt,
+            asset.Version));
     }
 }

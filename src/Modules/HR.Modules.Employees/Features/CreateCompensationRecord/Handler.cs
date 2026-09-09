@@ -68,6 +68,7 @@ internal sealed class CreateCompensationRecordHandler(
             record.Reason.ToString(),
             record.CreatedBy,
             record.CreatedAt,
-            record.UpdatedAt));
+            record.UpdatedAt,
+            record.Version));
     }
 }

@@ -54,7 +54,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{Guid.NewGuid()}/vacancies/{Guid.NewGuid()}",
-            new { advertTitle = "Updated Title", hiringManagerId = Guid.NewGuid() });
+            new { advertTitle = "Updated Title", hiringManagerId = Guid.NewGuid(), expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -67,7 +67,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{Guid.NewGuid()}",
-            new { companyId, advertTitle = "Updated Title", hiringManagerId = Guid.NewGuid() });
+            new { companyId, advertTitle = "Updated Title", hiringManagerId = Guid.NewGuid(), expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -83,7 +83,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, advertTitle = "Updated Title", hiringManagerId });
+            new { companyId, vacancyId, advertTitle = "Updated Title", hiringManagerId, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<VacancyPayload>();
@@ -112,7 +112,7 @@ public class UpdateVacancyEndpointTests
 
         var updateResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, advertTitle = "Backend Engineer", advertDescription = "Own the platform", hiringManagerId });
+            new { companyId, vacancyId, advertTitle = "Backend Engineer", advertDescription = "Own the platform", hiringManagerId, expectedVersion = 1 });
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
         var getResponse = await client.GetAsync($"/api/companies/{companyId}/vacancies/{vacancyId}");
@@ -135,7 +135,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, advertTitle = (string?)null, hiringManagerId });
+            new { companyId, vacancyId, advertTitle = (string?)null, hiringManagerId, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<VacancyPayload>();
@@ -173,7 +173,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, assignedRecruiterId = recruiterId });
+            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, assignedRecruiterId = recruiterId, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<VacancyPayload>();
@@ -198,7 +198,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, assignedRecruiterId = recruiterId });
+            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, assignedRecruiterId = recruiterId, expectedVersion = 1 });
 
         // Note: this is a handler-level Result.Failure(Error.Validation(...)), not a FastEndpoints
         // validator failure, so it maps to 400 (BadRequest) — same as other handler-level validation
@@ -219,7 +219,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, assignedRecruiterId = recruiterId });
+            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, assignedRecruiterId = recruiterId, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -236,12 +236,12 @@ public class UpdateVacancyEndpointTests
 
         var assignResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, assignedRecruiterId = recruiterId });
+            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, assignedRecruiterId = recruiterId, expectedVersion = 1 });
         Assert.Equal(HttpStatusCode.OK, assignResponse.StatusCode);
 
         var clearResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, assignedRecruiterId = (Guid?)null });
+            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, assignedRecruiterId = (Guid?)null, expectedVersion = 2 });
 
         Assert.Equal(HttpStatusCode.OK, clearResponse.StatusCode);
         var payload = await clearResponse.Content.ReadFromJsonAsync<VacancyPayload>();
@@ -287,7 +287,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, positionProfileId = newPositionProfileId, advertTitle = "Backend Engineer", hiringManagerId });
+            new { companyId, vacancyId, positionProfileId = newPositionProfileId, advertTitle = "Backend Engineer", hiringManagerId, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<VacancyPayload>();
@@ -315,7 +315,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, positionProfileId = newPositionProfileId, advertTitle = "Backend Engineer", hiringManagerId });
+            new { companyId, vacancyId, positionProfileId = newPositionProfileId, advertTitle = "Backend Engineer", hiringManagerId, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -333,7 +333,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, positionProfileId = newPositionProfileId, advertTitle = "Backend Engineer", hiringManagerId });
+            new { companyId, vacancyId, positionProfileId = newPositionProfileId, advertTitle = "Backend Engineer", hiringManagerId, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -349,7 +349,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, positionProfileId = Guid.NewGuid(), advertTitle = "Backend Engineer", hiringManagerId });
+            new { companyId, vacancyId, positionProfileId = Guid.NewGuid(), advertTitle = "Backend Engineer", hiringManagerId, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -367,7 +367,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, positionProfileId = otherCompanyPositionProfileId, advertTitle = "Backend Engineer", hiringManagerId });
+            new { companyId, vacancyId, positionProfileId = otherCompanyPositionProfileId, advertTitle = "Backend Engineer", hiringManagerId, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -383,7 +383,7 @@ public class UpdateVacancyEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, advertTitle = "Updated Title Only", hiringManagerId });
+            new { companyId, vacancyId, advertTitle = "Updated Title Only", hiringManagerId, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<VacancyPayload>();
@@ -419,6 +419,7 @@ public class UpdateVacancyEndpointTests
                 positionProfileId = newPositionProfileId,
                 advertTitle = "Backend Engineer",
                 hiringManagerId,
+                expectedVersion = 2,
                 isAuthorisedCorrection = true,
                 correctionReason = "Vacancy was created against the wrong position profile.",
             });
@@ -456,6 +457,7 @@ public class UpdateVacancyEndpointTests
                 positionProfileId = newPositionProfileId,
                 advertTitle = "Backend Engineer",
                 hiringManagerId,
+                expectedVersion = 1,
                 isAuthorisedCorrection = true,
             });
 
@@ -489,6 +491,7 @@ public class UpdateVacancyEndpointTests
                 positionProfileId = newPositionProfileId,
                 advertTitle = "Backend Engineer",
                 hiringManagerId,
+                expectedVersion = 2,
                 isAuthorisedCorrection = true,
                 correctionReason = "Vacancy was created against the wrong position profile.",
             });
@@ -522,14 +525,14 @@ public class UpdateVacancyEndpointTests
 
         var onResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, isAdvertisedInternally = true });
+            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, isAdvertisedInternally = true, expectedVersion = 1 });
         Assert.Equal(HttpStatusCode.OK, onResponse.StatusCode);
         using (var onDoc = System.Text.Json.JsonDocument.Parse(await onResponse.Content.ReadAsStringAsync()))
             Assert.True(onDoc.RootElement.GetProperty("isAdvertisedInternally").GetBoolean());
 
         var offResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}",
-            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, isAdvertisedInternally = false });
+            new { companyId, vacancyId, advertTitle = "Backend Engineer", hiringManagerId, isAdvertisedInternally = false, expectedVersion = 2 });
         Assert.Equal(HttpStatusCode.OK, offResponse.StatusCode);
         using (var offDoc = System.Text.Json.JsonDocument.Parse(await offResponse.Content.ReadAsStringAsync()))
             Assert.False(offDoc.RootElement.GetProperty("isAdvertisedInternally").GetBoolean());

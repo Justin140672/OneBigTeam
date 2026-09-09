@@ -34,6 +34,7 @@ internal sealed class GetCandidateHandler(RecruitmentDbContext db)
             candidate.DeactivatedByUserId,
             candidate.DeactivationReason,
             candidate.CreatedAt,
-            candidate.UpdatedAt));
+            candidate.UpdatedAt,
+            candidate.Version));
     }
 }

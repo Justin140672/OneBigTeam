@@ -166,7 +166,7 @@ public class CompanyDocumentCategoryEndpointTests
     {
         using var client = _factory.CreateClient();
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{Guid.NewGuid()}/document-categories/{Guid.NewGuid()}", new { name = "Renamed" });
+            $"/api/companies/{Guid.NewGuid()}/document-categories/{Guid.NewGuid()}", new { name = "Renamed", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -185,7 +185,7 @@ public class CompanyDocumentCategoryEndpointTests
 
         using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.PutAsJsonAsync(
-            $"/api/companies/{companyId}/document-categories/{categoryId}", new { name = "Renamed" });
+            $"/api/companies/{companyId}/document-categories/{categoryId}", new { name = "Renamed", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -200,7 +200,7 @@ public class CompanyDocumentCategoryEndpointTests
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
 
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/document-categories/{categoryId}", new { name = "Company Policies" });
+            $"/api/companies/{companyId}/document-categories/{categoryId}", new { name = "Company Policies", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<CategoryPayload>();
@@ -216,7 +216,7 @@ public class CompanyDocumentCategoryEndpointTests
         using var client = await ClientAs(companyId, userId);
 
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/document-categories/{Guid.NewGuid()}", new { name = "Renamed" });
+            $"/api/companies/{companyId}/document-categories/{Guid.NewGuid()}", new { name = "Renamed", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -236,7 +236,7 @@ public class CompanyDocumentCategoryEndpointTests
 
         using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.PutAsJsonAsync(
-            $"/api/companies/{companyB}/document-categories/{categoryInA}", new { name = "Renamed" });
+            $"/api/companies/{companyB}/document-categories/{categoryInA}", new { name = "Renamed", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -252,7 +252,7 @@ public class CompanyDocumentCategoryEndpointTests
         var second = await CreateCategoryAsync(client, companyId, "Policy");
 
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/document-categories/{second}", new { name = "Handbook" });
+            $"/api/companies/{companyId}/document-categories/{second}", new { name = "Handbook", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -270,7 +270,7 @@ public class CompanyDocumentCategoryEndpointTests
         Assert.Equal(HttpStatusCode.NoContent, deactivate.StatusCode);
 
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/document-categories/{categoryId}", new { name = "Renamed" });
+            $"/api/companies/{companyId}/document-categories/{categoryId}", new { name = "Renamed", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }

@@ -20,18 +20,7 @@ internal sealed class Endpoint(UpdateLeaveTypeHandler handler, ICurrentUser curr
             cancellationToken);
         if (result.IsFailure)
         {
-            var body = new { error = result.Error.Message };
-            if (result.Error.Code == "not_found")
-            {
-                await Send.ResultAsync(TypedResults.NotFound(body));
-                return;
-            }
-            if (result.Error.Code == "conflict")
-            {
-                await Send.ResultAsync(TypedResults.Conflict(body));
-                return;
-            }
-            await Send.ResultAsync(TypedResults.BadRequest(body));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
         await Send.ResultAsync(TypedResults.Ok(result.Value!));

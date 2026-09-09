@@ -156,7 +156,7 @@ public class LeavePolicyCrudEndpointTests
         var unknownId     = Guid.NewGuid();
         var response      = await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/leave-policies/{unknownId}",
-            new { companyId = SeededCompanyId, policyId = unknownId, name = "Ghost", carryOverDays = 0, allowNegativeBalance = false });
+            new { companyId = SeededCompanyId, policyId = unknownId, name = "Ghost", carryOverDays = 0, allowNegativeBalance = false, expectedVersion = 1 });
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -181,7 +181,8 @@ public class LeavePolicyCrudEndpointTests
                 name               = updatedName,
                 description        = "Updated description",
                 carryOverDays      = 10,
-                allowNegativeBalance = true
+                allowNegativeBalance = true,
+                expectedVersion    = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, updateResp.StatusCode);
@@ -211,7 +212,7 @@ public class LeavePolicyCrudEndpointTests
         // Try to rename it to the existing name
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/leave-policies/{second!.Id}",
-            new { companyId = SeededCompanyId, policyId = second.Id, name = existingName, carryOverDays = 0, allowNegativeBalance = false });
+            new { companyId = SeededCompanyId, policyId = second.Id, name = existingName, carryOverDays = 0, allowNegativeBalance = false, expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -281,7 +282,8 @@ public class LeavePolicyCrudEndpointTests
                 name          = created.Name,
                 carryOverDays = 0,
                 allowNegativeBalance = false,
-                isDefault     = false
+                isDefault     = false,
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.BadRequest, updateResp.StatusCode);

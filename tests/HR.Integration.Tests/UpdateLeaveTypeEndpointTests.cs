@@ -54,7 +54,8 @@ public class UpdateLeaveTypeEndpointTests
                 code = "ANNUAL",
                 defaultEntitlementDays = 28,
                 accrualMethod = "Monthly",
-                behaviour = "Standard"
+                behaviour = "Standard",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -78,7 +79,8 @@ public class UpdateLeaveTypeEndpointTests
                 code = "ANNUAL",
                 defaultEntitlementDays = 25,
                 accrualMethod = "Monthly",
-                behaviour = "Standard"
+                behaviour = "Standard",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -114,7 +116,8 @@ public class UpdateLeaveTypeEndpointTests
                 code = "ANNUAL",
                 defaultEntitlementDays = 10,
                 accrualMethod = "None",
-                behaviour = "Sickness"
+                behaviour = "Sickness",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);

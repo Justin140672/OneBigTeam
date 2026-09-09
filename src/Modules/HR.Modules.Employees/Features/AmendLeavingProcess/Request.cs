@@ -8,4 +8,6 @@ internal sealed record AmendLeavingProcessRequest(
     DateOnly LeavingDate,
     DateOnly LastWorkingDay,
     LeavingReason LeavingReason,
-    bool ConfirmBackdatedLeavingDate = false);
+    bool ConfirmBackdatedLeavingDate = false,
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    int? ExpectedVersion = null);

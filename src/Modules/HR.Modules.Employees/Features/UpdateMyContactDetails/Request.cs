@@ -12,4 +12,7 @@ internal sealed record UpdateMyContactDetailsRequest
     public string? County { get; init; }
     public string? PostCode { get; init; }
     public string? Country { get; init; }
+
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
 }

@@ -15,4 +15,5 @@ internal sealed record UpdateVacancyResponse(
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

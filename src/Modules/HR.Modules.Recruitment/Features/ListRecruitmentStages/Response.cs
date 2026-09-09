@@ -11,4 +11,5 @@ internal sealed record RecruitmentStageListItem(
     bool IsActive,
     bool IsTerminal,
     RecruitmentStageTerminalOutcome TerminalOutcome,
-    RecruitmentStagePurpose? Purpose);
+    RecruitmentStagePurpose? Purpose,
+    int Version);

@@ -139,7 +139,7 @@ public class PublicHolidayEndpointTests
 
         var updateResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/public-holidays/{created!.Id}",
-            new { companyId, id = created.Id, date = "2026-12-26", name = "Boxing Day", countryCode = "GB" });
+            new { companyId, id = created.Id, date = "2026-12-26", name = "Boxing Day", countryCode = "GB", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
         var updated = await updateResponse.Content.ReadFromJsonAsync<PublicHolidayPayload>();
@@ -154,7 +154,7 @@ public class PublicHolidayEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/public-holidays/{Guid.NewGuid()}",
-            new { companyId, id = Guid.NewGuid(), date = "2026-12-25", name = "Christmas Day", countryCode = "GB" });
+            new { companyId, id = Guid.NewGuid(), date = "2026-12-25", name = "Christmas Day", countryCode = "GB", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -178,7 +178,7 @@ public class PublicHolidayEndpointTests
 
         var updateResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/public-holidays/{h1!.Id}",
-            new { companyId, id = h1.Id, date = "2026-12-26", name = "Christmas Day", countryCode = "GB" });
+            new { companyId, id = h1.Id, date = "2026-12-26", name = "Christmas Day", countryCode = "GB", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Conflict, updateResponse.StatusCode);
     }

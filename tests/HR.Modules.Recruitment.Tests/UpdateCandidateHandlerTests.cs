@@ -33,6 +33,7 @@ public class UpdateCandidateHandlerTests
                 Email       = "emma.clarke-smith@example.com",
                 Phone       = "+44 7700 900001",
                 ResumeUrl   = "https://example.com/resume.pdf",
+                ExpectedVersion = 1,
             },
             CancellationToken.None);
 
@@ -117,6 +118,7 @@ public class UpdateCandidateHandlerTests
                 LastName    = "Clarke",
                 Email       = "emma.clarke@example.com",
                 Phone       = "+44 7700 900001",
+                ExpectedVersion = 1,
             },
             CancellationToken.None);
 

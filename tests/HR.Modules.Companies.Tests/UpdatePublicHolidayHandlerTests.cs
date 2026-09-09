@@ -32,7 +32,8 @@ public class UpdatePublicHolidayHandlerTests
                 Id = holiday.Id,
                 Date = new DateOnly(2026, 12, 26),
                 Name = "Boxing Day",
-                CountryCode = "gb"
+                CountryCode = "gb",
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 
@@ -137,7 +138,8 @@ public class UpdatePublicHolidayHandlerTests
                 Id = holiday.Id,
                 Date = new DateOnly(2026, 12, 25),
                 Name = "Christmas Day (Updated)",
-                CountryCode = "GB"
+                CountryCode = "GB",
+                ExpectedVersion = 1
             },
             CancellationToken.None);
 

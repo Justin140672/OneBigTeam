@@ -141,7 +141,16 @@ internal sealed class UpdateEmployeeProfileHandler
         if (employee.IsInitialCompanyAdmin && employee.Status == HR.Modules.Employees.Domain.EmploymentStatus.Draft)
             employee.Activate(now);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency. Nothing is committed on conflict, so no audit /
+        // integration events are published for a rejected save.
+        var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
+            employee,
+            request.ExpectedVersion,
+            "This employee's details were changed by someone else since you opened them. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateEmployeeProfileResponse>(saveResult.Error);
 
         var after = new EmployeeProfileSnapshot(
             employee.FirstName,
@@ -218,6 +227,7 @@ internal sealed class UpdateEmployeeProfileHandler
             employee.StartDate,
             employee.Status,
             employee.HasSystemAccess,
-            employee.UpdatedAt));
+            employee.UpdatedAt,
+            employee.Version));
     }
 }

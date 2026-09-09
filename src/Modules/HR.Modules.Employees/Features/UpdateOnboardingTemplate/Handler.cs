@@ -61,7 +61,15 @@ internal sealed class UpdateOnboardingTemplateHandler(EmployeesDbContext dbConte
 
         template.ReplaceTasks(desiredTasks, now);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict.
+        var saveResult = await dbContext.SaveChangesWithConcurrencyAsync(
+            template,
+            request.ExpectedVersion,
+            "This onboarding template was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateOnboardingTemplateResponse>(saveResult.Error);
 
         var tasks = template.Tasks
             .Where(t => t.IsActive)
@@ -83,6 +91,7 @@ internal sealed class UpdateOnboardingTemplateHandler(EmployeesDbContext dbConte
             template.Description,
             template.IsActive,
             template.UpdatedAt,
+            template.Version,
             tasks));
     }
 }

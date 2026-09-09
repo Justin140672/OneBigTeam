@@ -7,4 +7,7 @@ internal sealed record UpdateDocumentTypeRequest
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
     public bool AllowEmployeeUpload { get; init; }
+
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
 }

@@ -2,7 +2,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class DepartmentService(IHttpClientFactory httpClientFactory) : IEditService<DepartmentEditModel, Guid>
+public class DepartmentService(IHttpClientFactory httpClientFactory)
+    : IEditService<DepartmentEditModel, Guid>, IConcurrencyAwareEditService<DepartmentEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -44,7 +45,41 @@ public class DepartmentService(IHttpClientFactory httpClientFactory) : IEditServ
             Description = response.Description,
             ParentDepartmentId = response.ParentDepartmentId,
             ManagerEmployeeId = response.ManagerEmployeeId,
+            Version = response.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces the stale-save 409.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, DepartmentEditModel model, int? expectedVersion)
+    {
+        var request = new UpdateDepartmentRequest(
+            companyId,
+            id,
+            model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            model.ParentDepartmentId,
+            model.ManagerEmployeeId,
+            expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/departments/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateDepartmentResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                body?.Error ?? "A department with that name already exists.", body?.Code == "concurrency");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return ApiSaveResult.Fail("Department not found.");
+
+        return ApiSaveResult.Fail(body?.Error ?? "Failed to update department.");
     }
 
     async Task<(DepartmentEditModel? Result, string? Error)> IEditService<DepartmentEditModel, Guid>.CreateAsync(
@@ -69,7 +104,8 @@ public class DepartmentService(IHttpClientFactory httpClientFactory) : IEditServ
             model.Name.Trim(),
             string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
             model.ParentDepartmentId,
-            model.ManagerEmployeeId);
+            model.ManagerEmployeeId,
+            model.Version);
 
         var (updated, error) = await UpdateDepartmentAsync(companyId, id, request);
         return (updated is null ? null : model, error);
@@ -132,5 +168,5 @@ public class DepartmentService(IHttpClientFactory httpClientFactory) : IEditServ
         return body?.Error ?? "Failed to deactivate department.";
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

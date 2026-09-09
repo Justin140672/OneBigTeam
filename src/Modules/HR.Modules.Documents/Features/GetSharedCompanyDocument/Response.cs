@@ -44,7 +44,8 @@ internal sealed record GetSharedCompanyDocumentResponse(
     Guid? LastReviewedByEmployeeId,
     string? LastReviewedByName,
     string? LastReviewNotes,
-    IReadOnlyList<SharedCompanyDocumentReviewHistoryItem> ReviewHistory);
+    IReadOnlyList<SharedCompanyDocumentReviewHistoryItem> ReviewHistory,
+    int Version);
 
 internal sealed record AcknowledgementProgressInfo(
     int AcknowledgedCount,

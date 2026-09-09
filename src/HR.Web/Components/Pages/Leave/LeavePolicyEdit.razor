@@ -24,7 +24,10 @@
         <h1 class="mb-1">@PageTitle</h1>
         <p class="text-muted mb-4">Set the entitlement, carry-over, and balance rules this policy applies.</p>
 
-        @if (!string.IsNullOrEmpty(GlobalError))
+        <SaveConflictBanner Visible="SaveConflict" Disabled="@Saving" OnReload="ReloadLatestValuesAsync"
+                            Message="Someone else changed this leave policy while you were editing. Your changes have not been saved." />
+
+        @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
         {
             <div class="alert alert-danger">@GlobalError</div>
         }

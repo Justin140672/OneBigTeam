@@ -16,7 +16,8 @@ public class UpdateLeavePolicyValidatorTests
             Name = "Updated Policy",
             Description = "An updated leave policy",
             CarryOverDays = 5,
-            AllowNegativeBalance = false
+            AllowNegativeBalance = false,
+            ExpectedVersion = 1
         });
 
         Assert.True(result.IsValid);
@@ -98,7 +99,8 @@ public class UpdateLeavePolicyValidatorTests
             CompanyId = Guid.NewGuid(),
             PolicyId = Guid.NewGuid(),
             Name = "Policy",
-            CarryOverDays = 0
+            CarryOverDays = 0,
+            ExpectedVersion = 1
         });
 
         Assert.True(result.IsValid);
@@ -114,7 +116,8 @@ public class UpdateLeavePolicyValidatorTests
             CompanyId = Guid.NewGuid(),
             PolicyId = Guid.NewGuid(),
             Name = "Policy",
-            CarryOverDays = 365
+            CarryOverDays = 365,
+            ExpectedVersion = 1
         });
 
         Assert.True(result.IsValid);
@@ -129,7 +132,8 @@ public class UpdateLeavePolicyValidatorTests
         {
             CompanyId = Guid.NewGuid(),
             PolicyId = Guid.NewGuid(),
-            Name = new string('A', 200)
+            Name = new string('A', 200),
+            ExpectedVersion = 1
         });
 
         Assert.True(result.IsValid);

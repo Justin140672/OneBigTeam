@@ -30,6 +30,7 @@ public class UpdateOnboardingTemplateHandlerTests
             {
                 CompanyId = companyId,
                 Id = template.Id,
+                ExpectedVersion = 1,
                 Name = "New Name",
                 Description = "New description",
                 Tasks = [],
@@ -59,6 +60,7 @@ public class UpdateOnboardingTemplateHandlerTests
             {
                 CompanyId = companyId,
                 Id = template.Id,
+                ExpectedVersion = 1,
                 Name = "Template",
                 Tasks =
                 [
@@ -96,6 +98,7 @@ public class UpdateOnboardingTemplateHandlerTests
             {
                 CompanyId = companyId,
                 Id = template.Id,
+                ExpectedVersion = 1,
                 Name = "Template",
                 Tasks =
                 [
@@ -135,6 +138,7 @@ public class UpdateOnboardingTemplateHandlerTests
             {
                 CompanyId = companyId,
                 Id = template.Id,
+                ExpectedVersion = 1,
                 Name = "Template",
                 Tasks =
                 [

@@ -45,13 +45,21 @@ internal sealed class UpdateCompanyDocumentCategoryHandler(DocumentsDbContext db
 
         category.Rename(newName, now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            category,
+            request.ExpectedVersion,
+            "This document category was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateCompanyDocumentCategoryResponse>(saveResult.Error);
 
         return Result.Success(new UpdateCompanyDocumentCategoryResponse(
             category.Id,
             category.CompanyId,
             category.Name,
             category.IsActive,
-            category.UpdatedAt));
+            category.UpdatedAt,
+            category.Version));
     }
 }

@@ -11,8 +11,18 @@ public class UpdateEmployeeProfileValidatorTests
         FirstName = "Alice",
         LastName = "Smith",
         WorkEmail = "alice@example.com",
-        StartDate = new DateOnly(2026, 7, 1)
+        StartDate = new DateOnly(2026, 7, 1),
+        ExpectedVersion = 1
     };
+
+    [Fact]
+    public void Validate_Fails_When_ExpectedVersion_Is_Null()
+    {
+        var v = new UpdateEmployeeProfileValidator();
+        var result = v.Validate(ValidRequest() with { ExpectedVersion = null });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmployeeProfileRequest.ExpectedVersion));
+    }
 
     [Fact]
     public void Validate_Fails_When_CompanyId_Is_Empty()

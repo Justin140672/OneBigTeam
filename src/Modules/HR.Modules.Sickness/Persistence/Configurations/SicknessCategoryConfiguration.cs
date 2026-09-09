@@ -33,6 +33,12 @@ internal sealed class SicknessCategoryConfiguration : IEntityTypeConfiguration<S
             .HasColumnName("display_order")
             .IsRequired();
 
+        builder.Property(c => c.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

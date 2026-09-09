@@ -15,4 +15,5 @@ internal sealed record AmendLeavingProcessResponse(
     string NoticeSource,
     string LeavingReason,
     string Status,
-    bool OffboardingAlreadyStarted);
+    bool OffboardingAlreadyStarted,
+    int Version);

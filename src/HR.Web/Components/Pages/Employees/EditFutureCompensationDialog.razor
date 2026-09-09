@@ -7,7 +7,12 @@
     <DialogTemplates>
         <Header>Edit Future Compensation</Header>
         <Content>
-            @if (!string.IsNullOrEmpty(GlobalError))
+            <SaveConflictBanner Visible="SaveConflict"
+                                Disabled="@Saving"
+                                OnReload="ReloadLatestClickedAsync"
+                                Message="Someone else changed this compensation record while you were editing. Your changes have not been saved." />
+
+            @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
             {
                 <div class="alert alert-danger alert-dismissible mb-3">
                     @GlobalError
@@ -85,12 +90,18 @@
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
     [Parameter] public HR.Web.Models.CompensationHistoryItemModel? Record { get; set; }
 
+    // Ticket 2 (optimistic concurrency): the Version the edited record was loaded at, sent as
+    // ExpectedVersion on save. Refreshed by ReloadLatestClickedAsync after a conflict.
+    private int? _loadedVersion;
+
     protected override Task OnOpenedAsync()
     {
         GlobalError = null;
+        SaveConflict = false;
 
         if (Record is not null)
         {
+            _loadedVersion = Record.Version;
             Model.SalaryType = Record.SalaryType;
             Model.Salary = Record.Salary;
             Model.Currency = Record.Currency;
@@ -101,6 +112,26 @@
         }
 
         return Task.CompletedTask;
+    }
+
+    // Conflict recovery: re-fetch the record's latest server state, adopt its values and version,
+    // and clear the banner. Mirrors EmployeeEmploymentTab.ReloadLatestValuesAsync(rebaseline: true).
+    private async Task ReloadLatestClickedAsync()
+    {
+        if (Record is null)
+            return;
+
+        var history = await CompensationService.GetCompensationHistoryAsync(CompanyId, EmployeeId);
+        var latest = history.FirstOrDefault(h => h.Id == Record.Id);
+        if (latest is not null)
+        {
+            Record = latest;
+            await OnOpenedAsync();
+        }
+
+        SaveConflict = false;
+        GlobalError = null;
+        StateHasChanged();
     }
 
     protected override async Task<string?> SaveCoreAsync()
@@ -118,12 +149,21 @@
             Model.HoursPerWeek,
             Model.FTE,
             string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
-            Model.Reason);
+            Model.Reason,
+            ExpectedVersion: _loadedVersion);
 
-        var (updated, error) = await CompensationService.UpdateFutureCompensationRecordAsync(
+        var result = await CompensationService.UpdateFutureCompensationRecordAsync(
             CompanyId, EmployeeId, Record.Id, request);
 
-        return updated is not null ? null : error ?? "Failed to update compensation record.";
+        SaveConflict = result.IsConcurrencyConflict;
+
+        if (result.Result is not null)
+        {
+            _loadedVersion = result.Result.Version;
+            return null;
+        }
+
+        return result.Error ?? "Failed to update compensation record.";
     }
 
     protected override void ResetForm()

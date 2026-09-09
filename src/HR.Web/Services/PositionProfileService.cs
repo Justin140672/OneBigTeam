@@ -232,6 +232,33 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
         return (false, "Failed to save position profile.");
     }
 
+    // Ticket 2: concurrency-aware update. The caller builds the request (including ExpectedVersion);
+    // this surfaces the stale-save 409 ({ code: "concurrency" }) and the new version for the page's
+    // <SaveConflictBanner> / LoadedVersion plumbing. Kept separate from UpdatePositionProfileAsync
+    // so that method's existing (bool, string?) contract is undisturbed.
+    public async Task<ApiSaveResult> UpdatePositionProfileWithConcurrencyAsync(
+        Guid companyId, Guid id, UpdatePositionProfileRequest request)
+    {
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/position-profiles/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdatePositionProfileResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(body?.Error ?? "A conflict occurred.", body?.Code == "concurrency");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return ApiSaveResult.Fail("Position profile not found.");
+
+        return ApiSaveResult.Fail(body?.Error ?? "Failed to save position profile.");
+    }
+
     public async Task<string?> DeactivatePositionProfileAsync(Guid companyId, Guid id)
     {
         var response = await Http.DeleteAsync($"api/companies/{companyId}/position-profiles/{id}");
@@ -287,5 +314,5 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
         }
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

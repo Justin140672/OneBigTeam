@@ -11,7 +11,8 @@ public record OnboardingTemplateListItemModel(
     string Name,
     string? Description,
     bool IsActive,
-    int TaskCount);
+    int TaskCount,
+    int Version = 0);
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
@@ -23,7 +24,8 @@ public record GetOnboardingTemplateResponse(
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyList<OnboardingTemplateTaskModel> Tasks);
+    IReadOnlyList<OnboardingTemplateTaskModel> Tasks,
+    int Version = 0);
 
 public record OnboardingTemplateTaskModel(
     Guid Id,
@@ -53,7 +55,9 @@ public record UpdateOnboardingTemplateRequest(
     Guid Id,
     string Name,
     string? Description,
-    IReadOnlyList<UpdateOnboardingTemplateTaskItem> Tasks);
+    IReadOnlyList<UpdateOnboardingTemplateTaskItem> Tasks,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdateOnboardingTemplateTaskItem(
     Guid? Id,
@@ -71,12 +75,16 @@ public record UpdateOnboardingTemplateResponse(
     string? Description,
     bool IsActive,
     DateTimeOffset UpdatedAt,
-    IReadOnlyList<OnboardingTemplateTaskModel> Tasks);
+    IReadOnlyList<OnboardingTemplateTaskModel> Tasks,
+    int Version = 0);
 
 // ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
 public sealed class OnboardingTemplateEditModel
 {
+    // Ticket 2: optimistic-concurrency token the record was loaded at.
+    public int Version { get; set; }
+
     [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }

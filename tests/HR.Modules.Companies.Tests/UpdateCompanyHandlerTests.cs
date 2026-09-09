@@ -29,6 +29,7 @@ public class UpdateCompanyHandlerTests
         {
             CompanyId = company.Id,
             Name = "Acme Corporation",
+            ExpectedVersion = 1,
             Addresses =
             [
                 new UpdateCompanyAddressRequest
@@ -99,6 +100,7 @@ public class UpdateCompanyHandlerTests
         {
             CompanyId = company.Id,
             Name = "Acme Corporation",
+            ExpectedVersion = 1,
             Addresses =
             [
                 new UpdateCompanyAddressRequest
@@ -136,6 +138,7 @@ public class UpdateCompanyHandlerTests
         {
             CompanyId = company.Id,
             Name = "Acme Corporation",
+            ExpectedVersion = 1,
             Addresses =
             [
                 new UpdateCompanyAddressRequest

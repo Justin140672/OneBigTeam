@@ -55,7 +55,16 @@ internal sealed class UpdateLeaveTypeHandler(LeaveDbContext db, IClock clock, IA
             toilExpiryDays: request.ToilExpiryDays,
             allowNegativeToilBalance: request.AllowNegativeToilBalance);
 
-        await db.SaveChangesAsync(cancellationToken);
+        // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict, so the
+        // audit event below only runs on a successful save.
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            entity,
+            request.ExpectedVersion,
+            "This leave type was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateLeaveTypeResponse>(saveResult.Error);
 
         await auditPublisher.PublishAsync(new LeaveTypeUpdatedAuditEvent(
             entity.CompanyId,
@@ -82,6 +91,6 @@ internal sealed class UpdateLeaveTypeHandler(LeaveDbContext db, IClock clock, IA
             entity.Behaviour.ToString(),
             entity.IsActive, entity.HasBalance, entity.IsSystem,
             entity.ToilExpiryDays, entity.AllowNegativeToilBalance,
-            entity.UpdatedAt));
+            entity.UpdatedAt, entity.Version));
     }
 }

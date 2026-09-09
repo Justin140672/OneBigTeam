@@ -7,4 +7,5 @@ internal sealed record DocumentTypeListItem(
     string Name,
     string? Description,
     bool IsActive,
-    bool AllowEmployeeUpload);
+    bool AllowEmployeeUpload,
+    int Version);

@@ -10,7 +10,8 @@ public class UpdatePublicHolidayValidatorTests
         Id = Guid.NewGuid(),
         Date = new DateOnly(2026, 12, 25),
         Name = "Christmas Day",
-        CountryCode = "GB"
+        CountryCode = "GB",
+        ExpectedVersion = 1
     };
 
     [Fact]
@@ -89,5 +90,15 @@ public class UpdatePublicHolidayValidatorTests
         var v = new UpdatePublicHolidayValidator();
         var result = v.Validate(ValidRequest() with { Name = new string('N', 200) });
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_ExpectedVersion_Is_Null()
+    {
+        var v = new UpdatePublicHolidayValidator();
+        var result = v.Validate(ValidRequest() with { ExpectedVersion = null });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePublicHolidayRequest.ExpectedVersion)
+            && e.ErrorMessage.Contains("concurrency version is required"));
     }
 }

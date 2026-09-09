@@ -190,7 +190,11 @@
         }
       },
       "hr.sharedkernel": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "FluentValidation": "[12.1.1, )",
+          "Microsoft.EntityFrameworkCore": "[10.0.11, )"
+        }
       },
       "FastEndpoints": {
         "type": "CentralTransitive",

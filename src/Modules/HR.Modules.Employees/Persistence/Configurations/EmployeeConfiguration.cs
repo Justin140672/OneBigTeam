@@ -203,6 +203,12 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasColumnName("notes")
             .HasMaxLength(4000);
 
+        builder.Property(e => e.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

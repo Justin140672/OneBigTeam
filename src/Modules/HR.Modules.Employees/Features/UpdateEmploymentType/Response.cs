@@ -6,4 +6,5 @@ internal sealed record UpdateEmploymentTypeResponse(
     string Name,
     string? Description,
     bool IsActive,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

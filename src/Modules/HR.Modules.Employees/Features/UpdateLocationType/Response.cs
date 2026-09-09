@@ -6,4 +6,5 @@ internal sealed record UpdateLocationTypeResponse(
     string Name,
     string? Description,
     bool IsActive,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

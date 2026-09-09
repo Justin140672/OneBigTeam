@@ -8,7 +8,8 @@ internal sealed record GetCompanyResponse(
     bool IsActive,
     DateTimeOffset CreatedAt,
     IReadOnlyCollection<GetCompanyAddressResponse> Addresses,
-    GetCompanyBrandingResponse Branding);
+    GetCompanyBrandingResponse Branding,
+    int Version);
 
 internal sealed record GetCompanyBrandingResponse(
     string? PrimaryLogoUrl,

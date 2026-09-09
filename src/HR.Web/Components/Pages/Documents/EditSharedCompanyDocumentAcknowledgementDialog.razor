@@ -7,7 +7,9 @@
     <DialogTemplates>
         <Header>Edit Acknowledgement Settings</Header>
         <Content>
-            @if (!string.IsNullOrEmpty(GlobalError))
+            <SaveConflictBanner Visible="SaveConflict" Disabled="@Saving" OnReload="ReloadLatestAsync"
+                                Message="Someone else changed this document while you were editing. Your changes have not been saved." />
+            @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
             {
                 <div class="alert alert-danger alert-dismissible mb-3">
                     @GlobalError
@@ -82,9 +84,14 @@
 
     private bool _isLocked => Document is not null && Document.Status != "Draft";
 
+    // Ticket 2: optimistic-concurrency token loaded with the document, sent as ExpectedVersion on save.
+    private int? _loadedVersion;
+
     protected override async Task OnOpenedAsync()
     {
         GlobalError = null;
+        SaveConflict = false;
+        _loadedVersion = Document?.Version;
 
         if (Document is not null)
         {
@@ -108,14 +115,31 @@
         if (Document is null)
             return "No document selected.";
 
-        if (_isLocked)
-            return await DocumentService.UpdateSharedCompanyDocumentAcknowledgementSettingsAsync(
-                CompanyId, Document.Id,
-                Model.RequiresAcknowledgement, Model.AcknowledgementDueDate, Document.AcknowledgementStatement);
+        // Statement is locked after publishing — send the stored value unchanged in that case.
+        var statement = _isLocked ? Document.AcknowledgementStatement : Model.AcknowledgementStatement;
 
-        return await DocumentService.UpdateSharedCompanyDocumentAcknowledgementSettingsAsync(
+        var result = await DocumentService.UpdateSharedCompanyDocumentAcknowledgementSettingsAsync(
             CompanyId, Document.Id,
-            Model.RequiresAcknowledgement, Model.AcknowledgementDueDate, Model.AcknowledgementStatement);
+            Model.RequiresAcknowledgement, Model.AcknowledgementDueDate, statement,
+            _loadedVersion);
+
+        SaveConflict = result.IsConcurrencyConflict;
+        if (result.Success && result.NewVersion is { } v) _loadedVersion = v;
+        return result.Success ? null : result.ErrorMessage ?? "Failed to update acknowledgement settings.";
+    }
+
+    // Ticket 2: re-fetch the document and re-populate the form at the latest version.
+    private async Task ReloadLatestAsync()
+    {
+        if (Document is not null)
+        {
+            var fresh = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, Document.Id);
+            if (fresh is not null) Document = fresh;
+        }
+        await OnOpenedAsync();
+        SaveConflict = false;
+        GlobalError = null;
+        StateHasChanged();
     }
 
     protected override void ResetForm()

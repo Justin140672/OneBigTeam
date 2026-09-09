@@ -79,7 +79,8 @@ public class UpdateSicknessRecordHandlerTests
             CategoryId = newCategoryId,
             StartDate = new DateOnly(2026, 7, 2),
             StartDayPart = SicknessDayPart.HalfDayAM,
-            Notes = "Updated notes"
+            Notes = "Updated notes",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -107,7 +108,8 @@ public class UpdateSicknessRecordHandlerTests
             Id = record.Id,
             CategoryId = categoryId,
             StartDate = new DateOnly(2026, 7, 2),
-            StartDayPart = SicknessDayPart.FullDay
+            StartDayPart = SicknessDayPart.FullDay,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -175,7 +177,8 @@ public class UpdateSicknessRecordHandlerTests
             Id = record.Id,
             CategoryId = categoryId,
             StartDate = StartDate,
-            StartDayPart = SicknessDayPart.FullDay
+            StartDayPart = SicknessDayPart.FullDay,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -226,7 +229,8 @@ public class UpdateSicknessRecordHandlerTests
             CategoryId = categoryId,
             StartDate = StartDate,
             StartDayPart = SicknessDayPart.FullDay,
-            ActorEmployeeId = actorId
+            ActorEmployeeId = actorId,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -254,7 +258,8 @@ public class UpdateSicknessRecordHandlerTests
             Id = record.Id,
             CategoryId = newCategoryId,
             StartDate = new DateOnly(2026, 7, 5),
-            StartDayPart = SicknessDayPart.HalfDayAM
+            StartDayPart = SicknessDayPart.HalfDayAM,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -294,7 +299,8 @@ public class UpdateSicknessRecordHandlerTests
             CategoryId = categoryId,
             StartDate = StartDate,
             StartDayPart = SicknessDayPart.FullDay,
-            Notes = newSensitiveNotes
+            Notes = newSensitiveNotes,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);

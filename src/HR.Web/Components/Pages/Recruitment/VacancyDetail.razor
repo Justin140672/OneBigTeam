@@ -88,7 +88,9 @@
         </div>
         <p class="text-muted mb-3">Manage this vacancy's details, applications, and interviews.</p>
 
-        @if (!string.IsNullOrEmpty(GlobalError))
+        <SaveConflictBanner Visible="SaveConflict" Disabled="@Saving" OnReload="ReloadLatestValuesAsync"
+                            Message="Someone else changed this vacancy while you were editing. Your changes have not been saved." />
+        @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
         {
             <div class="alert alert-danger mb-3">@GlobalError</div>
         }

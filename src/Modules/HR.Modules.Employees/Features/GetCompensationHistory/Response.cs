@@ -13,6 +13,7 @@ internal sealed record CompensationHistoryItem(
     string Reason,
     Guid CreatedBy,
     string CreatedByName,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    int Version);
 
 internal sealed record GetCompensationHistoryResponse(IReadOnlyList<CompensationHistoryItem> Items);

@@ -8,4 +8,5 @@ internal sealed record UpdateDepartmentResponse(
     Guid? ParentDepartmentId,
     Guid? ManagerEmployeeId,
     bool IsActive,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

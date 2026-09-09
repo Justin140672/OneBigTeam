@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using HR.Web.Services;
 
 namespace HR.Web.Models;
 
@@ -39,7 +40,9 @@ public record GetCandidateResponse(
     bool IsActive = true,
     DateTimeOffset? DeactivatedAt = null,
     Guid? DeactivatedByUserId = null,
-    string? DeactivationReason = null);
+    string? DeactivationReason = null,
+    // Ticket 2: optimistic-concurrency token.
+    int Version = 0);
 
 // ── DEACTIVATE / REACTIVATE ─────────────────────────────────────────────────
 
@@ -99,7 +102,9 @@ public record UpdateCandidateRequest(
     string LastName,
     string Email,
     string? Phone,
-    string? ResumeUrl);
+    string? ResumeUrl,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdateCandidateResponse(
     Guid Id,
@@ -110,12 +115,15 @@ public record UpdateCandidateResponse(
     string? Phone,
     string? ResumeUrl,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
 // ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
-public sealed class CandidateEditModel
+public sealed class CandidateEditModel : IHasVersion
 {
+    public int Version { get; set; }
+
     [Required(ErrorMessage = "First name is required.")]
     public string FirstName { get; set; } = string.Empty;
     [Required(ErrorMessage = "Last name is required.")]

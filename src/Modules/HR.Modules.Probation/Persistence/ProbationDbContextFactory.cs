@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -12,7 +13,7 @@ internal sealed class ProbationDbContextFactory : IDesignTimeDbContextFactory<Pr
             ?? "Host=localhost;Port=5432;Database=hr;Username=postgres;Password=postgres";
 
         var optionsBuilder = new DbContextOptionsBuilder<ProbationDbContext>();
-        optionsBuilder.UseNpgsql(connectionString, npgsql =>
+        optionsBuilder.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
             npgsql.MigrationsHistoryTable("__ef_migrations_history", "probation"));
 
         return new ProbationDbContext(optionsBuilder.Options);

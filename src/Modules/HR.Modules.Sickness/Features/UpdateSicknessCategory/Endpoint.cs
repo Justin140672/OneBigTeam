@@ -20,12 +20,7 @@ internal sealed class Endpoint(UpdateSicknessCategoryHandler handler, ICurrentUs
             cancellationToken);
         if (result.IsFailure)
         {
-            if (result.Error.Code == "not_found")
-            {
-                await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
-                return;
-            }
-            await Send.ResultAsync(TypedResults.Conflict(new { error = result.Error.Message }));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
         await Send.ResultAsync(TypedResults.Ok(result.Value));

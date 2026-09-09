@@ -11,6 +11,7 @@ internal sealed record GetOnboardingTemplateResponse(
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
+    int Version,
     IReadOnlyList<OnboardingTemplateTaskListItem> Tasks);
 
 internal sealed record OnboardingTemplateTaskListItem(

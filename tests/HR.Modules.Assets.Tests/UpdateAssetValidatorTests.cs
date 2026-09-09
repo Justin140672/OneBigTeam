@@ -17,7 +17,8 @@ public class UpdateAssetValidatorTests
         Model = "XPS 15",
         SerialNumber = "SN123456",
         PurchaseDate = new DateOnly(2024, 1, 15),
-        PurchasePrice = 1500.00m
+        PurchasePrice = 1500.00m,
+        ExpectedVersion = 1
     };
 
     [Fact]
@@ -190,5 +191,14 @@ public class UpdateAssetValidatorTests
     public void Validate_Passes_When_PurchasePrice_Is_Null()
     {
         Assert.True(_validator.Validate(Valid() with { PurchasePrice = null }).IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_ExpectedVersion_Is_Null()
+    {
+        var result = _validator.Validate(Valid() with { ExpectedVersion = null });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateAssetRequest.ExpectedVersion)
+            && e.ErrorMessage.Contains("concurrency version is required"));
     }
 }

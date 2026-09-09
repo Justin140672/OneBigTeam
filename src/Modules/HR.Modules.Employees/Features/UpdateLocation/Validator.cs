@@ -22,5 +22,10 @@ internal sealed class UpdateLocationValidator : AbstractValidator<UpdateLocation
 
         RuleFor(r => r.LocationTypeId)
             .NotEmpty();
+
+        // Ticket 2: a loaded version is mandatory on this protected update.
+        RuleFor(r => r.ExpectedVersion)
+            .NotNull()
+            .WithMessage("A concurrency version is required. Reload the page and try again.");
     }
 }

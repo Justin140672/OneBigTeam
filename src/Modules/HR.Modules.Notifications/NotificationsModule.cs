@@ -27,7 +27,7 @@ public static class NotificationsModule
         string connectionString)
     {
         services.AddDbContext<NotificationsDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "notifications")));
 
         services.AddScoped<INotificationWriter, NotificationWriter>();

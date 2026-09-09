@@ -4,7 +4,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEditService<VacancyEditModel, Guid>
+public sealed class VacancyService(IHttpClientFactory httpClientFactory)
+    : IEditService<VacancyEditModel, Guid>, IConcurrencyAwareEditService<VacancyEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -199,7 +200,43 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
             HiringManagerId = response.HiringManagerId,
             AssignedRecruiterId = response.AssignedRecruiterId ?? Guid.Empty,
             IsAdvertisedInternally = response.IsAdvertisedInternally,
+            Version = response.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces a stale-save 409.
+    // The recruitment API returns no "code" on its 409 body, so ANY 409 is treated as a save conflict.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, VacancyEditModel model, int? expectedVersion)
+    {
+        var request = new UpdateVacancyRequest(
+            companyId, id,
+            model.PositionProfileId,
+            string.IsNullOrWhiteSpace(model.AdvertTitle) ? null : model.AdvertTitle.Trim(),
+            string.IsNullOrWhiteSpace(model.AdvertDescription) ? null : model.AdvertDescription.Trim(),
+            model.HiringManagerId!.Value,
+            AssignedRecruiterId: model.AssignedRecruiterId == Guid.Empty ? null : model.AssignedRecruiterId,
+            IsAuthorisedCorrection: model.IsAuthorisedCorrection,
+            CorrectionReason: string.IsNullOrWhiteSpace(model.CorrectionReason) ? null : model.CorrectionReason.Trim(),
+            IsAdvertisedInternally: model.IsAdvertisedInternally,
+            ExpectedVersion: expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/vacancies/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateVacancyResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        if (response.StatusCode == HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                await ReadErrorAsync(response, "Someone else changed this vacancy while you were editing.")
+                    ?? "Someone else changed this vacancy while you were editing.",
+                isConcurrencyConflict: true);
+
+        return ApiSaveResult.Fail(
+            await ReadErrorAsync(response, "Failed to update vacancy.") ?? "Failed to update vacancy.");
     }
 
     async Task<(VacancyEditModel? Result, string? Error)> IEditService<VacancyEditModel, Guid>.CreateAsync(Guid companyId, VacancyEditModel model)

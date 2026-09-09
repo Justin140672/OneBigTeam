@@ -33,7 +33,7 @@ public class UpdateEmployeeProfileEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{Guid.NewGuid()}/employees/{Guid.NewGuid()}/profile",
-            new { firstName = "Alice", lastName = "Smith", workEmail = "alice@example.com", startDate = "2026-07-01" });
+            new { firstName = "Alice", lastName = "Smith", workEmail = "alice@example.com", startDate = "2026-07-01", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -59,7 +59,8 @@ public class UpdateEmployeeProfileEndpointTests
                 lastName = "Jones",
                 workEmail = $"alicia.jones.{Guid.NewGuid():N}@example.com",
                 personalEmail = "alicia@gmail.com",
-                startDate = "2026-08-01"
+                startDate = "2026-08-01",
+                expectedVersion = await GetVersionAsync(client, companyId, created.Id)
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -93,7 +94,8 @@ public class UpdateEmployeeProfileEndpointTests
                 firstName = "Alice",
                 lastName = "Smith",
                 workEmail = emp2.WorkEmail,  // already taken by emp2
-                startDate = "2026-07-01"
+                startDate = "2026-07-01",
+                expectedVersion = await GetVersionAsync(client, companyId, emp1.Id)
             });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -117,7 +119,8 @@ public class UpdateEmployeeProfileEndpointTests
                 firstName = "Alice",
                 lastName = "Smith",
                 workEmail = "alice@example.com",
-                startDate = "2026-07-01"
+                startDate = "2026-07-01",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -189,6 +192,15 @@ public class UpdateEmployeeProfileEndpointTests
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EmployeePayload>())!;
     }
+
+    private static async Task<int> GetVersionAsync(HttpClient client, Guid companyId, Guid id)
+    {
+        var r = await client.GetAsync($"/api/companies/{companyId}/employees/{id}");
+        r.EnsureSuccessStatusCode();
+        return (await r.Content.ReadFromJsonAsync<VersionPayload>())!.Version;
+    }
+
+    private sealed record VersionPayload(int Version);
 
     private sealed record IdPayload(Guid Id);
 

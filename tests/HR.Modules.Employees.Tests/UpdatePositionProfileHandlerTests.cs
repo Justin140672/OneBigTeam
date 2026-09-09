@@ -46,6 +46,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 DepartmentId = department.Id,
                 LocationId = location.Id,
                 DefaultLeavePolicyId = Guid.NewGuid(),
@@ -107,6 +108,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = Guid.NewGuid(),
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 DepartmentId = department.Id,
                 LocationId = location.Id,
                 DefaultLeavePolicyId = Guid.NewGuid(),
@@ -141,6 +143,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile1.Id,
+                ExpectedVersion = 1,
                 DepartmentId = department.Id,
                 LocationId = location.Id,
                 DefaultLeavePolicyId = Guid.NewGuid(),
@@ -173,6 +176,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 DepartmentId = department.Id,
                 LocationId = location.Id,
                 DefaultLeavePolicyId = Guid.NewGuid(),
@@ -203,6 +207,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 Title = "Engineer",
                 DepartmentId = Guid.NewGuid(),
                 LocationId = location.Id,
@@ -234,6 +239,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 Title = "Engineer",
                 DepartmentId = department.Id,
                 LocationId = Guid.NewGuid(),
@@ -268,6 +274,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 Title = "Engineer",
                 DepartmentId = department.Id,
                 LocationId = location.Id,
@@ -299,6 +306,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 Title = "Engineer",
                 DepartmentId = department.Id,
                 LocationId = location.Id,
@@ -331,6 +339,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 Title = "Engineer",
                 DepartmentId = department.Id,
                 LocationId = location.Id,
@@ -370,6 +379,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 Title = "Engineer",
                 DepartmentId = department.Id,
                 LocationId = location.Id,
@@ -407,6 +417,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 Title = "Engineer",
                 DepartmentId = department.Id,
                 LocationId = location.Id,
@@ -442,6 +453,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 Title = "Engineer",
                 DepartmentId = department.Id,
                 LocationId = location.Id,
@@ -474,6 +486,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 Title = "Engineer",
                 DepartmentId = department.Id,
                 LocationId = location.Id,
@@ -506,6 +519,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 Title = "Engineer",
                 DepartmentId = department.Id,
                 LocationId = location.Id,
@@ -546,6 +560,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 Title = "Engineer",
                 DepartmentId = department.Id,
                 LocationId = location.Id,
@@ -590,6 +605,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 DepartmentId = department.Id,
                 LocationId = location.Id,
                 DefaultLeavePolicyId = newLeavePolicyId,
@@ -640,6 +656,7 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                ExpectedVersion = 1,
                 DepartmentId = department.Id,
                 LocationId = location.Id,
                 DefaultLeavePolicyId = Guid.NewGuid(),

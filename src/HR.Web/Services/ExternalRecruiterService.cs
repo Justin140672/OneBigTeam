@@ -4,7 +4,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class ExternalRecruiterService(IHttpClientFactory httpClientFactory) : IEditService<ExternalRecruiterEditModel, Guid>
+public sealed class ExternalRecruiterService(IHttpClientFactory httpClientFactory)
+    : IEditService<ExternalRecruiterEditModel, Guid>, IConcurrencyAwareEditService<ExternalRecruiterEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -116,7 +117,40 @@ public sealed class ExternalRecruiterService(IHttpClientFactory httpClientFactor
             ContactTelephone = response.ContactTelephone,
             Website = response.Website,
             Notes = response.Notes,
+            Version = response.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces a stale-save 409.
+    // The recruitment API returns no "code" on its 409 body, so ANY 409 is treated as a save conflict.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, ExternalRecruiterEditModel model, int? expectedVersion)
+    {
+        var request = new UpdateExternalRecruiterRequest(
+            companyId, id, model.AgencyName.Trim(),
+            string.IsNullOrWhiteSpace(model.ContactName) ? null : model.ContactName.Trim(),
+            string.IsNullOrWhiteSpace(model.ContactEmail) ? null : model.ContactEmail.Trim(),
+            string.IsNullOrWhiteSpace(model.ContactTelephone) ? null : model.ContactTelephone.Trim(),
+            string.IsNullOrWhiteSpace(model.Website) ? null : model.Website.Trim(),
+            string.IsNullOrWhiteSpace(model.Notes) ? null : model.Notes.Trim(),
+            expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/external-recruiters/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateExternalRecruiterResponse>(HrApiJsonOptions.Default);
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        if (response.StatusCode == HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                await ReadErrorAsync(response, "Someone else changed this external recruiter while you were editing.")
+                    ?? "Someone else changed this external recruiter while you were editing.",
+                isConcurrencyConflict: true);
+
+        return ApiSaveResult.Fail(
+            await ReadErrorAsync(response, "Failed to update external recruiter.") ?? "Failed to update external recruiter.");
     }
 
     async Task<(ExternalRecruiterEditModel? Result, string? Error)> IEditService<ExternalRecruiterEditModel, Guid>.CreateAsync(

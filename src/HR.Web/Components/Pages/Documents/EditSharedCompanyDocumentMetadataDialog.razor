@@ -9,7 +9,9 @@
     <DialogTemplates>
         <Header>Edit Document Metadata</Header>
         <Content>
-            @if (!string.IsNullOrEmpty(GlobalError))
+            <SaveConflictBanner Visible="SaveConflict" Disabled="@Saving" OnReload="ReloadLatestAsync"
+                                Message="Someone else changed this document while you were editing. Your changes have not been saved." />
+            @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
             {
                 <div class="alert alert-danger alert-dismissible mb-3">
                     @GlobalError
@@ -136,6 +138,9 @@
     // nothing to show in its popup.
     private bool _dataLoaded;
 
+    // Ticket 2: optimistic-concurrency token loaded with the document, sent as ExpectedVersion on save.
+    private int? _loadedVersion;
+
     private static readonly List<ReviewFrequencyOption> _reviewFrequencyOptions =
     [
         new("None", "None"),
@@ -149,7 +154,9 @@
     protected override async Task OnOpenedAsync()
     {
         GlobalError = null;
+        SaveConflict = false;
         _dataLoaded = false;
+        _loadedVersion = Document?.Version;
         _categories = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
 
         // A first page (browsable without typing anything) — same pattern as
@@ -223,12 +230,31 @@
         if (Document is null)
             return "No document selected.";
 
-        return await DocumentService.UpdateSharedCompanyDocumentMetadataAsync(
+        var result = await DocumentService.UpdateSharedCompanyDocumentMetadataAsync(
             CompanyId, Document.Id,
             Model.Title, Model.Description, Model.CategoryId!.Value,
             Model.EffectiveDate, Model.ReviewDate,
             Model.ReviewFrequency, Model.CustomReviewFrequencyMonths,
-            Model.ReviewOwnerEmployeeId == Guid.Empty ? null : Model.ReviewOwnerEmployeeId);
+            Model.ReviewOwnerEmployeeId == Guid.Empty ? null : Model.ReviewOwnerEmployeeId,
+            _loadedVersion);
+
+        SaveConflict = result.IsConcurrencyConflict;
+        if (result.Success && result.NewVersion is { } v) _loadedVersion = v;
+        return result.Success ? null : result.ErrorMessage ?? "Failed to update document.";
+    }
+
+    // Ticket 2: re-fetch the document and re-populate the form at the latest version.
+    private async Task ReloadLatestAsync()
+    {
+        if (Document is not null)
+        {
+            var fresh = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, Document.Id);
+            if (fresh is not null) Document = fresh;
+        }
+        await OnOpenedAsync();
+        SaveConflict = false;
+        GlobalError = null;
+        StateHasChanged();
     }
 
     protected override void ResetForm()

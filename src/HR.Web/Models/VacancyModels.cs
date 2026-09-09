@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using HR.Web.Services;
 
 namespace HR.Web.Models;
 
@@ -58,7 +59,9 @@ public record GetVacancyResponse(
     string? EffectiveLocation,
     int ApplicationCount,
     bool CanChangePositionProfile,
-    bool IsAdvertisedInternally = false);
+    bool IsAdvertisedInternally = false,
+    // Ticket 2: optimistic-concurrency token.
+    int Version = 0);
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
 
@@ -97,7 +100,9 @@ public record UpdateVacancyRequest(
     Guid? AssignedRecruiterId = null,
     bool IsAuthorisedCorrection = false,
     string? CorrectionReason = null,
-    bool IsAdvertisedInternally = false);
+    bool IsAdvertisedInternally = false,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdateVacancyResponse(
     Guid Id,
@@ -111,7 +116,8 @@ public record UpdateVacancyResponse(
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
 // ── CLOSE ─────────────────────────────────────────────────────────────────────
 
@@ -149,8 +155,10 @@ public record PublishVacancyResponse(
 
 // ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
-public sealed class VacancyEditModel
+public sealed class VacancyEditModel : IHasVersion
 {
+    public int Version { get; set; }
+
     public string? AdvertTitle { get; set; }
     public string? AdvertDescription { get; set; }
     [Required(ErrorMessage = "Position profile is required.")]

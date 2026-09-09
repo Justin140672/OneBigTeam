@@ -59,6 +59,12 @@ internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(a => a.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(a => a.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

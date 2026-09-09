@@ -7,6 +7,9 @@ internal sealed record UpdateCompanyRequest
     public Guid CompanyId { get; init; }
     public string Name { get; init; } = string.Empty;
     public List<UpdateCompanyAddressRequest> Addresses { get; init; } = [];
+
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
 }
 
 internal sealed record UpdateCompanyAddressRequest

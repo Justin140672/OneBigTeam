@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Companies.Domain;
 
-internal sealed class Company
+internal sealed class Company : IVersionedAggregate
 {
     private readonly List<CompanyAddress> _addresses = [];
 
@@ -9,6 +11,11 @@ internal sealed class Company
     public Guid Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public CompanyStatus Status { get; private set; }
+
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     // Kept as a computed shim so existing read-sites (UI badges, response DTOs) that only care
     // about "is this company usable right now" don't need a sweep — grepped all readers of
@@ -28,6 +35,7 @@ internal sealed class Company
             Id = id,
             Name = name,
             Status = CompanyStatus.PendingVerification,
+            Version = 1,
             CreatedAt = now,
             UpdatedAt = now,
         };

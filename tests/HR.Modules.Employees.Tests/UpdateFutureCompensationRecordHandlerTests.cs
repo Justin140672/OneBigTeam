@@ -142,7 +142,8 @@ public class UpdateFutureCompensationRecordHandlerTests
                 HoursPerWeek = 20m,
                 FTE = 0.5m,
                 Notes = "  Corrected  ",
-                Reason = CompensationChangeReason.Correction
+                Reason = CompensationChangeReason.Correction,
+                ExpectedVersion = 1
             },
             ActorEmployeeId,
             CancellationToken.None);

@@ -1,5 +1,6 @@
 using FluentValidation;
 using HR.Modules.Companies.Domain;
+using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Features.UpdateCompany;
 
@@ -7,6 +8,9 @@ internal sealed class UpdateCompanyValidator : AbstractValidator<UpdateCompanyRe
 {
     public UpdateCompanyValidator()
     {
+        // Ticket 2 item 3: a loaded concurrency version is mandatory on this protected update.
+        RuleFor(r => r.ExpectedVersion).RequireLoadedVersion();
+
         RuleFor(request => request.CompanyId)
             .NotEmpty();
 

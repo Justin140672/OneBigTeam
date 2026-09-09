@@ -1107,4 +1107,130 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// </summary>
     public Task<int> GetReviewHistoryRowActionControlCountAsync() =>
         ReviewHistoryCard.Locator(".e-row button, .e-row a, .e-row i").CountAsync();
+
+    // ── Ticket 2: optimistic-concurrency conflict on the metadata / audience / acknowledgement edit dialogs ──
+    // Each of the three edit dialogs (EditSharedCompanyDocument{Metadata,Audience,Acknowledgement}Dialog.razor)
+    // renders the shared <SaveConflictBanner> — a `div.alert.alert-warning.save-conflict-banner[role='alert']`
+    // with a "Reload latest values" Syncfusion button — when its save is rejected with HTTP 409
+    // (code=="concurrency"). The banner is matched by the component's own `.save-conflict-banner`
+    // class scoped to the owning dialog, additionally filtered on the "Reload latest values" action
+    // so an unrelated warning alert can never satisfy strict mode. Match on structure, not text.
+
+    private ILocator ConflictBannerIn(ILocator dialog) =>
+        // Only one edit dialog is ever open at a time, and <SaveConflictBanner> is the sole
+        // `.save-conflict-banner` on the page — match it directly rather than through the dialog's
+        // computed accessible name + a nested Has-button filter (that chain was resolving to zero
+        // even with the banner visibly rendered). Scope to :visible so the collapsed (Visible=false)
+        // instance in a just-closed dialog can't satisfy it.
+        page.Locator(".save-conflict-banner:visible");
+
+    private async Task SaveDialogExpectingConflictAsync(ILocator dialog)
+    {
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await ConflictBannerIn(dialog).WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+    }
+
+    private async Task SaveDialogExpectingSuccessAsync(ILocator dialog)
+    {
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    private async Task ClickDialogReloadLatestAsync(ILocator dialog)
+    {
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
+        await ConflictBannerIn(dialog).WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+    }
+
+    // ── Metadata dialog ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Opens the metadata edit dialog via the page header's "Edit" button and waits for its async
+    /// data load to settle. SaveCoreAsync dereferences Model.CategoryId.Value — which
+    /// OnOpenedAsync prefills asynchronously from the loaded document — so this also waits for the
+    /// Category combobox to show a value before any Save is attempted.
+    /// </summary>
+    public async Task OpenMetadataDialogAsync()
+    {
+        await EditMetadataHeaderButton.ClickAsync();
+        await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await Assertions.Expect(
+                EditMetadataDialog.Locator(".col-md-6").Filter(new() { HasText = "Category" })
+                    .Locator(".e-input-group input").First)
+            .Not.ToHaveValueAsync("", new() { Timeout = 15_000 });
+    }
+
+    public Task SetMetadataTitleAsync(string value) =>
+        ClearAndTypeAsync(EditMetadataDialog.GetByPlaceholder("Document title"), value);
+
+    public Task<string> GetMetadataTitleValueAsync() =>
+        EditMetadataDialog.GetByPlaceholder("Document title").InputValueAsync();
+
+    /// <summary>Auto-retrying wait for the metadata dialog's Title field to hold <paramref name="expected"/> (used after a reload round-trip).</summary>
+    public async Task WaitForMetadataTitleValueAsync(string expected) =>
+        await Assertions.Expect(EditMetadataDialog.GetByPlaceholder("Document title"))
+            .ToHaveValueAsync(expected, new() { Timeout = 15_000 });
+
+    public Task<bool> IsMetadataDialogOpenAsync() => EditMetadataDialog.IsVisibleAsync();
+    public Task<bool> IsMetadataConflictBannerVisibleAsync() => ConflictBannerIn(EditMetadataDialog).IsVisibleAsync();
+    public Task SaveMetadataDialogExpectingConflictAsync() => SaveDialogExpectingConflictAsync(EditMetadataDialog);
+    public Task SaveMetadataDialogExpectingSuccessAsync() => SaveDialogExpectingSuccessAsync(EditMetadataDialog);
+
+    public async Task ClickMetadataReloadLatestAsync()
+    {
+        await ClickDialogReloadLatestAsync(EditMetadataDialog);
+        // ReloadLatestAsync re-fetches the document and re-runs OnOpenedAsync (category + employee
+        // loads) before re-binding the form; give the re-bound values a beat to land.
+        await page.WaitForTimeoutAsync(300);
+    }
+
+    /// <summary>Opens the metadata dialog, replaces the Title, and saves successfully — used by a second tab to bump the document's version.</summary>
+    public async Task ChangeMetadataTitleAsync(string newTitle)
+    {
+        await OpenMetadataDialogAsync();
+        await SetMetadataTitleAsync(newTitle);
+        await SaveMetadataDialogExpectingSuccessAsync();
+        await Assertions.Expect(page.Locator("h1").First).ToHaveTextAsync(newTitle, new() { Timeout = 15_000 });
+    }
+
+    // ── Audience dialog ──────────────────────────────────────────────────────
+
+    private ILocator EditAudienceDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Edit Document Audience" });
+
+    /// <summary>Opens the Audience edit dialog and waits for its SfMultiSelect fields (gated on an async data load) to mount.</summary>
+    public async Task OpenAudienceDialogAsync()
+    {
+        await OpenEditAudienceDialogAsync();
+        await EditAudienceDialog.GetByPlaceholder("Any department")
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+    }
+
+    public Task<bool> IsAudienceDialogOpenAsync() => EditAudienceDialog.IsVisibleAsync();
+    public Task<bool> IsAudienceConflictBannerVisibleAsync() => ConflictBannerIn(EditAudienceDialog).IsVisibleAsync();
+    public Task SaveAudienceDialogExpectingConflictAsync() => SaveDialogExpectingConflictAsync(EditAudienceDialog);
+    public Task SaveAudienceDialogExpectingSuccessAsync() => SaveDialogExpectingSuccessAsync(EditAudienceDialog);
+
+    public async Task ClickAudienceReloadLatestAsync()
+    {
+        await ClickDialogReloadLatestAsync(EditAudienceDialog);
+        await EditAudienceDialog.GetByPlaceholder("Any department")
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        await page.WaitForTimeoutAsync(300);
+    }
+
+    // ── Acknowledgement dialog ───────────────────────────────────────────────
+
+    public Task<bool> IsAcknowledgementDialogOpenAsync() => EditAcknowledgementDialog.IsVisibleAsync();
+    public Task<bool> IsAcknowledgementConflictBannerVisibleAsync() => ConflictBannerIn(EditAcknowledgementDialog).IsVisibleAsync();
+    public Task SaveAcknowledgementDialogExpectingConflictAsync() => SaveDialogExpectingConflictAsync(EditAcknowledgementDialog);
+    public Task SaveAcknowledgementDialogExpectingSuccessAsync() => SaveDialogExpectingSuccessAsync(EditAcknowledgementDialog);
+
+    public async Task ClickAcknowledgementReloadLatestAsync()
+    {
+        await ClickDialogReloadLatestAsync(EditAcknowledgementDialog);
+        await page.WaitForTimeoutAsync(300);
+    }
 }

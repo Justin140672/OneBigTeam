@@ -45,7 +45,14 @@ internal sealed class UpdateDocumentTypeHandler(DocumentsDbContext db, IClock cl
 
         documentType.Update(newName, request.Description, request.AllowEmployeeUpload, now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            documentType,
+            request.ExpectedVersion,
+            "This document type was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateDocumentTypeResponse>(saveResult.Error);
 
         return Result.Success(new UpdateDocumentTypeResponse(
             documentType.Id,
@@ -54,6 +61,7 @@ internal sealed class UpdateDocumentTypeHandler(DocumentsDbContext db, IClock cl
             documentType.Description,
             documentType.IsActive,
             documentType.AllowEmployeeUpload,
-            documentType.UpdatedAt));
+            documentType.UpdatedAt,
+            documentType.Version));
     }
 }

@@ -11,4 +11,5 @@ internal sealed record GetExternalRecruiterResponse(
     string? Notes,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

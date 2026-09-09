@@ -59,5 +59,9 @@ internal sealed class UpdateEmploymentDetailsValidator : AbstractValidator<Updat
             .GreaterThan(0)
             .When(r => r.NoticePeriodLengthOverride.HasValue)
             .WithMessage("NoticePeriodLengthOverride must be greater than 0.");
+
+        // Ticket 2: a loaded concurrency version is mandatory on this protected update.
+        RuleFor(r => r.ExpectedVersion)
+            .RequireLoadedVersion();
     }
 }

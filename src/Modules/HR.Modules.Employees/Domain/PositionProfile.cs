@@ -1,10 +1,11 @@
 using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Contracts;
+using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Domain;
 
-internal sealed class PositionProfile
+internal sealed class PositionProfile : IVersionedAggregate
 {
     private readonly List<PositionProfileRequiredDocument> _requiredDocuments = [];
     private readonly List<PositionProfileRequiredAsset> _requiredAssets = [];
@@ -30,6 +31,11 @@ internal sealed class PositionProfile
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public IReadOnlyList<PositionProfileRequiredDocument> RequiredDocuments => _requiredDocuments.AsReadOnly();
     public IReadOnlyList<PositionProfileRequiredAsset> RequiredAssets => _requiredAssets.AsReadOnly();
@@ -72,6 +78,7 @@ internal sealed class PositionProfile
             DefaultLeavePolicyId = defaultLeavePolicyId,
             OnboardingTemplateId = onboardingTemplateId,
             IsActive = true,
+            Version = 1,
             CreatedAt = now,
             UpdatedAt = now,
         };

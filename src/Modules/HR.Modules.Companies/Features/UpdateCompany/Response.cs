@@ -8,7 +8,8 @@ internal sealed record UpdateCompanyResponse(
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyCollection<UpdateCompanyAddressResponse> Addresses);
+    IReadOnlyCollection<UpdateCompanyAddressResponse> Addresses,
+    int Version);
 
 internal sealed record UpdateCompanyAddressResponse(
     Guid Id,

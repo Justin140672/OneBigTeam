@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Leave.Domain;
 
-internal sealed class LeaveType
+internal sealed class LeaveType : IVersionedAggregate
 {
     private LeaveType() { }
 
@@ -50,6 +52,11 @@ internal sealed class LeaveType
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
+
     public static LeaveType Create(
         Guid id,
         Guid companyId,
@@ -78,6 +85,7 @@ internal sealed class LeaveType
             IsSystem = isSystem,
             ToilExpiryDays = toilExpiryDays,
             AllowNegativeToilBalance = allowNegativeToilBalance,
+            Version = 1,
             CreatedAt = now,
             UpdatedAt = now
         };

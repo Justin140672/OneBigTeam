@@ -92,7 +92,10 @@ public class CompanyCrossTenantAccessTests
         locale = "en-GB",
     };
 
-    private static object UpdateCompanyBody => new
+    // Ticket 2: UpdateCompany now requires a loaded concurrency version. The cross-tenant leg is
+    // rejected on authorization before validation, so its version value is immaterial; the
+    // own-tenant leg passes the company's current version (see CurrentCompanyVersionAsync).
+    private static object UpdateCompanyBody(int expectedVersion = 1) => new
     {
         name = "Updated Company",
         addresses = new[]
@@ -100,7 +103,14 @@ public class CompanyCrossTenantAccessTests
             new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", postalCode = (string?)"SW1A 1AA", countryCode = "GB" },
             new { type = "TradingAddress", line1 = "11 Billing Street", city = "Manchester", postalCode = (string?)null, countryCode = "GB" },
         },
+        expectedVersion,
     };
+
+    private static async Task<int> CurrentCompanyVersionAsync(HttpClient client, Guid companyId)
+    {
+        var company = await client.GetFromJsonAsync<System.Text.Json.JsonElement>($"/api/companies/{companyId}");
+        return company.GetProperty("version").GetInt32();
+    }
 
     private static readonly object LogoBody = new
     {
@@ -132,10 +142,11 @@ public class CompanyCrossTenantAccessTests
         var (ownTenantId, otherCompanyId) = await SeedOwnAndOtherAsync();
         using var client = await ClientFor(CompanyAdminUser, ownTenantId);
 
-        var crossTenant = await client.PutAsJsonAsync($"/api/companies/{otherCompanyId}", UpdateCompanyBody);
+        var crossTenant = await client.PutAsJsonAsync($"/api/companies/{otherCompanyId}", UpdateCompanyBody());
         Assert.Equal(HttpStatusCode.Forbidden, crossTenant.StatusCode);
 
-        var ownTenant = await client.PutAsJsonAsync($"/api/companies/{ownTenantId}", UpdateCompanyBody);
+        var ownVersion = await CurrentCompanyVersionAsync(client, ownTenantId);
+        var ownTenant = await client.PutAsJsonAsync($"/api/companies/{ownTenantId}", UpdateCompanyBody(ownVersion));
         Assert.True(ownTenant.IsSuccessStatusCode, $"Expected 2xx for own tenant, got {(int)ownTenant.StatusCode}.");
     }
 

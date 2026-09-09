@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using HR.Web.Services;
 
 namespace HR.Web.Models;
 
@@ -11,7 +12,8 @@ public record EmploymentTypeListItemModel(
     string? Description,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
 public record CreateEmploymentTypeRequest(Guid CompanyId, string Name, string? Description);
 
@@ -24,7 +26,10 @@ public record CreateEmploymentTypeResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-public record UpdateEmploymentTypeRequest(Guid CompanyId, Guid Id, string Name, string? Description);
+public record UpdateEmploymentTypeRequest(
+    Guid CompanyId, Guid Id, string Name, string? Description,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdateEmploymentTypeResponse(
     Guid Id,
@@ -32,10 +37,13 @@ public record UpdateEmploymentTypeResponse(
     string Name,
     string? Description,
     bool IsActive,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
-public sealed class EmploymentTypeEditModel
+public sealed class EmploymentTypeEditModel : IHasVersion
 {
+    public int Version { get; set; }
+
     [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }

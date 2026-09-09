@@ -15,7 +15,8 @@ public class UpdatePositionProfileValidatorTests
         DepartmentId = Guid.NewGuid(),
         LocationId = Guid.NewGuid(),
         DefaultLeavePolicyId = Guid.NewGuid(),
-        Title = "Senior Developer"
+        Title = "Senior Developer",
+        ExpectedVersion = 1
     };
 
     [Fact]
@@ -253,5 +254,15 @@ public class UpdatePositionProfileValidatorTests
         });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.ErrorMessage == "NoticePeriodLengthOverride must be greater than 0.");
+    }
+
+    [Fact]
+    public void Validate_Fails_When_ExpectedVersion_Is_Null()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { ExpectedVersion = null });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.ExpectedVersion)
+            && e.ErrorMessage.Contains("concurrency version is required"));
     }
 }

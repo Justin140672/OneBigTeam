@@ -2,7 +2,8 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class DocumentTypeService(IHttpClientFactory httpClientFactory) : IEditService<DocumentTypeEditModel, Guid>
+public class DocumentTypeService(IHttpClientFactory httpClientFactory)
+    : IEditService<DocumentTypeEditModel, Guid>, IConcurrencyAwareEditService<DocumentTypeEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -31,7 +32,37 @@ public class DocumentTypeService(IHttpClientFactory httpClientFactory) : IEditSe
             Name = existing.Name,
             Description = existing.Description,
             AllowEmployeeUpload = existing.AllowEmployeeUpload,
+            Version = existing.Version,
         };
+    }
+
+    // Ticket 2: concurrency-aware update — sends the loaded version and surfaces the stale-save 409.
+    public async Task<ApiSaveResult> UpdateAsync(
+        Guid companyId, Guid id, DocumentTypeEditModel model, int? expectedVersion)
+    {
+        var request = new UpdateDocumentTypeRequest(
+            companyId, id, model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            model.AllowEmployeeUpload, expectedVersion);
+
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/document-types/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateDocumentTypeResponse>();
+            return ApiSaveResult.Ok(updated?.Version);
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return ApiSaveResult.Fail(
+                body?.Error ?? "A document type with that name already exists.", body?.Code == "concurrency");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return ApiSaveResult.Fail("Document type not found.");
+
+        return ApiSaveResult.Fail(body?.Error ?? "Failed to update document type.");
     }
 
     async Task<(DocumentTypeEditModel? Result, string? Error)> IEditService<DocumentTypeEditModel, Guid>.CreateAsync(
@@ -113,5 +144,5 @@ public class DocumentTypeService(IHttpClientFactory httpClientFactory) : IEditSe
         return body?.Error ?? "Failed to deactivate document type.";
     }
 
-    private sealed record ErrorEnvelope(string? Error);
+    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

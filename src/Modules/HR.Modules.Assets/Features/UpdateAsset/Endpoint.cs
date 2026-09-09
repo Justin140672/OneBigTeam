@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Assets.Features.UpdateAsset;
@@ -18,10 +19,7 @@ internal sealed class Endpoint(UpdateAssetHandler handler)
 
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code == "conflict"
-                ? StatusCodes.Status409Conflict
-                : StatusCodes.Status404NotFound;
-            await Send.ResultAsync(Results.Json(new { error = result.Error.Message }, statusCode: statusCode));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

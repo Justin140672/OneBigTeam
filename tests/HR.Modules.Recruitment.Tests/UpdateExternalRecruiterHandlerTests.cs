@@ -21,7 +21,7 @@ public class UpdateExternalRecruiterHandlerTests
         await db.SaveChangesAsync();
 
         var result = await handler(db).HandleAsync(
-            new UpdateExternalRecruiterRequest(companyId, recruiter.Id, "New Agency Name", "John Doe", "john@newagency.com", "9999", "https://newagency.com", "Updated"),
+            new UpdateExternalRecruiterRequest(companyId, recruiter.Id, "New Agency Name", "John Doe", "john@newagency.com", "9999", "https://newagency.com", "Updated", ExpectedVersion: 1),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -70,7 +70,7 @@ public class UpdateExternalRecruiterHandlerTests
         await db.SaveChangesAsync();
 
         await new UpdateExternalRecruiterHandler(db, new FakeClock(FixedUtcNow), auditPublisher).HandleAsync(
-            new UpdateExternalRecruiterRequest(companyId, recruiter.Id, "New Name", null, null, null, null, null),
+            new UpdateExternalRecruiterRequest(companyId, recruiter.Id, "New Name", null, null, null, null, null, ExpectedVersion: 1),
             CancellationToken.None);
 
         var evt = Assert.Single(auditPublisher.Published);

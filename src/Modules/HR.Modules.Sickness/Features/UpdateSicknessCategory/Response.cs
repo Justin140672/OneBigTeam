@@ -7,4 +7,5 @@ internal sealed record UpdateSicknessCategoryResponse(
     bool IsActive,
     int DisplayOrder,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

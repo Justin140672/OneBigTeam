@@ -18,4 +18,7 @@ internal sealed record UpdateSharedCompanyDocumentMetadataRequest
     public SharedCompanyDocumentReviewFrequency ReviewFrequency { get; init; }
     public int? CustomReviewFrequencyMonths { get; init; }
     public Guid? ReviewOwnerEmployeeId { get; init; }
+
+    // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
 }

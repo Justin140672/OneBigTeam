@@ -20,6 +20,11 @@ internal sealed class UpdateOnboardingTemplateValidator : AbstractValidator<Upda
             .MaximumLength(2000)
             .When(r => r.Description is not null);
 
+        // Ticket 2: a loaded version is mandatory on this protected update.
+        RuleFor(r => r.ExpectedVersion)
+            .NotNull()
+            .WithMessage("A concurrency version is required. Reload the page and try again.");
+
         RuleForEach(r => r.Tasks).ChildRules(task =>
         {
             task.RuleFor(t => t.Title)

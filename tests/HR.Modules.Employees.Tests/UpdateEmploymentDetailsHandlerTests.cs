@@ -49,6 +49,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             ProbationEndDate = manualOverrideDate
@@ -78,6 +79,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             ProbationEndDate = null
@@ -108,6 +110,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             NoticePeriodUnitOverride = NoticePeriodUnit.Weeks,
@@ -143,6 +146,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             NoticePeriodUnitOverride = null,
@@ -193,6 +197,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = Guid.NewGuid(),
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate
         }, Guid.NewGuid(), CancellationToken.None);
@@ -218,6 +223,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate
         }, Guid.NewGuid(), CancellationToken.None);
@@ -247,6 +253,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             DepartmentId = otherCompanyDept.Id
@@ -277,6 +284,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             LocationId = location.Id
@@ -310,6 +318,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             LocationId = otherCompanyLocation.Id
@@ -344,6 +353,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Draft,
             StartDate = StartDate,
             ManagerId = manager.Id
@@ -373,6 +383,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Draft,
             StartDate = StartDate
         }, Guid.NewGuid(), CancellationToken.None);
@@ -425,6 +436,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = employee.Status,
             StartDate = StartDate,
             DepartmentId = newDept.Id,
@@ -467,6 +479,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = employee.Status,
             StartDate = StartDate
         }, Guid.NewGuid(), CancellationToken.None);
@@ -494,6 +507,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             EmployeeNumber = "EMP-9999"
@@ -523,6 +537,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee1.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             EmployeeNumber = employee2.EmployeeNumber
@@ -553,6 +568,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee1.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             EmployeeNumber = "EMP-1111"
@@ -562,6 +578,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee2.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             EmployeeNumber = "EMP-2222"
@@ -596,6 +613,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             EmployeeNumber = "EMP-8888"
@@ -636,6 +654,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             ManagerId = newManager.Id
@@ -671,6 +690,7 @@ public class UpdateEmploymentDetailsHandlerTests
         {
             CompanyId = companyId,
             Id = employee.Id,
+            ExpectedVersion = 1,
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             CorrelationId = correlationId

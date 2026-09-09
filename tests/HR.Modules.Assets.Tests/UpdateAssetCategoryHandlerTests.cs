@@ -25,7 +25,8 @@ public class UpdateAssetCategoryHandlerTests
             CompanyId = companyId,
             Id = categoryId,
             Name = "New Name",
-            Description = "New Description"
+            Description = "New Description",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -54,7 +55,8 @@ public class UpdateAssetCategoryHandlerTests
             CompanyId = companyId,
             Id = categoryId,
             Name = "Electronics",
-            Description = null
+            Description = null,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -116,7 +118,8 @@ public class UpdateAssetCategoryHandlerTests
             CompanyId = companyId,
             Id = categoryId,
             Name = "Vehicles Updated",
-            Description = null
+            Description = null,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -161,7 +164,8 @@ public class UpdateAssetCategoryHandlerTests
             CompanyId = companyId,
             Id = categoryId,
             Name = "ELECTRONICS",
-            Description = "New description"
+            Description = "New description",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);

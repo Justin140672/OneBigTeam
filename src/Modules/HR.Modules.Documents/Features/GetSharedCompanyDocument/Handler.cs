@@ -162,6 +162,7 @@ internal sealed class GetSharedCompanyDocumentHandler(
                 ? (namesLookup.TryGetValue(lastReviewerId, out var lastReviewedByName) ? lastReviewedByName : "Unknown")
                 : null,
             document.LastReviewNotes,
-            reviewHistory));
+            reviewHistory,
+            document.Version));
     }
 }

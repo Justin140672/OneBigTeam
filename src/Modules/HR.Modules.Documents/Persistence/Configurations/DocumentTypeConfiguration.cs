@@ -38,6 +38,12 @@ internal sealed class DocumentTypeConfiguration : IEntityTypeConfiguration<Docum
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(dt => dt.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(dt => dt.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

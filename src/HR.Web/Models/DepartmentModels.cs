@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using HR.Web.Services;
 
 namespace HR.Web.Models;
 
@@ -11,7 +12,8 @@ public record DepartmentListItemModel(
     string Name,
     Guid? ParentDepartmentId,
     Guid? ManagerEmployeeId,
-    bool IsActive);
+    bool IsActive,
+    int Version = 0);
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
@@ -22,7 +24,8 @@ public record GetDepartmentResponse(
     string? Description,
     Guid? ParentDepartmentId,
     Guid? ManagerEmployeeId,
-    bool IsActive);
+    bool IsActive,
+    int Version = 0);
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
 
@@ -49,7 +52,9 @@ public record UpdateDepartmentRequest(
     string Name,
     string? Description,
     Guid? ParentDepartmentId,
-    Guid? ManagerEmployeeId);
+    Guid? ManagerEmployeeId,
+    // Ticket 2: optimistic-concurrency token loaded before editing.
+    int? ExpectedVersion = null);
 
 public record UpdateDepartmentResponse(
     Guid Id,
@@ -59,12 +64,15 @@ public record UpdateDepartmentResponse(
     Guid? ParentDepartmentId,
     Guid? ManagerEmployeeId,
     bool IsActive,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version = 0);
 
 // ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
-public sealed class DepartmentEditModel
+public sealed class DepartmentEditModel : IHasVersion
 {
+    public int Version { get; set; }
+
     [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }

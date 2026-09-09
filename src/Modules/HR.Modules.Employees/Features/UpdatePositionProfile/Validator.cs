@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.SharedKernel;
 using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 
@@ -8,6 +9,9 @@ internal sealed class UpdatePositionProfileValidator : AbstractValidator<UpdateP
 {
     public UpdatePositionProfileValidator()
     {
+        // Ticket 2 item 3: a loaded concurrency version is mandatory on this protected update.
+        RuleFor(r => r.ExpectedVersion).RequireLoadedVersion();
+
         RuleFor(r => r.CompanyId)
             .NotEmpty();
 

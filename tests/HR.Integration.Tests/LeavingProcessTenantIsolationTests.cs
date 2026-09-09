@@ -139,7 +139,10 @@ public class LeavingProcessTenantIsolationTests
                 employeeId = employeeAId,
                 leavingDate = LeavingDate.AddDays(31).ToString("yyyy-MM-dd"),
                 lastWorkingDay = LeavingDate.AddDays(30).ToString("yyyy-MM-dd"),
-                leavingReason = "MutualAgreement"
+                leavingReason = "MutualAgreement",
+                // Ticket 2: amend now requires a loaded version; supply one so the request clears
+                // validation and the tenant-scoping 404 is what's actually asserted.
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

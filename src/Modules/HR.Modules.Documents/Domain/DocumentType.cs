@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Documents.Domain;
 
-internal sealed class DocumentType
+internal sealed class DocumentType : IVersionedAggregate
 {
     private DocumentType() { }
 
@@ -12,6 +14,11 @@ internal sealed class DocumentType
     public bool AllowEmployeeUpload { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public static DocumentType Create(
         Guid id,
@@ -27,6 +34,7 @@ internal sealed class DocumentType
         Description         = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
         IsActive            = true,
         AllowEmployeeUpload = allowEmployeeUpload,
+        Version             = 1,
         CreatedAt           = now,
         UpdatedAt           = now,
     };

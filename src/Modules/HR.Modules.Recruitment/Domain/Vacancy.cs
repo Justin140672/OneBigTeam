@@ -1,8 +1,13 @@
 using HR.Modules.Employees.Contracts;
 namespace HR.Modules.Recruitment.Domain;
 
-internal sealed class Vacancy
+internal sealed class Vacancy : HR.SharedKernel.IVersionedAggregate
 {
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
+
     private Vacancy() { }
 
     public Guid Id { get; private set; }
@@ -82,6 +87,7 @@ internal sealed class Vacancy
         HiringManagerId    = hiringManagerId,
         AssignedRecruiterId = assignedRecruiterId,
         IsAdvertisedInternally = isAdvertisedInternally,
+        Version            = 1,
         CreatedAt          = now,
         UpdatedAt          = now,
     };

@@ -1,10 +1,11 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Contracts;
 using HR.Modules.Employees.Services;
+using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Domain;
 
-internal sealed class EmployeeLeavingProcess
+internal sealed class EmployeeLeavingProcess : IVersionedAggregate
 {
     private EmployeeLeavingProcess() { }
 
@@ -35,6 +36,11 @@ internal sealed class EmployeeLeavingProcess
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
+
     public static EmployeeLeavingProcess Create(
         Guid id,
         Guid companyId,
@@ -63,6 +69,7 @@ internal sealed class EmployeeLeavingProcess
             NoticeSource = noticeSource,
             LeavingReason = leavingReason,
             Status = LeavingProcessStatus.InProgress,
+            Version = 1,
             StartedAt = now,
             StartedByUserId = startedByUserId,
             ReplacementManagerEmployeeId = replacementManagerEmployeeId,

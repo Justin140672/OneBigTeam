@@ -11,7 +11,8 @@ public class UpdateAssetCategoryValidatorTests
         CompanyId = Guid.NewGuid(),
         Id = Guid.NewGuid(),
         Name = "Electronics",
-        Description = "Electronic devices and accessories"
+        Description = "Electronic devices and accessories",
+        ExpectedVersion = 1
     };
 
     [Fact]
@@ -86,5 +87,14 @@ public class UpdateAssetCategoryValidatorTests
         var result = _validator.Validate(Valid() with { Name = "   " });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateAssetCategoryRequest.Name));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_ExpectedVersion_Is_Null()
+    {
+        var result = _validator.Validate(Valid() with { ExpectedVersion = null });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateAssetCategoryRequest.ExpectedVersion)
+            && e.ErrorMessage.Contains("concurrency version is required"));
     }
 }
