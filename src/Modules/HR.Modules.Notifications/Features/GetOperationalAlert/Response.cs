@@ -1,0 +1,26 @@
+namespace HR.Modules.Notifications.Features.GetOperationalAlert;
+
+internal sealed record GetOperationalAlertResponse(
+    Guid Id,
+    Guid CompanyId,
+    string Category,
+    string Severity,
+    string Status,
+    string Summary,
+    int OccurrenceCount,
+    DateTimeOffset FirstOccurredAt,
+    DateTimeOffset LastOccurredAt,
+    string? AffectedEntityType,
+    Guid? AffectedEntityId,
+    int? AffectedItemCount,
+    DateTimeOffset? ResolvedAt,
+    Guid? ResolvedByUserId,
+    bool IsRead,
+    string? Detail,
+    string DedupKey,
+    string? RecommendedAction,
+    string? ActionUrl,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? AcknowledgedAt,
+    Guid? AcknowledgedByUserId,
+    string? ResolutionNote);

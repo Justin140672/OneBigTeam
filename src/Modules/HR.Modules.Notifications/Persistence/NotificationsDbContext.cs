@@ -13,6 +13,7 @@ internal sealed class NotificationsDbContext : DbContext
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<EmailDelivery> EmailDeliveries => Set<EmailDelivery>();
     public DbSet<AdministrativeAlert> AdministrativeAlerts => Set<AdministrativeAlert>();
+    public DbSet<OperationalAlertEmailDelivery> OperationalAlertEmailDeliveries => Set<OperationalAlertEmailDelivery>();
     public DbSet<NotificationAuditReconciliationCursor> NotificationAuditReconciliationCursors =>
         Set<NotificationAuditReconciliationCursor>();
 

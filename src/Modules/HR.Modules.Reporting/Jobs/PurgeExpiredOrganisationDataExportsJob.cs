@@ -8,6 +8,13 @@ namespace HR.Modules.Reporting.Jobs;
 /// export past its 7-day expiry and marks the row Expired. Companies under a legal hold (NFR-07)
 /// are skipped so their export data is preserved. A storage-delete failure is logged and does not
 /// stop the run. Scheduled from <see cref="ReportingModule.UseReportingRecurringJobs"/>.
+///
+/// <para>Ticket 3K: this job re-lists and deletes <i>every</i> attempt key for the export (orphans
+/// plus the published archive) each run, independent of the artefact-cleanup cursor. So even a
+/// Completed export whose orphan archives were already swept has any remaining files removed when it
+/// expires here; and if a storage failure leaves work behind, the durable artefact-cleanup sweep
+/// still picks the now-Expired row up on a later run via its <c>artefact_cleanup_next_attempt_at</c>
+/// cursor.</para>
 /// </summary>
 internal sealed class PurgeExpiredOrganisationDataExportsJob(
     IOrganisationDataExportJobStore jobStore,
@@ -29,18 +36,24 @@ internal sealed class PurgeExpiredOrganisationDataExportsJob(
                 continue;
             }
 
-            if (!string.IsNullOrWhiteSpace(export.StorageKey))
+            // Follow-up D: remove every attempt archive stored for this export (superseded workers'
+            // orphans as well as the published one), not just the published key.
+            try
             {
-                try
-                {
-                    await storage.DeleteAsync(export.StorageKey!, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex,
-                        "Failed to delete stored organisation data export {ExportId} ({StorageKey}); marking expired anyway.",
-                        export.Id, export.StorageKey);
-                }
+                var keys = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var key in await storage.ListAttemptKeysAsync(export.CompanyId, export.Id, cancellationToken))
+                    keys.Add(key);
+                if (!string.IsNullOrWhiteSpace(export.StorageKey))
+                    keys.Add(export.StorageKey!);
+
+                foreach (var key in keys)
+                    await storage.DeleteAsync(key, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Failed to delete stored organisation data export {ExportId} ({StorageKey}); marking expired anyway.",
+                    export.Id, export.StorageKey);
             }
 
             await jobStore.MarkExpiredAsync(export.Id, cancellationToken);

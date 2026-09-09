@@ -300,6 +300,10 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
     public async Task OpenMetricDrillDownAsync(string label)
     {
         await WaitForSummaryTilesLoadedAsync();
+        // A previous drill-down's Syncfusion overlay may still be mid-fade and intercepting pointer
+        // events (see WaitForOverlayToClearAsync) — clicking the next tile through it is silently
+        // swallowed and the dialog never opens. Settle first.
+        await WaitForOverlayToClearAsync();
         await SummaryTile(label).ClickAsync();
         await DrillDownDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
@@ -333,5 +337,26 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
     {
         await DrillDownDialog.GetByRole(AriaRole.Button, new() { Name = "Close" }).First.ClickAsync();
         await DrillDownDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        await WaitForOverlayToClearAsync();
+    }
+
+    /// <summary>
+    /// Syncfusion's modal overlay (".e-dlg-overlay") is a DOM sibling of the dialog, and its close
+    /// animation can still be mid-fade (intercepting pointer events) for a moment after the dialog
+    /// role element already reports "Hidden". A caller that immediately clicks the next tile can
+    /// otherwise have that click swallowed by the stale overlay, so the next drill-down never opens.
+    /// Best-effort: a no-op if no overlay is present.
+    /// </summary>
+    private async Task WaitForOverlayToClearAsync()
+    {
+        try
+        {
+            await page.Locator(".e-dlg-overlay").WaitForAsync(
+                new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            // Ignore — best-effort settle only.
+        }
     }
 }

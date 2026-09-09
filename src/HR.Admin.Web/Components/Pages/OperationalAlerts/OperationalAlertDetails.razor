@@ -1,0 +1,205 @@
+@page "/operational-alerts/{Id:guid}"
+@inject OperationalAlertsService OperationalAlertsService
+
+<PageTitle>Operational alert — Admin Portal</PageTitle>
+
+<AdminBreadcrumb Trail="@(new (string, string?)[] { ("Operational Alerts", "/operational-alerts"), ("Alert details", null) })" />
+
+<h1>Operational alert</h1>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_alert is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view this operational alert, or it couldn't be found. Contact a
+        platform administrator if you believe this is a mistake.
+    </div>
+}
+else
+{
+    <section class="details-panel admin-actions-panel">
+        <h2>Resolution</h2>
+        @if (_alert.Status == "Resolved")
+        {
+            <p class="admin-actions-intro">
+                This alert was resolved@(_alert.ResolvedAt is { } r ? $" on {r:dd MMM yyyy HH:mm}" : "").
+            </p>
+        }
+        else
+        {
+            <p class="admin-actions-intro">
+                Resolving an alert requires a resolution note (5–1000 characters) and is recorded
+                against your account.
+            </p>
+            <div class="admin-actions-buttons">
+                <SfButton OnClick="OpenResolve">Resolve alert</SfButton>
+            </div>
+        }
+        @if (_actionMessage is not null)
+        {
+            <p class="@(_actionSucceeded ? "admin-action-success" : "admin-action-error")">@_actionMessage</p>
+        }
+    </section>
+
+    <div class="details-grid">
+        <section class="details-panel">
+            <h2>Alert</h2>
+            <dl class="details-kv">
+                <dt>Severity</dt>
+                <dd>@_alert.Severity</dd>
+                <dt>Category</dt>
+                <dd>@_alert.Category</dd>
+                <dt>Status</dt>
+                <dd>@_alert.Status</dd>
+                <dt>Summary</dt>
+                <dd>@(_alert.Summary ?? "—")</dd>
+                <dt>Detail</dt>
+                <dd>@(_alert.Detail ?? "—")</dd>
+                <dt>Recommended action</dt>
+                <dd>@(_alert.RecommendedAction ?? "—")</dd>
+                <dt>Action URL</dt>
+                <dd>
+                    @if (!string.IsNullOrWhiteSpace(_alert.ActionUrl))
+                    {
+                        <a href="@_alert.ActionUrl" target="_blank" rel="noopener noreferrer">@_alert.ActionUrl</a>
+                    }
+                    else
+                    {
+                        <text>—</text>
+                    }
+                </dd>
+                <dt>Dedup key</dt>
+                <dd><code>@(_alert.DedupKey ?? "—")</code></dd>
+            </dl>
+        </section>
+
+        <section class="details-panel">
+            <h2>Scope</h2>
+            <dl class="details-kv">
+                <dt>Company id</dt>
+                <dd>@(_alert.CompanyId?.ToString() ?? "—")</dd>
+                <dt>Occurrence count</dt>
+                <dd>@_alert.OccurrenceCount</dd>
+                <dt>Affected entity type</dt>
+                <dd>@(_alert.AffectedEntityType ?? "—")</dd>
+                <dt>Affected entity id</dt>
+                <dd>@(_alert.AffectedEntityId?.ToString() ?? "—")</dd>
+                <dt>Affected item count</dt>
+                <dd>@_alert.AffectedItemCount</dd>
+                <dt>Read</dt>
+                <dd>@(_alert.IsRead ? "Yes" : "No")</dd>
+            </dl>
+        </section>
+
+        <section class="details-panel">
+            <h2>Timeline</h2>
+            <dl class="details-kv">
+                <dt>Created</dt>
+                <dd>@FormatDate(_alert.CreatedAt)</dd>
+                <dt>First occurred</dt>
+                <dd>@FormatDate(_alert.FirstOccurredAt)</dd>
+                <dt>Last occurred</dt>
+                <dd>@FormatDate(_alert.LastOccurredAt)</dd>
+                <dt>Acknowledged</dt>
+                <dd>@FormatDate(_alert.AcknowledgedAt)</dd>
+                <dt>Acknowledged by</dt>
+                <dd>@(_alert.AcknowledgedByUserId?.ToString() ?? "—")</dd>
+                <dt>Resolved</dt>
+                <dd>@FormatDate(_alert.ResolvedAt)</dd>
+                <dt>Resolved by</dt>
+                <dd>@(_alert.ResolvedByUserId?.ToString() ?? "—")</dd>
+                <dt>Resolution note</dt>
+                <dd>@(_alert.ResolutionNote ?? "—")</dd>
+            </dl>
+        </section>
+    </div>
+}
+
+<a href="/operational-alerts">Back to operational alerts</a>
+
+<AdminActionConfirmDialog Visible="_dialogVisible"
+                           Title="Resolve alert"
+                           Warning="This marks the operational alert as resolved. Provide a resolution note describing what was done (5–1000 characters)."
+                           ConfirmText="Resolve alert"
+                           DangerConfirm="false"
+                           Busy="_actionBusy"
+                           OnConfirmed="OnResolveConfirmedAsync"
+                           OnCancelled="CloseDialog" />
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private OperationalAlertDetailResponse? _alert;
+    private bool _loading = true;
+
+    private bool _dialogVisible;
+    private bool _actionBusy;
+    private string? _actionMessage;
+    private bool _actionSucceeded;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _alert = await OperationalAlertsService.GetAlertAsync(Id);
+        _loading = false;
+    }
+
+    private void OpenResolve()
+    {
+        _actionMessage = null;
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogVisible = false;
+    }
+
+    private async Task OnResolveConfirmedAsync((string Reason, DateTimeOffset? NewTrialExpiresAt) input)
+    {
+        _actionBusy = true;
+        try
+        {
+            var result = await OperationalAlertsService.ResolveAlertAsync(Id, input.Reason);
+
+            switch (result.Outcome)
+            {
+                case ResolveAlertOutcome.Success:
+                    _actionSucceeded = true;
+                    _actionMessage = "Alert resolved successfully.";
+                    await LoadAsync();
+                    break;
+                case ResolveAlertOutcome.AlreadyResolved:
+                    _actionSucceeded = false;
+                    _actionMessage = "This alert has already been resolved by someone else.";
+                    await LoadAsync();
+                    break;
+                case ResolveAlertOutcome.ValidationFailed:
+                    _actionSucceeded = false;
+                    _actionMessage = "The resolution note must be between 5 and 1000 characters.";
+                    break;
+                default:
+                    _actionSucceeded = false;
+                    _actionMessage = "The alert could not be resolved. Please try again.";
+                    break;
+            }
+        }
+        finally
+        {
+            _actionBusy = false;
+            _dialogVisible = false;
+        }
+    }
+
+    private static string FormatDate(DateTimeOffset? value) =>
+        value is { } dt ? dt.ToString("dd MMM yyyy HH:mm") : "—";
+}

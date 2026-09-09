@@ -81,6 +81,18 @@ public static class ReportingModule
             "organisation-data-export-purge-expired",
             job => job.ExecuteAsync(CancellationToken.None),
             Cron.Daily());
+
+        // Ticket 3: recover exports left Pending-but-never-queued or interrupted mid-build.
+        jobManager.AddOrUpdate<Jobs.RecoverStalledOrganisationDataExportsJob>(
+            "organisation-data-export-recover-stalled",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "*/5 * * * *");
+
+        // Follow-up I: retryable cleanup of attempt archives left by failed/abandoned exports.
+        jobManager.AddOrUpdate<Jobs.CleanUpOrganisationDataExportArtefactsJob>(
+            "organisation-data-export-cleanup-artefacts",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "23 */6 * * *");
         return app;
     }
 
@@ -94,8 +106,12 @@ public static class ReportingModule
         services.AddScoped<IOrganisationDataExportJobStore, Services.OrganisationDataExportJobStore>();
         services.AddScoped<IOrganisationDataExportStatusReader, Services.OrganisationDataExportStatusReader>();
         services.AddSingleton<OrganisationDataExportPackageBuilder>();
+        // Follow-up G: renews the build job's ownership lease from its own DI/DbContext scope.
+        services.AddSingleton<Jobs.IOrganisationDataExportLeaseRenewer, Jobs.ScopedOrganisationDataExportLeaseRenewer>();
         services.AddScoped<Jobs.OrganisationDataExportBuildJob>();
         services.AddScoped<Jobs.PurgeExpiredOrganisationDataExportsJob>();
+        services.AddScoped<Jobs.RecoverStalledOrganisationDataExportsJob>();
+        services.AddScoped<Jobs.CleanUpOrganisationDataExportArtefactsJob>();
         services.AddScoped<Features.RequestOrganisationDataExport.RequestOrganisationDataExportHandler>();
         services.AddScoped<IValidator<Features.RequestOrganisationDataExport.RequestOrganisationDataExportRequest>, Features.RequestOrganisationDataExport.RequestOrganisationDataExportValidator>();
         services.AddScoped<Features.GetLatestOrganisationDataExport.GetLatestOrganisationDataExportHandler>();

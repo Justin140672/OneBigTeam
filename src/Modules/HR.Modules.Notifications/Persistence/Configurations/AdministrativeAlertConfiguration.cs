@@ -28,6 +28,9 @@ internal sealed class AdministrativeAlertConfiguration : IEntityTypeConfiguratio
             .HasColumnName("category")
             .IsRequired();
 
+        builder.Property(a => a.Reason)
+            .HasColumnName("reason");
+
         builder.Property(a => a.Summary)
             .HasColumnName("summary")
             .HasMaxLength(300)
@@ -68,6 +71,9 @@ internal sealed class AdministrativeAlertConfiguration : IEntityTypeConfiguratio
         builder.Property(a => a.ActionUrl)
             .HasColumnName("action_url")
             .HasMaxLength(500);
+
+        builder.Property(a => a.AffectedItemCount)
+            .HasColumnName("affected_item_count");
 
         builder.Property(a => a.IsRead)
             .HasColumnName("is_read")

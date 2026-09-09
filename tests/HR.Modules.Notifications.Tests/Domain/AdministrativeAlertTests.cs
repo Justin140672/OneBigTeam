@@ -9,7 +9,9 @@ public class AdministrativeAlertTests
 
     private static RaiseAdministrativeAlertCommand Command(
         AdministrativeAlertSeverity severity = AdministrativeAlertSeverity.Warning,
-        DateTimeOffset? occurredAt = null) =>
+        DateTimeOffset? occurredAt = null,
+        int? affectedItemCount = null,
+        AdministrativeAlertReason? reason = null) =>
         new(
             CompanyId: Guid.NewGuid(),
             Severity: severity,
@@ -21,7 +23,9 @@ public class AdministrativeAlertTests
             AffectedEntityType: "EmailDelivery",
             AffectedEntityId: Guid.NewGuid(),
             RecommendedAction: "check config",
-            ActionUrl: null);
+            ActionUrl: null,
+            AffectedItemCount: affectedItemCount,
+            Reason: reason);
 
     private static AdministrativeAlert Raise(
         AdministrativeAlertSeverity severity = AdministrativeAlertSeverity.Warning,
@@ -201,5 +205,60 @@ public class AdministrativeAlertTests
         alert.Resolve(Guid.NewGuid(), null, Now);
 
         Assert.Throws<InvalidOperationException>(() => alert.Resolve(Guid.NewGuid(), null, Now));
+    }
+
+    // Follow-up C: AffectedItemCount --------------------------------------------------------------
+
+    [Fact]
+    public void Raise_Copies_AffectedItemCount_From_The_Command()
+    {
+        var alert = AdministrativeAlert.Raise(Guid.NewGuid(), Command(affectedItemCount: 7), Now);
+
+        Assert.Equal(7, alert.AffectedItemCount);
+    }
+
+    [Fact]
+    public void Raise_Copies_Reason_From_The_Command()
+    {
+        var alert = AdministrativeAlert.Raise(
+            Guid.NewGuid(), Command(reason: AdministrativeAlertReason.MissingDocumentExport), Now);
+
+        Assert.Equal(AdministrativeAlertReason.MissingDocumentExport, alert.Reason);
+    }
+
+    [Fact]
+    public void Raise_Leaves_Reason_Null_When_Command_Omits_It()
+    {
+        var alert = AdministrativeAlert.Raise(Guid.NewGuid(), Command(reason: null), Now);
+
+        Assert.Null(alert.Reason);
+    }
+
+    [Fact]
+    public void Raise_Leaves_AffectedItemCount_Null_When_Command_Omits_It()
+    {
+        var alert = AdministrativeAlert.Raise(Guid.NewGuid(), Command(affectedItemCount: null), Now);
+
+        Assert.Null(alert.AffectedItemCount);
+    }
+
+    [Fact]
+    public void RecordRecurrence_With_A_Value_Updates_AffectedItemCount()
+    {
+        var alert = AdministrativeAlert.Raise(Guid.NewGuid(), Command(affectedItemCount: 3), Now);
+
+        alert.RecordRecurrence(AdministrativeAlertSeverity.Warning, "s", null, Now.AddMinutes(1), affectedItemCount: 9);
+
+        Assert.Equal(9, alert.AffectedItemCount);
+    }
+
+    [Fact]
+    public void RecordRecurrence_With_Null_Leaves_The_Existing_AffectedItemCount_Untouched()
+    {
+        var alert = AdministrativeAlert.Raise(Guid.NewGuid(), Command(affectedItemCount: 3), Now);
+
+        alert.RecordRecurrence(AdministrativeAlertSeverity.Warning, "s", null, Now.AddMinutes(1), affectedItemCount: null);
+
+        Assert.Equal(3, alert.AffectedItemCount);
     }
 }

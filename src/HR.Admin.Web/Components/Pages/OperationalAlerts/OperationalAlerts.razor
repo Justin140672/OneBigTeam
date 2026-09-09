@@ -1,0 +1,173 @@
+@page "/operational-alerts"
+@inject OperationalAlertsService OperationalAlertsService
+@inject NavigationManager Navigation
+
+<PageTitle>Operational Alerts — Admin Portal</PageTitle>
+
+<h1>Operational Alerts</h1>
+
+<div class="customer-list-toolbar failed-payments-toolbar">
+    <SfTextBox Placeholder="Filter by company id"
+               Value="@_companyIdText"
+               ValueChanged="@OnCompanyIdChanged"
+               CssClass="customer-search-box"></SfTextBox>
+
+    <select class="failed-payments-status-filter" value="@_categoryFilter" @onchange="OnCategoryFilterChanged">
+        <option value="">All categories</option>
+        <option value="Compliance">Compliance</option>
+        <option value="ReportGeneration">Report Generation</option>
+        <option value="IntegrationDelivery">Integration Delivery</option>
+        <option value="Security">Security</option>
+    </select>
+
+    <select class="failed-payments-status-filter" value="@_statusFilter" @onchange="OnStatusFilterChanged">
+        <option value="open">Open</option>
+        <option value="resolved">Resolved</option>
+    </select>
+</div>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_response is null)
+{
+    <div class="dashboard-error">
+        You're not authorised to view platform operational alerts, or they couldn't be loaded.
+        Contact a platform administrator if you believe this is a mistake.
+    </div>
+}
+else if (_response.Items.Count == 0)
+{
+    <p class="activity-empty">No operational alerts found for the selected filters.</p>
+}
+else
+{
+    <SfGrid @ref="_grid"
+            DataSource="@_response.Items"
+            AllowSorting="true"
+            AllowFiltering="true"
+            class="hr-grid">
+        <GridEvents TValue="OperationalAlertListItem" RowSelected="OnRowSelected" />
+        <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+        <GridColumns>
+            <GridColumn Field="@nameof(OperationalAlertListItem.Severity)" HeaderText="Severity" Width="120" />
+            <GridColumn Field="@nameof(OperationalAlertListItem.Category)" HeaderText="Category" Width="160" />
+            <GridColumn Field="@nameof(OperationalAlertListItem.CompanyId)" HeaderText="Company" Width="200" />
+            <GridColumn Field="@nameof(OperationalAlertListItem.Summary)" HeaderText="Summary" Width="320" />
+            <GridColumn Field="@nameof(OperationalAlertListItem.OccurrenceCount)" HeaderText="Occurrences" Width="130" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+            <GridColumn Field="@nameof(OperationalAlertListItem.FirstOccurredAt)" HeaderText="First seen" Width="170" Format="dd MMM yyyy HH:mm" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+            <GridColumn Field="@nameof(OperationalAlertListItem.LastOccurredAt)" HeaderText="Latest" Width="170" Format="dd MMM yyyy HH:mm" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+            <GridColumn Field="@nameof(OperationalAlertListItem.Status)" HeaderText="Status" Width="130" />
+        </GridColumns>
+    </SfGrid>
+
+    <div class="operational-alerts-pager">
+        <SfButton Disabled="@(_page <= 1)" OnClick="PreviousPageAsync">Previous</SfButton>
+        <span>Page @_response.Page — showing @_response.Items.Count of @_response.TotalCount alerts</span>
+        <SfButton Disabled="@(!HasNextPage)" OnClick="NextPageAsync">Next</SfButton>
+    </div>
+}
+
+@code {
+    private SfGrid<OperationalAlertListItem>? _grid;
+    private OperationalAlertListResponse? _response;
+    private bool _loading = true;
+
+    private const int PageSize = 20;
+    private string? _companyIdText;
+    private string _categoryFilter = "";
+    private string _statusFilter = "open";
+    private int _page = 1;
+    private CancellationTokenSource? _filterDebounceCts;
+
+    private bool HasNextPage =>
+        _response is not null && _response.Page * _response.PageSize < _response.TotalCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        Guid? companyId = Guid.TryParse(_companyIdText, out var parsed) ? parsed : null;
+
+        _response = await OperationalAlertsService.GetAlertsAsync(new OperationalAlertFilter(
+            companyId,
+            string.IsNullOrEmpty(_categoryFilter) ? null : _categoryFilter,
+            _statusFilter,
+            _page,
+            PageSize));
+
+        _loading = false;
+    }
+
+    private async Task DebouncedReloadAsync()
+    {
+        _filterDebounceCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _filterDebounceCts = cts;
+
+        try
+        {
+            await Task.Delay(300, cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (cts.IsCancellationRequested)
+            return;
+
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnCompanyIdChanged(string? value)
+    {
+        _companyIdText = value;
+        _page = 1;
+        await DebouncedReloadAsync();
+    }
+
+    private async Task OnCategoryFilterChanged(Microsoft.AspNetCore.Components.ChangeEventArgs args)
+    {
+        _categoryFilter = args.Value?.ToString() ?? "";
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnStatusFilterChanged(Microsoft.AspNetCore.Components.ChangeEventArgs args)
+    {
+        _statusFilter = args.Value?.ToString() ?? "open";
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        if (_page <= 1)
+            return;
+        _page--;
+        await LoadAsync();
+    }
+
+    private async Task NextPageAsync()
+    {
+        if (!HasNextPage)
+            return;
+        _page++;
+        await LoadAsync();
+    }
+
+    private void OnRowSelected(Syncfusion.Blazor.Grids.RowSelectEventArgs<OperationalAlertListItem> args)
+    {
+        if (args.Data is not null)
+            Navigation.NavigateTo($"/operational-alerts/{args.Data.Id}");
+    }
+}

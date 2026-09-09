@@ -13,9 +13,9 @@ internal sealed class LocalOrganisationDataExportStorage : IOrganisationDataExpo
     private readonly string _basePath =
         Path.Combine(Path.GetTempPath(), "onebigteam", "organisation-exports");
 
-    public async Task<string> UploadAsync(Guid companyId, Guid exportId, Stream content, CancellationToken cancellationToken)
+    public async Task<string> UploadAsync(Guid companyId, Guid exportId, Guid attemptToken, Stream content, CancellationToken cancellationToken)
     {
-        var storageKey = $"organisation-exports/{companyId}/{exportId}.zip";
+        var storageKey = $"organisation-exports/{companyId}/{exportId}/{attemptToken}.zip";
         var fullPath = ToFullPath(storageKey);
 
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
@@ -42,6 +42,19 @@ internal sealed class LocalOrganisationDataExportStorage : IOrganisationDataExpo
             File.Delete(fullPath);
 
         return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<string>> ListAttemptKeysAsync(Guid companyId, Guid exportId, CancellationToken cancellationToken)
+    {
+        var prefix = $"organisation-exports/{companyId}/{exportId}";
+        var dir = ToFullPath(prefix);
+        if (!Directory.Exists(dir))
+            return Task.FromResult<IReadOnlyList<string>>([]);
+
+        var keys = Directory.EnumerateFiles(dir)
+            .Select(f => $"{prefix}/{Path.GetFileName(f)}")
+            .ToList();
+        return Task.FromResult<IReadOnlyList<string>>(keys);
     }
 
     private string ToFullPath(string storageKey) =>

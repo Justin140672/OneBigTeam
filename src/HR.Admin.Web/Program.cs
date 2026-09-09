@@ -59,6 +59,7 @@ builder.Services.AddScoped<BackgroundJobsService>();
 builder.Services.AddScoped<SystemHealthService>();
 builder.Services.AddScoped<ApplicationMetricsService>();
 builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<OperationalAlertsService>();
 builder.Services.AddScoped<DeletionQueueService>();
 builder.Services.AddScoped<AdminUsersService>();
 builder.Services.AddScoped<PlatformSettingsService>();

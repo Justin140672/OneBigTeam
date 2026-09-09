@@ -18,7 +18,7 @@ namespace HR.Modules.Reporting.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("reporting")
-                .HasAnnotation("ProductVersion", "10.0.9")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -28,6 +28,26 @@ namespace HR.Modules.Reporting.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<int>("ArtefactCleanupAttemptCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("artefact_cleanup_attempt_count");
+
+                    b.Property<DateTimeOffset?>("ArtefactCleanupNextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("artefact_cleanup_next_attempt_at");
+
+                    b.Property<int>("AttemptCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTimeOffset?>("AttemptFilesCleanedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attempt_files_cleaned_at");
 
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
@@ -55,6 +75,10 @@ namespace HR.Modules.Reporting.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("file_size_bytes");
 
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at");
+
                     b.Property<DateTimeOffset?>("LastDownloadedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_downloaded_at");
@@ -62,6 +86,34 @@ namespace HR.Modules.Reporting.Migrations
                     b.Property<Guid?>("LastDownloadedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("last_downloaded_by_user_id");
+
+                    b.Property<int>("LateUploadRecheckAttemptCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("late_upload_recheck_attempt_count");
+
+                    b.Property<DateTimeOffset?>("LateUploadRecheckNextAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("late_upload_recheck_next_at");
+
+                    b.Property<DateTimeOffset?>("LeaseAcquiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_acquired_at");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_at");
+
+                    b.Property<Guid?>("LeaseOwnerToken")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_owner_token");
+
+                    b.Property<int>("MissingDocumentCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("missing_document_count");
 
                     b.Property<DateTimeOffset>("RequestedAt")
                         .HasColumnType("timestamp with time zone")
@@ -89,11 +141,29 @@ namespace HR.Modules.Reporting.Migrations
                         .HasColumnType("text")
                         .HasColumnName("storage_key");
 
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_organisation_data_exports_active_per_company")
+                        .HasFilter("status IN ('Pending', 'InProgress')");
+
+                    b.HasIndex("AttemptFilesCleanedAt", "ArtefactCleanupNextAttemptAt");
+
+                    b.HasIndex("AttemptFilesCleanedAt", "LateUploadRecheckNextAt");
+
+                    b.HasIndex("CompanyId", "RequestedAt");
 
                     b.HasIndex("CompanyId", "Status");
 
-                    b.HasIndex("CompanyId", "RequestedAt");
+                    b.HasIndex("Status", "AttemptFilesCleanedAt");
 
                     b.ToTable("organisation_data_exports", "reporting");
                 });

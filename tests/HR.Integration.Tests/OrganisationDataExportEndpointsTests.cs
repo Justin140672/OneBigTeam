@@ -118,11 +118,12 @@ public class OrganisationDataExportEndpointsTests
         var storage = scope.ServiceProvider.GetRequiredService<IOrganisationDataExportStorage>();
 
         var export = OrganisationDataExport.Create(AcmeCompanyId, CompanyAdmin, "Company Admin", DateTimeOffset.UtcNow.AddMinutes(-10));
-        export.MarkInProgress(DateTimeOffset.UtcNow.AddMinutes(-9));
+        var ownerToken = Guid.NewGuid();
+        export.BeginAttempt(ownerToken, DateTimeOffset.UtcNow.AddMinutes(-9));
 
         using var content = new MemoryStream("PK fake-zip"u8.ToArray());
-        var key = await storage.UploadAsync(AcmeCompanyId, export.Id, content, CancellationToken.None);
-        export.MarkCompleted(key, content.Length, DateTimeOffset.UtcNow.AddMinutes(-8));
+        var key = await storage.UploadAsync(AcmeCompanyId, export.Id, ownerToken, content, CancellationToken.None);
+        export.MarkCompleted(ownerToken, key, content.Length, DateTimeOffset.UtcNow.AddMinutes(-8));
 
         db.OrganisationDataExports.Add(export);
         await db.SaveChangesAsync();

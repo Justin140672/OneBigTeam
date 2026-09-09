@@ -82,7 +82,7 @@ builder.Services.AddEmployeesModule(connectionString, builder.Configuration);
 builder.Services.AddIdentityModule(connectionString, builder.Configuration);
 builder.Services.AddLeaveModule(connectionString);
 builder.Services.AddMarketingModule(connectionString);
-builder.Services.AddNotificationsModule(connectionString);
+builder.Services.AddNotificationsModule(connectionString, builder.Configuration);
 builder.Services.AddOnboardingModule(connectionString);
 builder.Services.AddOffboardingModule(connectionString);
 builder.Services.AddTasksModule(connectionString);
@@ -311,6 +311,13 @@ await migrationRunner.RunAsync("notifications", app.Services, async sp =>
 {
 	await sp.MigrateNotificationsAsync();
 	await sp.SeedNotificationsAsync();
+	// E2E-only: deterministic pool of operational alerts for HR.Admin.Web's /operational-alerts
+	// Playwright coverage (system-generated, no create UI). Same E2E_TESTING gate as the
+	// Employees arrange-data pool above.
+	if (string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase))
+	{
+		await sp.SeedE2eOperationalAlertsAsync();
+	}
 });
 
 await migrationRunner.RunAsync("tasks", app.Services, async sp =>

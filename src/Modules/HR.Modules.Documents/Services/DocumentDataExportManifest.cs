@@ -77,12 +77,14 @@ internal sealed class DocumentDataExportManifest(DocumentsDbContext db, IDocumen
             join t in db.DocumentTypes.AsNoTracking() on d.DocumentTypeId equals t.Id into types
             from t in types.DefaultIfEmpty()
             where d.CompanyId == companyId && d.StorageKey != ""
-            select new { d.StorageKey, d.FileName, TypeName = t != null ? t.Name : "Uncategorised" })
+            select new { d.Id, d.StorageKey, d.FileName, TypeName = t != null ? t.Name : "Uncategorised" })
             .ToListAsync(cancellationToken);
 
+        // Ticket 3: prefix each archive path with the stable document id so two documents that share
+        // a type and file name cannot collide inside the ZIP.
         return rows
             .Select(r => new DocumentExportFileEntry(
-                $"documents/{Sanitise(r.TypeName)}/{Sanitise(r.FileName)}",
+                $"documents/{Sanitise(r.TypeName)}/{r.Id:D}-{Sanitise(r.FileName)}",
                 r.StorageKey))
             .ToList();
     }

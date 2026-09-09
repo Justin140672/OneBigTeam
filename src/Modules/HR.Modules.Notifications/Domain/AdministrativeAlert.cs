@@ -16,6 +16,10 @@ internal sealed class AdministrativeAlert
     public Guid CompanyId { get; private set; }
     public AdministrativeAlertSeverity Severity { get; private set; }
     public AdministrativeAlertCategory Category { get; private set; }
+
+    /// <summary>Follow-up F: explicit persisted discriminator for the underlying failure; drives the operations-email decision.</summary>
+    public AdministrativeAlertReason? Reason { get; private set; }
+
     public string Summary { get; private set; } = string.Empty;
     public string? Detail { get; private set; }
     public string DedupKey { get; private set; } = string.Empty;
@@ -26,6 +30,9 @@ internal sealed class AdministrativeAlert
     public Guid? AffectedEntityId { get; private set; }
     public string? RecommendedAction { get; private set; }
     public string? ActionUrl { get; private set; }
+
+    /// <summary>Follow-up C: non-sensitive count of affected items (e.g. missing documents) for the operations email.</summary>
+    public int? AffectedItemCount { get; private set; }
     public bool IsRead { get; private set; }
     public AdministrativeAlertStatus Status { get; private set; }
     public DateTimeOffset? AcknowledgedAt { get; private set; }
@@ -41,6 +48,7 @@ internal sealed class AdministrativeAlert
         CompanyId          = command.CompanyId,
         Severity           = command.Severity,
         Category           = command.Category,
+        Reason             = command.Reason,
         Summary            = command.Summary,
         Detail             = command.Detail,
         DedupKey           = command.DedupKey,
@@ -51,6 +59,7 @@ internal sealed class AdministrativeAlert
         AffectedEntityId   = command.AffectedEntityId,
         RecommendedAction  = command.RecommendedAction,
         ActionUrl          = command.ActionUrl,
+        AffectedItemCount  = command.AffectedItemCount,
         IsRead             = false,
         Status             = AdministrativeAlertStatus.Open,
         CreatedAt          = now,
@@ -60,13 +69,16 @@ internal sealed class AdministrativeAlert
         AdministrativeAlertSeverity severity,
         string summary,
         string? detail,
-        DateTimeOffset occurredAt)
+        DateTimeOffset occurredAt,
+        int? affectedItemCount = null)
     {
         OccurrenceCount++;
         LastOccurredAt = occurredAt > LastOccurredAt ? occurredAt : LastOccurredAt;
         Severity = (AdministrativeAlertSeverity)Math.Max((int)Severity, (int)severity);
         Summary = summary;
         Detail = detail;
+        if (affectedItemCount is not null)
+            AffectedItemCount = affectedItemCount;
         IsRead = false;
 
         // A repeated failure re-opens an acknowledged alert. Resolved alerts are never recurred

@@ -69,4 +69,58 @@ public class OrganisationDataExportPackageBuilderTests
         Assert.NotNull(archive.GetEntry("t.csv"));
         Assert.Equal("PDF-BYTES", ReadEntry(archive, "documents/Contracts/offer.pdf"));
     }
+
+    // ----- Ticket 3: archive entry names are de-duplicated -----
+
+    [Fact]
+    public void Build_Disambiguates_Two_File_Entries_With_The_Same_Zip_Path()
+    {
+        var table = new DataExportTable("t", ["A"], []);
+        using var first = new MemoryStream("FIRST"u8.ToArray());
+        using var second = new MemoryStream("SECOND"u8.ToArray());
+
+        var bytes = _builder.Build([table],
+        [
+            ("documents/Contracts/offer.pdf", first),
+            ("documents/Contracts/offer.pdf", second),
+        ]);
+
+        using var archive = Open(bytes);
+        Assert.Equal(2, archive.Entries.Count(e => e.FullName.StartsWith("documents/Contracts/offer")));
+        Assert.Equal("FIRST", ReadEntry(archive, "documents/Contracts/offer.pdf"));
+        Assert.Equal("SECOND", ReadEntry(archive, "documents/Contracts/offer (2).pdf"));
+    }
+
+    [Fact]
+    public void Build_Disambiguates_A_File_Entry_That_Collides_With_A_Table_Csv_Name()
+    {
+        var table = new DataExportTable("report", ["A"], [new string?[] { "row" }]);
+        using var content = new MemoryStream("FILE-BODY"u8.ToArray());
+
+        var bytes = _builder.Build([table], [("report.csv", content)]);
+
+        using var archive = Open(bytes);
+        Assert.Equal("A\r\nrow\r\n", ReadEntry(archive, "report.csv"));
+        Assert.Equal("FILE-BODY", ReadEntry(archive, "report (2).csv"));
+    }
+
+    [Fact]
+    public void Build_Disambiguates_Three_Identical_Names_As_2_And_3()
+    {
+        using var a = new MemoryStream("A"u8.ToArray());
+        using var b = new MemoryStream("B"u8.ToArray());
+        using var c = new MemoryStream("C"u8.ToArray());
+
+        var bytes = _builder.Build([],
+        [
+            ("documents/x/file.pdf", a),
+            ("documents/x/file.pdf", b),
+            ("documents/x/file.pdf", c),
+        ]);
+
+        using var archive = Open(bytes);
+        Assert.Equal("A", ReadEntry(archive, "documents/x/file.pdf"));
+        Assert.Equal("B", ReadEntry(archive, "documents/x/file (2).pdf"));
+        Assert.Equal("C", ReadEntry(archive, "documents/x/file (3).pdf"));
+    }
 }

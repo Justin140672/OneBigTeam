@@ -4,6 +4,7 @@ using HR.Modules.Reporting.Domain;
 using HR.Modules.Reporting.Persistence;
 using HR.SharedKernel;
 using Hangfire;
+using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Reporting.Features.RequestOrganisationDataExport;
 
@@ -30,7 +31,17 @@ internal sealed class RequestOrganisationDataExportHandler(
         var export = OrganisationDataExport.Create(request.CompanyId, userId, requestedByDisplayName, now);
 
         db.OrganisationDataExports.Add(export);
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // Ticket 3: lost a race with a concurrent request/retry on the
+            // ix_organisation_data_exports_active_per_company filtered unique index.
+            return Result.Failure<RequestOrganisationDataExportResponse>(Error.Conflict(
+                "An organisation data export is already being prepared for this company. Wait for it to finish before requesting another."));
+        }
 
         backgroundJobClient.Enqueue<OrganisationDataExportBuildJob>(
             job => job.RunAsync(export.Id, request.CompanyId, userId, CancellationToken.None));

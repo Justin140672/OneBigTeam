@@ -67,7 +67,7 @@ public class ServiceContainerCompositionTests
         services.AddEmployeesModule(connectionString);
         services.AddIdentityModule(connectionString, configuration);
         services.AddLeaveModule(connectionString);
-        services.AddNotificationsModule(connectionString);
+        services.AddNotificationsModule(connectionString, configuration);
         services.AddOnboardingModule(connectionString);
         services.AddOffboardingModule(connectionString);
         services.AddTasksModule(connectionString);

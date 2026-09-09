@@ -23,8 +23,29 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
 
     public async Task ClickNewAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/external-recruiters/new**", new() { Timeout = 30_000 });
+        // The "Add" toolbar button is part of the Syncfusion grid toolbar, whose @onclick handler is
+        // wired over a separate SignalR render pass after the grid rows first paint (GoToAsync only
+        // waits for the rows). A click dispatched before that handler is attached is silently lost
+        // and no navigation happens — the bare single click then times out at 30s. Wait for the
+        // button to be actionable, and if the URL hasn't changed shortly after, click once more.
+        var addButton = page.GetByRole(AriaRole.Button, new() { Name = "Add" });
+        await addButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            await addButton.ClickAsync();
+            try
+            {
+                await page.WaitForURLAsync("**/external-recruiters/new**", new() { Timeout = 10_000 });
+                return;
+            }
+            catch (TimeoutException) when (attempt < 2)
+            {
+                // Circuit wasn't ready for that click — retry.
+            }
+        }
+
+        await page.WaitForURLAsync("**/external-recruiters/new**", new() { Timeout = 10_000 });
     }
 
     public async Task<bool> HasItemAsync(string agencyNameFragment)

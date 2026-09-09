@@ -19,11 +19,17 @@ public sealed class OrganisationDataExportPackageBuilder
     {
         using var buffer = new MemoryStream();
 
+        // Ticket 3: guarantee every archive entry name is unique. Even with stable document-id
+        // prefixes upstream, a defensive de-dupe here means a duplicate name can never produce a
+        // malformed archive that some ZIP readers reject.
+        var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
         {
             foreach (var table in tables)
             {
-                var entry = archive.CreateEntry($"{SanitiseName(table.Name)}.csv", CompressionLevel.Optimal);
+                var name = Uniquify(usedNames, $"{SanitiseName(table.Name)}.csv");
+                var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
                 using var entryStream = entry.Open();
                 using var writer = new StreamWriter(entryStream, Utf8NoBom);
                 WriteCsv(writer, table);
@@ -31,7 +37,8 @@ public sealed class OrganisationDataExportPackageBuilder
 
             foreach (var (zipPath, content) in files)
             {
-                var entry = archive.CreateEntry(NormaliseZipPath(zipPath), CompressionLevel.Optimal);
+                var name = Uniquify(usedNames, NormaliseZipPath(zipPath));
+                var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
                 using var entryStream = entry.Open();
                 content.CopyTo(entryStream);
             }
@@ -72,4 +79,25 @@ public sealed class OrganisationDataExportPackageBuilder
 
     private static string NormaliseZipPath(string zipPath) =>
         zipPath.Replace('\\', '/').TrimStart('/');
+
+    private static string Uniquify(HashSet<string> used, string path)
+    {
+        if (used.Add(path))
+            return path;
+
+        var slash = path.LastIndexOf('/');
+        var dir = slash >= 0 ? path[..(slash + 1)] : string.Empty;
+        var fileName = slash >= 0 ? path[(slash + 1)..] : path;
+
+        var dot = fileName.LastIndexOf('.');
+        var stem = dot > 0 ? fileName[..dot] : fileName;
+        var ext = dot > 0 ? fileName[dot..] : string.Empty;
+
+        for (var i = 2; ; i++)
+        {
+            var candidate = $"{dir}{stem} ({i}){ext}";
+            if (used.Add(candidate))
+                return candidate;
+        }
+    }
 }

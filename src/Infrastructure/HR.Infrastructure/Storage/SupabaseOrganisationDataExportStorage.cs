@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using HR.Infrastructure.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -23,9 +24,9 @@ internal sealed class SupabaseOrganisationDataExportStorage : IOrganisationDataE
         _options = options.Value;
     }
 
-    public async Task<string> UploadAsync(Guid companyId, Guid exportId, Stream content, CancellationToken cancellationToken)
+    public async Task<string> UploadAsync(Guid companyId, Guid exportId, Guid attemptToken, Stream content, CancellationToken cancellationToken)
     {
-        var storageKey = $"organisation-exports/{companyId}/{exportId}.zip";
+        var storageKey = $"organisation-exports/{companyId}/{exportId}/{attemptToken}.zip";
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
@@ -78,4 +79,37 @@ internal sealed class SupabaseOrganisationDataExportStorage : IOrganisationDataE
 
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<IReadOnlyList<string>> ListAttemptKeysAsync(Guid companyId, Guid exportId, CancellationToken cancellationToken)
+    {
+        var folder = $"organisation-exports/{companyId}/{exportId}";
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"{_options.SupabaseUrl}/storage/v1/object/list/{_options.BucketName}");
+
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ServiceRoleKey);
+        request.Content = System.Net.Http.Json.JsonContent.Create(new
+        {
+            prefix = $"{folder}/",
+            limit = 1000,
+        });
+
+        var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return [];
+
+        response.EnsureSuccessStatusCode();
+
+        var items = await response.Content.ReadFromJsonAsync<List<SupabaseStorageObject>>(cancellationToken);
+        if (items is null)
+            return [];
+
+        return items
+            .Where(i => !string.IsNullOrWhiteSpace(i.Name))
+            .Select(i => $"{folder}/{i.Name}")
+            .ToList();
+    }
+
+    private sealed record SupabaseStorageObject(string? Name);
 }

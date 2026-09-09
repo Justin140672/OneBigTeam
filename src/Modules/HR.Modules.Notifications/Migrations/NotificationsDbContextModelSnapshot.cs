@@ -51,6 +51,10 @@ namespace HR.Modules.Notifications.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("affected_entity_type");
 
+                    b.Property<int?>("AffectedItemCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("affected_item_count");
+
                     b.Property<int>("Category")
                         .HasColumnType("integer")
                         .HasColumnName("category");
@@ -89,6 +93,10 @@ namespace HR.Modules.Notifications.Migrations
                     b.Property<int>("OccurrenceCount")
                         .HasColumnType("integer")
                         .HasColumnName("occurrence_count");
+
+                    b.Property<int?>("Reason")
+                        .HasColumnType("integer")
+                        .HasColumnName("reason");
 
                     b.Property<string>("RecommendedAction")
                         .HasMaxLength(500)
@@ -301,11 +309,91 @@ namespace HR.Modules.Notifications.Migrations
                     b.ToTable("notification_audit_reconciliation_cursors", "notifications");
                 });
 
+            modelBuilder.Entity("HR.Modules.Notifications.Domain.OperationalAlertEmailDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AlertId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("alert_id");
+
+                    b.Property<int>("AttemptCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("attempt_count");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at");
+
+                    b.Property<DateTimeOffset?>("LeaseAcquiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_acquired_at");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_at");
+
+                    b.Property<Guid?>("LeaseOwnerToken")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_owner_token");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("status");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AlertId")
+                        .IsUnique();
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("operational_alert_email_deliveries", "notifications");
+                });
+
             modelBuilder.Entity("HR.Modules.Notifications.Domain.EmailDelivery", b =>
                 {
                     b.HasOne("HR.Modules.Notifications.Domain.Notification", null)
                         .WithMany()
                         .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HR.Modules.Notifications.Domain.OperationalAlertEmailDelivery", b =>
+                {
+                    b.HasOne("HR.Modules.Notifications.Domain.AdministrativeAlert", null)
+                        .WithMany()
+                        .HasForeignKey("AlertId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

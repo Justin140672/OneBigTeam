@@ -44,6 +44,9 @@ public class ReportExportAuditorTests
         Assert.Equal(companyId, command.CompanyId);
         Assert.Equal(HR.Infrastructure.Abstractions.AdministrativeAlertCategory.ReportGeneration, command.Category);
         Assert.Equal("report-generation:employee-directory", command.DedupKey);
+        // Follow-up F: an ordinary report-export failure carries no Reason, so it is recorded
+        // without queuing an internal-operations notification email.
+        Assert.Null(command.Reason);
     }
 
     [Fact]
