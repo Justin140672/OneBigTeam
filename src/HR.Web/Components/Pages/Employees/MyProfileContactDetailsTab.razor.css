@@ -54,12 +54,26 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    min-width: 0; /* allow the group to shrink inside the grid instead of overflowing at narrow widths / 200% zoom */
 }
 
 .cd-field-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 12px;
+}
+
+/* Field-level validation error container. Kept always-present (may be empty) so each input's
+   aria-describedby target exists before an error is shown. */
+.cd-error:empty {
+    display: none;
+}
+
+/* Ensure keyboard focus is always visible even where a component or reset removes outlines. */
+.cd-card ::deep :focus-visible,
+.cd-success-dismiss:focus-visible {
+    outline: 2px solid var(--hr-color-primary, #2563eb);
+    outline-offset: 2px;
 }
 
 .cd-label {

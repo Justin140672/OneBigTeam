@@ -1,12 +1,13 @@
 @using System.ComponentModel.DataAnnotations
 @inject EmployeeService EmployeeService
 @inject AppSession Session
+@inject IJSRuntime JS
 @inherits EditSectionBase<MyProfileContactDetailsTab.ContactDetailsFormModel>
 
 @if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
 {
-    <div class="alert alert-danger">
-        <i class="fa-solid fa-lock me-2"></i>You can only view your own contact details.
+    <div class="alert alert-danger" role="alert">
+        <i class="fa-solid fa-lock me-2" aria-hidden="true"></i>You can only view your own contact details.
     </div>
 }
 else if (IsLoading)
@@ -17,14 +18,14 @@ else
 {
     @if (!string.IsNullOrEmpty(SuccessMsg))
     {
-        <div class="cd-success-banner mb-3">
-            <i class="fa-solid fa-circle-check cd-success-icon"></i>
+        <div class="cd-success-banner mb-3" role="status" aria-live="polite">
+            <i class="fa-solid fa-circle-check cd-success-icon" aria-hidden="true"></i>
             <div>
                 <div class="cd-success-title">Contact details saved</div>
                 <div class="cd-success-body">Your contact details have been updated.</div>
             </div>
-            <button class="cd-success-dismiss" @onclick="@(() => SuccessMsg = null)">
-                <i class="fa-solid fa-xmark"></i>
+            <button type="button" class="cd-success-dismiss" aria-label="Dismiss confirmation" @onclick="DismissSuccessAsync">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
             </button>
         </div>
     }
@@ -36,17 +37,17 @@ else
 
     @if (!SaveConflict && GlobalError is not null)
     {
-        <div class="alert alert-danger alert-dismissible mb-3">
+        <div class="alert alert-danger alert-dismissible mb-3" role="alert">
             @GlobalError
-            <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
+            <button type="button" class="btn-close" aria-label="Dismiss error" @onclick="DismissGlobalErrorAsync"></button>
         </div>
     }
 
     <EditForm EditContext="EditContext">
         <DataAnnotationsValidator />
-        <div class="cd-card">
+        <div id="cd-form" class="cd-card">
             <div class="cd-card-header">
-                <i class="fa-solid fa-address-book cd-card-icon"></i>
+                <i class="fa-solid fa-address-book cd-card-icon" aria-hidden="true"></i>
                 <span class="cd-card-title">Contact Details</span>
             </div>
 
@@ -55,48 +56,63 @@ else
                 <div class="cd-section-label">Email</div>
 
                 <div class="cd-field-group">
-                    <label class="cd-label">Work Email</label>
-                    <input class="form-control cd-readonly" type="email" value="@_workEmail" readonly />
-                    <div class="cd-hint">Your work email is managed by HR and cannot be changed here.</div>
+                    <label class="cd-label" for="cd-work-email">Work Email</label>
+                    <input id="cd-work-email" class="form-control cd-readonly" type="email" value="@_workEmail" readonly
+                           aria-label="Work Email" aria-describedby="cd-work-email-hint" />
+                    <div id="cd-work-email-hint" class="cd-hint">Your work email is managed by HR and cannot be changed here.</div>
                 </div>
 
                 <div class="cd-field-group">
-                    <label class="cd-label">Personal Email</label>
-                    <HrTextBox @bind-Value="Model.PersonalEmail" Type="InputType.Email" Placeholder="e.g. name@personal.com" Maxlength="320" />
-                    <ValidationMessage For="@(() => Model.PersonalEmail)" />
+                    <label class="cd-label" for="cd-personal-email">Personal Email</label>
+                    <HrTextBox @bind-Value="Model.PersonalEmail" Type="InputType.Email" Placeholder="e.g. name@personal.com" Maxlength="320"
+                               HtmlAttributes="@Attrs("cd-personal-email", "Personal Email")" />
+                    <div id="cd-personal-email-hint" class="cd-hint visually-hidden">Optional. Used for personal correspondence only.</div>
+                    <div id="cd-personal-email-error" class="cd-error"><ValidationMessage For="@(() => Model.PersonalEmail)" /></div>
                 </div>
 
                 <!-- Address -->
                 <div class="cd-section-label mt-3">Home Address</div>
 
                 <div class="cd-field-group">
-                    <label class="cd-label">Address Line 1 <span class="cd-required">*</span></label>
-                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" Maxlength="200" />
-                    <ValidationMessage For="@(() => Model.AddressLine1)" />
+                    <label class="cd-label" for="cd-address-line-1">Address Line 1 <span class="cd-required" aria-hidden="true">*</span></label>
+                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" Maxlength="200"
+                               HtmlAttributes="@Attrs("cd-address-line-1", "Address Line 1", required: true)" />
+                    <div id="cd-address-line-1-hint" class="cd-hint visually-hidden">Required.</div>
+                    <div id="cd-address-line-1-error" class="cd-error"><ValidationMessage For="@(() => Model.AddressLine1)" /></div>
                 </div>
 
                 <div class="cd-field-group">
-                    <label class="cd-label">Address Line 2</label>
-                    <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." Maxlength="200" />
+                    <label class="cd-label" for="cd-address-line-2">Address Line 2</label>
+                    <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." Maxlength="200"
+                               HtmlAttributes="@Attrs("cd-address-line-2", "Address Line 2")" />
+                    <div id="cd-address-line-2-hint" class="cd-hint visually-hidden">Optional.</div>
+                    <div id="cd-address-line-2-error" class="cd-error"></div>
                 </div>
 
                 <div class="cd-field-row">
                     <div class="cd-field-group">
-                        <label class="cd-label">City <span class="cd-required">*</span></label>
-                        <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" Maxlength="100" />
-                        <ValidationMessage For="@(() => Model.City)" />
+                        <label class="cd-label" for="cd-city">City <span class="cd-required" aria-hidden="true">*</span></label>
+                        <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" Maxlength="100"
+                                   HtmlAttributes="@Attrs("cd-city", "City", required: true)" />
+                        <div id="cd-city-hint" class="cd-hint visually-hidden">Required.</div>
+                        <div id="cd-city-error" class="cd-error"><ValidationMessage For="@(() => Model.City)" /></div>
                     </div>
                     <div class="cd-field-group">
-                        <label class="cd-label">County / State</label>
-                        <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" Maxlength="100" />
+                        <label class="cd-label" for="cd-county">County / State</label>
+                        <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" Maxlength="100"
+                                   HtmlAttributes="@Attrs("cd-county", "County / State")" />
+                        <div id="cd-county-hint" class="cd-hint visually-hidden">Optional.</div>
+                        <div id="cd-county-error" class="cd-error"></div>
                     </div>
                 </div>
 
                 <div class="cd-field-row">
                     <div class="cd-field-group">
-                        <label class="cd-label">Post Code <span class="cd-required">*</span></label>
-                        <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" Maxlength="20" />
-                        <ValidationMessage For="@(() => Model.PostCode)" />
+                        <label class="cd-label" for="cd-post-code">Post Code <span class="cd-required" aria-hidden="true">*</span></label>
+                        <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" Maxlength="20"
+                                   HtmlAttributes="@Attrs("cd-post-code", "Post Code", required: true)" />
+                        <div id="cd-post-code-hint" class="cd-hint visually-hidden">Required.</div>
+                        <div id="cd-post-code-error" class="cd-error"><ValidationMessage For="@(() => Model.PostCode)" /></div>
                     </div>
                     @* Country is not shown — UK-only for now. Model.Country defaults to "United
                        Kingdom" and is preserved from the loaded value if one is already set. *@
@@ -107,22 +123,27 @@ else
 
                 <div class="cd-field-row">
                     <div class="cd-field-group">
-                        <label class="cd-label">Mobile / Work Phone</label>
-                        <HrTextBox @bind-Value="Model.PhoneNumber" Type="InputType.Tel" Placeholder="e.g. 07700 900000" Maxlength="30" />
-                        <ValidationMessage For="@(() => Model.PhoneNumber)" />
+                        <label class="cd-label" for="cd-phone-number">Mobile / Work Phone</label>
+                        <HrTextBox @bind-Value="Model.PhoneNumber" Type="InputType.Tel" Placeholder="e.g. 07700 900000" Maxlength="30"
+                                   HtmlAttributes="@Attrs("cd-phone-number", "Mobile / Work Phone")" />
+                        <div id="cd-phone-number-hint" class="cd-hint visually-hidden">Optional.</div>
+                        <div id="cd-phone-number-error" class="cd-error"><ValidationMessage For="@(() => Model.PhoneNumber)" /></div>
                     </div>
                     <div class="cd-field-group">
-                        <label class="cd-label">Home Phone</label>
-                        <HrTextBox @bind-Value="Model.HomePhone" Type="InputType.Tel" Placeholder="e.g. 01234 567890" Maxlength="30" />
-                        <ValidationMessage For="@(() => Model.HomePhone)" />
+                        <label class="cd-label" for="cd-home-phone">Home Phone</label>
+                        <HrTextBox @bind-Value="Model.HomePhone" Type="InputType.Tel" Placeholder="e.g. 01234 567890" Maxlength="30"
+                                   HtmlAttributes="@Attrs("cd-home-phone", "Home Phone")" />
+                        <div id="cd-home-phone-hint" class="cd-hint visually-hidden">Optional.</div>
+                        <div id="cd-home-phone-error" class="cd-error"><ValidationMessage For="@(() => Model.HomePhone)" /></div>
                     </div>
                 </div>
 
                 <div class="cd-form-footer">
-                    <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveClickedAsync">
+                    <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveClickedAsync"
+                              HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "cd-save-button" })">
                         @if (_saving)
                         {
-                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
                         }
                         Save Changes
                     </SfButton>
@@ -138,6 +159,37 @@ else
 
     private bool _saving;
     private string _workEmail = string.Empty;
+
+    // Builds the HtmlAttributes bag for an HrTextBox: a stable id (for label `for=`), a mirrored
+    // aria-label (Syncfusion wraps the input so for/id can be flaky — same belt-and-braces approach
+    // as EmployeeEdit), aria-describedby wiring the field to its hint + error containers, and
+    // aria-required for the mandatory fields. `required` is deliberately expressed via aria only —
+    // a native `required` attribute on the Syncfusion-wrapped input changes its :invalid styling
+    // and pseudo-class behaviour, which the existing visual design and E2E selectors don't expect.
+    private static Dictionary<string, object> Attrs(string id, string ariaLabel, bool required = false)
+    {
+        var attrs = new Dictionary<string, object>
+        {
+            ["id"] = id,
+            ["aria-label"] = ariaLabel,
+            ["aria-describedby"] = $"{id}-hint {id}-error",
+        };
+        if (required)
+            attrs["aria-required"] = "true";
+        return attrs;
+    }
+
+    private async Task DismissSuccessAsync()
+    {
+        SuccessMsg = null;
+        await JS.InvokeVoidAsync("hrFocusById", "cd-save-button");
+    }
+
+    private async Task DismissGlobalErrorAsync()
+    {
+        GlobalError = null;
+        await JS.InvokeVoidAsync("hrFocusById", "cd-save-button");
+    }
 
     protected override async Task LoadAsync()
     {
@@ -170,8 +222,16 @@ else
     private async Task SaveClickedAsync()
     {
         _saving = true;
-        await SaveAsync();
+        var error = await SaveAsync();
         _saving = false;
+
+        // Accessibility: on a client-side validation failure move focus to the first invalid field
+        // so a screen-reader / keyboard user is taken straight to the problem. Server errors and
+        // concurrency conflicts are announced via their live-region banners without stealing focus.
+        if (error is not null && !SaveConflict && EditContext.GetValidationMessages().Any())
+        {
+            await JS.InvokeVoidAsync("hrFocusFirstInvalid", "#cd-form");
+        }
     }
 
     // Concurrency-conflict recovery: explicit user reload — adopt the latest server values and
@@ -182,6 +242,9 @@ else
         _saving = true;
         await ReloadLatestValuesAsync(rebaseline: true);
         _saving = false;
+
+        // Orient the user on the refreshed values by moving focus to the first form field.
+        await JS.InvokeVoidAsync("hrFocusById", "cd-personal-email");
     }
 
     protected override async Task<string?> SaveCoreAsync()

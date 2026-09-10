@@ -197,4 +197,98 @@ public sealed class ContactDetailsTab(IPage page)
             ? (await input.InputValueAsync()).Trim()
             : null;
     }
+
+    // ── Accessibility / keyboard accessors (Ticket 7) ─────────────────────────
+
+    /// <summary>The primary "Save Changes" button as a locator.</summary>
+    public ILocator SaveButton =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Save Changes" });
+
+    /// <summary>Places keyboard focus on the first editable field (Personal Email).</summary>
+    public async Task FocusFirstFieldAsync() =>
+        await page.GetByPlaceholder("e.g. name@personal.com").ClickAsync();
+
+    /// <summary>Presses Tab once.</summary>
+    public Task PressTabAsync() => page.Keyboard.PressAsync("Tab");
+
+    /// <summary>The <c>id</c> of the currently focused element, or null.</summary>
+    public Task<string?> FocusedElementIdAsync() =>
+        page.EvaluateAsync<string?>("() => document.activeElement && document.activeElement.id ? document.activeElement.id : null");
+
+    /// <summary>True when the focused element is the Save button.</summary>
+    public Task<bool> ActiveElementIsSaveButtonAsync() =>
+        page.EvaluateAsync<bool>("() => !!document.activeElement && document.activeElement.id === 'cd-save-button'");
+
+    /// <summary>True when the focused element sits inside a <c>role="status"</c> live region.</summary>
+    public Task<bool> ActiveElementIsInStatusRegionAsync() =>
+        page.EvaluateAsync<bool>("() => !!document.activeElement && !!document.activeElement.closest('[role=\"status\"]')");
+
+    /// <summary>True when the focused element is inside the contact-details form (<c>#cd-form</c>).</summary>
+    public Task<bool> ActiveElementIsInFormAsync() =>
+        page.EvaluateAsync<bool>("() => { const f = document.getElementById('cd-form'); return !!f && !!document.activeElement && f.contains(document.activeElement); }");
+
+    /// <summary>
+    /// True when the focused element belongs to the same <c>.cd-field-group</c> as the control with
+    /// the given id — used to assert "focus moved to the field with the validation error".
+    /// </summary>
+    public Task<bool> ActiveElementIsInFieldGroupOfAsync(string controlId) =>
+        page.EvaluateAsync<bool>(
+            @"(id) => {
+                const el = document.activeElement;
+                if (!el) return false;
+                const group = el.closest('.cd-field-group');
+                return !!group && !!group.querySelector('#' + CSS.escape(id));
+            }", controlId);
+
+    /// <summary>
+    /// Describes the focused element for the keyboard-order journey: its tag, whether it is a form
+    /// control, whether it lies inside the form, whether it is the Save button, and its computed
+    /// accessible name (aria-label → aria-labelledby → associated/wrapping &lt;label&gt;).
+    /// </summary>
+    public async Task<FocusedControlInfo> DescribeActiveElementAsync()
+    {
+        var raw = await page.EvaluateAsync<string>(
+            @"() => {
+                const el = document.activeElement;
+                if (!el) return '|||';
+                const f = document.getElementById('cd-form');
+                const inForm = !!f && f.contains(el);
+                const tag = (el.tagName || '').toLowerCase();
+                const isControl = ['input', 'select', 'textarea', 'button'].includes(tag);
+                const isSave = el.id === 'cd-save-button';
+                let name = (el.getAttribute('aria-label') || '').trim();
+                if (!name) {
+                    const lb = el.getAttribute('aria-labelledby');
+                    if (lb) {
+                        name = lb.split(/\s+/)
+                            .map(id => { const n = document.getElementById(id); return n ? n.textContent.trim() : ''; })
+                            .join(' ').trim();
+                    }
+                }
+                if (!name && el.id) {
+                    const l = document.querySelector('label[for=""' + el.id + '""]');
+                    if (l) name = l.textContent.trim();
+                }
+                if (!name) {
+                    const w = el.closest('label');
+                    if (w) name = w.textContent.trim();
+                }
+                if (!name && isSave) name = (el.textContent || '').trim();
+                return [inForm, isControl, isSave, tag, name].join('§');
+            }");
+        var parts = raw.Split('§');
+        return new FocusedControlInfo(
+            InForm: parts.Length > 0 && parts[0] == "True",
+            IsControl: parts.Length > 1 && parts[1] == "True",
+            IsSaveButton: parts.Length > 2 && parts[2] == "True",
+            Tag: parts.Length > 3 ? parts[3] : "",
+            AccessibleName: parts.Length > 4 ? parts[4] : "");
+    }
+
+    /// <summary>role attribute of the optimistic-concurrency conflict banner.</summary>
+    public Task<string?> ConcurrencyBannerRoleAsync() =>
+        page.Locator(".save-conflict-banner").First.GetAttributeAsync("role");
+
+    public sealed record FocusedControlInfo(
+        bool InForm, bool IsControl, bool IsSaveButton, string Tag, string AccessibleName);
 }

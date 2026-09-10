@@ -210,6 +210,30 @@ function hrLabelGridFilterInputs(root) {
     run();
 })();
 
+// Ticket 7 — accessible contact-details form. Moves focus to the first field with a validation
+// error after a failed Save (screen-reader users otherwise get no cue where the problem is), and
+// a generic focus-by-id used to return focus to the Save button after dismissing a banner.
+function hrFocusFirstInvalid(formSelector) {
+    try {
+        const form = document.querySelector(formSelector);
+        if (!form) return;
+        const marker = form.querySelector('[aria-invalid="true"], .validation-message');
+        if (!marker) return;
+        const focusable = 'input, textarea, select, button, [tabindex]';
+        const target = marker.matches(focusable)
+            ? marker
+            : (marker.closest('.cd-field-group')?.querySelector(focusable) || marker);
+        if (target && typeof target.focus === 'function') target.focus();
+    } catch { }
+}
+
+function hrFocusById(id) {
+    try {
+        const el = document.getElementById(id);
+        if (el && typeof el.focus === 'function') el.focus();
+    } catch { }
+}
+
 function downloadFileFromBase64(fileName, contentType, base64Content) {
     const link = document.createElement('a');
     link.href = `data:${contentType};base64,${base64Content}`;
