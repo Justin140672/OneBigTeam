@@ -119,6 +119,16 @@ public static class SeededE2eEmployees
     public static readonly Pooled ConcurrencyAdmin = P(49, "SeedConcurrencyAdmin");
     public static readonly Pooled ConcurrencySelf  = P(50, "SeedConcurrencySelf");
 
+    // ── Ticket 7: self-service Contact Details "saving" control tests ─────────
+    // One dedicated login-less pool employee per held-save test (runtime Supabase login via the
+    // dev ensure-employee-login endpoint). The HR.Web test-only save-control store keys on the
+    // employee email, so each test controlling its own employee is fully isolated.
+    public static readonly IReadOnlyList<Pooled> ContactSaveControl =
+    [
+        P(51, "SeedContactSaveA"), P(52, "SeedContactSaveB"),
+        P(53, "SeedContactSaveC"), P(54, "SeedContactSaveD"),
+    ];
+
     /// <summary>Every pool member, for callers that just need to enumerate them.</summary>
     public static IEnumerable<Pooled> All()
     {
@@ -138,5 +148,6 @@ public static class SeededE2eEmployees
         foreach (var p in OnboardingTab) yield return p;
         yield return ConcurrencyAdmin;
         yield return ConcurrencySelf;
+        foreach (var p in ContactSaveControl) yield return p;
     }
 }

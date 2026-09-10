@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -357,107 +358,101 @@ public sealed class ContactDetailsTab(IPage page)
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
-    // ── Route interception for the contact-details update call ─────────────────
-    // EmployeeService.UpdateMyContactDetailsAsync issues:
-    //   PUT api/companies/{companyId}/employees/me/contact-details
-    // (GET on the same path loads the form; the handler lets non-PUT verbs pass straight through.)
-
-    private const string SaveRouteGlob = "**/api/companies/*/employees/me/contact-details";
+    // ── Server-side save control for the contact-details update call ───────────
+    // The self-service Contact Details save goes server-side (HR.Web → hrapi), so a Playwright
+    // browser-route interceptor cannot hold or fail it. Instead HR.Web exposes E2E_TESTING-only
+    // minimal-API endpoints on its own host, keyed by lower-cased employee email, that hold the
+    // NEXT server-side PUT .../employees/me/contact-details for that employee.
 
     /// <summary>
-    /// Installs a route interceptor that holds the NEXT contact-details save (PUT) until the caller
-    /// explicitly releases it (<see cref="HeldSave.ReleaseAsync"/> — fulfilled by letting the real
-    /// request through, a genuine success) or fails it (<see cref="HeldSave.FailAsync"/> — HTTP 500).
-    /// The interceptor auto-unroutes once the held request has been resolved.
+    /// Test-only handle over the HR.Web server-side contact-save control endpoints. Arm it before
+    /// clicking Save, wait for the held request to arrive, then either <see cref="ReleaseAsync"/>
+    /// (let the real API respond — genuine success) or <see cref="FailAsync"/> (respond HTTP 500).
+    /// Always dispose (prefer <c>await using</c>) — disposal best-effort DELETEs the control and
+    /// releases any still-held request, so cleanup is guaranteed even on assertion failure and,
+    /// being per-email, never affects another test.
     /// </summary>
-    public async Task<HeldSave> HoldNextSaveAsync()
+    public sealed class SaveControl : IAsyncDisposable
     {
-        var held = new HeldSave(page, SaveRouteGlob);
-        await held.BeginAsync();
-        return held;
-    }
+        private readonly HttpClient _http;
+        private readonly string _base;
+        private readonly string _email;
 
-    public sealed class HeldSave
-    {
-        private readonly IPage _page;
-        private readonly string _glob;
-        private readonly TaskCompletionSource<bool> _arrived = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource<bool> _resolved = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource<string> _decision = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private int _putCount;
-        private int _unrouted;
-
-        internal HeldSave(IPage page, string glob)
+        public SaveControl(string webBaseUrl, string employeeEmail)
         {
-            _page = page;
-            _glob = glob;
+            _base = webBaseUrl.TrimEnd('/');
+            _email = Uri.EscapeDataString(employeeEmail.ToLowerInvariant());
+            _http = new HttpClient();
         }
 
-        /// <summary>Number of save (PUT) requests that reached the interceptor.</summary>
-        public int PutCount => Volatile.Read(ref _putCount);
+        private string Url(string suffix = "") => $"{_base}/_e2e/contact-save-control/{_email}{suffix}";
 
-        /// <summary>Completes once the first save request is being held.</summary>
-        public Task WaitUntilHeldAsync() => _arrived.Task;
-
-        internal Task BeginAsync() => _page.RouteAsync(_glob, async route =>
+        /// <summary>Arms the control: the NEXT server-side contact-details PUT for this employee is held.</summary>
+        public static async Task<SaveControl> ArmAsync(string webBaseUrl, string employeeEmail)
         {
-            if (!string.Equals(route.Request.Method, "PUT", StringComparison.OrdinalIgnoreCase))
+            var ctrl = new SaveControl(webBaseUrl, employeeEmail);
+            var response = await ctrl._http.PostAsync(ctrl.Url(), content: null);
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(
+                    $"Failed to arm the contact-save control for '{employeeEmail}': HTTP {(int)response.StatusCode}.");
+            return ctrl;
+        }
+
+        private sealed record Status(bool arrived, int requestCount, bool resolved);
+
+        private async Task<Status?> GetStatusAsync()
+        {
+            var response = await _http.GetAsync(Url());
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<Status>();
+        }
+
+        /// <summary>Polls until the held server-side PUT has arrived. Default timeout 20s.</summary>
+        public async Task WaitUntilRequestArrivedAsync(TimeSpan? timeout = null)
+        {
+            var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(20));
+            while (DateTime.UtcNow < deadline)
             {
-                await route.ContinueAsync();
-                return;
+                var status = await GetStatusAsync();
+                if (status is { arrived: true }) return;
+                await Task.Delay(200);
             }
 
-            var n = Interlocked.Increment(ref _putCount);
-            if (n > 1)
-            {
-                // A duplicate submit slipped through client-side guards — fail it loudly rather
-                // than silently swallow, so the test assertion on PutCount is meaningful.
-                await route.AbortAsync();
-                return;
-            }
+            throw new TimeoutException(
+                $"No server-side contact-details PUT arrived for employee '{Uri.UnescapeDataString(_email)}' " +
+                $"within {(timeout ?? TimeSpan.FromSeconds(20)).TotalSeconds:0}s.");
+        }
 
-            _arrived.TrySetResult(true);
-            var decision = await _decision.Task;
+        /// <summary>Number of server-side save (PUT) requests seen by the control (0 if not armed).</summary>
+        public async Task<int> RequestCountAsync()
+        {
+            var status = await GetStatusAsync();
+            return status?.requestCount ?? 0;
+        }
 
-            if (decision == "fail")
-            {
-                await route.FulfillAsync(new RouteFulfillOptions
-                {
-                    Status = 500,
-                    ContentType = "application/json",
-                    Body = "{\"error\":\"Simulated server failure.\",\"code\":\"server_error\"}",
-                });
-            }
-            else
-            {
-                await route.ContinueAsync();
-            }
-
-            _resolved.TrySetResult(true);
-            await UnrouteAsync();
-        });
-
-        /// <summary>Releases the held save and lets the real request through (a genuine success).</summary>
+        /// <summary>Lets the held request through to the real API (a genuine success). Does not wait for completion.</summary>
         public async Task ReleaseAsync()
         {
-            await _arrived.Task;
-            _decision.TrySetResult("continue");
-            await _resolved.Task;
+            var response = await _http.PostAsync(Url("/release"), content: null);
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(
+                    $"Failed to release the held contact save: HTTP {(int)response.StatusCode}.");
         }
 
-        /// <summary>Fails the held save with a controlled HTTP 500.</summary>
+        /// <summary>Responds HTTP 500 to the held request. Does not wait for the UI to react.</summary>
         public async Task FailAsync()
         {
-            await _arrived.Task;
-            _decision.TrySetResult("fail");
-            await _resolved.Task;
+            var response = await _http.PostAsync(Url("/fail"), content: null);
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(
+                    $"Failed to fail the held contact save: HTTP {(int)response.StatusCode}.");
         }
 
-        /// <summary>Removes the interceptor so subsequent saves hit the real API (for retry assertions).</summary>
-        public async Task UnrouteAsync()
+        public async ValueTask DisposeAsync()
         {
-            if (Interlocked.Exchange(ref _unrouted, 1) == 1) return;
-            try { await _page.UnrouteAsync(_glob); } catch { /* already gone */ }
+            try { await _http.DeleteAsync(Url()); } catch { /* best-effort cleanup */ }
+            _http.Dispose();
         }
     }
 

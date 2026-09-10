@@ -237,74 +237,6 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
     }
 
     [Fact]
-    public async Task ContactDetailsTab_Saving_AnnouncesToAssistiveTechAndPreventsDuplicateSubmit()
-    {
-        var contact = await OpenContactDetailsAsync();
-        await FillValidUniqueAsync(contact);
-
-        var held = await contact.HoldNextSaveAsync();
-
-        await contact.ClickSaveAsync();
-        await held.WaitUntilHeldAsync();
-
-        // The live region announces the in-flight save and is exposed to assistive tech.
-        Assert.Contains("Saving contact details", await contact.SavingStatusTextAsync());
-        Assert.Equal("status", await contact.SavingStatusRegion.GetAttributeAsync("role"));
-        Assert.Equal("polite", await contact.SavingStatusRegion.GetAttributeAsync("aria-live"));
-
-        // Duplicate-submit protection: Save disabled, and a second activation raises no second request.
-        Assert.True(await contact.IsSaveDisabledAsync());
-        await contact.SaveButton.PressAsync("Enter");
-        await contact.ClickSaveAsync();
-        Assert.Equal(1, held.PutCount);
-
-        // Axe scan while the save is held.
-        await AccessibilityScan.AssertNoSeriousViolationsAsync(
-            _page, "my profile — Contact Details tab (saving in flight)");
-
-        await held.ReleaseAsync();
-
-        await _page.Locator(".cd-success-banner").WaitForAsync(
-            new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
-        Assert.Equal(string.Empty, await contact.SavingStatusTextAsync());
-    }
-
-    [Fact]
-    public async Task ContactDetailsTab_ServerFailure_ShowsAccessibleErrorAndAllowsRetry()
-    {
-        var contact = await OpenContactDetailsAsync();
-        var email = $"e2e.{Guid.NewGuid():N}@personal.example.com";
-        var line1 = $"{Guid.NewGuid():N} Retry Street";
-        await contact.FillAddressLine1Async(line1);
-        await contact.FillCityAsync("London");
-        await contact.FillPostCodeAsync("EC1A 1BB");
-        await contact.FillPersonalEmailAsync(email);
-
-        var held = await contact.HoldNextSaveAsync();
-        await contact.ClickSaveAsync();
-        await held.WaitUntilHeldAsync();
-        await held.FailAsync();
-
-        await _page.Locator(".alert-danger[role='alert']").WaitForAsync(
-            new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
-        Assert.False(string.IsNullOrWhiteSpace(await contact.ErrorAlertTextAsync()));
-
-        // Entered values preserved, saving status cleared, Save re-enabled.
-        Assert.Equal(email, await contact.GetPersonalEmailAsync());
-        Assert.Equal(line1, (await _page.GetByPlaceholder("Street address").InputValueAsync()).Trim());
-        Assert.Equal(string.Empty, await contact.SavingStatusTextAsync());
-        Assert.False(await contact.IsSaveDisabledAsync());
-
-        await AccessibilityScan.AssertNoSeriousViolationsAsync(
-            _page, "my profile — Contact Details tab (server error)");
-
-        // Retry against the real API now succeeds.
-        await held.UnrouteAsync();
-        await contact.SaveChangesAsync();
-        Assert.True(await contact.IsSuccessBannerVisibleAsync());
-    }
-
-    [Fact]
     public async Task ContactDetailsTab_SuccessBanner_DismissByKeyboard_ReturnsFocusToSave()
     {
         var contact = await OpenContactDetailsAsync();
@@ -314,26 +246,6 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
         await contact.DismissSuccessByKeyboardAsync("Enter");
 
         Assert.False(await contact.IsSuccessBannerVisibleAsync());
-        Assert.Equal("cd-save-button", await contact.FocusedElementIdAsync());
-    }
-
-    [Fact]
-    public async Task ContactDetailsTab_ErrorBanner_DismissByKeyboard_ReturnsFocusToSave()
-    {
-        var contact = await OpenContactDetailsAsync();
-        await FillValidUniqueAsync(contact);
-
-        var held = await contact.HoldNextSaveAsync();
-        await contact.ClickSaveAsync();
-        await held.WaitUntilHeldAsync();
-        await held.FailAsync();
-
-        await _page.Locator(".alert-danger[role='alert']").WaitForAsync(
-            new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
-
-        await contact.DismissErrorByKeyboardAsync("Space");
-
-        Assert.Equal(string.Empty, await contact.ErrorAlertTextAsync());
         Assert.Equal("cd-save-button", await contact.FocusedElementIdAsync());
     }
 

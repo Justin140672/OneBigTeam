@@ -484,6 +484,8 @@ public static class EmployeesModule
             (43, "SeedOnboardTabA", false), (44, "SeedOnboardTabB", false), (45, "SeedOnboardTabC", false),
             (46, "SeedOnboardTabD", false), (47, "SeedOnboardTabE", false), (48, "SeedOnboardTabF", false),
             (49, "SeedConcurrencyAdmin", false), (50, "SeedConcurrencySelf", false),
+            (51, "SeedContactSaveA", false), (52, "SeedContactSaveB", false),
+            (53, "SeedContactSaveC", false), (54, "SeedContactSaveD", false),
         };
 
         return Array.ConvertAll(defs, d => (

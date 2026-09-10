@@ -1,5 +1,6 @@
 using HR.Web.Components;
 using HR.Web.Services;
+using HR.Web.Testing;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -15,6 +16,10 @@ ThreadPool.SetMinThreads(Environment.ProcessorCount * 12, Environment.ProcessorC
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
+// TEST-ONLY: when running under the E2E harness (E2E_TESTING=true — HR.AppHost forbids this outside
+// Development/test environments), enable the contact-save control mechanism (see HR.Web.Testing).
+var isE2E = string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options => options.DetailedErrors = builder.Environment.IsDevelopment());
@@ -29,7 +34,7 @@ builder.Services.AddScoped<SupabaseSessionAccessor>();
 builder.Services.AddScoped<SupportSessionState>();
 builder.Services.AddTransient<SupabaseAuthDelegatingHandler>();
 
-builder.Services.AddHttpClient("hrapi", c =>
+var hrApiClientBuilder = builder.Services.AddHttpClient("hrapi", c =>
 {
     var apiBaseUrl =
         builder.Configuration["services:api:https:0"] ??
@@ -45,7 +50,16 @@ builder.Services.AddHttpClient("hrapi", c =>
 // Attaches a real Supabase access token (once one has been established via /verify-email) as a
 // Bearer token on every outgoing hrapi request — see SupabaseAuthDelegatingHandler/
 // SupabaseSessionAccessor remarks. No-op for the existing Development dev-persona flow.
-.AddHttpMessageHandler<SupabaseAuthDelegatingHandler>()
+.AddHttpMessageHandler<SupabaseAuthDelegatingHandler>();
+
+// TEST-ONLY: lets an E2E test hold/release/fail the outbound contact-details PUT. Ordered AFTER
+// SupabaseAuthDelegatingHandler so the JWT (and its email claim) is already on the request.
+if (isE2E)
+{
+    hrApiClientBuilder.AddHttpMessageHandler<E2eContactSaveControlHandler>();
+}
+
+hrApiClientBuilder
 // SocketsHttpHandler's default PooledConnectionLifetime is infinite, so a connection idle long
 // enough can be silently closed server-side by Kestrel's own keep-alive timeout while the pool
 // still considers it valid — the next request reused from the pool then fails mid-flight with an
@@ -66,6 +80,12 @@ builder.Services.AddHttpClient("hrapi", c =>
         CertificateRevocationCheckMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck,
     },
 });
+
+if (isE2E)
+{
+    builder.Services.AddSingleton<E2eContactSaveControlStore>();
+    builder.Services.AddTransient<E2eContactSaveControlHandler>();
+}
 
 builder.Services.AddScoped<CompanyService>();
 builder.Services.AddScoped<DepartmentService>();
@@ -380,6 +400,45 @@ app.MapGet("/logout", async (
 // here via NavigationManager.NavigateTo(..., forceLoad: true) so the Set-Cookie header lands in the
 // user's real cookie jar — a POST issued from an HttpClient inside the Blazor Server process would
 // only set a cookie on that throwaway HttpClient, never on the user's browser.
+// TEST-ONLY (E2E_TESTING-gated): endpoints for a Playwright test to drive the server-side outbound
+// contact-details save. Only mapped when E2E_TESTING=true, which is forbidden outside
+// Development/test environments.
+if (isE2E)
+{
+    app.MapPost("/_e2e/contact-save-control/{email}", (string email, E2eContactSaveControlStore store) =>
+    {
+        store.Register(email.ToLowerInvariant());
+        return Results.Ok();
+    }).AllowAnonymous();
+
+    app.MapGet("/_e2e/contact-save-control/{email}", (string email, E2eContactSaveControlStore store) =>
+        store.TryGet(email.ToLowerInvariant(), out var control)
+            ? Results.Ok(new { arrived = control.HasArrived, requestCount = control.RequestCount, resolved = control.IsResolved })
+            : Results.NotFound()).AllowAnonymous();
+
+    app.MapPost("/_e2e/contact-save-control/{email}/release", (string email, E2eContactSaveControlStore store) =>
+    {
+        if (!store.TryGet(email.ToLowerInvariant(), out var control))
+            return Results.NotFound();
+        control.ReleaseContinue();
+        return Results.Ok();
+    }).AllowAnonymous();
+
+    app.MapPost("/_e2e/contact-save-control/{email}/fail", (string email, E2eContactSaveControlStore store) =>
+    {
+        if (!store.TryGet(email.ToLowerInvariant(), out var control))
+            return Results.NotFound();
+        control.Fail();
+        return Results.Ok();
+    }).AllowAnonymous();
+
+    app.MapDelete("/_e2e/contact-save-control/{email}", (string email, E2eContactSaveControlStore store) =>
+    {
+        store.Remove(email.ToLowerInvariant());
+        return Results.Ok();
+    }).AllowAnonymous();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapGet("/dev/persona-cookie", (HttpContext context, AuthHandoffStore handoffStore, IHostEnvironment environment, string? code) =>
