@@ -289,6 +289,178 @@ public sealed class ContactDetailsTab(IPage page)
     public Task<string?> ConcurrencyBannerRoleAsync() =>
         page.Locator(".save-conflict-banner").First.GetAttributeAsync("role");
 
+    // ── Ticket 7 follow-up: accessible "saving" announcement ──────────────────
+
+    /// <summary>The always-rendered polite live region that announces the in-flight save.</summary>
+    public ILocator SavingStatusRegion => page.Locator("#cd-saving-status");
+
+    /// <summary>Current text content of the saving live region (empty when no save is in flight).</summary>
+    public async Task<string> SavingStatusTextAsync() =>
+        (await SavingStatusRegion.TextContentAsync() ?? string.Empty).Trim();
+
+    /// <summary>
+    /// True when keyboard focus currently sits inside the saving live region specifically
+    /// (<c>#cd-saving-status</c>) — used to assert focus is NOT yanked into it during a save. The
+    /// success banner is also <c>role="status"</c>, so this keys off the id, not the role.
+    /// </summary>
+    public Task<bool> ActiveElementIsInSavingRegionAsync() =>
+        page.EvaluateAsync<bool>(
+            "() => !!document.activeElement && !!document.activeElement.closest('#cd-saving-status')");
+
+    /// <summary>True when the Save button is disabled (duplicate-submit protection while saving).</summary>
+    public Task<bool> IsSaveDisabledAsync() => SaveButton.IsDisabledAsync();
+
+    /// <summary>Text of the red <c>role="alert"</c> global error banner, or empty if absent.</summary>
+    public async Task<string> ErrorAlertTextAsync()
+    {
+        var alert = page.Locator(".alert-danger");
+        return await alert.CountAsync() > 0
+            ? (await alert.First.InnerTextAsync()).Trim()
+            : string.Empty;
+    }
+
+    private ILocator SuccessDismissButton => page.Locator("button[aria-label='Dismiss confirmation']");
+    private ILocator ErrorDismissButton   => page.Locator("button[aria-label='Dismiss error']");
+
+    /// <summary>Focuses the success banner's dismiss button and confirms it holds focus.</summary>
+    public async Task FocusSuccessDismissAsync()
+    {
+        await SuccessDismissButton.FocusAsync();
+        await Assertions.Expect(SuccessDismissButton).ToBeFocusedAsync();
+    }
+
+    /// <summary>Focuses the error banner's dismiss button and confirms it holds focus.</summary>
+    public async Task FocusErrorDismissAsync()
+    {
+        await ErrorDismissButton.FocusAsync();
+        await Assertions.Expect(ErrorDismissButton).ToBeFocusedAsync();
+    }
+
+    /// <summary>Activates the currently focused element with the keyboard and waits for the given key name.</summary>
+    public Task PressKeyAsync(string key) => page.Keyboard.PressAsync(key);
+
+    /// <summary>Dismisses the success banner via keyboard and waits for it to disappear.</summary>
+    public async Task DismissSuccessByKeyboardAsync(string key = "Enter")
+    {
+        await FocusSuccessDismissAsync();
+        await page.Keyboard.PressAsync(key);
+        await page.Locator(".cd-success-banner").WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
+
+    /// <summary>Dismisses the error banner via keyboard and waits for it to disappear.</summary>
+    public async Task DismissErrorByKeyboardAsync(string key = "Enter")
+    {
+        await FocusErrorDismissAsync();
+        await page.Keyboard.PressAsync(key);
+        await page.Locator(".alert-danger").WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
+
+    // ── Route interception for the contact-details update call ─────────────────
+    // EmployeeService.UpdateMyContactDetailsAsync issues:
+    //   PUT api/companies/{companyId}/employees/me/contact-details
+    // (GET on the same path loads the form; the handler lets non-PUT verbs pass straight through.)
+
+    private const string SaveRouteGlob = "**/api/companies/*/employees/me/contact-details";
+
+    /// <summary>
+    /// Installs a route interceptor that holds the NEXT contact-details save (PUT) until the caller
+    /// explicitly releases it (<see cref="HeldSave.ReleaseAsync"/> — fulfilled by letting the real
+    /// request through, a genuine success) or fails it (<see cref="HeldSave.FailAsync"/> — HTTP 500).
+    /// The interceptor auto-unroutes once the held request has been resolved.
+    /// </summary>
+    public async Task<HeldSave> HoldNextSaveAsync()
+    {
+        var held = new HeldSave(page, SaveRouteGlob);
+        await held.BeginAsync();
+        return held;
+    }
+
+    public sealed class HeldSave
+    {
+        private readonly IPage _page;
+        private readonly string _glob;
+        private readonly TaskCompletionSource<bool> _arrived = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> _resolved = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<string> _decision = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _putCount;
+        private int _unrouted;
+
+        internal HeldSave(IPage page, string glob)
+        {
+            _page = page;
+            _glob = glob;
+        }
+
+        /// <summary>Number of save (PUT) requests that reached the interceptor.</summary>
+        public int PutCount => Volatile.Read(ref _putCount);
+
+        /// <summary>Completes once the first save request is being held.</summary>
+        public Task WaitUntilHeldAsync() => _arrived.Task;
+
+        internal Task BeginAsync() => _page.RouteAsync(_glob, async route =>
+        {
+            if (!string.Equals(route.Request.Method, "PUT", StringComparison.OrdinalIgnoreCase))
+            {
+                await route.ContinueAsync();
+                return;
+            }
+
+            var n = Interlocked.Increment(ref _putCount);
+            if (n > 1)
+            {
+                // A duplicate submit slipped through client-side guards — fail it loudly rather
+                // than silently swallow, so the test assertion on PutCount is meaningful.
+                await route.AbortAsync();
+                return;
+            }
+
+            _arrived.TrySetResult(true);
+            var decision = await _decision.Task;
+
+            if (decision == "fail")
+            {
+                await route.FulfillAsync(new RouteFulfillOptions
+                {
+                    Status = 500,
+                    ContentType = "application/json",
+                    Body = "{\"error\":\"Simulated server failure.\",\"code\":\"server_error\"}",
+                });
+            }
+            else
+            {
+                await route.ContinueAsync();
+            }
+
+            _resolved.TrySetResult(true);
+            await UnrouteAsync();
+        });
+
+        /// <summary>Releases the held save and lets the real request through (a genuine success).</summary>
+        public async Task ReleaseAsync()
+        {
+            await _arrived.Task;
+            _decision.TrySetResult("continue");
+            await _resolved.Task;
+        }
+
+        /// <summary>Fails the held save with a controlled HTTP 500.</summary>
+        public async Task FailAsync()
+        {
+            await _arrived.Task;
+            _decision.TrySetResult("fail");
+            await _resolved.Task;
+        }
+
+        /// <summary>Removes the interceptor so subsequent saves hit the real API (for retry assertions).</summary>
+        public async Task UnrouteAsync()
+        {
+            if (Interlocked.Exchange(ref _unrouted, 1) == 1) return;
+            try { await _page.UnrouteAsync(_glob); } catch { /* already gone */ }
+        }
+    }
+
     public sealed record FocusedControlInfo(
         bool InForm, bool IsControl, bool IsSaveButton, string Tag, string AccessibleName);
 }

@@ -138,12 +138,17 @@ else
                     </div>
                 </div>
 
+                @* Always-rendered polite live region: exists in the DOM before @_savingStatus is set
+                   so the "saving" announcement is reliably picked up by assistive tech. Focus is
+                   never moved here. *@
+                <div id="cd-saving-status" class="cd-saving-status visually-hidden" role="status" aria-live="polite" aria-atomic="true">@_savingStatus</div>
+
                 <div class="cd-form-footer">
                     <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveClickedAsync"
                               HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "cd-save-button" })">
                         @if (_saving)
                         {
-                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
                         }
                         Save Changes
                     </SfButton>
@@ -158,6 +163,7 @@ else
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
 
     private bool _saving;
+    private string _savingStatus = string.Empty;
     private string _workEmail = string.Empty;
 
     // Builds the HtmlAttributes bag for an HrTextBox: a stable id (for label `for=`), a mirrored
@@ -221,9 +227,19 @@ else
     // component drives its own button, so wrap it to manage this component's spinner state.
     private async Task SaveClickedAsync()
     {
+        if (_saving) return;
         _saving = true;
-        var error = await SaveAsync();
-        _saving = false;
+        _savingStatus = "Saving contact details…";
+        string? error;
+        try
+        {
+            error = await SaveAsync();
+        }
+        finally
+        {
+            _saving = false;
+            _savingStatus = string.Empty;
+        }
 
         // Accessibility: on a client-side validation failure move focus to the first invalid field
         // so a screen-reader / keyboard user is taken straight to the problem. Server errors and
@@ -240,8 +256,14 @@ else
     private async Task ReloadLatestClickedAsync()
     {
         _saving = true;
-        await ReloadLatestValuesAsync(rebaseline: true);
-        _saving = false;
+        try
+        {
+            await ReloadLatestValuesAsync(rebaseline: true);
+        }
+        finally
+        {
+            _saving = false;
+        }
 
         // Orient the user on the refreshed values by moving focus to the first form field.
         await JS.InvokeVoidAsync("hrFocusById", "cd-personal-email");
