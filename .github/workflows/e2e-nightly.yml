@@ -35,6 +35,22 @@ jobs:
       - name: Restore (locked mode)
         run: dotnet restore OneBigTeam.slnx --locked-mode
 
+      # The committed xunit.runner.json pins maxParallelThreads=15 — that is the local/dev
+      # reliability contract (MEMORY: "E2E must be deterministic at 15 threads") and must NOT be
+      # forked permanently. But this job runs on a 2-vCPU ubuntu-latest runner that is ALSO booting
+      # the full 5-service Aspire graph + a Postgres testcontainer. 15 headless Chromium under that
+      # CPU starvation makes HR.Web's HttpClient calls to HR.Api time out, surfacing as bogus
+      # "Something went wrong. Please try again." login failures. We patch the runner config down to
+      # 6 in-place for this CI run only (not committed, and before build so it is copied to bin/).
+      - name: Throttle E2E parallelism for the 2-core runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          cfg=tests/HR.Web.E2E.Tests/xunit.runner.json
+          jq '.maxParallelThreads = 6' "$cfg" > "$cfg.tmp"
+          mv "$cfg.tmp" "$cfg"
+          cat "$cfg"
+
       - name: Build E2E project (Release)
         run: dotnet build tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj -c Release --no-restore
 
@@ -50,6 +66,10 @@ jobs:
           dotnet test tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj
           -c Release --no-build
           --logger "trx;LogFileName=e2e.trx"
+
+      - name: Restore xunit.runner.json (avoid leaking the CI throttle)
+        if: always()
+        run: git checkout -- tests/HR.Web.E2E.Tests/xunit.runner.json
 
       - name: Upload results
         if: always()

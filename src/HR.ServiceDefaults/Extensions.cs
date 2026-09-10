@@ -27,8 +27,25 @@ public static class Extensions
 
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
-            // Turn on resilience by default
-            http.AddStandardResilienceHandler();
+            // Turn on resilience by default. The stock defaults (10s per attempt, 30s total) are
+            // tuned for a healthy cloud host. Our E2E nightly job runs every service + Postgres +
+            // headless Chromium on a 2-vCPU runner, where a single internal web->api hop (e.g.
+            // HR.Web's "hrapi" client calling POST /api/login) can legitimately take far longer
+            // than 10s under CPU starvation. When the attempt timeout fires there, HR.Web's
+            // catch-all turns it into a bogus "Something went wrong. Please try again." Widen the
+            // per-attempt and total budgets and add one more retry so backend slowness surfaces as
+            // a slow request that eventually succeeds, not a spurious error. All traffic governed by
+            // this handler is internal service-to-service, so the larger budget is safe.
+            http.AddStandardResilienceHandler(options =>
+            {
+                options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(30);
+                options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
+                // CircuitBreaker.SamplingDuration must be >= 2 * AttemptTimeout.
+                options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+                options.Retry.MaxRetryAttempts = 4;
+                options.Retry.Delay = TimeSpan.FromMilliseconds(500);
+                options.Retry.UseJitter = true;
+            });
 
             // Turn on service discovery by default
             http.AddServiceDiscovery();

@@ -123,84 +123,22 @@ builder.Services.AddRateLimiter(options =>
 			}));
 });
 
-// Supabase-backed JWT Bearer validation, shared between Development (dual-scheme below) and
-// non-Development (sole scheme). This Supabase project uses asymmetric JWT signing (JWKS), not a
-// shared HS256 secret — see SupabaseJwksKeyResolver below.
+// Supabase-backed JWT Bearer validation. This Supabase project uses asymmetric JWT signing
+// (ES256/RS256 via a bare JWKS document) — Ticket 6 replaced the hand-rolled synchronous JWKS
+// resolver with an async ConfigurationManager<OpenIdConnectConfiguration>. All wiring lives in
+// HR.Api.Authentication.SupabaseJwtBearerConfiguration so the real pipeline can be exercised verbatim
+// by SigningKeyRefreshResilienceTests. The ConfigurationManager is attached in a second, DI-aware
+// options configuration below so it can log retrieval failures through ILoggerFactory.
+//
+// The E2E_TESTING flag is the same one that swaps in FakeSupabaseAuthGateway
+// (HR.Modules.Identity.IdentityModule): under it this process validates locally-signed HS256 tokens
+// and never touches the network.
 void ConfigureSupabaseJwtBearer(JwtBearerOptions options)
 {
-	var supabaseProjectUrl = builder.Configuration["SupabaseAuth:ProjectUrl"] ?? "";
-	var supabaseJwksUrl = builder.Configuration["SupabaseAuth:JwksUrl"] ?? "";
-
-	// Same E2E_TESTING flag that swaps in FakeSupabaseAuthGateway (HR.Modules.Identity.IdentityModule)
-	// — read here too so this process's own JWT validation can accept the locally-signed tokens that
-	// gateway now mints for E2E sign-in (see HR.Modules.Identity.Services.E2eFakeSupabaseJwt's remarks
-	// for why: real Supabase Auth rate-limits sign-in under this suite's login volume). Both checks
-	// read the exact same env var, so they can never disagree about which mode the process is in.
 	var isE2ETesting = string.Equals(
 		Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
 
-	// Without this, JwtBearerHandler silently remaps short JWT claim names to legacy long-form
-	// ClaimTypes URIs (e.g. "sub" -> ClaimTypes.NameIdentifier, "email" -> ClaimTypes.Email) via
-	// JwtSecurityTokenHandler's default inbound claim mapping. CurrentUserClaims/
-	// SupabaseCurrentUserResolutionMiddleware look up "sub"/"email" literally, so without this
-	// they'd never find them on a real Supabase-issued token — resolving to an authenticated-but-
-	// unidentified user (UserId null), which fails every downstream check with a fast 403.
-	options.MapInboundClaims = false;
-
-	options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
-	{
-		ValidateIssuer = true,
-		ValidIssuer = $"{supabaseProjectUrl}/auth/v1",
-		ValidateAudience = true,
-		// "authenticated" is Supabase's well-known audience claim value for authenticated users on
-		// issued access tokens.
-		ValidAudience = "authenticated",
-		ValidateLifetime = true,
-		// Only ever returns more than the real JWKS keys when E2E_TESTING=true — every other
-		// environment (Development without that flag, and Production, which never sets it) resolves
-		// signing keys exactly as before, unchanged. JwtBearerHandler tries every candidate key
-		// returned here against the token's signature, so appending one extra, fixed, non-secret
-		// symmetric key under E2E_TESTING doesn't weaken or alter validation against real
-		// Supabase-issued tokens in any environment — it only additionally allows tokens actually
-		// signed with that same key, which only HR.Modules.Identity.Services.E2eFakeSupabaseJwt
-		// (itself only reachable via FakeSupabaseAuthGateway, itself only registered under this same
-		// flag) ever mints.
-		IssuerSigningKeyResolver = (_, _, kid, _) =>
-		{
-			// Under E2E_TESTING, every token actually presented to this API was minted locally by
-			// E2eFakeSupabaseJwt (see FakeSupabaseAuthGateway) — it is never signed by the real
-			// Supabase project, so a real key from SupabaseJwksKeyResolver could never match it
-			// anyway. Skip the real JWKS fetch entirely in this mode: SupabaseJwksKeyResolver.GetKeySet
-			// blocks the calling thread synchronously on an HttpClient.GetStringAsync(...).GetAwaiter()
-			// .GetResult() call under a SemaphoreSlim.Wait() lock (IssuerSigningKeyResolver has no
-			// async form), and the E2E environment's SupabaseAuth:JwksUrl target may be slow,
-			// rate-limited, or unreachable — every authenticated request's JWT validation (i.e. every
-			// page load past login) would otherwise pay that synchronous network cost once per 10-minute
-			// cache window, which is consistent with the app shell repeatedly failing to load within
-			// the E2E suite's 40-45s waits. Real (non-E2E) environments are completely unaffected —
-			// this branch only ever runs when E2E_TESTING=true.
-			if (isE2ETesting)
-			{
-				return [HR.Modules.Identity.Services.E2eFakeSupabaseJwt.SigningKey];
-			}
-
-			return SupabaseJwksKeyResolver.ResolveSigningKeys(supabaseJwksUrl, kid);
-		},
-	};
-
-	// The default Serilog MinimumLevel.Override for "Microsoft" (Warning) swallows JwtBearerHandler's
-	// own authentication-failure logs, so a validation failure otherwise surfaces only as a bare 401
-	// with no indication of why (expired token, bad signature, issuer/audience mismatch, etc.).
-	options.Events = new JwtBearerEvents
-	{
-		OnAuthenticationFailed = context =>
-		{
-			context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
-				.CreateLogger("SupabaseJwtBearer")
-				.LogWarning(context.Exception, "Supabase JWT validation failed");
-			return Task.CompletedTask;
-		},
-	};
+	SupabaseJwtBearerConfiguration.ConfigureValidation(options, builder.Configuration, isE2ETesting);
 }
 
 if (builder.Environment.IsDevelopment())
@@ -217,6 +155,23 @@ if (builder.Environment.IsDevelopment())
 builder.Services
 	.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 	.AddJwtBearer(ConfigureSupabaseJwtBearer);
+
+// Ticket 6: attach the async ConfigurationManager<OpenIdConnectConfiguration> for the real Supabase
+// JWKS endpoint, wrapped in a FreshnessGatedConfigurationManager that enforces an absolute
+// MaximumCachedKeyAge on every key-supplying path (IdentityModel's own LastKnownGoodLifetime only
+// bounds the LKG fallback slot and never expires the current keys during a sustained outage). Done as
+// a second, DI-aware configuration so the custom retriever can log fetch/parse failures through
+// ILoggerFactory. No-op under E2E_TESTING (that path resolves a local HS256 key and must never hit
+// the network) and when no JwksUrl is configured.
+builder.Services
+	.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+	.Configure<ILoggerFactory>((options, loggerFactory) =>
+	{
+		var isE2ETesting = string.Equals(
+			Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
+		SupabaseJwtBearerConfiguration.AttachConfigurationManager(
+			options, builder.Configuration, loggerFactory, isE2ETesting);
+	});
 
 builder.Services
 	.AddAuthorizationBuilder()
@@ -657,54 +612,3 @@ internal sealed record ContactRequest(
 	int? EmployeeCount,
 	string Message,
 	string? Website);
-
-// Fetches and caches Supabase's JWKS (bare JSON Web Key Set, RFC 7517) document so JWT Bearer
-// validation can resolve the signing key matching a token's "kid" header. AddJwtBearer's built-in
-// options.MetadataAddress auto-discovery expects a full OpenID Connect discovery document (which
-// itself points at a jwks_uri) — Supabase's JwksUrl here is a bare JWKS document, not an OIDC
-// discovery document, so MetadataAddress is not usable and this manual resolver is used instead.
-// IssuerSigningKeyResolver is a synchronous callback, so the JWKS fetch below is synchronous
-// (blocking) with a short in-memory cache to avoid fetching on every request.
-internal static class SupabaseJwksKeyResolver
-{
-	private static readonly HttpClient HttpClient = new();
-	private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
-	private static readonly SemaphoreSlim RefreshLock = new(1, 1);
-
-	private static Microsoft.IdentityModel.Tokens.JsonWebKeySet? _cachedKeySet;
-	private static DateTimeOffset _cachedAt = DateTimeOffset.MinValue;
-
-	public static IEnumerable<Microsoft.IdentityModel.Tokens.SecurityKey> ResolveSigningKeys(string jwksUrl, string? kid)
-	{
-		var keySet = GetKeySet(jwksUrl);
-		var keys = keySet.GetSigningKeys();
-
-		return string.IsNullOrEmpty(kid)
-			? keys
-			: keys.Where(key => key.KeyId == kid);
-	}
-
-	private static Microsoft.IdentityModel.Tokens.JsonWebKeySet GetKeySet(string jwksUrl)
-	{
-		if (_cachedKeySet is not null && DateTimeOffset.UtcNow - _cachedAt < CacheDuration)
-			return _cachedKeySet;
-
-		RefreshLock.Wait();
-		try
-		{
-			if (_cachedKeySet is not null && DateTimeOffset.UtcNow - _cachedAt < CacheDuration)
-				return _cachedKeySet;
-
-			// Blocking call: IssuerSigningKeyResolver is a synchronous delegate in
-			// Microsoft.IdentityModel.Tokens, so there is no async alternative here.
-			var json = HttpClient.GetStringAsync(jwksUrl).GetAwaiter().GetResult();
-			_cachedKeySet = new Microsoft.IdentityModel.Tokens.JsonWebKeySet(json);
-			_cachedAt = DateTimeOffset.UtcNow;
-			return _cachedKeySet;
-		}
-		finally
-		{
-			RefreshLock.Release();
-		}
-	}
-}

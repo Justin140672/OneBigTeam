@@ -27,6 +27,9 @@ builder.Services.AddHttpClient("hrapi", c =>
         throw new InvalidOperationException("API base URL is missing. Expected services:api:https:0 or services:api:http:0.");
 
     c.BaseAddress = new Uri(apiBaseUrl);
+    // Keep above the standard resilience handler's 120s total budget (ServiceDefaults) so the
+    // client timeout never truncates a legitimate retry sequence on a slow host.
+    c.Timeout = TimeSpan.FromSeconds(130);
 })
 .AddHttpMessageHandler<SupabaseAuthDelegatingHandler>()
 // SocketsHttpHandler's default PooledConnectionLifetime is infinite, so a connection idle long

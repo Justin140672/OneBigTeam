@@ -37,6 +37,10 @@ builder.Services.AddHttpClient("hrapi", c =>
         throw new InvalidOperationException("API base URL is missing. Expected services:api:https:0 or services:api:http:0.");
 
     c.BaseAddress = new Uri(apiBaseUrl);
+    // HttpClient.Timeout is the hard wall around the WHOLE resilience pipeline (all retries). The
+    // standard handler's total budget is widened to 120s in ServiceDefaults for slow CI hosts;
+    // keep this above that so the client timeout never truncates a legitimate retry sequence.
+    c.Timeout = TimeSpan.FromSeconds(130);
 })
 // Attaches a real Supabase access token (once one has been established via /verify-email) as a
 // Bearer token on every outgoing hrapi request — see SupabaseAuthDelegatingHandler/

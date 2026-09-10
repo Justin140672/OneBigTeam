@@ -1,3 +1,4 @@
+using System.Net;
 using Aspire.Hosting;
 using Aspire.Hosting.Testing;
 using Microsoft.Playwright;
@@ -47,11 +48,25 @@ public sealed class AppFixture : IAsyncLifetime
         // marketing can still be mid-startup even once web already answers /login. Without probing
         // it separately here too, a test that's first to navigate to MarketingBaseUrl in a run can
         // hit that startup window as ERR_CONNECTION_REFUSED instead of a clean wait.
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-        var deadline = DateTime.UtcNow.AddMinutes(3);
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        var deadline = DateTime.UtcNow.AddMinutes(5);
+
+        // Probe HR.Api directly FIRST. Every persona login drives a HR.Web -> HR.Api round-trip
+        // (POST /api/login etc.); on a slow CI host HR.Web can be serving /login while HR.Api is
+        // still applying migrations/seed, so the first login test hits a timeout that HR.Web's
+        // catch-all reports as "Something went wrong." /health/ready is mapped in every environment
+        // and returns 503 until startup migrations complete, so this waits for the real dependency.
+        await WaitUntilReadyAsync(http, $"{ApiBaseUrl}/health/ready", deadline);
+
         await WaitUntilRespondingAsync(http, $"{WebBaseUrl}/login", deadline);
         await WaitUntilRespondingAsync(http, $"{MarketingBaseUrl}/", deadline);
         await WaitUntilRespondingAsync(http, $"{AdminWebBaseUrl}/login", deadline);
+
+        // Final gate: confirm the actual failing path — a HR.Web request that fans out to HR.Api —
+        // works before releasing the suite, not just that HR.Web serves its own static /login.
+        // HR.Web's /health/ready aggregates its checks; a plain 200 here plus the direct API
+        // readiness above means both ends and the network between them are live.
+        await WaitUntilReadyAsync(http, $"{WebBaseUrl}/health/ready", deadline);
 
         _playwright = await Playwright.CreateAsync();
         _browser    = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
@@ -101,6 +116,31 @@ public sealed class AppFixture : IAsyncLifetime
             catch { /* app not up yet */ }
             await Task.Delay(1_000);
         }
+    }
+
+    // Like WaitUntilRespondingAsync but requires a genuine 2xx (readiness), not just "not 5xx".
+    // /health/ready returns 503 while startup migrations/seed are still running, so a <500 check
+    // would release the suite too early. Throws on deadline so a stuck dependency fails loudly and
+    // deterministically instead of letting every login test flake.
+    private static async Task WaitUntilReadyAsync(HttpClient http, string url, DateTime deadline)
+    {
+        HttpStatusCode? lastStatus = null;
+        string? lastError = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var response = await http.GetAsync(url);
+                lastStatus = response.StatusCode;
+                if (response.IsSuccessStatusCode) return;
+            }
+            catch (Exception ex) { lastError = ex.Message; }
+            await Task.Delay(1_000);
+        }
+
+        throw new TimeoutException(
+            $"Readiness probe never succeeded for {url} within the startup deadline "
+            + $"(last status: {lastStatus?.ToString() ?? "none"}, last error: {lastError ?? "none"}).");
     }
 
     private static void KillStaleTestHosts()
