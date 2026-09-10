@@ -17,6 +17,7 @@ internal sealed class ListCandidateDocumentsHandler(RecruitmentDbContext db)
             .Select(cd => new CandidateDocumentListItem(
                 cd.Id,
                 cd.Title,
+                cd.Kind.ToString(),
                 cd.FileName,
                 cd.FileSize,
                 cd.ContentType,

@@ -1,0 +1,310 @@
+@page "/companies/{CompanyId:guid}/vacancies/{VacancyId:guid}/applications/{ApplicationId:guid}/review-cv"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Forms
+@inject ApplicationService ApplicationService
+@inject CandidateService CandidateService
+@inject VacancyService VacancyService
+@inject AppSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Review CV</PageTitle>
+
+<div class="container py-4" data-testid="review-cv-page">
+    <a href="@BackTarget" class="text-decoration-none text-muted small">← Back</a>
+    <h1 class="mb-3 mt-1">Review CV</h1>
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator />
+    }
+    else if (_app is null)
+    {
+        <div class="alert alert-danger">This application could not be loaded.</div>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(_globalError))
+        {
+            <div class="alert alert-danger">@_globalError</div>
+        }
+        @if (!string.IsNullOrEmpty(_success))
+        {
+            <div class="alert alert-success">@_success</div>
+        }
+
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0">Candidate</h5></div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-5">Name</dt>
+                            <dd class="col-7" data-testid="review-cv-candidate-name">@_app.CandidateFirstName @_app.CandidateLastName</dd>
+                            <dt class="col-5">Email</dt>
+                            <dd class="col-7">@_app.CandidateEmail</dd>
+                            <dt class="col-5">Position</dt>
+                            <dd class="col-7" data-testid="review-cv-position">@(_vacancyTitle ?? "—")</dd>
+                            <dt class="col-5">Current stage</dt>
+                            <dd class="col-7" data-testid="review-cv-current-stage">@_app.CurrentStageName</dd>
+                            @if (!string.IsNullOrWhiteSpace(_app.Source) && _app.Source != "Unspecified")
+                            {
+                                <dt class="col-5">Source</dt>
+                                <dd class="col-7">
+                                    @if (_app.Source == "ExternalRecruiter")
+                                    {
+                                        <text>External Recruiter@(_app.SourceExternalRecruiterAgencyName is null ? "" : $" ({_app.SourceExternalRecruiterAgencyName})")</text>
+                                    }
+                                    else
+                                    {
+                                        @_app.Source
+                                    }
+                                </dd>
+                            }
+                        </dl>
+                        @if (_app.WithdrawnAt is not null)
+                        {
+                            <div class="alert alert-warning mt-3 mb-0">This candidate has withdrawn their application.</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">CV review notes</h5></div>
+                    <div class="card-body">
+                        @if (_app.CvReviewedAt is not null)
+                        {
+                            <p class="text-muted small mb-2">Last reviewed @_app.CvReviewedAt.Value.LocalDateTime.ToString("g")</p>
+                        }
+                        <div data-testid="review-cv-notes">
+                            <HrTextBox @bind-Value="_notes" Multiline="true" Rows="10" Maxlength="4000"
+                                       Placeholder="Record your assessment of this CV" />
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <SfButton IsPrimary="true" Disabled="@(_busy || _app.WithdrawnAt is not null)" OnClick="SaveNotesAsync" data-testid="review-cv-save-notes">Save Notes</SfButton>
+                            <SfButton Disabled="@(_busy || _app.WithdrawnAt is not null)" OnClick="MoveForwardAsync" data-testid="review-cv-move-forward">Move Forward</SfButton>
+                            <SfButton CssClass="e-danger" Disabled="@(_busy || _app.WithdrawnAt is not null)" OnClick="@(() => _showRejectDialog = true)" data-testid="review-cv-reject">Reject</SfButton>
+                            <SfButton Disabled="@_busy" OnClick="Close" data-testid="review-cv-close">Close</SfButton>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">CV</h5>
+                        @if (_app.CvDocumentId is not null)
+                        {
+                            <a href="@CvProxyUrl" target="_blank" rel="noopener">Open in new tab / Download</a>
+                        }
+                    </div>
+                    <div class="card-body">
+                        @if (_app.CvDocumentId is not null)
+                        {
+                            <p class="small text-muted">@_app.CvFileName</p>
+                            @if (string.Equals(_app.CvContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <object data="@CvProxyUrl" type="application/pdf" class="review-cv__viewer">
+                                    <p>Your browser can't display this PDF inline. <a href="@CvProxyUrl" target="_blank" rel="noopener">Download it to view.</a></p>
+                                </object>
+                            }
+                            else
+                            {
+                                <p>This file type can't be previewed. <a href="@CvProxyUrl" target="_blank" rel="noopener">Download it to view.</a></p>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted">No CV has been uploaded for this candidate.</p>
+                            @if (!string.IsNullOrWhiteSpace(_legacyResumeUrl))
+                            {
+                                <p>
+                                    <a href="@_legacyResumeUrl" target="_blank" rel="noopener">Legacy CV / resume link</a>
+                                    <span class="text-muted small"> (legacy link recorded on the candidate record)</span>
+                                </p>
+                            }
+
+                            <div class="mt-3">
+                                <label class="form-label">Upload a CV</label>
+                                <InputFile class="form-control" OnChange="OnFileSelected" accept=".pdf,.doc,.docx" />
+                                <div class="mt-2">
+                                    <SfButton IsPrimary="true" Disabled="@(_busy || _selectedFile is null)" OnClick="UploadCvAsync">Upload CV</SfButton>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<SfDialog Width="420px" IsModal="true" @bind-Visible="_showRejectDialog" Header="Reject Candidate" CssClass="review-cv-reject-dialog">
+    <DialogTemplates>
+        <Content>
+            <label class="form-label">Reason (optional)</label>
+            <div data-testid="review-cv-reject-reason">
+                <HrTextBox @bind-Value="_rejectionReason" Multiline="true" Rows="3" />
+            </div>
+            @if (_dialogError is not null)
+            {
+                <div class="alert alert-danger py-2 mt-2">@_dialogError</div>
+            }
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Reject" IsPrimary="true" OnClick="ConfirmRejectAsync" />
+        <DialogButton Content="Cancel" OnClick="@(() => _showRejectDialog = false)" />
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid VacancyId { get; set; }
+    [Parameter] public Guid ApplicationId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    [Parameter]
+    public string? ReturnUrl { get; set; }
+
+    private bool _loading = true;
+    private bool _busy;
+    private GetApplicationResponse? _app;
+    private string? _vacancyTitle;
+    private string? _legacyResumeUrl;
+    private string _notes = string.Empty;
+    private string? _globalError;
+    private string? _success;
+
+    private bool _showRejectDialog;
+    private string? _rejectionReason;
+    private string? _dialogError;
+
+    private IBrowserFile? _selectedFile;
+
+    private string BackTarget => string.IsNullOrWhiteSpace(ReturnUrl)
+        ? $"/companies/{CompanyId}/vacancies/{VacancyId}"
+        : (ReturnUrl.StartsWith('/') ? ReturnUrl : "/" + ReturnUrl);
+
+    private string CvProxyUrl => _app?.CvDocumentId is Guid docId
+        ? CandidateService.GetCandidateDocumentProxyUrl(CompanyId, _app.CandidateId, docId)
+        : string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!AppSession.GuardAccess(Navigation, Session.CanManageRecruitment))
+            return;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+
+        _app = await ApplicationService.GetApplicationAsync(CompanyId, VacancyId, ApplicationId);
+        if (_app is not null)
+        {
+            _notes = _app.CvReviewNotes ?? string.Empty;
+
+            var vacancy = await VacancyService.GetVacancyAsync(CompanyId, VacancyId);
+            _vacancyTitle = vacancy?.EffectiveTitle ?? vacancy?.PositionProfileTitle;
+
+            if (_app.CvDocumentId is null)
+            {
+                var candidate = await CandidateService.GetCandidateAsync(CompanyId, _app.CandidateId);
+                _legacyResumeUrl = candidate?.ResumeUrl;
+            }
+        }
+
+        _loading = false;
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+
+    private async Task SaveNotesAsync()
+    {
+        _busy = true;
+        _globalError = null;
+        _success = null;
+
+        var (result, error) = await ApplicationService.SaveCvReviewNotesAsync(CompanyId, VacancyId, ApplicationId, Trimmed(_notes));
+        _busy = false;
+
+        if (error is not null)
+        {
+            _globalError = error;
+            return;
+        }
+
+        _success = "CV review notes saved.";
+        _app = await ApplicationService.GetApplicationAsync(CompanyId, VacancyId, ApplicationId);
+        if (_app is not null) _notes = _app.CvReviewNotes ?? string.Empty;
+    }
+
+    private async Task MoveForwardAsync()
+    {
+        _busy = true;
+        _globalError = null;
+        _success = null;
+
+        var (result, error) = await ApplicationService.MoveApplicationForwardAsync(CompanyId, VacancyId, ApplicationId, Trimmed(_notes));
+        _busy = false;
+
+        if (error is not null)
+        {
+            _globalError = error;
+            return;
+        }
+
+        Navigation.NavigateTo(BackTarget);
+    }
+
+    private async Task ConfirmRejectAsync()
+    {
+        _dialogError = null;
+        _busy = true;
+
+        var (result, error) = await ApplicationService.RejectCandidateAsync(
+            CompanyId, VacancyId, ApplicationId, string.IsNullOrWhiteSpace(_rejectionReason) ? null : _rejectionReason.Trim());
+        _busy = false;
+
+        if (error is not null)
+        {
+            _dialogError = error;
+            return;
+        }
+
+        _showRejectDialog = false;
+        Navigation.NavigateTo(BackTarget);
+    }
+
+    private async Task UploadCvAsync()
+    {
+        if (_selectedFile is null) return;
+
+        _busy = true;
+        _globalError = null;
+        _success = null;
+
+        var error = await CandidateService.UploadCandidateDocumentAsync(
+            CompanyId, _app!.CandidateId, _selectedFile.Name, "Cv", _selectedFile);
+        _busy = false;
+
+        if (error is not null)
+        {
+            _globalError = error;
+            return;
+        }
+
+        _selectedFile = null;
+        _success = "CV uploaded.";
+        await LoadAsync();
+    }
+
+    private void Close() => Navigation.NavigateTo(BackTarget);
+
+    private static string? Trimmed(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

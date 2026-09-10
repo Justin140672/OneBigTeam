@@ -584,6 +584,31 @@ app.MapGet("/companies/{companyId:guid}/data-import/employees/template/download"
     return Results.File(bytes, contentType, fileName);
 }).RequireAuthorization();
 
+// Ticket #1: authenticated proxy that streams a candidate CV/document inline, so it can render in an
+// <iframe>/<object> and also work as an "Open / Download" link. Same cookie-auth-to-Bearer bridge as
+// the employee import template download above — the browser sends this app's session cookie on the
+// same-origin request, and the "hrapi" client attaches the real Supabase Bearer for the API call.
+// The API's own candidate-document policy still performs the real permission check server-side.
+app.MapGet("/companies/{companyId:guid}/candidates/{candidateId:guid}/cv/{documentId:guid}", async (
+    Guid companyId,
+    Guid candidateId,
+    Guid documentId,
+    IHttpClientFactory httpClientFactory) =>
+{
+    var http = httpClientFactory.CreateClient("hrapi");
+    using var response = await http.GetAsync(
+        $"api/companies/{companyId}/candidates/{candidateId}/documents/{documentId}/download");
+
+    if (!response.IsSuccessStatusCode)
+        return Results.StatusCode((int)response.StatusCode);
+
+    var bytes = await response.Content.ReadAsByteArrayAsync();
+    var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+
+    // No download file name → the browser renders it inline (Content-Disposition: inline).
+    return Results.File(bytes, contentType);
+}).RequireAuthorization();
+
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

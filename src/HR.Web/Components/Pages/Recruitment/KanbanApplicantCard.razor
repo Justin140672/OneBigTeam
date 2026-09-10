@@ -27,6 +27,10 @@
             {
                 <div class="kanban-applicant-card__move-menu" role="menu" aria-label="Move to stage"
                      data-testid="kanban-card-move-stage-menu">
+                    <button type="button" role="menuitem" data-testid="kanban-card-review-cv"
+                            @onclick="ReviewCv" @onclick:stopPropagation="true">
+                        Review CV
+                    </button>
                     @if (AvailableStages.Count == 0)
                     {
                         <span class="kanban-applicant-card__move-menu-empty">No other stages available</span>
@@ -68,9 +72,19 @@
     [Parameter] public IReadOnlyList<KanbanColumnModel> AvailableStages { get; set; } = [];
     [Parameter] public EventCallback<Guid> OnMoveToStage { get; set; }
 
+    // Ticket #1: navigates to the Review CV screen for this applicant (parent board wires the route
+    // + returnUrl, same pattern as OnOpen).
+    [Parameter] public EventCallback<KanbanApplicantModel> OnReviewCv { get; set; }
+
     private bool _menuOpen;
 
     private void ToggleMenu() => _menuOpen = !_menuOpen;
+
+    private async Task ReviewCv()
+    {
+        _menuOpen = false;
+        await OnReviewCv.InvokeAsync(Applicant);
+    }
 
     private async Task SelectStage(Guid stageId)
     {

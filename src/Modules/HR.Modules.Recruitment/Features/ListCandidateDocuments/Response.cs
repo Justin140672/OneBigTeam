@@ -5,6 +5,7 @@ internal sealed record ListCandidateDocumentsResponse(IReadOnlyList<CandidateDoc
 internal sealed record CandidateDocumentListItem(
     Guid Id,
     string Title,
+    string Kind,
     string FileName,
     long FileSize,
     string ContentType,

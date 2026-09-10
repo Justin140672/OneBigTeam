@@ -820,6 +820,20 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return await row.IsVisibleAsync() ? (await row.TextContentAsync())?.Trim() : null;
     }
 
+    /// <summary>
+    /// Clicks the per-row "Review CV" link (data-testid="review-cv-link") in the Applications tab
+    /// grid for the row matching <paramref name="candidateNameFragment"/>, then waits for the
+    /// Review CV route to commit. See VacancyApplicationsTab.razor's last GridColumn.
+    /// </summary>
+    public async Task ClickReviewCvForAsync(string candidateNameFragment)
+    {
+        var link = ApplicationRow(candidateNameFragment).First.Locator("[data-testid='review-cv-link']");
+        await link.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        await link.ClickAsync();
+        await page.WaitForURLAsync("**/review-cv**",
+            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
+    }
+
     public async Task<string?> GetApplicationStatusAsync(string candidateNameFragment)
     {
         var badge = ApplicationRow(candidateNameFragment).First.Locator(".badge").First;

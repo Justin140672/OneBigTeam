@@ -71,4 +71,25 @@ public class ListCandidateDocumentsHandlerTests
 
         Assert.Equal("Resume v2", result.Value!.Items[0].Title);
     }
+
+    [Fact]
+    public async Task HandleAsync_Surfaces_Document_Kind()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        db.Candidates.Add(candidate);
+        db.CandidateDocuments.AddRange(
+            CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "CV", "cv.pdf", 1024, "application/pdf", "key1", Guid.NewGuid(), Now.AddMinutes(5), CandidateDocumentKind.Cv),
+            CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "Cover Letter", "cover.pdf", 512, "application/pdf", "key2", Guid.NewGuid(), Now));
+        await db.SaveChangesAsync();
+
+        var result = await new ListCandidateDocumentsHandler(db).HandleAsync(
+            new ListCandidateDocumentsRequest { CompanyId = companyId, CandidateId = candidate.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Cv", result.Value!.Items[0].Kind);
+        Assert.Equal("Other", result.Value.Items[1].Kind);
+    }
 }

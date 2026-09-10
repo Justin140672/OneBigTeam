@@ -19,5 +19,10 @@ internal sealed class UploadCandidateDocumentValidator : AbstractValidator<Uploa
         RuleFor(r => r.File)
             .NotNull()
             .WithMessage("A file must be provided.");
+
+        RuleFor(r => r.Kind)
+            .Must(k => Enum.TryParse<Domain.CandidateDocumentKind>(k, ignoreCase: true, out _))
+            .When(r => !string.IsNullOrWhiteSpace(r.Kind))
+            .WithMessage("Kind must be 'Cv' or 'Other'.");
     }
 }

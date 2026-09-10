@@ -108,6 +108,15 @@
                         }
                     </Template>
                 </GridColumn>
+                <GridColumn HeaderText="" Width="110">
+                    <Template>
+                        @{
+                            var row = (ApplicationListItemModel)context;
+                        }
+                        <a href="/companies/@CompanyId/vacancies/@VacancyId/applications/@row.Id/review-cv?returnUrl=@Uri.EscapeDataString($"companies/{CompanyId}/vacancies/{VacancyId}")"
+                           data-testid="review-cv-link">Review CV</a>
+                    </Template>
+                </GridColumn>
             </GridColumns>
         </HrGrid>
     }

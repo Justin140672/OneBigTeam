@@ -39,7 +39,9 @@ using HR.Modules.Recruitment.Features.ListCandidates;
 using HR.Modules.Recruitment.Features.ListExternalRecruiters;
 using HR.Modules.Recruitment.Features.ListInterviewsForVacancy;
 using HR.Modules.Recruitment.Features.ListVacancies;
+using HR.Modules.Recruitment.Features.MoveApplicationForward;
 using HR.Modules.Recruitment.Features.MoveApplicationStage;
+using HR.Modules.Recruitment.Features.SaveCvReviewNotes;
 using HR.Modules.Recruitment.Features.OfferCandidate;
 using HR.Modules.Recruitment.Features.PublishVacancy;
 using HR.Modules.Recruitment.Features.PurgeEligibleCandidates;
@@ -164,6 +166,12 @@ public static class RecruitmentModule
 
         services.AddScoped<MoveApplicationStageHandler>();
         services.AddScoped<IValidator<MoveApplicationStageRequest>, MoveApplicationStageValidator>();
+
+        services.AddScoped<SaveCvReviewNotesHandler>();
+        services.AddScoped<IValidator<SaveCvReviewNotesRequest>, SaveCvReviewNotesValidator>();
+
+        services.AddScoped<MoveApplicationForwardHandler>();
+        services.AddScoped<IValidator<MoveApplicationForwardRequest>, MoveApplicationForwardValidator>();
 
         services.AddScoped<GetPipelineSummaryHandler>();
         services.AddScoped<IValidator<GetPipelineSummaryRequest>, GetPipelineSummaryValidator>();

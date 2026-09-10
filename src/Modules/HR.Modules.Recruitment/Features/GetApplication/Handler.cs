@@ -29,6 +29,9 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
                 CurrentStageName = s.Name,
                 a.InterviewOutcome,
                 a.Notes,
+                a.CvReviewNotes,
+                a.CvReviewedAt,
+                a.CvReviewedByUserId,
                 a.WithdrawnAt,
                 a.AppliedAt,
                 a.CreatedAt,
@@ -51,6 +54,15 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
                 .Select(r => r.AgencyName)
                 .SingleOrDefaultAsync(cancellationToken);
         }
+
+        var cv = await db.CandidateDocuments
+            .AsNoTracking()
+            .Where(cd => cd.CompanyId == request.CompanyId &&
+                         cd.CandidateId == row.CandidateId &&
+                         cd.Kind == Domain.CandidateDocumentKind.Cv)
+            .OrderByDescending(cd => cd.CreatedAt)
+            .Select(cd => new { cd.Id, cd.FileName, cd.ContentType, cd.FileSize, cd.CreatedAt })
+            .FirstOrDefaultAsync(cancellationToken);
 
         var stageHistory = await db.ApplicationStageHistoryEntries
             .AsNoTracking()
@@ -83,6 +95,14 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
             row.Source,
             row.SourceExternalRecruiterId,
             sourceRecruiterAgencyName,
+            row.CvReviewNotes,
+            row.CvReviewedAt,
+            row.CvReviewedByUserId,
+            cv?.Id,
+            cv?.FileName,
+            cv?.ContentType,
+            cv?.FileSize,
+            cv?.CreatedAt,
             stageHistory));
     }
 }

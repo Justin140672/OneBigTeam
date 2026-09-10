@@ -77,7 +77,8 @@
                                                          TerminalOutcome="@StageOutcome(app.StageId)"
                                                          OnOpen="OpenApplicant"
                                                          AvailableStages="@VisibleColumns.Where(c => c.StageId != app.StageId).ToList()"
-                                                         OnMoveToStage="(stageId) => MoveApplicationAsync(app, stageId)" />
+                                                         OnMoveToStage="(stageId) => MoveApplicationAsync(app, stageId)"
+                                                         OnReviewCv="ReviewCv" />
                                 </div>
                             }
                         }
@@ -276,6 +277,16 @@
         var candidateUrl = $"/companies/{CompanyId}/candidates/{applicant.CandidateId}" +
             $"?returnUrl={Uri.EscapeDataString(returnUrl)}";
         Navigation.NavigateTo(candidateUrl);
+    }
+
+    // Ticket #1: open the Review CV screen, carrying a returnUrl back to wherever this board is
+    // embedded (same rationale as OpenApplicant above).
+    private void ReviewCv(KanbanApplicantModel applicant)
+    {
+        var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
+        Navigation.NavigateTo(
+            $"/companies/{CompanyId}/vacancies/{VacancyId}/applications/{applicant.ApplicationId}/review-cv" +
+            $"?returnUrl={Uri.EscapeDataString(returnUrl)}");
     }
 
     private void OnDragStart(KanbanApplicantModel applicant) => _draggedCard = applicant;

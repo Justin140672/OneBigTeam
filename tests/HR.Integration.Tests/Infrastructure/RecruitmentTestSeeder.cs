@@ -114,13 +114,13 @@ internal static class RecruitmentTestSeeder
 
     public static async Task<Guid> SeedCandidateDocumentAsync(
         ApiWebApplicationFactory factory, Guid companyId, Guid candidateId, DateTimeOffset now,
-        string title = "CV", string fileName = "cv.pdf")
+        string title = "CV", string fileName = "cv.pdf", CandidateDocumentKind kind = CandidateDocumentKind.Other)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
         var document = CandidateDocument.Create(
             Guid.NewGuid(), companyId, candidateId, title, fileName, 2048, "application/pdf",
-            $"{companyId}/{candidateId}/{Guid.NewGuid():N}/{fileName}", Guid.NewGuid(), now);
+            $"{companyId}/{candidateId}/{Guid.NewGuid():N}/{fileName}", Guid.NewGuid(), now, kind);
         db.CandidateDocuments.Add(document);
         await db.SaveChangesAsync();
         return document.Id;

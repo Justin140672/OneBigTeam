@@ -29,6 +29,13 @@ internal sealed class CandidateDocumentConfiguration : IEntityTypeConfiguration<
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(cd => cd.Kind)
+            .HasColumnName("kind")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(Domain.CandidateDocumentKind.Other)
+            .IsRequired();
+
         builder.Property(cd => cd.FileName)
             .HasColumnName("file_name")
             .HasMaxLength(255)
@@ -63,5 +70,6 @@ internal sealed class CandidateDocumentConfiguration : IEntityTypeConfiguration<
 
         builder.HasIndex(cd => cd.CompanyId);
         builder.HasIndex(cd => cd.CandidateId);
+        builder.HasIndex(cd => new { cd.CandidateId, cd.Kind });
     }
 }

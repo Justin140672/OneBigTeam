@@ -38,7 +38,42 @@ public record GetApplicationResponse(
     Guid? SourceExternalRecruiterId,
     string? SourceExternalRecruiterAgencyName,
     // Ticket #66: stage-change history, ordered oldest first.
-    IReadOnlyList<ApplicationStageHistoryItemModel>? StageHistory = null);
+    IReadOnlyList<ApplicationStageHistoryItemModel>? StageHistory = null,
+    // Ticket #1: Candidate CV upload & review. All null for applications with no CV / no review yet.
+    string? CvReviewNotes = null,
+    DateTimeOffset? CvReviewedAt = null,
+    Guid? CvReviewedByUserId = null,
+    Guid? CvDocumentId = null,
+    string? CvFileName = null,
+    string? CvContentType = null,
+    long? CvFileSize = null,
+    DateTimeOffset? CvUploadedAt = null);
+
+// ── TICKET #1: CV REVIEW ──────────────────────────────────────────────────────
+
+public record SaveCvReviewNotesRequest(Guid CompanyId, Guid VacancyId, Guid ApplicationId, string? CvReviewNotes);
+
+public record SaveCvReviewNotesResponse(
+    Guid Id,
+    Guid VacancyId,
+    Guid CandidateId,
+    Guid CurrentStageId,
+    string? CvReviewNotes,
+    DateTimeOffset? CvReviewedAt,
+    Guid? CvReviewedByUserId,
+    DateTimeOffset UpdatedAt);
+
+public record MoveApplicationForwardRequest(Guid CompanyId, Guid VacancyId, Guid ApplicationId, string? CvReviewNotes);
+
+public record MoveApplicationForwardResponse(
+    Guid Id,
+    Guid VacancyId,
+    Guid CandidateId,
+    Guid PreviousStageId,
+    Guid CurrentStageId,
+    string CurrentStageName,
+    string? CvReviewNotes,
+    DateTimeOffset UpdatedAt);
 
 public record ApplicationStageHistoryItemModel(
     Guid Id,

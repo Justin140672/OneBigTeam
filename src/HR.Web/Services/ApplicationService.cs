@@ -120,6 +120,36 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
         return (null, await ReadErrorAsync(response, "Failed to hire candidate."));
     }
 
+    // Ticket #1: save the CV review notes only — no stage change. 400 if the application is withdrawn.
+    public async Task<(SaveCvReviewNotesResponse? Result, string? Error)> SaveCvReviewNotesAsync(
+        Guid companyId, Guid vacancyId, Guid applicationId, string? cvReviewNotes)
+    {
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/cv-review-notes",
+            new SaveCvReviewNotesRequest(companyId, vacancyId, applicationId, cvReviewNotes));
+
+        if (response.IsSuccessStatusCode)
+            return (await response.Content.ReadFromJsonAsync<SaveCvReviewNotesResponse>(HrApiJsonOptions.Default), null);
+
+        return (null, await ReadErrorAsync(response, "Failed to save CV review notes."));
+    }
+
+    // Ticket #1: persist the notes (if provided) and advance to the next active non-terminal stage.
+    // The server resolves the next stage from the company's stage config — never hard-coded here.
+    // 400 with an {error} body if there is no next stage / the stage is terminal / withdrawn.
+    public async Task<(MoveApplicationForwardResponse? Result, string? Error)> MoveApplicationForwardAsync(
+        Guid companyId, Guid vacancyId, Guid applicationId, string? cvReviewNotes)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/move-forward",
+            new MoveApplicationForwardRequest(companyId, vacancyId, applicationId, cvReviewNotes));
+
+        if (response.IsSuccessStatusCode)
+            return (await response.Content.ReadFromJsonAsync<MoveApplicationForwardResponse>(HrApiJsonOptions.Default), null);
+
+        return (null, await ReadErrorAsync(response, "Failed to move the application forward."));
+    }
+
     private static async Task<string?> ReadErrorAsync(HttpResponseMessage response, string fallback)
     {
         try

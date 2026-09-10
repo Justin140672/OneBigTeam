@@ -8,6 +8,7 @@ internal sealed class CandidateDocument
     public Guid CompanyId { get; private set; }
     public Guid CandidateId { get; private set; }
     public string Title { get; private set; } = string.Empty;
+    public CandidateDocumentKind Kind { get; private set; } = CandidateDocumentKind.Other;
     public string FileName { get; private set; } = string.Empty;
     public long FileSize { get; private set; }
     public string ContentType { get; private set; } = string.Empty;
@@ -25,12 +26,14 @@ internal sealed class CandidateDocument
         string contentType,
         string storageKey,
         Guid uploadedBy,
-        DateTimeOffset now) => new()
+        DateTimeOffset now,
+        CandidateDocumentKind kind = CandidateDocumentKind.Other) => new()
     {
         Id          = id,
         CompanyId   = companyId,
         CandidateId = candidateId,
         Title       = title.Trim(),
+        Kind        = kind,
         FileName    = fileName.Trim(),
         FileSize    = fileSize,
         ContentType = contentType.Trim(),

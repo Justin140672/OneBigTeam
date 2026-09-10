@@ -41,6 +41,10 @@ internal sealed class UploadCandidateDocumentHandler(
 
         var now = clock.UtcNowOffset();
 
+        var kind = Enum.TryParse<CandidateDocumentKind>(request.Kind, ignoreCase: true, out var parsedKind)
+            ? parsedKind
+            : CandidateDocumentKind.Other;
+
         var document = CandidateDocument.Create(
             Guid.NewGuid(),
             request.CompanyId,
@@ -51,7 +55,8 @@ internal sealed class UploadCandidateDocumentHandler(
             file.ContentType,
             storageKey,
             uploadedBy,
-            now);
+            now,
+            kind);
 
         db.CandidateDocuments.Add(document);
 
@@ -71,6 +76,7 @@ internal sealed class UploadCandidateDocumentHandler(
             document.CompanyId,
             document.CandidateId,
             document.Title,
+            document.Kind.ToString(),
             document.FileName,
             document.FileSize,
             document.ContentType,

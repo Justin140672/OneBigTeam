@@ -74,6 +74,46 @@ public class UploadCandidateDocumentHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Persists_Cv_Kind_When_Kind_Is_Cv()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var candidate = await SeedCandidate(db, companyId);
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new UploadCandidateDocumentRequest { CompanyId = companyId, CandidateId = candidate.Id, Title = "Resume", Kind = "Cv", File = FakePdfFile() },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Cv", result.Value!.Kind);
+
+        var saved = await db.CandidateDocuments.SingleAsync();
+        Assert.Equal(CandidateDocumentKind.Cv, saved.Kind);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Defaults_To_Other_Kind_When_Kind_Omitted()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var candidate = await SeedCandidate(db, companyId);
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new UploadCandidateDocumentRequest { CompanyId = companyId, CandidateId = candidate.Id, Title = "Resume", File = FakePdfFile() },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Other", result.Value!.Kind);
+
+        var saved = await db.CandidateDocuments.SingleAsync();
+        Assert.Equal(CandidateDocumentKind.Other, saved.Kind);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Candidate_Missing()
     {
         await using var db = BuildContext();

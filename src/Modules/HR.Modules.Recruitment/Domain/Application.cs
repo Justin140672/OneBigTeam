@@ -18,6 +18,14 @@ internal sealed class Application
     public string? Notes { get; private set; }
     public string? RejectionReason { get; private set; }
 
+    // Ticket 1: CV review notes belong to the Application (this candidate considered for this
+    // vacancy), distinct from the free-form pipeline Notes above. Recorded via the Review CV
+    // workflow (SaveCvReviewNotes / MoveApplicationForward). CvReviewedAt/CvReviewedByUserId track
+    // the most recent time the notes were saved — null until a recruiter first records a review.
+    public string? CvReviewNotes { get; private set; }
+    public DateTimeOffset? CvReviewedAt { get; private set; }
+    public Guid? CvReviewedByUserId { get; private set; }
+
     // Ticket #99 judgement call: "withdrawn" is candidate-initiated and orthogonal to the pipeline —
     // there is deliberately no "Withdrawn" RecruitmentStage. A withdrawn application keeps whatever
     // CurrentStageId it was at when withdrawn (historical accuracy) and is flagged separately here so
@@ -112,6 +120,19 @@ internal sealed class Application
     {
         CurrentStageId = newStageId;
         UpdatedAt      = now;
+    }
+
+    /// <summary>
+    /// Ticket 1: records (or updates) the recruiter's CV review notes for this application without
+    /// changing the pipeline stage. Called on its own by "Save Notes" and also by "Move Forward"
+    /// immediately before the stage transition. Trimming/normalisation mirrors <see cref="Notes"/>.
+    /// </summary>
+    public void RecordCvReview(string? cvReviewNotes, Guid reviewedByUserId, DateTimeOffset now)
+    {
+        CvReviewNotes      = string.IsNullOrWhiteSpace(cvReviewNotes) ? null : cvReviewNotes.Trim();
+        CvReviewedAt       = now;
+        CvReviewedByUserId = reviewedByUserId;
+        UpdatedAt          = now;
     }
 
     public void RecordRejection(Guid rejectedStageId, string? rejectionReason, DateTimeOffset now)

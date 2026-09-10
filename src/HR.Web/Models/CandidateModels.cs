@@ -118,6 +118,20 @@ public record UpdateCandidateResponse(
     DateTimeOffset UpdatedAt,
     int Version = 0);
 
+// ── DOCUMENTS (Ticket #1) ─────────────────────────────────────────────────────
+
+public record ListCandidateDocumentsResponse(List<CandidateDocumentListItemModel> Items);
+
+public record CandidateDocumentListItemModel(
+    Guid Id,
+    string Title,
+    string? FileName,
+    string? ContentType,
+    long? FileSize,
+    // Ticket #1: "Cv" or "Other".
+    string Kind,
+    DateTimeOffset UploadedAt);
+
 // ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
 public sealed class CandidateEditModel : IHasVersion

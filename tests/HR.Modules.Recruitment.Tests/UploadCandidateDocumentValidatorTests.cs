@@ -116,4 +116,46 @@ public class UploadCandidateDocumentValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UploadCandidateDocumentRequest.File));
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("Cv")]
+    [InlineData("cv")]
+    [InlineData("CV")]
+    [InlineData("Other")]
+    [InlineData("other")]
+    public void Validate_Passes_For_Absent_Or_Recognised_Kind(string? kind)
+    {
+        var result = _validator.Validate(new UploadCandidateDocumentRequest
+        {
+            CompanyId   = Guid.NewGuid(),
+            CandidateId = Guid.NewGuid(),
+            Title       = "Resume",
+            Kind        = kind,
+            File        = FakeFile(),
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Theory]
+    [InlineData("bogus")]
+    [InlineData("Resume")]
+    [InlineData("CvOrOther")]
+    public void Validate_Fails_For_Unrecognised_Kind(string kind)
+    {
+        var result = _validator.Validate(new UploadCandidateDocumentRequest
+        {
+            CompanyId   = Guid.NewGuid(),
+            CandidateId = Guid.NewGuid(),
+            Title       = "Resume",
+            Kind        = kind,
+            File        = FakeFile(),
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UploadCandidateDocumentRequest.Kind));
+    }
 }

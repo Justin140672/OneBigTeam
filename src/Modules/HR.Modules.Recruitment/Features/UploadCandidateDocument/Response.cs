@@ -5,6 +5,7 @@ internal sealed record UploadCandidateDocumentResponse(
     Guid CompanyId,
     Guid CandidateId,
     string Title,
+    string Kind,
     string FileName,
     long FileSize,
     string ContentType,

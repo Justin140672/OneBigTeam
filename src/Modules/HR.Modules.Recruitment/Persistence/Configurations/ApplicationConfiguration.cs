@@ -54,6 +54,16 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
             .HasColumnName("rejection_reason")
             .HasMaxLength(2000);
 
+        builder.Property(a => a.CvReviewNotes)
+            .HasColumnName("cv_review_notes")
+            .HasMaxLength(4000);
+
+        builder.Property(a => a.CvReviewedAt)
+            .HasColumnName("cv_reviewed_at");
+
+        builder.Property(a => a.CvReviewedByUserId)
+            .HasColumnName("cv_reviewed_by_user_id");
+
         builder.Property(a => a.AppliedAt)
             .HasColumnName("applied_at")
             .IsRequired();

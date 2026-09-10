@@ -1,6 +1,9 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using HR.Web.Models;
+using Microsoft.AspNetCore.Components.Forms;
 
 namespace HR.Web.Services;
 
@@ -78,6 +81,65 @@ public sealed class CandidateService(IHttpClientFactory httpClientFactory)
             return (await response.Content.ReadFromJsonAsync<ReactivateCandidateResponse>(), null);
 
         return (null, await ReadErrorAsync(response, "Failed to reactivate candidate."));
+    }
+
+    // ── DOCUMENTS (Ticket #1) ──────────────────────────────────────────────────
+
+    public async Task<ListCandidateDocumentsResponse?> ListCandidateDocumentsAsync(Guid companyId, Guid candidateId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<ListCandidateDocumentsResponse>(
+                $"api/companies/{companyId}/candidates/{candidateId}/documents", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    // Relative URL of the web-side authenticated proxy that streams a candidate document inline
+    // (see Program.cs) — safe to bind straight to an <a href> / <iframe src>.
+    public static string GetCandidateDocumentProxyUrl(Guid companyId, Guid candidateId, Guid documentId) =>
+        $"/companies/{companyId}/candidates/{candidateId}/cv/{documentId}";
+
+    // Returns null on success, or an error message string on failure. Pass kind "Cv" for a CV upload.
+    public async Task<string?> UploadCandidateDocumentAsync(
+        Guid companyId, Guid candidateId, string title, string kind, IBrowserFile file,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(title), "Title");
+            content.Add(new StringContent(kind), "Kind");
+
+            await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(
+                string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+            content.Add(fileContent, "File", file.Name);
+
+            var response = await Http.PostAsync(
+                $"api/companies/{companyId}/candidates/{candidateId}/documents", content, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (body.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Upload failed ({(int)response.StatusCode}).";
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
     }
 
     // ── IEditService<CandidateEditModel, Guid> ──────────────────────────────────

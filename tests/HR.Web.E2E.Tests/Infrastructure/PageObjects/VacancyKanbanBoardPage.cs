@@ -466,4 +466,19 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
 
     public Task<bool> IsMoveStageMenuOpenAsync(string candidateNameFragment) =>
         MoveStageMenu(candidateNameFragment).IsVisibleAsync();
+
+    // ── "Review CV" card menu item (ticket #1) ───────────────────────────────────
+    // Same kebab menu as "Move to stage…" — the first item is a "Review CV" button
+    // (data-testid="kanban-card-review-cv" in KanbanApplicantCard.razor) that navigates to the
+    // standalone Review CV route, carrying a returnUrl back to this board.
+    public async Task ClickReviewCvFromCardMenuAsync(string candidateNameFragment)
+    {
+        await MoveStageButton(candidateNameFragment).ClickAsync();
+        await MoveStageMenu(candidateNameFragment).WaitForAsync(new() { Timeout = 10_000 });
+        await MoveStageMenu(candidateNameFragment)
+            .Locator("[data-testid='kanban-card-review-cv']")
+            .ClickAsync();
+        await page.WaitForURLAsync("**/review-cv**",
+            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
+    }
 }

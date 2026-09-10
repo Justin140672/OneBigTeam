@@ -207,6 +207,95 @@ public class GetApplicationHandlerTests
         Assert.Equal(stages.ApplicationReceived.Id, result.Value.CurrentStageId);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_CvReviewNotes_And_Newest_Cv_Document_Summary()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
+        var reviewedBy = Guid.NewGuid();
+        application.RecordCvReview("Strong CV", reviewedBy, Now.AddDays(1));
+
+        var oldCv = CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "CV v1", "cv-v1.pdf", 111, "application/pdf", "k1", Guid.NewGuid(), Now, CandidateDocumentKind.Cv);
+        var newCv = CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "CV v2", "cv-v2.pdf", 222, "application/pdf", "k2", Guid.NewGuid(), Now.AddMinutes(10), CandidateDocumentKind.Cv);
+        var other = CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "Cover", "cover.pdf", 333, "application/pdf", "k3", Guid.NewGuid(), Now.AddMinutes(20));
+
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        db.CandidateDocuments.AddRange(oldCv, newCv, other);
+        await db.SaveChangesAsync();
+
+        var result = await new GetApplicationHandler(db).HandleAsync(
+            new GetApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Strong CV", result.Value!.CvReviewNotes);
+        Assert.Equal(Now.AddDays(1), result.Value.CvReviewedAt);
+        Assert.Equal(reviewedBy, result.Value.CvReviewedByUserId);
+        Assert.Equal(newCv.Id, result.Value.CvDocumentId);
+        Assert.Equal("cv-v2.pdf", result.Value.CvFileName);
+        Assert.Equal("application/pdf", result.Value.CvContentType);
+        Assert.Equal(222L, result.Value.CvFileSize);
+        Assert.Equal(Now.AddMinutes(10), result.Value.CvUploadedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Null_Cv_Summary_When_Candidate_Has_Only_Other_Documents()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        db.CandidateDocuments.Add(
+            CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "Cover", "cover.pdf", 333, "application/pdf", "k3", Guid.NewGuid(), Now));
+        await db.SaveChangesAsync();
+
+        var result = await new GetApplicationHandler(db).HandleAsync(
+            new GetApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.CvReviewNotes);
+        Assert.Null(result.Value.CvDocumentId);
+        Assert.Null(result.Value.CvFileName);
+        Assert.Null(result.Value.CvContentType);
+        Assert.Null(result.Value.CvFileSize);
+        Assert.Null(result.Value.CvUploadedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Null_Cv_Summary_When_Candidate_Has_No_Documents()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await new GetApplicationHandler(db).HandleAsync(
+            new GetApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.CvDocumentId);
+        Assert.Null(result.Value.CvUploadedAt);
+    }
+
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))

@@ -287,6 +287,33 @@ internal sealed record ApplicationStageChangedAuditEvent(
     object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
 }
 
+// Ticket 1: published whenever a recruiter saves CV review notes against an application (the
+// "Save Notes" action, and also the notes-save half of "Move Forward"). Stage changes made by
+// "Move Forward" / "Reject" additionally raise ApplicationStageChangedAuditEvent via
+// RecruitmentStageChangeRecorder — this event covers the notes change itself.
+internal sealed record ApplicationCvReviewNotesSavedAuditEvent(
+    Guid CompanyId,
+    Guid ApplicationId,
+    Guid VacancyId,
+    Guid CandidateId,
+    bool NotesCleared,
+    Guid ReviewedByUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "application.cv_review_notes_saved";
+    string IAuditEvent.EntityType => "Application";
+    Guid IAuditEvent.EntityId => ApplicationId;
+    Guid? IAuditEvent.ActorUserId => ReviewedByUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => NotesCleared ? "CV review notes cleared" : "CV review notes saved";
+    // The notes text itself is deliberately not included in the audit payload — it can contain
+    // free-form assessment of a named individual; the audit trail records only that a review happened.
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { NotesCleared };
+    object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
+}
+
 internal sealed record ExternalRecruiterCreatedAuditEvent(
     Guid CompanyId,
     Guid ExternalRecruiterId,
