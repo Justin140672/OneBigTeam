@@ -73,7 +73,7 @@ jobs:
       sha: ${{ steps.resolve.outputs.sha }}
       version: ${{ steps.resolve.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.sha }}
           fetch-depth: 0
@@ -118,7 +118,7 @@ jobs:
       DEPLOY_VERSION: ${{ needs.quality-gate.outputs.version }}
       RAILWAY_ENV: ${{ inputs.railway_environment || inputs.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.quality-gate.outputs.sha }}
           fetch-depth: 0
