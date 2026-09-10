@@ -368,9 +368,13 @@ public class OrganisationDataExportBuildJobTests
     {
         var manifest = new FakeDocumentManifest();
         manifest.AddFile("documents/x/a.pdf", "sk", "A"u8.ToArray());
-        var storage = new FakeExportStorage { UploadDelay = TimeSpan.FromMilliseconds(150) };
+        var storage = new FakeExportStorage();
         var h = CreateHarness(out var export, storage: storage, manifest: manifest);
         await using var _ = h.Db;
+
+        // Hold the upload open until the renewal loop has ticked at least twice — a deterministic
+        // handshake rather than a fixed delay racing the timer on a busy CI host.
+        storage.ReleaseWhen = () => h.Renewer.CallCount > 1;
 
         await h.Job.RunAsync(export.Id, export.CompanyId, export.RequestedByUserId, CancellationToken.None);
 
@@ -946,6 +950,12 @@ public class OrganisationDataExportBuildJobTests
         /// <summary>Ticket G: slows the upload so the background renewal loop ticks during it.</summary>
         public TimeSpan UploadDelay { get; init; } = TimeSpan.Zero;
 
+        /// <summary>
+        /// When set, the upload blocks until this predicate returns true (polled), instead of racing a
+        /// fixed <see cref="UploadDelay"/> against the renewal timer on a thread-starved CI host.
+        /// </summary>
+        public Func<bool>? ReleaseWhen { get; set; }
+
         public IReadOnlyCollection<string> Keys => _keys;
 
         /// <summary>Pre-seed an orphan attempt archive left behind by a superseded worker.</summary>
@@ -959,6 +969,12 @@ public class OrganisationDataExportBuildJobTests
             UploadCount++;
             if (UploadDelay > TimeSpan.Zero)
                 await Task.Delay(UploadDelay, cancellationToken);
+            if (ReleaseWhen is not null)
+            {
+                var deadline = DateTime.UtcNow.AddSeconds(10);
+                while (!ReleaseWhen() && DateTime.UtcNow < deadline)
+                    await Task.Delay(10, cancellationToken);
+            }
             if (AlwaysThrow || UploadCount <= FailuresBeforeSuccess)
                 throw new InvalidOperationException("transient storage failure");
             var key = KeyFor(companyId, exportId, attemptToken);

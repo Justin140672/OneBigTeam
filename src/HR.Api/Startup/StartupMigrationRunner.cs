@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 
 namespace HR.Api.Startup;
 
@@ -66,7 +67,12 @@ internal sealed class StartupMigrationRunner(ILogger<StartupMigrationRunner> log
         lock (_gate) { _results.Add(result); }
     }
 
-    /// <summary>Builds the <c>/health/startup-migrations</c> payload (shape unchanged: module name -&gt; status/checkedAt/error).</summary>
+    /// <summary>
+    /// Builds the <c>/health/startup-migrations</c> payload. Back-compatible: each module name is
+    /// still a top-level key mapping to <c>{status,checkedAt,error}</c>. Ticket 5 adds one extra
+    /// sibling key, <c>release</c> (<c>{sha,version}</c>), so the deploy pipeline can confirm the
+    /// migration result it is reading belongs to the <b>new</b> release and not a healthy old API.
+    /// </summary>
     public IResult ToHealthResult()
     {
         Dictionary<string, object> payload;
@@ -78,6 +84,8 @@ internal sealed class StartupMigrationRunner(ILogger<StartupMigrationRunner> log
                 r => (object)new { status = r.Status, checkedAt = r.CheckedAt, error = r.Error });
             allSucceeded = _results.All(r => r.Status == "succeeded");
         }
+
+        payload["release"] = ReleaseIdentity.ReleaseTag();
 
         return allSucceeded
             ? Results.Ok(payload)

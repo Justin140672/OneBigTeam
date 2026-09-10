@@ -321,6 +321,20 @@ internal sealed class FreshnessGatedConfigurationManager
 
     private async Task<OpenIdConnectConfiguration> GetGatedConfigurationAsync(CancellationToken cancel)
     {
+        // If we previously had a usable key set but it is now past the absolute MaximumCachedKeyAge
+        // cap, we are already failing closed — there is no stale-key storm to protect against, so
+        // bypass the forced-refresh throttle and ask the inner manager to refresh now. This makes
+        // recovery after a long outage prompt (bounded by the inner manager's own 1s real-time floor
+        // + single in-flight fetch) instead of waiting up to AutomaticRefreshInterval. Not done on
+        // cold start (snapshot null) — the inner GetBaseConfigurationAsync below already performs the
+        // first fetch and single-flights it. The unknown-kid storm cap in RequestRefresh() still
+        // applies whenever a usable, in-date key set is being served.
+        if (_snapshot is { } current
+            && _timeProvider.GetUtcNow() - current.RetrievedAt >= _maximumCachedKeyAge)
+        {
+            _inner!.RequestRefresh();
+        }
+
         // Always pump the inner manager: this is what performs the actual (non-blocking) fetch on
         // cold start, honours a pending RequestRefresh, runs AutomaticRefreshInterval background
         // refreshes and maintains single-flight. A sustained outage throws here once no cached

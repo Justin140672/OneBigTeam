@@ -303,10 +303,14 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
     {
         var manifest = new FakeManifest();
         manifest.AddFile("documents/x/a.pdf", "sk", "A"u8.ToArray());
-        var storage = new FakeStorage { UploadDelay = TimeSpan.FromMilliseconds(150) };
+        var storage = new FakeStorage();
 
         var h = CreateHarness(out var export, storage: storage, manifest: manifest);
         await using var _ = h.Db;
+
+        // The upload holds open until the renewal loop has ticked at least twice — a deterministic
+        // handshake rather than a fixed delay racing the timer on a busy CI host.
+        storage.ReleaseWhen = () => h.Renewer.CallCount > 1;
 
         await h.Job.RunAsync(export.Id, export.CompanyId, export.RequestedByUserId, CancellationToken.None);
 
@@ -438,11 +442,25 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
         public bool AlwaysThrow { get; init; }
         public TimeSpan UploadDelay { get; init; } = TimeSpan.Zero;
 
+        /// <summary>
+        /// When set, the upload blocks until this predicate returns true (polled), instead of racing a
+        /// fixed <see cref="UploadDelay"/> against the renewal timer. Keeps the "renewal loop ticked
+        /// during a slow upload" assertion deterministic on a thread-starved CI host.
+        /// </summary>
+        public Func<bool>? ReleaseWhen { get; set; }
+
         public async Task<string> UploadAsync(Guid companyId, Guid exportId, Guid attemptToken, Stream content, CancellationToken cancellationToken)
         {
             UploadCount++;
             if (UploadDelay > TimeSpan.Zero)
                 await Task.Delay(UploadDelay, cancellationToken);
+
+            if (ReleaseWhen is not null)
+            {
+                var deadline = DateTime.UtcNow.AddSeconds(10);
+                while (!ReleaseWhen() && DateTime.UtcNow < deadline)
+                    await Task.Delay(10, cancellationToken);
+            }
 
             // Drain the stream so a streamed upload is actually exercised (and never a buffered copy).
             using var sink = new MemoryStream();

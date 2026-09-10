@@ -1,17 +1,53 @@
-# Ticket 6 — Enforce signing-key freshness and verify refresh resilience
+# Ticket 6 — Make authentication signing-key refresh resilient
 
-Priority: High. Ticket 5 follow-up.
+Priority: Medium · Original issue: 9
 
+> Handle signing-key rotation and upstream failures without blocking request threads, causing refresh
+> storms, or weakening token validation.
+>
 > Supabase access tokens are asymmetrically signed (ES256/RS256) and verified against keys fetched
-> from the project JWKS endpoint. A sustained JWKS outage must not let the API keep trusting an
-> arbitrarily old key set forever, and the refresh path must recover on its own with no restart.
+> from the project JWKS endpoint. The previous implementation (`SupabaseJwksKeyResolver` in
+> `Program.cs`) did a **synchronous blocking** `HttpClient.GetStringAsync(...).GetAwaiter().GetResult()`
+> under a `SemaphoreSlim.Wait()` inside `IssuerSigningKeyResolver`, on the request thread, with a
+> hand-rolled 10-minute cache, no timeout, no bounded wait, and an unknown `kid` forcing a fresh
+> synchronous fetch on every request. This ticket replaces it with the established asynchronous
+> `ConfigurationManager<OpenIdConnectConfiguration>` mechanism and adds an absolute cached-key-age cap
+> so a sustained JWKS outage cannot let the API trust an arbitrarily old key set forever, while the
+> refresh path recovers on its own with no restart.
+
+## Endpoint compatibility (confirmed before selecting the mechanism)
+
+- Supabase serves a **bare JWKS document** at `{ProjectUrl}/auth/v1/.well-known/jwks.json` (the
+  configured `SupabaseAuth:JwksUrl`). It does **not** serve a usable OpenID Connect discovery
+  document, so `JwtBearerOptions.MetadataAddress` auto-discovery is not an option — a custom
+  `IConfigurationRetriever<OpenIdConnectConfiguration>` (`SupabaseJwksRetriever`) parses the bare JWKS
+  and populates only `SigningKeys`.
+- Token signing algorithms: ES256 (P-256) or RS256, asymmetric, `kid` header present. HS256 is
+  Supabase-legacy and never accepted on the real path.
+- Rotation model: a new key is published to the JWKS as **standby** before it starts signing, so a
+  periodic background refresh picks it up with no restart; `kid` selects the key.
+
+## Acceptance criteria mapping
+
+| Ticket criterion | How it is met |
+|---|---|
+| Established async refresh mechanism compatible with the endpoint | `ConfigurationManager<OpenIdConnectConfiguration>` (`Microsoft.IdentityModel.Protocols.OpenIdConnect`) fed by the custom bare-JWKS retriever |
+| No synchronous network waits in the auth path | `SupabaseJwksKeyResolver` deleted; keys come from the async `ConfigurationManager` / cached snapshot; `HttpClient.Timeout = KeyFetchTimeout` bounds any single fetch |
+| Only one refresh in flight per key source | `ConfigurationManager`'s own `SemaphoreSlim(1,1)`; verified by `Concurrent_cold_requests_result_in_a_single_upstream_key_fetch` |
+| Repeated unfamiliar key IDs cannot trigger unlimited upstream requests | `FreshnessGatedConfigurationManager.RequestRefresh()` honours at most one call per `RefreshInterval` (30s default); verified by the storm test |
+| Accept legitimate key rotation without a restart | background `AutomaticRefreshInterval` refresh + unknown-`kid` forced refresh; verified by the standby-rotation test |
+| Apply documented cache and outage behaviour consistently | single `GetGatedConfigurationAsync` path + resolver + key validator all enforce `MaximumCachedKeyAge` |
+| Never accept a token whose signature cannot be verified | `ValidateIssuerSigningKey = true`; empty key set past the cap ⇒ 401; forged-signature tests |
+| Preserve issuer, audience, lifetime, signature, allowed-algorithm validation | `TokenValidationParameters` unchanged except **added** `ValidAlgorithms` (ES256/RS256 real, HS256 E2E) |
+| Log useful refresh failures without exposing tokens or credentials | retriever + gate log message + exception type only, never token/PII/secret material |
 
 Scope: `HR.Api` JWT bearer wiring only —
-`src/HR.Api/Authentication/SupabaseSigningKeyOptions.cs`,
-`src/HR.Api/Authentication/SupabaseJwtBearerConfiguration.cs`,
-`src/HR.Api/Program.cs` (comment only),
+`src/HR.Api/Authentication/SupabaseSigningKeyOptions.cs` (new),
+`src/HR.Api/Authentication/SupabaseJwtBearerConfiguration.cs` (new),
+`src/HR.Api/Program.cs` (JWKS wiring extracted to the above; `SupabaseJwksKeyResolver` deleted;
+`ConfigurationManager` attached via a DI-aware named-options `Configure<ILoggerFactory>`),
 `src/HR.Api/appsettings.json` + `appsettings.Staging.json` (config block),
-and the test suite `tests/HR.Integration.Tests/SigningKeyRefreshResilienceTests.cs`.
+and the test suite `tests/HR.Integration.Tests/SigningKeyRefreshResilienceTests.cs` (new).
 
 No module, schema, entity, DB or authorization-model change.
 
@@ -110,6 +146,12 @@ the LKG slot.
 - **Forced-refresh throttle**: `RequestRefresh()` honours at most one call per `RefreshInterval` (on
   the injected clock, `Interlocked` compare-and-swap), then forwards to the inner manager. The inner
   `ConfigurationManager.RefreshInterval` is pinned to 1s so the gate is the single throttle authority.
+  **Exception**: once the cached set is *past* `MaximumCachedKeyAge` the gate is already failing
+  closed (empty key set), so there is no stale-key storm to cap — `GetGatedConfigurationAsync` then
+  bypasses the throttle and asks the inner manager to refresh on every call (still bounded by the
+  inner's own 1s real-time floor + single in-flight fetch). This makes recovery after a long outage
+  prompt instead of waiting up to `AutomaticRefreshInterval`. Not done on cold start (the first inner
+  fetch already covers that) and never while an in-date key set is being served.
 - **Startup validation**: `SupabaseSigningKeyOptions.Validate()` throws on non-positive
   `MaximumCachedKeyAge` / `KeyFetchTimeout`, `AutomaticRefreshInterval < 5m`, or `RefreshInterval < 30s`.
   Called from `AttachConfigurationManager`, i.e. at host start.
@@ -171,10 +213,16 @@ Toolchain: .NET SDK `10.0.401`, `Microsoft.AspNetCore.Authentication.JwtBearer` 
 
 | Command | Result |
 |---|---|
-| `dotnet build` (solution `OneBigTeam.slnx`) | Build succeeded, 0 errors (8 pre-existing NU1510 warnings) |
-| `dotnet test tests/HR.Integration.Tests/HR.Integration.Tests.csproj --no-build --filter "FullyQualifiedName~SigningKeyRefreshResilienceTests"` | Passed 23/23 (x5) |
-| `dotnet test tests/HR.Integration.Tests/HR.Integration.Tests.csproj --no-build --filter "FullyQualifiedName~LoginEndpointTests\|FullyQualifiedName~PlatformSettingsAuthorizationTests"` | Passed 20/20 |
-| `dotnet test tests/HR.Architecture.Tests/HR.Architecture.Tests.csproj --no-build` | Passed 320/320 |
+| `dotnet build src/HR.Api/HR.Api.csproj` | Build succeeded, 0 errors |
+| `dotnet build tests/HR.Integration.Tests/HR.Integration.Tests.csproj` | Build succeeded, 0 errors |
+| `dotnet test tests/HR.Integration.Tests --filter "FullyQualifiedName~SigningKeyRefreshResilienceTests"` | Passed 23/23 (~16s), 3 consecutive runs |
+| `dotnet test tests/HR.Integration.Tests --filter "LoginEndpointTests\|DisabledAccountEnforcementTests\|E2eTestingProductionGuardTests\|LogoutEndpointTests"` | Passed 18/18 |
+| `dotnet test tests/HR.Modules.Identity.Tests --filter "SupabaseAuth\|SensitiveAuthLogging\|LoginHandler"` | Passed 41/41 |
+| `dotnet test tests/HR.Architecture.Tests` | Passed 320/320 |
+
+No direct `PackageReference` was added — `Microsoft.IdentityModel.Protocols.OpenIdConnect` resolves
+transitively via `Microsoft.AspNetCore.Authentication.JwtBearer`, so no `Directory.Packages.props` or
+`packages.lock.json` change was needed.
 
 The full `HR.Integration.Tests` suite and all E2E suites were **not** run (per repo policy — filtered
 runs only).

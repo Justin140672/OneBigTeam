@@ -231,6 +231,24 @@ jobs:
           if-no-files-found: error
 
   # ------------------------------------------------------------------
+  # Ticket 5 — Pester tests for the verified-deploy / recovery scripts
+  # (.github/scripts/deploy/). ubuntu-latest ships pwsh + Pester 5.
+  # ------------------------------------------------------------------
+  deploy-scripts-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Pester (deploy scripts)
+        shell: pwsh
+        run: |
+          $mods = Get-Module -ListAvailable Pester | Where-Object { $_.Version -ge [version]'5.0.0' }
+          if (-not $mods) { Install-Module Pester -MinimumVersion 5.5.0 -Force -SkipPublisherCheck -Scope CurrentUser }
+          Import-Module Pester -MinimumVersion 5.0.0
+          $r = Invoke-Pester -Path .github/scripts/deploy/tests -Output Detailed -PassThru
+          if ($r.FailedCount -gt 0) { exit 1 }
+
+  # ------------------------------------------------------------------
   # Single required status check. Branch protection requires this job;
   # every deploy workflow refuses to run unless the target commit has a
   # successful `ci-success`. This is the "prevent deployment when
@@ -239,7 +257,7 @@ jobs:
   ci-success:
     runs-on: ubuntu-latest
     if: always()
-    needs: [dependency-audit, build-test, integration-tests, e2e-compile, package]
+    needs: [dependency-audit, build-test, integration-tests, e2e-compile, package, deploy-scripts-test]
     steps:
       - name: Verify all required jobs passed
         shell: bash

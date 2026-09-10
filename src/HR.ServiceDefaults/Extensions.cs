@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
@@ -131,6 +133,14 @@ public static class Extensions
         // mapped in every environment. See HealthCheckEndpoints for the security model (minimal
         // public body, token-gated detail, critical-vs-degraded dependency classification).
         HealthCheckEndpoints.MapLivenessAndReadiness(app);
+
+        // Ticket 5: anonymous running-release identity probe. Used by the deploy pipeline to verify
+        // the exact requested release is live on every required service (an old instance reporting
+        // the old SHA must fail verification). Discloses only service/sha/version/environment/start.
+        app.MapGet("/health/release", (IHostEnvironment env) =>
+                Results.Json(ReleaseIdentity.Payload(env.EnvironmentName, env.ApplicationName)))
+            .AllowAnonymous()
+            .WithName("HealthRelease");
 
         // The original Aspire aggregate endpoint stays Development-only — it emits full per-check
         // detail with no auth. See https://aka.ms/aspire/healthchecks.

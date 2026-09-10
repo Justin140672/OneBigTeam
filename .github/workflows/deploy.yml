@@ -4,6 +4,15 @@ name: Deploy (reusable)
 # Thin wrappers call this: deploy-test.yml, deploy-staging.yml, deploy-production.yml.
 # All approval / protection is enforced by the GitHub Environment named here
 # (see docs/runbooks/deployment-pipeline.md section "GitHub Environments").
+#
+# Ticket 5: the deploy job is a single verified-deploy + recovery controller
+# (.github/scripts/deploy/). It deploys every required service from ONE immutable git SHA, captures
+# the previous known-good deployment per service, waits (bounded) for each new deployment and
+# verifies its release identity by EXACT sha match against GET /health/release, verifies API
+# readiness + startup migrations against the NEW sha, handles partial rollout explicitly, and on any
+# verification failure restores the recorded known-good deployments (bounded) and re-verifies — or,
+# when release-safety.json marks the release migration-incompatible, refuses automatic application
+# rollback and prints actionable manual recovery instructions.
 
 on:
   workflow_call:
@@ -23,10 +32,20 @@ on:
         type: string
         default: ""
       run_migrations_check:
-        description: Gate the rollout on /health/startup-migrations after deploy
+        description: Gate the rollout on /health/startup-migrations (against the new sha) after deploy
         required: false
         type: boolean
         default: true
+      rollout_timeout_seconds:
+        description: Bounded wait for every service to report the new release identity
+        required: false
+        type: number
+        default: 900
+      recovery_timeout_seconds:
+        description: Bounded wait for every service to report the restored known-good identity
+        required: false
+        type: number
+        default: 600
     secrets:
       RAILWAY_TOKEN:
         description: Railway project token scoped to the target environment
@@ -47,13 +66,12 @@ env:
 jobs:
   # ----------------------------------------------------------------
   # Hard gate: the commit being deployed must have a green CI run.
-  # This is what "prevent deployment when mandatory quality gates
-  # fail" means in practice.
   # ----------------------------------------------------------------
   quality-gate:
     runs-on: ubuntu-latest
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
+      version: ${{ steps.resolve.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,7 +80,13 @@ jobs:
 
       - id: resolve
         shell: bash
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          # Deterministic build label injected as PLATFORM_VERSION on every service (Railway's
+          # Nixpacks build does not stamp the assembly, so /health/release relies on this + RELEASE_SHA).
+          echo "version=1.0.${{ github.run_number }}+$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Require a successful CI run for this commit
         env:
@@ -84,19 +108,20 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: quality-gate
-    # GitHub Environment protection rules (required reviewers, wait timer,
-    # deployment branch filter) are applied here. `production` MUST have
-    # "Required reviewers" configured - see the runbook.
+    # GitHub Environment protection rules (required reviewers, wait timer, deployment branch filter)
+    # are applied here. `production` MUST have "Required reviewers" configured - see the runbook.
     environment:
       name: ${{ inputs.environment }}
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       DEPLOY_SHA: ${{ needs.quality-gate.outputs.sha }}
+      DEPLOY_VERSION: ${{ needs.quality-gate.outputs.version }}
       RAILWAY_ENV: ${{ inputs.railway_environment || inputs.environment }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.quality-gate.outputs.sha }}
+          fetch-depth: 0
 
       - name: Record deployment start (GitHub Deployments API)
         id: ghdeploy
@@ -113,69 +138,56 @@ jobs:
             --jq '.id')
           echo "deployment_id=$id" >> "$GITHUB_OUTPUT"
           gh api "repos/${GITHUB_REPOSITORY}/deployments/$id/statuses" \
-            -f state=in_progress -f description="Railway deploy started" >/dev/null
+            -f state=in_progress -f description="Railway verified deploy started" >/dev/null
+
+      - name: Warn if migrations changed but release-safety.json was not touched
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+          [ -z "$base" ] && { echo "No parent commit to diff; skipping."; exit 0; }
+          changed=$(git diff --name-only "$base" HEAD || true)
+          if echo "$changed" | grep -Eq 'Persistence/Migrations/.*\.cs$'; then
+            if ! echo "$changed" | grep -q '.github/scripts/deploy/release-safety.json'; then
+              echo "::warning::This release changes EF migration files but does not touch \
+          .github/scripts/deploy/release-safety.json. If any change is contracting/destructive \
+          (DROP/RENAME COLUMN, NOT NULL tightening), set appRollbackSafe=false in that file so the \
+          pipeline does not attempt an unsafe automatic application rollback. See \
+          docs/runbooks/deployment-pipeline.md section 5."
+            fi
+          fi
 
       - name: Install Railway CLI
-        run: npm i -g @railway/cli
+        # Pinned (Ticket 5 follow-up). Historical restore no longer relies on the CLI — it uses the
+        # Railway GraphQL API `deploymentRollback` mutation — but the CLI is still used for
+        # `railway status --json` (project/service/environment id discovery), `railway variables
+        # --set ... --skip-deploys` (needs >= 3.5) and `railway up`. Bump deliberately and re-run
+        # the live demonstrations in docs/tickets/ticket-5-verified-releases-and-recovery.md.
+        run: npm i -g @railway/cli@5.52.0
 
-      - name: Capture current Railway deployment (rollback anchor)
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Best-effort: store the currently-live deployment id so we can roll back to it.
-          railway status --environment "$RAILWAY_ENV" --json > railway-before.json || true
-          cat railway-before.json || true
-
-      - name: Deploy services to Railway
-        shell: bash
-        run: |
-          set -euo pipefail
-          # One Railway project, one service per component. `--detach` returns once the
-          # build is queued; the readiness gate below is what actually confirms success.
-          for svc in marketing app api admin admin-api; do
-            echo "==== railway up: $svc ===="
-            railway up --service "$svc" --environment "$RAILWAY_ENV" --ci --detach
-          done
-
-      - name: Wait for API readiness (/health/ready)
+      - name: Verified deploy + recovery
         env:
-          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          MIGRATION_BEARER_TOKEN: ${{ secrets.API_HEALTH_BEARER_TOKEN }}
+          # Public base URLs per environment (docs/runbooks/deployment-pipeline.md section 4).
+          # admin-api is intentionally omitted until the HR.Admin.Api host exists.
+          SERVICE_URLS: |
+            {
+              "api": "${{ vars.API_BASE_URL }}",
+              "app": "${{ vars.APP_BASE_URL }}",
+              "marketing": "${{ vars.MARKETING_BASE_URL }}",
+              "admin": "${{ vars.ADMIN_BASE_URL }}"
+            }
         shell: pwsh
         run: |
-          $deadline = (Get-Date).AddMinutes(10)
-          do {
-            try {
-              $r = Invoke-WebRequest -Uri "$env:API_BASE_URL/health/ready" -TimeoutSec 15 -SkipHttpErrorCheck
-              Write-Host "readiness: $($r.StatusCode)"
-              if ($r.StatusCode -eq 200) { exit 0 }
-            } catch { Write-Host "readiness probe failed: $($_.Exception.Message)" }
-            Start-Sleep -Seconds 10
-          } while ((Get-Date) -lt $deadline)
-          Write-Error "API did not become ready within 10 minutes."
-          exit 1
-
-      - name: Verify startup migrations
-        if: inputs.run_migrations_check
-        env:
-          API_BASE_URL: ${{ vars.API_BASE_URL }}
-          API_BEARER_TOKEN: ${{ secrets.API_HEALTH_BEARER_TOKEN }}
-        shell: pwsh
-        run: |
-          ./.github/scripts/check-startup-migrations.ps1 `
-            -ApiBaseUrl "$env:API_BASE_URL" `
-            -BearerToken "$env:API_BEARER_TOKEN" `
-            -MaxAttempts 20 -DelaySeconds 6
-
-      - name: Rollback on failure
-        if: failure()
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "::warning::Deploy verification failed - rolling back $RAILWAY_ENV to the previous release."
-          for svc in marketing app api admin admin-api; do
-            railway redeploy --service "$svc" --environment "$RAILWAY_ENV" --yes || \
-              echo "::error::Automatic rollback of $svc failed - follow the manual rollback procedure in docs/runbooks/deployment-pipeline.md"
-          done
+          ./.github/scripts/deploy/Invoke-VerifiedDeploy.ps1 `
+            -Environment "$env:RAILWAY_ENV" `
+            -TargetSha "$env:DEPLOY_SHA" `
+            -Version "$env:DEPLOY_VERSION" `
+            -ServiceUrlsJson "$env:SERVICE_URLS" `
+            -RolloutTimeoutSeconds ${{ inputs.rollout_timeout_seconds }} `
+            -RecoveryTimeoutSeconds ${{ inputs.recovery_timeout_seconds }} `
+            -MigrationBearerToken "$env:MIGRATION_BEARER_TOKEN" `
+            -RunMigrationsCheck ([bool]::Parse("${{ inputs.run_migrations_check }}"))
 
       - name: Record deployment outcome
         if: always()

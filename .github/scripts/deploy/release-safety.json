@@ -1,0 +1,5 @@
+{
+  "appRollbackSafe": true,
+  "reason": "",
+  "notes": "Ticket 5. Set appRollbackSafe to false in the SAME release commit whenever this release ships a contracting or otherwise NOT-backward-compatible database migration (a DROP/RENAME COLUMN, a NOT NULL tightening, a destructive data change - see docs/runbooks/deployment-pipeline.md section 5). When false, the deploy pipeline will NOT auto-redeploy the previous application build on failure - it will print manual recovery instructions that include restoring the database via PITR, because redeploying old code does not restore data. Put the migration name and the follow-up contract plan in 'reason'."
+}

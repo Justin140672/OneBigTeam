@@ -461,6 +461,15 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
 
         ws.Dispose();
 
+        // On Windows the open handle makes Directory.Delete fail and the leftover survives. On Linux an
+        // open handle does not block deletion, so the scenario under test — "a failed cleanup left
+        // files behind" — has to be recreated explicitly to stay OS-independent.
+        if (Directory.GetDirectories(_root).Length == 0)
+        {
+            var leftover = Directory.CreateDirectory(Path.Combine(_root, Guid.NewGuid().ToString("N")));
+            File.WriteAllBytes(Path.Combine(leftover.FullName, "archive.zip"), new byte[800]);
+        }
+
         try
         {
             // Dir is no longer active -> its 800 bytes now count as orphan.
