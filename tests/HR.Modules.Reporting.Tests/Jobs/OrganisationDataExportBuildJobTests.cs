@@ -31,13 +31,31 @@ public class OrganisationDataExportBuildJobTests
 
     private static readonly TimeSpan FastRenewInterval = TimeSpan.FromMilliseconds(20);
 
+    private static OrganisationDataExportWorkspaceFactory NewWorkspaceFactory() =>
+        new(rootOverride: Path.Combine(Path.GetTempPath(), "obt-test-buildjob", Guid.NewGuid().ToString("N")));
+
+    private sealed class UnlimitedConcurrencyGate : IOrganisationDataExportConcurrencyGate
+    {
+        public int MaxConcurrentExports => int.MaxValue;
+
+        public Task<IAsyncDisposable?> AcquireAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IAsyncDisposable?>(new Noop());
+
+        private sealed class Noop : IAsyncDisposable
+        {
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
     private static Harness CreateHarness(
         out OrganisationDataExport export,
         Guid? companyId = null,
         FakeExportStorage? storage = null,
         FakeDocumentManifest? manifest = null,
         Func<IOrganisationDataExportJobStore, IOrganisationDataExportJobStore>? decorateStore = null,
-        Action<FakeLeaseRenewer>? configureRenewer = null)
+        Action<FakeLeaseRenewer>? configureRenewer = null,
+        IAuditDataExportSource? auditSource = null,
+        IOrganisationDataExportWorkspaceFactory? workspaceFactory = null)
     {
         var db = BuildContext();
         var company = companyId ?? Guid.NewGuid();
@@ -73,10 +91,12 @@ public class OrganisationDataExportBuildJobTests
             sources,
             sources,
             sources,
-            sources,
+            auditSource ?? sources,
             manifest,
             new OrganisationDataExportPackageBuilder(),
             storage,
+            new UnlimitedConcurrencyGate(),
+            workspaceFactory ?? NewWorkspaceFactory(),
             publisher,
             alerts,
             renewer,
@@ -518,7 +538,8 @@ public class OrganisationDataExportBuildJobTests
 
         var job = new OrganisationDataExportBuildJob(
             workerStore, sources, sources, sources, sources, sources, manifest,
-            new OrganisationDataExportPackageBuilder(), storage, publisher,
+            new OrganisationDataExportPackageBuilder(), storage,
+            new UnlimitedConcurrencyGate(), NewWorkspaceFactory(), publisher,
             new CapturingAdministrativeAlertWriter(), renewer, clock,
             NullLogger<OrganisationDataExportBuildJob>.Instance)
         {
@@ -531,6 +552,243 @@ public class OrganisationDataExportBuildJobTests
         Assert.Equal("Completed", view!.Status);
         Assert.Equal(1, storage.UploadCount);
         Assert.Single(publisher.Published.OfType<OrganisationDataExportCompletedIntegrationEvent>());
+    }
+
+    // ----- Ticket 4 follow-up: streamed audit source stays memory-bounded through the whole job -----
+
+    [Fact]
+    public async Task Large_Streamed_Audit_Source_Completes_Without_The_Job_Materialising_All_Rows()
+    {
+        var manifest = new FakeDocumentManifest();
+        manifest.AddFile("documents/x/a.pdf", "sk", "A"u8.ToArray());
+        var audit = new CountingStreamedAuditSource(rowCount: 5_000);
+        var h = CreateHarness(out var export, manifest: manifest, auditSource: audit);
+        await using var _ = h.Db;
+
+        await h.Job.RunAsync(export.Id, export.CompanyId, export.RequestedByUserId, CancellationToken.None);
+
+        Assert.Equal("Completed", await StatusOf(h, export.Id));
+        Assert.Equal(1, h.Storage.UploadCount);
+        Assert.Single(h.Publisher.Published.OfType<OrganisationDataExportCompletedIntegrationEvent>());
+        Assert.Equal(5_000, audit.Yielded);
+
+        // Behavioural: the job pulls the audit stream one row at a time — it never asks for all rows
+        // up front. This is not a retained-memory guarantee on its own; the retained-bytes proof is
+        // Archive_File_Grows_Substantially_While_The_Audit_Source_Is_Still_Yielding_Its_Prefix below,
+        // which measures what actually lands in the archive while the source is parked mid-yield.
+        Assert.True(audit.MaxLive <= 2, $"job requested audit rows ahead of writing them: max concurrently-live was {audit.MaxLive}");
+    }
+
+    [Fact]
+    public async Task Archive_File_Grows_Substantially_While_The_Audit_Source_Is_Still_Yielding_Its_Prefix()
+    {
+        var manifest = new FakeDocumentManifest();
+        manifest.AddFile("documents/x/a.pdf", "sk", "A"u8.ToArray());
+
+        var probe = new ProbeWorkspaceFactory(NewWorkspaceFactory());
+        var audit = new ParkingPrefixAuditSource(prefixRows: 20_000, () => probe.ArchiveBytesWritten);
+        var h = CreateHarness(out var export, manifest: manifest, auditSource: audit, workspaceFactory: probe);
+        await using var _ = h.Db;
+
+        var run = h.Job.RunAsync(export.Id, export.CompanyId, export.RequestedByUserId, CancellationToken.None);
+
+        try
+        {
+            await audit.ReachedPark.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            Assert.False(run.IsCompleted, "the job finished before the audit source was released");
+            Assert.True(audit.BaselineAtFirstRow >= 0, "the audit source never produced its first row");
+
+            // What reached the archive FileStream (through the budget-enforcing write stream the job
+            // wraps it in) while the source was parked mid-yield — must be far more than ZIP headers.
+            var grownWhileParked = probe.ArchiveBytesWritten - audit.BaselineAtFirstRow;
+            Assert.True(grownWhileParked >= 64 * 1024,
+                $"only {grownWhileParked} bytes past the first-row baseline reached the archive while the audit " +
+                "source was parked mid-yield — the job / package builder buffered upstream output");
+        }
+        finally
+        {
+            audit.Release();
+            await run.WaitAsync(TimeSpan.FromSeconds(30));
+        }
+
+        Assert.Equal("Completed", await StatusOf(h, export.Id));
+        Assert.Equal(1, h.Storage.UploadCount);
+        Assert.Single(h.Publisher.Published.OfType<OrganisationDataExportCompletedIntegrationEvent>());
+        Assert.Equal(20_001, audit.Yielded);
+    }
+
+    /// <summary>
+    /// Ticket 4 final follow-up (Finding 3): an audit source that streams a large, poorly-compressible
+    /// prefix, records the archive byte count at its first row, then parks on a
+    /// <see cref="TaskCompletionSource"/> until <see cref="Release"/> — so a test can measure how many
+    /// bytes reached the archive while the source was still mid-yield.
+    /// </summary>
+    private sealed class ParkingPrefixAuditSource(int prefixRows, Func<long> probeArchiveBytes) : IAuditDataExportSource
+    {
+        public readonly TaskCompletionSource ReachedPark = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public long BaselineAtFirstRow { get; private set; } = -1;
+        public int Yielded { get; private set; }
+
+        public void Release() => _release.TrySetResult();
+
+        public Task<IReadOnlyList<DataExportTable>> GetTablesAsync(Guid companyId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<DataExportTable>>(
+                [DataExportTable.Streamed("audit_log", ["OccurredAt", "Blob"], Stream)]);
+
+        private async IAsyncEnumerable<IReadOnlyList<string?>> Stream(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            for (var i = 0; i < prefixRows; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (i == 0)
+                    BaselineAtFirstRow = probeArchiveBytes();
+
+                yield return new string?[]
+                {
+                    new DateTimeOffset(Now).AddSeconds(-i).ToString("o"),
+                    string.Concat(Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N")),
+                };
+                Yielded++;
+            }
+
+            ReachedPark.SetResult();
+            await _release.Task;
+
+            yield return new string?[] { new DateTimeOffset(Now).ToString("o"), "tail" };
+            Yielded++;
+        }
+    }
+
+    /// <summary>
+    /// Wraps the real workspace factory and counts every byte the build job writes through the
+    /// budget-enforcing archive write stream (i.e. everything that lands in the archive file).
+    /// </summary>
+    private sealed class ProbeWorkspaceFactory(OrganisationDataExportWorkspaceFactory inner)
+        : IOrganisationDataExportWorkspaceFactory
+    {
+        private volatile ProbeWorkspace? _last;
+
+        public long ArchiveBytesWritten => _last?.ArchiveBytesWritten ?? 0;
+
+        public IOrganisationDataExportWorkspace CreateWorkspace(Guid exportId)
+        {
+            var ws = new ProbeWorkspace(inner.CreateWorkspace(exportId));
+            _last = ws;
+            return ws;
+        }
+
+        public int SweepOrphans(DateTimeOffset now) => inner.SweepOrphans(now);
+
+        private sealed class ProbeWorkspace(IOrganisationDataExportWorkspace inner) : IOrganisationDataExportWorkspace
+        {
+            private CountingPassThroughStream? _counter;
+
+            public long ArchiveBytesWritten => _counter?.BytesWritten ?? 0;
+
+            public long MaxArchiveBytes => inner.MaxArchiveBytes;
+
+            public FileStream OpenArchiveStream() => inner.OpenArchiveStream();
+
+            public Stream CreateBudgetEnforcingWriteStream(Stream innerStream)
+            {
+                _counter = new CountingPassThroughStream(inner.CreateBudgetEnforcingWriteStream(innerStream));
+                return _counter;
+            }
+
+            public void EnsureWithinBudget(long currentArchiveBytes) => inner.EnsureWithinBudget(currentArchiveBytes);
+
+            public void Dispose() => inner.Dispose();
+        }
+
+        private sealed class CountingPassThroughStream(Stream inner) : Stream
+        {
+            private long _bytes;
+
+            public long BytesWritten => Interlocked.Read(ref _bytes);
+
+            public override bool CanRead => inner.CanRead;
+            public override bool CanSeek => inner.CanSeek;
+            public override bool CanWrite => inner.CanWrite;
+            public override long Length => inner.Length;
+            public override long Position { get => inner.Position; set => inner.Position = value; }
+
+            public override void Write(byte[] buffer, int offset, int count)
+            {
+                Interlocked.Add(ref _bytes, count);
+                inner.Write(buffer, offset, count);
+            }
+
+            public override void Write(ReadOnlySpan<byte> buffer)
+            {
+                Interlocked.Add(ref _bytes, buffer.Length);
+                inner.Write(buffer);
+            }
+
+            public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            {
+                Interlocked.Add(ref _bytes, count);
+                return inner.WriteAsync(buffer, offset, count, cancellationToken);
+            }
+
+            public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+            {
+                Interlocked.Add(ref _bytes, buffer.Length);
+                return inner.WriteAsync(buffer, cancellationToken);
+            }
+
+            public override void WriteByte(byte value)
+            {
+                Interlocked.Add(ref _bytes, 1);
+                inner.WriteByte(value);
+            }
+
+            public override void Flush() => inner.Flush();
+            public override Task FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+            public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+            public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+            public override void SetLength(long value) => inner.SetLength(value);
+
+            protected override void Dispose(bool disposing)
+            {
+                // Mirrors the budget stream: does not dispose the underlying archive FileStream
+                // (the build job owns it for the subsequent upload).
+            }
+
+            public override ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class CountingStreamedAuditSource(int rowCount) : IAuditDataExportSource
+    {
+        private int _live;
+
+        public int Yielded { get; private set; }
+        public int MaxLive { get; private set; }
+
+        public Task<IReadOnlyList<DataExportTable>> GetTablesAsync(Guid companyId, CancellationToken cancellationToken)
+        {
+            var table = DataExportTable.Streamed("audit_log", ["OccurredAt", "Summary"], Stream);
+            return Task.FromResult<IReadOnlyList<DataExportTable>>([table]);
+        }
+
+        private async IAsyncEnumerable<IReadOnlyList<string?>> Stream(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            for (var i = 0; i < rowCount; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var now = Interlocked.Increment(ref _live);
+                MaxLive = Math.Max(MaxLive, now);
+                yield return new string?[] { new DateTimeOffset(Now).AddSeconds(-i).ToString("o"), $"row-{i}" };
+                Yielded++;
+                Interlocked.Decrement(ref _live);
+                await Task.Yield();
+            }
+        }
     }
 
     // ----- fakes -----

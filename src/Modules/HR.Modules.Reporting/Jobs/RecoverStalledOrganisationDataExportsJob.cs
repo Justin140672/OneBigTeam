@@ -28,6 +28,7 @@ internal sealed class RecoverStalledOrganisationDataExportsJob(
     IOrganisationDataExportJobStore jobStore,
     IBackgroundJobClient backgroundJobClient,
     IOrganisationDataExportStorage storage,
+    IOrganisationDataExportWorkspaceFactory workspaceFactory,
     IClock clock,
     ILogger<RecoverStalledOrganisationDataExportsJob> logger)
 {
@@ -36,6 +37,19 @@ internal sealed class RecoverStalledOrganisationDataExportsJob(
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
         var now = clock.UtcNowOffset();
+
+        // Ticket 4: remove temp-disk workspaces orphaned by a hard process kill (the build job deletes
+        // its own workspace on success/failure/cancellation).
+        try
+        {
+            var swept = workspaceFactory.SweepOrphans(now);
+            if (swept > 0)
+                logger.LogWarning("Swept {Count} orphaned organisation data export workspace(s) left by an interrupted build.", swept);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to sweep orphaned organisation data export workspaces.");
+        }
 
         var recoverable = await jobStore.GetRecoverableAsync(
             now.AddMinutes(-PendingQueueGraceMinutes),

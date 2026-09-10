@@ -106,6 +106,12 @@ public static class ReportingModule
         services.AddScoped<IOrganisationDataExportJobStore, Services.OrganisationDataExportJobStore>();
         services.AddScoped<IOrganisationDataExportStatusReader, Services.OrganisationDataExportStatusReader>();
         services.AddSingleton<OrganisationDataExportPackageBuilder>();
+        // Ticket 4: shared resource budgets, concurrency slot gate and bounded temp-disk workspaces.
+        services.AddSingleton(OrganisationDataExportResourceLimits.Default);
+        services.AddSingleton<IOrganisationDataExportConcurrencyGate>(sp =>
+            new OrganisationDataExportConcurrencyGate(sp.GetRequiredService<OrganisationDataExportResourceLimits>()));
+        services.AddSingleton<IOrganisationDataExportWorkspaceFactory>(sp =>
+            new OrganisationDataExportWorkspaceFactory(sp.GetRequiredService<OrganisationDataExportResourceLimits>()));
         // Follow-up G: renews the build job's ownership lease from its own DI/DbContext scope.
         services.AddSingleton<Jobs.IOrganisationDataExportLeaseRenewer, Jobs.ScopedOrganisationDataExportLeaseRenewer>();
         services.AddScoped<Jobs.OrganisationDataExportBuildJob>();

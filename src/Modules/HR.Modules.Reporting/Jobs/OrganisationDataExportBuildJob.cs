@@ -6,30 +6,30 @@ using Microsoft.Extensions.Logging;
 namespace HR.Modules.Reporting.Jobs;
 
 /// <summary>
-/// Story 2 / Ticket 3: builds the organisation data export ZIP for a single export row, uploads it to
-/// dedicated private storage, and marks the export Completed (or Failed). Enqueued one-off by the
-/// RequestOrganisationDataExport endpoint and re-enqueued by
+/// Story 2 / Ticket 3 / Ticket 4: builds the organisation data export ZIP for a single export row,
+/// uploads it to dedicated private storage, and marks the export Completed (or Failed). Enqueued
+/// one-off by the RequestOrganisationDataExport endpoint and re-enqueued by
 /// <see cref="RecoverStalledOrganisationDataExportsJob"/> after an interruption. All cross-module
 /// data is obtained through Abstractions contracts — no module-to-module reference.
 ///
-/// Ticket 3 hardening:
-/// <list type="bullet">
-///   <item>The Pending/InProgress -&gt; InProgress claim goes through
-///   <see cref="IOrganisationDataExportJobStore.BeginAttemptAsync"/> which is optimistic-concurrency
-///   guarded, so two workers racing the same row can never both build it.</item>
-///   <item>Transient storage upload failures are retried a bounded number of times before the
-///   attempt fails.</item>
-///   <item>If an expected document is genuinely missing from storage the export is <b>failed</b>
-///   (never completed with a partial archive) and an administrative alert is raised. The Documents
-///   records are left untouched.</item>
-/// </list>
+/// Ticket 3 hardening (unchanged): optimistic-concurrency attempt claim, bounded upload retry,
+/// fail-whole-export on genuinely missing documents with an administrative alert, and a continuous
+/// background ownership-lease renewal loop on its own DbContext scope.
 ///
-/// Follow-up G: the ownership lease is renewed continuously by a background loop
-/// (<see cref="LeaseRenewInterval"/>) that runs on its <b>own</b> DbContext scope for the entire
-/// build and upload — not just at checkpoints. If the loop finds the lease has been taken over it
-/// cancels processing through a linked <see cref="CancellationTokenSource"/> so the attempt unwinds
-/// without uploading, completing or failing. The atomic ownership check in
-/// <see cref="IOrganisationDataExportJobStore.MarkCompletedAsync"/> remains the final publish guard.
+/// Ticket 4 (resource limits):
+/// <list type="bullet">
+///   <item>A process-wide <see cref="IOrganisationDataExportConcurrencyGate"/> caps simultaneous
+///   builds. A build that cannot get a slot abandons the run before claiming an attempt and lets
+///   Hangfire re-queue it.</item>
+///   <item>The archive is assembled straight into a bounded temp-disk workspace
+///   (<see cref="IOrganisationDataExportWorkspaceFactory"/>) — never buffered in memory. Module
+///   tables are streamed one source at a time; document streams are opened, copied and disposed one
+///   at a time.</item>
+///   <item>The upload streams from the temp file (no <c>byte[]</c>, no <c>MemoryStream</c> copy).</item>
+///   <item>Temp-disk exhaustion fails the export with a clear reason plus an administrative alert.</item>
+///   <item>The workspace is deleted on success, failure and cancellation;
+///   <see cref="RecoverStalledOrganisationDataExportsJob"/> sweeps workspaces orphaned by a process kill.</item>
+/// </list>
 /// </summary>
 internal sealed class OrganisationDataExportBuildJob(
     IOrganisationDataExportJobStore jobStore,
@@ -41,6 +41,8 @@ internal sealed class OrganisationDataExportBuildJob(
     IDocumentDataExportManifest documentManifest,
     OrganisationDataExportPackageBuilder packageBuilder,
     IOrganisationDataExportStorage storage,
+    IOrganisationDataExportConcurrencyGate concurrencyGate,
+    IOrganisationDataExportWorkspaceFactory workspaceFactory,
     IIntegrationEventPublisher integrationEventPublisher,
     IAdministrativeAlertWriter administrativeAlertWriter,
     IOrganisationDataExportLeaseRenewer leaseRenewer,
@@ -74,8 +76,7 @@ internal sealed class OrganisationDataExportBuildJob(
             return;
         }
 
-        // OBT-REM-11: verify the caller-supplied companyId (used by the Hangfire failure-audit
-        // filter to scope this job to a tenant) actually matches the export row being processed.
+        // OBT-REM-11: verify the caller-supplied companyId matches the export row being processed.
         if (view.CompanyId != companyId)
         {
             logger.LogError(
@@ -85,31 +86,34 @@ internal sealed class OrganisationDataExportBuildJob(
                 $"OrganisationDataExport {exportId} does not belong to company {companyId}.");
         }
 
-        // Follow-up A: each run takes out its own ownership lease. Only the holder of this token may
-        // renew the lease, complete the export or fail it for missing documents — a superseded worker
-        // is locked out and cannot overwrite a published archive.
+        // Ticket 4: hold a concurrency slot for the whole build. Acquire it BEFORE claiming an attempt
+        // so a queued build never consumes an attempt just by waiting. If no slot frees up, throw so
+        // Hangfire re-queues this job with back-off; the recovery sweep is the long-stop.
+        await using var slot = await concurrencyGate.AcquireAsync(cancellationToken);
+        if (slot is null)
+        {
+            logger.LogWarning(
+                "Organisation data export {ExportId}: no build slot available within the queue-wait window; deferring.", exportId);
+            throw new OrganisationDataExportSlotUnavailableException(exportId);
+        }
+
+        // Follow-up A: each run takes out its own ownership lease.
         var ownerToken = Guid.NewGuid();
 
         if (!await jobStore.BeginAttemptAsync(exportId, ownerToken, cancellationToken))
         {
             logger.LogInformation(
-                "Organisation data export {ExportId} could not be claimed for an attempt (already owned by a live lease, terminal, out of attempts, or lost a race); skipping.",
+                "Organisation data export {ExportId} could not be claimed for an attempt (already owned, terminal, out of attempts, or lost a race); skipping.",
                 exportId);
             return;
         }
 
-        // Follow-up G: cancel the processing pipeline the moment ownership is lost.
         using var processingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        // Follow-up G: stops the renewal loop itself as soon as processing finishes/fails.
         using var renewalCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var ownershipLost = false;
         var renewalLoop = RenewLeaseContinuouslyAsync();
         var renewalStopped = false;
 
-        // Ticket 3J: stop and drain the heartbeat loop *before* any terminal write so a renewal can
-        // never interleave with completion/failure (bump the version and force a benign retry, or
-        // land after the terminal transition). The store's ownership guard remains the hard barrier
-        // for a superseded worker.
         async Task StopRenewalAsync()
         {
             if (renewalStopped)
@@ -136,8 +140,6 @@ internal sealed class OrganisationDataExportBuildJob(
                     bool stillOwned;
                     try
                     {
-                        // Follow-up G: renewal runs on its own DbContext scope (see the renewer),
-                        // never the worker's ReportingDbContext.
                         stillOwned = await leaseRenewer.RenewAsync(exportId, ownerToken, cancellationToken);
                     }
                     catch (OperationCanceledException)
@@ -146,9 +148,6 @@ internal sealed class OrganisationDataExportBuildJob(
                     }
                     catch (Exception ex)
                     {
-                        // Transient renewal failure: try again next tick. If it keeps failing until the
-                        // lease actually lapses, recovery will legitimately take over and the next
-                        // renewal returns false.
                         logger.LogWarning(ex,
                             "Organisation data export {ExportId}: lease renewal attempt failed; will retry.", exportId);
                         continue;
@@ -175,81 +174,69 @@ internal sealed class OrganisationDataExportBuildJob(
         {
             var cancel = processingCts.Token;
 
-            var tables = new List<DataExportTable>();
-            tables.AddRange(await employeeSource.GetTablesAsync(companyId, cancel));
-            tables.AddRange(await leaveSource.GetTablesAsync(companyId, cancel));
-            tables.AddRange(await sicknessSource.GetTablesAsync(companyId, cancel));
-            tables.AddRange(await recruitmentSource.GetTablesAsync(companyId, cancel));
-            tables.AddRange(await auditSource.GetTablesAsync(companyId, cancel));
-            tables.AddRange(await documentManifest.GetTablesAsync(companyId, cancel));
-
             var fileEntries = await documentManifest.GetFileEntriesAsync(companyId, cancel);
-            var openedFiles = new List<(string ZipPath, Stream Content)>();
-            var missing = new List<string>();
-            try
+
+            // Ticket 4: bounded temp-disk workspace; may throw OrganisationDataExportTempCapacityException
+            // (free-space margin or combined-budget reservation) before any bytes are written.
+            using var workspace = workspaceFactory.CreateWorkspace(exportId);
+            await using var archiveStream = workspace.OpenArchiveStream();
+
+            // Ticket 4: every archive byte — including the ZIP central-directory / finalisation write —
+            // flows through a counting stream that trips the per-export ceiling mid-write, so a single
+            // huge CSV row or document can never blow the budget before the post-entry check runs.
+            await using var budgetedArchiveStream = workspace.CreateBudgetEnforcingWriteStream(archiveStream);
+
+            // Ticket 4: stream every module's tables in one source at a time (only one module's rows
+            // resident at once), then the documents one stream at a time — straight into the temp file.
+            var missing = await packageBuilder.BuildToStreamAsync(
+                StreamTablesAsync(companyId, cancel),
+                fileEntries,
+                (entry, ct) => documentManifest.OpenDocumentAsync(companyId, entry.StorageKey, ct),
+                budgetedArchiveStream,
+                workspace.EnsureWithinBudget,
+                cancel);
+
+            if (missing.Count > 0)
             {
-                foreach (var fileEntry in fileEntries)
-                {
-                    cancel.ThrowIfCancellationRequested();
-                    var stream = await documentManifest.OpenDocumentAsync(companyId, fileEntry.StorageKey, cancel);
-                    if (stream is null)
-                        missing.Add(fileEntry.ZipPath);
-                    else
-                        openedFiles.Add((fileEntry.ZipPath, stream));
-                }
+                logger.LogError(
+                    "Organisation data export {ExportId} for company {CompanyId}: {MissingCount} expected document(s) missing from storage; failing the export.",
+                    exportId, companyId, missing.Count);
 
-                if (missing.Count > 0)
-                {
-                    logger.LogError(
-                        "Organisation data export {ExportId} for company {CompanyId}: {MissingCount} expected document(s) missing from storage; failing the export.",
-                        exportId, companyId, missing.Count);
-
-                    await StopRenewalAsync();
-                    if (await jobStore.MarkFailedDueToMissingDocumentsAsync(exportId, ownerToken, missing.Count, cancellationToken))
-                    {
-                        await RaiseMissingDocumentsAlertAsync(companyId, exportId, missing, cancellationToken);
-                    }
-                    else
-                    {
-                        logger.LogWarning(
-                            "Organisation data export {ExportId}: could not record missing-documents failure — no longer the lease owner; not raising an alert.",
-                            exportId);
-                    }
-                    return;
-                }
-
-                cancel.ThrowIfCancellationRequested();
-                var zipBytes = packageBuilder.Build(tables, openedFiles);
-
-                // Follow-up A/G: if a replacement worker has already taken ownership, abandon now —
-                // never upload over a published archive.
-                cancel.ThrowIfCancellationRequested();
-
-                // Follow-up D: each attempt uploads to its own object key (keyed by the owner token) so
-                // concurrent or retried attempts never overwrite one another.
-                var storageKey = await UploadWithRetryAsync(companyId, exportId, ownerToken, zipBytes, cancel);
-
-                // Ticket 3J: stop the heartbeat before the terminal completion write.
                 await StopRenewalAsync();
-
-                // Follow-up A/D: publish the winning archive path only via the atomic, ownership-guarded
-                // completion. A superseded worker gets false here and abandons its (now orphan) upload.
-                if (!await jobStore.MarkCompletedAsync(exportId, ownerToken, storageKey, zipBytes.LongLength, cancellationToken))
+                if (await jobStore.MarkFailedDueToMissingDocumentsAsync(exportId, ownerToken, missing.Count, cancellationToken))
+                {
+                    await RaiseMissingDocumentsAlertAsync(companyId, exportId, missing, cancellationToken);
+                }
+                else
                 {
                     logger.LogWarning(
-                        "Organisation data export {ExportId}: ownership lease lost before completion; a replacement worker owns it now. Not publishing.",
+                        "Organisation data export {ExportId}: could not record missing-documents failure — no longer the lease owner; not raising an alert.",
                         exportId);
-                    return;
                 }
+                return;
+            }
 
-                // Follow-up D: winner sweeps up any sibling attempt archives left by superseded workers.
-                await CleanUpSiblingAttemptsAsync(companyId, exportId, storageKey, cancellationToken);
-            }
-            finally
+            cancel.ThrowIfCancellationRequested();
+
+            await archiveStream.FlushAsync(cancel);
+            var archiveBytes = archiveStream.Length;
+
+            // Follow-up D: each attempt uploads to its own object key. Ticket 4: streamed from the
+            // temp file, never a buffered copy.
+            var storageKey = await UploadWithRetryAsync(companyId, exportId, ownerToken, archiveStream, cancel);
+
+            // Ticket 3J: stop the heartbeat before the terminal completion write.
+            await StopRenewalAsync();
+
+            if (!await jobStore.MarkCompletedAsync(exportId, ownerToken, storageKey, archiveBytes, cancellationToken))
             {
-                foreach (var (_, content) in openedFiles)
-                    await content.DisposeAsync();
+                logger.LogWarning(
+                    "Organisation data export {ExportId}: ownership lease lost before completion; a replacement worker owns it now. Not publishing.",
+                    exportId);
+                return;
             }
+
+            await CleanUpSiblingAttemptsAsync(companyId, exportId, storageKey, cancellationToken);
 
             await integrationEventPublisher.PublishAsync(
                 new OrganisationDataExportCompletedIntegrationEvent(
@@ -268,15 +255,27 @@ internal sealed class OrganisationDataExportBuildJob(
                 "Organisation data export {ExportId}: build cancelled by host shutdown; recovery will re-enqueue it after the lease expires.",
                 exportId);
         }
+        catch (OrganisationDataExportTempCapacityException ex)
+        {
+            logger.LogError(ex,
+                "Organisation data export {ExportId} for company {CompanyId}: temporary working storage exhausted.",
+                exportId, companyId);
+
+            await StopRenewalAsync();
+            if (await jobStore.MarkFailedAsync(
+                    exportId, ownerToken,
+                    "The export could not be completed because temporary working storage was exhausted. Please try again later.",
+                    cancellationToken))
+            {
+                await RaiseTempCapacityAlertAsync(companyId, exportId, ex.Message, cancellationToken);
+            }
+        }
         catch (Exception ex)
         {
             logger.LogError(ex,
                 "Organisation data export {ExportId} for company {CompanyId} failed.", exportId, companyId);
 
-            // Ticket 3J: stop the heartbeat before the terminal failure write.
             await StopRenewalAsync();
-
-            // Follow-up D: only the still-current owner may record the transient failure.
             if (!await jobStore.MarkFailedAsync(exportId, ownerToken, "Export could not be generated.", cancellationToken))
             {
                 logger.LogWarning(
@@ -285,10 +284,34 @@ internal sealed class OrganisationDataExportBuildJob(
         }
         finally
         {
-            // Follow-up G / Ticket 3J: stop renewal immediately when the attempt finishes, fails or
-            // loses ownership. Idempotent — the terminal-write paths above already drained it.
             await StopRenewalAsync();
             await processingCts.CancelAsync();
+        }
+    }
+
+    /// <summary>
+    /// Ticket 4: yields every contributing module's tables one source at a time, so only one module's
+    /// rows are materialised at any moment (the previous source's list becomes eligible for GC before
+    /// the next call).
+    /// </summary>
+    private async IAsyncEnumerable<DataExportTable> StreamTablesAsync(
+        Guid companyId,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        foreach (var source in new Func<Guid, CancellationToken, Task<IReadOnlyList<DataExportTable>>>[]
+                 {
+                     employeeSource.GetTablesAsync,
+                     leaveSource.GetTablesAsync,
+                     sicknessSource.GetTablesAsync,
+                     recruitmentSource.GetTablesAsync,
+                     auditSource.GetTablesAsync,
+                     documentManifest.GetTablesAsync,
+                 })
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var tables = await source(companyId, cancellationToken);
+            foreach (var table in tables)
+                yield return table;
         }
     }
 
@@ -315,14 +338,18 @@ internal sealed class OrganisationDataExportBuildJob(
         }
     }
 
-    private async Task<string> UploadWithRetryAsync(Guid companyId, Guid exportId, Guid attemptToken, byte[] zipBytes, CancellationToken cancellationToken)
+    private async Task<string> UploadWithRetryAsync(
+        Guid companyId, Guid exportId, Guid attemptToken, FileStream archiveStream, CancellationToken cancellationToken)
     {
         for (var attempt = 1; ; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                using var uploadStream = new MemoryStream(zipBytes, writable: false);
+                archiveStream.Position = 0;
+                // NonDisposingStreamWrapper: a storage client that disposes its content stream must
+                // not close the temp file between retries.
+                using var uploadStream = new NonDisposingStreamWrapper(archiveStream);
                 return await storage.UploadAsync(companyId, exportId, attemptToken, uploadStream, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException && attempt < StorageUploadMaxAttempts)
@@ -338,7 +365,6 @@ internal sealed class OrganisationDataExportBuildJob(
     private async Task RaiseMissingDocumentsAlertAsync(
         Guid companyId, Guid exportId, IReadOnlyList<string> missing, CancellationToken cancellationToken)
     {
-        // Best-effort: an alert-writer failure must never mask the export failure itself.
         try
         {
             var sample = string.Join(", ", missing.Take(5));
@@ -362,6 +388,36 @@ internal sealed class OrganisationDataExportBuildJob(
         {
             logger.LogWarning(alertEx,
                 "Organisation data export {ExportId}: failed to raise administrative alert for missing documents.", exportId);
+        }
+    }
+
+    private async Task RaiseTempCapacityAlertAsync(
+        Guid companyId, Guid exportId, string detail, CancellationToken cancellationToken)
+    {
+        // Ticket 4: consistent with the missing-documents alert pattern, but Reason is left null so it
+        // does not queue an operations email — capacity clears itself and the admin can re-request.
+        try
+        {
+            await administrativeAlertWriter.RaiseAsync(new RaiseAdministrativeAlertCommand(
+                companyId,
+                AdministrativeAlertSeverity.Warning,
+                AdministrativeAlertCategory.ReportGeneration,
+                "Organisation data export failed: temporary working storage exhausted",
+                $"Organisation data export '{exportId}' could not be built because temporary working storage was exhausted. {detail}",
+                clock.UtcNowOffset(),
+                DedupKey: $"organisation-data-export-temp-capacity:{companyId}",
+                AffectedEntityType: "OrganisationDataExport",
+                AffectedEntityId: exportId,
+                RecommendedAction: "Check free disk on the background-job host and the number of concurrent exports, then ask the company administrator to request a new export.",
+                ActionUrl: null,
+                AffectedItemCount: null,
+                Reason: null),
+                cancellationToken);
+        }
+        catch (Exception alertEx)
+        {
+            logger.LogWarning(alertEx,
+                "Organisation data export {ExportId}: failed to raise administrative alert for temp capacity.", exportId);
         }
     }
 }

@@ -13,8 +13,12 @@ public class RecoverStalledOrganisationDataExportsJobTests
     private static readonly DateTime Now = new(2026, 9, 9, 12, 0, 0, DateTimeKind.Utc);
 
     private static RecoverStalledOrganisationDataExportsJob Build(
-        FakeRecoveryJobStore store, RecordingBackgroundJobClient client, FakeRecoveryStorage? storage = null) =>
-        new(store, client, storage ?? new FakeRecoveryStorage(), new FakeClock(Now),
+        FakeRecoveryJobStore store, RecordingBackgroundJobClient client, FakeRecoveryStorage? storage = null,
+        IOrganisationDataExportWorkspaceFactory? workspaceFactory = null) =>
+        new(store, client, storage ?? new FakeRecoveryStorage(),
+            workspaceFactory ?? new OrganisationDataExportWorkspaceFactory(
+                rootOverride: Path.Combine(Path.GetTempPath(), "obt-test-recover", Guid.NewGuid().ToString("N"))),
+            new FakeClock(Now),
             NullLogger<RecoverStalledOrganisationDataExportsJob>.Instance);
 
     private static OrganisationDataExportJobView Pending(Guid companyId, Guid? userId = null) =>
@@ -240,6 +244,36 @@ public class RecoverStalledOrganisationDataExportsJobTests
         Assert.Equal(row.Id, failed.ExportId);
         Assert.Equal(store.ClaimForRecoveryCalls[0].RecoveryToken, failed.RecoveryToken);
         Assert.Empty(client.Enqueued);
+    }
+
+    [Fact]
+    public async Task Sweeps_Orphaned_Workspace_Directories_Left_By_An_Interrupted_Build()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "obt-test-recover-orphans", Guid.NewGuid().ToString("N"));
+        var orphanDir = Path.Combine(root, "orphan-" + Guid.NewGuid().ToString("N"));
+        var freshDir = Path.Combine(root, "fresh-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(orphanDir);
+        Directory.CreateDirectory(freshDir);
+        File.WriteAllText(Path.Combine(orphanDir, "export.zip"), "x");
+        Directory.SetLastWriteTimeUtc(orphanDir, Now.AddHours(-7));
+        Directory.SetLastWriteTimeUtc(freshDir, Now.AddHours(-1));
+
+        try
+        {
+            var workspaceFactory = new OrganisationDataExportWorkspaceFactory(rootOverride: root);
+            var store = new FakeRecoveryJobStore(); // nothing recoverable
+            var client = new RecordingBackgroundJobClient();
+
+            await Build(store, client, workspaceFactory: workspaceFactory).ExecuteAsync();
+
+            Assert.False(Directory.Exists(orphanDir));
+            Assert.True(Directory.Exists(freshDir));
+            Assert.Empty(client.Enqueued);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best-effort */ }
+        }
     }
 
     private sealed class FakeRecoveryJobStore(params OrganisationDataExportJobView[] recoverable)
