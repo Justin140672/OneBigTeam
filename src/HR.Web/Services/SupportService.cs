@@ -9,9 +9,9 @@ namespace HR.Web.Services;
 
 // Wraps the HR.Modules.Support API surface (submission, thread, staff status changes and the
 // staff-only cross-company dashboard). See src/Modules/HR.Modules.Support/Features/*.
-public sealed class SupportService(IHttpClientFactory httpClientFactory, ILogger<SupportService> logger)
+public sealed class SupportService(HrApiHttpClientFactory httpClientFactory, ILogger<SupportService> logger)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<List<SupportRequestListItem>?> ListSupportRequestsAsync(
         Guid companyId, string? status = null, CancellationToken cancellationToken = default)

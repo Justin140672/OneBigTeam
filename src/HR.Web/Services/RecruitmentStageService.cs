@@ -4,10 +4,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class RecruitmentStageService(IHttpClientFactory httpClientFactory)
+public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<RecruitmentStageEditModel, Guid>, IConcurrencyAwareEditService<RecruitmentStageEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListRecruitmentStagesResponse?> ListStagesAsync(Guid companyId)
     {

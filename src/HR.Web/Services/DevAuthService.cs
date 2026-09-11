@@ -7,9 +7,9 @@ public sealed record DevPersonaDto(string UserId, string Name, string JobTitle, 
 
 public sealed record DevSupabaseSessionDto(string AccessToken, string RefreshToken, int ExpiresIn);
 
-public sealed class DevAuthService(IHttpClientFactory httpClientFactory, ILogger<DevAuthService> logger)
+public sealed class DevAuthService(HrApiHttpClientFactory httpClientFactory, ILogger<DevAuthService> logger)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<IReadOnlyList<DevPersonaDto>> GetPersonasAsync()
     {

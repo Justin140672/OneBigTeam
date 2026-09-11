@@ -9,9 +9,9 @@ namespace HR.Admin.Web.Services;
 /// failure (401/403/404 or a transport error), PostActionAsync-style methods returning bool or the
 /// typed response (null on failure).
 /// </summary>
-public sealed class AdminUsersService(IHttpClientFactory httpClientFactory)
+public sealed class AdminUsersService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListPlatformAdministratorsResponse?> GetAdministratorsOrNullAsync(
         CancellationToken cancellationToken = default)

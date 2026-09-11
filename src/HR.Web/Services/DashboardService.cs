@@ -6,9 +6,9 @@ namespace HR.Web.Services;
 /// authoritative counts plus a capped (25) pre-ordered item list. Non-swallowing ("OrThrow") so
 /// <see cref="WidgetSourceLoader"/> can record the failure.
 /// </summary>
-public sealed class DashboardService(IHttpClientFactory httpClientFactory)
+public sealed class DashboardService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<DashboardSummaryModel> GetHrSummaryOrThrowAsync(Guid companyId, CancellationToken ct = default)
     {

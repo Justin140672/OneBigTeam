@@ -6,9 +6,9 @@ namespace HR.Web.Services;
 /// "hrapi" IHttpClientFactory client (bearer auth is attached by the client's handler, same pattern
 /// as ReportingService/SubscriptionService).
 /// </summary>
-public class OrganisationDataExportService(IHttpClientFactory httpClientFactory)
+public class OrganisationDataExportService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     private static string Base(Guid companyId) => $"api/companies/{companyId}/reporting/data-exports";
 

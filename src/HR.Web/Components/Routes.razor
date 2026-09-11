@@ -10,8 +10,18 @@
                 <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
                     <NotAuthorized>
                         @{
+                            // Ticket 12: this fires whenever AppSessionAuthStateProvider has fail-closed the
+                            // circuit's auth state (anonymous/different-identity reconnect, or an invalidated
+                            // circuit — see CircuitSessionState.Status). An ordinary client-side
+                            // NavigationManager.NavigateTo (no forceLoad) can, in some Blazor Server reconnect
+                            // scenarios, resume the SAME circuit rather than establishing a new one — but a
+                            // circuit that has been Invalidated must never be reused for a subsequent login,
+                            // since it may still hold cached component/service state for the previous
+                            // identity (see AppSession.InitialiseAsync). forceLoad: true forces a real browser
+                            // navigation, which tears down this circuit and negotiates a brand-new one (fresh
+                            // DI scope, fresh CircuitSessionState, fresh AppSession) for whoever logs in next.
                             if (!Navigation.Uri.EndsWith("/login", StringComparison.OrdinalIgnoreCase))
-                                Navigation.NavigateTo("/login", replace: true);
+                                Navigation.NavigateTo("/login", forceLoad: true, replace: true);
                         }
                     </NotAuthorized>
                 </AuthorizeRouteView>

@@ -1,4 +1,5 @@
 using System.Net.Http;
+using HR.Modules.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -80,6 +81,55 @@ public static class SupabaseJwtBearerConfiguration
                     .CreateLogger("SupabaseJwtBearer")
                     .LogWarning(context.Exception, "Supabase JWT validation failed");
                 return Task.CompletedTask;
+            },
+
+            // Ticket 13 — cross-tab/cross-replica logout enforcement. This runs AFTER the token has
+            // already passed full signature/issuer/audience/lifetime validation, for every request
+            // to HR.Api from every caller (HR.Web, HR.Admin.Web, or any other future client) — so
+            // this single check point covers all of them at once, and reads the same shared Postgres
+            // database every other application instance/replica writes to, so a logout recorded by
+            // one replica is honoured by every other replica's very next request. A revoked token
+            // fails the request with 401 here, before any endpoint/handler code runs.
+            OnTokenValidated = async context =>
+            {
+                var subClaim = context.Principal?.FindFirst("sub")?.Value;
+
+                if (!Guid.TryParse(subClaim, out var supabaseAuthUserId))
+                {
+                    // No parseable subject — nothing to check revocation against. Every other part of
+                    // this pipeline already requires a valid "sub" for tenant/user resolution, so this
+                    // is not a new gap.
+                    return;
+                }
+
+                // Deliberately read "iat" off the validated SecurityToken itself, NOT off
+                // context.Principal's claims: whether "iat"/"exp"/"nbf" survive into the mapped
+                // ClaimsPrincipal depends on which TokenHandler ASP.NET Core's JwtBearerHandler is
+                // using (JwtSecurityTokenHandler vs. the newer JsonWebTokenHandler) and its internal
+                // claim-mapping rules for registered/reserved claims — confirmed empirically via
+                // SessionRevocationEnforcementTests initially failing when read from the principal.
+                // Both known SecurityToken implementations expose IssuedAt directly and reliably.
+                var tokenIssuedAt = context.SecurityToken switch
+                {
+                    System.IdentityModel.Tokens.Jwt.JwtSecurityToken jwt =>
+                        new DateTimeOffset(jwt.IssuedAt, TimeSpan.Zero),
+                    Microsoft.IdentityModel.JsonWebTokens.JsonWebToken jwt =>
+                        new DateTimeOffset(jwt.IssuedAt, TimeSpan.Zero),
+                    // Unrecognised token type carries no reliably-readable "iat" — fail closed here
+                    // would reject every token of that type outright; instead treat it as "now" so
+                    // this specific revocation check never blocks it, same fail-open scope as a
+                    // missing claim would have had. This branch should never be hit in practice: both
+                    // cases above cover every TokenHandler ASP.NET Core's JwtBearerHandler ships with.
+                    _ => DateTimeOffset.UtcNow,
+                };
+
+                var isRevoked = await context.HttpContext.RequestServices.IsSessionRevokedAsync(
+                    supabaseAuthUserId, tokenIssuedAt, context.HttpContext.RequestAborted);
+
+                if (isRevoked)
+                {
+                    context.Fail("Session has been revoked.");
+                }
             },
         };
     }

@@ -1,8 +1,8 @@
 namespace HR.Web.Services;
 
-public class InviteService(IHttpClientFactory httpClientFactory)
+public class InviteService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<(string? Token, DateTimeOffset ExpiresAt, string? Error)> SendInviteAsync(
         Guid companyId, Guid employeeId, string email)

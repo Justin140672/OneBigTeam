@@ -3,9 +3,9 @@ using System.Web;
 
 namespace HR.Web.Services;
 
-public class EmployeeService(IHttpClientFactory httpClientFactory)
+public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     /// <summary>
     /// The full employee administration list (EmployeeList grid). API-gated to "employee:manage"

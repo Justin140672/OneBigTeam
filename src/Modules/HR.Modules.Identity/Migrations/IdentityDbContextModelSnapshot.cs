@@ -996,6 +996,21 @@ namespace HR.Modules.Identity.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HR.Modules.Identity.Domain.SessionRevocation", b =>
+                {
+                    b.Property<Guid>("SupabaseAuthUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supabase_auth_user_id");
+
+                    b.Property<DateTimeOffset>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.HasKey("SupabaseAuthUserId");
+
+                    b.ToTable("session_revocations", "identity");
+                });
+
             modelBuilder.Entity("HR.Modules.Identity.Domain.UserInvite", b =>
                 {
                     b.Property<Guid>("Id")

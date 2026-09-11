@@ -11,9 +11,9 @@ namespace HR.Web.Services;
 /// matched an account (see RequestPasswordResetHandler's own comment) — so this only surfaces a
 /// failure for a genuine request error (network/5xx), not "email not found".
 /// </summary>
-public sealed class PasswordResetService(IHttpClientFactory httpClientFactory, ILogger<PasswordResetService> logger)
+public sealed class PasswordResetService(HrApiHttpClientFactory httpClientFactory, ILogger<PasswordResetService> logger)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<bool> RequestResetAsync(string email, string? userAgent = null)
     {

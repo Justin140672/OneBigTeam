@@ -2,10 +2,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class DocumentTypeService(IHttpClientFactory httpClientFactory)
+public class DocumentTypeService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<DocumentTypeEditModel, Guid>, IConcurrencyAwareEditService<DocumentTypeEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListDocumentTypesAdminResponse?> ListDocumentTypesAsync(Guid companyId, bool includeInactive = false)
     {

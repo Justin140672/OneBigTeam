@@ -3,9 +3,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class OrganisationChartService(IHttpClientFactory httpClientFactory)
+public sealed class OrganisationChartService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<OrganisationChartResponse?> GetOrganisationChartAsync(
         Guid companyId,

@@ -37,4 +37,8 @@
     <UserSecretsId>17de2f88-b782-4aa9-96f1-f7accb33d2a2</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="HR.Web.Tests" />
+  </ItemGroup>
+
 </Project>

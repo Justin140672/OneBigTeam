@@ -2,9 +2,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class EmployeeNoteService(IHttpClientFactory httpClientFactory)
+public sealed class EmployeeNoteService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<IReadOnlyList<EmployeeNoteItemModel>> GetEmployeeNotesAsync(
         Guid companyId,

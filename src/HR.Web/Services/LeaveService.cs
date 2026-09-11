@@ -3,9 +3,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class LeaveService(IHttpClientFactory httpClientFactory)
+public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<bool> CancelLeaveRequestAsync(
         Guid companyId,

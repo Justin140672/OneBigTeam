@@ -11,9 +11,9 @@ public sealed record DevSupabaseSessionDto(string AccessToken, string RefreshTok
 // (/api/dev/personas, /api/dev/persona/{userId}), which perform a real Supabase password-grant
 // login. Development-only; production Admin Portal sign-in is out of scope for this story (real
 // Supabase email/password sign-in, matching HR.Web's Login.razor flow, is a follow-up item).
-public sealed class DevAuthService(IHttpClientFactory httpClientFactory, ILogger<DevAuthService> logger)
+public sealed class DevAuthService(HrApiHttpClientFactory httpClientFactory, ILogger<DevAuthService> logger)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<IReadOnlyList<DevPersonaDto>> GetPersonasAsync()
     {
@@ -38,11 +38,11 @@ public sealed class DevAuthService(IHttpClientFactory httpClientFactory, ILogger
     {
         try
         {
-            // Deliberately NOT the "hrapi" client: its SupabaseAuthDelegatingHandler is pooled by
-            // IHttpClientFactory and can carry a *previous* session's captured token (the classic
-            // pooled-handler-with-scoped-dependency trap), which would overwrite the explicit
-            // bearer below and make this probe answer for the wrong user. A bare client with just
-            // the base address and the token we were handed is unambiguous.
+            // Deliberately NOT HrApiHttpClientFactory: that attaches whatever token this circuit's
+            // CircuitSessionState currently holds (e.g. a stale dev-persona token from an earlier
+            // switch), which would overwrite the explicit bearer below and make this probe answer
+            // for the wrong user. A bare client with just the base address and the freshly-minted
+            // token we were handed is unambiguous.
             using var http = new HttpClient { BaseAddress = Http.BaseAddress, Timeout = TimeSpan.FromSeconds(10) };
             using var request = new HttpRequestMessage(HttpMethod.Get, "api/platform-admin/me");
             request.Headers.Authorization =

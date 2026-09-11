@@ -10,9 +10,9 @@ namespace HR.Admin.Web.Services;
 /// {"Errors": {"Field": ["message"]}}, mirrored from HR.Web's EmployeeService pattern) rather than
 /// swallowing them, per the story's acceptance criteria.
 /// </summary>
-public sealed class PlatformSettingsService(IHttpClientFactory httpClientFactory)
+public sealed class PlatformSettingsService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<PlatformSettingsModel?> GetSettingsOrNullAsync(
         CancellationToken cancellationToken = default)

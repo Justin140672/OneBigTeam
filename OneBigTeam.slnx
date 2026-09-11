@@ -38,6 +38,7 @@
     <Project Path="src/Shared/HR.SharedKernel/HR.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/HR.Admin.Web.Tests/HR.Admin.Web.Tests.csproj" />
     <Project Path="tests/HR.Architecture.Tests/HR.Architecture.Tests.csproj" />
     <Project Path="tests/HR.Marketing.Tests/HR.Marketing.Tests.csproj" />
     <Project Path="tests/HR.SharedKernel.Tests/HR.SharedKernel.Tests.csproj" />

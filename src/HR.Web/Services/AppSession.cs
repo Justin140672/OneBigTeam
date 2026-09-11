@@ -6,9 +6,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeService employeeService, SicknessCategoryService sicknessCategoryService, CompanyOnboardingService companyOnboardingService, SubscriptionService subscriptionService)
+public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, EmployeeService employeeService, SicknessCategoryService sicknessCategoryService, CompanyOnboardingService companyOnboardingService, SubscriptionService subscriptionService, CircuitSessionState sessionState)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public bool IsLoaded { get; private set; }
 
@@ -179,9 +179,35 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     // failure can still be retried by the next caller.
     private Task? _inFlight;
 
+    // Ticket 12: the Supabase access token this session's cached identity/permissions/employee
+    // data was actually loaded for. AppSessionAuthStateProvider.SetAuthenticationState is
+    // authoritative for the circuit's CURRENT auth state (it fail-closes CircuitSessionState on an
+    // anonymous or different-identity reconnect — see that class's remarks), but this cache
+    // (IsLoaded + all the fields below) previously had no way to notice that had happened, so a
+    // previous user's cached data could silently keep being served for the rest of the circuit's
+    // life even after the circuit's auth state had already been correctly blocked. Comparing
+    // against the live CircuitSessionState below forces a real reload whenever the identity this
+    // cache was built for is no longer the circuit's current (or has been invalidated).
+    private string? _loadedForToken;
+
     public async Task InitialiseAsync()
     {
-        if (IsLoaded) return;
+        if (IsLoaded)
+        {
+            if (sessionState.Status == CircuitAuthStatus.Invalidated || sessionState.AccessToken != _loadedForToken)
+            {
+                // The circuit's identity has changed or been invalidated since this cache was
+                // built — do not blindly trust IsLoaded. Force a genuine reload rather than
+                // inventing any clever incremental "patch the diff" mechanism (fail-closed,
+                // explicit state over implicit machinery, per project convention).
+                IsLoaded = false;
+                _inFlight = null;
+            }
+            else
+            {
+                return;
+            }
+        }
 
         _inFlight ??= LoadIdentityAsync();
         try
@@ -273,6 +299,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
         // LoadEnrichmentAsync/InitialiseAsync), so a slow or failing secondary call can never
         // leave MainLayout stuck on its "Loading…" gate and, with it, every route guard inert.
         IsLoaded = true;
+        _loadedForToken = sessionState.AccessToken;
     }
 
     private async Task LoadEnrichmentAsync()

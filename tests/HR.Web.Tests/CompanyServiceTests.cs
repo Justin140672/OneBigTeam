@@ -9,12 +9,12 @@ namespace HR.Web.Tests;
 
 public class CompanyServiceTests
 {
-    private static IHttpClientFactory BuildFactory(HttpMessageHandler handler)
+    private static HrApiHttpClientFactory BuildFactory(HttpMessageHandler handler)
     {
         var services = new ServiceCollection();
         services.AddHttpClient("hrapi", c => c.BaseAddress = new Uri("http://localhost/"))
             .ConfigurePrimaryHttpMessageHandler(() => handler);
-        return services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>();
+        return new HrApiHttpClientFactory(services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>(), new CircuitSessionState());
     }
 
     // ── GetCompanySettingsAsync ──────────────────────────────────────────────────

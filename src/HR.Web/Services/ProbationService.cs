@@ -2,9 +2,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class ProbationService(IHttpClientFactory httpClientFactory)
+public sealed class ProbationService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ProbationRecordModel?> GetProbationRecordByEmployeeAsync(
         Guid companyId,

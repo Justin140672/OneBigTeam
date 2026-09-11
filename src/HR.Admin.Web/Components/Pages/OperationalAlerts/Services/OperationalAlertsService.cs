@@ -11,9 +11,9 @@ namespace HR.Admin.Web.Services;
 /// ResolveAlertAsync returns a small result type so the page can distinguish
 /// success / already-resolved (409) / validation (422) / generic error.
 /// </summary>
-public sealed class OperationalAlertsService(IHttpClientFactory httpClientFactory)
+public sealed class OperationalAlertsService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<OperationalAlertListResponse?> GetAlertsAsync(
         OperationalAlertFilter filter,

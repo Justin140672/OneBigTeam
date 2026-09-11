@@ -5,9 +5,9 @@ using System.Web;
 
 namespace HR.Web.Services;
 
-public class ReportingService(IHttpClientFactory httpClientFactory)
+public class ReportingService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<GetReportCatalogResponse?> GetReportCatalogAsync(
         Guid companyId, CancellationToken cancellationToken = default)

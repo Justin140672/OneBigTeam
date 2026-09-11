@@ -7,9 +7,9 @@ using Microsoft.AspNetCore.Components.Forms;
 
 namespace HR.Web.Services;
 
-public sealed class ProfilePhotoService(IHttpClientFactory httpClientFactory)
+public sealed class ProfilePhotoService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     // ── Self-service ────────────────────────────────────────────────────────
 

@@ -7,9 +7,9 @@ namespace HR.Web.Services;
 /// Employee-facing internal vacancies. Backed by the read-only "internal-vacancies" endpoints which
 /// only require an authenticated employee (any authenticated employee of the company).
 /// </summary>
-public class InternalVacancyService(IHttpClientFactory httpClientFactory)
+public class InternalVacancyService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<InternalVacancyListResponse?> ListAsync(Guid companyId, string? search)
     {

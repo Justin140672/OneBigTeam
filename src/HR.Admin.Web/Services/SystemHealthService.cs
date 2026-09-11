@@ -3,9 +3,9 @@ using HR.Admin.Web.Models;
 
 namespace HR.Admin.Web.Services;
 
-public sealed class SystemHealthService(IHttpClientFactory httpClientFactory)
+public sealed class SystemHealthService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     /// <summary>
     /// Returns null when the call fails or the caller isn't authorised (401/403) — same

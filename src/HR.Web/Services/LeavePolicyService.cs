@@ -2,10 +2,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class LeavePolicyService(IHttpClientFactory httpClientFactory)
+public class LeavePolicyService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<LeavePolicyEditModel, Guid>, IConcurrencyAwareEditService<LeavePolicyEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListLeavePoliciesResponse?> ListLeavePoliciesAsync(Guid companyId, bool activeOnly = false)
     {

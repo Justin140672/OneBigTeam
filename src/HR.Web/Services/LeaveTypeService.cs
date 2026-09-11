@@ -2,10 +2,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class LeaveTypeService(IHttpClientFactory httpClientFactory)
+public class LeaveTypeService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<LeaveTypeEditModel, Guid>, IConcurrencyAwareEditService<LeaveTypeEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListLeaveTypesResponse?> ListLeaveTypesAsync(Guid companyId, bool includeInactive = false)
     {

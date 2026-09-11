@@ -2,9 +2,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class NotificationService(IHttpClientFactory httpClientFactory)
+public sealed class NotificationService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     // NOT-06: pageNumber/pageSize support the notification dropdown's "load more" button —
     // each call fetches one page, which the caller appends to the previously loaded items.

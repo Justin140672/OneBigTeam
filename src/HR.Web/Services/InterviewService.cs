@@ -3,9 +3,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class InterviewService(IHttpClientFactory httpClientFactory)
+public sealed class InterviewService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<GetInterviewsTodayCountResponse?> GetInterviewsTodayCountAsync(Guid companyId)
     {

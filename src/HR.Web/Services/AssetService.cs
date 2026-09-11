@@ -3,10 +3,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class AssetService(IHttpClientFactory httpClientFactory)
+public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<AssetEditModel, Guid>, IConcurrencyAwareEditService<AssetEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<List<EmployeeAssetItem>?> GetEmployeeAssignmentsAsync(
         Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)

@@ -7,10 +7,10 @@ using Microsoft.AspNetCore.Components.Forms;
 
 namespace HR.Web.Services;
 
-public sealed class CandidateService(IHttpClientFactory httpClientFactory)
+public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<CandidateEditModel, Guid>, IConcurrencyAwareEditService<CandidateEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListCandidatesResponse?> ListCandidatesAsync(Guid companyId, string? search = null, int pageNumber = 1, int pageSize = 20, bool includeInactive = false)
     {

@@ -2,10 +2,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class AssetCategoryService(IHttpClientFactory httpClientFactory)
+public class AssetCategoryService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<AssetCategoryEditModel, Guid>, IConcurrencyAwareEditService<AssetCategoryEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListAssetCategoriesResponse?> ListAssetCategoriesAsync(Guid companyId, bool includeInactive = false)
     {

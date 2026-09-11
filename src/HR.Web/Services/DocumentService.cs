@@ -7,9 +7,9 @@ using Microsoft.AspNetCore.Components.Forms;
 
 namespace HR.Web.Services;
 
-public sealed class DocumentService(IHttpClientFactory httpClientFactory)
+public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<GetExpiringDocumentsResponse?> GetExpiringDocumentsAsync(
         Guid companyId, CancellationToken cancellationToken = default)

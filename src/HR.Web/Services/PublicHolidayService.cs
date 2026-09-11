@@ -2,10 +2,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class PublicHolidayService(IHttpClientFactory httpClientFactory)
+public class PublicHolidayService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<PublicHolidayEditModel, Guid>, IConcurrencyAwareEditService<PublicHolidayEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListPublicHolidaysResponse?> ListAsync(Guid companyId)
     {

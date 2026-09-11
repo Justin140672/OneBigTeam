@@ -2,9 +2,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class CompanyOnboardingService(IHttpClientFactory httpClientFactory)
+public class CompanyOnboardingService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<GetCompanyOnboardingChecklistResponse?> GetChecklistAsync(
         CancellationToken cancellationToken = default)

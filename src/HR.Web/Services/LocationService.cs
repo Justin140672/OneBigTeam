@@ -2,10 +2,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class LocationService(IHttpClientFactory httpClientFactory)
+public class LocationService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<LocationEditModel, Guid>, IConcurrencyAwareEditService<LocationEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListLocationsResponse?> ListLocationsAsync(Guid companyId, bool includeInactive = false)
     {

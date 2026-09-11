@@ -30,9 +30,15 @@ builder.Services.TryAddSingleton(TimeProvider.System);
 // session from the interactive circuit to the real HTTP hop that sets the session cookie, WITHOUT
 // ever putting a token in a URL (security ticket: remove auth tokens from browser-visible URLs).
 builder.Services.AddSingleton<AuthHandoffStore>();
+// CircuitSessionState is the real, per-circuit source of truth for the current Supabase access
+// token (see its remarks). SupabaseSessionAccessor keeps it in sync with the session cookie;
+// HrApiHttpClientFactory reads it directly (in the caller's own scope) to attach the bearer token —
+// no pooled DelegatingHandler is involved in carrying user identity anymore, which removes the
+// captive-dependency root cause of the original P1 cross-user token leak.
+builder.Services.AddScoped<CircuitSessionState>();
 builder.Services.AddScoped<SupabaseSessionAccessor>();
+builder.Services.AddScoped<HrApiHttpClientFactory>();
 builder.Services.AddScoped<SupportSessionState>();
-builder.Services.AddTransient<SupabaseAuthDelegatingHandler>();
 
 var hrApiClientBuilder = builder.Services.AddHttpClient("hrapi", c =>
 {
@@ -46,14 +52,13 @@ var hrApiClientBuilder = builder.Services.AddHttpClient("hrapi", c =>
     // standard handler's total budget is widened to 120s in ServiceDefaults for slow CI hosts;
     // keep this above that so the client timeout never truncates a legitimate retry sequence.
     c.Timeout = TimeSpan.FromSeconds(130);
-})
-// Attaches a real Supabase access token (once one has been established via /verify-email) as a
-// Bearer token on every outgoing hrapi request — see SupabaseAuthDelegatingHandler/
-// SupabaseSessionAccessor remarks. No-op for the existing Development dev-persona flow.
-.AddHttpMessageHandler<SupabaseAuthDelegatingHandler>();
+});
+// The bearer token is no longer attached by a pooled DelegatingHandler — see HrApiHttpClientFactory,
+// which attaches it directly on the HttpClient it returns, resolved from the caller's own real DI
+// scope. Consumers should inject HrApiHttpClientFactory and call CreateClient() instead of injecting
+// IHttpClientFactory directly for the "hrapi" client.
 
-// TEST-ONLY: lets an E2E test hold/release/fail the outbound contact-details PUT. Ordered AFTER
-// SupabaseAuthDelegatingHandler so the JWT (and its email claim) is already on the request.
+// TEST-ONLY: lets an E2E test hold/release/fail the outbound contact-details PUT.
 if (isE2E)
 {
     hrApiClientBuilder.AddHttpMessageHandler<E2eContactSaveControlHandler>();
@@ -343,13 +348,13 @@ app.MapPost("/reset-password-begin", async (HttpContext context, AuthHandoffStor
 // /verify-email-complete/dev/persona-cookie: Blazor Server's interactive circuit can't set cookies
 // mid-render, so this must be a real browser navigation reached via hardNavigate — Login.razor
 // already has the tokens by the time it calls this, having gotten them from api/login itself.
-app.MapGet("/login-complete", (HttpContext context, AuthHandoffStore handoffStore, IHostEnvironment environment, string? code) =>
+app.MapGet("/login-complete", (HttpContext context, AuthHandoffStore handoffStore, IHostEnvironment environment, CircuitSessionState sessionState, string? code) =>
 {
     var session = handoffStore.Redeem(code);
     if (session is null)
         return Results.Redirect("/login?error=session");
 
-    SupabaseSessionAccessor.SetSessionCookie(context, session.AccessToken, session.ExpiresInSeconds, environment);
+    SupabaseSessionAccessor.SetSessionCookie(context, session.AccessToken, session.ExpiresInSeconds, environment, sessionState);
 
     // Redirect to a clean URL — no token, no code, nothing to bookmark, share or leak. The fresh
     // circuit created by this hard navigation reads the session from the cookie (see
@@ -364,16 +369,19 @@ app.MapGet("/login-complete", (HttpContext context, AuthHandoffStore handoffStor
 app.MapGet("/logout", async (
     HttpContext context,
     IHostEnvironment environment,
-    IHttpClientFactory httpClientFactory,
+    HrApiHttpClientFactory httpClientFactory,
+    CircuitSessionState sessionState,
     ILoggerFactory loggerFactory) =>
 {
     // Best-effort server-side session revocation: HR.Api's POST /api/logout calls Supabase's GoTrue
-    // logout (scope=global) using the bearer the "hrapi" client attaches from the session cookie.
-    // Any failure here (network, GoTrue down, token already expired) must NOT block sign-out — the
-    // cookie is cleared regardless, so the browser session ends either way.
+    // logout (scope=global) using the bearer HrApiHttpClientFactory attaches from this request's own
+    // CircuitSessionState. Any failure here (network, GoTrue down, token already expired) must NOT
+    // block sign-out — the cookie is cleared regardless, so the browser session ends either way.
+    // Deliberately called BEFORE clearing CircuitSessionState below, so this best-effort revocation
+    // call still carries the (soon to be invalidated) token.
     try
     {
-        var http = httpClientFactory.CreateClient("hrapi");
+        var http = httpClientFactory.CreateClient();
         using var response = await http.PostAsync("api/logout", content: null, context.RequestAborted);
         if (!response.IsSuccessStatusCode)
         {
@@ -387,7 +395,13 @@ app.MapGet("/logout", async (
             .LogWarning(ex, "Server-side sign-out call failed; clearing the cookie anyway.");
     }
 
-    SupabaseSessionAccessor.ClearSessionCookie(context, environment);
+    // Clears both the browser cookie AND this request's CircuitSessionState. The latter closes the
+    // gap the ticket flagged: without it, a call racing on this same scope that finds no live
+    // HttpContext could otherwise still resolve the old token from CircuitSessionState after the
+    // cookie was already deleted. The subsequent hard-navigation redirect to /login also tears down
+    // this circuit/scope entirely, so there is no further code that could observe a stale value even
+    // in principle.
+    SupabaseSessionAccessor.ClearSessionCookie(context, environment, sessionState);
     return Results.Redirect("/login");
 }).AllowAnonymous();
 
@@ -441,13 +455,13 @@ if (isE2E)
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapGet("/dev/persona-cookie", (HttpContext context, AuthHandoffStore handoffStore, IHostEnvironment environment, string? code) =>
+    app.MapGet("/dev/persona-cookie", (HttpContext context, AuthHandoffStore handoffStore, IHostEnvironment environment, CircuitSessionState sessionState, string? code) =>
     {
         var session = handoffStore.Redeem(code);
         if (session is null)
             return Results.Redirect("/login?error=session");
 
-        SupabaseSessionAccessor.SetSessionCookie(context, session.AccessToken, session.ExpiresInSeconds, environment);
+        SupabaseSessionAccessor.SetSessionCookie(context, session.AccessToken, session.ExpiresInSeconds, environment, sessionState);
         return Results.Redirect("/");
     }).AllowAnonymous();
 }
@@ -476,7 +490,7 @@ if (app.Environment.IsDevelopment())
 app.MapGet("/support-session/redeem", async (
     HttpContext context,
     string? token,
-    IHttpClientFactory httpClientFactory) =>
+    HrApiHttpClientFactory httpClientFactory) =>
 {
     if (string.IsNullOrWhiteSpace(token))
     {
@@ -488,7 +502,7 @@ app.MapGet("/support-session/redeem", async (
             """, "text/html");
     }
 
-    var http = httpClientFactory.CreateClient("hrapi");
+    var http = httpClientFactory.CreateClient();
 
     HttpResponseMessage response;
     try
@@ -552,9 +566,9 @@ app.MapGet("/support-session/redeem", async (
 // server-side against hrapi's own "employee:manage" policy.
 app.MapGet("/companies/{companyId:guid}/data-import/employees/template/download", async (
     Guid companyId,
-    IHttpClientFactory httpClientFactory) =>
+    HrApiHttpClientFactory httpClientFactory) =>
 {
-    var http = httpClientFactory.CreateClient("hrapi");
+    var http = httpClientFactory.CreateClient();
     using var response = await http.GetAsync($"api/companies/{companyId}/data-import/employees/template");
 
     if (!response.IsSuccessStatusCode)
@@ -593,9 +607,9 @@ app.MapGet("/companies/{companyId:guid}/candidates/{candidateId:guid}/cv/{docume
     Guid companyId,
     Guid candidateId,
     Guid documentId,
-    IHttpClientFactory httpClientFactory) =>
+    HrApiHttpClientFactory httpClientFactory) =>
 {
-    var http = httpClientFactory.CreateClient("hrapi");
+    var http = httpClientFactory.CreateClient();
     using var response = await http.GetAsync(
         $"api/companies/{companyId}/candidates/{candidateId}/documents/{documentId}/download");
 

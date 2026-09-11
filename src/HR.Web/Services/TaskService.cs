@@ -4,9 +4,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class TaskService(IHttpClientFactory httpClientFactory)
+public sealed class TaskService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<TaskListResponse?> GetMyTasksAsync(Guid companyId, int pageNumber = 1, int pageSize = 20, string? status = null, CancellationToken cancellationToken = default)
     {

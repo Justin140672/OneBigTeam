@@ -4,9 +4,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class SicknessService(IHttpClientFactory httpClientFactory)
+public sealed class SicknessService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ReturnToWorkReviewDetailModel?> GetReturnToWorkReviewAsync(
         Guid companyId,

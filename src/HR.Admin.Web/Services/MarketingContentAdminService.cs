@@ -9,9 +9,9 @@ namespace HR.Admin.Web.Services;
 /// HR.Modules.Marketing. Modeled on <see cref="PlatformSettingsService"/>: "hrapi" HttpClientFactory
 /// client, null on read failure, 422 FluentValidation field errors surfaced on writes.
 /// </summary>
-public sealed class MarketingContentAdminService(IHttpClientFactory httpClientFactory)
+public sealed class MarketingContentAdminService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<AdminMarketingContentModel?> GetContentOrNullAsync(CancellationToken cancellationToken = default)
     {

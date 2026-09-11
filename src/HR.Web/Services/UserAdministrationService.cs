@@ -3,9 +3,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class UserAdministrationService(IHttpClientFactory httpClientFactory)
+public sealed class UserAdministrationService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListUsersResponse?> ListUsersAsync(
         Guid companyId, int page = 1, int pageSize = 100, string? search = null)

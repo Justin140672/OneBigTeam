@@ -5,13 +5,13 @@ using Microsoft.AspNetCore.Components.Forms;
 
 namespace HR.Web.Services;
 
-public sealed class DataImportService(IHttpClientFactory httpClientFactory)
+public sealed class DataImportService(HrApiHttpClientFactory httpClientFactory)
 {
     /// <summary>Sentinel returned as the error string from <see cref="GetSessionAsync"/> when the
     /// session doesn't exist, so callers can show a "not found" message instead of a generic error.</summary>
     public const string NotFoundSentinel = "NotFound";
 
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<(UploadImportFileResponse? Result, string? Error)> UploadFileAsync(
         Guid companyId, IBrowserFile file, CancellationToken cancellationToken = default)

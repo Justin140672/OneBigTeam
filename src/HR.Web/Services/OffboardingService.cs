@@ -3,9 +3,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class OffboardingService(IHttpClientFactory httpClientFactory)
+public sealed class OffboardingService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<OffboardingOverviewModel?> GetOverviewAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
     {

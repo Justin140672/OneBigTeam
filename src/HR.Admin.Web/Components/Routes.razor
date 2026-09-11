@@ -6,8 +6,12 @@
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized>
                 @{
+                    // Ticket 12: forceLoad: true so a fail-closed (invalidated) circuit is torn down and a
+                    // brand-new circuit is negotiated for the next login, rather than risking an ordinary
+                    // client-side navigation resuming the same circuit — see HR.Web's Routes.razor for the
+                    // full rationale (mirrored exactly here).
                     if (!Navigation.Uri.EndsWith("/login", StringComparison.OrdinalIgnoreCase))
-                        Navigation.NavigateTo("/login", replace: true);
+                        Navigation.NavigateTo("/login", forceLoad: true, replace: true);
                 }
             </NotAuthorized>
         </AuthorizeRouteView>

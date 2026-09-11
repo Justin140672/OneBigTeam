@@ -4,10 +4,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class ExternalRecruiterService(IHttpClientFactory httpClientFactory)
+public sealed class ExternalRecruiterService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<ExternalRecruiterEditModel, Guid>, IConcurrencyAwareEditService<ExternalRecruiterEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     // ── EXTERNAL RECRUITERS (#75) ────────────────────────────────────────────
 

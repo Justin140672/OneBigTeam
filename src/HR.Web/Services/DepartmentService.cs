@@ -2,10 +2,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class DepartmentService(IHttpClientFactory httpClientFactory)
+public class DepartmentService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<DepartmentEditModel, Guid>, IConcurrencyAwareEditService<DepartmentEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListDepartmentsResponse?> ListDepartmentsAsync(Guid companyId, bool includeInactive = false)
     {

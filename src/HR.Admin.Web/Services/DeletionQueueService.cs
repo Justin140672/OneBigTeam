@@ -8,9 +8,9 @@ namespace HR.Admin.Web.Services;
 /// CustomerDetailsService: HttpClientFactory "hrapi" client, GetXxxOrNullAsync returning null on
 /// any failure (401/403/404 or a transport error), PostActionAsync returning bool.
 /// </summary>
-public sealed class DeletionQueueService(IHttpClientFactory httpClientFactory)
+public sealed class DeletionQueueService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     /// <summary>
     /// Returns null when the call fails or the caller isn't authorised (401/403) — same

@@ -167,6 +167,8 @@ public static class IdentityModule
         services.AddScoped<ResetPasswordHandler>();
         services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordValidator>();
 
+        // Ticket 13: cross-tab/cross-replica logout enforcement. See ISessionRevocationStore remarks.
+        services.AddScoped<ISessionRevocationStore, SessionRevocationStore>();
         services.AddScoped<Features.Logout.LogoutHandler>();
 
         services.AddScoped<VerifyEmailHandler>();
@@ -595,5 +597,44 @@ public static class IdentityModule
         var session = await gateway.SignInWithPasswordAsync(email, SupabaseAuthGateway.DevSupabasePassword, cancellationToken);
         var expiresIn = (int)Math.Max(1, (session.ExpiresAt - DateTimeOffset.UtcNow).TotalSeconds);
         return (session.AccessToken, session.RefreshToken, expiresIn);
+    }
+
+    /// <summary>
+    /// Ticket 13: cross-tab/cross-replica logout enforcement. Called from HR.Api's
+    /// SupabaseJwtBearerConfiguration.OnTokenValidated for every request whose bearer token has
+    /// already passed full signature/issuer/audience/lifetime validation, on this app instance or
+    /// any other replica sharing the same Postgres database. Returns true when
+    /// <paramref name="tokenIssuedAt"/> (the token's own "iat" claim) is at or before the most recent
+    /// recorded logout instant for <paramref name="supabaseAuthUserId"/> — i.e. this specific token
+    /// was issued to a session that has since been logged out and must be rejected regardless of its
+    /// own (unexpired) lifetime. <paramref name="services"/> is the current request's own
+    /// IServiceProvider (JwtBearerEvents run inside the request's DI scope already), so this never
+    /// creates a new scope. This is the only public entry point HR.Api (the host, one dependency
+    /// direction removed from this module's internals) needs — everything else about session
+    /// revocation stays internal to this module, matching every other cross-module/host boundary
+    /// surface exposed from this class.
+    ///
+    /// Uses <c>GetService</c> (not <c>GetRequiredService</c>) deliberately: a handful of existing
+    /// integration tests (e.g. SigningKeyRefreshResilienceTests) build a deliberately minimal host
+    /// that wires up SupabaseJwtBearerConfiguration in isolation to exercise JWKS/signing-key
+    /// behaviour, without registering this module's full DI graph. Those hosts are not exercising
+    /// revocation at all, so this returns "not revoked" rather than throwing when the store isn't
+    /// registered. HR.Api's real Program.cs always calls AddIdentityModule, which does register
+    /// ISessionRevocationStore, so production behaviour is unaffected.
+    /// </summary>
+    public static async Task<bool> IsSessionRevokedAsync(
+        this IServiceProvider services,
+        Guid supabaseAuthUserId,
+        DateTimeOffset tokenIssuedAt,
+        CancellationToken cancellationToken)
+    {
+        var store = services.GetService<ISessionRevocationStore>();
+        if (store is null)
+        {
+            return false;
+        }
+
+        var revokedAt = await store.GetRevokedAtAsync(supabaseAuthUserId, cancellationToken);
+        return revokedAt is { } revoked && tokenIssuedAt <= revoked;
     }
 }

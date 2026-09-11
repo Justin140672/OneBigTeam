@@ -2,9 +2,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class CompanyService(IHttpClientFactory httpClientFactory)
+public class CompanyService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<GetCompanySettingsResponse?> GetCompanySettingsAsync(Guid id)
     {

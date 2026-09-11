@@ -29,7 +29,21 @@ internal sealed class Endpoint(
             accessToken = parsed.Parameter;
         }
 
-        var result = await handler.HandleAsync(accessToken, cancellationToken);
+        // ASP.NET Core's authentication middleware always runs (UseAuthentication), even for an
+        // [AllowAnonymous] endpoint — only the later [Authorize] failure is skipped. So when the
+        // presented bearer is a genuine, currently-valid Supabase access token, HR.Api's own JWT
+        // bearer pipeline has already validated its signature/issuer/audience/lifetime and populated
+        // HttpContext.User by the time this runs. Reading "sub" from there (rather than decoding the
+        // raw header ourselves) means the user id trusted for revocation is never taken from an
+        // unverified, caller-supplied token.
+        Guid? supabaseAuthUserId = null;
+        if (HttpContext.User.Identity?.IsAuthenticated == true
+            && Guid.TryParse(HttpContext.User.FindFirst("sub")?.Value, out var parsedUserId))
+        {
+            supabaseAuthUserId = parsedUserId;
+        }
+
+        var result = await handler.HandleAsync(accessToken, supabaseAuthUserId, cancellationToken);
         await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

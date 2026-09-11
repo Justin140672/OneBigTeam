@@ -4,10 +4,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class VacancyService(IHttpClientFactory httpClientFactory)
+public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<VacancyEditModel, Guid>, IConcurrencyAwareEditService<VacancyEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListVacanciesResponse?> ListVacanciesAsync(
         Guid companyId,

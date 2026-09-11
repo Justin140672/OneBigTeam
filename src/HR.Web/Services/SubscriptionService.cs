@@ -2,9 +2,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class SubscriptionService(IHttpClientFactory httpClientFactory)
+public class SubscriptionService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<GetSubscriptionStatusResponse?> GetStatusAsync(
         CancellationToken cancellationToken = default)

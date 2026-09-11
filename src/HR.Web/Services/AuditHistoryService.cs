@@ -2,9 +2,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class AuditHistoryService(IHttpClientFactory httpClientFactory)
+public sealed class AuditHistoryService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<IReadOnlyList<AuditHistoryItemModel>> GetEmployeeAuditHistoryAsync(
         Guid companyId,

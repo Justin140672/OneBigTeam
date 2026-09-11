@@ -2,10 +2,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class EmploymentTypeService(IHttpClientFactory httpClientFactory)
+public class EmploymentTypeService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<EmploymentTypeEditModel, Guid>, IConcurrencyAwareEditService<EmploymentTypeEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListEmploymentTypesResponse?> ListEmploymentTypesAsync(Guid companyId, bool includeInactive = false)
     {

@@ -3,9 +3,9 @@ using HR.Admin.Web.Models;
 
 namespace HR.Admin.Web.Services;
 
-public sealed class CustomerDetailsService(IHttpClientFactory httpClientFactory)
+public sealed class CustomerDetailsService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     /// <summary>
     /// Returns null when the call fails, the caller isn't authorised (401/403), or the company

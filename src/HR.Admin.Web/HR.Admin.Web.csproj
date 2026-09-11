@@ -33,4 +33,8 @@
     <UserSecretsId>2f1c8a4e-9b3d-4a7c-8e21-9d6f0c5b7a11</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="HR.Admin.Web.Tests" />
+  </ItemGroup>
+
 </Project>

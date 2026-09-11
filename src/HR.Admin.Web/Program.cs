@@ -16,8 +16,13 @@ builder.Services.TryAddSingleton(TimeProvider.System);
 // Single-use, in-memory exchange store so a freshly established session is handed to the
 // cookie-setting hop via an opaque code, never a token in a URL (security parity with HR.Web).
 builder.Services.AddSingleton<AuthHandoffStore>();
+// CircuitSessionState is the real, per-circuit source of truth for the current Supabase access
+// token (see its remarks). SupabaseSessionAccessor keeps it in sync with the session cookie;
+// HrApiHttpClientFactory reads it directly (in the caller's own scope) to attach the bearer token —
+// no pooled DelegatingHandler is involved in carrying user identity anymore.
+builder.Services.AddScoped<CircuitSessionState>();
 builder.Services.AddScoped<SupabaseSessionAccessor>();
-builder.Services.AddTransient<SupabaseAuthDelegatingHandler>();
+builder.Services.AddScoped<HrApiHttpClientFactory>();
 
 builder.Services.AddHttpClient("hrapi", c =>
 {
@@ -31,7 +36,9 @@ builder.Services.AddHttpClient("hrapi", c =>
     // client timeout never truncates a legitimate retry sequence on a slow host.
     c.Timeout = TimeSpan.FromSeconds(130);
 })
-.AddHttpMessageHandler<SupabaseAuthDelegatingHandler>()
+// The bearer token is no longer attached by a pooled DelegatingHandler — see HrApiHttpClientFactory,
+// which attaches it directly on the HttpClient it returns, resolved from the caller's own real DI
+// scope.
 // SocketsHttpHandler's default PooledConnectionLifetime is infinite, so a connection idle long
 // enough can be silently closed server-side by Kestrel's own keep-alive timeout while the pool
 // still considers it valid — the next request reused from the pool then fails mid-flight with an
@@ -105,12 +112,13 @@ app.Use(async (context, next) =>
 app.MapGet("/logout", async (
     HttpContext context,
     IHostEnvironment environment,
-    IHttpClientFactory httpClientFactory,
+    HrApiHttpClientFactory httpClientFactory,
+    CircuitSessionState sessionState,
     ILoggerFactory loggerFactory) =>
 {
     try
     {
-        var http = httpClientFactory.CreateClient("hrapi");
+        var http = httpClientFactory.CreateClient();
         using var response = await http.PostAsync("api/logout", content: null, context.RequestAborted);
         if (!response.IsSuccessStatusCode)
         {
@@ -124,7 +132,9 @@ app.MapGet("/logout", async (
             .LogWarning(ex, "Server-side sign-out call failed; clearing the cookie anyway.");
     }
 
-    SupabaseSessionAccessor.ClearSessionCookie(context, environment);
+    // Clears both the browser cookie AND this request's CircuitSessionState so a later call racing
+    // on this same scope with no live HttpContext cannot resume sending the old bearer token.
+    SupabaseSessionAccessor.ClearSessionCookie(context, environment, sessionState);
     return Results.Redirect("/login");
 }).AllowAnonymous();
 
@@ -134,13 +144,13 @@ app.MapGet("/logout", async (
 // redirect is a clean "/".
 if (app.Environment.IsDevelopment())
 {
-    app.MapGet("/dev/persona-cookie", (HttpContext context, AuthHandoffStore handoffStore, IHostEnvironment environment, string? code) =>
+    app.MapGet("/dev/persona-cookie", (HttpContext context, AuthHandoffStore handoffStore, IHostEnvironment environment, CircuitSessionState sessionState, string? code) =>
     {
         var session = handoffStore.Redeem(code);
         if (session is null)
             return Results.Redirect("/login?error=session");
 
-        SupabaseSessionAccessor.SetSessionCookie(context, session.AccessToken, session.ExpiresInSeconds, environment);
+        SupabaseSessionAccessor.SetSessionCookie(context, session.AccessToken, session.ExpiresInSeconds, environment, sessionState);
         return Results.Redirect("/");
     }).AllowAnonymous();
 }

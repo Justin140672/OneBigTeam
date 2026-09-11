@@ -2,9 +2,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class OnboardingTemplateService(IHttpClientFactory httpClientFactory)
+public class OnboardingTemplateService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<ListOnboardingTemplatesResponse?> ListOnboardingTemplatesAsync(
         Guid companyId, bool includeInactive = false)

@@ -10,11 +10,11 @@ namespace HR.Admin.Web.Services;
 /// surfaces both the handler's structural-validation failure (400 <c>{"error": "..."}</c> from
 /// SubscriptionPricingConfig.Validate) and FluentValidation 422 field errors.
 /// </summary>
-public sealed class SubscriptionPricingService(IHttpClientFactory httpClientFactory)
+public sealed class SubscriptionPricingService(HrApiHttpClientFactory httpClientFactory)
 {
     private const string Route = "api/companies/admin/subscription-pricing-config";
 
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<SubscriptionPricingConfigModel?> GetConfigOrNullAsync(CancellationToken cancellationToken = default)
     {

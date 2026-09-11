@@ -4,9 +4,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class RecruitmentKanbanService(IHttpClientFactory httpClientFactory)
+public sealed class RecruitmentKanbanService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<GetRecruitmentKanbanResponse?> GetKanbanAsync(
         Guid companyId, Guid vacancyId, CancellationToken cancellationToken = default)

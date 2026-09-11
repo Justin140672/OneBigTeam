@@ -12,9 +12,9 @@ namespace HR.Web.Services;
 /// SeedDevSupabaseUsersAsync — just with SupabaseAuthGateway.DevSupabasePassword rather than a
 /// literal "password").
 /// </summary>
-public sealed class AuthService(IHttpClientFactory httpClientFactory, ILogger<AuthService> logger)
+public sealed class AuthService(HrApiHttpClientFactory httpClientFactory, ILogger<AuthService> logger)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<(LoginResult? Session, string? Error)> LoginAsync(string email, string password)
     {

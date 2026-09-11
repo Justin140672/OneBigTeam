@@ -3,9 +3,9 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class EmployeeTimelineService(IHttpClientFactory httpClientFactory)
+public sealed class EmployeeTimelineService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<(TimelineBackfillResponse? Result, string? Error)> CommitBackfillAsync(
         Guid companyId, CancellationToken cancellationToken = default)

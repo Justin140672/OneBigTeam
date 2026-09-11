@@ -7,9 +7,9 @@ namespace HR.Web.Services;
 /// Employee-facing directory. Backed by the "employees/directory" endpoints which only require an
 /// authenticated employee (policy role:employee); company is resolved server-side from AppSession.
 /// </summary>
-public class EmployeeDirectoryService(IHttpClientFactory httpClientFactory)
+public class EmployeeDirectoryService(HrApiHttpClientFactory httpClientFactory)
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<EmployeeDirectoryListResponse?> ListAsync(
         Guid companyId,

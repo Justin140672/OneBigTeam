@@ -34,10 +34,15 @@ namespace HR.Web.E2E.Tests.Tests;
 /// </summary>
 public sealed class RealSupabaseLoginFlowTests : IAsyncLifetime
 {
-    // James Okafor — Manager-only persona, chosen because he's not the sole login target of a
-    // role-fixed fixture's own bootstrap in a way that would race this test's own uncached, real
-    // interactive login for the same persona (see PersonaLoginCache's per-persona real-login gate).
-    private const string Email = "james.okafor@acme.example";
+    // Laura Bennett — HR Administrator persona (Employee + HrAdministrator roles, see
+    // HR.Modules.Identity.IdentityModule seed data). Manager-only personas (e.g. James Okafor,
+    // previously used here) don't have sidebar access to the "People and users > Employees" item
+    // exercised by RealFormLogin_ThenCircuitDrivenApiCall_IsAuthenticated_NotTreatedAsAnonymous
+    // below, since that nav item requires employee:manage-equivalent HR-administrator permissions
+    // a plain Manager doesn't hold. Laura is used elsewhere across this suite (e.g.
+    // WorkloadActionsReportTests, HrDashboardTests) as the standard HR Administrator login for
+    // exactly this reason.
+    private const string Email = "laura.bennett@acme.example";
 
     private AppFixture _app = null!;
     private Microsoft.Playwright.IBrowserContext _context = null!;
@@ -74,15 +79,77 @@ public sealed class RealSupabaseLoginFlowTests : IAsyncLifetime
 
         await _page.WaitForSelectorAsync(".app-shell", new() { Timeout = 15_000 });
 
-        // James is Manager-only; Home.razor's post-login redirect lands him on /dashboard/manager
-        // (see SidebarNavigationTests for the same persona/redirect pairing), confirming this isn't
-        // just "some" authenticated session but specifically James Okafor's.
-        await _page.WaitForURLAsync(new Regex("/dashboard/manager"), new() { Timeout = 15_000 });
-        Assert.Contains("/dashboard/manager", _page.Url);
+        // Laura is HR Administrator; AppSession.LandingUrl's priority order (see its remarks) puts
+        // HR Administrator above Recruiter/Manager/Company Administrator, so Home.razor's
+        // post-login redirect lands her on /dashboard/hr, confirming this isn't just "some"
+        // authenticated session but specifically Laura Bennett's.
+        await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 15_000 });
+        Assert.Contains("/dashboard/hr", _page.Url);
 
         var userInfo = _page.Locator(".top-bar-user-info");
         await userInfo.WaitForAsync(new() { Timeout = 10_000 });
         var displayedName = await userInfo.InnerTextAsync();
-        Assert.Contains("James Okafor", displayedName, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Laura Bennett", displayedName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Regression test for the P1 fix ("circuit-scope token bridging"): Blazor Server creates a
+    /// SEPARATE DI scope per interactive circuit, so a bearer token captured only in the negotiating
+    /// HTTP request's own (different) DI scope never reached the circuit's own CircuitSessionState —
+    /// meaning every interactive-circuit API call after login silently carried NO Authorization
+    /// header. That would surface here as the shell either never rendering real data (stuck on a
+    /// loading/error state) or the app treating the session as anonymous and bouncing to /login,
+    /// even though the login form itself just succeeded.
+    ///
+    /// This performs a real interactive login (production render mode, prerender disabled per
+    /// App.razor) and then triggers a genuine, circuit-driven API call — navigating to the employee
+    /// list, which is fetched via HR.Web's EmployeeService/HrApiHttpClientFactory from inside the
+    /// already-established circuit, not from the initial pre-render HTTP request. Before the fix,
+    /// this exact call would have gone out with no bearer token and HR.Api would have rejected it.
+    /// </summary>
+    [Fact]
+    public async Task RealFormLogin_ThenCircuitDrivenApiCall_IsAuthenticated_NotTreatedAsAnonymous()
+    {
+        var login = new LoginPage(_page, _app.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.RealFormLoginAsync(Email);
+
+        await _page.WaitForSelectorAsync(".app-shell", new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 15_000 });
+
+        // Navigating to /companies/{id}/employees from an already-open circuit (no full page reload,
+        // this is client-side Blazor Server routing) forces the component's OnInitializedAsync to
+        // make a fresh HR.Api call through HrApiHttpClientFactory using THIS circuit's own
+        // CircuitSessionState — exactly the code path the original bug broke. A page reload here
+        // would re-run the initial HTTP request/prerender path instead and could mask the bug, so
+        // this deliberately uses in-app navigation via the real sidebar, not GotoAsync.
+        //
+        // The sidebar is a Syncfusion SfMenu: "Employees" lives inside the "People and users"
+        // group flyout (see AdminNavigation.cs), not as a top-level link, and its rendered items
+        // expose role="menuitem" rather than role="link" — so GetByRole(Link, "Employees") can
+        // never match regardless of auth state. Use the existing SidebarPage helper (the pattern
+        // every other sidebar-driven E2E test in this suite already uses) instead of a hand-rolled
+        // locator.
+        var sidebar = new SidebarPage(_page);
+        await sidebar.ClickGroupedMenuItemAsync("People and users", "Employees");
+
+        // If the circuit's bearer token were missing, HR.Api would reject the call as
+        // unauthenticated and the app would either show an error/empty state or redirect to
+        // /login — asserting we land on and stay on an authenticated employees view, with real
+        // row content rendered, rules both of those failure modes out.
+        await _page.WaitForURLAsync(new Regex("/employees"), new() { Timeout = 15_000 });
+        Assert.DoesNotContain("/login", _page.Url);
+
+        var grid = _page.Locator(".e-grid, [data-testid='employee-list']").First;
+        await grid.WaitForAsync(new() { Timeout = 15_000 });
+        Assert.True(await grid.IsVisibleAsync());
+
+        // The shell itself must still show Laura Bennett as the authenticated user — proving this
+        // wasn't silently downgraded to an anonymous circuit somewhere along the way.
+        var userInfo = _page.Locator(".top-bar-user-info");
+        await userInfo.WaitForAsync(new() { Timeout = 10_000 });
+        var displayedName = await userInfo.InnerTextAsync();
+        Assert.Contains("Laura Bennett", displayedName, StringComparison.OrdinalIgnoreCase);
     }
 }

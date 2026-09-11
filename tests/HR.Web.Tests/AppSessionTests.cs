@@ -18,16 +18,16 @@ public class AppSessionTests
     private static readonly Guid OnboardingViewPermission = new("00000000-0000-0000-0001-000000000019");
     private static readonly Guid SupportManagePermission = new("00000000-0000-0000-0001-000000000042");
 
-    private static IHttpClientFactory BuildFactory(HttpMessageHandler handler)
+    private static HrApiHttpClientFactory BuildFactory(HttpMessageHandler handler, CircuitSessionState? sessionState = null)
     {
         var services = new ServiceCollection();
         services.AddHttpClient("hrapi", c => c.BaseAddress = new Uri("http://localhost/"))
             .ConfigurePrimaryHttpMessageHandler(() => handler);
-        return services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>();
+        return new HrApiHttpClientFactory(services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>(), sessionState ?? new CircuitSessionState());
     }
 
-    private static AppSession BuildSession(IHttpClientFactory factory) =>
-        new(factory, new EmployeeService(factory), new SicknessCategoryService(factory), new CompanyOnboardingService(factory), new SubscriptionService(factory));
+    private static AppSession BuildSession(HrApiHttpClientFactory factory, CircuitSessionState? sessionState = null) =>
+        new(factory, new EmployeeService(factory), new SicknessCategoryService(factory), new CompanyOnboardingService(factory), new SubscriptionService(factory), sessionState ?? new CircuitSessionState());
 
     private static RoutingHandler BuildHappyPathHandler(
         Guid userId, Guid companyId, Guid employeeId,
@@ -420,11 +420,74 @@ public class AppSessionTests
         Assert.Equal("/getting-started", session.LandingUrl);
     }
 
+    // ── Ticket 12: cached identity must not survive circuit invalidation ───────────────────────
+    // InitialiseAsync now compares CircuitSessionState.Status/AccessToken against the token this
+    // session's fields were actually loaded for (_loadedForToken) — see AppSession.InitialiseAsync's
+    // own remarks. This is covered only indirectly elsewhere (by the AppSessionAuthStateProvider
+    // tests proving Status transitions correctly) and by a Playwright E2E test; this is the one
+    // direct AppSession-level test proving the cache itself is discarded and reloaded rather than
+    // silently keeping a previous identity's data once the shared CircuitSessionState it was built
+    // against has been invalidated by a later SetToken/Clear sequence.
+    [Fact]
+    public async Task InitialiseAsync_Reloads_When_SessionState_Was_Invalidated_After_The_Initial_Load()
+    {
+        var userIdA = Guid.NewGuid();
+        var userIdB = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var sessionState = new CircuitSessionState();
+        sessionState.SetToken("token-a");
+
+        // A handler whose response identity flips after the first api/me call, standing in for "the
+        // backend now represents a different signed-in identity" — the same shared AppSession
+        // instance below is asked to InitialiseAsync twice against this one factory, so a genuine
+        // reload after invalidation is the only way userIdB's data could ever be observed.
+        var handler = new SwitchingIdentityHandler(
+            BuildHappyPathHandler(userIdA, companyId, employeeId),
+            BuildHappyPathHandler(userIdB, companyId, employeeId));
+        var factory = BuildFactory(handler, sessionState);
+        var session = BuildSession(factory, sessionState);
+
+        await session.InitialiseAsync();
+        Assert.True(session.IsLoaded);
+        Assert.Equal(userIdA, session.UserId);
+
+        var requestCountAfterFirstLoad = handler.RequestCount;
+
+        // Same SAME AppSession instance: if InitialiseAsync still (incorrectly) trusted a stale
+        // IsLoaded==true with no live-state check, this would be a pure no-op and userIdA's cached
+        // fields would remain forever, even though the circuit has since been invalidated.
+        await session.InitialiseAsync();
+        Assert.Equal(requestCountAfterFirstLoad, handler.RequestCount);
+        Assert.Equal(userIdA, session.UserId);
+
+        // Simulate what AppSessionAuthStateProvider.ApplyState does on a rejected different-identity
+        // reconnect: Clear() flips an Authenticated circuit to sticky Invalidated, and a brand new
+        // token then arrives on what production code treats as a genuinely fresh circuit — but here
+        // we drive the SAME AppSession instance to prove its own guard, independent of ApplyState.
+        sessionState.Clear();
+        Assert.Equal(CircuitAuthStatus.Invalidated, sessionState.Status);
+        sessionState.SetToken("token-b");
+
+        await session.InitialiseAsync();
+
+        Assert.True(session.IsLoaded);
+        Assert.True(handler.RequestCount > requestCountAfterFirstLoad,
+            "InitialiseAsync must re-fetch once the shared CircuitSessionState has moved past the token this session's cache was loaded for.");
+        Assert.Equal(userIdB, session.UserId);
+    }
+
     // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class RoutingHandler(Dictionary<string, object> responsesByPathSuffix) : HttpMessageHandler
     {
         public int RequestCount { get; private set; }
+
+        // Exposes the protected HttpMessageHandler.SendAsync so SwitchingIdentityHandler can delegate
+        // to an inner RoutingHandler instance directly instead of duplicating its routing logic.
+        public Task<HttpResponseMessage> PublicSendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            SendAsync(request, cancellationToken);
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
@@ -450,5 +513,33 @@ public class AppSessionTests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(new HttpResponseMessage(statusCode));
+    }
+
+    // Routes every request to firstHandler until api/me has been requested once, then routes every
+    // subsequent request to secondHandler — used by
+    // InitialiseAsync_Reloads_When_SessionState_Was_Invalidated_After_The_Initial_Load to simulate
+    // "the backend now represents a different identity" across two InitialiseAsync calls made
+    // against the very same AppSession/HttpMessageHandler.
+    private sealed class SwitchingIdentityHandler(RoutingHandler firstHandler, RoutingHandler secondHandler) : HttpMessageHandler
+    {
+        private int _meRequestCount;
+
+        public int RequestCount => firstHandler.RequestCount + secondHandler.RequestCount;
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri!.PathAndQuery.TrimStart('/');
+            var useSecond = _meRequestCount > 0;
+            if (path.Equals("api/me", StringComparison.Ordinal))
+                _meRequestCount++;
+
+            var inner = useSecond ? secondHandler : firstHandler;
+            return InvokeSendAsync(inner, request, cancellationToken);
+        }
+
+        private static Task<HttpResponseMessage> InvokeSendAsync(
+            RoutingHandler inner, HttpRequestMessage request, CancellationToken cancellationToken) =>
+            inner.PublicSendAsync(request, cancellationToken);
     }
 }

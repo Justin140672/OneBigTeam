@@ -2,10 +2,10 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class SicknessCategoryService(IHttpClientFactory httpClientFactory)
+public class SicknessCategoryService(HrApiHttpClientFactory httpClientFactory)
     : IEditService<SicknessCategoryEditModel, Guid>, IConcurrencyAwareEditService<SicknessCategoryEditModel, Guid>
 {
-    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+    private HttpClient Http => httpClientFactory.CreateClient();
 
     // Defaults to true (no filtering) so existing callers that resolve category names for
     // historical records keep seeing deactivated categories. The list page explicitly
