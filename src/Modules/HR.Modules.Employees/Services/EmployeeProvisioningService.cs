@@ -43,6 +43,8 @@ internal sealed class EmployeeProvisioningService(
                 County            = request.County,
                 PostCode          = request.PostCode,
                 SourceReference   = request.SourceReference,
+                Salary            = request.Salary,
+                SalaryFrequency   = request.SalaryFrequency,
             },
             cancellationToken);
 

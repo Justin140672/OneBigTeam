@@ -90,7 +90,7 @@ public class RejectCandidateHandlerTests
 
         Assert.True(result.IsSuccess);
 
-        var stageChanged = Assert.IsType<HR.SharedKernel.ApplicantStageChangedIntegrationEvent>(Assert.Single(eventPublisher.PublishedEvents));
+        var stageChanged = Assert.IsType<HR.SharedKernel.ApplicationStageChangedIntegrationEvent>(Assert.Single(eventPublisher.PublishedEvents));
         Assert.Equal("Application Received", stageChanged.PreviousStage);
         Assert.Equal("Rejected", stageChanged.NewStage);
         Assert.Equal(performedBy, stageChanged.ChangedBy);

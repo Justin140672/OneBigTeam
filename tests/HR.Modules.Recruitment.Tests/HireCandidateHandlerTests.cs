@@ -334,6 +334,175 @@ public class HireCandidateHandlerTests
         Assert.Equal("validation", result.Error.Code);
     }
 
+    // Ticket 2: offer-response gating, offer start-date fallback, and offer compensation hand-off.
+
+    private static (RecruitmentDbContext db, Guid companyId, Vacancy vacancy, FakePositionProfileReader reader, Candidate candidate, Application application, RecruitmentStageTestData.SeededStages stages)
+        SeedOfferStageApplication(RecruitmentDbContext db)
+    {
+        var (_, companyId, vacancy, _, _, reader, stages) = SeedVacancyWithResolvableProfile(db);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        return (db, companyId, vacancy, reader, candidate, application, stages);
+    }
+
+    [Theory]
+    [InlineData((int)OfferResponseStatus.Declined)]
+    [InlineData((int)OfferResponseStatus.Withdrawn)]
+    public async Task HandleAsync_Blocks_Hire_When_Offer_Was_Declined_Or_Withdrawn(int responseRaw)
+    {
+        var response = (OfferResponseStatus)responseRaw;
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, stages) = SeedOfferStageApplication(db);
+        application.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, new DateOnly(2026, 9, 1), new DateOnly(2026, 7, 4), null, Now);
+        application.RespondToOffer(response, Now);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(provisioning.Requests);
+
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal(stages.Offer.Id, saved.CurrentStageId);
+        var savedCandidate = await db.Candidates.SingleAsync();
+        Assert.Null(savedCandidate.EmployeeId);
+    }
+
+    [Theory]
+    [InlineData((int)OfferResponseStatus.Accepted)]
+    [InlineData((int)OfferResponseStatus.AwaitingResponse)]
+    public async Task HandleAsync_Allows_Hire_When_Offer_Accepted_Or_Still_Awaiting_Response(int responseRaw)
+    {
+        var response = (OfferResponseStatus)responseRaw;
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, _) = SeedOfferStageApplication(db);
+        application.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, new DateOnly(2026, 9, 1), new DateOnly(2026, 7, 4), null, Now);
+        if (response != OfferResponseStatus.AwaitingResponse)
+            application.RespondToOffer(response, Now);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(provisioning.Requests);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Hire_When_No_Offer_Was_Ever_Recorded_Legacy_Path()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, _) = SeedOfferStageApplication(db);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Falls_Back_To_Offer_ProposedStartDate_When_Request_StartDate_Is_Null()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, _) = SeedOfferStageApplication(db);
+        application.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, new DateOnly(2026, 9, 15), new DateOnly(2026, 7, 4), null, Now);
+        application.RespondToOffer(OfferResponseStatus.Accepted, Now);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id) with { StartDate = null },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new DateOnly(2026, 9, 15), Assert.Single(provisioning.Requests).StartDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Request_StartDate_Overrides_Offer_ProposedStartDate()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, _) = SeedOfferStageApplication(db);
+        application.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, new DateOnly(2026, 9, 15), new DateOnly(2026, 7, 4), null, Now);
+        application.RespondToOffer(OfferResponseStatus.Accepted, Now);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id) with { StartDate = new DateOnly(2026, 8, 1) },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new DateOnly(2026, 8, 1), Assert.Single(provisioning.Requests).StartDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_No_StartDate_Anywhere()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, stages) = SeedOfferStageApplication(db);
+        application.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, offeredStartDate: null, new DateOnly(2026, 7, 4), null, Now);
+        application.RespondToOffer(OfferResponseStatus.Accepted, Now);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id) with { StartDate = null },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(provisioning.Requests);
+
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal(stages.Offer.Id, saved.CurrentStageId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Passes_Offer_Salary_And_Frequency_Into_Provisioning_Request()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, _) = SeedOfferStageApplication(db);
+        application.RecordOfferTerms(64250m, OfferSalaryFrequency.Daily, new DateOnly(2026, 9, 1), new DateOnly(2026, 7, 4), null, Now);
+        application.RespondToOffer(OfferResponseStatus.Accepted, Now);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var provisioned = Assert.Single(provisioning.Requests);
+        Assert.Equal(64250m, provisioned.Salary);
+        Assert.Equal("Daily", provisioned.SalaryFrequency);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Passes_Null_Offer_Compensation_Into_Provisioning_When_No_Offer_Salary_Recorded()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, _) = SeedOfferStageApplication(db);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var provisioned = Assert.Single(provisioning.Requests);
+        Assert.Null(provisioned.Salary);
+        Assert.Null(provisioned.SalaryFrequency);
+    }
+
     private static HireCandidateHandler handler(
         RecruitmentDbContext db,
         FakeEmployeeProvisioningService? provisioning = null,

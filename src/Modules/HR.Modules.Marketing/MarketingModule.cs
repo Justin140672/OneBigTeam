@@ -213,7 +213,7 @@ public static class MarketingModule
             "Give hiring activity a simple home, from open roles to candidate progress, so recruitment does not disappear into personal inboxes.",
             [
                 "Create and publish vacancies — get a role in front of candidates without juggling a separate job board account",
-                "Track applicants through each stage — always know where each candidate stands, instead of digging through email threads",
+                "Track candidates through each stage — always know where each candidate stands, instead of digging through email threads",
                 "Manage interviews and hiring decisions — keep interview feedback in one place so decisions aren't lost between people",
                 "Convert successful candidates into employees — skip re-entering the same details once someone accepts an offer",
                 "Recruitment dashboard and pipeline — see how hiring is progressing across all your open roles at a glance",

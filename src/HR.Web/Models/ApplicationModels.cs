@@ -13,7 +13,12 @@ public record ApplicationListItemModel(
     Guid CurrentStageId,
     string? InterviewOutcome,
     bool IsWithdrawn,
-    DateTimeOffset AppliedAt);
+    DateTimeOffset AppliedAt,
+    // Ticket #2: offer response tracking. Null until an offer has been made.
+    // "AwaitingResponse" / "Accepted" / "Declined" / "Withdrawn".
+    string? OfferResponseStatus = null,
+    decimal? OfferedSalary = null,
+    DateOnly? OfferedStartDate = null);
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
@@ -47,7 +52,11 @@ public record GetApplicationResponse(
     string? CvFileName = null,
     string? CvContentType = null,
     long? CvFileSize = null,
-    DateTimeOffset? CvUploadedAt = null);
+    DateTimeOffset? CvUploadedAt = null,
+    // Ticket #2: offer terms & response.
+    string? OfferResponseStatus = null,
+    decimal? OfferedSalary = null,
+    DateOnly? OfferedStartDate = null);
 
 // ── TICKET #1: CV REVIEW ──────────────────────────────────────────────────────
 
@@ -144,6 +153,17 @@ public record RejectCandidateResponse(
 // Dedicated response for the Offer action (rather than the generic ApplicationActionResponse) so the
 // linked Position Profile's read-only employment defaults are available to the UI while HR decides to
 // make an offer. See OfferCandidateResponse (HR.Modules.Recruitment) for the authoritative shape.
+public record OfferCandidateRequest(
+    Guid CompanyId,
+    Guid VacancyId,
+    Guid ApplicationId,
+    // Ticket #2: all optional offer terms.
+    decimal? OfferedSalary = null,
+    string? OfferedSalaryFrequency = null, // "Annual" | "Hourly" | "Daily"
+    DateOnly? ProposedStartDate = null,
+    DateOnly? OfferDate = null, // defaults to today server-side when omitted
+    string? OfferNotes = null);
+
 public record OfferCandidateResponse(
     Guid Id,
     Guid VacancyId,
@@ -163,7 +183,37 @@ public record OfferCandidateResponse(
     decimal? HoursPerDayOverride,
     int? ProbationMonthsOverride,
     Guid? DefaultLeavePolicyId,
-    string? LocationName);
+    string? LocationName,
+    // Ticket #2: offer terms & response echoed back.
+    decimal? OfferedSalary = null,
+    string? OfferedSalaryFrequency = null,
+    DateOnly? ProposedStartDate = null,
+    DateOnly? OfferDate = null,
+    string? OfferNotes = null,
+    string? OfferResponseStatus = null,
+    DateTimeOffset? OfferMadeAt = null,
+    DateTimeOffset? OfferRespondedAt = null);
+
+// ── TICKET #2: OFFER RESPONSE ─────────────────────────────────────────────────
+
+public record RespondToOfferRequest(
+    Guid CompanyId,
+    Guid VacancyId,
+    Guid ApplicationId,
+    string Status); // "Accepted" | "Declined" | "Withdrawn"
+
+public record RespondToOfferResponse(
+    Guid Id,
+    Guid VacancyId,
+    Guid CandidateId,
+    Guid CurrentStageId,
+    string? OfferResponseStatus,
+    decimal? OfferedSalary,
+    string? OfferedSalaryFrequency,
+    DateOnly? ProposedStartDate,
+    DateOnly? OfferDate,
+    string? OfferNotes,
+    DateTimeOffset UpdatedAt);
 
 // Department, Location and Position Profile are no longer independently-entered fields — the hired
 // employee is always assigned to the Vacancy's own linked Position Profile (and the Department/Location
@@ -177,7 +227,8 @@ public record HireCandidateRequest(
     Guid CompanyId,
     Guid VacancyId,
     Guid ApplicationId,
-    DateOnly StartDate,
+    // Ticket #2: optional — server falls back to the accepted offer's ProposedStartDate.
+    DateOnly? StartDate,
     DateOnly DateOfBirth,
     string Nationality,
     string Gender,

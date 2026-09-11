@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>HR.Modules.Leave.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Compile Include="../../../../src/HR.Web/Services/SupabaseSessionAccessor.cs" Link="WebSession.cs" />
+    <Compile Include="../../../../src/HR.Web/Services/SupabaseAuthDelegatingHandler.cs" Link="WebHandler.cs" />
+    <Compile Include="../../../../src/HR.Admin.Web/Services/SupabaseSessionAccessor.cs" Link="AdminSession.cs" />
+    <Compile Include="../../../../src/HR.Admin.Web/Services/SupabaseAuthDelegatingHandler.cs" Link="AdminHandler.cs" />
+    <ProjectReference Include="../../../../src/HR.ServiceDefaults/HR.ServiceDefaults.csproj" />
+    <ProjectReference Include="../../../../src/Modules/HR.Modules.Leave/HR.Modules.Leave.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <Compile Include="../../../../tests/HR.Modules.Leave.Tests/Infrastructure/FakeClock.cs" />
+    <Compile Include="../../../../tests/HR.Modules.Leave.Tests/Infrastructure/FakeCompanyLeaveSettingsReader.cs" />
+    <Compile Include="../../../../tests/HR.Modules.Leave.Tests/Infrastructure/FakeNotificationWriter.cs" />
+    <Compile Include="../../../../tests/HR.Modules.Leave.Tests/Infrastructure/IntegrationEventPublisherFakes.cs" />
+    <Compile Include="../../../../src/Modules/HR.Modules.DataImport/Services/ImportFileValidator.cs" />
+    <Compile Include="../../../../src/Modules/HR.Modules.DataImport/Services/IImportFileValidator.cs" />
+    <Compile Include="../../../../src/Modules/HR.Modules.DataImport/Services/ImportFileUploadOptions.cs" />
+    <Compile Include="../../../../src/Modules/HR.Modules.DataImport/Services/LocalImportFileStorageService.cs" />
+    <Compile Include="../../../../src/Modules/HR.Modules.DataImport/Services/IImportFileStorageService.cs" />
+  </ItemGroup>
+</Project>

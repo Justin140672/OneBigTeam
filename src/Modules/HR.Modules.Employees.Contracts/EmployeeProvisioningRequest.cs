@@ -28,4 +28,13 @@ public sealed record EmployeeProvisioningRequest(
     /// after a partial failure, supplying the same value guarantees the same employee is returned
     /// instead of a duplicate being created. Format: "&lt;source&gt;:&lt;entity&gt;:&lt;id&gt;".
     /// </summary>
-    string? SourceReference = null);
+    string? SourceReference = null,
+    /// <summary>
+    /// Ticket 2: agreed compensation for an automated hire (candidate offer accepted). When
+    /// <paramref name="Salary"/> is a positive value, the Employees module seeds the new hire's first
+    /// Compensation record from it so HR does not re-enter what was agreed on the offer.
+    /// <paramref name="SalaryFrequency"/> is "Annual" | "Hourly" | "Daily" (defaults to Annual when
+    /// unrecognised). Both null for human-initiated creation, which manages compensation separately.
+    /// </summary>
+    decimal? Salary = null,
+    string? SalaryFrequency = null);

@@ -25,7 +25,7 @@ public class GetVacancyPerformanceReportHandlerTests
         Assert.Equal(vacancyId, row.VacancyId);
         Assert.Equal("Engineer", row.VacancyTitle);
         Assert.Equal(40, row.DaysOpen);
-        Assert.Equal(12, row.ApplicantCount);
+        Assert.Equal(12, row.CandidateCount);
         Assert.Equal(5, row.InterviewCount);
         Assert.Equal(2, row.OfferCount);
         Assert.Equal(hireDate, row.HireDate);

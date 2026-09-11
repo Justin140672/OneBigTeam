@@ -5,7 +5,7 @@ using Microsoft.Playwright;
 namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
-/// Covers the Recruitment Kanban board (VacancyKanbanBoard.razor / KanbanApplicantCard.razor,
+/// Covers the Recruitment Kanban board (VacancyKanbanBoard.razor / KanbanCandidateCard.razor,
 /// tickets #69-#73, reworked to dynamic per-company stages by tickets #97-#101).
 ///
 /// The board now renders one column per RecruitmentStage the applying company has configured, in
@@ -81,7 +81,7 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
         foreach (var stage in AllSeededStages)
         {
             Assert.True(await kanban.HasColumnHeaderAsync(stage),
-                $"Expected a Kanban column header for stage '{stage}' to render, including stages with no current applicants");
+                $"Expected a Kanban column header for stage '{stage}' to render, including stages with no current candidates");
         }
 
         // The freshly created application sits in the seeded initial stage — its column should show
@@ -96,24 +96,24 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
     }
 
     [Fact]
-    public async Task SearchBox_FiltersVisibleCards_ByApplicantName()
+    public async Task SearchBox_FiltersVisibleCards_ByCandidateName()
     {
         var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
 
         Assert.True(await kanban.HasCardForNameAsync(candidateLast),
-            "Expected the new applicant's card to be visible before filtering");
+            "Expected the new candidate's card to be visible before filtering");
 
         // Filter down to a name fragment that only matches a candidate that does not exist —
-        // the real applicant's card must disappear.
-        await kanban.FillSearchAsync("NoSuchApplicantXyz");
+        // the real candidate's card must disappear.
+        await kanban.FillSearchAsync("NoSuchCandidateXyz");
         Assert.False(await kanban.HasCardForNameAsync(candidateLast),
-            "Expected the applicant's card to be hidden once the search term no longer matches their name");
+            "Expected the candidate's card to be hidden once the search term no longer matches their name");
         Assert.Equal(0, await kanban.CountVisibleCardsAsync());
 
         // Filtering back to (part of) the real name brings the card back.
         await kanban.FillSearchAsync(candidateLast);
         Assert.True(await kanban.HasCardForNameAsync(candidateLast),
-            "Expected the applicant's card to reappear once the search term matches their name again");
+            "Expected the candidate's card to reappear once the search term matches their name again");
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
 
         await kanban.ClickCardAsync(candidateLast);
 
-        // VacancyKanbanBoard.OpenApplicant navigates to /companies/{companyId}/candidates/{candidateId}.
+        // VacancyKanbanBoard.OpenCandidate navigates to /companies/{companyId}/candidates/{candidateId}.
         await _page.WaitForURLAsync(new System.Text.RegularExpressions.Regex(@"/candidates/[0-9a-f-]{36}"),
             new() { Timeout = 15_000 });
         Assert.Matches(@"/candidates/[0-9a-f-]{36}", _page.Url);

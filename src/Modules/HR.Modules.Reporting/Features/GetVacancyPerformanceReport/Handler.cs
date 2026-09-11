@@ -14,7 +14,7 @@ internal sealed class GetVacancyPerformanceReportHandler(IVacancyPerformanceRead
 
         var rows = items
             .Select(i => new VacancyPerformanceReportRow(
-                i.VacancyId, i.VacancyTitle, i.DaysOpen, i.ApplicantCount, i.InterviewCount, i.OfferCount, i.HireDate))
+                i.VacancyId, i.VacancyTitle, i.DaysOpen, i.CandidateCount, i.InterviewCount, i.OfferCount, i.HireDate))
             .ToList();
 
         return Result.Success(new GetVacancyPerformanceReportResponse(rows));

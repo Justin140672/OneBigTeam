@@ -18,8 +18,8 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// complete a drop under Blazor Server's re-render cycle. Each column is a
 /// "[data-testid='kanban-column']" div carrying its stage name in ".vacancy-kanban-board__column-title"
 /// and its card count in ".vacancy-kanban-board__column-count"; cards are native
-/// draggable="true" wrappers around our own KanbanApplicantCard.razor template, whose outer element
-/// carries the well-known "kanban-applicant-card" class (plus a stage-specific modifier — see
+/// draggable="true" wrappers around our own KanbanCandidateCard.razor template, whose outer element
+/// carries the well-known "kanban-candidate-card" class (plus a stage-specific modifier — see
 /// StageCssClassAsync).
 /// </summary>
 public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
@@ -78,10 +78,10 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
     }
 
     public async Task<int> CountVisibleCardsAsync() =>
-        await Board.Locator(".kanban-applicant-card").CountAsync();
+        await Board.Locator(".kanban-candidate-card").CountAsync();
 
     public async Task<bool> HasCardForNameAsync(string candidateNameFragment) =>
-        await Board.Locator(".kanban-applicant-card").Filter(new() { HasText = candidateNameFragment }).CountAsync() > 0;
+        await Board.Locator(".kanban-candidate-card").Filter(new() { HasText = candidateNameFragment }).CountAsync() > 0;
 
     // ── Columns (tickets #69/#71) ────────────────────────────────────────────────
 
@@ -184,7 +184,7 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
     public async Task<bool> IsCardInColumnAsync(string candidateNameFragment, string stageName)
     {
         var column = await ColumnAsync(stageName);
-        var cardInColumn = column.Locator(".kanban-applicant-card").Filter(new() { HasText = candidateNameFragment });
+        var cardInColumn = column.Locator(".kanban-candidate-card").Filter(new() { HasText = candidateNameFragment });
 
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (true)
@@ -202,7 +202,7 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
     // ── Card content / visual distinction (ticket #71) ───────────────────────────
 
     private ILocator Card(string candidateNameFragment) =>
-        Board.Locator(".kanban-applicant-card").Filter(new() { HasText = candidateNameFragment }).First;
+        Board.Locator(".kanban-candidate-card").Filter(new() { HasText = candidateNameFragment }).First;
 
     public Task<bool> IsCardVisibleAsync(string candidateNameFragment) => Card(candidateNameFragment).IsVisibleAsync();
 
@@ -210,10 +210,10 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
         (await Card(candidateNameFragment).GetAttributeAsync("class")) ?? "";
 
     public Task<bool> HasRejectedStylingAsync(string candidateNameFragment) =>
-        HasClassAsync(candidateNameFragment, "kanban-applicant-card--danger");
+        HasClassAsync(candidateNameFragment, "kanban-candidate-card--danger");
 
     public Task<bool> HasHiredStylingAsync(string candidateNameFragment) =>
-        HasClassAsync(candidateNameFragment, "kanban-applicant-card--success");
+        HasClassAsync(candidateNameFragment, "kanban-candidate-card--success");
 
     private async Task<bool> HasClassAsync(string candidateNameFragment, string cssClass) =>
         (await GetCardClassAsync(candidateNameFragment)).Split(' ').Contains(cssClass);
@@ -226,7 +226,7 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
 
     public async Task<string?> GetCardRecruiterTextAsync(string candidateNameFragment)
     {
-        var meta = Card(candidateNameFragment).Locator(".kanban-applicant-card__meta");
+        var meta = Card(candidateNameFragment).Locator(".kanban-candidate-card__meta");
         return (await meta.TextContentAsync())?.Trim();
     }
 
@@ -469,7 +469,7 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
 
     // ── "Review CV" card menu item (ticket #1) ───────────────────────────────────
     // Same kebab menu as "Move to stage…" — the first item is a "Review CV" button
-    // (data-testid="kanban-card-review-cv" in KanbanApplicantCard.razor) that navigates to the
+    // (data-testid="kanban-card-review-cv" in KanbanCandidateCard.razor) that navigates to the
     // standalone Review CV route, carrying a returnUrl back to this board.
     public async Task ClickReviewCvFromCardMenuAsync(string candidateNameFragment)
     {

@@ -39,6 +39,22 @@ internal sealed class Application
     public DateTimeOffset? OfferApprovedAt { get; private set; }
     public Guid? OfferApprovedByUserId { get; private set; }
 
+    // Ticket 2: the actual terms of the offer made to this candidate. Recorded by OfferCandidate at
+    // the moment the application moves to the offer stage (see RecordOfferTerms). These belong to the
+    // Application (this candidate, this vacancy) — not the Candidate, and not the Position Profile,
+    // which only supplies read-only defaults. All nullable: salary/frequency/proposed start date may
+    // legitimately be unknown when the offer is first logged; OfferResponseStatus is null until an
+    // offer is actually made. There is deliberately no version history (out of scope) — an offer is
+    // logged once and then responded to.
+    public decimal? OfferedSalary { get; private set; }
+    public OfferSalaryFrequency? OfferedSalaryFrequency { get; private set; }
+    public DateOnly? OfferedStartDate { get; private set; }
+    public DateOnly? OfferDate { get; private set; }
+    public string? OfferNotes { get; private set; }
+    public OfferResponseStatus? OfferResponseStatus { get; private set; }
+    public DateTimeOffset? OfferMadeAt { get; private set; }
+    public DateTimeOffset? OfferRespondedAt { get; private set; }
+
     public DateTimeOffset AppliedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -146,6 +162,43 @@ internal sealed class Application
     {
         CurrentStageId = hiredStageId;
         UpdatedAt      = now;
+    }
+
+    /// <summary>
+    /// Ticket 2: records (or re-records) the terms of the offer being made to this candidate and puts
+    /// the offer into <see cref="Domain.OfferResponseStatus.AwaitingResponse"/>. Called by
+    /// OfferCandidate immediately after the stage move, in the same transaction. Trimming of notes
+    /// mirrors <see cref="Notes"/>. Does not touch CurrentStageId — the caller owns the stage move.
+    /// </summary>
+    public void RecordOfferTerms(
+        decimal? offeredSalary,
+        OfferSalaryFrequency? offeredSalaryFrequency,
+        DateOnly? offeredStartDate,
+        DateOnly offerDate,
+        string? offerNotes,
+        DateTimeOffset now)
+    {
+        OfferedSalary          = offeredSalary;
+        OfferedSalaryFrequency = offeredSalaryFrequency;
+        OfferedStartDate       = offeredStartDate;
+        OfferDate              = offerDate;
+        OfferNotes             = string.IsNullOrWhiteSpace(offerNotes) ? null : offerNotes.Trim();
+        OfferResponseStatus    = Domain.OfferResponseStatus.AwaitingResponse;
+        OfferMadeAt            = now;
+        OfferRespondedAt       = null;
+        UpdatedAt              = now;
+    }
+
+    /// <summary>
+    /// Ticket 2: records the candidate's / employer's explicit response to a made offer. Callers
+    /// (RespondToOfferHandler) must have already checked that <see cref="OfferResponseStatus"/> is
+    /// <see cref="Domain.OfferResponseStatus.AwaitingResponse"/> — this method trusts that guard.
+    /// </summary>
+    public void RespondToOffer(OfferResponseStatus response, DateTimeOffset now)
+    {
+        OfferResponseStatus = response;
+        OfferRespondedAt    = now;
+        UpdatedAt           = now;
     }
 
     /// <summary>

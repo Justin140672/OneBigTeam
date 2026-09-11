@@ -12,7 +12,7 @@ namespace HR.Modules.Recruitment.Services;
 /// three effects required by tickets #65/#66/#67 happen exactly once per successful stage change:
 ///  1. A persisted ApplicationStageHistoryEntry (ticket #66) — added to the DbContext but not saved,
 ///     so callers can commit it in the same transaction as their own SaveChangesAsync.
-///  2. An ApplicantStageChangedIntegrationEvent (ticket #65) — published only after the stage change
+///  2. An ApplicationStageChangedIntegrationEvent (ticket #65) — published only after the stage change
 ///     has actually been committed.
 ///  3. An ApplicationStageChangedAuditEvent (ticket #67) — published alongside the integration event.
 /// Ticket #99: stages are now RecruitmentStage rows rather than ApplicationStatus enum values, so
@@ -57,7 +57,7 @@ internal sealed class RecruitmentStageChangeRecorder(
         var newStageName      = stageNames.GetValueOrDefault(application.CurrentStageId, application.CurrentStageId.ToString());
 
         await eventPublisher.PublishAsync(
-            new ApplicantStageChangedIntegrationEvent(
+            new ApplicationStageChangedIntegrationEvent(
                 application.CompanyId,
                 application.Id,
                 application.VacancyId,

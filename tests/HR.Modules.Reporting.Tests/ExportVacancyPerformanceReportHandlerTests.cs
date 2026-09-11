@@ -23,7 +23,7 @@ public class ExportVacancyPerformanceReportHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Vacancy Performance Report", exporter.LastData!.ReportTitle);
-        Assert.Equal(["Vacancy", "Days Open", "Applicants", "Interviews", "Offers", "Hire Date"], exporter.LastData.ColumnHeaders);
+        Assert.Equal(["Vacancy", "Days Open", "Candidates", "Interviews", "Offers", "Hire Date"], exporter.LastData.ColumnHeaders);
         var row = Assert.Single(exporter.LastData.Rows);
         Assert.Equal("Engineer", row[0]);
         Assert.Equal("2026-03-01", row[5]);

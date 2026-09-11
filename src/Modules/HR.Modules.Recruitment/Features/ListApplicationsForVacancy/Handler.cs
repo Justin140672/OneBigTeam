@@ -20,9 +20,10 @@ internal sealed class ListApplicationsForVacancyHandler(RecruitmentDbContext db)
         if (request.StageId.HasValue)
             query = query.Where(x => x.a.CurrentStageId == request.StageId.Value);
 
-        var items = await query
+        var rows = await query
             .OrderByDescending(x => x.a.AppliedAt)
-            .Select(x => new ApplicationListItem(
+            .Select(x => new
+            {
                 x.a.Id,
                 x.a.CandidateId,
                 x.c.FirstName,
@@ -30,9 +31,29 @@ internal sealed class ListApplicationsForVacancyHandler(RecruitmentDbContext db)
                 x.c.Email,
                 x.a.CurrentStageId,
                 x.a.InterviewOutcome,
-                x.a.WithdrawnAt != null,
-                x.a.AppliedAt))
+                IsWithdrawn = x.a.WithdrawnAt != null,
+                x.a.AppliedAt,
+                x.a.OfferResponseStatus,
+                x.a.OfferedSalary,
+                x.a.OfferedStartDate,
+            })
             .ToListAsync(cancellationToken);
+
+        var items = rows
+            .Select(r => new ApplicationListItem(
+                r.Id,
+                r.CandidateId,
+                r.FirstName,
+                r.LastName,
+                r.Email,
+                r.CurrentStageId,
+                r.InterviewOutcome,
+                r.IsWithdrawn,
+                r.AppliedAt,
+                r.OfferResponseStatus?.ToString(),
+                r.OfferedSalary,
+                r.OfferedStartDate))
+            .ToList();
 
         return Result.Success(new ListApplicationsForVacancyResponse(items));
     }

@@ -6,7 +6,7 @@ namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
 /// Covers the recruitment Kanban board / Recruitment Dashboard redesign (VacancyKanbanBoard.razor,
-/// KanbanApplicantCard.razor, RecruitmentDashboard.razor): the narrower-viewport toolbar layout, the
+/// KanbanCandidateCard.razor, RecruitmentDashboard.razor): the narrower-viewport toolbar layout, the
 /// Board/List view toggle's aria-pressed state, the "No candidates at this stage" empty-column copy,
 /// the new keyboard-accessible "Move to stage…" card menu (an alternative to dragging, sharing the
 /// same server-side MoveApplicationStageAsync call and validation as the drag path — see

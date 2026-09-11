@@ -33,7 +33,7 @@ public sealed class RecruitmentKanbanService(IHttpClientFactory httpClientFactor
         if (response.IsSuccessStatusCode)
             return (await response.Content.ReadFromJsonAsync<MoveApplicationStageResponse>(HrApiJsonOptions.Default), null);
 
-        return (null, await ReadErrorAsync(response, "Failed to move applicant to the new stage."));
+        return (null, await ReadErrorAsync(response, "Failed to move candidate to the new stage."));
     }
 
     private static async Task<string?> ReadErrorAsync(HttpResponseMessage response, string fallback)

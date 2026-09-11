@@ -5,7 +5,7 @@ namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
 /// Covers the "Review CV" screen (ReviewCv.razor, ticket #1) and its two entry points — the vacancy
-/// Kanban board applicant card menu (KanbanApplicantCard.razor's "Review CV" menu item) and the
+/// Kanban board candidate card menu (KanbanCandidateCard.razor's "Review CV" menu item) and the
 /// per-row "Review CV" link on the Vacancy Detail Applications tab (VacancyApplicationsTab.razor).
 ///
 /// Each test creates its own fresh Candidate + Position Profile + Vacancy + Application (unique names
@@ -97,7 +97,7 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
         Assert.Equal(notes, await review.GetNotesAsync());
         Assert.Equal(InitialStage, await review.GetCurrentStageAsync());
 
-        // Saving notes must not have moved the applicant on the board either.
+        // Saving notes must not have moved the candidate on the board either.
         await arranged.Kanban.GoToStandaloneAsync(AcmeId, arranged.VacancyId);
         Assert.True(await arranged.Kanban.IsCardInColumnAsync(arranged.CandidateLast, InitialStage));
     }
@@ -118,7 +118,7 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
         // Returned to the board (the returnUrl the card menu carried).
         await arranged.Kanban.WaitForLoadedAsync();
         Assert.True(await arranged.Kanban.IsCardInColumnAsync(arranged.CandidateLast, NextStage),
-            $"Expected the applicant to have moved to '{NextStage}' after Move Forward");
+            $"Expected the candidate to have moved to '{NextStage}' after Move Forward");
         Assert.False(await arranged.Kanban.IsCardInColumnAsync(arranged.CandidateLast, InitialStage));
 
         // Notes typed before Move Forward are persisted as part of the same call.
@@ -128,7 +128,7 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
     }
 
     [Fact]
-    public async Task Reject_ViaDialog_MovesApplicantToRejectedStage()
+    public async Task Reject_ViaDialog_MovesCandidateToRejectedStage()
     {
         var arranged = await ArrangeApplicationAsync();
         var review = await OpenReviewCvFromKanbanAsync(arranged);
@@ -137,7 +137,7 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
 
         await arranged.Kanban.WaitForLoadedAsync();
         Assert.True(await arranged.Kanban.IsCardInColumnAsync(arranged.CandidateLast, RejectedStage),
-            "Expected the applicant to land in the Rejected stage via the existing rejection workflow");
+            "Expected the candidate to land in the Rejected stage via the existing rejection workflow");
         Assert.False(await arranged.Kanban.IsCardInColumnAsync(arranged.CandidateLast, InitialStage));
     }
 
@@ -149,7 +149,7 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
 
         var applicationId = review.GetApplicationIdFromUrl();
 
-        // Type notes but DON'T save — Close must discard them and not move the applicant.
+        // Type notes but DON'T save — Close must discard them and not move the candidate.
         await review.SetNotesAsync("Draft thoughts that should never be saved.");
         await review.CloseAsync();
 
@@ -157,7 +157,7 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
 
         await arranged.Kanban.WaitForLoadedAsync();
         Assert.True(await arranged.Kanban.IsCardInColumnAsync(arranged.CandidateLast, InitialStage),
-            "Expected Close to leave the applicant on the original stage");
+            "Expected Close to leave the candidate on the original stage");
 
         await review.GoToAsync(AcmeId, arranged.VacancyId, applicationId);
         Assert.Equal(string.Empty, await review.GetNotesAsync());

@@ -14,7 +14,7 @@ internal sealed class ExportRecruitmentPipelineReportHandler(
 
     private static readonly string[] ColumnHeaders =
     [
-        "Group", "Vacancies", "Applicants", "Interviews", "Offers", "Hires",
+        "Group", "Vacancies", "Candidates", "Interviews", "Offers", "Hires",
     ];
 
     public async Task<Result<ExportRecruitmentPipelineReportResponse>> HandleAsync(
@@ -40,7 +40,7 @@ internal sealed class ExportRecruitmentPipelineReportHandler(
                 {
                     item.GroupLabel,
                     item.Vacancies.ToString(),
-                    item.Applicants.ToString(),
+                    item.Candidates.ToString(),
                     item.Interviews.ToString(),
                     item.Offers.ToString(),
                     item.Hires.ToString(),

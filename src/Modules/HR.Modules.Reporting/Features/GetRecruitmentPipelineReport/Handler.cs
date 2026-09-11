@@ -16,7 +16,7 @@ internal sealed class GetRecruitmentPipelineReportHandler(IRecruitmentPipelineRe
 
             var items = vacancyRows
                 .Select(r => new RecruitmentPipelineReportRow(
-                    r.VacancyId.ToString(), r.VacancyTitle, 1, r.Applicants, r.Interviews, r.Offers, r.Hires))
+                    r.VacancyId.ToString(), r.VacancyTitle, 1, r.Candidates, r.Interviews, r.Offers, r.Hires))
                 .ToList();
 
             return Result.Success(new GetRecruitmentPipelineReportResponse(items));
@@ -27,7 +27,7 @@ internal sealed class GetRecruitmentPipelineReportHandler(IRecruitmentPipelineRe
 
         var recruiterItems = recruiterRows
             .Select(r => new RecruitmentPipelineReportRow(
-                r.RecruiterId?.ToString() ?? "unassigned", r.RecruiterName, r.Vacancies, r.Applicants, r.Interviews, r.Offers, r.Hires))
+                r.RecruiterId?.ToString() ?? "unassigned", r.RecruiterName, r.Vacancies, r.Candidates, r.Interviews, r.Offers, r.Hires))
             .ToList();
 
         return Result.Success(new GetRecruitmentPipelineReportResponse(recruiterItems));

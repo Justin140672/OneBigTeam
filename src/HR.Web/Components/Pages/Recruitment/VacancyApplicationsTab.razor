@@ -9,6 +9,7 @@
 @inject EmploymentTypeService EmploymentTypeService
 @inject ExternalRecruiterService ExternalRecruiterService
 @inject RecruitmentStageService RecruitmentStageService
+@inject PositionProfileService PositionProfileService
 @inject CompanyService CompanyService
 @inject IJSRuntime JS
 
@@ -69,6 +70,12 @@
                         @if (row.IsWithdrawn)
                         {
                             <span class="text-muted ms-1">(Withdrawn)</span>
+                        }
+                        @if (row.OfferResponseStatus is not null)
+                        {
+                            <span class="ms-1" data-testid="offer-response-badge">
+                                <StatusBadge Variant="@OfferResponseVariant(row.OfferResponseStatus)">Offer: @OfferResponseLabel(row.OfferResponseStatus)</StatusBadge>
+                            </span>
                         }
                     </Template>
                 </GridColumn>
@@ -270,11 +277,25 @@
         <Content>
             <EditForm EditContext="_hireEditContext">
                 <DataAnnotationsValidator />
+                @if (_hireOfferAccepted)
+                {
+                    <div class="alert alert-info py-2" data-testid="hire-offer-accepted-context">
+                        Offer accepted: @FormatOfferedSalary(_hireOfferedSalary, _hireOfferedSalaryFrequency) – will seed first compensation record.
+                    </div>
+                }
+                @if (_hireOfferBlockedMessage is not null)
+                {
+                    <div class="alert alert-warning py-2" data-testid="hire-offer-blocked">@_hireOfferBlockedMessage</div>
+                }
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                        <SfDatePicker TValue="DateOnly?" @bind-Value="_hireModel.StartDate" />
+                        <label class="form-label">Start Date @if (!_hireStartDateOptional) {<span class="text-danger">*</span>}</label>
+                        <SfDatePicker TValue="DateOnly?" @bind-Value="_hireModel.StartDate" data-testid="hire-start-date" />
                         <ValidationMessage For="@(() => _hireModel.StartDate)" />
+                        @if (_hireStartDateOptional)
+                        {
+                            <div class="form-text">Leave blank to use the accepted offer's proposed start date.</div>
+                        }
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
@@ -385,6 +406,90 @@
     </DialogButtons>
 </SfDialog>
 
+<SfDialog Width="520px" IsModal="true" @bind-Visible="_showOfferDialog" Header="Make an Offer" CssClass="offer-candidate-dialog">
+    <DialogTemplates>
+        <Content>
+            <EditForm EditContext="_offerEditContext">
+                <DataAnnotationsValidator />
+                <div class="alert alert-light border py-2" data-testid="offer-position-profile-context">
+                    <div class="fw-semibold">@(_offerProfileTitle ?? "Position Profile")</div>
+                    <div class="text-muted small">
+                        Salary range:
+                        @if (_offerSalaryMin is not null || _offerSalaryMax is not null)
+                        {
+                            <span>@FormatMoney(_offerSalaryMin) – @FormatMoney(_offerSalaryMax)</span>
+                            <span> (@(_offerSalaryType ?? "—"))</span>
+                        }
+                        else
+                        {
+                            <span>Not specified</span>
+                        }
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Offered Salary</label>
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="_offerModel.OfferedSalary" Format="c0" Min="0" ShowSpinButton="false" data-testid="offer-salary" />
+                        <ValidationMessage For="@(() => _offerModel.OfferedSalary)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Salary Frequency</label>
+                        <SfDropDownList TValue="string" TItem="string" DataSource="@_salaryFrequencyOptions"
+                                        @bind-Value="_offerModel.OfferedSalaryFrequency" data-testid="offer-salary-frequency" />
+                        <ValidationMessage For="@(() => _offerModel.OfferedSalaryFrequency)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Proposed Start Date</label>
+                        <SfDatePicker TValue="DateOnly?" @bind-Value="_offerModel.ProposedStartDate" data-testid="offer-proposed-start-date" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Offer Date</label>
+                        <SfDatePicker TValue="DateOnly?" @bind-Value="_offerModel.OfferDate" data-testid="offer-date" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Offer Notes</label>
+                        <HrTextBox @bind-Value="_offerModel.OfferNotes" Multiline="true" Rows="3" data-testid="offer-notes" />
+                        <ValidationMessage For="@(() => _offerModel.OfferNotes)" />
+                    </div>
+                </div>
+                @if (_dialogError is not null)
+                {
+                    <div class="alert alert-danger py-2 mt-3">@_dialogError</div>
+                }
+            </EditForm>
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Make Offer" IsPrimary="true" OnClick="ConfirmOfferAsync" />
+        <DialogButton Content="Cancel" OnClick="() => _showOfferDialog = false" />
+    </DialogButtons>
+</SfDialog>
+
+<SfDialog Width="420px" IsModal="true" @bind-Visible="_showOfferResponseDialog" Header="Record Offer Response" CssClass="offer-response-dialog">
+    <DialogTemplates>
+        <Content>
+            <EditForm EditContext="_offerResponseEditContext">
+                <DataAnnotationsValidator />
+                <div class="mb-3">
+                    <label class="form-label">Response <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="string" TItem="string" DataSource="@_offerResponseOptions"
+                                    @bind-Value="_offerResponseModel.Status" Placeholder="Select a response"
+                                    data-testid="offer-response-status" />
+                    <ValidationMessage For="@(() => _offerResponseModel.Status)" />
+                </div>
+                @if (_dialogError is not null)
+                {
+                    <div class="alert alert-danger py-2">@_dialogError</div>
+                }
+            </EditForm>
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Record Response" IsPrimary="true" OnClick="ConfirmOfferResponseAsync" />
+        <DialogButton Content="Cancel" OnClick="() => _showOfferResponseDialog = false" />
+    </DialogButtons>
+</SfDialog>
+
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid VacancyId { get; set; }
@@ -452,6 +557,158 @@
         _scheduleEditContext = new EditContext(_scheduleModel);
         _addEditContext = new EditContext(_addModel);
         _hireEditContext = new EditContext(_hireModel);
+        _offerEditContext = new EditContext(_offerModel);
+        _offerResponseEditContext = new EditContext(_offerResponseModel);
+    }
+
+    // ── Ticket #2: Offer details & response ───────────────────────────────────
+    private bool _showOfferDialog;
+    private readonly OfferFormModel _offerModel = new();
+    private EditContext _offerEditContext = default!;
+    private string? _offerProfileTitle;
+    private decimal? _offerSalaryMin;
+    private decimal? _offerSalaryMax;
+    private string? _offerSalaryType;
+    private static readonly string[] _salaryFrequencyOptions = ["None", "Annual", "Hourly", "Daily"];
+
+    private bool _showOfferResponseDialog;
+    private readonly OfferResponseFormModel _offerResponseModel = new();
+    private EditContext _offerResponseEditContext = default!;
+    private static readonly string[] _offerResponseOptions = ["Accepted", "Declined", "Withdrawn"];
+
+    // Hire dialog offer context
+    private bool _hireOfferAccepted;
+    private bool _hireStartDateOptional;
+    private string? _hireOfferBlockedMessage;
+    private decimal? _hireOfferedSalary;
+    private string? _hireOfferedSalaryFrequency;
+
+    public sealed class OfferFormModel
+    {
+        public decimal? OfferedSalary { get; set; }
+        public string? OfferedSalaryFrequency { get; set; } = "None";
+        public DateOnly? ProposedStartDate { get; set; }
+        public DateOnly? OfferDate { get; set; }
+        [MaxLength(2000, ErrorMessage = "Offer notes cannot exceed 2000 characters.")]
+        public string? OfferNotes { get; set; }
+    }
+
+    public sealed class OfferResponseFormModel
+    {
+        [Required(ErrorMessage = "Please select a response.")]
+        public string? Status { get; set; }
+    }
+
+    private static string FormatMoney(decimal? value) => value is null ? "—" : value.Value.ToString("C0");
+
+    private static string FormatOfferedSalary(decimal? salary, string? frequency)
+    {
+        if (salary is null) return "salary not recorded";
+        var suffix = frequency switch
+        {
+            "Annual" => " /year",
+            "Hourly" => " /hour",
+            "Daily" => " /day",
+            _ => "",
+        };
+        return salary.Value.ToString("C0") + suffix;
+    }
+
+    private static StatusBadgeVariant OfferResponseVariant(string? status) => status switch
+    {
+        "Accepted" => StatusBadgeVariant.Success,
+        "Declined" or "Withdrawn" => StatusBadgeVariant.Danger,
+        "AwaitingResponse" => StatusBadgeVariant.Warning,
+        _ => StatusBadgeVariant.Secondary,
+    };
+
+    private static string OfferResponseLabel(string? status) => status switch
+    {
+        "AwaitingResponse" => "Awaiting response",
+        _ => status ?? "—",
+    };
+
+    private async Task OpenOfferDialog(ApplicationListItemModel row)
+    {
+        _dialogError = null;
+        _activeApplication = row;
+        _offerModel.OfferedSalary = null;
+        _offerModel.OfferedSalaryFrequency = "None";
+        _offerModel.ProposedStartDate = null;
+        _offerModel.OfferDate = DateOnly.FromDateTime(DateTime.Today);
+        _offerModel.OfferNotes = null;
+        _offerProfileTitle = null;
+        _offerSalaryMin = _offerSalaryMax = null;
+        _offerSalaryType = null;
+
+        // Position Profile salary context comes from the vacancy's linked profile.
+        var vacancy = await VacancyService.GetVacancyAsync(CompanyId, VacancyId);
+        _offerProfileTitle = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle;
+        if (vacancy is not null)
+        {
+            var profile = await PositionProfileService.GetPositionProfileAsync(CompanyId, vacancy.PositionProfileId);
+            _offerSalaryMin = profile?.SalaryMin;
+            _offerSalaryMax = profile?.SalaryMax;
+            _offerSalaryType = profile?.SalaryType;
+        }
+
+        // Pre-populate offered salary from SalaryMin (overridable).
+        _offerModel.OfferedSalary = _offerSalaryMin;
+
+        _offerEditContext = new EditContext(_offerModel);
+        _showOfferDialog = true;
+    }
+
+    private async Task ConfirmOfferAsync()
+    {
+        if (_activeApplication is null || !_offerEditContext.Validate())
+            return;
+
+        var freq = _offerModel.OfferedSalaryFrequency is null or "None" ? null : _offerModel.OfferedSalaryFrequency;
+        var request = new OfferCandidateRequest(
+            CompanyId, VacancyId, _activeApplication.Id,
+            _offerModel.OfferedSalary, freq, _offerModel.ProposedStartDate, _offerModel.OfferDate,
+            string.IsNullOrWhiteSpace(_offerModel.OfferNotes) ? null : _offerModel.OfferNotes.Trim());
+
+        var (result, error) = await ApplicationService.OfferCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);
+        if (result is null)
+        {
+            _dialogError = error;
+            return;
+        }
+
+        _showOfferDialog = false;
+        _actionSuccess = "Offer made to candidate.";
+        _actionError = null;
+        await LoadAsync();
+    }
+
+    private void OpenOfferResponseDialog(ApplicationListItemModel row)
+    {
+        _dialogError = null;
+        _activeApplication = row;
+        _offerResponseModel.Status = null;
+        _offerResponseEditContext = new EditContext(_offerResponseModel);
+        _showOfferResponseDialog = true;
+    }
+
+    private async Task ConfirmOfferResponseAsync()
+    {
+        if (_activeApplication is null || !_offerResponseEditContext.Validate())
+            return;
+
+        var (result, error) = await ApplicationService.RespondToOfferAsync(
+            CompanyId, VacancyId, _activeApplication.Id, _offerResponseModel.Status!);
+        if (result is null)
+        {
+            _dialogError = error;
+            return;
+        }
+
+        _showOfferResponseDialog = false;
+        _actionSuccess = $"Offer response recorded: {result.OfferResponseStatus}.";
+        _actionError = null;
+        await LoadAsync();
     }
 
     public sealed class AddApplicationFormModel : IValidatableObject
@@ -477,8 +734,10 @@
 
     public sealed class HireCandidateFormModel : IValidatableObject
     {
-        [Required(ErrorMessage = "Please select a start date.")]
         public DateOnly? StartDate { get; set; }
+
+        // Ticket #2: false when an accepted offer supplies a proposed start date the server can fall back to.
+        public bool StartDateRequired { get; set; } = true;
 
         [Required(ErrorMessage = "Please select a date of birth.")]
         public DateOnly? DateOfBirth { get; set; }
@@ -516,6 +775,11 @@
                 yield return new ValidationResult(
                     "Please enter an employee number.",
                     [nameof(EmployeeNumber)]);
+
+            if (StartDateRequired && StartDate is null)
+                yield return new ValidationResult(
+                    "Please select a start date.",
+                    [nameof(StartDate)]);
         }
     }
 
@@ -627,7 +891,7 @@
     // "Pending" means an interview has been scheduled but no outcome has been recorded yet
     // (RecordInterviewOutcome hasn't been called) — Schedule Interview/Offer/Hire/Reject are
     // disabled until that outcome is recorded, so a recruiter can't accidentally schedule a second
-    // interview or move an applicant on/off the pipeline while one is still awaiting a result.
+    // interview or move a candidate on/off the pipeline while one is still awaiting a result.
     // Withdraw is deliberately left enabled — a candidate can withdraw at any point regardless of
     // where their interview stands.
     private static bool HasPendingInterview(ApplicationListItemModel row) =>
@@ -811,20 +1075,6 @@
         await LoadAsync();
     }
 
-    private async Task OfferAsync(ApplicationListItemModel row)
-    {
-        _actionError = null;
-        var (result, error) = await ApplicationService.OfferCandidateAsync(CompanyId, VacancyId, row.Id);
-        if (result is null)
-        {
-            _actionError = error;
-            return;
-        }
-
-        _actionSuccess = "Offer made to candidate.";
-        await LoadAsync();
-    }
-
     private async Task WithdrawAsync(ApplicationListItemModel row)
     {
         _actionError = null;
@@ -843,7 +1093,25 @@
     {
         _dialogError = null;
         _activeApplication = row;
-        _hireModel.StartDate = DateOnly.FromDateTime(DateTime.Today);
+
+        // Ticket #2: reflect the offer response into the Hire dialog.
+        _hireOfferAccepted = row.OfferResponseStatus == "Accepted";
+        _hireOfferedSalary = row.OfferedSalary;
+        // The vacancy list row doesn't carry the offered frequency; annual is the common case and
+        // matches how the compensation record is seeded server-side.
+        _hireOfferedSalaryFrequency = "Annual";
+        _hireOfferBlockedMessage = row.OfferResponseStatus switch
+        {
+            "Declined" => "The candidate declined the offer — record a new offer before hiring.",
+            "Withdrawn" => "The offer was withdrawn — record a new offer before hiring.",
+            _ => null,
+        };
+        // When an accepted offer carries a proposed start date, the server can fall back to it,
+        // so the Start Date field becomes optional.
+        _hireStartDateOptional = _hireOfferAccepted && row.OfferedStartDate is not null;
+        _hireModel.StartDateRequired = !_hireStartDateOptional;
+
+        _hireModel.StartDate = row.OfferedStartDate ?? DateOnly.FromDateTime(DateTime.Today);
         _hireModel.DateOfBirth = null;
         _hireModel.Nationality = null;
         _hireModel.Gender = null;
@@ -913,11 +1181,13 @@
             // An offer's already been made once on the Offer stage — Schedule Interview/Offer/
             // Reject stop making sense there (Hire and Withdraw remain valid).
             var enabledPreOffer = enabled && !onOfferStage;
+            var canRecordOfferResponse = _selectedRow?.OfferResponseStatus == "AwaitingResponse";
 
             return new List<object>
             {
                 new ItemModel { Id = "app-schedule", Text = "Schedule Interview", PrefixIcon = "fa-solid fa-calendar-plus", Disabled = !enabledPreOffer, TooltipText = "Schedule an interview for the selected application" },
                 new ItemModel { Id = "app-offer",     Text = "Offer",              PrefixIcon = "fa-solid fa-file-signature", Disabled = !enabledPreOffer, TooltipText = "Make an offer to the selected candidate" },
+                new ItemModel { Id = "app-offer-response", Text = "Record Offer Response", PrefixIcon = "fa-solid fa-reply", Disabled = !canRecordOfferResponse, TooltipText = "Record the candidate's response to the standing offer" },
                 new ItemModel { Id = "app-hire",      Text = "Hire",               PrefixIcon = "fa-solid fa-user-check", Disabled = !enabled, TooltipText = "Hire the selected candidate" },
                 new ItemModel { Id = "app-reject",    Text = "Reject",             PrefixIcon = "fa-solid fa-user-xmark", Disabled = !enabledPreOffer, TooltipText = "Reject the selected candidate" },
                 new ItemModel { Id = "app-withdraw",  Text = "Withdraw",           PrefixIcon = "fa-solid fa-arrow-rotate-left", Disabled = _selectedRow is null, TooltipText = "Withdraw the selected application" },
@@ -953,6 +1223,7 @@
         await _grid.EnableToolbarItemsAsync(["app-schedule", "app-offer", "app-reject"], enabledPreOffer);
         await _grid.EnableToolbarItemsAsync(["app-hire"], enabled);
         await _grid.EnableToolbarItemsAsync(["app-withdraw"], _selectedRow is not null);
+        await _grid.EnableToolbarItemsAsync(["app-offer-response"], _selectedRow?.OfferResponseStatus == "AwaitingResponse");
     }
 
     private async Task OnToolbarClick(ClickEventArgs args)
@@ -966,7 +1237,10 @@
                 await OpenScheduleDialog(row);
                 break;
             case "app-offer":
-                await OfferAsync(row);
+                await OpenOfferDialog(row);
+                break;
+            case "app-offer-response":
+                OpenOfferResponseDialog(row);
                 break;
             case "app-hire":
                 await OpenHireDialog(row);
@@ -1004,6 +1278,12 @@
         if (_activeApplication is null)
             return;
 
+        if (_hireOfferBlockedMessage is not null)
+        {
+            _dialogError = _hireOfferBlockedMessage;
+            return;
+        }
+
         if (!_hireEditContext.Validate())
         {
             _dialogError = _hireEditContext.GetValidationMessages().FirstOrDefault()
@@ -1013,7 +1293,7 @@
 
         var request = new HireCandidateRequest(
             CompanyId, VacancyId, _activeApplication.Id,
-            _hireModel.StartDate!.Value, _hireModel.DateOfBirth!.Value, _hireModel.Nationality!, _hireModel.Gender!,
+            _hireModel.StartDate, _hireModel.DateOfBirth!.Value, _hireModel.Nationality!, _hireModel.Gender!,
             string.IsNullOrWhiteSpace(_hireModel.GenderOther) ? null : _hireModel.GenderOther.Trim(),
             employeeNumberRequired ? _hireModel.EmployeeNumber!.Trim() : string.Empty, _hireModel.EmploymentTypeId!.Value,
             _hireModel.ManagerId == Guid.Empty ? null : _hireModel.ManagerId,

@@ -280,6 +280,33 @@ internal sealed class CreateEmployeeHandler
 
         _dbContext.Employees.Add(employee);
 
+        // Ticket 2: an automated hire from an accepted candidate offer carries the agreed salary —
+        // seed the new hire's first Compensation record from it in the same transaction so HR does
+        // not have to re-key what was already agreed. Only ever set on this provisioning path
+        // (Salary is null for human-initiated creation, which manages compensation separately).
+        if (request.Salary is > 0m)
+        {
+            var salaryType = Enum.TryParse<SalaryType>(request.SalaryFrequency, ignoreCase: true, out var parsedType)
+                             && Enum.IsDefined(parsedType)
+                ? parsedType
+                : SalaryType.Annual;
+
+            _dbContext.Compensations.Add(Compensation.Create(
+                Guid.NewGuid(),
+                request.CompanyId,
+                employee.Id,
+                employee.StartDate,
+                salaryType,
+                request.Salary.Value,
+                currency: "GBP",
+                hoursPerWeek: null,
+                fte: null,
+                notes: "Created from accepted recruitment offer.",
+                CompensationChangeReason.NewHire,
+                createdBy: employee.Id,
+                now));
+        }
+
         try
         {
             await _dbContext.SaveChangesAsync(cancellationToken);

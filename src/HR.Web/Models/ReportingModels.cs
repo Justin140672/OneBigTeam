@@ -240,7 +240,7 @@ public record RecruitmentPipelineReportRowModel(
     string GroupKey,
     string GroupLabel,
     int Vacancies,
-    int Applicants,
+    int Candidates,
     int Interviews,
     int Offers,
     int Hires);
@@ -257,7 +257,7 @@ public record VacancyPerformanceReportRowModel(
     Guid VacancyId,
     string VacancyTitle,
     int DaysOpen,
-    int ApplicantCount,
+    int CandidateCount,
     int InterviewCount,
     int OfferCount,
     DateOnly? HireDate);

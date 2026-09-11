@@ -37,10 +37,21 @@ internal sealed record GetApplicationResponse(
     string? CvContentType,
     long? CvFileSize,
     DateTimeOffset? CvUploadedAt,
-    // Ticket #66: stage-change history surfaced directly on the applicant record, ordered oldest
+    // Ticket #66: stage-change history surfaced directly on the candidate's application record, ordered oldest
     // first. Distinct from the cross-cutting IAuditEvent log (see RecruitmentAudit's
     // ApplicationStageChangedAuditEvent) — this is domain-specific data, not a general audit trail.
-    IReadOnlyList<ApplicationStageHistoryItem> StageHistory);
+    IReadOnlyList<ApplicationStageHistoryItem> StageHistory,
+    // Ticket 2: offer terms and response lifecycle recorded on this application. All null until an
+    // offer is made via OfferCandidate. OfferResponseStatus is one of AwaitingResponse / Accepted /
+    // Declined / Withdrawn.
+    decimal? OfferedSalary = null,
+    string? OfferedSalaryFrequency = null,
+    DateOnly? OfferedStartDate = null,
+    DateOnly? OfferDate = null,
+    string? OfferNotes = null,
+    string? OfferResponseStatus = null,
+    DateTimeOffset? OfferMadeAt = null,
+    DateTimeOffset? OfferRespondedAt = null);
 
 internal sealed record ApplicationStageHistoryItem(
     Guid Id,

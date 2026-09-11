@@ -4,7 +4,7 @@ namespace HR.Modules.Recruitment.Domain;
 /// Persisted record of a single stage change on an Application, written whenever a stage change
 /// succeeds (see Services/RecruitmentStageChangeRecorder). Distinct from the cross-cutting
 /// IAuditEvent mechanism (see RecruitmentAudit.ApplicationStageChangedAuditEvent) — this is
-/// domain-specific data surfaced directly on the applicant record (GetApplication.StageHistory),
+/// domain-specific data surfaced directly on the candidate's application record (GetApplication.StageHistory),
 /// not a general "who changed what" audit log entry.
 /// Ticket #99: PreviousStage/NewStage are now RecruitmentStage ids (Guid) rather than
 /// ApplicationStatus enum values. A nullable PreviousStageId represents "no prior stage" (does not

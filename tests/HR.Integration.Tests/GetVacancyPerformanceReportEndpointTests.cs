@@ -83,7 +83,7 @@ public class GetVacancyPerformanceReportEndpointTests
         Guid VacancyId,
         string VacancyTitle,
         int DaysOpen,
-        int ApplicantCount,
+        int CandidateCount,
         int InterviewCount,
         int OfferCount,
         DateOnly? HireDate);

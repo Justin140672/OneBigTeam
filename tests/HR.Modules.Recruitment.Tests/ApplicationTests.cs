@@ -243,4 +243,106 @@ public class ApplicationTests
         Assert.Equal(secondApprover, application.OfferApprovedByUserId);
         Assert.Equal(Now.AddDays(2), application.OfferApprovedAt);
     }
+
+    // Ticket 2: offer terms + response.
+
+    [Fact]
+    public void Create_Defaults_All_Offer_Term_Fields_To_Null()
+    {
+        var application = CreateApplication();
+
+        Assert.Null(application.OfferedSalary);
+        Assert.Null(application.OfferedSalaryFrequency);
+        Assert.Null(application.OfferedStartDate);
+        Assert.Null(application.OfferDate);
+        Assert.Null(application.OfferNotes);
+        Assert.Null(application.OfferResponseStatus);
+        Assert.Null(application.OfferMadeAt);
+        Assert.Null(application.OfferRespondedAt);
+    }
+
+    [Fact]
+    public void RecordOfferTerms_Sets_All_Fields_And_Puts_Offer_Into_AwaitingResponse()
+    {
+        var stageId = Guid.NewGuid();
+        var application = CreateApplication(stageId);
+        var later = Now.AddDays(1);
+        var startDate = new DateOnly(2026, 3, 1);
+        var offerDate = new DateOnly(2026, 1, 15);
+
+        application.RecordOfferTerms(55000m, OfferSalaryFrequency.Annual, startDate, offerDate, "Standard package.", later);
+
+        Assert.Equal(55000m, application.OfferedSalary);
+        Assert.Equal(OfferSalaryFrequency.Annual, application.OfferedSalaryFrequency);
+        Assert.Equal(startDate, application.OfferedStartDate);
+        Assert.Equal(offerDate, application.OfferDate);
+        Assert.Equal("Standard package.", application.OfferNotes);
+        Assert.Equal(OfferResponseStatus.AwaitingResponse, application.OfferResponseStatus);
+        Assert.Equal(later, application.OfferMadeAt);
+        Assert.Null(application.OfferRespondedAt);
+        Assert.Equal(later, application.UpdatedAt);
+        // Does not touch the pipeline stage — the caller owns the stage move.
+        Assert.Equal(stageId, application.CurrentStageId);
+    }
+
+    [Fact]
+    public void RecordOfferTerms_Trims_Notes_And_Maps_Whitespace_Only_To_Null()
+    {
+        var application = CreateApplication();
+
+        application.RecordOfferTerms(null, null, null, new DateOnly(2026, 1, 15), "   Negotiated up.   ", Now);
+        Assert.Equal("Negotiated up.", application.OfferNotes);
+
+        application.RecordOfferTerms(null, null, null, new DateOnly(2026, 1, 15), "   ", Now);
+        Assert.Null(application.OfferNotes);
+    }
+
+    [Fact]
+    public void RecordOfferTerms_Accepts_Null_Salary_Frequency_And_Start_Date()
+    {
+        var application = CreateApplication();
+
+        application.RecordOfferTerms(null, null, null, new DateOnly(2026, 1, 15), null, Now);
+
+        Assert.Null(application.OfferedSalary);
+        Assert.Null(application.OfferedSalaryFrequency);
+        Assert.Null(application.OfferedStartDate);
+        Assert.Equal(OfferResponseStatus.AwaitingResponse, application.OfferResponseStatus);
+    }
+
+    [Fact]
+    public void RecordOfferTerms_Called_Again_Re_Records_And_Clears_Prior_Response_Timestamp()
+    {
+        var application = CreateApplication();
+        application.RecordOfferTerms(40000m, OfferSalaryFrequency.Annual, null, new DateOnly(2026, 1, 1), null, Now);
+        application.RespondToOffer(OfferResponseStatus.Declined, Now.AddDays(1));
+
+        application.RecordOfferTerms(45000m, OfferSalaryFrequency.Annual, null, new DateOnly(2026, 2, 1), null, Now.AddDays(2));
+
+        Assert.Equal(45000m, application.OfferedSalary);
+        Assert.Equal(OfferResponseStatus.AwaitingResponse, application.OfferResponseStatus);
+        Assert.Null(application.OfferRespondedAt);
+        Assert.Equal(Now.AddDays(2), application.OfferMadeAt);
+    }
+
+    [Theory]
+    [InlineData((int)OfferResponseStatus.Accepted)]
+    [InlineData((int)OfferResponseStatus.Declined)]
+    [InlineData((int)OfferResponseStatus.Withdrawn)]
+    public void RespondToOffer_Sets_Status_And_OfferRespondedAt(int responseRaw)
+    {
+        var response = (OfferResponseStatus)responseRaw;
+        var stageId = Guid.NewGuid();
+        var application = CreateApplication(stageId);
+        application.RecordOfferTerms(50000m, OfferSalaryFrequency.Annual, null, new DateOnly(2026, 1, 1), null, Now);
+        var later = Now.AddDays(3);
+
+        application.RespondToOffer(response, later);
+
+        Assert.Equal(response, application.OfferResponseStatus);
+        Assert.Equal(later, application.OfferRespondedAt);
+        Assert.Equal(later, application.UpdatedAt);
+        // Response never moves the pipeline stage.
+        Assert.Equal(stageId, application.CurrentStageId);
+    }
 }

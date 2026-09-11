@@ -13,7 +13,7 @@
 
 <div class="container-fluid py-4">
     <h1 class="mb-1">Recruitment Pipeline Report</h1>
-    <p class="text-muted mb-3">Vacancies, applicants, interviews, offers and hires grouped by recruiter or vacancy.</p>
+    <p class="text-muted mb-3">Vacancies, candidates, interviews, offers and hires grouped by recruiter or vacancy.</p>
 
     @if (_exportError is not null)
     {
@@ -63,7 +63,7 @@
             <GridColumns>
                 <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.GroupLabel)" HeaderText="@GroupLabelHeader" Width="180" />
                 <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.Vacancies)" HeaderText="Vacancies" Width="120" />
-                <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.Applicants)" HeaderText="Applicants" Width="120" />
+                <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.Candidates)" HeaderText="Candidates" Width="120" />
                 <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.Interviews)" HeaderText="Interviews" Width="120" />
                 <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.Offers)" HeaderText="Offers" Width="120" />
                 <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.Hires)" HeaderText="Hires" Width="120" />

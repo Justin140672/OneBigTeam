@@ -37,7 +37,7 @@ public sealed class RecruitmentPipelineReportTests(RecruiterPersonaFixture fixtu
         var headers = await report.GetColumnHeadersAsync();
         Assert.Contains(headers, h => h.Contains("Recruiter") || h.Contains("Vacancy"));
         Assert.Contains(headers, h => h.Contains("Vacancies"));
-        Assert.Contains(headers, h => h.Contains("Applicants"));
+        Assert.Contains(headers, h => h.Contains("Candidates"));
         Assert.Contains(headers, h => h.Contains("Interviews"));
         Assert.Contains(headers, h => h.Contains("Offers"));
         Assert.Contains(headers, h => h.Contains("Hires"));

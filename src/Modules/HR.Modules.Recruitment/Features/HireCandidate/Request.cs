@@ -6,7 +6,12 @@ internal sealed record HireCandidateRequest
     public Guid CompanyId { get; init; }
     public Guid VacancyId { get; init; }
     public Guid ApplicationId { get; init; }
-    public DateOnly StartDate { get; init; }
+
+    // Ticket 2: optional. When omitted, HireCandidateHandler falls back to the proposed start date
+    // recorded on the accepted offer (Application.OfferedStartDate) so HR doesn't re-enter it. Hiring
+    // fails if neither is present.
+    public DateOnly? StartDate { get; init; }
+
     public DateOnly DateOfBirth { get; init; }
     public string Nationality { get; init; } = string.Empty;
     public string Gender { get; init; } = string.Empty;

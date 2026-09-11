@@ -37,4 +37,13 @@ internal sealed record CreateEmployeeRequest
     /// EmployeeCreated. Null for human-initiated creation.
     /// </summary>
     public string? SourceReference { get; init; }
+
+    /// <summary>
+    /// Ticket 2: agreed starting compensation supplied by an automated hire (accepted candidate
+    /// offer). When <see cref="Salary"/> is positive the handler creates the employee's first
+    /// Compensation record. <see cref="SalaryFrequency"/> is "Annual" | "Hourly" | "Daily"
+    /// (defaults to Annual). Null for human-initiated creation (compensation managed separately).
+    /// </summary>
+    public decimal? Salary { get; init; }
+    public string? SalaryFrequency { get; init; }
 }

@@ -80,6 +80,42 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("offer_approved_by_user_id");
 
+                    b.Property<DateOnly?>("OfferDate")
+                        .HasColumnType("date")
+                        .HasColumnName("offer_date");
+
+                    b.Property<DateTimeOffset?>("OfferMadeAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("offer_made_at");
+
+                    b.Property<string>("OfferNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("offer_notes");
+
+                    b.Property<DateTimeOffset?>("OfferRespondedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("offer_responded_at");
+
+                    b.Property<string>("OfferResponseStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("offer_response_status");
+
+                    b.Property<decimal?>("OfferedSalary")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("offered_salary");
+
+                    b.Property<string>("OfferedSalaryFrequency")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("offered_salary_frequency");
+
+                    b.Property<DateOnly?>("OfferedStartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("offered_start_date");
+
                     b.Property<string>("RejectionReason")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")

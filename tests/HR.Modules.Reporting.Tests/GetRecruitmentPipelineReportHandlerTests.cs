@@ -23,7 +23,7 @@ public class GetRecruitmentPipelineReportHandlerTests
         Assert.Equal(recruiterId.ToString(), row.GroupKey);
         Assert.Equal("Bob", row.GroupLabel);
         Assert.Equal(3, row.Vacancies);
-        Assert.Equal(10, row.Applicants);
+        Assert.Equal(10, row.Candidates);
         Assert.Equal(1, row.Hires);
     }
 
@@ -59,6 +59,6 @@ public class GetRecruitmentPipelineReportHandlerTests
         Assert.Equal(vacancyId.ToString(), row.GroupKey);
         Assert.Equal("Engineer", row.GroupLabel);
         Assert.Equal(1, row.Vacancies);
-        Assert.Equal(5, row.Applicants);
+        Assert.Equal(5, row.Candidates);
     }
 }

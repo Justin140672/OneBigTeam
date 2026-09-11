@@ -25,11 +25,35 @@ public sealed class CandidateListPage(IPage page, string baseUrl)
 
     public async Task ClickNewCandidateAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        // WaitUntil=Commit, not the default Load: a Blazor interactive navigation may never
-        // re-fire the target document's "load" event.
-        await page.WaitForURLAsync("**/candidates/new**",
-            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
+        // Same race as EmployeeListPage.ClickNewEmployeeAsync: SearchPageBase's "hr-add" toolbar
+        // handler silently no-ops while the page's async permission check is still pending
+        // (GetAddUrl() returns null, nothing navigates, no error). A Recruiter-only account
+        // (candidate:view is Recruiter-gated) hits this most under headless + parallel load.
+        // Wait for the button, then retry the click until the navigation actually commits.
+        var button = page.GetByRole(AriaRole.Button, new() { Name = "Add" });
+        await button.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60_000 });
+
+        const int maxAttempts = 8;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            await button.ClickAsync();
+            try
+            {
+                // WaitUntil=Commit, not the default Load: a Blazor interactive navigation may
+                // never re-fire the target document's "load" event.
+                await page.WaitForURLAsync("**/candidates/new**",
+                    new()
+                    {
+                        Timeout = attempt < maxAttempts ? 3_000 : 30_000,
+                        WaitUntil = WaitUntilState.Commit,
+                    });
+                return;
+            }
+            catch (TimeoutException) when (attempt < maxAttempts)
+            {
+                // Permission check likely still pending when we clicked — try again.
+            }
+        }
     }
 
     /// <summary>

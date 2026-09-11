@@ -26,7 +26,7 @@ public sealed record RecruitmentPipelineRecruiterRow(
     Guid? RecruiterId,
     string RecruiterName,
     int Vacancies,
-    int Applicants,
+    int Candidates,
     int Interviews,
     int Offers,
     int Hires);
@@ -34,7 +34,7 @@ public sealed record RecruitmentPipelineRecruiterRow(
 public sealed record RecruitmentPipelineVacancyRow(
     Guid VacancyId,
     string VacancyTitle,
-    int Applicants,
+    int Candidates,
     int Interviews,
     int Offers,
     int Hires);

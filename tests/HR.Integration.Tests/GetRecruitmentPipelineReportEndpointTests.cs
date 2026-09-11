@@ -82,7 +82,7 @@ public class GetRecruitmentPipelineReportEndpointTests
         string GroupKey,
         string GroupLabel,
         int Vacancies,
-        int Applicants,
+        int Candidates,
         int Interviews,
         int Offers,
         int Hires);

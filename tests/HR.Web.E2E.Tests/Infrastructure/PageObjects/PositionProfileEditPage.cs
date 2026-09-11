@@ -82,6 +82,14 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         await TypeIntoNumericInputAsync(page.GetByPlaceholder("Max"), max.ToString());
     }
 
+    /// <summary>
+    /// Selects a value ("Annual", "Hourly", "Daily", …) from the "Salary Type" dropdown in the
+    /// Defaults card. Scoped to that field's own <c>.hr-field</c> wrapper by label, same pattern as
+    /// <see cref="SelectDefaultLeavePolicyAsync"/> (the card has three sibling comboboxes).
+    /// </summary>
+    public Task SelectSalaryTypeAsync(string salaryType) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".hr-field", new PageLocatorOptions { HasText = "Salary Type" }), salaryType);
+
     /// <summary>Selects a value from the Department dropdown on the position profile create/edit form.</summary>
     public Task SelectDepartmentAsync(string nameFragment) =>
         DropDownSelector.SelectAsync(page, page.Locator(".hr-field", new PageLocatorOptions { HasText = "Department" }).First, nameFragment);

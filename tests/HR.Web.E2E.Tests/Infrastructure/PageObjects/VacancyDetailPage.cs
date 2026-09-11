@@ -797,7 +797,10 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<string?> GetApplicationSourceColumnTextAsync(string candidateNameFragment)
     {
-        var cell = ApplicationRow(candidateNameFragment).First.Locator(".e-rowcell").Last;
+        // Column order (VacancyApplicationsTab.razor GridColumns): Candidate, Email, Status,
+        // Interview Outcome, Applied, Source, then the trailing header-less "Review CV" link column
+        // (ticket #1). The Source column is index 5 — ".Last" would now hit the Review CV cell.
+        var cell = ApplicationRow(candidateNameFragment).First.Locator(".e-rowcell").Nth(5);
         return (await cell.TextContentAsync())?.Trim();
     }
 
@@ -873,9 +876,9 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// button isn't directly visible there, open the overflow popup ("..." nav button) and look
     /// inside it instead.
     /// </summary>
-    private async Task<ILocator> ApplicationsToolbarButtonAsync(string name)
+    private async Task<ILocator> ApplicationsToolbarButtonAsync(string name, bool exact = false)
     {
-        var direct = ApplicationsTab.Locator(".e-toolbar").GetByRole(AriaRole.Button, new() { Name = name });
+        var direct = ApplicationsTab.Locator(".e-toolbar").GetByRole(AriaRole.Button, new() { Name = name, Exact = exact });
 
         // RefreshToolbarStateAsync's own round-trip (re-enabling the relevant toolbar buttons
         // after SelectApplicationRowAsync's click) can still be in flight — a disabled Syncfusion
@@ -901,7 +904,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         }
 
         await overflowToggle.ClickAsync();
-        var popup = page.Locator(".e-toolbar-pop:visible").GetByRole(AriaRole.Button, new() { Name = name });
+        var popup = page.Locator(".e-toolbar-pop:visible").GetByRole(AriaRole.Button, new() { Name = name, Exact = exact });
         await popup.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
         return popup;
     }
@@ -927,7 +930,13 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task ClickOfferForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await (await ApplicationsToolbarButtonAsync("Offer")).ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Offer", exact: true)).ClickAsync();
+
+        // Ticket #2: the "Offer" toolbar item now opens the "Make an Offer" dialog instead of
+        // advancing directly. Accept the pre-populated defaults and submit.
+        var offerDialog = page.Locator(".offer-candidate-dialog");
+        await offerDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await offerDialog.GetByRole(AriaRole.Button, new() { Name = "Make Offer" }).ClickAsync();
 
         // Same reasoning as ClickWithdrawForAsync — OfferAsync sets _actionSuccess and awaits
         // LoadAsync's grid refetch within the same event handler, with no intermediate render in
@@ -1229,4 +1238,203 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
+    // ── Ticket #2: Make an Offer dialog ─────────────────────────────────────────
+    // Opened from the Applications tab grid toolbar's "Offer" item (ItemModel Id="app-offer"),
+    // which as of Ticket #2 opens the Make an Offer dialog (CssClass="offer-candidate-dialog")
+    // rather than immediately advancing the application. New elements carry data-testid values:
+    // offer-position-profile-context, offer-salary, offer-salary-frequency,
+    // offer-proposed-start-date, offer-date, offer-notes (see VacancyApplicationsTab.razor).
+
+    private ILocator OfferDialog => page.Locator("[role='dialog'].offer-candidate-dialog");
+
+    /// <summary>
+    /// Selects the application row and clicks the toolbar's "Offer" item (exact-name match — a
+    /// substring match would also hit "Record Offer Response"), then waits for the Make an Offer
+    /// dialog to open.
+    /// </summary>
+    public async Task OpenMakeOfferDialogAsync(string candidateNameFragment)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        await (await ApplicationsToolbarButtonAsync("Offer", exact: true)).ClickAsync();
+        await OfferDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+    }
+
+    /// <summary>Reads the "Position Profile salary range" context block (data-testid="offer-position-profile-context").</summary>
+    public async Task<string?> GetOfferPositionProfileContextTextAsync()
+    {
+        var ctx = page.Locator("[data-testid='offer-position-profile-context']");
+        await ctx.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        return (await ctx.TextContentAsync())?.Trim();
+    }
+
+    private ILocator OfferSalaryInput =>
+        page.Locator(".offer-candidate-dialog .col-md-6").Filter(new() { HasText = "Offered Salary" })
+            .Locator("input.e-numerictextbox, input.e-input").First;
+
+    /// <summary>Reads the current (formatted) value shown in the "Offered Salary" numeric field.</summary>
+    public Task<string> GetOfferedSalaryValueAsync() => OfferSalaryInput.InputValueAsync();
+
+    /// <summary>Retypes the "Offered Salary" numeric field — SfNumericTextBox needs a real click/select-all/type/Tab, a bare Fill bypasses its interop.</summary>
+    public async Task SetOfferedSalaryAsync(string value)
+    {
+        await OfferSalaryInput.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        await OfferSalaryInput.PressSequentiallyAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public Task SelectOfferSalaryFrequencyAsync(string frequency) =>
+        DropDownSelector.SelectAsync(
+            page,
+            page.Locator(".offer-candidate-dialog .col-md-6").Filter(new() { HasText = "Salary Frequency" }),
+            frequency);
+
+    private ILocator OfferDateField(string labelText) =>
+        page.Locator(".offer-candidate-dialog .col-md-6").Filter(new() { HasText = labelText })
+            .Locator("input.e-input").First;
+
+    public async Task FillOfferProposedStartDateAsync(string ddMMyyyy)
+    {
+        var input = OfferDateField("Proposed Start Date");
+        await input.ClickAsync();
+        await input.FillAsync(ddMMyyyy);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public async Task FillOfferDateAsync(string ddMMyyyy)
+    {
+        var input = OfferDateField("Offer Date");
+        await input.ClickAsync();
+        await input.FillAsync(ddMMyyyy);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public async Task FillOfferNotesAsync(string value)
+    {
+        var textarea = page.Locator("[data-testid='offer-notes'] textarea, .offer-candidate-dialog textarea.e-input").First;
+        await textarea.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    /// <summary>Clicks "Make Offer" and waits for the dialog to close and the success alert to confirm the offer landed.</summary>
+    public async Task SubmitOfferAsync()
+    {
+        await page.Locator(".offer-candidate-dialog .e-footer-content button:has-text('Make Offer')").ClickAsync();
+        await OfferDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+        await Assertions.Expect(page.Locator("[data-testid='vacancy-applications-tab'] .alert-success"))
+            .ToHaveTextAsync("Offer made to candidate.", new() { Timeout = 15_000 });
+    }
+
+    /// <summary>Clicks "Make Offer" without waiting for the dialog to close — for validation cases that keep it open.</summary>
+    public Task ClickMakeOfferButtonAsync() =>
+        page.Locator(".offer-candidate-dialog .e-footer-content button:has-text('Make Offer')").ClickAsync();
+
+    // ── Ticket #2: Record Offer Response dialog ─────────────────────────────────
+    // Toolbar item Id="app-offer-response", Text="Record Offer Response", disabled unless the
+    // selected application's OfferResponseStatus == "AwaitingResponse". Dialog CssClass=
+    // "offer-response-dialog" with a single dropdown (data-testid="offer-response-status").
+
+    private ILocator OfferResponseDialog => page.Locator("[role='dialog'].offer-response-dialog");
+
+    /// <summary>
+    /// Returns whether the "Record Offer Response" toolbar item is currently enabled for the given
+    /// application row (selects it first). Syncfusion marks a disabled grid-toolbar item with the
+    /// "e-overlay" class; polls briefly since RefreshToolbarStateAsync re-enables items via a
+    /// server round-trip after row selection.
+    /// </summary>
+    public async Task<bool> IsRecordOfferResponseToolbarItemEnabledAsync(string candidateNameFragment)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        var item = ApplicationsTab.Locator(".e-toolbar-item").Filter(new() { HasText = "Record Offer Response" }).First;
+        await item.WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 10_000 });
+
+        bool enabled = false;
+        var deadline = DateTime.UtcNow.AddSeconds(4);
+        while (DateTime.UtcNow < deadline)
+        {
+            var cls = await item.GetAttributeAsync("class") ?? "";
+            enabled = !cls.Contains("e-overlay") && !cls.Contains("e-disabled");
+            if (enabled) break;
+            await page.WaitForTimeoutAsync(200);
+        }
+        return enabled;
+    }
+
+    public async Task OpenRecordOfferResponseDialogAsync(string candidateNameFragment)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        await (await ApplicationsToolbarButtonAsync("Record Offer Response", exact: true)).ClickAsync();
+        await OfferResponseDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+    }
+
+    public Task SelectOfferResponseStatusAsync(string status) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".offer-response-dialog"), status);
+
+    public async Task SubmitOfferResponseAsync()
+    {
+        await page.Locator(".offer-response-dialog .e-footer-content button:has-text('Record Response')").ClickAsync();
+        await OfferResponseDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+        // The dialog hides ahead of the LoadAsync grid refetch that repaints the offer badge.
+        await page.WaitForTimeoutAsync(300);
+    }
+
+    /// <summary>
+    /// Reads the Applications grid "Offer: …" badge text (data-testid="offer-response-badge") for
+    /// the given row, or null if no offer badge is shown. Polls, since the badge appears/updates
+    /// only after LoadAsync re-runs post-offer / post-response.
+    /// </summary>
+    public async Task<string?> GetOfferResponseBadgeTextAsync(string candidateNameFragment)
+    {
+        var badge = ApplicationRow(candidateNameFragment).First.Locator("[data-testid='offer-response-badge']");
+        try
+        {
+            await badge.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
+        return (await badge.TextContentAsync())?.Trim();
+    }
+
+    // ── Ticket #2: Hire dialog offer context ────────────────────────────────────
+
+    /// <summary>The "will seed first compensation record" accepted-offer info panel (data-testid="hire-offer-accepted-context").</summary>
+    public async Task<string?> GetHireOfferAcceptedContextTextAsync()
+    {
+        var el = page.Locator("[data-testid='hire-offer-accepted-context']");
+        try
+        {
+            await el.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 8_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
+        return (await el.TextContentAsync())?.Trim();
+    }
+
+    /// <summary>True if the Hire dialog shows the "record a new offer before hiring" warning (data-testid="hire-offer-blocked").</summary>
+    public async Task<bool> IsHireOfferBlockedWarningVisibleAsync()
+    {
+        try
+        {
+            await page.Locator("[data-testid='hire-offer-blocked']").WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = 8_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Reads the current value of the Hire dialog's Start Date field (data-testid="hire-start-date").</summary>
+    public async Task<string> GetHireStartDateValueAsync()
+    {
+        var input = page.Locator(".hire-candidate-dialog .e-date-wrapper input.e-input").First;
+        await input.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        return await input.InputValueAsync();
+    }
 }

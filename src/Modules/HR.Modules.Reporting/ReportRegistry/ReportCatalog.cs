@@ -84,12 +84,12 @@ internal static class ReportCatalog
 
         // Standard: recruiter/vacancy-grouped counts only, no named candidates in the exported rows.
         new("recruitment-pipeline-report", "Recruitment Pipeline Report", ReportCategory.Recruitment,
-            "Vacancies, applicants, interviews, offers and hires grouped by recruiter or vacancy.",
+            "Vacancies, candidates, interviews, offers and hires grouped by recruiter or vacancy.",
             ReportAccessGate.Recruitment, typeof(GetRecruitmentPipelineReportRequest), ReportSensitivity.Standard),
 
         // Standard: per-vacancy aggregate counts only, no named candidates in the exported rows.
         new("vacancy-performance-report", "Vacancy Performance Report", ReportCategory.Recruitment,
-            "Per-vacancy days open, applicant count, interview count, offer count and hire date.",
+            "Per-vacancy days open, candidate count, interview count, offer count and hire date.",
             ReportAccessGate.Recruitment, typeof(GetVacancyPerformanceReportRequest), ReportSensitivity.Standard),
 
         new("probation-report", "Probation Report", ReportCategory.Hr,

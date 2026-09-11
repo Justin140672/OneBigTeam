@@ -13,4 +13,8 @@ internal sealed record ApplicationListItem(
     Guid CurrentStageId,
     InterviewOutcome? InterviewOutcome,
     bool IsWithdrawn,
-    DateTimeOffset AppliedAt);
+    DateTimeOffset AppliedAt,
+    // Ticket 2: offer response lifecycle for this application (null until an offer is made).
+    string? OfferResponseStatus = null,
+    decimal? OfferedSalary = null,
+    DateOnly? OfferedStartDate = null);

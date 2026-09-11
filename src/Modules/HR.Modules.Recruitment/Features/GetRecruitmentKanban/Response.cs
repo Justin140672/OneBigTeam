@@ -12,9 +12,9 @@ internal sealed record KanbanColumn(
     string StageName,
     bool IsTerminal,
     int Count,
-    IReadOnlyList<KanbanApplicantSummary> Applicants);
+    IReadOnlyList<KanbanCandidateSummary> Candidates);
 
-internal sealed record KanbanApplicantSummary(
+internal sealed record KanbanCandidateSummary(
     Guid ApplicationId,
     Guid CandidateId,
     string CandidateFirstName,

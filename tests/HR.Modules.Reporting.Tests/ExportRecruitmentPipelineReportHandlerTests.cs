@@ -21,7 +21,7 @@ public class ExportRecruitmentPipelineReportHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Recruitment Pipeline Report", exporter.LastData!.ReportTitle);
-        Assert.Equal(["Group", "Vacancies", "Applicants", "Interviews", "Offers", "Hires"], exporter.LastData.ColumnHeaders);
+        Assert.Equal(["Group", "Vacancies", "Candidates", "Interviews", "Offers", "Hires"], exporter.LastData.ColumnHeaders);
         var row = Assert.Single(exporter.LastData.Rows);
         Assert.Equal("Bob", row[0]);
         Assert.Equal("1", row[5]);

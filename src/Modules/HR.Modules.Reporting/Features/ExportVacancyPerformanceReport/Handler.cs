@@ -14,7 +14,7 @@ internal sealed class ExportVacancyPerformanceReportHandler(
 
     private static readonly string[] ColumnHeaders =
     [
-        "Vacancy", "Days Open", "Applicants", "Interviews", "Offers", "Hire Date",
+        "Vacancy", "Days Open", "Candidates", "Interviews", "Offers", "Hire Date",
     ];
 
     public async Task<Result<ExportVacancyPerformanceReportResponse>> HandleAsync(
@@ -40,7 +40,7 @@ internal sealed class ExportVacancyPerformanceReportHandler(
                 {
                     item.VacancyTitle,
                     item.DaysOpen.ToString(),
-                    item.ApplicantCount.ToString(),
+                    item.CandidateCount.ToString(),
                     item.InterviewCount.ToString(),
                     item.OfferCount.ToString(),
                     item.HireDate?.ToString("yyyy-MM-dd"),

@@ -38,6 +38,14 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
                 a.UpdatedAt,
                 a.Source,
                 a.SourceExternalRecruiterId,
+                a.OfferedSalary,
+                a.OfferedSalaryFrequency,
+                a.OfferedStartDate,
+                a.OfferDate,
+                a.OfferNotes,
+                a.OfferResponseStatus,
+                a.OfferMadeAt,
+                a.OfferRespondedAt,
             })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -103,6 +111,14 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
             cv?.ContentType,
             cv?.FileSize,
             cv?.CreatedAt,
-            stageHistory));
+            stageHistory,
+            row.OfferedSalary,
+            row.OfferedSalaryFrequency?.ToString(),
+            row.OfferedStartDate,
+            row.OfferDate,
+            row.OfferNotes,
+            row.OfferResponseStatus?.ToString(),
+            row.OfferMadeAt,
+            row.OfferRespondedAt));
     }
 }

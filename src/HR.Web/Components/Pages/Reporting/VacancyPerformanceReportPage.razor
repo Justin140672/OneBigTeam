@@ -13,7 +13,7 @@
 
 <div class="container-fluid py-4">
     <h1 class="mb-1">Vacancy Performance Report</h1>
-    <p class="text-muted mb-3">Per-vacancy days open, applicant count, interview count, offer count and hire date.</p>
+    <p class="text-muted mb-3">Per-vacancy days open, candidate count, interview count, offer count and hire date.</p>
 
     @if (_exportError is not null)
     {
@@ -54,7 +54,7 @@
             <GridColumns>
                 <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.VacancyTitle)" HeaderText="Vacancy" Width="200" />
                 <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.DaysOpen)" HeaderText="Days Open" Width="120" />
-                <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.ApplicantCount)" HeaderText="Applicants" Width="120" />
+                <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.CandidateCount)" HeaderText="Candidates" Width="120" />
                 <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.InterviewCount)" HeaderText="Interviews" Width="120" />
                 <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.OfferCount)" HeaderText="Offers" Width="120" />
                 <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.HireDate)" HeaderText="Hire Date" Width="140" Format="d" />

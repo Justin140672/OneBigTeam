@@ -81,18 +81,35 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
         return (null, await ReadErrorAsync(response, "Failed to withdraw application."));
     }
 
-    public async Task<(OfferCandidateResponse? Result, string? Error)> OfferCandidateAsync(Guid companyId, Guid vacancyId, Guid applicationId)
+    public async Task<(OfferCandidateResponse? Result, string? Error)> OfferCandidateAsync(
+        Guid companyId, Guid vacancyId, Guid applicationId, OfferCandidateRequest? request = null)
     {
         // A truly bodyless POST (no Content-Type header at all) gets rejected by FastEndpoints
-        // with 415 Unsupported Media Type, even though OfferCandidateRequest's properties are
-        // all route-bound — post an empty JSON object instead of a null body (see the identical
-        // fix in DataImportService.ValidateSessionAsync/ConfirmSessionAsync).
-        var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer", new { });
+        // with 415 Unsupported Media Type — post a JSON body. Ticket #2 adds optional offer terms;
+        // when the caller passes no request we still send the route-bound identifiers as an object.
+        var body = request ?? new OfferCandidateRequest(companyId, vacancyId, applicationId);
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer", body, HrApiJsonOptions.Default);
 
         if (response.IsSuccessStatusCode)
             return (await response.Content.ReadFromJsonAsync<OfferCandidateResponse>(HrApiJsonOptions.Default), null);
 
         return (null, await ReadErrorAsync(response, "Failed to make offer."));
+    }
+
+    // Ticket #2: record the candidate's response to a standing offer.
+    // 422 validation / 400 business / 404 not found / 409 already resolved.
+    public async Task<(RespondToOfferResponse? Result, string? Error)> RespondToOfferAsync(
+        Guid companyId, Guid vacancyId, Guid applicationId, string status)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer/response",
+            new RespondToOfferRequest(companyId, vacancyId, applicationId, status), HrApiJsonOptions.Default);
+
+        if (response.IsSuccessStatusCode)
+            return (await response.Content.ReadFromJsonAsync<RespondToOfferResponse>(HrApiJsonOptions.Default), null);
+
+        return (null, await ReadErrorAsync(response, "Failed to record the offer response."));
     }
 
     public async Task<(RejectCandidateResponse? Result, string? Error)> RejectCandidateAsync(

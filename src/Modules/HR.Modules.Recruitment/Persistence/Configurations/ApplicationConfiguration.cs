@@ -41,6 +41,37 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
         builder.Property(a => a.OfferApprovedByUserId)
             .HasColumnName("offer_approved_by_user_id");
 
+        // Ticket 2: offer terms recorded on the application.
+        builder.Property(a => a.OfferedSalary)
+            .HasColumnName("offered_salary")
+            .HasPrecision(18, 2);
+
+        builder.Property(a => a.OfferedSalaryFrequency)
+            .HasColumnName("offered_salary_frequency")
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(a => a.OfferedStartDate)
+            .HasColumnName("offered_start_date");
+
+        builder.Property(a => a.OfferDate)
+            .HasColumnName("offer_date");
+
+        builder.Property(a => a.OfferNotes)
+            .HasColumnName("offer_notes")
+            .HasMaxLength(2000);
+
+        builder.Property(a => a.OfferResponseStatus)
+            .HasColumnName("offer_response_status")
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(a => a.OfferMadeAt)
+            .HasColumnName("offer_made_at");
+
+        builder.Property(a => a.OfferRespondedAt)
+            .HasColumnName("offer_responded_at");
+
         builder.Property(a => a.InterviewOutcome)
             .HasColumnName("interview_outcome")
             .HasConversion<string>()

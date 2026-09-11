@@ -1244,6 +1244,88 @@ public class CreateEmployeeHandlerTests
         Assert.True(result.IsSuccess);
     }
 
+    // Ticket 2: automated hire from an accepted recruitment offer seeds the first Compensation row.
+
+    private static CreateEmployeeRequest BuildRequestWithLookups(
+        Guid companyId, Guid departmentId, Guid locationId, Guid positionProfileId, Guid employmentTypeId,
+        decimal? salary = null, string? salaryFrequency = null) => new()
+    {
+        CompanyId = companyId,
+        DepartmentId = departmentId,
+        LocationId = locationId,
+        PositionProfileId = positionProfileId,
+        EmploymentTypeId = employmentTypeId,
+        EmployeeNumber = "EMP-0001",
+        FirstName = "Alice",
+        LastName = "Smith",
+        WorkEmail = "alice.smith@example.com",
+        StartDate = StartDate,
+        DateOfBirth = new DateOnly(1990, 5, 20),
+        Nationality = "British",
+        Gender = "Female",
+        Salary = salary,
+        SalaryFrequency = salaryFrequency,
+    };
+
+    [Theory]
+    [InlineData(null, (int)SalaryType.Annual)]
+    [InlineData("Annual", (int)SalaryType.Annual)]
+    [InlineData("hourly", (int)SalaryType.Hourly)]
+    [InlineData("Daily", (int)SalaryType.Daily)]
+    [InlineData("nonsense", (int)SalaryType.Annual)]
+    public async Task HandleAsync_Creates_Compensation_From_Offer_Salary_With_Mapped_SalaryType(
+        string? salaryFrequency, int expectedTypeRaw)
+    {
+        var expectedType = (SalaryType)expectedTypeRaw;
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+
+        var result = await handler.HandleAsync(
+            BuildRequestWithLookups(companyId, departmentId, locationId, positionProfileId, employmentTypeId, 52000m, salaryFrequency),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var compensation = await context.Compensations.SingleAsync();
+        Assert.Equal(companyId, compensation.CompanyId);
+        Assert.Equal(result.Value!.Id, compensation.EmployeeId);
+        Assert.Equal(52000m, compensation.Salary);
+        Assert.Equal(expectedType, compensation.SalaryType);
+        Assert.Equal("GBP", compensation.Currency);
+        Assert.Equal(CompensationChangeReason.NewHire, compensation.Reason);
+        Assert.Equal(result.Value.Id, compensation.CreatedBy);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Create_Compensation_When_Offer_Salary_Is_Null()
+    {
+        await AssertNoCompensationCreated(salary: null);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Create_Compensation_When_Offer_Salary_Is_Zero()
+    {
+        await AssertNoCompensationCreated(salary: 0m);
+    }
+
+    private static async Task AssertNoCompensationCreated(decimal? salary)
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+
+        var result = await handler.HandleAsync(
+            BuildRequestWithLookups(companyId, departmentId, locationId, positionProfileId, employmentTypeId, salary, "Annual"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(await context.Compensations.ToListAsync());
+    }
+
     private static EmployeesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<EmployeesDbContext>()

@@ -8,7 +8,7 @@ namespace HR.Modules.Recruitment.Services;
 
 /// <summary>
 /// Backs IRecruitmentPipelineReader (OBT-709), IVacancyPerformanceReader (OBT-710) and
-/// IRecruitmentPipelineSummaryReader. Kept as a single reader so the applicant/interview/offer/hire
+/// IRecruitmentPipelineSummaryReader. Kept as a single reader so the candidate/interview/offer/hire
 /// counting logic — which all three reports need — is written once. "Offers" are counted as distinct
 /// applications with an ApplicationStageHistoryEntry into the company's "Offer" named
 /// RecruitmentStage (there is no separate Offer entity/field in the domain). Date range filtering
@@ -53,7 +53,7 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext, IP
                     g.Key,
                     g.Key is not null && recruiterNames.TryGetValue(g.Key.Value, out var name) ? name : "Unassigned",
                     g.Count(),
-                    rows.Sum(r => r.Applicants),
+                    rows.Sum(r => r.Candidates),
                     rows.Sum(r => r.Interviews),
                     rows.Sum(r => r.Offers),
                     rows.Sum(r => r.Hires));
@@ -79,7 +79,7 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext, IP
             .Select(m => new RecruitmentPipelineVacancyRow(
                 m.VacancyId,
                 vacancyTitles.TryGetValue(m.VacancyId, out var title) ? title ?? "(untitled vacancy)" : "(untitled vacancy)",
-                m.Applicants,
+                m.Candidates,
                 m.Interviews,
                 m.Offers,
                 m.Hires))
@@ -117,7 +117,7 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext, IP
                     v.OpenedAt,
                     v.ClosedAt,
                     Math.Max(daysOpen, 0),
-                    m?.Applicants ?? 0,
+                    m?.Candidates ?? 0,
                     m?.Interviews ?? 0,
                     m?.Offers ?? 0,
                     m?.HireDate);
@@ -199,7 +199,7 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext, IP
     }
 
     private sealed record VacancyMetrics(
-        Guid VacancyId, int Applicants, int Interviews, int Offers, int Hires, DateOnly? HireDate);
+        Guid VacancyId, int Candidates, int Interviews, int Offers, int Hires, DateOnly? HireDate);
 
     private async Task<List<VacancyMetrics>> BuildVacancyMetricsAsync(
         Guid companyId,

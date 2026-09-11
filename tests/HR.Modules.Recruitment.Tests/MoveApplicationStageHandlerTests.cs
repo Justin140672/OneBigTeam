@@ -119,9 +119,9 @@ public class MoveApplicationStageHandlerTests
         Assert.True(result.IsSuccess);
 
         var integrationEvent = Assert.Single(eventPublisher.PublishedEvents);
-        var stageChanged = Assert.IsType<ApplicantStageChangedIntegrationEvent>(integrationEvent);
+        var stageChanged = Assert.IsType<ApplicationStageChangedIntegrationEvent>(integrationEvent);
         Assert.Equal(companyId, stageChanged.CompanyId);
-        Assert.Equal(application.Id, stageChanged.ApplicantId);
+        Assert.Equal(application.Id, stageChanged.ApplicationId);
         Assert.Equal(vacancy.Id, stageChanged.VacancyId);
         Assert.Equal("Application Received", stageChanged.PreviousStage);
         Assert.Equal("CV Review", stageChanged.NewStage);

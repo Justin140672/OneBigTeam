@@ -85,7 +85,7 @@ public class GetRecruitmentKanbanEndpointTests
     }
 
     [Fact]
-    public async Task Get_Kanban_Returns_Ok_With_A_Column_Per_Active_Stage_And_Grouped_Applicants_For_Recruiter()
+    public async Task Get_Kanban_Returns_Ok_With_A_Column_Per_Active_Stage_And_Grouped_Candidates_For_Recruiter()
     {
         var companyId = Guid.NewGuid();
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
@@ -115,13 +115,13 @@ public class GetRecruitmentKanbanEndpointTests
 
         var appliedColumn = payload.Columns.Single(c => c.StageName == "Application Received");
         Assert.Equal(1, appliedColumn.Count);
-        Assert.Single(appliedColumn.Applicants);
+        Assert.Single(appliedColumn.Candidates);
 
         var otherColumns = payload.Columns.Where(c => c.StageName != "Application Received");
         Assert.All(otherColumns, c =>
         {
             Assert.Equal(0, c.Count);
-            Assert.Empty(c.Applicants);
+            Assert.Empty(c.Candidates);
         });
     }
 
@@ -140,6 +140,6 @@ public class GetRecruitmentKanbanEndpointTests
     }
 
     private sealed record KanbanPayload(Guid VacancyId, string VacancyTitle, List<KanbanColumnPayload> Columns);
-    private sealed record KanbanColumnPayload(Guid StageId, string StageName, bool IsTerminal, int Count, List<KanbanApplicantPayload> Applicants);
-    private sealed record KanbanApplicantPayload(Guid ApplicationId, Guid CandidateId, string CandidateFirstName, string CandidateLastName);
+    private sealed record KanbanColumnPayload(Guid StageId, string StageName, bool IsTerminal, int Count, List<KanbanCandidatePayload> Candidates);
+    private sealed record KanbanCandidatePayload(Guid ApplicationId, Guid CandidateId, string CandidateFirstName, string CandidateLastName);
 }

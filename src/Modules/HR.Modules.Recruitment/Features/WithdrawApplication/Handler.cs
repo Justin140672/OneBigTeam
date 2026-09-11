@@ -40,7 +40,7 @@ internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock
         // — there is no "Withdrawn" RecruitmentStage. CurrentStageId is left unchanged (the stage the
         // application was at when withdrawn is preserved for historical accuracy); WithdrawnAt is set
         // instead so Kanban/reporting can treat this application as inactive. No stage-history entry
-        // or ApplicantStageChangedIntegrationEvent is recorded here, since CurrentStageId does not
+        // or ApplicationStageChangedIntegrationEvent is recorded here, since CurrentStageId does not
         // change — only the audit trail (below) records that the withdrawal happened.
         application.Withdraw(now);
 

@@ -5,7 +5,7 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// <summary>
 /// Page object for the Review CV screen (ReviewCv.razor, ticket #1), route
 /// /companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/review-cv. Guarded by
-/// Session.CanManageRecruitment. Reached from the vacancy Kanban board applicant card menu
+/// Session.CanManageRecruitment. Reached from the vacancy Kanban board candidate card menu
 /// (VacancyKanbanBoardPage.ClickReviewCvFromCardMenuAsync) or the Applications tab row link
 /// (VacancyDetailPage.ClickReviewCvForAsync), or navigated to directly via <see cref="GoToAsync"/>.
 ///

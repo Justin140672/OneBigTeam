@@ -13,7 +13,8 @@ internal sealed class OfferCandidateHandler(
     IClock clock,
     IPositionProfileReader positionProfileReader,
     RecruitmentStageChangeRecorder recorder,
-    ICompanyRecruitmentSettingsReader recruitmentSettingsReader)
+    ICompanyRecruitmentSettingsReader recruitmentSettingsReader,
+    IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<OfferCandidateResponse>> HandleAsync(
         OfferCandidateRequest request,
@@ -55,19 +56,12 @@ internal sealed class OfferCandidateHandler(
             return Result.Failure<OfferCandidateResponse>(
                 Error.NotFound($"Recruitment stage '{application.CurrentStageId}' was not found."));
 
-        // Ticket #99 judgement call: since stages are now data-driven, the equivalent of the old
-        // "must be Interviewed" rule is "must not already be on a terminal stage" — a company may
-        // have zero, one, or several interview-shaped stages ahead of Offer.
         if (currentStage.IsTerminal)
             return Result.Failure<OfferCandidateResponse>(
                 Error.Validation($"Cannot make an offer for an application already on the terminal stage '{currentStage.Name}'."));
 
         // Prefer the stage the company has explicitly flagged as its Offer stage
-        // (RecruitmentStagePurpose.Offer) — this is the same signal the offer metrics use. Only
-        // when no stage carries that flag do we fall back to the heuristic "last non-terminal
-        // stage by DisplayOrder". The fallback is fragile: any later-ordered non-terminal stage
-        // (a "Reference Check" inserted after Offer, or — in test runs — a leftover ad-hoc stage
-        // whose cleanup did not complete) would otherwise silently hijack the offer transition.
+        // (RecruitmentStagePurpose.Offer); fall back to "last non-terminal stage by DisplayOrder".
         var activeNonTerminalStages = await db.RecruitmentStages
             .AsNoTracking()
             .Where(s => s.CompanyId == request.CompanyId && s.IsActive && !s.IsTerminal)
@@ -83,7 +77,9 @@ internal sealed class OfferCandidateHandler(
                 Error.Validation("This company has no active non-terminal recruitment stage to move this application to."));
 
         // SET-05: when the company requires offer approval, an offer cannot be made until this
-        // specific application has been explicitly approved via the ApproveOffer endpoint.
+        // specific application has been explicitly approved via the ApproveOffer endpoint. Recording
+        // offer terms must NOT bypass this rule — the check stays exactly where it was, ahead of any
+        // state change.
         var recruitmentSettings = await recruitmentSettingsReader.GetRecruitmentSettingsAsync(request.CompanyId, cancellationToken);
         if (recruitmentSettings.OfferApprovalRequired && application.OfferApprovedAt is null)
             return Result.Failure<OfferCandidateResponse>(
@@ -99,19 +95,49 @@ internal sealed class OfferCandidateHandler(
             return Result.Failure<OfferCandidateResponse>(
                 Error.NotFound($"Vacancy '{request.VacancyId}' was not found."));
 
+        // Cross-module read: informational-only employment defaults from the linked Position Profile
+        // (owned by HR.Modules.Employees), resolved via the narrow IPositionProfileReader contract.
+        // Read before recording terms so an omitted salary/frequency can be pre-populated from the
+        // role's defined compensation — HR can still override with the actual agreed figure.
+        var employmentDefaults = await positionProfileReader.GetEmploymentDefaultsAsync(
+            request.CompanyId, vacancy.PositionProfileId, cancellationToken);
+
         var now = clock.UtcNowOffset();
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
         var previousStageId = application.CurrentStageId;
 
+        var offeredSalary = request.OfferedSalary ?? employmentDefaults?.SalaryMin;
+
+        OfferSalaryFrequency? offeredFrequency =
+            !string.IsNullOrWhiteSpace(request.OfferedSalaryFrequency) &&
+            Enum.TryParse<OfferSalaryFrequency>(request.OfferedSalaryFrequency, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed)
+                ? parsed
+                : Enum.TryParse<OfferSalaryFrequency>(employmentDefaults?.SalaryType, ignoreCase: true, out var fromProfile) && Enum.IsDefined(fromProfile)
+                    ? fromProfile
+                    : null;
+
+        var offerDate = request.OfferDate ?? today;
+
         application.MoveToStage(offerStage.Id, now);
+        application.RecordOfferTerms(offeredSalary, offeredFrequency, request.ProposedStartDate, offerDate, request.OfferNotes, now);
         recorder.AddHistoryEntry(application, previousStageId, performedBy, now);
         await db.SaveChangesAsync(cancellationToken);
         await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);
 
-        // Cross-module read: informational-only employment defaults from the linked Position Profile
-        // (owned by HR.Modules.Employees), resolved via the narrow IPositionProfileReader contract. See
-        // OfferCandidateResponse's remarks — this does not affect the offer itself.
-        var employmentDefaults = await positionProfileReader.GetEmploymentDefaultsAsync(
-            request.CompanyId, vacancy.PositionProfileId, cancellationToken);
+        // Salary figures are deliberately excluded from the audit payload (05-database-standards /
+        // 09-coding-standards: salary must not appear in audit payloads) — the event records only
+        // that an offer was made, its dates and its response status.
+        await auditPublisher.PublishAsync(
+            new OfferDetailsRecordedAuditEvent(
+                application.CompanyId,
+                application.Id,
+                application.VacancyId,
+                application.CandidateId,
+                offerDate,
+                request.ProposedStartDate,
+                performedBy,
+                now),
+            cancellationToken);
 
         return Result.Success(new OfferCandidateResponse(
             application.Id,
@@ -132,6 +158,14 @@ internal sealed class OfferCandidateHandler(
             employmentDefaults?.HoursPerDayOverride,
             employmentDefaults?.ProbationMonthsOverride,
             employmentDefaults?.DefaultLeavePolicyId,
-            employmentDefaults?.LocationName));
+            employmentDefaults?.LocationName,
+            application.OfferedSalary,
+            application.OfferedSalaryFrequency?.ToString(),
+            application.OfferedStartDate,
+            application.OfferDate,
+            application.OfferNotes,
+            application.OfferResponseStatus?.ToString(),
+            application.OfferMadeAt,
+            application.OfferRespondedAt));
     }
 }

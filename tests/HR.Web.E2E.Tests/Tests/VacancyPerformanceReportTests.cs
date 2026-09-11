@@ -35,7 +35,7 @@ public sealed class VacancyPerformanceReportTests(RecruiterPersonaFixture fixtur
         var headers = await report.GetColumnHeadersAsync();
         Assert.Contains(headers, h => h.Contains("Vacancy"));
         Assert.Contains(headers, h => h.Contains("Days Open"));
-        Assert.Contains(headers, h => h.Contains("Applicants"));
+        Assert.Contains(headers, h => h.Contains("Candidates"));
         Assert.Contains(headers, h => h.Contains("Interviews"));
         Assert.Contains(headers, h => h.Contains("Offers"));
         Assert.Contains(headers, h => h.Contains("Hire Date"));

@@ -7,13 +7,13 @@ using Microsoft.EntityFrameworkCore;
 namespace HR.Modules.Recruitment.Features.GetRecruitmentKanban;
 
 /// <summary>
-/// Ticket #63: Kanban read model for a single vacancy's applicant pipeline, grouped by stage in
+/// Ticket #63: Kanban read model for a single vacancy's candidate pipeline, grouped by stage in
 /// pipeline order. Ticket #99: columns are now the company's own active RecruitmentStage rows (in
 /// DisplayOrder) instead of the fixed eight ApplicationStatus values — the board layout is stable
 /// across vacancies within the same company, but differs between companies with different stage
 /// configurations. Withdrawn applications are not given a separate column (no "Withdrawn" stage
 /// exists — see Application.WithdrawnAt's remarks) — they remain visible under whatever stage they
-/// were on when withdrawn, flagged via KanbanApplicantSummary.IsWithdrawn so the UI can grey them out.
+/// were on when withdrawn, flagged via KanbanCandidateSummary.IsWithdrawn so the UI can grey them out.
 /// </summary>
 internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPositionProfileReader positionProfileReader)
 {
@@ -55,7 +55,7 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
             .OrderBy(s => s.DisplayOrder)
             .ToListAsync(cancellationToken);
 
-        var applicants = await (
+        var candidates = await (
             from a in db.Applications.AsNoTracking()
             join c in db.Candidates.AsNoTracking() on a.CandidateId equals c.Id
             where a.CompanyId == request.CompanyId && a.VacancyId == request.VacancyId
@@ -72,7 +72,7 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
             })
             .ToListAsync(cancellationToken);
 
-        var groupedByStage = applicants
+        var groupedByStage = candidates
             .GroupBy(a => a.CurrentStageId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
@@ -82,7 +82,7 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
                 var items = groupedByStage.TryGetValue(stage.Id, out var group) ? group : [];
 
                 var summaries = items
-                    .Select(a => new KanbanApplicantSummary(
+                    .Select(a => new KanbanCandidateSummary(
                         a.Id,
                         a.CandidateId,
                         a.FirstName,

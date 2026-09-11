@@ -66,16 +66,16 @@
                         }
                         else
                         {
-                            @foreach (var applicant in cards)
+                            @foreach (var candidate in cards)
                             {
-                                var app = applicant;
+                                var app = candidate;
                                 <div class="vacancy-kanban-board__draggable" draggable="true"
                                      @ondragstart="() => OnDragStart(app)"
                                      @ondragend="OnDragEnd">
-                                    <KanbanApplicantCard Applicant="app"
+                                    <KanbanCandidateCard Candidate="app"
                                                          RecruiterName="@RecruiterName(app)"
                                                          TerminalOutcome="@StageOutcome(app.StageId)"
-                                                         OnOpen="OpenApplicant"
+                                                         OnOpen="OpenCandidate"
                                                          AvailableStages="@VisibleColumns.Where(c => c.StageId != app.StageId).ToList()"
                                                          OnMoveToStage="(stageId) => MoveApplicationAsync(app, stageId)"
                                                          OnReviewCv="ReviewCv" />
@@ -104,7 +104,7 @@
     // IsTerminal (see KanbanColumnModel), so hiding Hired/Rejected columns is a pure client-side
     // filter of the already-loaded _columns/FilteredCards. Defaults to false (terminal columns
     // hidden) per the dashboard redesign brief, so a recruiter's default board view stays focused
-    // on in-flight applicants; callers that want the old "always show everything" behaviour can
+    // on in-flight candidates; callers that want the old "always show everything" behaviour can
     // pass ShowTerminalStages="true".
     //
     // IMPORTANT for any embedding site: this parameter's default is "hide terminal columns," which
@@ -112,7 +112,7 @@
     // checkbox-driven usage. The standalone VacancyKanbanPage route predates this parameter and has
     // no toggle of its own — it must always pass ShowTerminalStages="true" explicitly to preserve
     // its original "show every configured stage, including Hired/Rejected" behaviour. Omitting it
-    // there silently drops the Hired/Rejected columns entirely (not just hides applicants in them)
+    // there silently drops the Hired/Rejected columns entirely (not just hides candidates in them)
     // — this exact regression broke VacancyKanbanBoardTests.Board_RendersOneColumnPerConfiguredStage_
     // InDisplayOrder_IncludingEmptyColumns when this parameter was first introduced.
     [Parameter] public bool ShowTerminalStages { get; set; }
@@ -126,7 +126,7 @@
     private bool _loading = true;
     private string? _error;
     private string? _vacancyTitle;
-    private List<KanbanApplicantModel> _cards = [];
+    private List<KanbanCandidateModel> _cards = [];
     private List<KanbanColumnModel> _columns = [];
     private Dictionary<Guid, string> _candidateEmails = [];
 
@@ -145,7 +145,7 @@
     // component mid-drag. A native HTML5 drag session is cancelled by the browser if the DOM under
     // the pointer is mutated while it's in progress — exactly what a mid-drag Blazor re-render risks
     // — which is what caused every drag to visually "bounce back" to its origin instead of dropping.
-    private KanbanApplicantModel? _draggedCard;
+    private KanbanCandidateModel? _draggedCard;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -193,7 +193,7 @@
 
         _vacancyTitle = kanban.VacancyTitle;
         _columns = kanban.Columns.ToList();
-        _cards = kanban.Columns.SelectMany(c => c.Applicants).ToList();
+        _cards = kanban.Columns.SelectMany(c => c.Candidates).ToList();
 
         var candidates = (await candidatesTask)?.Items ?? [];
         _candidateEmails = candidates.ToDictionary(c => c.Id, c => c.Email);
@@ -222,7 +222,7 @@
 
         _vacancyTitle = kanban.VacancyTitle;
         _columns = kanban.Columns.ToList();
-        _cards = kanban.Columns.SelectMany(c => c.Applicants).ToList();
+        _cards = kanban.Columns.SelectMany(c => c.Candidates).ToList();
     }
 
     private RecruitmentStageTerminalOutcome StageOutcome(Guid stageId) =>
@@ -231,7 +231,7 @@
     private IEnumerable<KanbanColumnModel> VisibleColumns =>
         ShowTerminalStages ? _columns : _columns.Where(c => !c.IsTerminal);
 
-    private IEnumerable<KanbanApplicantModel> FilteredCards
+    private IEnumerable<KanbanCandidateModel> FilteredCards
     {
         get
         {
@@ -254,11 +254,11 @@
         }
     }
 
-    private IEnumerable<KanbanApplicantModel> CardsFor(KanbanColumnModel column) =>
+    private IEnumerable<KanbanCandidateModel> CardsFor(KanbanColumnModel column) =>
         FilteredCards.Where(c => c.StageId == column.StageId);
 
-    private static string RecruiterName(KanbanApplicantModel applicant) =>
-        applicant.AssignedRecruiterAgencyName ?? "Unassigned";
+    private static string RecruiterName(KanbanCandidateModel candidate) =>
+        candidate.AssignedRecruiterAgencyName ?? "Unassigned";
 
     private async Task OnSearchChanged(Syncfusion.Blazor.Inputs.ChangedEventArgs args)
     {
@@ -266,7 +266,7 @@
         await SearchTextChanged.InvokeAsync(SearchText);
     }
 
-    private async Task OpenApplicant(KanbanApplicantModel applicant)
+    private async Task OpenCandidate(KanbanCandidateModel candidate)
     {
         // Carry a returnUrl so CandidateDetail.razor's "Close" button comes back to wherever this
         // board is actually embedded (the standalone Kanban route, or the Recruitment Dashboard's
@@ -274,22 +274,22 @@
         // card click had no memory of where it was opened from.
         var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
 
-        var candidateUrl = $"/companies/{CompanyId}/candidates/{applicant.CandidateId}" +
+        var candidateUrl = $"/companies/{CompanyId}/candidates/{candidate.CandidateId}" +
             $"?returnUrl={Uri.EscapeDataString(returnUrl)}";
         Navigation.NavigateTo(candidateUrl);
     }
 
     // Ticket #1: open the Review CV screen, carrying a returnUrl back to wherever this board is
-    // embedded (same rationale as OpenApplicant above).
-    private void ReviewCv(KanbanApplicantModel applicant)
+    // embedded (same rationale as OpenCandidate above).
+    private void ReviewCv(KanbanCandidateModel candidate)
     {
         var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
         Navigation.NavigateTo(
-            $"/companies/{CompanyId}/vacancies/{VacancyId}/applications/{applicant.ApplicationId}/review-cv" +
+            $"/companies/{CompanyId}/vacancies/{VacancyId}/applications/{candidate.ApplicationId}/review-cv" +
             $"?returnUrl={Uri.EscapeDataString(returnUrl)}");
     }
 
-    private void OnDragStart(KanbanApplicantModel applicant) => _draggedCard = applicant;
+    private void OnDragStart(KanbanCandidateModel candidate) => _draggedCard = candidate;
 
     private void OnDragEnd() => _draggedCard = null;
 
@@ -308,15 +308,15 @@
     }
 
     // Shared by both the drag-and-drop drop handler above and the keyboard-accessible "Move to
-    // stage…" card menu (KanbanApplicantCard.OnMoveToStage) — both paths call the exact same
+    // stage…" card menu (KanbanCandidateCard.OnMoveToStage) — both paths call the exact same
     // KanbanService method the server-side authorization/validation already gates, so neither path
     // bypasses or duplicates that logic.
-    private async Task MoveApplicationAsync(KanbanApplicantModel applicant, Guid targetStageId)
+    private async Task MoveApplicationAsync(KanbanCandidateModel candidate, Guid targetStageId)
     {
-        if (applicant.StageId == targetStageId)
+        if (candidate.StageId == targetStageId)
             return;
 
-        var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, applicant.ApplicationId, targetStageId);
+        var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, candidate.ApplicationId, targetStageId);
 
         // ReloadKanbanOnlyAsync always clears _error at its own start (a fresh load has no error
         // yet), so on failure the error message must be applied AFTER the reload, not before —
@@ -324,6 +324,6 @@
         // snapped back but with no visible explanation why.
         await ReloadKanbanOnlyAsync();
 
-        _error = result is null ? (error ?? "Failed to move applicant to the new stage.") : null;
+        _error = result is null ? (error ?? "Failed to move candidate to the new stage.") : null;
     }
 }

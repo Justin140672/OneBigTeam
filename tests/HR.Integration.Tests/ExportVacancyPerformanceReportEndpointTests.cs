@@ -60,7 +60,7 @@ public class ExportVacancyPerformanceReportEndpointTests
         Assert.Equal("text/csv", response.Content.Headers.ContentType?.MediaType);
 
         var body = await response.Content.ReadAsStringAsync();
-        Assert.StartsWith("Vacancy,Days Open,Applicants,Interviews,Offers,Hire Date", body);
+        Assert.StartsWith("Vacancy,Days Open,Candidates,Interviews,Offers,Hire Date", body);
     }
 
     [Fact]

@@ -47,6 +47,13 @@ internal sealed class HireCandidateHandler(
             return Result.Failure<HireCandidateResponse>(
                 Error.Validation("Cannot hire an application that has been withdrawn."));
 
+        // Ticket 2: a declined or withdrawn offer must never result in an Employee. An offer that is
+        // still AwaitingResponse, Accepted, or was never formally recorded (legacy / offer-terms not
+        // captured) may still be hired — the explicit block is only for the two negative outcomes.
+        if (application.OfferResponseStatus is OfferResponseStatus.Declined or OfferResponseStatus.Withdrawn)
+            return Result.Failure<HireCandidateResponse>(
+                Error.Validation($"Cannot hire this candidate — the offer was {application.OfferResponseStatus.Value.ToString().ToLowerInvariant()}."));
+
         var currentStage = await db.RecruitmentStages
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.Id == application.CurrentStageId && s.CompanyId == request.CompanyId, cancellationToken);
@@ -104,13 +111,20 @@ internal sealed class HireCandidateHandler(
             return Result.Failure<HireCandidateResponse>(
                 Error.Validation("The vacancy's position profile has no location set; cannot hire without a location."));
 
+        // Ticket 2: use the accepted offer's proposed start date when the request omits one, so HR
+        // doesn't have to re-key what was already agreed on the offer.
+        var effectiveStartDate = request.StartDate ?? application.OfferedStartDate;
+        if (effectiveStartDate is null)
+            return Result.Failure<HireCandidateResponse>(
+                Error.Validation("A start date is required — none was supplied and no proposed start date was recorded on the offer."));
+
         var provisioningResult = await employeeProvisioningService.CreateFromCandidateAsync(
             new EmployeeProvisioningRequest(
                 request.CompanyId,
                 candidate.FirstName,
                 candidate.LastName,
                 candidate.Email,
-                request.StartDate,
+                effectiveStartDate.Value,
                 request.DateOfBirth,
                 request.Nationality,
                 request.Gender,
@@ -133,7 +147,12 @@ internal sealed class HireCandidateHandler(
                 // to the Recruitment schema. If the process dies between those two commits, retrying the
                 // hire would otherwise create a second employee (candidate.EmployeeId is still null).
                 // This stable key makes CreateEmployeeHandler return the already-provisioned employee.
-                SourceReference: $"recruitment:application:{application.Id}"),
+                SourceReference: $"recruitment:application:{application.Id}",
+                // Ticket 2: forward the agreed offer compensation so the Employees module seeds the
+                // new hire's first Compensation record — HR doesn't re-enter it. Null when no offer
+                // salary was recorded (legacy path); Employees then creates no compensation row.
+                Salary: application.OfferedSalary,
+                SalaryFrequency: application.OfferedSalaryFrequency?.ToString()),
             cancellationToken);
 
         if (provisioningResult.IsFailure)

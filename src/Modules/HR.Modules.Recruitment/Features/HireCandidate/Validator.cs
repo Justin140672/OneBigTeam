@@ -15,8 +15,12 @@ internal sealed class HireCandidateValidator : AbstractValidator<HireCandidateRe
         RuleFor(r => r.ApplicationId)
             .NotEmpty();
 
+        // StartDate is optional here (Ticket 2): when omitted the handler falls back to the accepted
+        // offer's proposed start date. The handler fails the hire if neither is available.
         RuleFor(r => r.StartDate)
-            .NotEmpty();
+            .Must(d => d!.Value != default)
+            .When(r => r.StartDate.HasValue)
+            .WithMessage("Start date is invalid.");
 
         RuleFor(r => r.DateOfBirth)
             .NotEmpty().WithMessage("Date of birth is required.");

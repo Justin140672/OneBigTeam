@@ -60,7 +60,7 @@ public class ExportRecruitmentPipelineReportEndpointTests
         Assert.Equal("text/csv", response.Content.Headers.ContentType?.MediaType);
 
         var body = await response.Content.ReadAsStringAsync();
-        Assert.StartsWith("Group,Vacancies,Applicants,Interviews,Offers,Hires", body);
+        Assert.StartsWith("Group,Vacancies,Candidates,Interviews,Offers,Hires", body);
     }
 
     [Fact]

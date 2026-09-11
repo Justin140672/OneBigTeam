@@ -145,7 +145,7 @@ public class MoveApplicationForwardHandlerTests
         Assert.Equal(seed.Stages.Interview.Id, history.NewStageId);
 
         var integrationEvent = Assert.Single(events.PublishedEvents);
-        var stageChanged = Assert.IsType<ApplicantStageChangedIntegrationEvent>(integrationEvent);
+        var stageChanged = Assert.IsType<ApplicationStageChangedIntegrationEvent>(integrationEvent);
         Assert.Equal("CV Review", stageChanged.PreviousStage);
         Assert.Equal("Interview", stageChanged.NewStage);
 

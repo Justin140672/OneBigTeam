@@ -34,7 +34,7 @@ public class GetRecruitmentKanbanHandlerTests
         Assert.All(result.Value.Columns, c =>
         {
             Assert.Equal(0, c.Count);
-            Assert.Empty(c.Applicants);
+            Assert.Empty(c.Candidates);
         });
     }
 
@@ -58,7 +58,7 @@ public class GetRecruitmentKanbanHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Groups_Applicants_Into_Correct_Stage_Column()
+    public async Task HandleAsync_Groups_Candidates_Into_Correct_Stage_Column()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
@@ -82,10 +82,10 @@ public class GetRecruitmentKanbanHandlerTests
         var cvReviewColumn = result.Value.Columns.Single(c => c.StageId == stages.CvReview.Id);
 
         Assert.Equal(1, appliedColumn.Count);
-        Assert.Equal(applied.Id, appliedColumn.Applicants.Single().ApplicationId);
+        Assert.Equal(applied.Id, appliedColumn.Candidates.Single().ApplicationId);
 
         Assert.Equal(1, cvReviewColumn.Count);
-        Assert.Equal(cvReview.Id, cvReviewColumn.Applicants.Single().ApplicationId);
+        Assert.Equal(cvReview.Id, cvReviewColumn.Candidates.Single().ApplicationId);
     }
 
     [Fact]
@@ -110,12 +110,12 @@ public class GetRecruitmentKanbanHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(6, result.Value!.Columns.Count);
         var appliedColumn = result.Value.Columns.Single(c => c.StageId == stages.ApplicationReceived.Id);
-        var applicant = Assert.Single(appliedColumn.Applicants);
-        Assert.True(applicant.IsWithdrawn);
+        var withdrawnSummary = Assert.Single(appliedColumn.Candidates);
+        Assert.True(withdrawnSummary.IsWithdrawn);
     }
 
     [Fact]
-    public async Task HandleAsync_Column_Count_Matches_Applicants_Count()
+    public async Task HandleAsync_Column_Count_Matches_Candidates_Count()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
@@ -138,18 +138,18 @@ public class GetRecruitmentKanbanHandlerTests
         Assert.True(result.IsSuccess);
         var appliedColumn = result.Value!.Columns.Single(c => c.StageId == stages.ApplicationReceived.Id);
         Assert.Equal(3, appliedColumn.Count);
-        Assert.Equal(appliedColumn.Applicants.Count, appliedColumn.Count);
+        Assert.Equal(appliedColumn.Candidates.Count, appliedColumn.Count);
     }
 
     [Fact]
-    public async Task HandleAsync_Orders_Applicants_Within_A_Column_By_AppliedAt()
+    public async Task HandleAsync_Orders_Candidates_Within_A_Column_By_AppliedAt()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidateLater = Candidate.Create(Guid.NewGuid(), companyId, "Later", "Applicant", "later@example.com", null, null, Now);
-        var candidateEarlier = Candidate.Create(Guid.NewGuid(), companyId, "Earlier", "Applicant", "earlier@example.com", null, null, Now);
+        var candidateLater = Candidate.Create(Guid.NewGuid(), companyId, "Later", "Candidate", "later@example.com", null, null, Now);
+        var candidateEarlier = Candidate.Create(Guid.NewGuid(), companyId, "Earlier", "Candidate", "earlier@example.com", null, null, Now);
         var applicationLater = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidateLater.Id, stages.ApplicationReceived.Id, null, Now.AddDays(2));
         var applicationEarlier = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidateEarlier.Id, stages.ApplicationReceived.Id, null, Now.AddDays(1));
         db.Vacancies.Add(vacancy);
@@ -165,11 +165,11 @@ public class GetRecruitmentKanbanHandlerTests
         var appliedColumn = result.Value!.Columns.Single(c => c.StageId == stages.ApplicationReceived.Id);
         Assert.Equal(
             [applicationEarlier.Id, applicationLater.Id],
-            appliedColumn.Applicants.Select(a => a.ApplicationId));
+            appliedColumn.Candidates.Select(a => a.ApplicationId));
     }
 
     [Fact]
-    public async Task HandleAsync_Propagates_AssignedRecruiterId_And_VacancyTitle_Onto_Each_Applicant()
+    public async Task HandleAsync_Propagates_AssignedRecruiterId_And_VacancyTitle_Onto_Each_Candidate()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
@@ -188,7 +188,7 @@ public class GetRecruitmentKanbanHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        var summary = result.Value!.Columns.Single(c => c.StageId == stages.ApplicationReceived.Id).Applicants.Single();
+        var summary = result.Value!.Columns.Single(c => c.StageId == stages.ApplicationReceived.Id).Candidates.Single();
         Assert.Equal(recruiterId, summary.AssignedRecruiterId);
         Assert.Equal("Senior Software Engineer", summary.VacancyTitle);
         Assert.Equal("Senior Software Engineer", result.Value.VacancyTitle);

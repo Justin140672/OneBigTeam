@@ -48,6 +48,7 @@ using HR.Modules.Recruitment.Features.PurgeEligibleCandidates;
 using HR.Modules.Recruitment.Features.ReactivateCandidate;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Features.RejectCandidate;
+using HR.Modules.Recruitment.Features.RespondToOffer;
 using HR.Modules.Recruitment.Features.ListRecruitmentStages;
 using HR.Modules.Recruitment.Features.CreateRecruitmentStage;
 using HR.Modules.Recruitment.Features.UpdateRecruitmentStage;
@@ -190,6 +191,9 @@ public static class RecruitmentModule
 
         services.AddScoped<RejectCandidateHandler>();
         services.AddScoped<IValidator<RejectCandidateRequest>, RejectCandidateValidator>();
+
+        services.AddScoped<RespondToOfferHandler>();
+        services.AddScoped<IValidator<RespondToOfferRequest>, RespondToOfferValidator>();
 
         services.AddScoped<HireCandidateHandler>();
         services.AddScoped<IValidator<HireCandidateRequest>, HireCandidateValidator>();

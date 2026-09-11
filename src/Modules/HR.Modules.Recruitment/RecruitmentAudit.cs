@@ -121,6 +121,54 @@ internal sealed record OfferApprovedAuditEvent(
     object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
 }
 
+// Ticket 2: published when offer terms are recorded for an application (the OfferCandidate action).
+// Salary figures are deliberately NOT included — salary must not appear in audit payloads
+// (05-database-standards). Records only the dates and that an offer was made.
+internal sealed record OfferDetailsRecordedAuditEvent(
+    Guid CompanyId,
+    Guid ApplicationId,
+    Guid VacancyId,
+    Guid CandidateId,
+    DateOnly OfferDate,
+    DateOnly? ProposedStartDate,
+    Guid PerformedByUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "offer.details_recorded";
+    string IAuditEvent.EntityType => "Application";
+    Guid IAuditEvent.EntityId => ApplicationId;
+    Guid? IAuditEvent.ActorUserId => PerformedByUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Offer details recorded";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { OfferDate, ProposedStartDate, ResponseStatus = "AwaitingResponse" };
+    object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
+}
+
+// Ticket 2: published when an offer's response is recorded (Accepted / Declined / Withdrawn).
+internal sealed record OfferResponseRecordedAuditEvent(
+    Guid CompanyId,
+    Guid ApplicationId,
+    Guid VacancyId,
+    Guid CandidateId,
+    string PreviousStatus,
+    string NewStatus,
+    Guid PerformedByUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "offer.response_recorded";
+    string IAuditEvent.EntityType => "Application";
+    Guid IAuditEvent.EntityId => ApplicationId;
+    Guid? IAuditEvent.ActorUserId => PerformedByUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Offer response recorded as '{NewStatus}'";
+    object? IAuditEvent.Before => new { ResponseStatus = PreviousStatus };
+    object? IAuditEvent.After => new { ResponseStatus = NewStatus };
+    object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
+}
+
 // SET-05: published once per PurgeEligibleCandidates run, summarising how many candidates (past the
 // company's CandidateRetentionDays window, per DOC-04-style explicit authorised action) were purged.
 internal sealed record CandidatesPurgedAuditEvent(
@@ -257,7 +305,7 @@ internal sealed record InterviewOutcomeRecordedAuditEvent(
 }
 
 // Deliberately separate from ApplicationStageHistoryEntry (a domain-specific record surfaced on the
-// applicant record via GetApplication.StageHistory): this is the cross-cutting "who changed
+// candidate's application record via GetApplication.StageHistory): this is the cross-cutting "who changed
 // business data" audit log entry, published for every successful stage change (named transition
 // methods and the generic MoveToStage path alike) via RecruitmentStageChangeRecorder.
 // Ticket #99: PreviousStageId/NewStageId are RecruitmentStage ids (Guid) rather than

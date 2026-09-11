@@ -4,7 +4,7 @@ namespace HR.Web.Models;
 // Mirrors HR.Modules.Recruitment.Features.GetRecruitmentKanban.Response (post ticket #99) — columns
 // are now the company's own active RecruitmentStage rows, in DisplayOrder, not a fixed 8-status
 // enum. There is no more dedicated "Withdrawn" column: a withdrawn application stays under its real
-// current stage and is flagged via IsWithdrawn instead (see KanbanApplicantModel).
+// current stage and is flagged via IsWithdrawn instead (see KanbanCandidateModel).
 
 public sealed record GetRecruitmentKanbanResponse(
     Guid VacancyId,
@@ -16,9 +16,9 @@ public sealed record KanbanColumnModel(
     string StageName,
     bool IsTerminal,
     int Count,
-    IReadOnlyList<KanbanApplicantModel> Applicants);
+    IReadOnlyList<KanbanCandidateModel> Candidates);
 
-public sealed record KanbanApplicantModel(
+public sealed record KanbanCandidateModel(
     Guid ApplicationId,
     Guid CandidateId,
     string CandidateFirstName,

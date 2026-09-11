@@ -49,9 +49,19 @@ public class HireCandidateValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_StartDate_Is_Default()
+    public void Validate_Passes_When_StartDate_Is_Null()
     {
-        var result = _validator.Validate(ValidRequest() with { StartDate = default });
+        // Ticket 2: StartDate is now optional — the handler falls back to the accepted offer's
+        // proposed start date, and fails the hire itself if neither is present.
+        var result = _validator.Validate(ValidRequest() with { StartDate = null });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_StartDate_Is_Supplied_But_Default_Value()
+    {
+        var result = _validator.Validate(ValidRequest() with { StartDate = new DateOnly() });
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(HireCandidateRequest.StartDate));
