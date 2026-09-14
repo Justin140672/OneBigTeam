@@ -14,9 +14,9 @@
       },
       "Microsoft.AspNetCore.App.Internal.Assets": {
         "type": "Direct",
-        "requested": "[10.0.12, )",
-        "resolved": "10.0.12",
-        "contentHash": "+sIBo9AMBZH46qHWHQdfzcGMt+RuBaPYrUMOAM9VjA7MQ9QtIez3lq1C3E05+Yroa94KKt3DSWaxmCI4H28a9Q=="
+        "requested": "[10.0.11, )",
+        "resolved": "10.0.11",
+        "contentHash": "tYYYBZsuF2DSz1I3hcfB8qC4nNekIKufkYZOJ2R28fNK3PkS7fJao/mIX5H84NH94UACZQ4dhvt8GDlkrJFwLg=="
       },
       "Newtonsoft.Json": {
         "type": "Direct",
@@ -26,115 +26,115 @@
       },
       "Syncfusion.Blazor.Buttons": {
         "type": "Direct",
-        "requested": "[34.2.3, )",
-        "resolved": "34.2.3",
-        "contentHash": "zstPQmz9ejwEYpnyAWsBCUPIxhdhUwoMEhxvGX8geJJIsMRDnnu0hLRJ2Vc7kvWY3bHYuHJIEjFCbdlivu9Jiw==",
+        "requested": "[34.2.7, )",
+        "resolved": "34.2.7",
+        "contentHash": "tbswn+pLkaTlBiKD0FuBZKlWyQw1RYzBevHa75yFRIFGKordYQRdATZAyTA2STKe5skgfZyUZGsROSxT04GT2g==",
         "dependencies": {
-          "Syncfusion.Blazor.Core": "34.2.3"
+          "Syncfusion.Blazor.Core": "34.2.7"
         }
       },
       "Syncfusion.Blazor.Charts": {
         "type": "Direct",
-        "requested": "[34.2.3, )",
-        "resolved": "34.2.3",
-        "contentHash": "cUgKoVtgNsipyzFfqCaeiZ33p9kWD7k4E1uBOZAbiKkXgBNg1p1iI7CB3+fs+8NYXkhdJUMIjPXgVXLef56VIA==",
+        "requested": "[34.2.7, )",
+        "resolved": "34.2.7",
+        "contentHash": "fU9Ai+s/5J/1iDud0oH8N5+MbXf6Q8xuO77gzt5Tlq4Dlh01fC0uhDMf5mbVQvc35W77aWVzFPUbGT04GJYVjg==",
         "dependencies": {
-          "Syncfusion.Blazor.Core": "34.2.3",
-          "Syncfusion.Blazor.Data": "34.2.3",
-          "Syncfusion.Blazor.DataVizCommon": "34.2.3",
-          "Syncfusion.ExcelExport.Net.Core": "34.2.3",
-          "Syncfusion.PdfExport.Net.Core": "34.2.3",
-          "Syncfusion.Telemetry": "34.2.3"
+          "Syncfusion.Blazor.Core": "34.2.7",
+          "Syncfusion.Blazor.Data": "34.2.7",
+          "Syncfusion.Blazor.DataVizCommon": "34.2.7",
+          "Syncfusion.ExcelExport.Net.Core": "34.2.7",
+          "Syncfusion.PdfExport.Net.Core": "34.2.7",
+          "Syncfusion.Telemetry": "34.2.7"
         }
       },
       "Syncfusion.Blazor.Diagram": {
         "type": "Direct",
-        "requested": "[34.2.3, )",
-        "resolved": "34.2.3",
-        "contentHash": "qyeFKtXWUT0iQTgxGH+IDaDEVo5ymw37mHrDtRfeRHMexC2xVmoaoJ0Cp6snSRTOHubB3vsJ10P20pHwN4FeRQ==",
+        "requested": "[34.2.7, )",
+        "resolved": "34.2.7",
+        "contentHash": "KVXDiAwcItAA6FgXN096TBNBjR6j8kzR904MbdA4hn//eaw3MC74aJApdpxpgJCdGpCgYJVyOtYsddXMva8ZvA==",
         "dependencies": {
-          "Syncfusion.Blazor.Core": "34.2.3",
-          "Syncfusion.Blazor.Data": "34.2.3",
-          "Syncfusion.Blazor.Navigations": "34.2.3",
-          "Syncfusion.Blazor.Popups": "34.2.3",
-          "Syncfusion.Telemetry": "34.2.3"
+          "Syncfusion.Blazor.Core": "34.2.7",
+          "Syncfusion.Blazor.Data": "34.2.7",
+          "Syncfusion.Blazor.Navigations": "34.2.7",
+          "Syncfusion.Blazor.Popups": "34.2.7",
+          "Syncfusion.Telemetry": "34.2.7"
         }
       },
       "Syncfusion.Blazor.DropDowns": {
         "type": "Direct",
-        "requested": "[34.2.3, )",
-        "resolved": "34.2.3",
-        "contentHash": "+OSIqy69xkawWu7W68kzalaqLt+38FV8xh55Y7KjTm4lwqKY/7Qn4AMpfoY/vT+DtdWNRdF4RB1yW1xKaoStaw==",
+        "requested": "[34.2.7, )",
+        "resolved": "34.2.7",
+        "contentHash": "dsMr+gwHEjdKIpgCAULPP0qdOl4fbSeKMQOvm5MfdFsNgvoHb0UBHU3S+jQqWhyuHpj2ZIHHnJBUbIjUrI6qPg==",
         "dependencies": {
-          "Syncfusion.Blazor.Buttons": "34.2.3",
-          "Syncfusion.Blazor.Core": "34.2.3",
-          "Syncfusion.Blazor.Data": "34.2.3",
-          "Syncfusion.Blazor.Inputs": "34.2.3",
-          "Syncfusion.Blazor.Notifications": "34.2.3",
-          "Syncfusion.Blazor.Spinner": "34.2.3"
+          "Syncfusion.Blazor.Buttons": "34.2.7",
+          "Syncfusion.Blazor.Core": "34.2.7",
+          "Syncfusion.Blazor.Data": "34.2.7",
+          "Syncfusion.Blazor.Inputs": "34.2.7",
+          "Syncfusion.Blazor.Notifications": "34.2.7",
+          "Syncfusion.Blazor.Spinner": "34.2.7"
         }
       },
       "Syncfusion.Blazor.Grid": {
         "type": "Direct",
-        "requested": "[34.2.3, )",
-        "resolved": "34.2.3",
-        "contentHash": "7iXXBZ9MWWnieM4wR5N5y2S90ISnjBWvFMfiw48T3g3+WSKJtAcejGx2TL7BqDiDDHuvZRgKHyUDuCBcHFmWzQ==",
+        "requested": "[34.2.7, )",
+        "resolved": "34.2.7",
+        "contentHash": "sOZ37iS+f3RDc40EJhAWlmurZhhU7VeofvxbRhJbcPBTDsZxxZSOfymu09xfI/RCyi08wZkgwYLcU4lLUomcXQ==",
         "dependencies": {
-          "Syncfusion.Blazor.Buttons": "34.2.3",
-          "Syncfusion.Blazor.Calendars": "34.2.3",
-          "Syncfusion.Blazor.Core": "34.2.3",
-          "Syncfusion.Blazor.Data": "34.2.3",
-          "Syncfusion.Blazor.DropDowns": "34.2.3",
-          "Syncfusion.Blazor.Inputs": "34.2.3",
-          "Syncfusion.Blazor.Navigations": "34.2.3",
-          "Syncfusion.Blazor.Popups": "34.2.3",
-          "Syncfusion.Blazor.Spinner": "34.2.3",
-          "Syncfusion.ExcelExport.Net.Core": "34.2.3",
-          "Syncfusion.PdfExport.Net.Core": "34.2.3",
-          "Syncfusion.Telemetry": "34.2.3"
+          "Syncfusion.Blazor.Buttons": "34.2.7",
+          "Syncfusion.Blazor.Calendars": "34.2.7",
+          "Syncfusion.Blazor.Core": "34.2.7",
+          "Syncfusion.Blazor.Data": "34.2.7",
+          "Syncfusion.Blazor.DropDowns": "34.2.7",
+          "Syncfusion.Blazor.Inputs": "34.2.7",
+          "Syncfusion.Blazor.Navigations": "34.2.7",
+          "Syncfusion.Blazor.Popups": "34.2.7",
+          "Syncfusion.Blazor.Spinner": "34.2.7",
+          "Syncfusion.ExcelExport.Net.Core": "34.2.7",
+          "Syncfusion.PdfExport.Net.Core": "34.2.7",
+          "Syncfusion.Telemetry": "34.2.7"
         }
       },
       "Syncfusion.Blazor.Inputs": {
         "type": "Direct",
-        "requested": "[34.2.3, )",
-        "resolved": "34.2.3",
-        "contentHash": "WaPZf1+ceCoxi2ZmRGgpFbRswwI6LH3Ltd3ZJ+9tZTm6Ue4PEuHkUdBn4Xt8XxXRQrNl+ubcXgLsl/qCTwdWFQ==",
+        "requested": "[34.2.7, )",
+        "resolved": "34.2.7",
+        "contentHash": "9eFLgg3dUo3KwMRyMQE59SiAWzAXZn5V95A6AqGz+lCkq78dw7l9dy3HuIP1BY6Ay+MoNTWb7kI+wmvIaXZ3cA==",
         "dependencies": {
-          "Syncfusion.Blazor.Buttons": "34.2.3",
-          "Syncfusion.Blazor.Core": "34.2.3",
-          "Syncfusion.Blazor.Data": "34.2.3",
-          "Syncfusion.Blazor.Popups": "34.2.3",
-          "Syncfusion.Blazor.Spinner": "34.2.3",
-          "Syncfusion.Blazor.SplitButtons": "34.2.3"
+          "Syncfusion.Blazor.Buttons": "34.2.7",
+          "Syncfusion.Blazor.Core": "34.2.7",
+          "Syncfusion.Blazor.Data": "34.2.7",
+          "Syncfusion.Blazor.Popups": "34.2.7",
+          "Syncfusion.Blazor.Spinner": "34.2.7",
+          "Syncfusion.Blazor.SplitButtons": "34.2.7"
         }
       },
       "Syncfusion.Blazor.Popups": {
         "type": "Direct",
-        "requested": "[34.2.3, )",
-        "resolved": "34.2.3",
-        "contentHash": "yRY9xbNjQdW+3vHTP6wZjhSanBMVAshDGEJMmYG4tPcJQ7DpExzzJQ81mUJSJIB7/MhwF3OzCwU/u2pAyEtxDA==",
+        "requested": "[34.2.7, )",
+        "resolved": "34.2.7",
+        "contentHash": "zCeOuFUwUzDoqmrZExRWzy7wFuOYGRYMTGVFdYT0wkuMvWN/V/DZhx31WpTxjzO9mPmX2bcB6ME/iiBCeKNWAg==",
         "dependencies": {
-          "Syncfusion.Blazor.Buttons": "34.2.3",
-          "Syncfusion.Blazor.Core": "34.2.3"
+          "Syncfusion.Blazor.Buttons": "34.2.7",
+          "Syncfusion.Blazor.Core": "34.2.7"
         }
       },
       "Syncfusion.Blazor.SplitButtons": {
         "type": "Direct",
-        "requested": "[34.2.3, )",
-        "resolved": "34.2.3",
-        "contentHash": "8EbTaYfRqN4WI1M4J1eyUsQhgQcPehzbk+iBh0NaFtz3zYmLJ3Qq/R41wA4/56lzg+/QniOsD8oTcej/O3CTFA==",
+        "requested": "[34.2.7, )",
+        "resolved": "34.2.7",
+        "contentHash": "CSYv7xuzZu9hgSSxaOSyTJUElUIlCpGV1jmiXEZwkaztb9cdEiuSRRmQ8Ewio78wVa22XjpGN+PNu/b16uq+oQ==",
         "dependencies": {
-          "Syncfusion.Blazor.Buttons": "34.2.3",
-          "Syncfusion.Blazor.Core": "34.2.3",
-          "Syncfusion.Blazor.Popups": "34.2.3",
-          "Syncfusion.Blazor.Spinner": "34.2.3"
+          "Syncfusion.Blazor.Buttons": "34.2.7",
+          "Syncfusion.Blazor.Core": "34.2.7",
+          "Syncfusion.Blazor.Popups": "34.2.7",
+          "Syncfusion.Blazor.Spinner": "34.2.7"
         }
       },
       "Syncfusion.Blazor.Themes": {
         "type": "Direct",
-        "requested": "[34.2.3, )",
-        "resolved": "34.2.3",
-        "contentHash": "AE3RAJwXZzRxTTF8O4ydBlCDgiKQRcMZyUUkDvrGn/tvNZE27hgN9+m90IfxnP/ZpmMIKSSfE4sXIL0hIz/JZg=="
+        "requested": "[34.2.7, )",
+        "resolved": "34.2.7",
+        "contentHash": "79Q6G9aPUrRpT43nWuH8sso/mJfgsuzdp2Sx7Zc1bCPGeVH6tp6jhZkemAsqjo8M2vMTZ0tRN2RNXuHYQKnrzg=="
       },
       "AngleSharp": {
         "type": "Transitive",
@@ -265,89 +265,89 @@
       },
       "Syncfusion.Blazor.Core": {
         "type": "Transitive",
-        "resolved": "34.2.3",
-        "contentHash": "lXWvrkriR/xdwV42XxsFJmksBS6VjysO3W7f3LjDBSor9NRgzWLPOrPOZTCn/+BZTrMnp3rmW3VE7REYG8hKGQ==",
+        "resolved": "34.2.7",
+        "contentHash": "4gKUB1hY/D9CVpgpK33QxKy6xiWSbPEuv4ycWsvh65lHG2Z36Hg7FePz0L4jfTBJw5jseBwvoZiy+WBnoG+s2A==",
         "dependencies": {
-          "Syncfusion.Licensing": "34.2.3"
+          "Syncfusion.Licensing": "34.2.7"
         }
       },
       "Syncfusion.Blazor.Data": {
         "type": "Transitive",
-        "resolved": "34.2.3",
-        "contentHash": "KhHrFhD8bKxa+3zKO89atPi3CzfHMd0LxF49h3XvWWMnG6oCkPb5vnRNXHLWM/cKHJAK95vRPPxSIPOY7Aq+yQ==",
+        "resolved": "34.2.7",
+        "contentHash": "Kcb3QraZ4AW7pNmaGuf2VegU2bnbZCLnIH7kAZFmOP2VSHFXeXXH9uMY0PuZtCcKPlYYGrkU1anj1NTFj5BhTA==",
         "dependencies": {
-          "Syncfusion.Blazor.Core": "34.2.3"
+          "Syncfusion.Blazor.Core": "34.2.7"
         }
       },
       "Syncfusion.Blazor.DataVizCommon": {
         "type": "Transitive",
-        "resolved": "34.2.3",
-        "contentHash": "wEMx5qUjhnt6MGpZwJGNOiCal0ggYr9TV0pqRySx7e14l7aJ3yt56VebTLT4SOGJzqj/D88B+A+c77Fj7csxow==",
+        "resolved": "34.2.7",
+        "contentHash": "Cus1M+h6eS4RCqDjGXEU+34+pPVwEM4yo/gRX3BmK2c/dnJsUOr13a5q7N8FiUU89CbfHN7WC+JCko4Vxmlxlg==",
         "dependencies": {
-          "Syncfusion.Blazor.Core": "34.2.3"
+          "Syncfusion.Blazor.Core": "34.2.7"
         }
       },
       "Syncfusion.Blazor.Lists": {
         "type": "Transitive",
-        "resolved": "34.2.3",
-        "contentHash": "MqHZTJAfGnqPaR1kEZ2CGzpR2W9XSs8YtsbpXrwHrJQiuJK6J/EtcUv0ohDahArAPsw1foIVf00uaCtPqopezw==",
+        "resolved": "34.2.7",
+        "contentHash": "j7uBKXKR+D/h92MMP1ofXqAuIWW9XW24yrdJl896h+BbUce3D81vqKUgNElLERbN20ZrSjimQFnrQZq2iXqZyg==",
         "dependencies": {
-          "Syncfusion.Blazor.Buttons": "34.2.3",
-          "Syncfusion.Blazor.Core": "34.2.3",
-          "Syncfusion.Blazor.Data": "34.2.3"
+          "Syncfusion.Blazor.Buttons": "34.2.7",
+          "Syncfusion.Blazor.Core": "34.2.7",
+          "Syncfusion.Blazor.Data": "34.2.7"
         }
       },
       "Syncfusion.Blazor.Navigations": {
         "type": "Transitive",
-        "resolved": "34.2.3",
-        "contentHash": "2kVikiTed78FaMtS7p28MiVOiQ9EoBI34M0O4G++TuTlskbttgfTMKmbHvk0KnYYhinS3D/AbT45ix4qsPt7lw==",
+        "resolved": "34.2.7",
+        "contentHash": "KkmWk17N9Xgle3n2OfYPzR69t9MMIjs8BBun+uh5nosY44NqcowADVRemc6KUSqV6VaPrRhf3WO0Z3US2Fq/pQ==",
         "dependencies": {
-          "Syncfusion.Blazor.Buttons": "34.2.3",
-          "Syncfusion.Blazor.Core": "34.2.3",
-          "Syncfusion.Blazor.Data": "34.2.3",
-          "Syncfusion.Blazor.DropDowns": "34.2.3",
-          "Syncfusion.Blazor.Inputs": "34.2.3",
-          "Syncfusion.Blazor.Lists": "34.2.3",
-          "Syncfusion.Blazor.Popups": "34.2.3",
-          "Syncfusion.Blazor.Spinner": "34.2.3"
+          "Syncfusion.Blazor.Buttons": "34.2.7",
+          "Syncfusion.Blazor.Core": "34.2.7",
+          "Syncfusion.Blazor.Data": "34.2.7",
+          "Syncfusion.Blazor.DropDowns": "34.2.7",
+          "Syncfusion.Blazor.Inputs": "34.2.7",
+          "Syncfusion.Blazor.Lists": "34.2.7",
+          "Syncfusion.Blazor.Popups": "34.2.7",
+          "Syncfusion.Blazor.Spinner": "34.2.7"
         }
       },
       "Syncfusion.Blazor.Notifications": {
         "type": "Transitive",
-        "resolved": "34.2.3",
-        "contentHash": "uHvVnPPQI6g0FuJAzxBDTKO6U5dNBrhDHXAddZsqyDf3jgBE1PKcABHyBtum1EwPEN4TD+TbUBfmQdxrAtqqRw==",
+        "resolved": "34.2.7",
+        "contentHash": "mW8WcgpFnAXT4XvbQ/I5TjTiw93JP4S2F3VRvVJwPqv8OHnW7+K7R6axKGMb3JN+5L96mJ3taA8Yp7smPuo0+A==",
         "dependencies": {
-          "Syncfusion.Blazor.Buttons": "34.2.3",
-          "Syncfusion.Blazor.Core": "34.2.3"
+          "Syncfusion.Blazor.Buttons": "34.2.7",
+          "Syncfusion.Blazor.Core": "34.2.7"
         }
       },
       "Syncfusion.Blazor.Spinner": {
         "type": "Transitive",
-        "resolved": "34.2.3",
-        "contentHash": "TS/h2zTKroJCo8X0NIS+dYeT0tQLEtjBuH3eiBdkm1KWj0F2xnEqiOsHRmu40dBryBddVl4fThfceWRv6p9A7g==",
+        "resolved": "34.2.7",
+        "contentHash": "ui0thc5AKzRdq5zHM76MvWgOi1zFzYl8KnTn9aJ9YdeN4n3KItmnSKRNd82fxKeGUaFgkQRUfR7yiY0LPX4eRA==",
         "dependencies": {
-          "Syncfusion.Blazor.Core": "34.2.3"
+          "Syncfusion.Blazor.Core": "34.2.7"
         }
       },
       "Syncfusion.ExcelExport.Net.Core": {
         "type": "Transitive",
-        "resolved": "34.2.3",
-        "contentHash": "NCgQTG3djpPviQNBHENo0/4lYLohJAaCebXWBQC3n44FSF+WjhIsZ6DBaoOX6ZL3gO2zCfGOJ7gV1A4eaTe5Gw=="
+        "resolved": "34.2.7",
+        "contentHash": "6znrv48AKEsZWMLPalKajGj6SmYC0Km7mFORGUZdcwzvQW583dLUrcNxiPsGvGJmPjbWDLcgA0e1Bc9kJjg2Zw=="
       },
       "Syncfusion.Licensing": {
         "type": "Transitive",
-        "resolved": "34.2.3",
-        "contentHash": "Wio/yEnsFfM+ksnKDKCI1rbu6Vj7rJaBGllEh1dvrrx8GZtLFQvoIiIpueN5Eo+2PWDT7fr31uxBuehz4fscmQ=="
+        "resolved": "34.2.7",
+        "contentHash": "Muv2cIR1IleuHDvX300mn7LFUP9azulEHQx2DBlHdUY8mJrk53sHWrYMr18Dsl2hkirdwh7T1fYH0WcXLsPCRQ=="
       },
       "Syncfusion.PdfExport.Net.Core": {
         "type": "Transitive",
-        "resolved": "34.2.3",
-        "contentHash": "e7DDZ8slkQwEeuF24PzHB77pgtRM/xCC3UH6t1vUpVjMDVUUZprM2R4TzwzFGgkLsM7LiFryiBtw3EfgBGNDCA=="
+        "resolved": "34.2.7",
+        "contentHash": "CIv5IR5nD5q9TQj52eSDSMfaFkUVMJbR24qvAwDAAbTZolkX0R5ZmKrMMwXB0S6lYX8VaUu+NpgjYPQGpOurHA=="
       },
       "Syncfusion.Telemetry": {
         "type": "Transitive",
-        "resolved": "34.2.3",
-        "contentHash": "EO4HnFSApzYwlfoG1St2+gmvTLEuNZOruV0/FSUAvSwuUvLWEHcj49/K64Y4A+9/wQuARRfTjASFRFibFPOo2A=="
+        "resolved": "34.2.7",
+        "contentHash": "f2kXYlRRgGz5oNc5Hu8g24Gblb0SvXqy7745eFlFxMFje2TTpiZasVU1j31AOFAoXryeagQTjZsDGEpuYTZPeQ=="
       },
       "hr.infrastructure.abstractions": {
         "type": "Project",
@@ -477,14 +477,14 @@
       },
       "Syncfusion.Blazor.Calendars": {
         "type": "CentralTransitive",
-        "requested": "[34.2.3, )",
-        "resolved": "34.2.3",
-        "contentHash": "ssIlINmoQLkzLmpug+RACAscpcipYaUYsURXSfmbOlFVG5S09xXP5jbJh2KX61a1PXfT8skyYZbKSE85jvumbg==",
+        "requested": "[34.2.7, )",
+        "resolved": "34.2.7",
+        "contentHash": "cyz2nNNb1wdxbE/6PBB6sLE6SH5j6+hfRS1OnUAOPG1POrKEIsoXe4H1aZraPwiOEQLupgAD23ndr3064x41OA==",
         "dependencies": {
-          "Syncfusion.Blazor.Buttons": "34.2.3",
-          "Syncfusion.Blazor.Core": "34.2.3",
-          "Syncfusion.Blazor.Inputs": "34.2.3",
-          "Syncfusion.Blazor.Lists": "34.2.3"
+          "Syncfusion.Blazor.Buttons": "34.2.7",
+          "Syncfusion.Blazor.Core": "34.2.7",
+          "Syncfusion.Blazor.Inputs": "34.2.7",
+          "Syncfusion.Blazor.Lists": "34.2.7"
         }
       }
     }
