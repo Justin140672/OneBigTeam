@@ -29,8 +29,7 @@ public class CreateEmployeeIdempotencyTests
         var companyId = Guid.NewGuid();
         var (departmentId, locationId, employmentTypeId, positionProfileId) = await SeedAsync(context, companyId);
 
-        var publisher = new CapturingIntegrationEventPublisher();
-        var handler = BuildHandler(context, publisher);
+        var handler = BuildHandler(context);
 
         const string sourceRef = "recruitment:application:11111111-1111-1111-1111-111111111111";
 
@@ -50,7 +49,10 @@ public class CreateEmployeeIdempotencyTests
         Assert.Equal(first.Value!.Id, second.Value!.Id);
 
         Assert.Single(await context.Employees.ToListAsync());
-        Assert.Single(publisher.Published.OfType<EmployeeCreatedIntegrationEvent>());
+        // Ticket 3 (P1) follow-up item 3/5: EmployeeCreatedIntegrationEvent is staged as an outbox
+        // entry atomically with the employee row now, rather than published directly - so "published
+        // once" is now "exactly one outbox entry", carrying the same not-duplicated guarantee.
+        Assert.Single(await StagedIntegrationEventsAsync(context));
     }
 
     [Fact]
@@ -60,8 +62,7 @@ public class CreateEmployeeIdempotencyTests
         var companyId = Guid.NewGuid();
         var (departmentId, locationId, employmentTypeId, positionProfileId) = await SeedAsync(context, companyId);
 
-        var publisher = new CapturingIntegrationEventPublisher();
-        var handler = BuildHandler(context, publisher);
+        var handler = BuildHandler(context);
 
         var a = await handler.HandleAsync(
             RequestFor(companyId, departmentId, locationId, employmentTypeId, positionProfileId,
@@ -76,7 +77,7 @@ public class CreateEmployeeIdempotencyTests
         Assert.True(b.IsSuccess);
         Assert.NotEqual(a.Value!.Id, b.Value!.Id);
         Assert.Equal(2, await context.Employees.CountAsync());
-        Assert.Equal(2, publisher.Published.OfType<EmployeeCreatedIntegrationEvent>().Count());
+        Assert.Equal(2, (await StagedIntegrationEventsAsync(context)).Count);
     }
 
     [Fact]
@@ -86,7 +87,7 @@ public class CreateEmployeeIdempotencyTests
         var companyId = Guid.NewGuid();
         var (departmentId, locationId, employmentTypeId, positionProfileId) = await SeedAsync(context, companyId);
 
-        var handler = BuildHandler(context, new CapturingIntegrationEventPublisher());
+        var handler = BuildHandler(context);
 
         var result = await handler.HandleAsync(
             RequestFor(companyId, departmentId, locationId, employmentTypeId, positionProfileId,
@@ -114,10 +115,15 @@ public class CreateEmployeeIdempotencyTests
         Assert.Null(blank.SourceReference);
     }
 
-    private static CreateEmployeeHandler BuildHandler(EmployeesDbContext context, IIntegrationEventPublisher publisher) =>
-        new(context, new FakeClock(FixedUtcNow), publisher,
+    private static CreateEmployeeHandler BuildHandler(EmployeesDbContext context) =>
+        new(context, new FakeClock(FixedUtcNow),
             new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(),
             new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+
+    private static async Task<List<AuditOutboxEntry>> StagedIntegrationEventsAsync(EmployeesDbContext context) =>
+        await context.AuditOutboxEntries
+            .Where(e => e.EventTypeName.Contains(nameof(EmployeeCreatedIntegrationEvent)))
+            .ToListAsync();
 
     private static CreateEmployeeRequest RequestFor(
         Guid companyId, Guid departmentId, Guid locationId, Guid employmentTypeId, Guid positionProfileId,

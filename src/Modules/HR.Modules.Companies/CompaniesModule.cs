@@ -1,4 +1,5 @@
 using FluentValidation;
+using Hangfire;
 
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.AdminCancelSubscription;
@@ -426,5 +427,18 @@ public static class CompaniesModule
         services.AddScoped<IValidator<UpdateSubscriptionPricingConfigRequest>, UpdateSubscriptionPricingConfigValidator>();
         services.AddScoped<GetPublicSubscriptionPricingHandler>();
         services.AddScoped<IValidator<GetPublicSubscriptionPricingRequest>, GetPublicSubscriptionPricingValidator>();
+
+        services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
+    }
+
+    public static WebApplication UseCompaniesRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
+            "companies-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
+        return app;
     }
 }

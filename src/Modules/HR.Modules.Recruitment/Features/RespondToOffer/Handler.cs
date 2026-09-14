@@ -2,6 +2,8 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.RespondToOffer;
@@ -23,6 +25,26 @@ internal sealed class RespondToOfferHandler(
         Guid performedBy,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, RespondToOfferResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<RespondToOfferResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var target = Enum.Parse<OfferResponseStatus>(request.Status, ignoreCase: true);
 
         var application = await db.Applications
@@ -52,7 +74,33 @@ internal sealed class RespondToOfferHandler(
         var previousStatus = application.OfferResponseStatus.Value.ToString();
 
         application.RespondToOffer(target, now);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new RespondToOfferResponse(
+            application.Id,
+            application.VacancyId,
+            application.CandidateId,
+            application.CurrentStageId,
+            application.OfferResponseStatus!.Value.ToString(),
+            application.OfferedSalary,
+            application.OfferedSalaryFrequency?.ToString(),
+            application.OfferedStartDate,
+            application.OfferDate,
+            application.OfferNotes,
+            application.OfferMadeAt,
+            application.OfferRespondedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, RespondToOfferResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(
             new OfferResponseRecordedAuditEvent(
@@ -66,18 +114,6 @@ internal sealed class RespondToOfferHandler(
                 now),
             cancellationToken);
 
-        return Result.Success(new RespondToOfferResponse(
-            application.Id,
-            application.VacancyId,
-            application.CandidateId,
-            application.CurrentStageId,
-            application.OfferResponseStatus!.Value.ToString(),
-            application.OfferedSalary,
-            application.OfferedSalaryFrequency?.ToString(),
-            application.OfferedStartDate,
-            application.OfferDate,
-            application.OfferNotes,
-            application.OfferMadeAt,
-            application.OfferRespondedAt));
+        return Result.Success(response);
     }
 }

@@ -298,6 +298,64 @@ public class AssignManagerHandlerTests
         Assert.Empty(publisher.Published);
     }
 
+    // -- Idempotency-Key (ticket 3, P1 follow-up) --------------------------------------------
+
+    [Fact]
+    public async Task HandleAsync_With_IdempotencyKey_Replays_Cached_Response_Without_Reassigning_Twice()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.AddRange(manager, employee);
+        await context.SaveChangesAsync();
+
+        var publisher = new CapturingIntegrationEventPublisher();
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = new AssignManagerRequest { CompanyId = companyId, Id = employee.Id, ManagerId = manager.Id, IdempotencyKey = idempotencyKey };
+
+        var first = await handler.HandleAsync(request, CancellationToken.None);
+        var second = await handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(first.Value!.ManagerId, second.Value!.ManagerId);
+        // Only the first (non-replayed) call should have published the ManagerChanged event.
+        Assert.Single(publisher.Published);
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_Same_IdempotencyKey_And_Different_Payload_Returns_Conflict()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var managerA = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        var managerB = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Boss", "bob@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0002", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0003", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.AddRange(managerA, managerB, employee);
+        await context.SaveChangesAsync();
+
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = new AssignManagerRequest { CompanyId = companyId, Id = employee.Id, ManagerId = managerA.Id, IdempotencyKey = idempotencyKey };
+
+        var first = await handler.HandleAsync(request, CancellationToken.None);
+        var second = await handler.HandleAsync(request with { ManagerId = managerB.Id }, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsFailure);
+        Assert.Equal("conflict", second.Error.Code);
+        Assert.Equal("This Idempotency-Key was already used for a different request.", second.Error.Message);
+
+        var saved = await context.Employees.SingleAsync(e => e.Id == employee.Id);
+        Assert.Equal(managerA.Id, saved.ManagerId);
+    }
+
     private static EmployeesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<EmployeesDbContext>()

@@ -16,13 +16,23 @@ internal sealed class Endpoint(DeactivateDocumentTypeHandler handler)
         DeactivateDocumentTypeRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            cancellationToken);
 
         if (result.IsFailure)
         {
             if (result.Error.Code == "not_found")
             {
                 await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
+                return;
+            }
+
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(new { error = result.Error.Message }));
                 return;
             }
 

@@ -12,9 +12,15 @@
     <!-- Ticket 2: base-code optimistic-concurrency save helper (EF Core) and Result-&gt;IResult
          translator (ASP.NET Core). Kept here so there is one implementation, not one per module. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <!-- Ticket 3 (P1) follow-up: relational mapping APIs (ToTable, HasColumnType) for the shared
+         idempotency-record configuration. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <!-- Ticket 2 item 3: shared FluentValidation rule requiring a loaded concurrency version
          on every protected update request. -->
     <PackageReference Include="FluentValidation" />
+    <!-- Ticket 3 (P1) follow-up item 4: IdempotencyKeyHeaderValidator is a FastEndpoints global
+         pre-processor. -->
+    <PackageReference Include="FastEndpoints" />
   </ItemGroup>
 
   <ItemGroup>

@@ -2,6 +2,8 @@ using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.MoveApplicationStage;
@@ -26,6 +28,26 @@ internal sealed class MoveApplicationStageHandler(
         Guid performedBy,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, MoveApplicationStageResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<MoveApplicationStageResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var application = await db.Applications
             .SingleOrDefaultAsync(
                 a => a.Id == request.ApplicationId &&
@@ -67,11 +89,8 @@ internal sealed class MoveApplicationStageHandler(
         application.MoveToStage(newStage.Id, now);
 
         recorder.AddHistoryEntry(application, previousStageId, performedBy, now, request.Notes);
-        await db.SaveChangesAsync(cancellationToken);
 
-        await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);
-
-        return Result.Success(new MoveApplicationStageResponse(
+        var response = new MoveApplicationStageResponse(
             application.Id,
             application.VacancyId,
             application.CandidateId,
@@ -80,6 +99,23 @@ internal sealed class MoveApplicationStageHandler(
             application.Notes,
             application.AppliedAt,
             application.CreatedAt,
-            application.UpdatedAt));
+            application.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, MoveApplicationStageResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);
+
+        return Result.Success(response);
     }
 }

@@ -23,7 +23,12 @@ internal sealed class Endpoint(MoveApplicationForwardHandler handler, ICurrentUs
             return;
         }
 
-        var result = await handler.HandleAsync(request, performedBy, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            performedBy,
+            cancellationToken);
 
         if (result.IsFailure)
         {
@@ -32,6 +37,12 @@ internal sealed class Endpoint(MoveApplicationForwardHandler handler, ICurrentUs
             if (result.Error.Code == "not_found")
             {
                 await Send.ResultAsync(TypedResults.NotFound(businessError));
+                return;
+            }
+
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(businessError));
                 return;
             }
 

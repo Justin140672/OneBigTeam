@@ -1,5 +1,7 @@
 using HR.Modules.Recruitment.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.SaveCvReviewNotes;
@@ -19,6 +21,26 @@ internal sealed class SaveCvReviewNotesHandler(
         Guid performedBy,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, SaveCvReviewNotesResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<SaveCvReviewNotesResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var application = await db.Applications
             .SingleOrDefaultAsync(
                 a => a.Id == request.ApplicationId &&
@@ -37,7 +59,28 @@ internal sealed class SaveCvReviewNotesHandler(
         var now = clock.UtcNowOffset();
         application.RecordCvReview(request.CvReviewNotes, performedBy, now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        var response = new SaveCvReviewNotesResponse(
+            application.Id,
+            application.VacancyId,
+            application.CandidateId,
+            application.CurrentStageId,
+            application.CvReviewNotes,
+            application.CvReviewedAt,
+            application.CvReviewedByUserId,
+            application.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, SaveCvReviewNotesResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(
             new ApplicationCvReviewNotesSavedAuditEvent(
@@ -50,14 +93,6 @@ internal sealed class SaveCvReviewNotesHandler(
                 now),
             cancellationToken);
 
-        return Result.Success(new SaveCvReviewNotesResponse(
-            application.Id,
-            application.VacancyId,
-            application.CandidateId,
-            application.CurrentStageId,
-            application.CvReviewNotes,
-            application.CvReviewedAt,
-            application.CvReviewedByUserId,
-            application.UpdatedAt));
+        return Result.Success(response);
     }
 }

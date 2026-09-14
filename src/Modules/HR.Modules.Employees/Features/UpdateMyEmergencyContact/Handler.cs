@@ -3,6 +3,8 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Contracts;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Features.UpdateMyEmergencyContact;
@@ -18,6 +20,26 @@ internal sealed class UpdateMyEmergencyContactHandler(
         Guid employeeId,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, UpdateMyEmergencyContactResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<UpdateMyEmergencyContactResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var contact = await dbContext.EmergencyContacts
             .SingleOrDefaultAsync(
                 c => c.CompanyId == request.CompanyId &&
@@ -43,7 +65,21 @@ internal sealed class UpdateMyEmergencyContactHandler(
 
         contact.Update(request.Name, request.Relationship, request.PhoneNumber, request.Email, now);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var response = new UpdateMyEmergencyContactResponse(
+            contact.Id, contact.Name, contact.Relationship, contact.PhoneNumber, contact.Email);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync<IdempotencyRecord, UpdateMyEmergencyContactResponse>(dbContext.IdempotencyRecords, 
+                scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         var after = new EmergencyContactSnapshot(
             contact.Name, contact.Relationship, contact.PhoneNumber, contact.Email);
@@ -53,7 +89,6 @@ internal sealed class UpdateMyEmergencyContactHandler(
                 request.CompanyId, employeeId, employeeId, now, before, after),
             cancellationToken);
 
-        return Result.Success(new UpdateMyEmergencyContactResponse(
-            contact.Id, contact.Name, contact.Relationship, contact.PhoneNumber, contact.Email));
+        return Result.Success(response);
     }
 }

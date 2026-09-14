@@ -2,6 +2,8 @@ using HR.Modules.Identity.Authorization;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.AddEmployeeRoleOverride;
@@ -23,6 +25,28 @@ internal sealed class AddEmployeeRoleOverrideHandler(
         Guid? actorUserId,
         CancellationToken cancellationToken)
     {
+                var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, AddEmployeeRoleOverrideResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<AddEmployeeRoleOverrideResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var isMember = await targetUserCompanyGuard.IsMemberAsync(request.CompanyId, request.UserId, cancellationToken);
         if (!isMember)
             return Result.Failure<AddEmployeeRoleOverrideResponse>(Error.NotFound("User was not found."));
@@ -76,7 +100,22 @@ internal sealed class AddEmployeeRoleOverrideHandler(
             request.Reason.Trim(), request.ExpiresAt, now, actorUserId);
 
         db.EmployeeRoleOverrides.Add(created);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new AddEmployeeRoleOverrideResponse(
+            request.UserId, request.RoleId, request.OverrideType, created.Reason, created.ExpiresAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, AddEmployeeRoleOverrideResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await auditEventPublisher.PublishAsync(
             new EmployeeRoleOverrideCreatedAuditEvent(
@@ -91,8 +130,7 @@ internal sealed class AddEmployeeRoleOverrideHandler(
                 now),
             cancellationToken);
 
-        return Result.Success(new AddEmployeeRoleOverrideResponse(
-            request.UserId, request.RoleId, request.OverrideType, created.Reason, created.ExpiresAt));
+        return Result.Success(response);
     }
 
     private Task PublishRejectionAsync(

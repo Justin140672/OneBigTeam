@@ -33,7 +33,12 @@ internal sealed class Endpoint(PurgeEligibleCandidatesHandler handler, ICurrentU
             return;
         }
 
-        var result = await handler.HandleAsync(request, purgedBy, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            purgedBy,
+            cancellationToken);
 
         if (result.IsFailure)
         {

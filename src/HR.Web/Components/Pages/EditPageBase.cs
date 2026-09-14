@@ -1,8 +1,10 @@
 using System.Reflection;
+using System.Text.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.WebUtilities;
+using HR.SharedKernel.Idempotency;
 using HR.Web.Services;
 
 namespace HR.Web.Components.Pages;
@@ -420,6 +422,12 @@ public abstract class EditPageBase<TModel, TKey> : EditPageBase<TModel>
     protected abstract Guid GetCompanyId();
     protected abstract TKey? GetId();
 
+    // Ticket 3 (P1) final follow-up items 1/2: THIS page instance - not the scoped service - owns
+    // the idempotency key for the one logical "create" operation it currently represents. A
+    // second, independent create (a different page instance - e.g. the user opens a second tab,
+    // or navigates away and back) gets its own instance of this class and therefore its own key.
+    private readonly PendingIdempotentOperation _createOperation = new();
+
     protected virtual bool IsNew => GetId() is null;
 
     // Ticket 2: the optimistic-concurrency token the current Model was loaded at, read straight off
@@ -455,8 +463,35 @@ public abstract class EditPageBase<TModel, TKey> : EditPageBase<TModel>
     {
         if (IsNew)
         {
-            var (created, createError) = await Service.CreateAsync(GetCompanyId(), Model);
-            return created is not null ? null : createError ?? "Failed to save.";
+            if (Service is IIdempotentCreateService<TModel> idempotentService)
+            {
+                // Fingerprint keyed on the company too (GetCompanyId() can vary per page for some
+                // entities), not just the model.
+                var key = _createOperation.PrepareKey((GetCompanyId(), Model));
+
+                try
+                {
+                    var (created, createError) = await idempotentService.CreateAsync(GetCompanyId(), Model, key);
+
+                    // A definitive outcome (success or a business rejection) was returned - not
+                    // thrown - so this operation is done: the next Save (a corrected resubmission,
+                    // or a fresh create after navigating away and back) is a new logical operation.
+                    _createOperation.Complete();
+
+                    return created is not null ? null : createError ?? "Failed to save.";
+                }
+                catch
+                {
+                    // Ambiguous - the response was lost (network failure/timeout), so the mutation
+                    // may already have committed server-side. Deliberately do NOT complete the
+                    // operation: the next Save of this same unchanged model must reuse its key so
+                    // the server can replay rather than repeat the create.
+                    return "Failed to save. Please try again.";
+                }
+            }
+
+            var (createdModel, createModelError) = await Service.CreateAsync(GetCompanyId(), Model);
+            return createdModel is not null ? null : createModelError ?? "Failed to save.";
         }
 
         // Ticket 2: when the service round-trips a version, send the loaded token and surface a

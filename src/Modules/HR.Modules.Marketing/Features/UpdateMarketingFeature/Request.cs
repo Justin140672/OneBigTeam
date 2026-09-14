@@ -13,4 +13,7 @@ internal sealed record UpdateMarketingFeatureRequest(
     IReadOnlyList<string>? Benefits,
     string? YouTubeId,
     int DisplayOrder,
-    MarketingDeliveryStatus DeliveryStatus);
+    MarketingDeliveryStatus DeliveryStatus)
+{
+    internal string? IdempotencyKey { get; init; }
+}

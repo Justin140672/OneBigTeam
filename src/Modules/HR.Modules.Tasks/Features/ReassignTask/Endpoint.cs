@@ -23,8 +23,14 @@ internal sealed class Endpoint(ReassignTaskHandler handler, ICurrentUser current
             return;
         }
 
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
         var result = await handler.HandleAsync(
-            request with { ActorUserId = actorUserId },
+            request with
+            {
+                ActorUserId = actorUserId,
+                IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
+            },
             cancellationToken);
 
         if (result.IsFailure)
@@ -32,6 +38,12 @@ internal sealed class Endpoint(ReassignTaskHandler handler, ICurrentUser current
             if (result.Error.Code == "forbidden")
             {
                 await Send.ResultAsync(TypedResults.Forbid());
+                return;
+            }
+
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(new { error = result.Error.Message }));
                 return;
             }
 

@@ -2,6 +2,8 @@ using HR.Modules.Leave.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.DeactivateLeaveType;
@@ -16,6 +18,26 @@ internal sealed class DeactivateLeaveTypeHandler(
         DeactivateLeaveTypeRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, object?>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success();
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var entity = await db.LeaveTypes
             .FirstOrDefaultAsync(t => t.Id == request.Id && t.CompanyId == request.CompanyId, cancellationToken);
 
@@ -57,7 +79,19 @@ internal sealed class DeactivateLeaveTypeHandler(
 
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
         entity.Deactivate(now);
-        await db.SaveChangesAsync(cancellationToken);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, object?>(db.IdempotencyRecords, 
+                scope, key, fingerprint!, StatusCodes.Status204NoContent, null, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success();
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(new LeaveTypeDeactivatedAuditEvent(
             entity.CompanyId,

@@ -1,6 +1,8 @@
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Features.CreateProbationReview;
@@ -22,6 +24,26 @@ internal sealed class CreateProbationReviewHandler
         CreateProbationReviewRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await _dbContext.TryReplayAsync<IdempotencyRecord, CreateProbationReviewResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<CreateProbationReviewResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var record = await _dbContext.ProbationRecords
             .FirstOrDefaultAsync(
                 r => r.CompanyId == request.CompanyId && r.Id == request.ProbationRecordId,
@@ -53,7 +75,28 @@ internal sealed class CreateProbationReviewHandler
             _clock.UtcNowOffset());
 
         _dbContext.ProbationReviews.Add(review);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var response = new CreateProbationReviewResponse(
+            review.Id,
+            review.CompanyId,
+            review.ProbationRecordId,
+            review.ReviewType.ToString(),
+            review.DueDate,
+            review.Status.ToString(),
+            review.CreatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await _dbContext.SaveIdempotentAsync(_dbContext.IdempotencyRecords,
+                scope, key, fingerprint!, StatusCodes.Status201Created, response, review.CreatedAt, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         await _auditPublisher.PublishAsync(new ProbationReviewCreatedAuditEvent(
             review.CompanyId,
@@ -65,13 +108,6 @@ internal sealed class CreateProbationReviewHandler
             review.DueDate,
             review.CreatedAt), cancellationToken);
 
-        return Result.Success(new CreateProbationReviewResponse(
-            review.Id,
-            review.CompanyId,
-            review.ProbationRecordId,
-            review.ReviewType.ToString(),
-            review.DueDate,
-            review.Status.ToString(),
-            review.CreatedAt));
+        return Result.Success(response);
     }
 }

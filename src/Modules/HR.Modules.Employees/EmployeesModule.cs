@@ -154,6 +154,11 @@ public static class EmployeesModule
             "reconcile-former-employee-access",
             job => job.ExecuteAsync(),
             Cron.Daily(1));
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<IdempotencyMaintenanceJob>(
+            "employees-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 
@@ -388,6 +393,7 @@ public static class EmployeesModule
 
         services.AddScoped<ProcessPromotionsJob>();
         services.AddScoped<ReconcileFormerEmployeeAccessJob>();
+        services.AddScoped<IdempotencyMaintenanceJob>();
 
         services.AddScoped<GetEmployeeTimelineHandler>();
         services.AddScoped<IValidator<GetEmployeeTimelineRequest>, GetEmployeeTimelineValidator>();

@@ -2,6 +2,8 @@ using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.AwardToil;
@@ -12,6 +14,26 @@ internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, I
         AwardToilRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, AwardToilResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<AwardToilResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var toilLeaveType = await dbContext.LeaveTypes
             .SingleOrDefaultAsync(
                 lt => lt.CompanyId == request.CompanyId
@@ -84,7 +106,31 @@ internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, I
             now);
 
         dbContext.ToilTransactions.Add(transaction);
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var response = new AwardToilResponse(
+            transaction.Id,
+            transaction.CompanyId,
+            transaction.EmployeeId,
+            transaction.LeaveBalanceId,
+            transaction.ActorEmployeeId,
+            transaction.Days,
+            balance.RemainingDays,
+            transaction.OccurredOn,
+            transaction.Notes,
+            transaction.CreatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(new LeaveBalanceAdjustedAuditEvent(
             balance.CompanyId,
@@ -108,16 +154,6 @@ internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, I
             transaction.Notes,
             now), cancellationToken);
 
-        return Result.Success(new AwardToilResponse(
-            transaction.Id,
-            transaction.CompanyId,
-            transaction.EmployeeId,
-            transaction.LeaveBalanceId,
-            transaction.ActorEmployeeId,
-            transaction.Days,
-            balance.RemainingDays,
-            transaction.OccurredOn,
-            transaction.Notes,
-            transaction.CreatedAt));
+        return Result.Success(response);
     }
 }

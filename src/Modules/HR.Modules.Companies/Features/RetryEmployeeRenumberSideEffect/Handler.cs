@@ -3,6 +3,8 @@ using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Jobs;
 using HR.Modules.Companies.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Features.RetryEmployeeRenumberSideEffect;
@@ -21,6 +23,26 @@ internal sealed class RetryEmployeeRenumberSideEffectHandler(
         RetryEmployeeRenumberSideEffectRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, RetryEmployeeRenumberSideEffectResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<RetryEmployeeRenumberSideEffectResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var message = await dbContext.OutboxMessages
             .SingleOrDefaultAsync(
                 m => m.Id == request.OutboxMessageId && m.CompanyId == request.CompanyId,
@@ -34,11 +56,30 @@ internal sealed class RetryEmployeeRenumberSideEffectHandler(
             return Result.Failure<RetryEmployeeRenumberSideEffectResponse>(
                 Error.Validation($"Cannot retry a side effect with status '{message.Status}'. Only a Failed side effect can be retried."));
 
-        message.ResetForRetry(clock.UtcNowOffset());
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var now = clock.UtcNowOffset();
+        message.ResetForRetry(now);
+
+        var response = new RetryEmployeeRenumberSideEffectResponse(message.Id, message.CompanyId, message.Status);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync(
+                dbContext.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+            {
+                // Lost a race against a concurrent duplicate under the same key - the winner's
+                // attempt already enqueued the retry job, so don't enqueue a second one here.
+                return Result.Success(outcome.Response!);
+            }
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         backgroundJobClient.Enqueue<EmployeeRenumberSideEffectJob>(job => job.ProcessAsync(message.Id, message.CompanyId));
 
-        return Result.Success(new RetryEmployeeRenumberSideEffectResponse(message.Id, message.CompanyId, message.Status));
+        return Result.Success(response);
     }
 }

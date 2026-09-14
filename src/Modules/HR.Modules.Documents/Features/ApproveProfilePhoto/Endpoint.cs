@@ -48,7 +48,12 @@ internal sealed class Endpoint(ApproveProfilePhotoHandler handler, IAuthorizatio
             return;
         }
 
-        var result = await handler.HandleAsync(request, reviewerId, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            reviewerId,
+            cancellationToken);
 
         if (result.IsFailure)
         {
@@ -57,6 +62,12 @@ internal sealed class Endpoint(ApproveProfilePhotoHandler handler, IAuthorizatio
             if (result.Error.Code == "not_found")
             {
                 await Send.ResultAsync(TypedResults.NotFound(error));
+                return;
+            }
+
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(error));
                 return;
             }
 

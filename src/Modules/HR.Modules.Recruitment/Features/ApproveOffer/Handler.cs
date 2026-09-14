@@ -1,5 +1,7 @@
 using HR.Modules.Recruitment.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.ApproveOffer;
@@ -19,6 +21,26 @@ internal sealed class ApproveOfferHandler(
         Guid approvedBy,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, ApproveOfferResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<ApproveOfferResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var application = await db.Applications
             .SingleOrDefaultAsync(
                 a => a.Id == request.ApplicationId &&
@@ -36,14 +58,28 @@ internal sealed class ApproveOfferHandler(
 
         var now = clock.UtcNowOffset();
         application.ApproveOffer(approvedBy, now);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new ApproveOfferResponse(
+            application.Id, application.CompanyId, application.OfferApprovedAt!.Value, application.OfferApprovedByUserId!.Value);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, ApproveOfferResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(
             new OfferApprovedAuditEvent(
                 application.CompanyId, application.Id, application.VacancyId, application.CandidateId, approvedBy, now),
             cancellationToken);
 
-        return Result.Success(new ApproveOfferResponse(
-            application.Id, application.CompanyId, application.OfferApprovedAt!.Value, application.OfferApprovedByUserId!.Value));
+        return Result.Success(response);
     }
 }

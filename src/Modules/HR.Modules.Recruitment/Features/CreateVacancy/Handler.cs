@@ -4,6 +4,8 @@ using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.CreateVacancy;
@@ -18,6 +20,26 @@ internal sealed class CreateVacancyHandler(
         CreateVacancyRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, CreateVacancyResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<CreateVacancyResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         // Cross-module validation: PositionProfile is owned by HR.Modules.Employees, so existence
         // and company-ownership are verified through the narrow IPositionProfileReader contract
         // rather than a direct module reference or a database foreign key.
@@ -86,9 +108,8 @@ internal sealed class CreateVacancyHandler(
             request.IsAdvertisedInternally);
 
         db.Vacancies.Add(vacancy);
-        await db.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new CreateVacancyResponse(
+        var response = new CreateVacancyResponse(
             vacancy.Id,
             vacancy.CompanyId,
             vacancy.PositionProfileId,
@@ -101,6 +122,21 @@ internal sealed class CreateVacancyHandler(
             vacancy.OpenedAt,
             vacancy.ClosedAt,
             vacancy.CreatedAt,
-            vacancy.UpdatedAt));
+            vacancy.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, CreateVacancyResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return Result.Success(response);
     }
 }

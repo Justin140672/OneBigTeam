@@ -93,6 +93,12 @@ public static class ReportingModule
             "organisation-data-export-cleanup-artefacts",
             job => job.ExecuteAsync(CancellationToken.None),
             "23 */6 * * *");
+
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
+            "reporting-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 
@@ -118,6 +124,7 @@ public static class ReportingModule
         services.AddScoped<Jobs.PurgeExpiredOrganisationDataExportsJob>();
         services.AddScoped<Jobs.RecoverStalledOrganisationDataExportsJob>();
         services.AddScoped<Jobs.CleanUpOrganisationDataExportArtefactsJob>();
+        services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
         services.AddScoped<Features.RequestOrganisationDataExport.RequestOrganisationDataExportHandler>();
         services.AddScoped<IValidator<Features.RequestOrganisationDataExport.RequestOrganisationDataExportRequest>, Features.RequestOrganisationDataExport.RequestOrganisationDataExportValidator>();
         services.AddScoped<Features.GetLatestOrganisationDataExport.GetLatestOrganisationDataExportHandler>();

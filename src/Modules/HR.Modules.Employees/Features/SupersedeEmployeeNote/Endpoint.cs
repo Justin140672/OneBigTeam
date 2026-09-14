@@ -25,7 +25,11 @@ internal sealed class Endpoint(SupersedeEmployeeNoteHandler handler, ICurrentUse
             return;
         }
 
-        var result = await handler.HandleAsync(request, actorId, actorId, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            actorId, actorId, cancellationToken);
 
         if (result.IsFailure)
         {

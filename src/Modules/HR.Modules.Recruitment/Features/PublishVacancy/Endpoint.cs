@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
+using HR.SharedKernel;
 
 namespace HR.Modules.Recruitment.Features.PublishVacancy;
 
@@ -16,7 +17,11 @@ internal sealed class Endpoint(PublishVacancyHandler handler)
         PublishVacancyRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            cancellationToken);
 
         if (result.IsFailure)
         {
@@ -25,6 +30,12 @@ internal sealed class Endpoint(PublishVacancyHandler handler)
             if (result.Error.Code == "not_found")
             {
                 await Send.ResultAsync(TypedResults.NotFound(businessError));
+                return;
+            }
+
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(businessError));
                 return;
             }
 

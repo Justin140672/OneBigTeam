@@ -13,4 +13,12 @@ internal sealed record CreateAssetRequest
     public string? SerialNumber { get; init; }
     public DateOnly? PurchaseDate { get; init; }
     public decimal? PurchasePrice { get; init; }
+
+    // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1
+    // follow-up). Null when the caller didn't supply one, in which case no dedup is attempted.
+    internal string? IdempotencyKey { get; init; }
+
+    // Populated by the endpoint from the authenticated user's id (ticket 3, P1 follow-up item 3) -
+    // the actor scope an idempotency key is bound to. Never bound from the client body.
+    internal Guid ActorId { get; init; }
 }

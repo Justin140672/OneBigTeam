@@ -312,6 +312,7 @@ public static class DocumentsModule
         services.AddScoped<DocumentExpiryReminderJob>();
         services.AddHttpClient();
         services.AddScoped<ScanUploadedFileJob>();
+        services.AddScoped<IdempotencyMaintenanceJob>();
 
         services.AddScoped<ISharedCompanyDocumentAcknowledgementHistoryReplayer, SharedCompanyDocumentAcknowledgementHistoryReplayer>();
 
@@ -342,6 +343,11 @@ public static class DocumentsModule
             "document-expiry-reminders",
             job => job.ExecuteAsync(),
             Cron.Daily(11));
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<IdempotencyMaintenanceJob>(
+            "documents-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 

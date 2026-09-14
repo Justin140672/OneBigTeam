@@ -3,6 +3,8 @@ using HR.Modules.Leave.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.CreateLeaveRequestDraft;
@@ -23,6 +25,26 @@ internal sealed class CreateLeaveRequestDraftHandler(
         CreateLeaveRequestDraftRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, CreateLeaveRequestDraftResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<CreateLeaveRequestDraftResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var leaveType = await dbContext.LeaveTypes
             .SingleOrDefaultAsync(
                 lt => lt.Id == request.LeaveTypeId && lt.CompanyId == request.CompanyId && lt.IsActive,
@@ -71,9 +93,8 @@ internal sealed class CreateLeaveRequestDraftHandler(
             now);
 
         dbContext.LeaveRequests.Add(draft);
-        await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new CreateLeaveRequestDraftResponse(
+        var response = new CreateLeaveRequestDraftResponse(
             draft.Id,
             draft.CompanyId,
             draft.EmployeeId,
@@ -86,6 +107,21 @@ internal sealed class CreateLeaveRequestDraftHandler(
             draft.EndPart,
             draft.TotalDays,
             draft.Reason,
-            draft.CreatedAt));
+            draft.CreatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return Result.Success(response);
     }
 }

@@ -3,6 +3,8 @@ using HR.Modules.Documents.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.DeactivateDocumentType;
@@ -16,6 +18,29 @@ internal sealed class DeactivateDocumentTypeHandler(
         DeactivateDocumentTypeRequest request,
         CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated request. Payload-less success, so a
+        // trivial `bool` marker is persisted/replayed purely to detect a repeated delivery.
+                var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+        
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, bool>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success();
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var documentType = await db.DocumentTypes
             .SingleOrDefaultAsync(
                 dt => dt.Id == request.DocumentTypeId &&
@@ -65,8 +90,21 @@ internal sealed class DeactivateDocumentTypeHandler(
                 $"{string.Join(" and ", usageSegments)}."));
         }
 
-        documentType.Deactivate(clock.UtcNowOffset());
-        await db.SaveChangesAsync(cancellationToken);
+        var now = clock.UtcNowOffset();
+        documentType.Deactivate(now);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync(db.IdempotencyRecords,
+            scope, key, fingerprint!, StatusCodes.Status204NoContent, true, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success();
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         return Result.Success();
     }

@@ -5,6 +5,8 @@ using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.AcknowledgeSharedCompanyDocument;
@@ -23,6 +25,29 @@ internal sealed class AcknowledgeSharedCompanyDocumentHandler(
         Guid callerEmployeeId,
         CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated request before doing any business
+        // work, so a repeated delivery can't double-apply the acknowledgement.
+                var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+        
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, AcknowledgeSharedCompanyDocumentResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<AcknowledgeSharedCompanyDocumentResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var document = await db.SharedCompanyDocuments
             .AsNoTracking()
             .FirstOrDefaultAsync(
@@ -80,7 +105,27 @@ internal sealed class AcknowledgeSharedCompanyDocumentHandler(
             now);
 
         db.SharedCompanyDocumentAcknowledgements.Add(acknowledgement);
-        await db.SaveChangesAsync(cancellationToken);
+
+        // Built from in-memory values ahead of the save, so it can double as both the response and
+        // the payload persisted for an idempotency replay.
+        var response = new AcknowledgeSharedCompanyDocumentResponse(
+            document.Id, document.VersionNumber, acknowledgement.AcknowledgedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync(db.IdempotencyRecords,
+            scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            // Lost a race against a concurrent duplicate under the same key — this attempt's
+            // acknowledgement row was rolled back along with it, so skip the task-complete/audit/
+            // integration-event publishing below and hand back the winner's result untouched.
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         // Complete the acknowledging employee's own open Acknowledge task for this document, if
         // one exists — scoped to this employee specifically (not just "the first open task for
@@ -111,7 +156,6 @@ internal sealed class AcknowledgeSharedCompanyDocumentHandler(
                 document.CompanyId, callerEmployeeId, document.Id, document.Title, now),
             cancellationToken);
 
-        return Result.Success(new AcknowledgeSharedCompanyDocumentResponse(
-            document.Id, document.VersionNumber, acknowledgement.AcknowledgedAt));
+        return Result.Success(response);
     }
 }

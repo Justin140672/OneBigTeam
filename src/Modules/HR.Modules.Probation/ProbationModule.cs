@@ -80,6 +80,7 @@ public static class ProbationModule
         services.AddScoped<IProbationReportReader, ProbationReportReader>();
         services.AddScoped<IEmployeesInProbationReader, Services.EmployeesInProbationReader>();
         services.AddScoped<Services.ProbationResourceAuthorizer>();
+        services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
     }
 
     public static WebApplication UseProbationRecurringJobs(this WebApplication app)
@@ -89,6 +90,11 @@ public static class ProbationModule
             "generate-due-probation-reviews",
             job => job.ExecuteAsync(),
             Cron.Daily(1));
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
+            "probation-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 

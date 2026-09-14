@@ -14,9 +14,18 @@ internal sealed class Endpoint(DeactivateAssetCategoryHandler handler)
 
     public override async Task HandleAsync(DeactivateAssetCategoryRequest request, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            cancellationToken);
         if (result.IsFailure)
         {
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(new { error = result.Error.Message }));
+                return;
+            }
             await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
             return;
         }

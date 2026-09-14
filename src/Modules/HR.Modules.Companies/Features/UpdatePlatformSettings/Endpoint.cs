@@ -15,11 +15,22 @@ internal sealed class Endpoint(
 
     public override async Task HandleAsync(UpdatePlatformSettingsRequest req, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(req, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            req with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            cancellationToken);
 
         if (result.IsFailure)
         {
             var businessError = new { error = result.Error.Message };
+
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(businessError));
+                return;
+            }
+
             await Send.ResultAsync(TypedResults.BadRequest(businessError));
             return;
         }

@@ -15,4 +15,9 @@ internal sealed record StartLeavingProcessRequest(
     // only meaningful when the departing employee actually has direct reports; ignored otherwise.
     // When omitted for a manager with direct reports, those reports are left without a manager
     // and the departure is routed to an HR exception queue.
-    Guid? ReplacementManagerEmployeeId = null);
+    Guid? ReplacementManagerEmployeeId = null)
+{
+    // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1
+    // follow-up). Null when the caller didn't supply one, in which case no dedup is attempted.
+    internal string? IdempotencyKey { get; init; }
+}

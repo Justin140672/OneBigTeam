@@ -518,4 +518,90 @@ public class PromoteEmployeeHandlerTests
         Assert.Equal(newManagerId, savedEmployee.ManagerId);
         Assert.Equal(newLocationId, savedEmployee.LocationId);
     }
+
+    // -- Idempotency-Key (ticket 3, P1 follow-up) --------------------------------------------
+
+    [Fact]
+    public async Task HandleAsync_With_IdempotencyKey_Replays_Cached_Response_Without_Creating_Second_Promotion()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = CreateEmployee(companyId, Now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context);
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = BuildRequest(companyId, employee.Id, Guid.NewGuid()) with { IdempotencyKey = idempotencyKey };
+
+        var first = await handler.HandleAsync(request, Guid.NewGuid(), CancellationToken.None);
+        var second = await handler.HandleAsync(request, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(first.Value!.Id, second.Value!.Id);
+        Assert.Single(await context.EmployeePromotions.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_Same_IdempotencyKey_And_Different_Payload_Returns_Conflict()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = CreateEmployee(companyId, Now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context);
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = BuildRequest(companyId, employee.Id, Guid.NewGuid()) with { IdempotencyKey = idempotencyKey };
+
+        var first = await handler.HandleAsync(request, Guid.NewGuid(), CancellationToken.None);
+        var second = await handler.HandleAsync(
+            request with { Notes = "Different notes entirely." },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsFailure);
+        Assert.Equal("conflict", second.Error.Code);
+        Assert.Equal("This Idempotency-Key was already used for a different request.", second.Error.Message);
+        Assert.Single(await context.EmployeePromotions.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_IdempotencyKey_And_Backdated_EffectiveDate_Returns_PostFinalization_CompletedAt()
+    {
+        // Regression guard: PromoteEmployeeHandler snapshots the response for the
+        // idempotency-replay payload BEFORE calling FinalizeAsync, since a replayed request must
+        // never re-run finalization. The value actually returned to THIS (first, non-replayed)
+        // caller must still reflect the post-finalization state (CompletedAt populated), not the
+        // pre-finalization snapshot that was persisted for replay purposes.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = CreateEmployee(companyId, Now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var newPositionProfileId = Guid.NewGuid();
+        var handler = BuildHandler(context);
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = BuildRequest(
+            companyId, employee.Id, newPositionProfileId,
+            effectiveDate: Today.AddDays(-1),
+            confirmBackdatedEffectiveDate: true)
+            with
+            { IdempotencyKey = idempotencyKey };
+
+        var result = await handler.HandleAsync(request, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value!.CompletedAt);
+
+        var savedPromotion = await context.EmployeePromotions.SingleAsync();
+        Assert.NotNull(savedPromotion.CompletedAt);
+
+        var savedEmployee = await context.Employees.SingleAsync();
+        Assert.Equal(newPositionProfileId, savedEmployee.PositionProfileId);
+    }
 }

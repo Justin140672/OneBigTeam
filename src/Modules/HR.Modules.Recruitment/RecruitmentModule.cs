@@ -256,6 +256,7 @@ public static class RecruitmentModule
 
         services.AddScoped<InterviewReminderJob>();
         services.AddScoped<OutstandingInterviewFeedbackReminderJob>();
+        services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
 
         services.AddScoped<CreateExternalRecruiterHandler>();
         services.AddScoped<IValidator<CreateExternalRecruiterRequest>, CreateExternalRecruiterValidator>();
@@ -314,6 +315,11 @@ public static class RecruitmentModule
             "outstanding-interview-feedback-reminders",
             job => job.ExecuteAsync(),
             Cron.Daily(6));
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
+            "recruitment-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 

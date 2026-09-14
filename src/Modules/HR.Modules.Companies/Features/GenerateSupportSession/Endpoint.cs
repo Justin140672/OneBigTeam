@@ -15,6 +15,11 @@ internal sealed class Endpoint(
 
     public override async Task HandleAsync(GenerateSupportSessionRequest req, CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up item 5: deliberately NOT idempotency-wrapped. The response
+        // carries a live, single-issue bearer token - replaying a stored copy would both leak that
+        // secret into the idempotency table in plaintext (the business table only ever stores its
+        // hash) and hand back a session that may since have been revoked. A retry here should mint
+        // a fresh session, not replay an old one.
         var result = await handler.HandleAsync(req, cancellationToken);
 
         if (result.IsFailure)
@@ -30,6 +35,12 @@ internal sealed class Endpoint(
             if (result.Error.Code == "not_found")
             {
                 await Send.ResultAsync(TypedResults.NotFound(businessError));
+                return;
+            }
+
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(businessError));
                 return;
             }
 

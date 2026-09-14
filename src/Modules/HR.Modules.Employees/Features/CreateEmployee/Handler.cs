@@ -6,6 +6,9 @@ using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using HR.SharedKernel.Outbox;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Features.CreateEmployee;
@@ -14,7 +17,6 @@ internal sealed class CreateEmployeeHandler
 {
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
-    private readonly IIntegrationEventPublisher _publisher;
     private readonly IProbationDateResolver _probationDateResolver;
     private readonly ICompanyContactValidationReader _contactValidationReader;
     private readonly ICompanyEmployeeNumberSettingsReader _employeeNumberSettingsReader;
@@ -23,7 +25,6 @@ internal sealed class CreateEmployeeHandler
     public CreateEmployeeHandler(
         EmployeesDbContext dbContext,
         IClock clock,
-        IIntegrationEventPublisher publisher,
         IProbationDateResolver probationDateResolver,
         ICompanyContactValidationReader contactValidationReader,
         ICompanyEmployeeNumberSettingsReader employeeNumberSettingsReader,
@@ -31,7 +32,6 @@ internal sealed class CreateEmployeeHandler
     {
         _dbContext = dbContext;
         _clock = clock;
-        _publisher = publisher;
         _probationDateResolver = probationDateResolver;
         _contactValidationReader = contactValidationReader;
         _employeeNumberSettingsReader = employeeNumberSettingsReader;
@@ -42,6 +42,31 @@ internal sealed class CreateEmployeeHandler
         CreateEmployeeRequest request,
         CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated request (client-supplied
+        // Idempotency-Key header) before generating a new employee number, so a repeated delivery
+        // can't create a second employee for the same logical request. Distinct from the
+        // SourceReference dedup below, which is a separate NFR-08 mechanism keyed on business data
+        // rather than a client-supplied header.
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await _dbContext.TryReplayAsync<IdempotencyRecord, CreateEmployeeResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<CreateEmployeeResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         // NFR-08: idempotency short-circuit. Automated provisioning flows (candidate hire) supply a
         // stable SourceReference. If the upstream workflow is retried after a partial failure, an
         // employee for this source may already exist — return it rather than creating a duplicate,
@@ -307,12 +332,51 @@ internal sealed class CreateEmployeeHandler
                 now));
         }
 
+        // Built from in-memory values ahead of the save, so it can double as both the response and
+        // the payload persisted for an idempotency replay.
+        var response = MapResponse(employee);
+
+        // Ticket 3 (P1) follow-up item 3/5: stage the integration event in the SAME transaction as
+        // the business write and the idempotency record, instead of publishing after commit. A
+        // crash between "committed" and "published" can now only delay delivery (the background
+        // dispatcher retries the outbox row until it succeeds), never lose it - which matters here
+        // specifically because onboarding/probation/leave/task/notification provisioning all key
+        // off this event. On an idempotent replay (below) this line is never reached, so a replay
+        // can never enqueue a second outbox row - and therefore never re-run that downstream
+        // provisioning - for the same logical employee creation.
+        _dbContext.AuditOutboxEntries.EnqueueIntegrationOutbox(
+            new EmployeeCreatedIntegrationEvent(
+                employee.CompanyId, employee.Id, employee.StartDate, employee.ManagerId, probationEndDate,
+                employee.PositionProfileId, positionProfile?.DefaultLeavePolicyId),
+            request.CompanyId, now);
+
         try
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            if (request.IdempotencyKey is { } key)
+            {
+                var outcome = await _dbContext.SaveIdempotentAsync<IdempotencyRecord, CreateEmployeeResponse>(_dbContext.IdempotencyRecords, 
+                    scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+                // Lost a race against a concurrent duplicate under the same key - this attempt's
+                // employee row was rolled back along with it, so skip our own event publish and
+                // hand back the winner's result untouched.
+                if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                    return Result.Success(outcome.Response!);
+            }
+            else
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
         }
-        catch (DbUpdateException)
+        catch (Exception exception) when (exception is DbUpdateException or InvalidOperationException)
         {
+            // Covers both: (a) a plain DbUpdateException from SaveChangesAsync when no
+            // Idempotency-Key was supplied, and (b) the narrow case where SaveIdempotentAsync's own
+            // 23505 handling mistook a genuine (CompanyId, EmployeeNumber)/SourceReference unique
+            // violation for a same-key race, rolled back, found no idempotency record to replay,
+            // and threw InvalidOperationException — in both cases the underlying cause is one of
+            // the business unique constraints below, not a duplicate Idempotency-Key delivery.
+
             // NFR-08: backstop for a concurrent retry of the same automated provisioning workflow —
             // the (CompanyId, SourceReference) filtered unique index rejected this insert because a
             // parallel run already created the employee for this source. Return that row as an
@@ -338,11 +402,7 @@ internal sealed class CreateEmployeeHandler
                 Error.Conflict($"An employee with employee number '{employeeNumber}' already exists in this company."));
         }
 
-        await _publisher.PublishAsync(new EmployeeCreatedIntegrationEvent(
-            employee.CompanyId, employee.Id, employee.StartDate, employee.ManagerId, probationEndDate,
-            employee.PositionProfileId, positionProfile?.DefaultLeavePolicyId), cancellationToken);
-
-        return Result.Success(MapResponse(employee));
+        return Result.Success(response);
     }
 
     private static CreateEmployeeResponse MapResponse(Employee employee) =>

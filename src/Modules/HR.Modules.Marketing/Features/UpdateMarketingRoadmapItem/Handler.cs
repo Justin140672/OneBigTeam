@@ -1,6 +1,8 @@
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
 using HR.Modules.Marketing.Persistence;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Marketing.Features.UpdateMarketingRoadmapItem;
@@ -15,6 +17,27 @@ internal sealed class UpdateMarketingRoadmapItemHandler(
         UpdateMarketingRoadmapItemRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, Guid.Empty, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, UpdateMarketingRoadmapItemResponse>(
+                scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<UpdateMarketingRoadmapItemResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var now = clock.UtcNowOffset();
 
         var item = await dbContext.MarketingRoadmapItems
@@ -43,7 +66,29 @@ internal sealed class UpdateMarketingRoadmapItemHandler(
             return Result.Failure<UpdateMarketingRoadmapItemResponse>(update.Error);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var response = new UpdateMarketingRoadmapItemResponse(
+            item.Id,
+            item.Title,
+            item.IsPublished,
+            item.DisplayOrder,
+            item.DeliveryStatus.ToString(),
+            item.UpdatedAt,
+            item.UpdatedByUserId);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync(
+                dbContext.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+            {
+                return Result.Success(outcome.Response!);
+            }
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         await auditEventPublisher.PublishAsync(
             new MarketingRoadmapItemUpdatedAuditEvent(
@@ -55,13 +100,6 @@ internal sealed class UpdateMarketingRoadmapItemHandler(
                     item.Title, item.Description, item.IsPublished, item.DisplayOrder, item.DeliveryStatus.ToString())),
             cancellationToken);
 
-        return Result.Success(new UpdateMarketingRoadmapItemResponse(
-            item.Id,
-            item.Title,
-            item.IsPublished,
-            item.DisplayOrder,
-            item.DeliveryStatus.ToString(),
-            item.UpdatedAt,
-            item.UpdatedByUserId));
+        return Result.Success(response);
     }
 }

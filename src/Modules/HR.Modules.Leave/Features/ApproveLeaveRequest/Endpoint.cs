@@ -29,7 +29,12 @@ internal sealed class Endpoint(
         // SEC: the acting reviewer must always be the authenticated caller, never trusted from
         // request data — any client-supplied ReviewedByEmployeeId is discarded here and replaced
         // with the server-resolved identity before authorization or persistence.
-        request = request with { ReviewedByEmployeeId = reviewerId };
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+        request = request with
+        {
+            ReviewedByEmployeeId = reviewerId,
+            IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
+        };
 
         // LEAVE-01: only HR Administrators or a manager anywhere above the target employee in
         // the reporting hierarchy may approve.
@@ -48,6 +53,12 @@ internal sealed class Endpoint(
             if (result.Error.Code == "not_found")
             {
                 await Send.ResultAsync(TypedResults.NotFound(businessError));
+                return;
+            }
+
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(businessError));
                 return;
             }
 

@@ -26,6 +26,16 @@ public interface IConcurrencyAwareEditService<TModel, TKey> : IEditService<TMode
     Task<ApiSaveResult> UpdateAsync(Guid companyId, TKey id, TModel model, int? expectedVersion);
 }
 
+// Ticket 3 (P1) final follow-up items 1/2: opt-in extension for a "simple" edit service whose
+// CreateAsync is idempotency-key-aware. EditPageBase<TModel, TKey> detects a service implementing
+// this and owns the key's lifecycle itself (generate once per logical create, reuse across retries
+// of an unchanged submission, rotate the moment the submitted model changes, discard on a
+// definitive outcome) - the service stays stateless with respect to operation identity.
+public interface IIdempotentCreateService<TModel>
+{
+    Task<(TModel? Result, string? Error)> CreateAsync(Guid companyId, TModel model, Guid idempotencyKey);
+}
+
 // Implemented by a "simple" edit model whose service round-trips an optimistic-concurrency token.
 // EditPageBase<TModel, TKey> reads Version after loading (as the expected version for the next
 // save) and writes the post-save version back onto it.

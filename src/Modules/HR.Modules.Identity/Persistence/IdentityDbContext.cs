@@ -1,4 +1,5 @@
 using HR.Modules.Identity.Domain;
+using HR.SharedKernel.Idempotency;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Persistence;
@@ -24,10 +25,12 @@ internal sealed class IdentityDbContext : DbContext
     public DbSet<PlatformAdministrator> PlatformAdministrators => Set<PlatformAdministrator>();
     public DbSet<SessionRevocation> SessionRevocations => Set<SessionRevocation>();
     public DbSet<AccountDisablement> AccountDisablements => Set<AccountDisablement>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("identity");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
+        modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration<IdempotencyRecord>());
     }
 }

@@ -2,6 +2,8 @@ using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.SetRecruitmentStageActiveStatus;
@@ -22,6 +24,26 @@ internal sealed class SetRecruitmentStageActiveStatusHandler(
         SetRecruitmentStageActiveStatusRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, SetRecruitmentStageActiveStatusResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<SetRecruitmentStageActiveStatusResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var stage = await db.RecruitmentStages
             .SingleOrDefaultAsync(
                 s => s.Id == request.RecruitmentStageId && s.CompanyId == request.CompanyId,
@@ -60,18 +82,32 @@ internal sealed class SetRecruitmentStageActiveStatusHandler(
         var now = clock.UtcNowOffset();
 
         stage.SetActiveStatus(request.IsActive, now);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new SetRecruitmentStageActiveStatusResponse(
+            stage.Id,
+            stage.CompanyId,
+            stage.Name,
+            stage.IsActive,
+            stage.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, SetRecruitmentStageActiveStatusResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(
             new RecruitmentStageActiveStatusChangedAuditEvent(
                 stage.CompanyId, stage.Id, stage.Name, previousIsActive, stage.IsActive, now),
             cancellationToken);
 
-        return Result.Success(new SetRecruitmentStageActiveStatusResponse(
-            stage.Id,
-            stage.CompanyId,
-            stage.Name,
-            stage.IsActive,
-            stage.UpdatedAt));
+        return Result.Success(response);
     }
 }

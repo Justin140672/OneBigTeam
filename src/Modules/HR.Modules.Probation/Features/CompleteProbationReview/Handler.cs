@@ -2,7 +2,9 @@ using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
 using HR.Infrastructure.Abstractions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Features.CompleteProbationReview;
@@ -37,6 +39,26 @@ internal sealed class CompleteProbationReviewHandler
         Guid completedByEmployeeId,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await _dbContext.TryReplayAsync<IdempotencyRecord, CompleteProbationReviewResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<CompleteProbationReviewResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var record = await _dbContext.ProbationRecords
             .FirstOrDefaultAsync(
                 r => r.CompanyId == request.CompanyId && r.Id == request.ProbationRecordId,
@@ -116,7 +138,30 @@ internal sealed class CompleteProbationReviewHandler
         // ProbationDbContext's UseVersionedAggregates()) automatically advances ProbationRecord's
         // Version here, which is sufficient to make a concurrently-loaded administrative-edit
         // screen (UpdateProbationRecord) go stale.
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        var response = new CompleteProbationReviewResponse(
+            review.Id,
+            review.CompanyId,
+            review.ProbationRecordId,
+            review.ReviewType.ToString(),
+            review.DueDate,
+            review.Status.ToString(),
+            review.CompletedAt,
+            review.CompletedByEmployeeId,
+            review.Outcome?.ToString(),
+            review.Notes);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await _dbContext.SaveIdempotentAsync(_dbContext.IdempotencyRecords,
+                scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         if (request.Outcome == ProbationOutcome.Extend)
         {
@@ -186,16 +231,6 @@ internal sealed class CompleteProbationReviewHandler
                 _notificationWriter, record, review, now, cancellationToken);
         }
 
-        return Result.Success(new CompleteProbationReviewResponse(
-            review.Id,
-            review.CompanyId,
-            review.ProbationRecordId,
-            review.ReviewType.ToString(),
-            review.DueDate,
-            review.Status.ToString(),
-            review.CompletedAt,
-            review.CompletedByEmployeeId,
-            review.Outcome?.ToString(),
-            review.Notes));
+        return Result.Success(response);
     }
 }

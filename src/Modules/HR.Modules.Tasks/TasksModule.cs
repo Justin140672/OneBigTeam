@@ -1,3 +1,4 @@
+using Hangfire;
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.CandidateHired;
@@ -18,6 +19,7 @@ using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -74,6 +76,18 @@ public static class TasksModule
         services.AddScoped<CompleteTaskHandler>();
 
         services.AddHostedService<DueSoonNotifier>();
+        services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
+    }
+
+    public static WebApplication UseTasksRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
+            "tasks-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
+        return app;
     }
 
     public static async Task MigrateTasksAsync(this IServiceProvider services)

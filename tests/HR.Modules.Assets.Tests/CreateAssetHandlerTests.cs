@@ -39,7 +39,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -74,7 +74,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -102,7 +102,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -121,7 +121,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -141,7 +141,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
 
         await handler.HandleAsync(new CreateAssetRequest
         {
@@ -162,7 +162,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
 
         var request = new CreateAssetRequest
         {
@@ -185,7 +185,7 @@ public class CreateAssetHandlerTests
         await using var db = BuildContext();
         var (categoryId1, companyId1) = await SeedActiveCategoryAsync(db);
         var (categoryId2, companyId2) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
 
         await handler.HandleAsync(new CreateAssetRequest
         {
@@ -210,7 +210,7 @@ public class CreateAssetHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Category_Does_Not_Exist()
     {
         await using var db = BuildContext();
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -229,7 +229,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, _) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -244,12 +244,14 @@ public class CreateAssetHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Publishes_AssetCreated_Audit_Event_On_Success()
+    public async Task HandleAsync_Stages_AssetCreated_Audit_Outbox_Entry_On_Success()
     {
+        // Ticket 3 (P1) follow-up item 5: the handler no longer calls IAuditEventPublisher
+        // directly - it stages an AuditOutboxEntry in the same transaction as the business write,
+        // which a background dispatcher delivers independently.
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var auditPublisher = new FakeAuditPublisher();
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), auditPublisher, new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -260,20 +262,22 @@ public class CreateAssetHandlerTests
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        var evt = Assert.Single(auditPublisher.Published);
+        var outboxEntry = await db.AuditOutboxEntries.SingleAsync();
+        Assert.Contains(nameof(AssetCreatedAuditEvent), outboxEntry.EventTypeName);
+        HR.SharedKernel.IAuditEvent evt = System.Text.Json.JsonSerializer.Deserialize<AssetCreatedAuditEvent>(outboxEntry.PayloadJson)!;
         Assert.Equal("asset.created", evt.EventType);
         Assert.Equal(result.Value!.Id, evt.EntityId);
         Assert.Equal(companyId, evt.CompanyId);
         Assert.Null(evt.ActorUserId);
+        Assert.Null(outboxEntry.DispatchedAt);
     }
 
     [Fact]
-    public async Task HandleAsync_Does_Not_Publish_Audit_Event_On_Failure()
+    public async Task HandleAsync_Does_Not_Stage_Audit_Outbox_Entry_On_Failure()
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var auditPublisher = new FakeAuditPublisher();
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), auditPublisher, new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
 
         var request = new CreateAssetRequest
         {
@@ -283,13 +287,13 @@ public class CreateAssetHandlerTests
             Name = "First"
         };
         await handler.HandleAsync(request, CancellationToken.None);
-        auditPublisher.Published.ToList(); // reset not needed — just verify count below
 
-        var auditPublisher2 = new FakeAuditPublisher();
-        var handler2 = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), auditPublisher2, new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var handler2 = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
         var result = await handler2.HandleAsync(request with { Name = "Duplicate" }, CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Empty(auditPublisher2.Published);
+        // Exactly one outbox entry (from the first, successful call) - the failed duplicate attempt
+        // must not have staged a second one.
+        Assert.Single(await db.AuditOutboxEntries.ToListAsync());
     }
 }

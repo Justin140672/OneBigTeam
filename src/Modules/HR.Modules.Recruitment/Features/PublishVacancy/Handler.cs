@@ -3,6 +3,8 @@ using HR.Modules.Recruitment.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.PublishVacancy;
@@ -18,6 +20,26 @@ internal sealed class PublishVacancyHandler(
         PublishVacancyRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, PublishVacancyResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<PublishVacancyResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var vacancy = await db.Vacancies
             .SingleOrDefaultAsync(
                 v => v.Id == request.VacancyId && v.CompanyId == request.CompanyId,
@@ -43,7 +65,32 @@ internal sealed class PublishVacancyHandler(
         var openedAt = request.OpenedAt ?? DateOnly.FromDateTime(now.UtcDateTime);
 
         vacancy.Open(now, openedAt);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new PublishVacancyResponse(
+            vacancy.Id,
+            vacancy.CompanyId,
+            vacancy.PositionProfileId,
+            vacancy.AdvertTitle,
+            vacancy.AdvertDescription,
+            vacancy.Status,
+            vacancy.HiringManagerId,
+            vacancy.OpenedAt,
+            vacancy.ClosedAt,
+            vacancy.CreatedAt,
+            vacancy.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, PublishVacancyResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         // Cross-module read purely for a readable audit Summary line — see VacancyClosedAuditEvent's
         // remarks and the identical pattern in CloseVacancyHandler/UpdateVacancyHandler.
@@ -55,18 +102,6 @@ internal sealed class PublishVacancyHandler(
             new VacancyPublishedAuditEvent(vacancy.CompanyId, vacancy.Id, effectiveTitle, previousStatus, openedAt, now),
             cancellationToken);
 
-        return Result.Success(new PublishVacancyResponse(
-            vacancy.Id,
-            vacancy.CompanyId,
-            vacancy.PositionProfileId,
-            vacancy.AdvertTitle,
-            vacancy.AdvertDescription,
-            vacancy.Status,
-            vacancy.HiringManagerId,
-            vacancy.OpenedAt,
-            vacancy.ClosedAt,
-            vacancy.CreatedAt,
-            vacancy.UpdatedAt));
-
+        return Result.Success(response);
     }
 }

@@ -4,6 +4,8 @@ using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.HireCandidate;
@@ -22,6 +24,32 @@ internal sealed class HireCandidateHandler(
         Guid performedBy,
         CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated hire request up front. Note
+        // employeeProvisioningService.CreateFromCandidateAsync below already has its OWN, separate
+        // idempotency safeguard via a stable SourceReference key (see the NFR-08 remark further
+        // down) that protects the cross-module employee-creation step specifically. This precheck
+        // additionally protects the local Recruitment-side mutation (RecordHire/LinkToEmployee) and
+        // lets a retried request short-circuit before re-running the whole hire flow at all.
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, HireCandidateResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<HireCandidateResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var vacancy = await db.Vacancies
             .AsNoTracking()
             .SingleOrDefaultAsync(
@@ -164,7 +192,36 @@ internal sealed class HireCandidateHandler(
         application.RecordHire(hiredStage.Id, now);
         candidate.LinkToEmployee(provisioningResult.Value!, now);
         recorder.AddHistoryEntry(application, previousStageId, performedBy, now);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new HireCandidateResponse(
+            application.Id,
+            application.VacancyId,
+            application.CandidateId,
+            provisioningResult.Value!,
+            application.CurrentStageId,
+            application.InterviewOutcome,
+            application.Notes,
+            application.AppliedAt,
+            application.CreatedAt,
+            application.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, HireCandidateResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            // Lost a race against a concurrent duplicate under the same key - this attempt's
+            // RecordHire/LinkToEmployee changes were rolled back along with it, so skip the
+            // integration/audit event publishes and hand back the winner's result untouched. Note
+            // the employee itself was already provisioned above via the idempotent
+            // CreateFromCandidateAsync call, so no duplicate Employee is created either way.
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await eventPublisher.PublishAsync(new CandidateHiredIntegrationEvent(
             application.CompanyId,
@@ -186,16 +243,6 @@ internal sealed class HireCandidateHandler(
                 now),
             cancellationToken);
 
-        return Result.Success(new HireCandidateResponse(
-            application.Id,
-            application.VacancyId,
-            application.CandidateId,
-            provisioningResult.Value!,
-            application.CurrentStageId,
-            application.InterviewOutcome,
-            application.Notes,
-            application.AppliedAt,
-            application.CreatedAt,
-            application.UpdatedAt));
+        return Result.Success(response);
     }
 }

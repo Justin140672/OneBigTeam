@@ -1,4 +1,5 @@
 using HR.Modules.Companies.Domain;
+using HR.SharedKernel.Idempotency;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Persistence;
@@ -22,10 +23,12 @@ internal sealed class CompaniesDbContext : DbContext
     public DbSet<SupportSession> SupportSessions => Set<SupportSession>();
     public DbSet<PlatformMetricsSnapshot> PlatformMetricsSnapshots => Set<PlatformMetricsSnapshot>();
     public DbSet<PlatformSettings> PlatformSettings => Set<PlatformSettings>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("companies");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CompaniesDbContext).Assembly);
+        modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration<IdempotencyRecord>());
     }
 }

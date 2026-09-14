@@ -43,6 +43,7 @@ public static class SupportModule
         services.AddScoped<IValidator<AddSupportResponseRequest>, AddSupportResponseValidator>();
         services.AddScoped<GetSupportDashboardHandler>();
         services.AddScoped<SupportNotificationRetryJob>();
+        services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
     }
 
     public static WebApplication UseSupportRecurringJobs(this WebApplication app)
@@ -52,6 +53,11 @@ public static class SupportModule
             "support-notification-retries",
             job => job.ExecuteAsync(),
             Cron.Hourly());
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
+            "support-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 

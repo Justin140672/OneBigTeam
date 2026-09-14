@@ -1,5 +1,7 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
+using HR.SharedKernel.Idempotency;
+using HR.SharedKernel.Outbox;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -37,11 +39,15 @@ internal sealed class EmployeesDbContext : DbContext
     public DbSet<EmployeePromotion> EmployeePromotions => Set<EmployeePromotion>();
     public DbSet<EmployeeTimelineEntry> EmployeeTimelineEntries => Set<EmployeeTimelineEntry>();
     public DbSet<EmployeeEqualityData> EmployeeEqualityData => Set<EmployeeEqualityData>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+    public DbSet<AuditOutboxEntry> AuditOutboxEntries => Set<AuditOutboxEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("employees");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(EmployeesDbContext).Assembly);
+        modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration<IdempotencyRecord>());
+        modelBuilder.ApplyConfiguration(new AuditOutboxEntryConfiguration<AuditOutboxEntry>());
 
         var protector = _protector ?? ResolveProtector();
         if (protector is null)

@@ -70,6 +70,7 @@ public static class OffboardingModule
         // departure is finalised while mandatory offboarding tasks remain outstanding, rather than
         // relying solely on Employees' one-time manager notification.
         services.AddScoped<IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>, MarkOffboardingIncompleteOnDepartureFinalisedHandler>();
+        services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
 
         return services;
     }
@@ -89,6 +90,11 @@ public static class OffboardingModule
             "offboarding-plan-creation-reconciliation",
             job => job.ExecuteAsync(),
             Cron.Daily(10));
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
+            "offboarding-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 

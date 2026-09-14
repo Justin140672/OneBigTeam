@@ -55,6 +55,10 @@ internal sealed class GenerateSupportSessionHandler(
             now);
 
         dbContext.SupportSessions.Add(supportSession);
+
+        var response = new GenerateSupportSessionResponse(
+            supportSession.Id, supportSession.CompanyId, supportSession.ExpiresAt, token);
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await auditEventPublisher.PublishAsync(
@@ -66,8 +70,7 @@ internal sealed class GenerateSupportSessionHandler(
                 request.Reason),
             cancellationToken);
 
-        return Result.Success(new GenerateSupportSessionResponse(
-            supportSession.Id, supportSession.CompanyId, supportSession.ExpiresAt, token));
+        return Result.Success(response);
     }
 
     private static string GenerateToken()

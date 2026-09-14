@@ -1,5 +1,7 @@
 using HR.Modules.Identity.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.CancelInvite;
@@ -14,6 +16,28 @@ internal sealed class CancelInviteHandler(
         Guid? actorUserId,
         CancellationToken cancellationToken)
     {
+                var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, CancelInviteResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<CancelInviteResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var invite = await db.UserInvites
             .FirstOrDefaultAsync(i => i.Id == request.InviteId && i.CompanyId == request.CompanyId, cancellationToken);
 
@@ -26,12 +50,26 @@ internal sealed class CancelInviteHandler(
 
         var now = clock.UtcNow;
         invite.Cancel(now);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new CancelInviteResponse(invite.Id);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, CancelInviteResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, new DateTimeOffset(now, TimeSpan.Zero), cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await auditEventPublisher.PublishAsync(
             new UserInviteCancelledAuditEvent(invite.CompanyId, invite.EmployeeId, invite.Id, invite.Email, actorUserId, now),
             cancellationToken);
 
-        return Result.Success(new CancelInviteResponse(invite.Id));
+        return Result.Success(response);
     }
 }

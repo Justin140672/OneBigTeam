@@ -5,6 +5,8 @@ using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -49,6 +51,34 @@ internal sealed class SignUpHandler(
 {
     public async Task<Result<SignUpResponse>> HandleAsync(SignUpRequest request, CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated signup submission BEFORE provisioning
+        // a brand-new Company — this is the multi-step saga described in the class remarks above, so
+        // catching a retry here (before ProvisionCompanyAsync ever runs again) is what actually
+        // matters; the final SaveIdempotentAsync call in CreateIdentityRecordAsync only additionally
+        // covers the narrow concurrent-race case (two identical requests landing at the same instant).
+        // No CompanyId exists yet at this point (SignUp provisions a brand-new Company), so the
+        // precheck scope uses Guid.Empty for CompanyId; the post-provisioning save in
+        // CreateIdentityRecordAsync below scopes to the newly-created companyId instead.
+        var scope = new IdempotencyScope(GetType().Name, Guid.Empty, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, SignUpResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<SignUpResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var normalizedEmail = request.AdminEmail.Trim().ToUpperInvariant();
 
         // Checks both identity tables: ApplicationUser (local-auth path — AcceptInvite,
@@ -79,10 +109,19 @@ internal sealed class SignUpHandler(
             // error against) this specific employee if its Work Email matches.
             await employeeProvisioningService.MarkAsInitialCompanyAdminAsync(companyId, employeeResult.Value, cancellationToken);
 
-            var user = await CreateIdentityRecordAsync(companyId, employeeResult.Value, request, cancellationToken);
+            var (user, replayedResponse) = await CreateIdentityRecordAsync(
+                companyId, employeeResult.Value, request, fingerprint, cancellationToken);
+
+            if (replayedResponse is not null)
+            {
+                // Lost a race against a concurrent duplicate under the same key - this attempt's
+                // UserProfile/UserRoles rows were rolled back along with it, so skip the audit
+                // publish and hand back the winner's result untouched.
+                return Result.Success(replayedResponse);
+            }
 
             await auditEventPublisher.PublishAsync(
-                new RegistrationCreatedAuditEvent(companyId, user.Id, clock.UtcNowOffset(), Succeeded: true, FailureReason: null),
+                new RegistrationCreatedAuditEvent(companyId, user!.Id, clock.UtcNowOffset(), Succeeded: true, FailureReason: null),
                 cancellationToken);
 
             var response = new SignUpResponse(user.Id, companyId, user.Email, user.FirstName, user.LastName);
@@ -148,11 +187,12 @@ internal sealed class SignUpHandler(
     // which sends the verification email) plus a corresponding local UserProfile, rather than a
     // local-auth ApplicationUser. The admin is NOT signed in here — the company remains
     // PendingVerification until Phase D's VerifyEmail flow runs.
-    private async Task<UserProfile> CreateIdentityRecordAsync(
-        Guid companyId, Guid employeeId, SignUpRequest request, CancellationToken cancellationToken)
+    private async Task<(UserProfile? Profile, SignUpResponse? ReplayedResponse)> CreateIdentityRecordAsync(
+        Guid companyId, Guid employeeId, SignUpRequest request, string? fingerprint, CancellationToken cancellationToken)
     {
         var now = clock.UtcNowOffset();
         var email = request.AdminEmail.Trim();
+        var scope = new IdempotencyScope(GetType().Name, companyId, Guid.Empty);
 
         var webBaseUrl =
             configuration["services:web:https:0"] ??
@@ -196,9 +236,21 @@ internal sealed class SignUpHandler(
         dbContext.UserRoles.Add(UserRole.Create(profile.Id, SystemRoles.CompanyAdministrator, now));
         dbContext.UserRoles.Add(UserRole.Create(profile.Id, SystemRoles.HrAdministrator, now));
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (request.IdempotencyKey is { } key)
+        {
+            var precomputedResponse = new SignUpResponse(profile.Id, companyId, profile.Email, profile.FirstName, profile.LastName);
+            var outcome = await dbContext.SaveIdempotentAsync<IdempotencyRecord, SignUpResponse>(
+                dbContext.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, precomputedResponse, now, cancellationToken);
 
-        return profile;
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return (null, outcome.Response);
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return (profile, null);
     }
 
     private async Task CompensateFailedRegistrationAsync(Guid companyId, string failureReason, CancellationToken cancellationToken)

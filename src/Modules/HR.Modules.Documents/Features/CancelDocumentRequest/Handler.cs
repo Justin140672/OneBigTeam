@@ -3,6 +3,8 @@ using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.CancelDocumentRequest;
@@ -18,6 +20,35 @@ internal sealed class CancelDocumentRequestHandler(
         Guid cancelledBy,
         CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated request before doing any business
+        // work. This handler's success response is payload-less (Result), so a trivial `bool`
+        // marker is persisted/replayed purely to detect a repeated delivery — its value is unused.
+                var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+        
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(new CancelDocumentRequestRequest
+            {
+                CompanyId = request.CompanyId,
+                EmployeeId = request.EmployeeId,
+                DocumentRequestId = request.DocumentRequestId,
+            })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, bool>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success();
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var documentRequest = await db.DocumentRequests
             .FirstOrDefaultAsync(
                 r => r.Id == request.DocumentRequestId
@@ -39,7 +70,22 @@ internal sealed class CancelDocumentRequestHandler(
         var documentTypeName = documentType?.Name ?? documentRequest.DocumentTypeId.ToString();
 
         documentRequest.Cancel(now);
-        await db.SaveChangesAsync(cancellationToken);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync(db.IdempotencyRecords,
+            scope, key, fingerprint!, StatusCodes.Status204NoContent, true, now, cancellationToken);
+
+            // Lost a race against a concurrent duplicate under the same key — this attempt's
+            // cancellation was rolled back along with it, so skip the task-cancel/audit publishing
+            // below; the winner's request already did it.
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success();
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await taskCanceller.CancelBySourceEntityAsync(
             request.CompanyId,

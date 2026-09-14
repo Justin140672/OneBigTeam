@@ -5,6 +5,8 @@ using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.ScheduleInterview;
@@ -21,6 +23,26 @@ internal sealed class ScheduleInterviewHandler(
         Guid scheduledBy,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, ScheduleInterviewResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<ScheduleInterviewResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var application = await db.Applications
             .SingleOrDefaultAsync(
                 a => a.Id == request.ApplicationId &&
@@ -80,7 +102,35 @@ internal sealed class ScheduleInterviewHandler(
             now);
 
         db.Interviews.Add(interview);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new ScheduleInterviewResponse(
+            interview.Id,
+            interview.CompanyId,
+            interview.ApplicationId,
+            interview.InterviewerEmployeeId,
+            interview.ScheduledAt,
+            interview.DurationMinutes,
+            interview.Location,
+            interview.Outcome,
+            interview.Notes,
+            interview.CreatedAt,
+            interview.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, ScheduleInterviewResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+            // Lost a race against a concurrent duplicate under the same key - this attempt's
+            // Interview row was rolled back along with it, so skip creating tasks/sending the
+            // notification and hand back the winner's result untouched.
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         var candidateName = await db.Candidates
             .Where(c => c.Id == application.CandidateId)
@@ -144,17 +194,6 @@ internal sealed class ScheduleInterviewHandler(
             now,
             cancellationToken);
 
-        return Result.Success(new ScheduleInterviewResponse(
-            interview.Id,
-            interview.CompanyId,
-            interview.ApplicationId,
-            interview.InterviewerEmployeeId,
-            interview.ScheduledAt,
-            interview.DurationMinutes,
-            interview.Location,
-            interview.Outcome,
-            interview.Notes,
-            interview.CreatedAt,
-            interview.UpdatedAt));
+        return Result.Success(response);
     }
 }

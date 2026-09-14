@@ -3,7 +3,9 @@ using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
 using HR.Infrastructure.Abstractions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Features.CompleteTask;
@@ -20,6 +22,34 @@ internal sealed class CompleteTaskHandler(
         CompleteTaskRequest request,
         CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated request before doing any business
+        // work, so a repeated delivery can't double-fire completion side effects (notification,
+        // audit, downstream dispatch). Checked ahead of the atomic insert-or-replay in
+        // SaveIdempotentAsync below, which also catches a same-key request that races in
+        // concurrently. This is a distinct concern from the existing wasAlreadyCompleted
+        // domain-state check below, which guards against a second completion of an
+        // already-Completed task regardless of key.
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, CompleteTaskResponse>(
+                scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<CompleteTaskResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var task = await dbContext.TaskItems
             .SingleOrDefaultAsync(
                 t => t.Id == request.Id && t.CompanyId == request.CompanyId,
@@ -70,28 +100,49 @@ internal sealed class CompleteTaskHandler(
         // Open/InProgress -> Completed transition, not on a repeat call.
         var wasAlreadyCompleted = task.Status == TaskItemStatus.Completed;
 
-        task.Complete(request.CompletedBy, clock.UtcNowOffset());
+        var now = clock.UtcNowOffset();
+        task.Complete(request.CompletedBy, now);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        // Built from in-memory values ahead of the save, so it can double as both the response and
+        // the payload persisted for an idempotency replay.
+        var response = new CompleteTaskResponse(
+            task.Id,
+            task.CompanyId,
+            task.Title,
+            task.Description,
+            task.Status.ToString(),
+            task.Priority.ToString(),
+            task.Source.ToString(),
+            task.DueDate,
+            task.AssignedEmployeeId,
+            task.AssignedUserId,
+            task.CreatedBy,
+            task.CompletedBy,
+            task.CompletedAt,
+            task.CreatedAt,
+            task.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+            {
+                // Lost a race against a concurrent duplicate under the same key - this attempt's
+                // completion was rolled back along with it, so skip our own
+                // notification/audit/dispatch and hand back the winner's result untouched.
+                return Result.Success(outcome.Response!);
+            }
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         if (wasAlreadyCompleted)
         {
-            return Result.Success(new CompleteTaskResponse(
-                task.Id,
-                task.CompanyId,
-                task.Title,
-                task.Description,
-                task.Status.ToString(),
-                task.Priority.ToString(),
-                task.Source.ToString(),
-                task.DueDate,
-                task.AssignedEmployeeId,
-                task.AssignedUserId,
-                task.CreatedBy,
-                task.CompletedBy,
-                task.CompletedAt,
-                task.CreatedAt,
-                task.UpdatedAt));
+            return Result.Success(response);
         }
 
         if (task.AssignedEmployeeId.HasValue)
@@ -103,7 +154,7 @@ internal sealed class CompleteTaskHandler(
                 task.Id,
                 NotificationType.TaskCompleted,
                 NotificationPriority.Normal,
-                clock.UtcNowOffset(),
+                now,
                 cancellationToken);
         }
 
@@ -129,21 +180,6 @@ internal sealed class CompleteTaskHandler(
             request.OutcomeDecision,
             request.OutcomeReason), cancellationToken);
 
-        return Result.Success(new CompleteTaskResponse(
-            task.Id,
-            task.CompanyId,
-            task.Title,
-            task.Description,
-            task.Status.ToString(),
-            task.Priority.ToString(),
-            task.Source.ToString(),
-            task.DueDate,
-            task.AssignedEmployeeId,
-            task.AssignedUserId,
-            task.CreatedBy,
-            task.CompletedBy,
-            task.CompletedAt,
-            task.CreatedAt,
-            task.UpdatedAt));
+        return Result.Success(response);
     }
 }

@@ -122,6 +122,65 @@ public class CreateEmployeeNoteHandlerTests
         Assert.Empty(await context.EmployeeNotes.ToListAsync());
     }
 
+    // -- Idempotency-Key (ticket 3, P1 follow-up) --------------------------------------------
+
+    [Fact]
+    public async Task HandleAsync_With_IdempotencyKey_Replays_Cached_Response_Without_Creating_Second_Note()
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var companyId = Guid.NewGuid();
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2024, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeEmployeeTimelineWriter());
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = new CreateEmployeeNoteRequest(companyId, employee.Id, NoteCategory.General, "Some note.", false)
+        {
+            IdempotencyKey = idempotencyKey
+        };
+
+        var first = await handler.HandleAsync(request, ActorEmployeeId, ActorUserId, CancellationToken.None);
+        var second = await handler.HandleAsync(request, ActorEmployeeId, ActorUserId, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(first.Value!.Id, second.Value!.Id);
+        Assert.Single(await context.EmployeeNotes.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_Same_IdempotencyKey_And_Different_Payload_Returns_Conflict()
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var companyId = Guid.NewGuid();
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2024, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeEmployeeTimelineWriter());
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = new CreateEmployeeNoteRequest(companyId, employee.Id, NoteCategory.General, "Some note.", false)
+        {
+            IdempotencyKey = idempotencyKey
+        };
+
+        var first = await handler.HandleAsync(request, ActorEmployeeId, ActorUserId, CancellationToken.None);
+        var second = await handler.HandleAsync(
+            request with { NoteText = "A completely different note." },
+            ActorEmployeeId,
+            ActorUserId,
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsFailure);
+        Assert.Equal("conflict", second.Error.Code);
+        Assert.Equal("This Idempotency-Key was already used for a different request.", second.Error.Message);
+        Assert.Single(await context.EmployeeNotes.ToListAsync());
+    }
+
     private static EmployeesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<EmployeesDbContext>()

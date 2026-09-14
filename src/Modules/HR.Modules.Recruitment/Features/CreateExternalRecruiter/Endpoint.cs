@@ -28,7 +28,11 @@ internal sealed class Endpoint(CreateExternalRecruiterHandler handler, ICurrentU
             return;
         }
 
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            cancellationToken);
 
         if (result.IsFailure)
         {

@@ -8,4 +8,7 @@ internal sealed record UpdateMarketingRoadmapItemRequest(
     string Description,
     string IconName,
     MarketingDeliveryStatus DeliveryStatus,
-    int DisplayOrder);
+    int DisplayOrder)
+{
+    internal string? IdempotencyKey { get; init; }
+}

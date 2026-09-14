@@ -1,6 +1,8 @@
 using HR.Modules.Recruitment.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.ReorderRecruitmentStages;
@@ -14,6 +16,26 @@ internal sealed class ReorderRecruitmentStagesHandler(
         ReorderRecruitmentStagesRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, ReorderRecruitmentStagesResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<ReorderRecruitmentStagesResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var stages = await db.RecruitmentStages
             .Where(s => s.CompanyId == request.CompanyId)
             .ToListAsync(cancellationToken);
@@ -44,17 +66,30 @@ internal sealed class ReorderRecruitmentStagesHandler(
         for (var i = 0; i < request.OrderedStageIds.Count; i++)
             stagesById[request.OrderedStageIds[i]].SetDisplayOrder(i + 1, now);
 
-        await db.SaveChangesAsync(cancellationToken);
-
-        await auditPublisher.PublishAsync(
-            new RecruitmentStagesReorderedAuditEvent(request.CompanyId, request.OrderedStageIds, now),
-            cancellationToken);
-
         var items = request.OrderedStageIds
             .Select(id => stagesById[id])
             .Select(s => new ReorderedStageItem(s.Id, s.Name, s.DisplayOrder))
             .ToList();
 
-        return Result.Success(new ReorderRecruitmentStagesResponse(items));
+        var response = new ReorderRecruitmentStagesResponse(items);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, ReorderRecruitmentStagesResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        await auditPublisher.PublishAsync(
+            new RecruitmentStagesReorderedAuditEvent(request.CompanyId, request.OrderedStageIds, now),
+            cancellationToken);
+
+        return Result.Success(response);
     }
 }

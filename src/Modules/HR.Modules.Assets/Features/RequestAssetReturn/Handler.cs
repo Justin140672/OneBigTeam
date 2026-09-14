@@ -1,7 +1,9 @@
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Assets.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
 using HR.Infrastructure.Abstractions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Features.RequestAssetReturn;
@@ -18,6 +20,26 @@ internal sealed class RequestAssetReturnHandler(
         RequestAssetReturnRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, object?>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success();
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var assignment = await db.AssetAssignments
             .FirstOrDefaultAsync(
                 a => a.Id == request.Id && a.CompanyId == request.CompanyId,
@@ -30,6 +52,19 @@ internal sealed class RequestAssetReturnHandler(
             return Result.Failure(Error.Conflict("Asset has already been returned."));
 
         var now = clock.UtcNowOffset();
+
+        // This handler has no business-entity mutation of its own to stage on `db` — task
+        // creation/notification/audit below are each performed via their own writer. Claim the
+        // idempotency key up front (its own SaveChangesAsync) so a retried/duplicated request
+        // short-circuits before re-running those side effects.
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, object?>(db.IdempotencyRecords, 
+                scope, key, fingerprint!, StatusCodes.Status204NoContent, null, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success();
+        }
 
         // AssetTaskCompletionAction already creates a "Return asset" task automatically the
         // moment the employee acknowledges receiving the asset (by design — see that class's own

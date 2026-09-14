@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
@@ -38,6 +39,11 @@ public static class Extensions
             // per-attempt and total budgets and add one more retry so backend slowness surfaces as
             // a slow request that eventually succeeds, not a spurious error. All traffic governed by
             // this handler is internal service-to-service, so the larger budget is safe.
+            // Ticket 3 (P1) follow-up: must be added BEFORE AddStandardResilienceHandler so it wraps
+            // it and can attach the request method to the shared ResilienceContext ahead of every
+            // attempt - see RequestMethodCapturingHandler for why.
+            http.AddHttpMessageHandler(() => new RequestMethodCapturingHandler());
+
             http.AddStandardResilienceHandler(options =>
             {
                 options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(30);
@@ -47,6 +53,28 @@ public static class Extensions
                 options.Retry.MaxRetryAttempts = 4;
                 options.Retry.Delay = TimeSpan.FromMilliseconds(500);
                 options.Retry.UseJitter = true;
+
+                // Ticket 3 (P1): the standard predicate retries any transient failure regardless of
+                // HTTP method. Several handlers commit their write before publishing audit events, so
+                // a retried POST/PUT/PATCH/DELETE after a failed-looking-but-committed response (or a
+                // dropped response) can repeat the mutation (e.g. double leave adjustment, duplicate
+                // auto-numbered asset). Only auto-retry methods that are safe to repeat.
+                //
+                // On a timeout or connection failure Outcome.Result is null - there's no response to
+                // read RequestMessage.Method off. Fall back to the method RequestMethodCapturingHandler
+                // attached to this operation's ResilienceContext before the first attempt, so a safe
+                // GET/HEAD/OPTIONS still retries after a dropped connection or attempt timeout instead
+                // of being (incorrectly) treated as unsafe just because there was no response object.
+                options.Retry.ShouldHandle = args =>
+                {
+                    var method = args.Outcome.Result?.RequestMessage?.Method
+                        ?? (args.Context.Properties.TryGetValue(RequestMethodCapturingHandler.RequestMethodKey, out var captured)
+                            ? captured
+                            : null);
+                    var isSafeToRetry = method == HttpMethod.Get || method == HttpMethod.Head || method == HttpMethod.Options;
+
+                    return ValueTask.FromResult(isSafeToRetry && HttpClientResiliencePredicates.IsTransient(args.Outcome));
+                };
             });
 
             // Turn on service discovery by default

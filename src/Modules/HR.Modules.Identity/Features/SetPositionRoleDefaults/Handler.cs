@@ -4,6 +4,8 @@ using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.SetPositionRoleDefaults;
@@ -27,6 +29,28 @@ internal sealed class SetPositionRoleDefaultsHandler(
         Guid? actorUserId,
         CancellationToken cancellationToken)
     {
+                var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, SetPositionRoleDefaultsResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<SetPositionRoleDefaultsResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var profileExists = await positionProfileReader.ExistsAsync(
             request.CompanyId, request.PositionProfileId, cancellationToken);
         if (!profileExists)
@@ -70,9 +94,23 @@ internal sealed class SetPositionRoleDefaultsHandler(
         foreach (var roleId in toAdd)
             db.PositionRoles.Add(PositionRole.Create(request.PositionProfileId, roleId, now));
 
-        await db.SaveChangesAsync(cancellationToken);
+        var response = new SetPositionRoleDefaultsResponse(request.PositionProfileId, requestedRoleIds);
+        var hasChanges = toRemove.Count > 0 || toAdd.Count > 0;
 
-        if (toRemove.Count > 0 || toAdd.Count > 0)
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, SetPositionRoleDefaultsResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        if (hasChanges)
         {
             await auditEventPublisher.PublishAsync(
                 new PositionRoleDefaultsChangedAuditEvent(
@@ -80,6 +118,6 @@ internal sealed class SetPositionRoleDefaultsHandler(
                 cancellationToken);
         }
 
-        return Result.Success(new SetPositionRoleDefaultsResponse(request.PositionProfileId, requestedRoleIds));
+        return Result.Success(response);
     }
 }

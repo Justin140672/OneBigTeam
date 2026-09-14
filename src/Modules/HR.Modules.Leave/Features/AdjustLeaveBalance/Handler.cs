@@ -3,6 +3,9 @@ using HR.Modules.Leave.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using HR.SharedKernel.Outbox;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.AdjustLeaveBalance;
@@ -12,13 +15,40 @@ internal sealed class AdjustLeaveBalanceHandler(
     IClock clock,
     IWorkingPatternProvider workingPatternProvider,
     ICompanyLeaveSettingsReader leaveSettingsReader,
-    IEmployeeNameReader employeeNameReader,
-    IAuditEventPublisher auditPublisher)
+    IEmployeeNameReader employeeNameReader)
 {
     public async Task<Result<AdjustLeaveBalanceResponse>> HandleAsync(
         AdjustLeaveBalanceRequest request,
         CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up item 3: the security/ownership boundary this key is scoped to -
+        // the client-supplied key alone is never trusted as identity. ActorId is the employee who
+        // performed the adjustment (already resolved by the endpoint from the authenticated user).
+        var scope = new IdempotencyScope(nameof(AdjustLeaveBalanceHandler), request.CompanyId, request.AdjustedByEmployeeId);
+
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated request before doing any business
+        // work, so a repeated delivery can't double-apply the adjustment. Checked ahead of the
+        // atomic insert-or-replay in SaveIdempotentAsync below, which also catches a same-key
+        // request that races in concurrently.
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, AdjustLeaveBalanceResponse>(
+                scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<AdjustLeaveBalanceResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var leaveType = await dbContext.LeaveTypes
             .SingleOrDefaultAsync(
                 lt => lt.Id == request.LeaveTypeId && lt.CompanyId == request.CompanyId && lt.IsActive,
@@ -106,27 +136,11 @@ internal sealed class AdjustLeaveBalanceHandler(
 
         dbContext.LeaveBalanceAdjustments.Add(adjustment);
 
-        // Explicit transaction per ticket requirement, even though both writes share one DbContext/SaveChangesAsync.
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
         var newRemainingHours = balance.RemainingDays * workingPattern.HoursPerDay;
 
-        await auditPublisher.PublishAsync(new LeaveBalanceAdjustedAuditEvent(
-            balance.CompanyId,
-            balance.EmployeeId,
-            balance.LeaveTypeId,
-            balance.Id,
-            balance.PolicyYear,
-            adjustmentDays,
-            balance.RemainingDays,
-            request.AdjustedByEmployeeId,
-            now,
-            AdjustmentHours: adjustmentHoursForRecord,
-            Reason: request.Reason.ToString()), cancellationToken);
-
-        return Result.Success(new AdjustLeaveBalanceResponse(
+        // Built from in-memory values ahead of the save (balance.Adjust already ran above), so it
+        // can double as both the response and the payload persisted for an idempotency replay.
+        var response = new AdjustLeaveBalanceResponse(
             adjustment.Id,
             adjustment.CompanyId,
             adjustment.EmployeeId,
@@ -139,6 +153,51 @@ internal sealed class AdjustLeaveBalanceHandler(
             adjustment.Reason.ToString(),
             adjustment.Comments,
             adjustment.AdjustedByEmployeeId,
-            adjustment.AdjustedAt));
+            adjustment.AdjustedAt);
+
+        // Ticket 3 (P1) follow-up item 5: stage the audit intent in the SAME transaction as the
+        // business write and the idempotency record, instead of publishing after commit. A crash
+        // between "committed" and "published" can now only delay delivery (the background
+        // dispatcher retries the outbox row until it succeeds), never lose it. On an idempotent
+        // replay (below) this line is never reached, so a replay can never enqueue a second outbox
+        // row for the same logical adjustment.
+        dbContext.AuditOutboxEntries.EnqueueAuditOutbox(new LeaveBalanceAdjustedAuditEvent(
+            balance.CompanyId,
+            balance.EmployeeId,
+            balance.LeaveTypeId,
+            balance.Id,
+            balance.PolicyYear,
+            adjustmentDays,
+            balance.RemainingDays,
+            request.AdjustedByEmployeeId,
+            now,
+            AdjustmentHours: adjustmentHoursForRecord,
+            Reason: request.Reason.ToString()), request.CompanyId, now);
+
+        // Explicit transaction per ticket requirement, even though both writes share one DbContext/SaveChangesAsync.
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+            {
+                // Lost a race against a concurrent duplicate under the same key. SaveIdempotentAsync
+                // already rolled back this attempt's transaction (including the staged outbox entry
+                // above) - nothing here was committed, so skip our own commit and hand back the
+                // winner's result untouched. Its own outbox row continues delivery independently.
+                return Result.Success(outcome.Response!);
+            }
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return Result.Success(response);
     }
 }

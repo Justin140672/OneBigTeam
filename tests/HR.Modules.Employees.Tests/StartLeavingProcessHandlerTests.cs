@@ -497,6 +497,95 @@ public class StartLeavingProcessHandlerTests
         Assert.Equal(replacement.Id, call.ReplacementManagerEmployeeId);
     }
 
+    // -- Idempotency-Key (ticket 3, P1 follow-up) --------------------------------------------
+
+    [Fact]
+    public async Task HandleAsync_With_IdempotencyKey_Replays_Cached_Response_Without_Creating_Second_LeavingProcess()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context);
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = BuildRequest(companyId, employee.Id) with { IdempotencyKey = idempotencyKey };
+
+        var first = await handler.HandleAsync(request, Guid.NewGuid(), CancellationToken.None);
+        var second = await handler.HandleAsync(request, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(first.Value!.Id, second.Value!.Id);
+        Assert.Single(await context.EmployeeLeavingProcesses.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_Same_IdempotencyKey_And_Different_Payload_Returns_Conflict()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context);
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = BuildRequest(companyId, employee.Id) with { IdempotencyKey = idempotencyKey };
+
+        var first = await handler.HandleAsync(request, Guid.NewGuid(), CancellationToken.None);
+        var second = await handler.HandleAsync(
+            request with { LeavingReason = LeavingReason.Redundancy },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsFailure);
+        Assert.Equal("conflict", second.Error.Code);
+        Assert.Equal("This Idempotency-Key was already used for a different request.", second.Error.Message);
+        Assert.Single(await context.EmployeeLeavingProcesses.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_IdempotencyKey_And_Backdated_LeavingDate_Returns_PostFinalization_Status()
+    {
+        // Regression guard: StartLeavingProcessHandler snapshots the response for the
+        // idempotency-replay payload BEFORE calling FinalizeAsync, since a replayed request must
+        // never re-run finalization. The value actually returned to THIS (first, non-replayed)
+        // caller must still reflect the post-finalization state (Status == Completed), not the
+        // pre-finalization snapshot that was persisted for replay purposes.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context);
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = BuildRequest(
+            companyId, employee.Id, leavingDate: new DateOnly(2026, 6, 1), confirmBackdatedLeavingDate: true)
+            with
+            { IdempotencyKey = idempotencyKey };
+
+        var result = await handler.HandleAsync(request, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(LeavingProcessStatus.Completed.ToString(), result.Value!.Status);
+
+        var savedEmployee = await context.Employees.SingleAsync();
+        Assert.Equal(EmploymentStatus.FormerEmployee, savedEmployee.Status);
+
+        var savedProcess = await context.EmployeeLeavingProcesses.SingleAsync();
+        Assert.Equal(LeavingProcessStatus.Completed, savedProcess.Status);
+    }
+
     private static EmployeesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<EmployeesDbContext>()

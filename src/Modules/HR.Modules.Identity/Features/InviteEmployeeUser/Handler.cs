@@ -3,6 +3,8 @@ using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.InviteEmployeeUser;
@@ -20,6 +22,28 @@ internal sealed class InviteEmployeeUserHandler(
         Guid? actorUserId,
         CancellationToken cancellationToken)
     {
+                var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, InviteEmployeeUserResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<InviteEmployeeUserResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         // Employee must belong to this company (per the shared name-reader port — employees not
         // found in the company simply won't appear in the returned dictionary).
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, [request.EmployeeId], cancellationToken);
@@ -53,7 +77,23 @@ internal sealed class InviteEmployeeUserHandler(
 
         var invite = UserInvite.Create(request.EmployeeId, request.CompanyId, request.Email, now, request.RoleIds, actorUserId);
         db.UserInvites.Add(invite);
-        await db.SaveChangesAsync(cancellationToken);
+
+        // Note: the invite link/email is sent AFTER the save, using in-memory values, so the
+        // idempotency check above (which short-circuits before this point on replay) also prevents
+        // a retried/duplicated request from sending a second invitation email.
+        if (request.IdempotencyKey is { } key)
+        {
+            var precomputedResponse = new InviteEmployeeUserResponse(invite.Id, invite.EmployeeId, invite.Email, invite.ExpiresAt, EmailSent: false);
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, InviteEmployeeUserResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, precomputedResponse, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         var inviteLink = inviteLinkBuilder.Build(invite.Token);
         var recipientName = names.TryGetValue(request.EmployeeId, out var n) ? n : null;

@@ -1,6 +1,8 @@
 using HR.Modules.Recruitment.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.PurgeEligibleCandidates;
@@ -28,6 +30,26 @@ internal sealed class PurgeEligibleCandidatesHandler(
         Guid purgedBy,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, PurgeEligibleCandidatesResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<PurgeEligibleCandidatesResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         // NFR-07: a company under legal hold is exempt from all retention deletion until lifted.
         if (await legalHoldStatusReader.IsUnderLegalHoldAsync(request.CompanyId, cancellationToken))
         {
@@ -59,7 +81,20 @@ internal sealed class PurgeEligibleCandidatesHandler(
         foreach (var candidate in eligibleCandidates)
             candidate.Purge(purgedBy, now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        var response = new PurgeEligibleCandidatesResponse(eligibleCandidates.Count);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, PurgeEligibleCandidatesResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(
             new CandidatesPurgedAuditEvent(
@@ -69,6 +104,6 @@ internal sealed class PurgeEligibleCandidatesHandler(
                 now),
             cancellationToken);
 
-        return Result.Success(new PurgeEligibleCandidatesResponse(eligibleCandidates.Count));
+        return Result.Success(response);
     }
 }

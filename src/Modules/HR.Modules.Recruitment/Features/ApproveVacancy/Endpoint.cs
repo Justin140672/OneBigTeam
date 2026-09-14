@@ -29,7 +29,12 @@ internal sealed class Endpoint(ApproveVacancyHandler handler, ICurrentUser curre
             return;
         }
 
-        var result = await handler.HandleAsync(request, approvedBy, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            approvedBy,
+            cancellationToken);
 
         if (result.IsFailure)
         {

@@ -4,6 +4,8 @@ using HR.Modules.Leave.Services;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.SubmitLeaveRequest;
@@ -46,6 +48,26 @@ internal sealed class SubmitLeaveRequestHandler
         SubmitLeaveRequestRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await _dbContext.TryReplayAsync<IdempotencyRecord, SubmitLeaveRequestResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<SubmitLeaveRequestResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var leaveType = await _dbContext.LeaveTypes
             .SingleOrDefaultAsync(
                 lt => lt.Id == request.LeaveTypeId && lt.CompanyId == request.CompanyId && lt.IsActive,
@@ -191,7 +213,35 @@ internal sealed class SubmitLeaveRequestHandler
                 return Result.Failure<SubmitLeaveRequestResponse>(effectResult.Error);
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        var response = new SubmitLeaveRequestResponse(
+            leaveRequest.Id,
+            leaveRequest.CompanyId,
+            leaveRequest.EmployeeId,
+            leaveRequest.LeaveTypeId,
+            leaveRequest.LeavePolicyId,
+            leaveRequest.Status.ToString(),
+            leaveRequest.StartDate,
+            leaveRequest.StartPart,
+            leaveRequest.EndDate,
+            leaveRequest.EndPart,
+            leaveRequest.TotalDays,
+            leaveRequest.Reason,
+            leaveRequest.CreatedAt,
+            conflicts,
+            excludedHolidays);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await _dbContext.SaveIdempotentAsync(_dbContext.IdempotencyRecords,
+                scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         await _auditPublisher.PublishAsync(new LeaveSubmittedAuditEvent(
             leaveRequest.CompanyId,
@@ -222,22 +272,7 @@ internal sealed class SubmitLeaveRequestHandler
             await _approvalEffects.PublishApprovalOutcomeAsync(leaveRequest, request.EmployeeId, now, cancellationToken);
         }
 
-        return Result.Success(new SubmitLeaveRequestResponse(
-            leaveRequest.Id,
-            leaveRequest.CompanyId,
-            leaveRequest.EmployeeId,
-            leaveRequest.LeaveTypeId,
-            leaveRequest.LeavePolicyId,
-            leaveRequest.Status.ToString(),
-            leaveRequest.StartDate,
-            leaveRequest.StartPart,
-            leaveRequest.EndDate,
-            leaveRequest.EndPart,
-            leaveRequest.TotalDays,
-            leaveRequest.Reason,
-            leaveRequest.CreatedAt,
-            conflicts,
-            excludedHolidays));
+        return Result.Success(response);
     }
 
 }

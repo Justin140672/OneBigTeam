@@ -1,4 +1,5 @@
 using HR.Modules.Documents.Domain;
+using HR.SharedKernel.Idempotency;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Persistence;
@@ -22,10 +23,12 @@ internal class DocumentsDbContext : DbContext
     public DbSet<SharedCompanyDocumentReviewHistory> SharedCompanyDocumentReviewHistories => Set<SharedCompanyDocumentReviewHistory>();
     public DbSet<SharedCompanyDocumentAcknowledgement> SharedCompanyDocumentAcknowledgements => Set<SharedCompanyDocumentAcknowledgement>();
     public DbSet<SharedCompanyDocumentAudienceRule> SharedCompanyDocumentAudienceRules => Set<SharedCompanyDocumentAudienceRule>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("documents");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DocumentsDbContext).Assembly);
+        modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration<IdempotencyRecord>());
     }
 }

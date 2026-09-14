@@ -85,6 +85,7 @@ public static class NotificationsModule
         // audit) after a partial failure in NotificationWriter.
         services.AddScoped<ReconcilePendingEmailDeliveriesJob>();
         services.AddScoped<ReconcileMissingNotificationAuditsJob>();
+        services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
 
         return services;
     }
@@ -118,6 +119,12 @@ public static class NotificationsModule
             "notifications-reconcile-stalled-operational-alert-emails",
             job => job.ExecuteAsync(CancellationToken.None),
             Cron.Hourly());
+
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
+            "notifications-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
 
         return app;
     }

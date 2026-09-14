@@ -24,7 +24,7 @@ public class EmployeeProvisioningServiceTests
         var (departmentId, locationId, employmentTypeId, positionProfileId) = await SeedMandatoryLookupsAsync(context, companyId);
 
         var createEmployeeHandler = new CreateEmployeeHandler(
-            context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
+            context, new FakeClock(FixedUtcNow),
             new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
         var service = new EmployeeProvisioningService(createEmployeeHandler, context, new FakeClock(FixedUtcNow));
 
@@ -53,7 +53,7 @@ public class EmployeeProvisioningServiceTests
         var (departmentId, locationId, employmentTypeId, positionProfileId) = await SeedMandatoryLookupsAsync(context, companyId);
 
         var createEmployeeHandler = new CreateEmployeeHandler(
-            context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
+            context, new FakeClock(FixedUtcNow),
             new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
         var service = new EmployeeProvisioningService(createEmployeeHandler, context, new FakeClock(FixedUtcNow));
 
@@ -84,7 +84,7 @@ public class EmployeeProvisioningServiceTests
         var (departmentId, locationId, employmentTypeId, positionProfileId) = await SeedMandatoryLookupsAsync(context, companyId);
 
         var createEmployeeHandler = new CreateEmployeeHandler(
-            context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
+            context, new FakeClock(FixedUtcNow),
             new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
         var service = new EmployeeProvisioningService(createEmployeeHandler, context, new FakeClock(FixedUtcNow));
 
@@ -117,7 +117,7 @@ public class EmployeeProvisioningServiceTests
         var (departmentId, locationId, employmentTypeId, positionProfileId) = await SeedMandatoryLookupsAsync(context, companyId);
 
         var createEmployeeHandler = new CreateEmployeeHandler(
-            context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
+            context, new FakeClock(FixedUtcNow),
             new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
         var service = new EmployeeProvisioningService(createEmployeeHandler, context, new FakeClock(FixedUtcNow));
 
@@ -148,7 +148,7 @@ public class EmployeeProvisioningServiceTests
         var companyId = Guid.NewGuid();
 
         var createEmployeeHandler = new CreateEmployeeHandler(
-            context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
+            context, new FakeClock(FixedUtcNow),
             new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
         var service = new EmployeeProvisioningService(createEmployeeHandler, context, new FakeClock(FixedUtcNow));
 

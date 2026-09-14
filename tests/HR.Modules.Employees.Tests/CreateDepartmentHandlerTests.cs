@@ -147,6 +147,65 @@ public class CreateDepartmentHandlerTests
         Assert.True(result.IsSuccess);
     }
 
+    // -- Idempotency-Key (ticket 3, P1 follow-up) --------------------------------------------
+
+    [Fact]
+    public async Task HandleAsync_With_IdempotencyKey_Replays_Cached_Response_Without_Creating_Second_Department()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var handler = new CreateDepartmentHandler(context, new FakeClock(FixedUtcNow));
+        var idempotencyKey = Guid.NewGuid().ToString();
+
+        var request = new CreateDepartmentRequest { CompanyId = companyId, Name = "Engineering", IdempotencyKey = idempotencyKey };
+
+        var first = await handler.HandleAsync(request, CancellationToken.None);
+        var second = await handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(first.Value!.Id, second.Value!.Id);
+        Assert.Single(await context.Departments.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_Same_IdempotencyKey_And_Different_Payload_Returns_Conflict()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var handler = new CreateDepartmentHandler(context, new FakeClock(FixedUtcNow));
+        var idempotencyKey = Guid.NewGuid().ToString();
+
+        var request = new CreateDepartmentRequest { CompanyId = companyId, Name = "Engineering", IdempotencyKey = idempotencyKey };
+
+        var first = await handler.HandleAsync(request, CancellationToken.None);
+        var second = await handler.HandleAsync(request with { Name = "Platform" }, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsFailure);
+        Assert.Equal("conflict", second.Error.Code);
+        Assert.Equal("This Idempotency-Key was already used for a different request.", second.Error.Message);
+        Assert.Single(await context.Departments.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Without_IdempotencyKey_Creates_Separate_Departments_For_Repeated_Calls()
+    {
+        // Regression: no Idempotency-Key supplied means no dedup at all — two calls with the same
+        // (valid, non-conflicting) payload each create their own department, exactly as before.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var handler = new CreateDepartmentHandler(context, new FakeClock(FixedUtcNow));
+
+        var first = await handler.HandleAsync(new CreateDepartmentRequest { CompanyId = companyId, Name = "Engineering" }, CancellationToken.None);
+        var second = await handler.HandleAsync(new CreateDepartmentRequest { CompanyId = companyId, Name = "Platform" }, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.NotEqual(first.Value!.Id, second.Value!.Id);
+        Assert.Equal(2, await context.Departments.CountAsync());
+    }
+
     private static EmployeesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<EmployeesDbContext>()

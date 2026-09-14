@@ -34,15 +34,24 @@ public class AdjustLeaveBalanceHandlerTests
 
     private static AdjustLeaveBalanceHandler BuildHandler(
         LeaveDbContext context,
-        Dictionary<Guid, string>? employeeNames = null,
-        IAuditEventPublisher? auditPublisher = null) =>
+        Dictionary<Guid, string>? employeeNames = null) =>
         new(
             context,
             new FakeClock(FixedUtcNow),
             new FakeWorkingPatternProvider(),
             new FakeCompanyLeaveSettingsReader(),
-            new FakeEmployeeNameReader(employeeNames),
-            auditPublisher ?? new NoOpAuditEventPublisher());
+            new FakeEmployeeNameReader(employeeNames));
+
+    // Ticket 3 (P1) follow-up item 5: the handler no longer calls IAuditEventPublisher directly -
+    // it stages an AuditOutboxEntry in the same transaction as the business write, which a
+    // background dispatcher delivers independently. Deserialize the staged entry to assert on the
+    // audit intent that was captured.
+    private static async Task<LeaveBalanceAdjustedAuditEvent> SingleStagedAuditEventAsync(LeaveDbContext context)
+    {
+        var entry = await context.AuditOutboxEntries.SingleAsync();
+        Assert.Contains(nameof(LeaveBalanceAdjustedAuditEvent), entry.EventTypeName);
+        return System.Text.Json.JsonSerializer.Deserialize<LeaveBalanceAdjustedAuditEvent>(entry.PayloadJson)!;
+    }
 
     private static AdjustLeaveBalanceRequest BuildRequest(
         Guid companyId,
@@ -134,8 +143,7 @@ public class AdjustLeaveBalanceHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var auditPublisher = new CapturingAuditEventPublisher();
-        var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" }, auditPublisher);
+        var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" });
         var adjustedBy = Guid.NewGuid();
 
         // Standard-behaviour leave type: AdjustmentValue is interpreted directly as days (no
@@ -167,8 +175,7 @@ public class AdjustLeaveBalanceHandlerTests
         Assert.Equal("Awarded extra days", persistedAdjustment.Comments);
         Assert.Equal(adjustedBy, persistedAdjustment.AdjustedByEmployeeId);
 
-        var published = Assert.Single(auditPublisher.Published);
-        var auditEvent = Assert.IsType<LeaveBalanceAdjustedAuditEvent>(published);
+        var auditEvent = await SingleStagedAuditEventAsync(context);
         Assert.Equal(companyId, auditEvent.CompanyId);
         Assert.Equal(employeeId, auditEvent.EmployeeId);
         Assert.Equal(leaveType.Id, auditEvent.LeaveTypeId);
@@ -196,8 +203,7 @@ public class AdjustLeaveBalanceHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var auditPublisher = new CapturingAuditEventPublisher();
-        var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" }, auditPublisher);
+        var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" });
         var adjustedBy = Guid.NewGuid();
 
         // Toil-behaviour leave type: AdjustmentValue is interpreted as HOURS and divided by the
@@ -221,8 +227,7 @@ public class AdjustLeaveBalanceHandlerTests
         Assert.Equal(2m, persistedAdjustment.AdjustmentDays);
         Assert.Equal(15m, persistedAdjustment.AdjustmentHours);
 
-        var published = Assert.Single(auditPublisher.Published);
-        var auditEvent = Assert.IsType<LeaveBalanceAdjustedAuditEvent>(published);
+        var auditEvent = await SingleStagedAuditEventAsync(context);
         Assert.Equal(2m, auditEvent.AdjustmentDays);
         Assert.Equal(15m, auditEvent.AdjustmentHours);
     }

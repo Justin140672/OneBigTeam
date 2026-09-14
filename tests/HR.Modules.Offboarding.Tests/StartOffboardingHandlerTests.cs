@@ -834,4 +834,109 @@ public class StartOffboardingHandlerTests
             harness.AuditPublisher.Published.OfType<HR.Modules.Offboarding.OffboardingPlanStartedAuditEvent>());
         Assert.Equal(HR.Modules.Offboarding.OffboardingSystemActor.Id, startedEvent.ActorEmployeeId);
     }
+
+    // -- Idempotency-Key (ticket 3, P1 follow-up) --------------------------------------------
+
+    [Fact]
+    public async Task HandleAsync_With_IdempotencyKey_First_Call_Succeeds_Normally()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var harness = BuildHandler(dbContext, names);
+
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = BuildRequest(companyId, employeeId) with { IdempotencyKey = idempotencyKey };
+
+        var result = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(companyId, result.Value!.CompanyId);
+        Assert.Equal(employeeId, result.Value.EmployeeId);
+        Assert.Single(await dbContext.OffboardingPlans.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_IdempotencyKey_Replay_Returns_Same_Response_Without_Second_Plan_Or_Repeated_SideEffects()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var harness = BuildHandler(dbContext, names, managerId: managerId);
+
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = BuildRequest(companyId, employeeId) with { IdempotencyKey = idempotencyKey };
+
+        var first = await harness.Handler.HandleAsync(request, CancellationToken.None);
+        var notificationCountAfterFirst = harness.Notifications.Written.Count;
+        var integrationCountAfterFirst = harness.IntegrationPublisher.Published.Count;
+        var auditCountAfterFirst = harness.AuditPublisher.Published.Count;
+
+        var second = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(first.Value!.Id, second.Value!.Id);
+        Assert.Equal(first.Value.CreatedAt, second.Value.CreatedAt);
+        Assert.Equal(first.Value.GeneratedTaskIds, second.Value.GeneratedTaskIds);
+
+        Assert.Single(await dbContext.OffboardingPlans.ToListAsync());
+
+        // Replay must not re-invoke any side-effecting dependency a second time.
+        Assert.Equal(notificationCountAfterFirst, harness.Notifications.Written.Count);
+        Assert.Equal(integrationCountAfterFirst, harness.IntegrationPublisher.Published.Count);
+        Assert.Equal(auditCountAfterFirst, harness.AuditPublisher.Published.Count);
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_Same_IdempotencyKey_And_Different_Payload_Returns_Conflict_And_No_Second_Plan()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var harness = BuildHandler(dbContext, names);
+
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var request = BuildRequest(companyId, employeeId, new DateOnly(2026, 7, 15)) with
+        { IdempotencyKey = idempotencyKey };
+
+        var first = await harness.Handler.HandleAsync(request, CancellationToken.None);
+        var second = await harness.Handler.HandleAsync(
+            request with { LastWorkingDay = new DateOnly(2026, 8, 1) },
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsFailure);
+        Assert.Equal("conflict", second.Error.Code);
+        Assert.Equal("This Idempotency-Key was already used for a different request.", second.Error.Message);
+        Assert.Single(await dbContext.OffboardingPlans.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Without_IdempotencyKey_Does_Not_Attempt_Deduplication()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId1 = Guid.NewGuid();
+        var employeeId2 = Guid.NewGuid();
+        var names = new Dictionary<Guid, string>
+        {
+            [employeeId1] = "Jamie Smith",
+            [employeeId2] = "Robin Report",
+        };
+        var harness = BuildHandler(dbContext, names);
+
+        var first = await harness.Handler.HandleAsync(BuildRequest(companyId, employeeId1), CancellationToken.None);
+        var second = await harness.Handler.HandleAsync(BuildRequest(companyId, employeeId2), CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.NotEqual(first.Value!.Id, second.Value!.Id);
+        Assert.Equal(2, await dbContext.OffboardingPlans.CountAsync());
+        Assert.Empty(dbContext.IdempotencyRecords);
+    }
 }

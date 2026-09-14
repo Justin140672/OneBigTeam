@@ -1,4 +1,5 @@
 using HR.Modules.Support.Domain;
+using HR.SharedKernel.Idempotency;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Support.Persistence;
@@ -15,10 +16,12 @@ internal sealed class SupportDbContext : DbContext
     public DbSet<SupportResponse> SupportResponses => Set<SupportResponse>();
     public DbSet<SupportResponseAttachment> SupportResponseAttachments => Set<SupportResponseAttachment>();
     public DbSet<SupportNotificationAttempt> SupportNotificationAttempts => Set<SupportNotificationAttempt>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("support");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(SupportDbContext).Assembly);
+        modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration<IdempotencyRecord>());
     }
 }

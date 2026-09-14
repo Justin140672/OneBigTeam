@@ -28,7 +28,18 @@ internal sealed class Endpoint(SaveMyEqualityDataHandler handler, ICurrentUser c
             return;
         }
 
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            cancellationToken);
+
+        if (result.IsFailure && result.Error.Code == "conflict")
+        {
+            await Send.ResultAsync(TypedResults.Conflict(new { error = result.Error.Message }));
+            return;
+        }
+
         await Send.ResultAsync(TypedResults.Ok(result.Value));
     }
 }

@@ -34,7 +34,7 @@ public class UpdateAssetHandlerTests
         }, CancellationToken.None);
         var categoryId = categoryResult.Value!.Id;
 
-        var assetHandler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var assetHandler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
         var assetResult = await assetHandler.HandleAsync(new CreateAssetRequest
         {
             CompanyId = companyId,
@@ -176,7 +176,7 @@ public class UpdateAssetHandlerTests
         var (categoryId, companyId, assetId) = await SeedAssetAsync(db, "ASSET-001");
 
         // Create a second asset with a different number
-        var assetHandler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
+        var assetHandler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
         await assetHandler.HandleAsync(new CreateAssetRequest
         {
             CompanyId = companyId,

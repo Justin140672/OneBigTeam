@@ -1,5 +1,7 @@
 using HR.Modules.Identity.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.ResendInvite;
@@ -16,6 +18,28 @@ internal sealed class ResendInviteHandler(
         Guid? actorUserId,
         CancellationToken cancellationToken)
     {
+                var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, ResendInviteResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<ResendInviteResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var invite = await db.UserInvites
             .FirstOrDefaultAsync(i => i.Id == request.InviteId && i.CompanyId == request.CompanyId, cancellationToken);
 
@@ -28,7 +52,20 @@ internal sealed class ResendInviteHandler(
 
         var now = clock.UtcNow;
         invite.Resend(now);
-        await db.SaveChangesAsync(cancellationToken);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var precomputedResponse = new ResendInviteResponse(invite.Id, invite.ExpiresAt, EmailSent: false);
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, ResendInviteResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, precomputedResponse, new DateTimeOffset(now, TimeSpan.Zero), cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         var inviteLink = inviteLinkBuilder.Build(invite.Token);
 

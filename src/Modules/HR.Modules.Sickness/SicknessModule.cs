@@ -86,6 +86,7 @@ public static class SicknessModule
         services.AddScoped<ISicknessReportReader, SicknessReportReader>();
         services.AddScoped<HR.Infrastructure.Abstractions.ISicknessDataExportSource, Services.SicknessDataExportSource>();
         services.AddScoped<Services.SicknessResourceAuthorizer>();
+        services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
     }
 
     public static WebApplication UseSicknessRecurringJobs(this WebApplication app)
@@ -108,6 +109,11 @@ public static class SicknessModule
             "attendance-alert-evaluation",
             job => job.ExecuteAsync(),
             Cron.Daily(6));
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
+            "sickness-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 

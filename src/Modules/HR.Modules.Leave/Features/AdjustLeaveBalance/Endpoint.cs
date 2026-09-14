@@ -22,8 +22,14 @@ internal sealed class Endpoint(AdjustLeaveBalanceHandler handler, ICurrentUser c
             return;
         }
 
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
         var result = await handler.HandleAsync(
-            request with { AdjustedByEmployeeId = adjustedByEmployeeId },
+            request with
+            {
+                AdjustedByEmployeeId = adjustedByEmployeeId,
+                IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
+            },
             cancellationToken);
 
         if (result.IsFailure)
@@ -32,6 +38,11 @@ internal sealed class Endpoint(AdjustLeaveBalanceHandler handler, ICurrentUser c
             if (result.Error.Code == "not_found")
             {
                 await Send.ResultAsync(TypedResults.NotFound(businessError));
+                return;
+            }
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(businessError));
                 return;
             }
             await Send.ResultAsync(TypedResults.BadRequest(businessError));

@@ -2,6 +2,8 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Features.SupersedeEmployeeNote;
@@ -17,6 +19,26 @@ internal sealed class SupersedeEmployeeNoteHandler(
         Guid actorUserId,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, SupersedeEmployeeNoteResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<SupersedeEmployeeNoteResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var original = await dbContext.EmployeeNotes
             .SingleOrDefaultAsync(
                 n => n.CompanyId == request.CompanyId &&
@@ -47,7 +69,33 @@ internal sealed class SupersedeEmployeeNoteHandler(
         original.MarkSuperseded(newNote.Id);
 
         dbContext.EmployeeNotes.Add(newNote);
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var response = new SupersedeEmployeeNoteResponse(
+            newNote.Id,
+            newNote.CompanyId,
+            newNote.EmployeeId,
+            newNote.Category.ToString(),
+            newNote.NoteText,
+            newNote.IsImportant,
+            newNote.IsSuperseded,
+            newNote.SupersededByNoteId,
+            newNote.CreatedByUserId,
+            newNote.CreatedDate,
+            original.Id,
+            original.IsSuperseded);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync<IdempotencyRecord, SupersedeEmployeeNoteResponse>(dbContext.IdempotencyRecords, 
+                scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         await auditEventPublisher.PublishAsync(
             new EmployeeNoteCreatedAuditEvent(
@@ -72,18 +120,6 @@ internal sealed class SupersedeEmployeeNoteHandler(
                 now),
             cancellationToken);
 
-        return Result.Success(new SupersedeEmployeeNoteResponse(
-            newNote.Id,
-            newNote.CompanyId,
-            newNote.EmployeeId,
-            newNote.Category.ToString(),
-            newNote.NoteText,
-            newNote.IsImportant,
-            newNote.IsSuperseded,
-            newNote.SupersededByNoteId,
-            newNote.CreatedByUserId,
-            newNote.CreatedDate,
-            original.Id,
-            original.IsSuperseded));
+        return Result.Success(response);
     }
 }

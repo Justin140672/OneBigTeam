@@ -1,6 +1,8 @@
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Features.CreatePublicHoliday;
@@ -20,6 +22,26 @@ internal sealed class CreatePublicHolidayHandler
         CreatePublicHolidayRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await _dbContext.TryReplayAsync<IdempotencyRecord, CreatePublicHolidayResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<CreatePublicHolidayResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var exists = await _dbContext.PublicHolidays
             .AnyAsync(
                 h => h.CompanyId == request.CompanyId && h.Date == request.Date,
@@ -42,14 +64,28 @@ internal sealed class CreatePublicHolidayHandler
             now);
 
         _dbContext.PublicHolidays.Add(holiday);
-        await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new CreatePublicHolidayResponse(
+        var response = new CreatePublicHolidayResponse(
             holiday.Id,
             holiday.CompanyId,
             holiday.Date,
             holiday.Name,
             holiday.CountryCode,
-            holiday.CreatedAt));
+            holiday.CreatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await _dbContext.SaveIdempotentAsync(
+                _dbContext.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return Result.Success(response);
     }
 }

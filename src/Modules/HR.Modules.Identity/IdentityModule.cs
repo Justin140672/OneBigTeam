@@ -221,6 +221,7 @@ public static class IdentityModule
         services.AddScoped<RemoveEmployeeRoleOverrideHandler>();
         services.AddScoped<IValidator<RemoveEmployeeRoleOverrideRequest>, RemoveEmployeeRoleOverrideValidator>();
         services.AddScoped<ExpireEmployeeRoleOverridesJob>();
+        services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
 
         services.AddScoped<IWorkloadActionProvider, EmployeeAccountsAwaitingInvitationWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, EmployeeAccountsAwaitingDisablementWorkloadActionProvider>();
@@ -342,6 +343,11 @@ public static class IdentityModule
             "expire-employee-role-overrides",
             job => job.ExecuteAsync(),
             Cron.Daily(2));
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
+            "identity-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 

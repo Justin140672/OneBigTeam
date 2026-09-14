@@ -5,4 +5,7 @@ internal sealed record SaveReportViewRequest(
     string ReportId,
     string Name,
     string FilterCriteriaJson,
-    bool? IsDefault);
+    bool? IsDefault)
+{
+    internal string? IdempotencyKey { get; init; }
+}

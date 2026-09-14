@@ -5,6 +5,8 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Contracts;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Features.CloseSicknessRecord;
@@ -23,6 +25,30 @@ internal sealed class CloseSicknessRecordHandler(
         CloseSicknessRecordRequest request,
         CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated request before doing any business
+        // work, so a repeated delivery can't double-close the record or double-raise a
+        // return-to-work review.
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, CloseSicknessRecordResponse>(
+                scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<CloseSicknessRecordResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var record = await db.SicknessRecords
             .FirstOrDefaultAsync(r =>
                 r.Id == request.Id &&
@@ -121,7 +147,43 @@ internal sealed class CloseSicknessRecordHandler(
                 now);
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        // Built from in-memory values ahead of the save, so it can double as both the response
+        // and the payload persisted for an idempotency replay.
+        var response = new CloseSicknessRecordResponse(
+            record.Id,
+            record.CompanyId,
+            record.EmployeeId,
+            record.CategoryId,
+            record.Status,
+            record.StartDate,
+            record.StartDayPart,
+            record.EndDate,
+            record.EndDayPart,
+            record.ReturnToWorkDate,
+            record.EvidenceStatus,
+            record.EvidenceNotes,
+            record.Notes,
+            record.TotalDays,
+            record.CreatedAt,
+            record.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+            {
+                // Lost a race against a concurrent duplicate under the same key. SaveIdempotentAsync
+                // already rolled back this attempt's transaction - nothing here was committed, so
+                // skip the rest of this handler's side effects and hand back the winner's result.
+                return Result.Success(outcome.Response!);
+            }
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         // One-time evaluation at close time (SICK-01) — an absence that already reached the
         // fit-note threshold by the time it was closed (including one closed before the daily
@@ -166,22 +228,6 @@ internal sealed class CloseSicknessRecordHandler(
                 now), cancellationToken);
         }
 
-        return Result.Success(new CloseSicknessRecordResponse(
-            record.Id,
-            record.CompanyId,
-            record.EmployeeId,
-            record.CategoryId,
-            record.Status,
-            record.StartDate,
-            record.StartDayPart,
-            record.EndDate,
-            record.EndDayPart,
-            record.ReturnToWorkDate,
-            record.EvidenceStatus,
-            record.EvidenceNotes,
-            record.Notes,
-            record.TotalDays,
-            record.CreatedAt,
-            record.UpdatedAt));
+        return Result.Success(response);
     }
 }

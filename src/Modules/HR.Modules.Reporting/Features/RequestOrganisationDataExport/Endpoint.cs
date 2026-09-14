@@ -34,7 +34,13 @@ internal sealed class Endpoint(
             return;
         }
 
-        var result = await handler.HandleAsync(request, userId, currentUser.Email, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            userId,
+            currentUser.Email,
+            cancellationToken);
 
         if (result.IsFailure)
         {

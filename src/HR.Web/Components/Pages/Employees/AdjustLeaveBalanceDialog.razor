@@ -1,4 +1,5 @@
 @using System.ComponentModel.DataAnnotations
+@using HR.SharedKernel.Idempotency
 @using HR.Web.Models
 @inject LeaveService LeaveService
 
@@ -99,6 +100,12 @@
     private string? _error;
     private bool _submitting;
 
+    // Ticket 3 (P1) final follow-up items 1/2: this dialog instance - not the scoped LeaveService -
+    // owns the idempotency key for the ONE logical "adjust balance" submission it currently
+    // represents. Reused across retries of that same unchanged submission; rotated the moment the
+    // user changes a material field; discarded in Reset() on every definitive outcome.
+    private readonly PendingIdempotentOperation _submitOperation = new();
+
     protected override void OnInitialized()
     {
         _editContext = new EditContext(_model);
@@ -134,29 +141,59 @@
             return;
         }
 
+        // Disable-while-in-flight (below, via _submitting on the button) is this dialog's only
+        // concurrent-submission guard - by design, one dialog instance represents one in-progress
+        // adjustment at a time, so there's nothing else to give a separate key to here. A second,
+        // independent adjustment (e.g. a second dialog instance for a different employee) gets its
+        // own IdempotencyKeyScope simply by being a different component instance.
         _submitting = true;
         _error = null;
 
-        var (response, error) = await LeaveService.AdjustLeaveBalanceAsync(
-            CompanyId, EmployeeId,
-            new AdjustLeaveBalanceModel(
-                LeaveTypeId,
-                _model.AdjustmentValue!.Value,
-                _model.Reason,
-                string.IsNullOrWhiteSpace(_model.Comments) ? null : _model.Comments,
-                _model.AllowNegativeOverride));
+        var request = new AdjustLeaveBalanceModel(
+            LeaveTypeId,
+            _model.AdjustmentValue!.Value,
+            _model.Reason,
+            string.IsNullOrWhiteSpace(_model.Comments) ? null : _model.Comments,
+            _model.AllowNegativeOverride);
 
-        _submitting = false;
+        // Fingerprint includes which employee/leave type this dialog instance currently targets -
+        // it's a reusable component, so Blazor can rebind it to a different employee between opens
+        // without recreating it.
+        var key = _submitOperation.PrepareKey((CompanyId, EmployeeId, request));
 
-        if (response is not null)
+        try
         {
-            await VisibleChanged.InvokeAsync(false);
-            Reset();
-            await OnAdjusted.InvokeAsync();
+            var (response, error) = await LeaveService.AdjustLeaveBalanceAsync(
+                CompanyId, EmployeeId, request, key);
+
+            // A definitive outcome (success or a business rejection) was returned - not thrown -
+            // so this submission has concluded one way or another: the NEXT submit (a corrected
+            // resubmission, or a fresh adjustment after this dialog is reopened) starts a new
+            // logical operation.
+            _submitOperation.Complete();
+
+            if (response is not null)
+            {
+                await VisibleChanged.InvokeAsync(false);
+                Reset();
+                await OnAdjusted.InvokeAsync();
+            }
+            else
+            {
+                _error = error ?? "Failed to adjust leave balance.";
+            }
         }
-        else
+        catch (Exception)
         {
-            _error = error ?? "Failed to adjust leave balance.";
+            // Ambiguous - the response was lost (network failure/timeout), so the mutation may
+            // already have committed server-side. Deliberately do NOT reset the key/fingerprint:
+            // the user's next click of this same "Save" button (unchanged fields) must reuse them
+            // so the server can replay rather than repeat the adjustment.
+            _error = "Failed to adjust leave balance. Please try again.";
+        }
+        finally
+        {
+            _submitting = false;
         }
     }
 
@@ -174,5 +211,9 @@
         _model.AllowNegativeOverride = false;
         _editContext = new EditContext(_model);
         _error = null;
+
+        // Cancelling discards whatever partial submission was pending - the next open of this
+        // dialog (even for the same employee/leave type) is a new logical operation.
+        _submitOperation.Complete();
     }
 }

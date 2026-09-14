@@ -3,6 +3,8 @@ using HR.Modules.Assets.Domain;
 using HR.Modules.Assets.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Features.CreateAssetAssignment;
@@ -13,6 +15,26 @@ internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock cl
         CreateAssetAssignmentRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, CreateAssetAssignmentResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<CreateAssetAssignmentResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var asset = await db.Assets.FirstOrDefaultAsync(
             a => a.Id == request.AssetId && a.CompanyId == request.CompanyId,
             cancellationToken);
@@ -33,7 +55,24 @@ internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock cl
         asset.MarkAssigned(now);
 
         db.AssetAssignments.Add(assignment);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new CreateAssetAssignmentResponse(
+            assignment.Id, assignment.CompanyId, assignment.AssetId,
+            assignment.EmployeeId, assignment.AssignedBy,
+            assignment.AssignedAt, assignment.Notes, assignment.CreatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync(db.IdempotencyRecords, 
+                scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(new AssetAssignedAuditEvent(
             assignment.CompanyId,
@@ -70,9 +109,6 @@ internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock cl
             now,
             cancellationToken);
 
-        return Result.Success(new CreateAssetAssignmentResponse(
-            assignment.Id, assignment.CompanyId, assignment.AssetId,
-            assignment.EmployeeId, assignment.AssignedBy,
-            assignment.AssignedAt, assignment.Notes, assignment.CreatedAt));
+        return Result.Success(response);
     }
 }

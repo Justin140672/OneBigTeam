@@ -16,7 +16,12 @@ internal sealed class Endpoint(
 
     public override async Task HandleAsync(AddEmployeeRoleOverrideRequest request, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, currentUser.UserId, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            currentUser.UserId,
+            cancellationToken);
 
         if (result.IsFailure)
         {

@@ -1,4 +1,5 @@
 using HR.Modules.Recruitment.Domain;
+using HR.SharedKernel.Idempotency;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Persistence;
@@ -18,10 +19,12 @@ internal class RecruitmentDbContext : DbContext
     public DbSet<ApplicationStageHistoryEntry> ApplicationStageHistoryEntries => Set<ApplicationStageHistoryEntry>();
     public DbSet<ExternalRecruiter> ExternalRecruiters => Set<ExternalRecruiter>();
     public DbSet<RecruitmentStage> RecruitmentStages => Set<RecruitmentStage>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("recruitment");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(RecruitmentDbContext).Assembly);
+        modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration<IdempotencyRecord>());
     }
 }

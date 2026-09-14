@@ -4,6 +4,8 @@ using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.PublishSharedCompanyDocument;
@@ -21,6 +23,29 @@ internal sealed class PublishSharedCompanyDocumentHandler(
         Guid publishedBy,
         CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated request before doing any business
+        // work, so a repeated delivery can't double-fan-out acknowledgement tasks.
+                var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+        
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, PublishSharedCompanyDocumentResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<PublishSharedCompanyDocumentResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var document = await db.SharedCompanyDocuments
             .FirstOrDefaultAsync(d => d.Id == request.DocumentId && d.CompanyId == request.CompanyId, cancellationToken);
 
@@ -75,6 +100,11 @@ internal sealed class PublishSharedCompanyDocumentHandler(
 
         var now = clock.UtcNowOffset();
         document.Publish(publishedBy, now);
+
+        // Cross-module task/notification fan-out happens after the save below, so the final task
+        // count can't be known before it — response therefore can't be built purely from
+        // in-memory values ahead of the save for this handler. The status check above (Draft-only)
+        // already prevents this document from being published twice regardless of the key.
         await db.SaveChangesAsync(cancellationToken);
 
         var acknowledgementTasksCreated = 0;
@@ -143,13 +173,23 @@ internal sealed class PublishSharedCompanyDocumentHandler(
             publishedBy,
             now), cancellationToken);
 
-        return Result.Success(new PublishSharedCompanyDocumentResponse(
+        var response = new PublishSharedCompanyDocumentResponse(
             document.Id,
             document.CompanyId,
             document.Title,
             document.Status.ToString(),
             document.PublishedBy!.Value,
             document.PublishedAt!.Value,
-            acknowledgementTasksCreated));
+            acknowledgementTasksCreated);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            // The business save/fan-out already happened above; this only persists the idempotency
+            // record itself (with the final response) so a retry of the same key can be replayed.
+            await db.SaveIdempotentAsync(db.IdempotencyRecords,
+            scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+        }
+
+        return Result.Success(response);
     }
 }

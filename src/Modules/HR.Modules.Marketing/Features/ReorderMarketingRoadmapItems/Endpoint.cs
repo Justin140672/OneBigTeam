@@ -15,7 +15,11 @@ internal sealed class Endpoint(ReorderMarketingRoadmapItemsHandler handler)
 
     public override async Task HandleAsync(ReorderMarketingRoadmapItemsRequest req, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(req, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            req with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            cancellationToken);
 
         if (result.IsFailure)
         {

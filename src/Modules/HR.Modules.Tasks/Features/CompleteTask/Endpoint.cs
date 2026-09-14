@@ -22,8 +22,14 @@ internal sealed class Endpoint(CompleteTaskHandler handler, ICurrentUser current
             return;
         }
 
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
         var result = await handler.HandleAsync(
-            request with { CompletedBy = completedBy },
+            request with
+            {
+                CompletedBy = completedBy,
+                IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
+            },
             cancellationToken);
 
         if (result.IsFailure)

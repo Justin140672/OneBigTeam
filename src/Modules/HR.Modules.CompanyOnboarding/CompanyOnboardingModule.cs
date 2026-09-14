@@ -1,7 +1,9 @@
+using Hangfire;
 using HR.SharedKernel;
 using HR.Modules.CompanyOnboarding.Features.DismissOnboardingChecklist;
 using HR.Modules.CompanyOnboarding.Features.GetOnboardingChecklist;
 using HR.Modules.CompanyOnboarding.Features.MarkOnboardingTaskComplete;
+using HR.Modules.CompanyOnboarding.Jobs;
 using HR.Modules.CompanyOnboarding.Persistence;
 using HR.Modules.CompanyOnboarding.Services;
 using Microsoft.AspNetCore.Builder;
@@ -84,5 +86,18 @@ public static class CompanyOnboardingModule
         services.AddScoped<GetOnboardingChecklistHandler>();
         services.AddScoped<DismissOnboardingChecklistHandler>();
         services.AddScoped<MarkOnboardingTaskCompleteHandler>();
+
+        services.AddScoped<IdempotencyMaintenanceJob>();
+    }
+
+    public static WebApplication UseCompanyOnboardingRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<IdempotencyMaintenanceJob>(
+            "companyonboarding-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
+        return app;
     }
 }

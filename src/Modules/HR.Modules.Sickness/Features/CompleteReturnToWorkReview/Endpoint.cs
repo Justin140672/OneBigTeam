@@ -33,10 +33,20 @@ internal sealed class Endpoint(
             return;
         }
 
-        var result = await handler.HandleAsync(request, reviewedBy, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            reviewedBy,
+            cancellationToken);
 
         if (result.IsFailure)
         {
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(new { error = result.Error.Message }));
+                return;
+            }
             // Mirrors GetReturnToWorkReview/Endpoint.cs: unauthorized/unrelated access and
             // "doesn't exist" both surface as plain NotFound so a manager cannot use the
             // response to distinguish the two while guessing review ids.

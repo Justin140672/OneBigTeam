@@ -28,7 +28,13 @@ internal sealed class Endpoint(
 
         var accessGates = await ReportAccessGateEvaluator.EvaluateAsync(authorizationService, User);
 
-        var result = await handler.HandleAsync(request, userId, accessGates, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            userId,
+            accessGates,
+            cancellationToken);
 
         if (result.IsFailure)
         {

@@ -1,5 +1,6 @@
 using HR.SharedKernel;
 using FluentValidation;
+using Hangfire;
 
 using HR.Modules.Marketing.Domain;
 using HR.Modules.Marketing.Features.CreateMarketingFeature;
@@ -14,6 +15,7 @@ using HR.Modules.Marketing.Features.UpdateMarketingFeature;
 using HR.Modules.Marketing.Features.UpdateMarketingRoadmapItem;
 using HR.Modules.Marketing.Persistence;
 
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -65,6 +67,21 @@ public static class MarketingModule
 
         services.AddScoped<ReorderMarketingRoadmapItemsHandler>();
         services.AddScoped<IValidator<ReorderMarketingRoadmapItemsRequest>, ReorderMarketingRoadmapItemsValidator>();
+
+        services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
+    }
+
+    /// <summary>
+    /// Ticket 3 (P1) follow-up item 4: cleans up expired idempotency records for this module.
+    /// </summary>
+    public static WebApplication UseMarketingRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
+            "marketing-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
+        return app;
     }
 
     public static async Task MigrateMarketingAsync(this IServiceProvider services)

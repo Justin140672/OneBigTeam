@@ -1,9 +1,10 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Assets.Features.CreateAsset;
 
-internal sealed class Endpoint(CreateAssetHandler handler)
+internal sealed class Endpoint(CreateAssetHandler handler, ICurrentUser currentUser)
     : Endpoint<CreateAssetRequest, CreateAssetResponse>
 {
     public override void Configure()
@@ -14,7 +15,15 @@ internal sealed class Endpoint(CreateAssetHandler handler)
 
     public override async Task HandleAsync(CreateAssetRequest request, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with
+            {
+                IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
+                ActorId = currentUser.UserId ?? Guid.Empty,
+            },
+            cancellationToken);
 
         if (result.IsFailure)
         {

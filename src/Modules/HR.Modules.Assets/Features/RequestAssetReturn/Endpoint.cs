@@ -14,7 +14,11 @@ internal sealed class Endpoint(RequestAssetReturnHandler handler)
 
     public override async Task HandleAsync(RequestAssetReturnRequest request, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            cancellationToken);
 
         if (result.IsFailure && result.Error.Code == "conflict")
         {

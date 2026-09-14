@@ -1,5 +1,7 @@
 using HR.Modules.Documents.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.DeleteEmployeeDocument;
@@ -19,6 +21,29 @@ internal sealed class DeleteEmployeeDocumentHandler(
         Guid deletedBy,
         CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated request. Payload-less success, so a
+        // trivial `bool` marker is persisted/replayed purely to detect a repeated delivery.
+                var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+        
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, bool>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success();
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var row = await (
             from ed in db.EmployeeDocuments
             join d  in db.Documents     on ed.DocumentId    equals d.Id
@@ -36,7 +61,18 @@ internal sealed class DeleteEmployeeDocumentHandler(
         var now = clock.UtcNowOffset();
         row.ed.Archive(deletedBy, request.Reason, now);
 
-        await db.SaveChangesAsync(cancellationToken);
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync(db.IdempotencyRecords,
+            scope, key, fingerprint!, StatusCodes.Status204NoContent, true, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success();
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(new EmployeeDocumentArchivedAuditEvent(
             request.CompanyId,

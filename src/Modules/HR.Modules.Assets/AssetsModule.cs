@@ -74,6 +74,7 @@ public static class AssetsModule
         services.AddScoped<IAssetAssignmentReportReader, AssetAssignmentReportReader>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<IWorkloadActionProvider, AssetsAwaitingReturnWorkloadActionProvider>();
+        services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
     }
 
     public static WebApplication UseAssetsRecurringJobs(this WebApplication app)
@@ -83,6 +84,12 @@ public static class AssetsModule
             "asset-reminders",
             job => job.ExecuteAsync(),
             Cron.Daily(2));
+        // Ticket 3 (P1) follow-up items 5/6: dispatch audit-outbox entries and clean up expired
+        // idempotency records.
+        jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
+            "assets-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 

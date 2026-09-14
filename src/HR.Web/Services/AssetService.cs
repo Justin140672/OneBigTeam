@@ -1,10 +1,12 @@
 using System.Net.Http.Json;
+using HR.SharedKernel.Idempotency;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
 
 public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
-    : IEditService<AssetEditModel, Guid>, IConcurrencyAwareEditService<AssetEditModel, Guid>
+    : IEditService<AssetEditModel, Guid>, IConcurrencyAwareEditService<AssetEditModel, Guid>,
+      IIdempotentCreateService<AssetEditModel>
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
@@ -99,10 +101,19 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
+    /// <summary>
+    /// Ticket 3 (P1) final follow-up item 1: stateless with respect to operation identity - the
+    /// caller supplies <paramref name="idempotencyKey"/> and owns its lifecycle. A network
+    /// failure/timeout throws before reaching any return here (this method has no catch of its
+    /// own, matching its pre-existing behaviour) rather than being swallowed into a returned
+    /// tuple, so the caller can tell "ambiguous - keep the key for a retry" apart from a
+    /// definitive outcome without string-matching an error message.
+    /// </summary>
     public async Task<(CreateAssetResponse? Result, string? Error)> CreateAssetAsync(
-        Guid companyId, CreateAssetRequest request)
+        Guid companyId, CreateAssetRequest request, Guid idempotencyKey)
     {
-        var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/assets", request);
+        var response = await Http.PostAsJsonIdempotentAsync(
+            $"api/companies/{companyId}/assets", request, idempotencyKey);
 
         if (response.IsSuccessStatusCode)
         {
@@ -112,6 +123,8 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
 
         if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
+            // Either a genuine duplicate asset number, or the idempotency layer's own "key reused
+            // for a different request" conflict.
             var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
             return (null, body?.Error ?? "An asset with that number already exists.");
         }
@@ -204,8 +217,20 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
         return ApiSaveResult.Fail(body?.Error ?? "Failed to update asset.");
     }
 
+    // Callers that only know IEditService<AssetEditModel, Guid> (not idempotency-aware) get a
+    // fresh key generated per call - correct but with no cross-retry dedup benefit. The real UI
+    // path (EditPageBase<TModel, TKey>) detects IIdempotentCreateService<AssetEditModel> below and
+    // owns a real key's lifecycle across retries instead of hitting this overload.
     async Task<(AssetEditModel? Result, string? Error)> IEditService<AssetEditModel, Guid>.CreateAsync(
-        Guid companyId, AssetEditModel model)
+        Guid companyId, AssetEditModel model) =>
+        await CreateFromModelAsync(companyId, model, Guid.NewGuid());
+
+    async Task<(AssetEditModel? Result, string? Error)> IIdempotentCreateService<AssetEditModel>.CreateAsync(
+        Guid companyId, AssetEditModel model, Guid idempotencyKey) =>
+        await CreateFromModelAsync(companyId, model, idempotencyKey);
+
+    private async Task<(AssetEditModel? Result, string? Error)> CreateFromModelAsync(
+        Guid companyId, AssetEditModel model, Guid idempotencyKey)
     {
         var request = new CreateAssetRequest(
             companyId, model.AssetNumber.Trim(), model.CategoryId!.Value, model.Name.Trim(),
@@ -214,7 +239,7 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
             string.IsNullOrWhiteSpace(model.SerialNumber) ? null : model.SerialNumber.Trim(),
             model.PurchaseDate, model.PurchasePrice);
 
-        var (created, error) = await CreateAssetAsync(companyId, request);
+        var (created, error) = await CreateAssetAsync(companyId, request, idempotencyKey);
         return (created is null ? null : model, error);
     }
 

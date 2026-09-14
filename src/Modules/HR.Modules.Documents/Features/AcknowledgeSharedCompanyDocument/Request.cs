@@ -13,4 +13,8 @@ internal sealed record AcknowledgeSharedCompanyDocumentRequest
     // Must be true — enforced by AcknowledgeSharedCompanyDocumentValidator. Server-side mirror of
     // the UI's confirmation checkbox so the API can't be called directly to acknowledge without it.
     public bool Confirmed { get; init; }
+
+    // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1
+    // follow-up). Null when the caller didn't supply one, in which case no dedup is attempted.
+    internal string? IdempotencyKey { get; init; }
 }

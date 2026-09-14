@@ -1,6 +1,7 @@
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.DeleteLeaveRequestDraft;
 using HR.Modules.Leave.Persistence;
+using HR.Modules.Leave.Tests.Infrastructure;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -44,7 +45,7 @@ public class DeleteLeaveRequestDraftHandlerTests
         context.LeaveRequests.Add(draft);
         await context.SaveChangesAsync();
 
-        var handler = new DeleteLeaveRequestDraftHandler(context);
+        var handler = new DeleteLeaveRequestDraftHandler(context, new FakeClock(FixedUtcNow));
         var result = await handler.HandleAsync(DeleteRequest(companyId, employeeId, draft.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -88,7 +89,7 @@ public class DeleteLeaveRequestDraftHandlerTests
         context.LeaveRequests.Add(draft);
         await context.SaveChangesAsync();
 
-        var handler = new DeleteLeaveRequestDraftHandler(context);
+        var handler = new DeleteLeaveRequestDraftHandler(context, new FakeClock(FixedUtcNow));
         var result = await handler.HandleAsync(DeleteRequest(companyId, employeeId, draft.Id), CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -100,7 +101,7 @@ public class DeleteLeaveRequestDraftHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Id_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new DeleteLeaveRequestDraftHandler(context);
+        var handler = new DeleteLeaveRequestDraftHandler(context, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(
             DeleteRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
@@ -120,7 +121,7 @@ public class DeleteLeaveRequestDraftHandlerTests
         context.LeaveRequests.Add(draft);
         await context.SaveChangesAsync();
 
-        var handler = new DeleteLeaveRequestDraftHandler(context);
+        var handler = new DeleteLeaveRequestDraftHandler(context, new FakeClock(FixedUtcNow));
         var result = await handler.HandleAsync(DeleteRequest(companyId, Guid.NewGuid(), draft.Id), CancellationToken.None);
 
         Assert.True(result.IsFailure);

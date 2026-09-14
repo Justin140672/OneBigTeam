@@ -1,5 +1,7 @@
 using HR.Modules.Assets.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Features.RetireAsset;
@@ -10,6 +12,26 @@ internal sealed class RetireAssetHandler(AssetsDbContext db, IClock clock)
         RetireAssetRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, object?>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success();
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var asset = await db.Assets
             .FirstOrDefaultAsync(a => a.Id == request.Id && a.CompanyId == request.CompanyId, cancellationToken);
 
@@ -27,7 +49,18 @@ internal sealed class RetireAssetHandler(AssetsDbContext db, IClock clock)
             return Result.Failure(Error.Conflict(ex.Message));
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, object?>(db.IdempotencyRecords, 
+                scope, key, fingerprint!, StatusCodes.Status204NoContent, null, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success();
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         return Result.Success();
     }

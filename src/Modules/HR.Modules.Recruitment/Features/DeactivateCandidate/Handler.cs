@@ -1,5 +1,7 @@
 using HR.Modules.Recruitment.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.DeactivateCandidate;
@@ -11,6 +13,26 @@ internal sealed class DeactivateCandidateHandler(RecruitmentDbContext db, IClock
         Guid performedBy,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, DeactivateCandidateResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<DeactivateCandidateResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var candidate = await db.Candidates
             .SingleOrDefaultAsync(
                 c => c.Id == request.CandidateId && c.CompanyId == request.CompanyId,
@@ -46,7 +68,28 @@ internal sealed class DeactivateCandidateHandler(RecruitmentDbContext db, IClock
         var now = clock.UtcNowOffset();
 
         candidate.Deactivate(performedBy, request.Reason, now);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new DeactivateCandidateResponse(
+            candidate.Id,
+            candidate.CompanyId,
+            candidate.IsActive,
+            candidate.DeactivatedAt,
+            candidate.DeactivatedByUserId,
+            candidate.DeactivationReason,
+            candidate.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, DeactivateCandidateResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(
             new CandidateDeactivatedAuditEvent(
@@ -58,13 +101,6 @@ internal sealed class DeactivateCandidateHandler(RecruitmentDbContext db, IClock
                 now),
             cancellationToken);
 
-        return Result.Success(new DeactivateCandidateResponse(
-            candidate.Id,
-            candidate.CompanyId,
-            candidate.IsActive,
-            candidate.DeactivatedAt,
-            candidate.DeactivatedByUserId,
-            candidate.DeactivationReason,
-            candidate.UpdatedAt));
+        return Result.Success(response);
     }
 }

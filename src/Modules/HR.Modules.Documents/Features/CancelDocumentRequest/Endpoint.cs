@@ -43,7 +43,18 @@ internal sealed class Endpoint(CancelDocumentRequestHandler handler, IAuthorizat
             return;
         }
 
-        var result = await handler.HandleAsync(request, callerId, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            new CancelDocumentRequestRequest
+            {
+                CompanyId = request.CompanyId,
+                EmployeeId = request.EmployeeId,
+                DocumentRequestId = request.DocumentRequestId,
+                IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
+            },
+            callerId,
+            cancellationToken);
 
         if (result.IsFailure)
         {

@@ -1,7 +1,9 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
 using HR.Infrastructure.Abstractions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Features.AddRequiredDocumentToPositionProfile;
@@ -17,6 +19,26 @@ internal sealed class AddRequiredDocumentHandler(
         Guid actorEmployeeId,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, AddRequiredDocumentResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<AddRequiredDocumentResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var profileExists = await dbContext.PositionProfiles
             .AnyAsync(
                 p => p.Id == request.PositionProfileId && p.CompanyId == request.CompanyId,
@@ -58,7 +80,27 @@ internal sealed class AddRequiredDocumentHandler(
             now);
 
         dbContext.PositionProfileRequiredDocuments.Add(requiredDocument);
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var response = new AddRequiredDocumentResponse(
+            requiredDocument.Id,
+            requiredDocument.PositionProfileId,
+            requiredDocument.DocumentTypeId,
+            requiredDocument.IsMandatory,
+            requiredDocument.DueDaysAfterStart,
+            requiredDocument.RequiresExpiryDate);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync<IdempotencyRecord, AddRequiredDocumentResponse>(dbContext.IdempotencyRecords, 
+                scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         await auditEventPublisher.PublishAsync(
             new RequiredDocumentAddedAuditEvent(
@@ -70,12 +112,6 @@ internal sealed class AddRequiredDocumentHandler(
                 now),
             cancellationToken);
 
-        return Result.Success(new AddRequiredDocumentResponse(
-            requiredDocument.Id,
-            requiredDocument.PositionProfileId,
-            requiredDocument.DocumentTypeId,
-            requiredDocument.IsMandatory,
-            requiredDocument.DueDaysAfterStart,
-            requiredDocument.RequiresExpiryDate));
+        return Result.Success(response);
     }
 }

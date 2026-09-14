@@ -360,8 +360,10 @@
       "hr.sharedkernel": {
         "type": "Project",
         "dependencies": {
+          "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "Microsoft.EntityFrameworkCore": "[10.0.11, )"
+          "Microsoft.EntityFrameworkCore": "[10.0.11, )",
+          "Microsoft.EntityFrameworkCore.Relational": "[10.0.11, )"
         }
       },
       "Microsoft.EntityFrameworkCore.Relational": {

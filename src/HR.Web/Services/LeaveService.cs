@@ -1,4 +1,5 @@
 using System.Text.Json;
+using HR.SharedKernel.Idempotency;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -161,41 +162,44 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
+    /// <summary>
+    /// Ticket 3 (P1) final follow-up item 1: stateless with respect to operation identity - the
+    /// caller (the component/dialog that owns this one logical submission) supplies
+    /// <paramref name="idempotencyKey"/> and decides whether to reuse or rotate it. This method
+    /// deliberately does NOT catch a network failure/timeout/lost-response (it propagates as an
+    /// exception) so the caller can tell "ambiguous - keep the key for a retry" apart from a
+    /// definitive outcome (returned normally, whether success or a business rejection) without
+    /// string-matching an error message.
+    /// </summary>
     public async Task<(AdjustLeaveBalanceResponse? Response, string? Error)> AdjustLeaveBalanceAsync(
         Guid companyId,
         Guid employeeId,
         AdjustLeaveBalanceModel request,
+        Guid idempotencyKey,
         CancellationToken cancellationToken = default)
     {
+        var httpResponse = await Http.PostAsJsonIdempotentAsync(
+            $"api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
+            request, idempotencyKey, HrApiJsonOptions.Default, cancellationToken);
+
+        if (httpResponse.IsSuccessStatusCode)
+            return (await httpResponse.Content.ReadFromJsonAsync<AdjustLeaveBalanceResponse>(HrApiJsonOptions.Default, cancellationToken), null);
+
+        if (httpResponse.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
+        {
+            var validationBody = await httpResponse.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(cancellationToken);
+            var first = validationBody?.Errors?.Values.SelectMany(v => v).FirstOrDefault();
+            return (null, first ?? "Validation failed.");
+        }
+
+        var body = await httpResponse.Content.ReadAsStringAsync(cancellationToken);
         try
         {
-            var httpResponse = await Http.PostAsJsonAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
-                request, HrApiJsonOptions.Default, cancellationToken);
-
-            if (httpResponse.IsSuccessStatusCode)
-                return (await httpResponse.Content.ReadFromJsonAsync<AdjustLeaveBalanceResponse>(HrApiJsonOptions.Default, cancellationToken), null);
-
-            if (httpResponse.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
-            {
-                var validationBody = await httpResponse.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(cancellationToken);
-                var first = validationBody?.Errors?.Values.SelectMany(v => v).FirstOrDefault();
-                return (null, first ?? "Validation failed.");
-            }
-
-            var body = await httpResponse.Content.ReadAsStringAsync(cancellationToken);
-            try
-            {
-                using var doc = JsonDocument.Parse(body);
-                var msg = doc.RootElement.TryGetProperty("error", out var e) ? e.GetString() : null;
-                return (null, msg ?? "Failed to adjust leave balance.");
-            }
-            catch
-            {
-                return (null, "Failed to adjust leave balance.");
-            }
+            using var doc = JsonDocument.Parse(body);
+            var msg = doc.RootElement.TryGetProperty("error", out var e) ? e.GetString() : null;
+            return (null, msg ?? "Failed to adjust leave balance.");
         }
-        catch
+        catch (JsonException)
         {
             return (null, "Failed to adjust leave balance.");
         }

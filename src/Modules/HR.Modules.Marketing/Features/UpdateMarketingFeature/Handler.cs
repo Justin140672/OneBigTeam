@@ -1,6 +1,8 @@
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
 using HR.Modules.Marketing.Persistence;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Marketing.Features.UpdateMarketingFeature;
@@ -15,6 +17,27 @@ internal sealed class UpdateMarketingFeatureHandler(
         UpdateMarketingFeatureRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, Guid.Empty, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, UpdateMarketingFeatureResponse>(
+                scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<UpdateMarketingFeatureResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var now = clock.UtcNowOffset();
         var slug = (request.Slug ?? string.Empty).Trim().ToLowerInvariant();
 
@@ -59,7 +82,30 @@ internal sealed class UpdateMarketingFeatureHandler(
             return Result.Failure<UpdateMarketingFeatureResponse>(update.Error);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var response = new UpdateMarketingFeatureResponse(
+            feature.Id,
+            feature.Slug,
+            feature.Title,
+            feature.IsPublished,
+            feature.DisplayOrder,
+            feature.DeliveryStatus.ToString(),
+            feature.UpdatedAt,
+            feature.UpdatedByUserId);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync(
+                dbContext.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+            {
+                return Result.Success(outcome.Response!);
+            }
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         await auditEventPublisher.PublishAsync(
             new MarketingFeatureUpdatedAuditEvent(
@@ -72,14 +118,6 @@ internal sealed class UpdateMarketingFeatureHandler(
                     feature.DeliveryStatus.ToString())),
             cancellationToken);
 
-        return Result.Success(new UpdateMarketingFeatureResponse(
-            feature.Id,
-            feature.Slug,
-            feature.Title,
-            feature.IsPublished,
-            feature.DisplayOrder,
-            feature.DeliveryStatus.ToString(),
-            feature.UpdatedAt,
-            feature.UpdatedByUserId));
+        return Result.Success(response);
     }
 }

@@ -27,13 +27,24 @@ internal sealed class Endpoint(
             return;
         }
 
-        var result = await handler.HandleAsync(request, completedByEmployeeId, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            completedByEmployeeId,
+            cancellationToken);
 
         if (result.IsFailure)
         {
             if (result.Error.Code == "not_found")
             {
                 await Send.ResultAsync(TypedResults.NotFound());
+                return;
+            }
+
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(new { error = result.Error.Message }));
                 return;
             }
 

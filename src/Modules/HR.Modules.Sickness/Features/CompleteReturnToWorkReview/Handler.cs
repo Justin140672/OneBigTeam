@@ -4,6 +4,8 @@ using HR.Modules.Sickness.Services;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Tasks.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Features.CompleteReturnToWorkReview;
@@ -29,6 +31,27 @@ internal sealed class CompleteReturnToWorkReviewHandler(
         Guid reviewedBy,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, CompleteReturnToWorkReviewResponse>(
+                scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<CompleteReturnToWorkReviewResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var review = await db.ReturnToWorkReviews
             .FirstOrDefaultAsync(
                 r => r.CompanyId == request.CompanyId && r.Id == request.ReviewId,
@@ -92,7 +115,30 @@ internal sealed class CompleteReturnToWorkReviewHandler(
                 }
             }
 
-            await db.SaveChangesAsync(cancellationToken);
+            var response = new CompleteReturnToWorkReviewResponse(
+                review.Id,
+                review.CompanyId,
+                review.SicknessRecordId,
+                review.EmployeeId,
+                review.Status.ToString(),
+                review.Outcome!.Value.ToString(),
+                review.AdjustmentsRequired,
+                review.AdjustmentDetails,
+                review.ReviewedBy!.Value,
+                review.CompletedAt!.Value);
+
+            if (request.IdempotencyKey is { } key)
+            {
+                var outcome = await db.SaveIdempotentAsync(
+                    db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+                if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                    return Result.Success(outcome.Response!);
+            }
+            else
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
 
             await auditPublisher.PublishAsync(new ReturnToWorkReviewCompletedAuditEvent(
                 review.Id,

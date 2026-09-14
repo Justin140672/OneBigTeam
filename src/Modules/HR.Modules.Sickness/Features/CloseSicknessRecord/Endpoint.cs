@@ -15,8 +15,14 @@ internal sealed class Endpoint(CloseSicknessRecordHandler handler, ICurrentUser 
 
     public override async Task HandleAsync(CloseSicknessRecordRequest request, CancellationToken cancellationToken)
     {
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
         var result = await handler.HandleAsync(
-            request with { ActorEmployeeId = currentUser.UserId },
+            request with
+            {
+                ActorEmployeeId = currentUser.UserId,
+                IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
+            },
             cancellationToken);
         if (result.IsFailure)
         {

@@ -73,6 +73,13 @@ public static class LeaveModule
             "toil-expiry",
             job => job.ExecuteAsync(),
             Cron.Daily(0));
+        // Ticket 3 (P1) follow-up items 5/6: dispatch audit-outbox entries and clean up expired
+        // idempotency records. Every 5 minutes is comfortably below the 7-day retention window while
+        // keeping audit delivery latency low after a transient failure.
+        jobManager.AddOrUpdate<IdempotencyMaintenanceJob>(
+            "leave-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 
@@ -149,6 +156,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         services.AddScoped<Services.ToilLedgerService>();
         services.AddScoped<ToilExpiryService>();
         services.AddScoped<ToilExpiryJob>();
+        services.AddScoped<IdempotencyMaintenanceJob>();
 
         // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
         services.AddScoped<IOnboardingTaskDefinition, ReviewDefaultLeavePolicyTask>();

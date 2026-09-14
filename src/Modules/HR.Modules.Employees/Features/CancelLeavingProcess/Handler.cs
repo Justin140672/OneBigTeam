@@ -3,6 +3,8 @@ using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Features.CancelLeavingProcess;
@@ -20,6 +22,26 @@ internal sealed class CancelLeavingProcessHandler(
         Guid actorEmployeeId,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, CancelLeavingProcessResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<CancelLeavingProcessResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var leavingProcess = await dbContext.EmployeeLeavingProcesses
             .SingleOrDefaultAsync(
                 p => p.CompanyId == request.CompanyId
@@ -55,7 +77,25 @@ internal sealed class CancelLeavingProcessHandler(
         leavingProcess.Cancel(request.CancellationReason, now);
         employee.Activate(now);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var response = new CancelLeavingProcessResponse(
+            leavingProcess.Id,
+            leavingProcess.CompanyId,
+            leavingProcess.EmployeeId,
+            leavingProcess.Status.ToString(),
+            offboardingAlreadyStarted);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync<IdempotencyRecord, CancelLeavingProcessResponse>(dbContext.IdempotencyRecords, 
+                scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         if (offboardingAlreadyStarted)
         {
@@ -83,11 +123,6 @@ internal sealed class CancelLeavingProcessHandler(
                 leavingProcess.CompanyId, leavingProcess.EmployeeId, now),
             cancellationToken);
 
-        return Result.Success(new CancelLeavingProcessResponse(
-            leavingProcess.Id,
-            leavingProcess.CompanyId,
-            leavingProcess.EmployeeId,
-            leavingProcess.Status.ToString(),
-            offboardingAlreadyStarted));
+        return Result.Success(response);
     }
 }

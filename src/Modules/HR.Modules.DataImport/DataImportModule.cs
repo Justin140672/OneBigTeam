@@ -1,5 +1,6 @@
 using HR.SharedKernel;
 using FluentValidation;
+using Hangfire;
 using HR.Modules.DataImport.Features.ConfirmImportSession;
 using HR.Modules.DataImport.Features.DownloadImportTemplate;
 using HR.Modules.DataImport.Features.ExportImportErrors;
@@ -9,8 +10,10 @@ using HR.Modules.DataImport.Features.GetImportSessionColumns;
 using HR.Modules.DataImport.Features.ListImportSessions;
 using HR.Modules.DataImport.Features.UploadImportFile;
 using HR.Modules.DataImport.Features.ValidateImportSession;
+using HR.Modules.DataImport.Jobs;
 using HR.Modules.DataImport.Persistence;
 using HR.Modules.DataImport.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -57,11 +60,24 @@ public static class DataImportModule
         services.AddScoped<DownloadImportTemplateHandler>();
         services.AddScoped<IValidator<DownloadImportTemplateRequest>, DownloadImportTemplateValidator>();
 
+        services.AddScoped<IdempotencyMaintenanceJob>();
+
         services.AddDbContext<DataImportDbContext>(options =>
             options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "data_import")));
 
         return services;
+    }
+
+    public static WebApplication UseDataImportRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
+        jobManager.AddOrUpdate<IdempotencyMaintenanceJob>(
+            "dataimport-idempotency-maintenance",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
+        return app;
     }
 
     public static async Task MigrateDataImportAsync(this IServiceProvider services)

@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -704,6 +706,82 @@ public class CreateEmployeeEndpointTests
                 employeeNumber: "EMP-777"));
         Assert.Equal(HttpStatusCode.Created, responseB.StatusCode);
     }
+
+    // -- Idempotency-Key (ticket 3, P1 follow-up) --------------------------------------------
+
+    private static HttpRequestMessage BuildIdempotentPostRequest(string url, object body, string idempotencyKey)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(body)
+        };
+        request.Headers.Add("Idempotency-Key", idempotencyKey);
+        return request;
+    }
+
+    [Fact]
+    public async Task Post_Employees_With_Same_IdempotencyKey_And_Same_Body_Returns_Same_Employee_And_Creates_Only_One_Row()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
+
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var body = EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+            companyId, refData, "Alice", "Smith", $"alice.smith.{Guid.NewGuid():N}@example.com");
+
+        var firstResponse = await client.SendAsync(BuildIdempotentPostRequest($"/api/companies/{companyId}/employees", body, idempotencyKey));
+        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+        var firstPayload = await firstResponse.Content.ReadFromJsonAsync<EmployeePayload>();
+
+        var secondResponse = await client.SendAsync(BuildIdempotentPostRequest($"/api/companies/{companyId}/employees", body, idempotencyKey));
+        Assert.Equal(HttpStatusCode.Created, secondResponse.StatusCode);
+        var secondPayload = await secondResponse.Content.ReadFromJsonAsync<EmployeePayload>();
+
+        Assert.NotNull(firstPayload);
+        Assert.NotNull(secondPayload);
+        Assert.Equal(firstPayload!.Id, secondPayload!.Id);
+        Assert.Equal(firstPayload.CompanyId, secondPayload.CompanyId);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Employees.Persistence.EmployeesDbContext>();
+        var employees = await db.Employees.Where(e => e.CompanyId == companyId).ToListAsync();
+        Assert.Single(employees);
+    }
+
+    [Fact]
+    public async Task Post_Employees_With_Same_IdempotencyKey_And_Different_Body_Returns_Conflict()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
+
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+        var idempotencyKey = Guid.NewGuid().ToString();
+        var body = EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+            companyId, refData, "Alice", "Smith", $"alice.smith.{Guid.NewGuid():N}@example.com");
+        var differentBody = EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+            companyId, refData, "Bob", "Jones", $"bob.jones.{Guid.NewGuid():N}@example.com");
+
+        var firstResponse = await client.SendAsync(BuildIdempotentPostRequest($"/api/companies/{companyId}/employees", body, idempotencyKey));
+        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+
+        var secondResponse = await client.SendAsync(BuildIdempotentPostRequest($"/api/companies/{companyId}/employees", differentBody, idempotencyKey));
+        Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Employees.Persistence.EmployeesDbContext>();
+        var employees = await db.Employees.Where(e => e.CompanyId == companyId).ToListAsync();
+        Assert.Single(employees);
+    }
+
+    // Regression: Post_Employees_Creates_Employee_With_Draft_Status above already exercises the
+    // no-Idempotency-Key path (no header sent) and confirms normal Created behaviour is unaffected.
 
     private sealed record DepartmentPayload(Guid Id);
     private sealed record PositionProfilePayload(Guid Id);

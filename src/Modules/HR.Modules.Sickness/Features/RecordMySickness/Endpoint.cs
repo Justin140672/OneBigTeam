@@ -30,8 +30,14 @@ internal sealed class Endpoint(RecordMySicknessHandler handler, ICurrentUser cur
             return;
         }
 
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
         var result = await handler.HandleAsync(
-            request with { ActorEmployeeId = authenticatedEmployeeId },
+            request with
+            {
+                ActorEmployeeId = authenticatedEmployeeId,
+                IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
+            },
             cancellationToken);
 
         if (result.IsFailure)

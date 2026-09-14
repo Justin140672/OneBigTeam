@@ -2,6 +2,8 @@ using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.AssignLeavePolicyToEmployee;
@@ -16,6 +18,26 @@ internal sealed class AssignLeavePolicyToEmployeeHandler(
         AssignLeavePolicyToEmployeeRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, AssignLeavePolicyToEmployeeResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<AssignLeavePolicyToEmployeeResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var policy = await dbContext.LeavePolicies
             .SingleOrDefaultAsync(
                 p => p.Id == request.LeavePolicyId && p.CompanyId == request.CompanyId,
@@ -100,7 +122,26 @@ internal sealed class AssignLeavePolicyToEmployeeHandler(
             }
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var response = new AssignLeavePolicyToEmployeeResponse(
+            assignment.Id,
+            assignment.CompanyId,
+            assignment.EmployeeId,
+            assignment.LeavePolicyId,
+            assignment.EffectiveFrom,
+            assignment.CreatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(new LeavePolicyAssignedAuditEvent(
             assignment.CompanyId,
@@ -111,12 +152,6 @@ internal sealed class AssignLeavePolicyToEmployeeHandler(
             request.ActorEmployeeId,
             now), cancellationToken);
 
-        return Result.Success(new AssignLeavePolicyToEmployeeResponse(
-            assignment.Id,
-            assignment.CompanyId,
-            assignment.EmployeeId,
-            assignment.LeavePolicyId,
-            assignment.EffectiveFrom,
-            assignment.CreatedAt));
+        return Result.Success(response);
     }
 }

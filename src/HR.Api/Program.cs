@@ -479,6 +479,11 @@ app.UseDocumentsRecurringJobs();
 app.UseLeaveRecurringJobs();
 app.UseReportingRecurringJobs();
 app.UseNotificationsRecurringJobs();
+app.UseTasksRecurringJobs();
+app.UseMarketingRecurringJobs();
+app.UseCompaniesRecurringJobs();
+app.UseCompanyOnboardingRecurringJobs();
+app.UseDataImportRecurringJobs();
 app.UseLoggingMiddleware();
 app.UseRouting();
 app.UseRateLimiter();
@@ -593,6 +598,10 @@ app.UseFastEndpoints(c =>
 {
 	c.Serializer.Options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 	c.Errors.StatusCode = 422;
+
+	// Ticket 3 (P1) follow-up item 4: validate the "Idempotency-Key" header, if present, before any
+	// endpoint's own handler runs.
+	c.Endpoints.Configurator = ep => ep.PreProcessors(Order.Before, new HR.SharedKernel.Idempotency.IdempotencyKeyHeaderValidator());
 });
 app.MapDefaultEndpoints();
 

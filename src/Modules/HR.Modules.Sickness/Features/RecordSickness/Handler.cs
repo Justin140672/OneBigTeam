@@ -3,8 +3,10 @@ using HR.Modules.Sickness.Persistence;
 using HR.Modules.Sickness.Services;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Contracts;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Features.RecordSickness;
@@ -25,6 +27,27 @@ internal sealed class RecordSicknessHandler(
         RecordSicknessRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, RecordSicknessResponse>(
+                scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<RecordSicknessResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var categoryExists = await db.SicknessCategories
             .AnyAsync(c => c.Id == request.CategoryId && c.CompanyId == request.CompanyId, cancellationToken);
 
@@ -80,7 +103,32 @@ internal sealed class RecordSicknessHandler(
             now);
 
         db.SicknessRecords.Add(entity);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new RecordSicknessResponse(
+            entity.Id,
+            entity.CompanyId,
+            entity.EmployeeId,
+            entity.CategoryId,
+            entity.Status,
+            entity.StartDate,
+            entity.StartDayPart,
+            entity.EvidenceStatus,
+            entity.Notes,
+            entity.CreatedAt,
+            entity.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         // One-time evaluation at creation time (SICK-01) — catches an absence that is already at or
         // over the fit-note threshold when recorded (e.g. a backdated ongoing absence, or a closed
@@ -119,17 +167,6 @@ internal sealed class RecordSicknessHandler(
             entity.TotalDays,
             now), cancellationToken);
 
-        return Result.Success(new RecordSicknessResponse(
-            entity.Id,
-            entity.CompanyId,
-            entity.EmployeeId,
-            entity.CategoryId,
-            entity.Status,
-            entity.StartDate,
-            entity.StartDayPart,
-            entity.EvidenceStatus,
-            entity.Notes,
-            entity.CreatedAt,
-            entity.UpdatedAt));
+        return Result.Success(response);
     }
 }

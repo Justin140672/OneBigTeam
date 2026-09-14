@@ -36,7 +36,12 @@ internal sealed class Endpoint(ArchiveSharedCompanyDocumentHandler handler, ICur
             return;
         }
 
-        var result = await handler.HandleAsync(request, archivedBy, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            archivedBy,
+            cancellationToken);
 
         if (result.IsFailure)
         {

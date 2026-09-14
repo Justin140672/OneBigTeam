@@ -27,7 +27,12 @@ internal sealed class Endpoint(ScheduleInterviewHandler handler, ICurrentUser cu
             return;
         }
 
-        var result = await handler.HandleAsync(request, scheduledBy, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            scheduledBy,
+            cancellationToken);
 
         if (result.IsFailure)
         {

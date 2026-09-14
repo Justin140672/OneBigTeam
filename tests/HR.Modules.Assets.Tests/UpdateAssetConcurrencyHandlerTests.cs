@@ -30,7 +30,7 @@ public class UpdateAssetConcurrencyHandlerTests
         var categoryId = categoryResult.Value!.Id;
 
         var assetResult = await new CreateAssetHandler(
-                seed, new FakeClock(FixedUtcNow), new FakeAuditPublisher(),
+                seed, new FakeClock(FixedUtcNow),
                 new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator())
             .HandleAsync(new CreateAssetRequest
             {

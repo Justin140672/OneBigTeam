@@ -3,6 +3,8 @@ using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.UpdateUserRoles;
@@ -21,6 +23,28 @@ internal sealed class UpdateUserRolesHandler(
         Guid? actorUserId,
         CancellationToken cancellationToken)
     {
+                var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, UpdateUserRolesResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<UpdateUserRolesResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         // IAM-01: the target user id must belong to the route company — otherwise a valid user id
         // from another company could have its roles read/changed cross-tenant.
         var isMember = await targetUserCompanyGuard.IsMemberAsync(request.CompanyId, request.UserId, cancellationToken);
@@ -123,9 +147,23 @@ internal sealed class UpdateUserRolesHandler(
         foreach (var roleId in toAdd)
             db.UserRoles.Add(UserRole.Create(request.UserId, roleId, now));
 
-        await db.SaveChangesAsync(cancellationToken);
+        var response = new UpdateUserRolesResponse(request.UserId, requestedRoleIds);
+        var hasChanges = toRemove.Count > 0 || toAdd.Count > 0;
 
-        if (toRemove.Count > 0 || toAdd.Count > 0)
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, UpdateUserRolesResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, new DateTimeOffset(now, TimeSpan.Zero), cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        if (hasChanges)
         {
             await auditEventPublisher.PublishAsync(
                 new UserRolesChangedAuditEvent(
@@ -139,7 +177,7 @@ internal sealed class UpdateUserRolesHandler(
                 cancellationToken);
         }
 
-        return Result.Success(new UpdateUserRolesResponse(request.UserId, requestedRoleIds));
+        return Result.Success(response);
     }
 
     private Task PublishRejectionAsync(

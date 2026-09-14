@@ -2,6 +2,8 @@ using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.RejectLeaveRequest;
@@ -12,6 +14,26 @@ internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, INotif
         RejectLeaveRequestRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, RejectLeaveRequestResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<RejectLeaveRequestResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var leaveRequest = await dbContext.LeaveRequests
             .SingleOrDefaultAsync(
                 r => r.Id == request.LeaveRequestId
@@ -46,7 +68,35 @@ internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, INotif
         }
 
         leaveRequest.Reject(request.ReviewedByEmployeeId, now, request.RejectionReason);
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var response = new RejectLeaveRequestResponse(
+            leaveRequest.Id,
+            leaveRequest.CompanyId,
+            leaveRequest.EmployeeId,
+            leaveRequest.LeaveTypeId,
+            leaveRequest.StartDate,
+            leaveRequest.StartPart,
+            leaveRequest.EndDate,
+            leaveRequest.EndPart,
+            leaveRequest.TotalDays,
+            leaveRequest.Status.ToString(),
+            leaveRequest.ReviewedByEmployeeId!.Value,
+            leaveRequest.ReviewedAt!.Value,
+            leaveRequest.RejectionReason,
+            leaveRequest.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         var body = request.RejectionReason is not null
             ? $"Your leave from {leaveRequest.StartDate:d MMM yyyy} to {leaveRequest.EndDate:d MMM yyyy} has been rejected. Reason: {request.RejectionReason}"
@@ -86,20 +136,6 @@ internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, INotif
             request.RejectionReason,
             now), cancellationToken);
 
-        return Result.Success(new RejectLeaveRequestResponse(
-            leaveRequest.Id,
-            leaveRequest.CompanyId,
-            leaveRequest.EmployeeId,
-            leaveRequest.LeaveTypeId,
-            leaveRequest.StartDate,
-            leaveRequest.StartPart,
-            leaveRequest.EndDate,
-            leaveRequest.EndPart,
-            leaveRequest.TotalDays,
-            leaveRequest.Status.ToString(),
-            leaveRequest.ReviewedByEmployeeId!.Value,
-            leaveRequest.ReviewedAt!.Value,
-            leaveRequest.RejectionReason,
-            leaveRequest.UpdatedAt));
+        return Result.Success(response);
     }
 }

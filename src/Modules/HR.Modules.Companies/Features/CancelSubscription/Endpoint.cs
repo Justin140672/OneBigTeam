@@ -14,7 +14,10 @@ internal sealed class Endpoint(
 
     public override async Task HandleAsync(CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            cancellationToken, string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey);
 
         if (result.IsFailure)
         {
@@ -29,6 +32,12 @@ internal sealed class Endpoint(
             if (result.Error.Code == "not_found")
             {
                 await Send.ResultAsync(TypedResults.NotFound(businessError));
+                return;
+            }
+
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(businessError));
                 return;
             }
 

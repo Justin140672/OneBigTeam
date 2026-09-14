@@ -15,8 +15,14 @@ internal sealed class Endpoint(DeactivateLeaveTypeHandler handler, ICurrentUser 
 
     public override async Task HandleAsync(DeactivateLeaveTypeRequest request, CancellationToken cancellationToken)
     {
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
         var result = await handler.HandleAsync(
-            request with { ActorEmployeeId = currentUser.UserId },
+            request with
+            {
+                ActorEmployeeId = currentUser.UserId,
+                IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
+            },
             cancellationToken);
         if (result.IsFailure)
         {
@@ -25,6 +31,10 @@ internal sealed class Endpoint(DeactivateLeaveTypeHandler handler, ICurrentUser 
                 await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
                 return;
             }
+            // NOTE: pre-existing business "conflict" errors (already inactive, system type, in use)
+            // deliberately stay mapped to 400 here to preserve existing API contract/tests. An
+            // idempotency-key reuse (also Error.Conflict) therefore also surfaces as 400 rather
+            // than 409 for this endpoint specifically.
             await Send.ResultAsync(TypedResults.BadRequest(new { error = result.Error.Message }));
             return;
         }

@@ -34,7 +34,12 @@ internal sealed class Endpoint(CancelPendingProfilePhotoHandler handler, ICurren
             return;
         }
 
-        var result = await handler.HandleAsync(request, employeeId, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            employeeId,
+            cancellationToken);
 
         if (result.IsFailure)
         {
@@ -43,6 +48,12 @@ internal sealed class Endpoint(CancelPendingProfilePhotoHandler handler, ICurren
             if (result.Error.Code == "not_found")
             {
                 await Send.ResultAsync(TypedResults.NotFound(error));
+                return;
+            }
+
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(error));
                 return;
             }
 

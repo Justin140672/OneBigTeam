@@ -4,7 +4,9 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Features.UpdatePlatformSettings;
@@ -19,6 +21,26 @@ internal sealed class UpdatePlatformSettingsHandler(
         UpdatePlatformSettingsRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, Guid.Empty, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, UpdatePlatformSettingsResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<UpdatePlatformSettingsResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var now = clock.UtcNowOffset();
 
         var settings = await dbContext.PlatformSettings
@@ -55,7 +77,30 @@ internal sealed class UpdatePlatformSettingsHandler(
             return Result.Failure<UpdatePlatformSettingsResponse>(updateResult.Error);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var featureFlags = JsonSerializer.Deserialize<Dictionary<string, bool>>(settings.FeatureFlagsJson) ?? [];
+
+        var response = new UpdatePlatformSettingsResponse(
+            settings.TrialLengthDays,
+            settings.DefaultMonthlyPriceGbp,
+            settings.SupportEmail,
+            settings.MaintenanceModeEnabled,
+            settings.MaintenanceModeMessage,
+            featureFlags,
+            settings.UpdatedAt,
+            settings.UpdatedByUserId);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync(
+                dbContext.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         await auditEventPublisher.PublishAsync(
             new PlatformSettingsUpdatedAuditEvent(
@@ -72,16 +117,6 @@ internal sealed class UpdatePlatformSettingsHandler(
                     settings.FeatureFlagsJson)),
             cancellationToken);
 
-        var featureFlags = JsonSerializer.Deserialize<Dictionary<string, bool>>(settings.FeatureFlagsJson) ?? [];
-
-        return Result.Success(new UpdatePlatformSettingsResponse(
-            settings.TrialLengthDays,
-            settings.DefaultMonthlyPriceGbp,
-            settings.SupportEmail,
-            settings.MaintenanceModeEnabled,
-            settings.MaintenanceModeMessage,
-            featureFlags,
-            settings.UpdatedAt,
-            settings.UpdatedByUserId));
+        return Result.Success(response);
     }
 }

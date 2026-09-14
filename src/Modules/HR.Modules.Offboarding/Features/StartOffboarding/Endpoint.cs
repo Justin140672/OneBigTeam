@@ -15,10 +15,16 @@ internal sealed class Endpoint(StartOffboardingHandler handler, ICurrentUser cur
 
     public override async Task HandleAsync(StartOffboardingRequest request, CancellationToken cancellationToken)
     {
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
         // OFF-08: resolved server-side from the authenticated user, never bound from the client
         // body — identifies the human HR actor who manually started this plan.
         var result = await handler.HandleAsync(
-            request with { ActorEmployeeId = currentUser.UserId ?? OffboardingSystemActor.Id },
+            request with
+            {
+                ActorEmployeeId = currentUser.UserId ?? OffboardingSystemActor.Id,
+                IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
+            },
             cancellationToken);
 
         if (result.IsFailure)

@@ -4,6 +4,8 @@ using HR.Modules.Leave.Services;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.SubmitLeaveRequestDraft;
@@ -31,6 +33,26 @@ internal sealed class SubmitLeaveRequestDraftHandler(
         SubmitLeaveRequestDraftRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, SubmitLeaveRequestDraftResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<SubmitLeaveRequestDraftResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var draft = await dbContext.LeaveRequests
             .SingleOrDefaultAsync(
                 r => r.Id == request.LeaveRequestId
@@ -179,7 +201,35 @@ internal sealed class SubmitLeaveRequestDraftHandler(
                 return Result.Failure<SubmitLeaveRequestDraftResponse>(effectResult.Error);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var response = new SubmitLeaveRequestDraftResponse(
+            draft.Id,
+            draft.CompanyId,
+            draft.EmployeeId,
+            draft.LeaveTypeId,
+            draft.LeavePolicyId,
+            draft.Status.ToString(),
+            draft.StartDate,
+            draft.StartPart,
+            draft.EndDate,
+            draft.EndPart,
+            draft.TotalDays,
+            draft.Reason,
+            draft.UpdatedAt,
+            conflicts,
+            excludedHolidays);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(new LeaveSubmittedAuditEvent(
             draft.CompanyId,
@@ -209,21 +259,6 @@ internal sealed class SubmitLeaveRequestDraftHandler(
             await approvalEffects.PublishApprovalOutcomeAsync(draft, request.EmployeeId, now, cancellationToken);
         }
 
-        return Result.Success(new SubmitLeaveRequestDraftResponse(
-            draft.Id,
-            draft.CompanyId,
-            draft.EmployeeId,
-            draft.LeaveTypeId,
-            draft.LeavePolicyId,
-            draft.Status.ToString(),
-            draft.StartDate,
-            draft.StartPart,
-            draft.EndDate,
-            draft.EndPart,
-            draft.TotalDays,
-            draft.Reason,
-            draft.UpdatedAt,
-            conflicts,
-            excludedHolidays));
+        return Result.Success(response);
     }
 }

@@ -16,7 +16,12 @@ internal sealed class Endpoint(
 
     public override async Task HandleAsync(SetPositionRoleDefaultsRequest request, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, currentUser.UserId, cancellationToken);
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+
+        var result = await handler.HandleAsync(
+            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            currentUser.UserId,
+            cancellationToken);
 
         if (result.IsFailure)
         {
@@ -29,6 +34,11 @@ internal sealed class Endpoint(
             if (result.Error.Code == "forbidden")
             {
                 await Send.ResultAsync(Results.Json(error, statusCode: StatusCodes.Status403Forbidden));
+                return;
+            }
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(error));
                 return;
             }
             await Send.ResultAsync(TypedResults.UnprocessableEntity(error));

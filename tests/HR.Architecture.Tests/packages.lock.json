@@ -828,6 +828,7 @@
           "FluentValidation": "[12.1.1, )",
           "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
+          "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -842,6 +843,7 @@
           "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
+          "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -920,6 +922,7 @@
           "FluentValidation": "[12.1.1, )",
           "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
+          "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -1046,6 +1049,7 @@
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
+          "Hangfire.Core": "[1.8.24, )",
           "Microsoft.EntityFrameworkCore": "[10.0.11, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -1072,8 +1076,10 @@
       "hr.sharedkernel": {
         "type": "Project",
         "dependencies": {
+          "FastEndpoints": "[8.2.0, )",
           "FluentValidation": "[12.1.1, )",
-          "Microsoft.EntityFrameworkCore": "[10.0.11, )"
+          "Microsoft.EntityFrameworkCore": "[10.0.11, )",
+          "Microsoft.EntityFrameworkCore.Relational": "[10.0.11, )"
         }
       },
       "ClosedXML": {

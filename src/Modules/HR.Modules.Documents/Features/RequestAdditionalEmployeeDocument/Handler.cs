@@ -3,6 +3,8 @@ using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.RequestAdditionalEmployeeDocument;
@@ -18,6 +20,37 @@ internal sealed class RequestAdditionalEmployeeDocumentHandler(
         Guid requestedBy,
         CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated request before creating a second
+        // document request for the same logical request.
+                var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+        
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(new RequestAdditionalEmployeeDocumentRequest
+            {
+                CompanyId = request.CompanyId,
+                EmployeeId = request.EmployeeId,
+                DocumentTypeId = request.DocumentTypeId,
+                DueDate = request.DueDate,
+                IsMandatory = request.IsMandatory,
+                Notes = request.Notes,
+            })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, RequestAdditionalEmployeeDocumentResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<RequestAdditionalEmployeeDocumentResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var documentType = await db.DocumentTypes
             .FirstOrDefaultAsync(
                 dt => dt.Id == request.DocumentTypeId
@@ -54,7 +87,31 @@ internal sealed class RequestAdditionalEmployeeDocumentHandler(
             now);
 
         db.DocumentRequests.Add(documentRequest);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new RequestAdditionalEmployeeDocumentResponse(
+            documentRequest.Id,
+            documentRequest.CompanyId,
+            documentRequest.EmployeeId,
+            documentRequest.DocumentTypeId,
+            documentType.Name,
+            documentRequest.DueDate,
+            documentRequest.IsMandatory,
+            documentRequest.Notes,
+            documentRequest.Status.ToString(),
+            documentRequest.CreatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync(db.IdempotencyRecords,
+            scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await taskCreator.CreateAsync(
             request.CompanyId,
@@ -79,16 +136,6 @@ internal sealed class RequestAdditionalEmployeeDocumentHandler(
             requestedBy,
             now), cancellationToken);
 
-        return Result.Success(new RequestAdditionalEmployeeDocumentResponse(
-            documentRequest.Id,
-            documentRequest.CompanyId,
-            documentRequest.EmployeeId,
-            documentRequest.DocumentTypeId,
-            documentType.Name,
-            documentRequest.DueDate,
-            documentRequest.IsMandatory,
-            documentRequest.Notes,
-            documentRequest.Status.ToString(),
-            documentRequest.CreatedAt));
+        return Result.Success(response);
     }
 }

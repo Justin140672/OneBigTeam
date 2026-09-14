@@ -76,7 +76,73 @@ public class AssetServiceTests
         Assert.Empty(result);
     }
 
+    // Ticket 3 (P1) final follow-up item 1: AssetService.CreateAssetAsync is stateless with
+    // respect to operation identity now - it sends exactly whatever key the caller supplies,
+    // and owns none itself. The "reuse on retry / rotate after a material change / discard on a
+    // definitive outcome" lifecycle lives in the caller (PendingIdempotentOperationTests covers
+    // that directly) and in EditPageBase (the real UI caller for asset creation).
+    [Fact]
+    public async Task CreateAssetAsync_Sends_Exactly_The_Callers_Supplied_Key()
+    {
+        var response = new CreateAssetResponse(
+            Guid.NewGuid(), Guid.NewGuid(), "A-001", Guid.NewGuid(), "Laptop", null, null, null, null, null,
+            "Available", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var capturing = new CapturingHandler(new JsonResponseHandler<CreateAssetResponse>(response));
+        var factory = BuildFactory(capturing);
+        var service = new AssetService(factory);
+        var companyId = Guid.NewGuid();
+        var request = new CreateAssetRequest(companyId, "A-001", Guid.NewGuid(), "Laptop", null, null, null, null, null);
+
+        var keyOne = Guid.NewGuid();
+        var keyTwo = Guid.NewGuid();
+        await service.CreateAssetAsync(companyId, request, keyOne);
+        await service.CreateAssetAsync(companyId, request, keyTwo);
+
+        Assert.Equal([keyOne.ToString(), keyTwo.ToString()], capturing.CapturedKeys);
+    }
+
+    [Fact]
+    public async Task CreateAssetAsync_Propagates_Network_Failure_Without_Swallowing_It()
+    {
+        // The caller (PendingIdempotentOperation's owner) relies on this to tell "ambiguous, keep
+        // the key" (an exception) apart from a definitive outcome (a returned tuple).
+        var capturing = new CapturingHandler(new ThrowingHandler());
+        var factory = BuildFactory(capturing);
+        var service = new AssetService(factory);
+        var companyId = Guid.NewGuid();
+        var request = new CreateAssetRequest(companyId, "A-001", Guid.NewGuid(), "Laptop", null, null, null, null, null);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => service.CreateAssetAsync(companyId, request, Guid.NewGuid()));
+    }
+
     // ── Fake handlers ────────────────────────────────────────────────────────────
+
+    private sealed class CapturingHandler(HttpMessageHandler inner) : HttpMessageHandler
+    {
+        public HttpMessageHandler Inner { get; set; } = inner;
+        public List<string> CapturedKeys { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Headers.TryGetValues("Idempotency-Key", out var values))
+                CapturedKeys.Add(values.Single());
+
+            var invoker = new HttpMessageInvoker(Inner);
+            return await invoker.SendAsync(request, cancellationToken);
+        }
+    }
+
+    private sealed class JsonResponseHandler<T>(T payload) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(payload) };
+            return Task.FromResult(response);
+        }
+    }
 
     private sealed class StaticResponseHandler(HttpStatusCode statusCode) : HttpMessageHandler
     {

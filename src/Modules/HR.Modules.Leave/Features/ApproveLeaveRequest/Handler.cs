@@ -3,6 +3,8 @@ using HR.Modules.Leave.Persistence;
 using HR.Modules.Leave.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.ApproveLeaveRequest;
@@ -13,6 +15,26 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, ICloc
         ApproveLeaveRequestRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, ApproveLeaveRequestResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<ApproveLeaveRequestResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var leaveRequest = await dbContext.LeaveRequests
             .SingleOrDefaultAsync(
                 r => r.Id == request.LeaveRequestId
@@ -44,11 +66,7 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, ICloc
         if (effectResult.IsFailure)
             return Result.Failure<ApproveLeaveRequestResponse>(effectResult.Error);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        await approvalEffects.PublishApprovalOutcomeAsync(leaveRequest, request.ReviewedByEmployeeId, now, cancellationToken);
-
-        return Result.Success(new ApproveLeaveRequestResponse(
+        var response = new ApproveLeaveRequestResponse(
             leaveRequest.Id,
             leaveRequest.CompanyId,
             leaveRequest.EmployeeId,
@@ -61,6 +79,23 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, ICloc
             leaveRequest.Status.ToString(),
             leaveRequest.ReviewedByEmployeeId!.Value,
             leaveRequest.ReviewedAt!.Value,
-            leaveRequest.UpdatedAt));
+            leaveRequest.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        await approvalEffects.PublishApprovalOutcomeAsync(leaveRequest, request.ReviewedByEmployeeId, now, cancellationToken);
+
+        return Result.Success(response);
     }
 }

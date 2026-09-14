@@ -4,6 +4,8 @@ using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.OfferCandidate;
@@ -21,6 +23,26 @@ internal sealed class OfferCandidateHandler(
         Guid performedBy,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, OfferCandidateResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<OfferCandidateResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var application = await db.Applications
             .SingleOrDefaultAsync(
                 a => a.Id == request.ApplicationId &&
@@ -121,25 +143,8 @@ internal sealed class OfferCandidateHandler(
         application.MoveToStage(offerStage.Id, now);
         application.RecordOfferTerms(offeredSalary, offeredFrequency, request.ProposedStartDate, offerDate, request.OfferNotes, now);
         recorder.AddHistoryEntry(application, previousStageId, performedBy, now);
-        await db.SaveChangesAsync(cancellationToken);
-        await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);
 
-        // Salary figures are deliberately excluded from the audit payload (05-database-standards /
-        // 09-coding-standards: salary must not appear in audit payloads) — the event records only
-        // that an offer was made, its dates and its response status.
-        await auditPublisher.PublishAsync(
-            new OfferDetailsRecordedAuditEvent(
-                application.CompanyId,
-                application.Id,
-                application.VacancyId,
-                application.CandidateId,
-                offerDate,
-                request.ProposedStartDate,
-                performedBy,
-                now),
-            cancellationToken);
-
-        return Result.Success(new OfferCandidateResponse(
+        var response = new OfferCandidateResponse(
             application.Id,
             application.VacancyId,
             application.CandidateId,
@@ -166,6 +171,38 @@ internal sealed class OfferCandidateHandler(
             application.OfferNotes,
             application.OfferResponseStatus?.ToString(),
             application.OfferMadeAt,
-            application.OfferRespondedAt));
+            application.OfferRespondedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, OfferCandidateResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);
+
+        // Salary figures are deliberately excluded from the audit payload (05-database-standards /
+        // 09-coding-standards: salary must not appear in audit payloads) — the event records only
+        // that an offer was made, its dates and its response status.
+        await auditPublisher.PublishAsync(
+            new OfferDetailsRecordedAuditEvent(
+                application.CompanyId,
+                application.Id,
+                application.VacancyId,
+                application.CandidateId,
+                offerDate,
+                request.ProposedStartDate,
+                performedBy,
+                now),
+            cancellationToken);
+
+        return Result.Success(response);
     }
 }

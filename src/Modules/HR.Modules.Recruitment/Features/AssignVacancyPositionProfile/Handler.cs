@@ -2,6 +2,8 @@ using HR.Modules.Recruitment.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.AssignVacancyPositionProfile;
@@ -21,6 +23,26 @@ internal sealed class AssignVacancyPositionProfileHandler(
         AssignVacancyPositionProfileRequest request,
         CancellationToken cancellationToken)
     {
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await db.TryReplayAsync<IdempotencyRecord, AssignVacancyPositionProfileResponse>(scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<AssignVacancyPositionProfileResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var vacancy = await db.Vacancies
             .SingleOrDefaultAsync(
                 v => v.Id == request.VacancyId && v.CompanyId == request.CompanyId,
@@ -63,19 +85,33 @@ internal sealed class AssignVacancyPositionProfileHandler(
         var now = clock.UtcNowOffset();
 
         vacancy.AssignPositionProfile(request.PositionProfileId, now);
-        await db.SaveChangesAsync(cancellationToken);
+
+        var response = new AssignVacancyPositionProfileResponse(
+            vacancy.Id,
+            vacancy.CompanyId,
+            vacancy.PositionProfileId,
+            vacancy.AdvertTitle,
+            vacancy.Status,
+            vacancy.UpdatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, AssignVacancyPositionProfileResponse>(
+                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+        else
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(
             new VacancyPositionProfileAssignedAuditEvent(
                 vacancy.CompanyId, vacancy.Id, previousPositionProfileId, request.PositionProfileId, "manual", now),
             cancellationToken);
 
-        return Result.Success(new AssignVacancyPositionProfileResponse(
-            vacancy.Id,
-            vacancy.CompanyId,
-            vacancy.PositionProfileId,
-            vacancy.AdvertTitle,
-            vacancy.Status,
-            vacancy.UpdatedAt));
+        return Result.Success(response);
     }
 }

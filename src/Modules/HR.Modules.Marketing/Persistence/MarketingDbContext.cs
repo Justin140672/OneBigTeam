@@ -1,4 +1,5 @@
 using HR.Modules.Marketing.Domain;
+using HR.SharedKernel.Idempotency;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -14,10 +15,12 @@ internal sealed class MarketingDbContext : DbContext
     public DbSet<MarketingProduct> MarketingProducts => Set<MarketingProduct>();
     public DbSet<MarketingFeature> MarketingFeatures => Set<MarketingFeature>();
     public DbSet<MarketingRoadmapItem> MarketingRoadmapItems => Set<MarketingRoadmapItem>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("marketing");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(MarketingDbContext).Assembly);
+        modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration<IdempotencyRecord>());
     }
 }

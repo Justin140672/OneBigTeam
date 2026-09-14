@@ -6,6 +6,8 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Contracts;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Offboarding.Features.StartOffboarding;
@@ -30,6 +32,38 @@ internal sealed class StartOffboardingHandler(
         StartOffboardingRequest request,
         CancellationToken cancellationToken)
     {
+        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated "start offboarding" request before
+        // doing any business work, so a repeated delivery can't attempt to create a second plan
+        // (surfacing as a confusing Conflict on retry) once the first attempt already succeeded.
+        // Note: unlike AdjustLeaveBalance, the idempotency record here is NOT saved in the same
+        // SaveChangesAsync call as the plan/task creation below — this handler already has its own
+        // unique-active-plan-index conflict detection (DbUpdateException catch further down), and
+        // combining the two would make SaveIdempotentAsync's generic "any 23505 means a concurrent
+        // duplicate of THIS key" handling misinterpret that unrelated constraint violation. Instead
+        // the record is saved on its own, in isolation, right before the handler returns success —
+        // this still lets a genuine retry (client resubmits after not receiving the first response)
+        // short-circuit here instead of hitting the active-plan conflict check below.
+        var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
+
+        var fingerprint = request.IdempotencyKey is not null
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            : null;
+
+        if (request.IdempotencyKey is { } precheckKey)
+        {
+            var replay = await dbContext.TryReplayAsync<IdempotencyRecord, StartOffboardingResponse>(
+                scope, precheckKey, fingerprint!, cancellationToken);
+
+            switch (replay?.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(replay.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<StartOffboardingResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+            }
+        }
+
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, [request.EmployeeId], cancellationToken);
         if (!names.TryGetValue(request.EmployeeId, out var employeeNameValue))
             return Result.Failure<StartOffboardingResponse>(Error.NotFound("Employee not found."));
@@ -191,7 +225,7 @@ internal sealed class StartOffboardingHandler(
             new OffboardingStartedIntegrationEvent(plan.CompanyId, plan.EmployeeId, now),
             cancellationToken);
 
-        return Result.Success(new StartOffboardingResponse(
+        var response = new StartOffboardingResponse(
             plan.Id,
             plan.CompanyId,
             plan.EmployeeId,
@@ -199,7 +233,22 @@ internal sealed class StartOffboardingHandler(
             plan.Status.ToString(),
             plan.Notes,
             generatedTaskIds,
-            plan.CreatedAt));
+            plan.CreatedAt);
+
+        if (request.IdempotencyKey is { } key)
+        {
+            // Isolated save — only the idempotency record is pending on this DbContext at this
+            // point, so a unique-violation here can only mean a genuine concurrent duplicate of
+            // this exact key (not a conflation with the earlier active-plan-index conflict).
+            var outcome = await dbContext.SaveIdempotentAsync(
+                dbContext.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status201Created, response, now,
+                cancellationToken);
+
+            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                return Result.Success(outcome.Response!);
+        }
+
+        return Result.Success(response);
     }
 
     private async Task CreateAssetReturnTasksAsync(
