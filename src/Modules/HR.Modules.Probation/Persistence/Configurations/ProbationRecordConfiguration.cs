@@ -72,6 +72,13 @@ internal sealed class ProbationRecordConfiguration : IEntityTypeConfiguration<Pr
             .HasColumnName("updated_at")
             .IsRequired();
 
+        // Ticket 16 (optimistic concurrency).
+        builder.Property(r => r.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.HasIndex(r => r.CompanyId);
         builder.HasIndex(r => new { r.CompanyId, r.EmployeeId });
         builder.HasIndex(r => new { r.CompanyId, r.Status });

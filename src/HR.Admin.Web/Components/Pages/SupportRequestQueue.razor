@@ -1,0 +1,88 @@
+@page "/customers/{CompanyId:guid}/support-requests"
+@inject SupportRequestAdminService SupportRequestAdminService
+@inject NavigationManager Navigation
+
+<PageTitle>Support requests — Admin Portal</PageTitle>
+
+<AdminBreadcrumb Trail="@(new (string, string?)[] { ("Customers", "/customers"), ("Customer details", $"/customers/{CompanyId}"), ("Support requests", null) })" />
+
+<h1>Support requests</h1>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_outcome == SupportRequestFetchOutcome.Unauthenticated)
+{
+    <div class="dashboard-error">You are not signed in. Please sign in again.</div>
+}
+else if (_outcome == SupportRequestFetchOutcome.NotAnEnabledPlatformAdministrator)
+{
+    <div class="dashboard-error">
+        You are not an enabled platform administrator, so you cannot view this customer's support
+        requests.
+    </div>
+}
+else if (_outcome == SupportRequestFetchOutcome.NotFound)
+{
+    <div class="dashboard-error">This customer could not be found.</div>
+}
+else if (_outcome == SupportRequestFetchOutcome.Failed)
+{
+    <div class="dashboard-error">A temporary error occurred while loading support requests. Please try again.</div>
+}
+else if (_requests is null || _requests.Count == 0)
+{
+    <p class="activity-empty">No support requests found for this company.</p>
+}
+else
+{
+    <SfGrid @ref="_grid"
+            DataSource="@_requests"
+            AllowPaging="true"
+            AllowSorting="true"
+            AllowFiltering="true"
+            class="hr-grid">
+        <GridEvents TValue="SupportRequestListItem" RowSelected="OnRowSelected" />
+        <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+        <GridPageSettings PageSize="20" />
+        <GridColumns>
+            <GridColumn Field="@nameof(SupportRequestListItem.ReferenceNumber)" HeaderText="Reference" Width="130" />
+            <GridColumn Field="@nameof(SupportRequestListItem.Title)" HeaderText="Title" Width="220" />
+            <GridColumn Field="@nameof(SupportRequestListItem.Type)" HeaderText="Type" Width="160" />
+            <GridColumn Field="@nameof(SupportRequestListItem.Priority)" HeaderText="Priority" Width="110" />
+            <GridColumn Field="@nameof(SupportRequestListItem.Status)" HeaderText="Status" Width="150" />
+            <GridColumn Field="@nameof(SupportRequestListItem.CreatedAt)" HeaderText="Created" Width="150" Format="dd MMM yyyy" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+            <GridColumn Field="@nameof(SupportRequestListItem.UpdatedAt)" HeaderText="Updated" Width="150" Format="dd MMM yyyy" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
+        </GridColumns>
+    </SfGrid>
+
+    <p>@_requests.Count support request(s)</p>
+}
+
+<a href="/customers/@CompanyId">Back to customer details</a>
+
+@code {
+    [Parameter]
+    public Guid CompanyId { get; set; }
+
+    private SfGrid<SupportRequestListItem>? _grid;
+    private List<SupportRequestListItem>? _requests;
+    private SupportRequestFetchOutcome _outcome = SupportRequestFetchOutcome.Success;
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        var result = await SupportRequestAdminService.ListSupportRequestsAsync(CompanyId);
+        _outcome = result.Outcome;
+        _requests = result.Items;
+        _loading = false;
+    }
+
+    private void OnRowSelected(Syncfusion.Blazor.Grids.RowSelectEventArgs<SupportRequestListItem> args)
+    {
+        if (args.Data is not null)
+            Navigation.NavigateTo($"/customers/{CompanyId}/support-requests/{args.Data.Id}");
+    }
+}

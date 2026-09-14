@@ -126,29 +126,13 @@ public sealed class SupportService(HrApiHttpClientFactory httpClientFactory, ILo
         }
     }
 
-    public async Task<(UpdateSupportRequestStatusResult? Result, string? Error)> UpdateStatusAsync(
-        Guid companyId, Guid id, string status, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await Http.PutAsJsonAsync(
-                $"api/companies/{companyId}/support/requests/{id}/status",
-                new { companyId, id, status }, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var updated = await response.Content.ReadFromJsonAsync<UpdateSupportRequestStatusResult>(
-                    HrApiJsonOptions.Default, cancellationToken);
-                return (updated, null);
-            }
-
-            return (null, await ReadErrorAsync(response, "Failed to update status.", cancellationToken));
-        }
-        catch (Exception ex)
-        {
-            return (null, ex.Message);
-        }
-    }
+    // Ticket 16: status-change write path removed. Per SupportRequestQueue.razor's own product
+    // copy ("Ticket status can only be changed by support staff in the Admin app"), status editing
+    // is exclusively an HR.Admin.Web capability — see SupportRequestAdminService in HR.Admin.Web.
+    // This method previously had no callers anywhere in HR.Web (confirmed via repo-wide grep
+    // before removal) and is deleted rather than kept as unused dead code. Read-side Version
+    // display (SupportRequestListItem/SupportRequestDetailModel.Version) is retained — HR.Web
+    // still needs to display the current version/"last changed" state even though it never writes it.
 
     public async Task<(AddSupportResponseResult? Result, string? Error)> AddResponseAsync(
         Guid companyId,

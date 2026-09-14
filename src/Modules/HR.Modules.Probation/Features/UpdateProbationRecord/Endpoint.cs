@@ -24,19 +24,11 @@ internal sealed class Endpoint(
 
         if (result.IsFailure)
         {
-            if (result.Error.Code == "not_found")
-            {
-                await Send.ResultAsync(TypedResults.NotFound());
-                return;
-            }
-
-            if (result.Error.Code == "conflict")
-            {
-                await Send.ResultAsync(TypedResults.Conflict(new { error = result.Error.Message }));
-                return;
-            }
-
-            await Send.ResultAsync(TypedResults.BadRequest(new { error = result.Error.Message }));
+            // Ticket 18: preserve the structured error code (concurrency vs. ordinary business
+            // conflict) via the shared ProblemResults translator so HR.Web can tell a stale
+            // ExpectedVersion apart from a terminal-status rejection instead of treating every
+            // HTTP 409 as a concurrency conflict.
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

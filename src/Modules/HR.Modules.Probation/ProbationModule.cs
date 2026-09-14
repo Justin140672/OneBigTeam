@@ -198,6 +198,52 @@ public static class ProbationModule
             activeReview2Id, acmeId, activeRecord2Id,
             ProbationReviewType.ManagerCheckIn, new DateOnly(2026, 5, 7), now));
 
+        // Third, independent active probation — Emma Jones under David Park, with a PENDING
+        // FinalDecision review (not ManagerCheckIn like Carlos/Sophie above). Ticket 18: this is
+        // what ProbationRecordAdministrativeEditTests' terminal-mid-edit E2E scenarios need —
+        // completing this FinalDecision review (Pass/Fail) via the Task view UI is the only way
+        // to independently transition an otherwise-editable record to a terminal status
+        // (Passed/Failed) while a separate edit session has it open, exactly like a real HR
+        // admin's "administrative correction" racing a manager's probation decision. Emma already
+        // has an unrelated *completed* probation record from the `entries` loop above (multiple
+        // records per employee is an established pattern here, same as Carlos Rivera) — this new
+        // record has a later StartDate so GetProbationRecordByEmployee's
+        // OrderByDescending(StartDate) picks it as the current one. Fixed IDs so E2E tests can
+        // navigate directly to both the record and its review/task.
+        var activeRecord3Id = Guid.Parse("40000000-0000-0000-0000-000000000012");
+        var activeReview3Id = Guid.Parse("50000000-0000-0000-0000-000000000102");
+        var empEmmaId       = Guid.Parse("30000000-0000-0000-0000-000000000009");
+        var empDavidId2     = Guid.Parse("30000000-0000-0000-0000-000000000008");
+
+        var activeRecord3 = ProbationRecord.Create(
+            activeRecord3Id, acmeId, empEmmaId, empDavidId2,
+            new DateOnly(2026, 4, 7), new DateOnly(2026, 7, 7), null, today, now);
+        db.ProbationRecords.Add(activeRecord3);
+
+        db.ProbationReviews.Add(ProbationReview.Create(
+            activeReview3Id, acmeId, activeRecord3Id,
+            ProbationReviewType.FinalDecision, new DateOnly(2026, 7, 7), now));
+
+        // Fourth, independent active probation — Marcus Diallo under Laura Bennett, also with a
+        // pending FinalDecision review. Ticket 18: kept entirely separate from Emma Jones' record
+        // above because ProbationRecordAdministrativeEditTests needs TWO independent mid-edit
+        // terminal-transition scenarios (reload-discovers-terminal vs. save-discovers-terminal)
+        // and each permanently terminalizes its own record — sharing one would make the second
+        // test depend on/interfere with the first (and break under xUnit's undefined test order).
+        var activeRecord4Id = Guid.Parse("40000000-0000-0000-0000-000000000014");
+        var activeReview4Id = Guid.Parse("50000000-0000-0000-0000-000000000104");
+        var empMarcusId     = Guid.Parse("30000000-0000-0000-0000-000000000006");
+        var empLauraId2     = Guid.Parse("30000000-0000-0000-0000-000000000005");
+
+        var activeRecord4 = ProbationRecord.Create(
+            activeRecord4Id, acmeId, empMarcusId, empLauraId2,
+            new DateOnly(2026, 4, 7), new DateOnly(2026, 7, 7), null, today, now);
+        db.ProbationRecords.Add(activeRecord4);
+
+        db.ProbationReviews.Add(ProbationReview.Create(
+            activeReview4Id, acmeId, activeRecord4Id,
+            ProbationReviewType.FinalDecision, new DateOnly(2026, 7, 7), now));
+
         await db.SaveChangesAsync();
     }
 }

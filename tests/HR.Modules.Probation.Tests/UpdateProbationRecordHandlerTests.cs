@@ -40,7 +40,8 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = newManagerId,
             ExpectedEndDate = new DateOnly(2026, 9, 1),
-            Notes = "Updated notes."
+            Notes = "Updated notes.",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -84,7 +85,8 @@ public class UpdateProbationRecordHandlerTests
             ManagerEmployeeId = newManagerId,
             ExpectedEndDate = newExpectedEndDate,
             Notes = "Corrected manager and date.",
-            ActorEmployeeId = actorEmployeeId
+            ActorEmployeeId = actorEmployeeId,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -130,7 +132,8 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = managerId,
             ExpectedEndDate = new DateOnly(2026, 9, 1),
-            Notes = null
+            Notes = null,
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -169,7 +172,8 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = newManagerId,
             ExpectedEndDate = new DateOnly(2026, 12, 15),
-            Notes = "Correcting details."
+            Notes = "Correcting details.",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -212,7 +216,8 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = Guid.NewGuid(),
             ExpectedEndDate = new DateOnly(2026, 12, 1),
-            Notes = "Attempted edit."
+            Notes = "Attempted edit.",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -254,7 +259,8 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = Guid.NewGuid(),
             ExpectedEndDate = new DateOnly(2026, 12, 1),
-            Notes = "Attempted edit."
+            Notes = "Attempted edit.",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -291,7 +297,8 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = Guid.NewGuid(),
             ExpectedEndDate = new DateOnly(2026, 12, 1),
-            Notes = "Attempted edit."
+            Notes = "Attempted edit.",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -332,7 +339,8 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = managerId,
             ExpectedEndDate = new DateOnly(2026, 9, 1),
-            Notes = "Still reviewing."
+            Notes = "Still reviewing.",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -357,7 +365,8 @@ public class UpdateProbationRecordHandlerTests
             CompanyId = Guid.NewGuid(),
             Id = Guid.NewGuid(),
             ManagerEmployeeId = Guid.NewGuid(),
-            ExpectedEndDate = new DateOnly(2026, 9, 1)
+            ExpectedEndDate = new DateOnly(2026, 9, 1),
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -393,7 +402,8 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = managerId,
             ExpectedEndDate = new DateOnly(2026, 9, 1),
-            Notes = "  Trimmed.  "
+            Notes = "  Trimmed.  ",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -433,7 +443,8 @@ public class UpdateProbationRecordHandlerTests
             CompanyId = companyId,
             Id = record.Id,
             ManagerEmployeeId = managerId,
-            ExpectedEndDate = new DateOnly(2026, 12, 1)
+            ExpectedEndDate = new DateOnly(2026, 12, 1),
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -482,7 +493,8 @@ public class UpdateProbationRecordHandlerTests
             Id = record.Id,
             ManagerEmployeeId = managerId,
             ExpectedEndDate = new DateOnly(2026, 9, 1), // unchanged
-            Notes = "No date change."
+            Notes = "No date change.",
+            ExpectedVersion = 1
         }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -494,8 +506,172 @@ public class UpdateProbationRecordHandlerTests
         Assert.Equal(ProbationReviewStatus.Pending, onlyReview.Status);
     }
 
-    private static ProbationDbContext BuildContext() =>
+    // Ticket 16 (optimistic concurrency) — see UpdateSupportRequestStatusHandlerTests for the
+    // sibling pattern this mirrors.
+
+    [Fact]
+    public async Task HandleAsync_With_Correct_ExpectedVersion_Increments_Version()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        Assert.Equal(1, record.Version);
+
+        var handler = new UpdateProbationRecordHandler(
+            context,
+            new FakeClock(FixedUtcNow),
+            new ProbationReviewRecalculationService(
+                context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
+            new FakeCompanyProbationSettingsReader(),
+            new FakeAuditPublisher());
+
+        var result = await handler.HandleAsync(new UpdateProbationRecordRequest
+        {
+            CompanyId = companyId,
+            Id = record.Id,
+            ManagerEmployeeId = managerId,
+            ExpectedEndDate = new DateOnly(2026, 9, 1),
+            Notes = "Version bump check.",
+            ExpectedVersion = 1
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value!.Version);
+
+        var persisted = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(2, persisted.Version);
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_Stale_ExpectedVersion_Returns_Concurrency_Failure_And_Does_Not_Save()
+    {
+        // Ticket 16: separate DbContext instances over the same named EF InMemory database, exactly
+        // like UpdateAssetCategoryConcurrencyHandlerTests — verifying persisted state through the
+        // SAME tracked context the handler mutated would read back the in-memory (mutated-but-
+        // rolled-back) entity rather than what was actually committed to the store.
+        var dbName = Guid.NewGuid().ToString("N");
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        Guid recordId;
+
+        await using (var seed = BuildContext(dbName))
+        {
+            var record = ProbationRecord.Create(
+                Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
+                new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
+            seed.ProbationRecords.Add(record);
+            await seed.SaveChangesAsync();
+            recordId = record.Id;
+        }
+
+        var publisher = new FakeAuditPublisher();
+        var taskCreator = new FakeTaskCreator();
+
+        await using (var context = BuildContext(dbName))
+        {
+            var handler = new UpdateProbationRecordHandler(
+                context,
+                new FakeClock(FixedUtcNow),
+                new ProbationReviewRecalculationService(
+                    context, taskCreator, new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                    new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
+                new FakeCompanyProbationSettingsReader(),
+                publisher);
+
+            var result = await handler.HandleAsync(new UpdateProbationRecordRequest
+            {
+                CompanyId = companyId,
+                Id = recordId,
+                ManagerEmployeeId = Guid.NewGuid(),
+                ExpectedEndDate = new DateOnly(2026, 12, 1), // also changes the date, to prove recalculation is skipped
+                Notes = "Stale attempt.",
+                ExpectedVersion = 99 // stale — the persisted record is at version 1
+            }, CancellationToken.None);
+
+            Assert.True(result.IsFailure);
+            Assert.Equal("concurrency", result.Error.Code);
+        }
+
+        // Side effects gated on save success must not have run.
+        Assert.Empty(publisher.Published);
+        Assert.Empty(taskCreator.Created);
+
+        await using var verify = BuildContext(dbName);
+        var persisted = await verify.ProbationRecords.SingleAsync();
+        Assert.Equal(1, persisted.Version);
+        Assert.Equal(managerId, persisted.ManagerEmployeeId);
+        Assert.Equal(new DateOnly(2026, 9, 1), persisted.ExpectedEndDate);
+        Assert.Empty(await verify.ProbationReviews.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_Null_ExpectedVersion_Returns_Concurrency_Failure_And_Does_Not_Save()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        Guid recordId;
+
+        await using (var seed = BuildContext(dbName))
+        {
+            var record = ProbationRecord.Create(
+                Guid.NewGuid(), companyId, Guid.NewGuid(), managerId,
+                new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, DateOnly.FromDateTime(now.UtcDateTime), now);
+            seed.ProbationRecords.Add(record);
+            await seed.SaveChangesAsync();
+            recordId = record.Id;
+        }
+
+        var publisher = new FakeAuditPublisher();
+
+        await using (var context = BuildContext(dbName))
+        {
+            var handler = new UpdateProbationRecordHandler(
+                context,
+                new FakeClock(FixedUtcNow),
+                new ProbationReviewRecalculationService(
+                    context, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeEmployeeNameReader(),
+                    new FakeHrAdministratorDirectory(), new FakeNotificationWriter()),
+                new FakeCompanyProbationSettingsReader(),
+                publisher);
+
+            // The FluentValidation layer normally rejects a null ExpectedVersion (422) before the
+            // handler is ever reached; this exercises the handler's own defence-in-depth guard.
+            var result = await handler.HandleAsync(new UpdateProbationRecordRequest
+            {
+                CompanyId = companyId,
+                Id = recordId,
+                ManagerEmployeeId = Guid.NewGuid(),
+                ExpectedEndDate = new DateOnly(2026, 12, 1),
+                Notes = "No version supplied.",
+                ExpectedVersion = null
+            }, CancellationToken.None);
+
+            Assert.True(result.IsFailure);
+            Assert.Equal("concurrency", result.Error.Code);
+        }
+
+        Assert.Empty(publisher.Published);
+
+        await using var verify = BuildContext(dbName);
+        var persisted = await verify.ProbationRecords.SingleAsync();
+        Assert.Equal(1, persisted.Version);
+        Assert.Equal(managerId, persisted.ManagerEmployeeId);
+    }
+
+    private static ProbationDbContext BuildContext(string? dbName = null) =>
         new(new DbContextOptionsBuilder<ProbationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .UseInMemoryDatabase(dbName ?? Guid.NewGuid().ToString("N"))
             .Options);
 }

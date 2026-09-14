@@ -36,7 +36,7 @@ public class EmployeeDepartureFinalisedHandlerTests
         var handler = new EmployeeDepartureFinalisedHandler(context);
 
         await handler.HandleAsync(
-            new EmployeeDepartureFinalisedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 9), occurredAt),
+            new EmployeeDepartureFinalisedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 9), occurredAt, AccessDisabled: true),
             CancellationToken.None);
 
         var saved = await context.EmployeeLeavePolicyAssignments.SingleAsync();
@@ -62,7 +62,7 @@ public class EmployeeDepartureFinalisedHandlerTests
         // with a later OccurredAt — the original DeactivatedAt must be preserved.
         var handler = new EmployeeDepartureFinalisedHandler(context);
         await handler.HandleAsync(
-            new EmployeeDepartureFinalisedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 9), Now.AddDays(5)),
+            new EmployeeDepartureFinalisedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 9), Now.AddDays(5), AccessDisabled: true),
             CancellationToken.None);
 
         var saved = await context.EmployeeLeavePolicyAssignments.SingleAsync();
@@ -81,7 +81,7 @@ public class EmployeeDepartureFinalisedHandlerTests
 
         // Should not throw and should leave the (empty) table untouched.
         await handler.HandleAsync(
-            new EmployeeDepartureFinalisedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 9), Now),
+            new EmployeeDepartureFinalisedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 9), Now, AccessDisabled: true),
             CancellationToken.None);
 
         Assert.Empty(context.EmployeeLeavePolicyAssignments);
@@ -108,7 +108,7 @@ public class EmployeeDepartureFinalisedHandlerTests
 
         var handler = new EmployeeDepartureFinalisedHandler(context);
         await handler.HandleAsync(
-            new EmployeeDepartureFinalisedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 9), Now),
+            new EmployeeDepartureFinalisedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 9), Now, AccessDisabled: true),
             CancellationToken.None);
 
         var saved = await context.EmployeeLeavePolicyAssignments.ToListAsync();

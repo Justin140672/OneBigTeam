@@ -1,5 +1,6 @@
 @using HR.Web.Models
 @inject ProbationService ProbationService
+@inject UserService UserService
 
 @if (_loading)
 {
@@ -18,40 +19,64 @@ else
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Probation Record</h5>
-                    <span class="badge @StatusBadgeClass(_record.Status)">@StatusLabel(_record.Status)</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge @StatusBadgeClass(_record.Status)">@StatusLabel(_record.Status)</span>
+                        @if (!_editing && _canEdit && IsEditable(_record.Status))
+                        {
+                            <SfButton CssClass="e-small e-outline" OnClick="@(() => { _editing = true; _terminalWhileEditingMessage = null; })" data-testid="edit-probation-record">Edit</SfButton>
+                        }
+                    </div>
                 </div>
                 <div class="card-body">
-                    <dl class="row mb-0 small">
-                        <dt class="col-sm-5 text-muted fw-normal">Start Date</dt>
-                        <dd class="col-sm-7">@_record.StartDate.ToString("d MMM yyyy")</dd>
+                    @if (!string.IsNullOrEmpty(_terminalWhileEditingMessage))
+                    {
+                        <div class="alert alert-warning mb-3" role="status" data-testid="probation-record-terminal-while-editing">@_terminalWhileEditingMessage</div>
+                    }
+                    @if (_editing)
+                    {
+                        <ProbationRecordEditPanel CompanyId="CompanyId"
+                                                   Record="_record"
+                                                   OnSaved="OnRecordSaved"
+                                                   OnCancel="@(() => _editing = false)"
+                                                   OnBecameTerminal="OnRecordBecameTerminal" />
+                    }
+                    else
+                    {
+                        <dl class="row mb-0 small">
+                            <dt class="col-sm-5 text-muted fw-normal">Manager</dt>
+                            <dd class="col-sm-7" data-testid="probation-manager">@_managerName</dd>
 
-                        <dt class="col-sm-5 text-muted fw-normal">Expected End</dt>
-                        <dd class="col-sm-7">@_record.ExpectedEndDate.ToString("d MMM yyyy")</dd>
+                            <dt class="col-sm-5 text-muted fw-normal">Start Date</dt>
+                            <dd class="col-sm-7">@_record.StartDate.ToString("d MMM yyyy")</dd>
 
-                        @if (_record.DecisionDate.HasValue)
-                        {
-                            <dt class="col-sm-5 text-muted fw-normal">Decision Date</dt>
-                            <dd class="col-sm-7">@_record.DecisionDate.Value.ToString("d MMM yyyy")</dd>
-                        }
+                            <dt class="col-sm-5 text-muted fw-normal">Expected End</dt>
+                            <dd class="col-sm-7" data-testid="probation-expected-end-date">@_record.ExpectedEndDate.ToString("d MMM yyyy")</dd>
 
-                        @if (!string.IsNullOrWhiteSpace(_record.OutcomeNotes))
-                        {
-                            <dt class="col-sm-5 text-muted fw-normal">Outcome Notes</dt>
-                            <dd class="col-sm-7">@_record.OutcomeNotes</dd>
-                        }
+                            @if (_record.DecisionDate.HasValue)
+                            {
+                                <dt class="col-sm-5 text-muted fw-normal">Decision Date</dt>
+                                <dd class="col-sm-7">@_record.DecisionDate.Value.ToString("d MMM yyyy")</dd>
+                            }
 
-                        @if (!string.IsNullOrWhiteSpace(_record.ExtensionReason))
-                        {
-                            <dt class="col-sm-5 text-muted fw-normal">Extension Reason</dt>
-                            <dd class="col-sm-7">@_record.ExtensionReason</dd>
-                        }
+                            @if (!string.IsNullOrWhiteSpace(_record.OutcomeNotes))
+                            {
+                                <dt class="col-sm-5 text-muted fw-normal">Outcome Notes</dt>
+                                <dd class="col-sm-7">@_record.OutcomeNotes</dd>
+                            }
 
-                        @if (!string.IsNullOrWhiteSpace(_record.Notes))
-                        {
-                            <dt class="col-sm-5 text-muted fw-normal">Notes</dt>
-                            <dd class="col-sm-7">@_record.Notes</dd>
-                        }
-                    </dl>
+                            @if (!string.IsNullOrWhiteSpace(_record.ExtensionReason))
+                            {
+                                <dt class="col-sm-5 text-muted fw-normal">Extension Reason</dt>
+                                <dd class="col-sm-7">@_record.ExtensionReason</dd>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(_record.Notes))
+                            {
+                                <dt class="col-sm-5 text-muted fw-normal">Notes</dt>
+                                <dd class="col-sm-7" data-testid="probation-notes">@_record.Notes</dd>
+                            }
+                        </dl>
+                    }
                 </div>
             </div>
         </div>
@@ -80,17 +105,59 @@ else
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
 
+    [Inject] private EmployeeService EmployeeService { get; set; } = default!;
+
     private bool _loading = true;
     private ProbationRecordModel? _record;
     private IReadOnlyList<ProbationReviewModel> _reviews = [];
+    private bool _canEdit;
+    private bool _editing;
+    private string _managerName = "—";
+    private string? _terminalWhileEditingMessage;
+
+    // PROB-05: an "administrative correction" edit is only permitted while the record hasn't
+    // already reached a terminal decision — mirrors UpdateProbationRecordHandler's own check.
+    private static bool IsEditable(string status) => status is not ("Passed" or "Failed" or "NotApplicable");
 
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
+        _editing = false;
+        _terminalWhileEditingMessage = null;
+        _canEdit = await UserService.HasPermissionAsync(SystemPermissions.ProbationManage);
         _record = await ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
         if (_record is not null)
+        {
             _reviews = await ProbationService.GetProbationReviewsAsync(CompanyId, _record.Id);
+            var manager = await EmployeeService.GetEmployeeAsync(CompanyId, _record.ManagerEmployeeId);
+            _managerName = manager is not null ? $"{manager.FirstName} {manager.LastName}" : "—";
+        }
         _loading = false;
+    }
+
+    // Fired both after a successful save and after a conflict "Reload latest values" — in both
+    // cases the panel itself stays open (per the ticket: after a successful save the user must be
+    // able to keep editing with the new version; after a reload they must see the winning record
+    // while remaining able to edit and save again), so this only refreshes the read-only summary
+    // data this tab owns (the record + manager name) without touching _editing.
+    private async Task OnRecordSaved(ProbationRecordModel updated)
+    {
+        _record = updated;
+        var manager = await EmployeeService.GetEmployeeAsync(CompanyId, updated.ManagerEmployeeId);
+        _managerName = manager is not null ? $"{manager.FirstName} {manager.LastName}" : "—";
+    }
+
+    // Ticket 18: a conflict "Reload latest values" discovered the record is now terminal
+    // (Passed/Failed/NotApplicable) — adopt the authoritative record, exit the editor (the Edit
+    // button is then hidden automatically via IsEditable), and show a clear explanation instead of
+    // the concurrency reload banner.
+    private async Task OnRecordBecameTerminal((ProbationRecordModel Latest, string Message) args)
+    {
+        _record = args.Latest;
+        _terminalWhileEditingMessage = args.Message;
+        _editing = false;
+        var manager = await EmployeeService.GetEmployeeAsync(CompanyId, args.Latest.ManagerEmployeeId);
+        _managerName = manager is not null ? $"{manager.FirstName} {manager.LastName}" : "—";
     }
 
     private static string StatusLabel(string status) => status switch

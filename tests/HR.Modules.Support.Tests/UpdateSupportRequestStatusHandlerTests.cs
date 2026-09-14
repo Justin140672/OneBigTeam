@@ -12,9 +12,11 @@ public class UpdateSupportRequestStatusHandlerTests
     private static readonly DateTime FixedUtcNow = new(2026, 6, 30, 10, 0, 0, DateTimeKind.Utc);
     private static readonly DateTimeOffset SeedNow = new(2026, 6, 1, 9, 0, 0, TimeSpan.Zero);
 
-    private static SupportDbContext BuildContext() =>
+    private static SupportDbContext BuildContext() => BuildContext(Guid.NewGuid().ToString("N"));
+
+    private static SupportDbContext BuildContext(string dbName) =>
         new(new DbContextOptionsBuilder<SupportDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .UseInMemoryDatabase(dbName)
             .Options);
 
     private static SupportRequest CreateRequest(Guid companyId, SupportRequestStatus initialStatus = SupportRequestStatus.Submitted)
@@ -50,7 +52,7 @@ public class UpdateSupportRequestStatusHandlerTests
 
         var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow), new FakeHrAdministratorDirectory(), new FakeNotificationWriter());
         var result = await handler.HandleAsync(
-            new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = to },
+            new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = to, ExpectedVersion = request.Version },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -72,7 +74,7 @@ public class UpdateSupportRequestStatusHandlerTests
 
         var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow), new FakeHrAdministratorDirectory(), new FakeNotificationWriter());
         var result = await handler.HandleAsync(
-            new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = SupportRequestStatus.Submitted },
+            new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = SupportRequestStatus.Submitted, ExpectedVersion = request.Version },
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -100,7 +102,7 @@ public class UpdateSupportRequestStatusHandlerTests
         var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow), hrAdminDirectory, notificationWriter);
 
         var result = await handler.HandleAsync(
-            new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = SupportRequestStatus.UnderReview },
+            new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = SupportRequestStatus.UnderReview, ExpectedVersion = request.Version },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -125,7 +127,7 @@ public class UpdateSupportRequestStatusHandlerTests
         var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow), hrAdminDirectory, notificationWriter);
 
         await handler.HandleAsync(
-            new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = SupportRequestStatus.Submitted },
+            new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = SupportRequestStatus.Submitted, ExpectedVersion = request.Version },
             CancellationToken.None);
 
         Assert.Empty(notificationWriter.WrittenNotifications);
@@ -160,5 +162,80 @@ public class UpdateSupportRequestStatusHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+    }
+
+    // Ticket 15 (optimistic concurrency): a stale ExpectedVersion must be rejected without mutating
+    // the entity or firing any notification side effect.
+    [Fact]
+    public async Task HandleAsync_Returns_Concurrency_Error_When_ExpectedVersion_Is_Stale()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        await using var db = BuildContext(dbName);
+        var companyId = Guid.NewGuid();
+        var request = CreateRequest(companyId, SupportRequestStatus.Submitted);
+        db.SupportRequests.Add(request);
+        await db.SaveChangesAsync();
+        var staleVersion = request.Version;
+
+        var hrAdminDirectory = new FakeHrAdministratorDirectory();
+        hrAdminDirectory.Seed(companyId, Guid.NewGuid());
+        var notificationWriter = new FakeNotificationWriter();
+
+        // Someone else legitimately advances the version first, using their own DbContext instance
+        // (as two separate requests would) so the "stale" second write below observes a real
+        // persisted mismatch rather than an in-memory tracked mutation on a shared context.
+        await using (var firstDb = BuildContext(dbName))
+        {
+            var firstHandler = new UpdateSupportRequestStatusHandler(firstDb, new FakeClock(FixedUtcNow), hrAdminDirectory, notificationWriter);
+            var firstResult = await firstHandler.HandleAsync(
+                new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = SupportRequestStatus.UnderReview, ExpectedVersion = staleVersion },
+                CancellationToken.None);
+            Assert.True(firstResult.IsSuccess);
+        }
+        notificationWriter.WrittenNotifications.Clear();
+
+        // A second caller, on its own DbContext, still believes the old (now stale) version is current.
+        await using (var secondDb = BuildContext(dbName))
+        {
+            var secondHandler = new UpdateSupportRequestStatusHandler(secondDb, new FakeClock(FixedUtcNow), hrAdminDirectory, notificationWriter);
+            var secondResult = await secondHandler.HandleAsync(
+                new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = SupportRequestStatus.Planned, ExpectedVersion = staleVersion },
+                CancellationToken.None);
+
+            Assert.True(secondResult.IsFailure);
+            Assert.Equal("concurrency", secondResult.Error.Code);
+        }
+
+        Assert.Empty(notificationWriter.WrittenNotifications);
+
+        await using var verifyDb = BuildContext(dbName);
+        var saved = await verifyDb.SupportRequests.SingleAsync(r => r.Id == request.Id);
+        Assert.Equal(SupportRequestStatus.UnderReview, saved.Status); // unchanged by the rejected write
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Concurrency_Error_When_ExpectedVersion_Is_Null()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        await using var db = BuildContext(dbName);
+        var companyId = Guid.NewGuid();
+        var request = CreateRequest(companyId, SupportRequestStatus.Submitted);
+        db.SupportRequests.Add(request);
+        await db.SaveChangesAsync();
+
+        var notificationWriter = new FakeNotificationWriter();
+        var handler = new UpdateSupportRequestStatusHandler(db, new FakeClock(FixedUtcNow), new FakeHrAdministratorDirectory(), notificationWriter);
+
+        var result = await handler.HandleAsync(
+            new UpdateSupportRequestStatusRequest { CompanyId = companyId, Id = request.Id, Status = SupportRequestStatus.UnderReview, ExpectedVersion = null },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("concurrency", result.Error.Code);
+        Assert.Empty(notificationWriter.WrittenNotifications);
+
+        await using var verifyDb = BuildContext(dbName);
+        var saved = await verifyDb.SupportRequests.SingleAsync(r => r.Id == request.Id);
+        Assert.Equal(SupportRequestStatus.Submitted, saved.Status); // unchanged
     }
 }

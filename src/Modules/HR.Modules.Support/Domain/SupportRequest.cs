@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Support.Domain;
 
-internal sealed class SupportRequest
+internal sealed class SupportRequest : IVersionedAggregate
 {
     private SupportRequest() { }
 
@@ -22,6 +24,11 @@ internal sealed class SupportRequest
     public string? CorrelationId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // Explicit, persisted optimistic-concurrency token (Ticket 2/15). See AssetCategory.Version.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public static SupportRequest Create(
         Guid id,
@@ -60,7 +67,8 @@ internal sealed class SupportRequest
             DiagnosticsJson = diagnosticsJson,
             CorrelationId = correlationId,
             CreatedAt = now,
-            UpdatedAt = now
+            UpdatedAt = now,
+            Version = 1
         };
     }
 

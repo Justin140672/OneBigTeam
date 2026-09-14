@@ -65,6 +65,7 @@ internal sealed class GetSupportRequestHandler(SupportDbContext db)
             entity.CorrelationId,
             entity.CreatedAt,
             entity.UpdatedAt,
+            entity.Version,
             attachments,
             responseDtos));
     }

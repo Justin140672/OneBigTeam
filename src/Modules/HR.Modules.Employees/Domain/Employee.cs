@@ -63,6 +63,15 @@ internal sealed class Employee : IVersionedAggregate
     public DateOnly? ContinuousServiceDate { get; private set; }
     public DateOnly? ProbationEndDate { get; private set; }
     public DateOnly? LeavingDate { get; private set; }
+    // P1 fix (departure access disablement): set once ReconcileFormerEmployeeAccessJob has
+    // published (or confirmed no need to publish) an EmployeeDepartureFinalisedIntegrationEvent
+    // for this employee's existing HasSystemAccess=false state — covers employees whose departure
+    // was finalised before Identity started consuming that event to actually disable the linked
+    // ApplicationUser. Persisted (not computed) so the reconciliation sweep never reprocesses an
+    // employee twice, regardless of whether Identity's own disablement ultimately succeeded —
+    // downstream retry/visibility of the Identity-side disablement itself is handled entirely by
+    // HR.Modules.Identity.Domain.AccountDisablement, not by this flag.
+    public DateTimeOffset? AccessDisablementReconciledAt { get; private set; }
     public NoticePeriodUnit? NoticePeriodUnitOverride { get; private set; }
     public int? NoticePeriodLengthOverride { get; private set; }
     public string? Notes { get; private set; }
@@ -205,6 +214,11 @@ internal sealed class Employee : IVersionedAggregate
     {
         Status = EmploymentStatus.FormerEmployee;
         UpdatedAt = now;
+    }
+
+    public void MarkAccessDisablementReconciled(DateTimeOffset now)
+    {
+        AccessDisablementReconciledAt = now;
     }
 
     public void UpdatePersonalDetails(

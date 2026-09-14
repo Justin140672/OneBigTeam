@@ -92,6 +92,12 @@ internal sealed class SupportRequestConfiguration : IEntityTypeConfiguration<Sup
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property(r => r.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.HasIndex(r => r.CompanyId);
         builder.HasIndex(r => r.Status);
         builder.HasIndex(r => r.CreatedAt);

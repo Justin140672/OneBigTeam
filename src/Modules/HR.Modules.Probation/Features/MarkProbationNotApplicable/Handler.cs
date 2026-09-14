@@ -48,6 +48,11 @@ internal sealed class MarkProbationNotApplicableHandler
             if (existing.Status is ProbationStatus.NotStarted or ProbationStatus.Active)
             {
                 existing.MarkNotApplicable(reason, now);
+
+                // Ticket 16 (optimistic concurrency) classification: a one-directional applicability
+                // decision, not an independently-loaded edit-form lifecycle — the shared
+                // VersionAdvancingSaveChangesInterceptor advances Version automatically here,
+                // sufficient to make a concurrently-loaded UpdateProbationRecord screen stale.
                 await _dbContext.SaveChangesAsync(cancellationToken);
 
                 await _auditPublisher.PublishAsync(new ProbationMarkedNotApplicableAuditEvent(

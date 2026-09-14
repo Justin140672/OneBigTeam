@@ -237,6 +237,41 @@ public static class TasksModule
             now,
             sourceEntityId: Guid.Parse("50000000-0000-0000-0000-000000000101")));
 
+        // Third, independent probation review task — links to the third active seeded review in
+        // ProbationModule seed (Emma Jones, a pending FinalDecision review, not ManagerCheckIn).
+        // Ticket 18: assigned to Laura Bennett (HrAdministrator) so the same persona used by
+        // ProbationRecordAdministrativeEditTests can, from a second browser tab, independently
+        // complete this FinalDecision review (Pass/Fail) — transitioning Emma's probation record
+        // to a terminal status — while that suite's first tab has the record open for an
+        // "administrative correction" edit. Kept separate from the Carlos/Sophie tasks above so
+        // completing it doesn't interfere with ProbationReviewTaskTests/ProbationReviewFlowTests.
+        db.TaskItems.Add(TaskItem.Create(
+            Guid.Parse("a0000000-0000-0000-0000-00000000002b"), companyId, empCtoId,
+            "Complete probation review — Emma Jones",
+            "Probation final decision due 7 July 2026.",
+            TaskPriority.High, TaskSource.Probation, TaskActionType.Review,
+            new DateOnly(2026, 7, 7),
+            assignedEmployeeId: empHrMgrId,
+            assignedUserId: empHrMgrId,
+            now,
+            sourceEntityId: Guid.Parse("50000000-0000-0000-0000-000000000102")));
+
+        // Fourth, independent probation review task — links to the fourth active seeded review
+        // (Marcus Diallo, also a pending FinalDecision review). See ProbationModule.cs's seed
+        // remarks: kept separate from the Emma Jones task above so
+        // ProbationRecordAdministrativeEditTests' two independent mid-edit terminal-transition
+        // scenarios don't share (and mutate) the same record. Also assigned to Laura Bennett.
+        db.TaskItems.Add(TaskItem.Create(
+            Guid.Parse("a0000000-0000-0000-0000-00000000002c"), companyId, empCtoId,
+            "Complete probation review — Marcus Diallo",
+            "Probation final decision due 7 July 2026.",
+            TaskPriority.High, TaskSource.Probation, TaskActionType.Review,
+            new DateOnly(2026, 7, 7),
+            assignedEmployeeId: empHrMgrId,
+            assignedUserId: empHrMgrId,
+            now,
+            sourceEntityId: Guid.Parse("50000000-0000-0000-0000-000000000104")));
+
         // Asset acknowledgement tasks — linked to seeded AssetAssignments in AssetsModule seed.
         db.TaskItems.Add(TaskItem.Create(
             Guid.Parse("a0000000-0000-0000-0000-000000000020"), companyId, empCtoId,

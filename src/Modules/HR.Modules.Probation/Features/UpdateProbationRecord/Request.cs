@@ -15,6 +15,9 @@ internal sealed record UpdateProbationRecordRequest
     public DateOnly ExpectedEndDate { get; init; }
     public string? Notes { get; init; }
 
+    // Ticket 16 (optimistic concurrency) — see UpdateSupportRequestStatusRequest.ExpectedVersion.
+    public int? ExpectedVersion { get; init; }
+
     // PROB-07: populated by the endpoint from the authenticated user's resolved identity — never
     // bound from the client body.
     internal Guid? ActorEmployeeId { get; init; }

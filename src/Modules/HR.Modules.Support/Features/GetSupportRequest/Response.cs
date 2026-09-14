@@ -16,6 +16,7 @@ internal sealed record GetSupportRequestResponse(
     string? CorrelationId,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
+    int Version,
     List<GetSupportRequestAttachmentDto> Attachments,
     List<GetSupportRequestResponseDto> Responses);
 

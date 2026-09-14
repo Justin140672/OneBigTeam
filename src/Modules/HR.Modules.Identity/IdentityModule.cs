@@ -189,9 +189,13 @@ public static class IdentityModule
         services.AddScoped<ResetPlatformAdministratorMfaHandler>();
         services.AddScoped<IValidator<ResetPlatformAdministratorMfaRequest>, ResetPlatformAdministratorMfaValidator>();
 
+        // P1 fix: departure-triggered account disablement is now driven exclusively by
+        // EmployeeDepartureFinalisedIntegrationEvent (the authoritative departure decision), not by
+        // OffboardingPlanCompletedIntegrationEvent — see Features/OnEmployeeDepartureFinalised.
         services.AddScoped<
-            IIntegrationEventHandler<OffboardingPlanCompletedIntegrationEvent>,
-            Features.OnOffboardingPlanCompleted.Handler>();
+            IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>,
+            Features.OnEmployeeDepartureFinalised.Handler>();
+        services.AddScoped<Jobs.AccountDisablementJob>();
 
         // IAM-03: position-based default role administration.
         services.AddScoped<HR.Modules.Identity.Services.PositionSync>();

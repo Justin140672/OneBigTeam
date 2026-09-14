@@ -76,6 +76,11 @@ public sealed class CustomerDetailsPage(IPage page, string baseUrl)
 
     public ILocator BackToCustomersLink => page.GetByRole(AriaRole.Link, new() { Name = "Back to customers" });
 
+    // Ticket 16 — links from the read-only details page into the (also read-mostly, save-for-its
+    // status editor) support request queue for this company.
+    public ILocator OpenSupportRequestsLink =>
+        page.GetByRole(AriaRole.Link, new() { Name = "Open support requests" });
+
     public Task ClickBackToCustomersAsync() => BackToCustomersLink.ClickAsync();
 
     // Subscription management panel — "Schedule deletion" action. Uses its own

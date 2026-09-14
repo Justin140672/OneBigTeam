@@ -23,6 +23,7 @@ internal sealed class IdentityDbContext : DbContext
     public DbSet<UserInvite> UserInvites => Set<UserInvite>();
     public DbSet<PlatformAdministrator> PlatformAdministrators => Set<PlatformAdministrator>();
     public DbSet<SessionRevocation> SessionRevocations => Set<SessionRevocation>();
+    public DbSet<AccountDisablement> AccountDisablements => Set<AccountDisablement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

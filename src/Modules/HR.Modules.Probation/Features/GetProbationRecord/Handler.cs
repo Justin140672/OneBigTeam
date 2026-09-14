@@ -34,6 +34,7 @@ internal sealed class GetProbationRecordHandler
             record.ExtensionReason,
             record.DecisionDate,
             record.DecisionMakerEmployeeId,
-            record.OutcomeNotes));
+            record.OutcomeNotes,
+            record.Version));
     }
 }

@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Probation.Domain;
 
-internal sealed class ProbationRecord
+internal sealed class ProbationRecord : IVersionedAggregate
 {
     /// <summary>
     /// PROB-05: explicit allowed-transition table for <see cref="ProbationStatus"/>. Passed and
@@ -63,6 +65,18 @@ internal sealed class ProbationRecord
     public string? NotApplicableReason { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // Ticket 16 (optimistic concurrency): explicit, persisted concurrency token. Mapped as an EF
+    // concurrency token in ProbationRecordConfiguration. Every other mutation path in this module
+    // (CompleteProbationReview, MarkProbationNotApplicable, ReassignReviewsOnManagerChanged,
+    // GenerateDueProbationReviewsJob) still calls plain SaveChangesAsync rather than the guarded
+    // helper — those writers rely on the shared VersionAdvancingSaveChangesInterceptor (wired via
+    // ProbationDbContext's UseVersionedAggregates() call) to advance Version automatically, which
+    // satisfies the "must at least advance the version" requirement for internal/system-triggered
+    // transitions without requiring a client-supplied ExpectedVersion.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     /// <summary>
     /// PROB-06: <paramref name="today"/> decides the initial status — NotStarted when the

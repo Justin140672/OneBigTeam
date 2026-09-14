@@ -1,3 +1,4 @@
+using HR.Web.E2E.Tests.Infrastructure;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -337,6 +338,26 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     public async Task EnterReviewNotesAsync(string notes)
     {
         await Dialog.GetByPlaceholder("Enter your review notes…").FillAsync(notes);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    /// <summary>
+    /// Selects the Outcome dropdown (Pass/Fail/Extend probation) shown only for a FinalDecision
+    /// review — see ProbationReviewPanel.razor. Must be called before <see cref="CompleteReviewAsync"/>
+    /// for a FinalDecision review, since Outcome is required and the panel has no default value.
+    /// Uses the shared DropDownSelector — see its own remarks for why every Syncfusion combobox in
+    /// this suite goes through it rather than a hand-rolled click.
+    /// </summary>
+    public async Task SelectReviewOutcomeAsync(string outcome) =>
+        await DropDownSelector.SelectAsync(page, Dialog.Locator("[data-testid='probation-review-panel']"), outcome);
+
+    /// <summary>
+    /// Fills the "Reason for failure" textarea shown only when Outcome is "Fail" (required by
+    /// ProbationReviewPanel's validation).
+    /// </summary>
+    public async Task EnterFailureReasonAsync(string reason)
+    {
+        await Dialog.GetByPlaceholder("Enter the reason for failing probation…").FillAsync(reason);
         await page.Keyboard.PressAsync("Tab");
     }
 

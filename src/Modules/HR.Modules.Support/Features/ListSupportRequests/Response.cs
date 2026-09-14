@@ -9,4 +9,5 @@ internal sealed record ListSupportRequestsResponse(
     string Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
+    int Version,
     string? LatestResponseSnippet);

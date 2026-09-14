@@ -49,6 +49,7 @@ internal sealed class ListSupportRequestsHandler(SupportDbContext db)
                     r.Status.ToString(),
                     r.CreatedAt,
                     r.UpdatedAt,
+                    r.Version,
                     snippet);
             })
             .ToList();

@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Support.Features.UpdateSupportRequestStatus;
@@ -21,8 +22,7 @@ internal sealed class Endpoint(UpdateSupportRequestStatusHandler handler)
 
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code == "not_found" ? StatusCodes.Status404NotFound : StatusCodes.Status409Conflict;
-            await Send.ResultAsync(Results.Json(new { error = result.Error.Message }, statusCode: statusCode));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

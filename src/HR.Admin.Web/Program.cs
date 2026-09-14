@@ -64,6 +64,7 @@ builder.Services.AddScoped<CustomerDashboardService>();
 builder.Services.AddScoped<CustomerDetailsService>();
 builder.Services.AddScoped<CustomerListService>();
 builder.Services.AddScoped<CustomerSupportViewService>();
+builder.Services.AddScoped<SupportRequestAdminService>();
 builder.Services.AddScoped<FailedPaymentsService>();
 builder.Services.AddScoped<BackgroundJobsService>();
 builder.Services.AddScoped<SystemHealthService>();

@@ -89,7 +89,8 @@ internal sealed class EmployeeDepartureFinalizer(
                 employee.CompanyId,
                 employee.Id,
                 process.LeavingDate,
-                now),
+                now,
+                accessDisabled),
             cancellationToken);
 
         await timelineWriter.TryAddAsync(

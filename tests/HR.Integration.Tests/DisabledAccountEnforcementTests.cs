@@ -111,8 +111,15 @@ public class DisabledAccountEnforcementTests
         Assert.Equal(HttpStatusCode.OK, afterReEnable.StatusCode);
     }
 
+    // P1 fix: offboarding-plan completion must NOT disable an account by itself — departure
+    // finalisation (see HR.Modules.Employees.Services.EmployeeDepartureFinalizer /
+    // HR.Modules.Identity.Features.OnEmployeeDepartureFinalised) is now the sole trigger for that.
+    // OffboardingPlanCompletedIntegrationEvent currently has zero consumers — this proves publishing
+    // it is a genuine no-op and does not touch ApplicationUser.IsActive.
+    // See DepartureFinalisationDisablesAccountIntegrationTests for the replacement end-to-end
+    // coverage of the actual (departure-finalisation-driven) disablement path.
     [Fact]
-    public async Task Auto_Offboarding_Completion_Disables_Account_And_Gates_Subsequent_Requests()
+    public async Task Offboarding_Plan_Completion_Alone_Does_Not_Disable_Account_Or_Gate_Subsequent_Requests()
     {
         var companyId = Guid.NewGuid();
         var (userId, email) = await SeedAdminCallerAsync(companyId);
@@ -123,22 +130,20 @@ public class DisabledAccountEnforcementTests
 
         using (var scope = _factory.Services.CreateScope())
         {
-            var handler = scope.ServiceProvider
-                .GetRequiredService<IIntegrationEventHandler<OffboardingPlanCompletedIntegrationEvent>>();
-            await handler.HandleAsync(
+            var publisher = scope.ServiceProvider.GetRequiredService<IIntegrationEventPublisher>();
+            await publisher.PublishAsync(
                 new OffboardingPlanCompletedIntegrationEvent(companyId, userId, Guid.NewGuid(), DateTimeOffset.UtcNow),
                 CancellationToken.None);
         }
 
-        // The auto path flipped the same IsActive flag the middleware checks.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-            Assert.False(await db.Users.Where(u => u.Id == userId).Select(u => u.IsActive).FirstAsync());
+            Assert.True(await db.Users.Where(u => u.Id == userId).Select(u => u.IsActive).FirstAsync());
         }
 
         var afterOffboarding = await client.GetAsync($"/api/companies/{companyId}/users");
-        await AssertAccountDisabledAsync(afterOffboarding);
+        Assert.Equal(HttpStatusCode.OK, afterOffboarding.StatusCode);
     }
 
     [Fact]

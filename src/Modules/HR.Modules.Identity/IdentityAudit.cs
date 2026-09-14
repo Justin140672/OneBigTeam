@@ -142,28 +142,56 @@ internal sealed record UserDisabledAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// Published when a user account is automatically disabled because the linked employee's
-// offboarding plan completed (Features/OnOffboardingPlanCompleted). Tagged distinctly from the
-// manual UserDisabledAuditEvent above so audit history can tell the two apart.
-internal sealed record UserAutoDisabledOnOffboardingAuditEvent(
+// P1 fix: published only once an employee's departure-triggered ApplicationUser disablement has
+// actually succeeded (Features/OnEmployeeDepartureFinalised + Jobs/AccountDisablementJob) — never
+// published optimistically at request/enqueue time. Replaces the former
+// UserAutoDisabledOnOffboardingAuditEvent, which incorrectly tied disablement to offboarding-plan
+// completion rather than the authoritative departure-finalisation decision (Employees'
+// HasSystemAccess + the company's auto-disable-on-leaving-date setting).
+internal sealed record UserAutoDisabledOnDepartureAuditEvent(
     Guid CompanyId,
     Guid UserId,
     Guid EmployeeId,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
-    string IAuditEvent.EventType       => "user.auto-disabled-offboarding";
+    string IAuditEvent.EventType       => "user.auto-disabled-departure";
     string IAuditEvent.EntityType      => "ApplicationUser";
     Guid   IAuditEvent.EntityId        => UserId;
     Guid?  IAuditEvent.EmployeeId      => EmployeeId;
     Guid?  IAuditEvent.ActorUserId     => null;
     Guid?  IAuditEvent.ActorEmployeeId => null;
-    // AUD-04: triggered by an integration event from Offboarding — no human actor.
+    // AUD-04: triggered by an integration event from Employees (departure finalisation) — no human actor.
     AuditActorType IAuditEvent.ActorType => AuditActorType.IntegrationHandler;
     Guid?  IAuditEvent.CorrelationId   => null;
-    string? IAuditEvent.Summary        => "User account automatically disabled — offboarding plan completed";
+    string? IAuditEvent.Summary        => "User account automatically disabled — employee departure finalised";
     object? IAuditEvent.Before         => new { IsActive = true };
     object? IAuditEvent.After          => new { IsActive = false };
     object? IAuditEvent.Metadata       => null;
+}
+
+// P1 fix: published when a departure-triggered ApplicationUser disablement permanently fails
+// after exhausting retries (Jobs/AccountDisablementJob) — makes the failure visible in the audit
+// trail (in addition to the persisted, queryable AccountDisablement.Status = Failed row and the
+// structured error logs), rather than leaving a former employee's account silently still active.
+internal sealed record UserAccountDisablementFailedAuditEvent(
+    Guid CompanyId,
+    Guid UserId,
+    Guid EmployeeId,
+    string Reason,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "user.auto-disable-departure-failed";
+    string IAuditEvent.EntityType      => "ApplicationUser";
+    Guid   IAuditEvent.EntityId        => UserId;
+    Guid?  IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId     => null;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    AuditActorType IAuditEvent.ActorType => AuditActorType.IntegrationHandler;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => $"Failed to automatically disable user account after employee departure: {Reason}";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => null;
+    object? IAuditEvent.Metadata       => new { Reason };
 }
 
 // Published when a user account is re-enabled by an administrator (Features/EnableUser).

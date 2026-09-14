@@ -28,12 +28,24 @@ internal sealed class UpdateSupportRequestStatusHandler(
         var previousStatus = entity.Status;
         var now = clock.UtcNowOffset();
         entity.ChangeStatus(request.Status, now);
-        await db.SaveChangesAsync(cancellationToken);
+
+        // Ticket 15: optimistic concurrency (base-code helper).
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            entity,
+            request.ExpectedVersion,
+            "This support request was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateSupportRequestStatusResponse>(saveResult.Error);
 
         // Notify every HR Administrator for this company whenever a ticket's status actually
         // changes — mirrors how other modules (Tasks, Offboarding, Sickness, ...) fan out an
         // in-app notification via the same shared INotificationWriter. Best-effort: a notification
         // failure must never fail the status change itself, which has already been saved.
+        //
+        // Ticket 15: notifications must only be touched AFTER the guarded save above succeeds — a
+        // stale/rejected save (409) must never create or remove a notification.
         //
         // The notifications table enforces (employee_id, source_entity_id, type) uniqueness — see
         // NotificationConfiguration.cs — because most notification types fire at most once per
@@ -67,6 +79,6 @@ internal sealed class UpdateSupportRequestStatusHandler(
             }
         }
 
-        return Result.Success(new UpdateSupportRequestStatusResponse(entity.Id, entity.Status.ToString(), entity.UpdatedAt));
+        return Result.Success(new UpdateSupportRequestStatusResponse(entity.Id, entity.Status.ToString(), entity.UpdatedAt, entity.Version));
     }
 }

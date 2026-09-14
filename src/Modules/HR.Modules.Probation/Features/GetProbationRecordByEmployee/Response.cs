@@ -14,4 +14,5 @@ internal sealed record GetProbationRecordByEmployeeResponse(
     Guid? DecisionMakerEmployeeId,
     string? OutcomeNotes,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Version);

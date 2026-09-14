@@ -122,4 +122,63 @@ public sealed class SessionRevocationStoreTests
 
         Assert.Equal(laterInstant, result);
     }
+
+    [Fact]
+    public async Task Concurrent_RevokeAsync_Calls_For_The_Same_User_Converge_On_The_Greatest_Timestamp()
+    {
+        // Two separate connections racing to upsert the same user's revocation row concurrently.
+        // Whichever statement physically commits last in Postgres must not matter: the atomic
+        // GREATEST(...) upsert guarantees the final stored value is the later of the two instants,
+        // regardless of code-level call order or which task happens to be awaited/scheduled first.
+        var userId = Guid.NewGuid();
+        var earlierInstant = new DateTimeOffset(2026, 9, 11, 12, 0, 0, TimeSpan.Zero);
+        var laterInstant = earlierInstant.AddMinutes(5);
+
+        await using var contextA = _fixture.BuildContext();
+        await using var contextB = _fixture.BuildContext();
+        var storeA = new SessionRevocationStore(contextA);
+        var storeB = new SessionRevocationStore(contextB);
+
+        // Note: storeA is issued the LATER timestamp and storeB the EARLIER one, so a naive
+        // "last write wins" implementation without GREATEST could go either way depending on
+        // physical commit order — the assertion below only holds because of the DB-level max.
+        await Task.WhenAll(
+            storeA.RevokeAsync(userId, laterInstant, CancellationToken.None),
+            storeB.RevokeAsync(userId, earlierInstant, CancellationToken.None));
+
+        await using var readContext = _fixture.BuildContext();
+        var result = await new SessionRevocationStore(readContext)
+            .GetRevokedAtAsync(userId, CancellationToken.None);
+
+        Assert.Equal(laterInstant, result);
+    }
+
+    [Fact]
+    public async Task Concurrent_RevokeAsync_Calls_For_A_Previously_Unseen_User_Do_Not_Throw_On_Insert_Conflict()
+    {
+        // Two separate connections racing to INSERT the first-ever revocation row for the same
+        // user concurrently. Without ON CONFLICT DO UPDATE this would race to a unique-constraint
+        // violation; the atomic upsert must let both complete cleanly and converge on the greater
+        // timestamp.
+        var userId = Guid.NewGuid();
+        var earlierInstant = new DateTimeOffset(2026, 9, 11, 12, 0, 0, TimeSpan.Zero);
+        var laterInstant = earlierInstant.AddMinutes(5);
+
+        await using var contextA = _fixture.BuildContext();
+        await using var contextB = _fixture.BuildContext();
+        var storeA = new SessionRevocationStore(contextA);
+        var storeB = new SessionRevocationStore(contextB);
+
+        var exception = await Record.ExceptionAsync(() => Task.WhenAll(
+            storeA.RevokeAsync(userId, earlierInstant, CancellationToken.None),
+            storeB.RevokeAsync(userId, laterInstant, CancellationToken.None)));
+
+        Assert.Null(exception);
+
+        await using var readContext = _fixture.BuildContext();
+        var result = await new SessionRevocationStore(readContext)
+            .GetRevokedAtAsync(userId, CancellationToken.None);
+
+        Assert.Equal(laterInstant, result);
+    }
 }

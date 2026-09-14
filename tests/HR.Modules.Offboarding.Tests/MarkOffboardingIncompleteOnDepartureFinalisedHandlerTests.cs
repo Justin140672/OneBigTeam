@@ -56,7 +56,7 @@ public class MarkOffboardingIncompleteOnDepartureFinalisedHandlerTests
     }
 
     private static EmployeeDepartureFinalisedIntegrationEvent BuildEvent(Guid companyId, Guid employeeId) =>
-        new(companyId, employeeId, DateOnly.FromDateTime(Now.Date), Now);
+        new(companyId, employeeId, DateOnly.FromDateTime(Now.Date), Now, AccessDisabled: true);
 
     [Fact]
     public async Task HandleAsync_Is_NoOp_When_No_Offboarding_Plan_Exists()

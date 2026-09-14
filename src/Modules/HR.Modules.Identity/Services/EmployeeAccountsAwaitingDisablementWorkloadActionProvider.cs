@@ -9,9 +9,11 @@ namespace HR.Modules.Identity.Services;
 
 /// <summary>
 /// OBT-721 Workload &amp; HR Actions Report provider for employee accounts awaiting disablement.
-/// HR-only. Identity.Features.OnOffboardingPlanCompleted.Handler already auto-disables an account
-/// the moment its OffboardingPlan completes, so an account only sits "awaiting disablement" in the
-/// gap between an employee's LastWorkingDay passing and their offboarding plan actually completing.
+/// HR-only. P1 fix: departure-triggered disablement (Identity.Features.OnEmployeeDepartureFinalised)
+/// is now the authoritative account-disabling trigger, decoupled from offboarding-plan completion —
+/// this provider still surfaces accounts that are still active past their LastWorkingDay with
+/// offboarding incomplete, which remains a useful HR signal regardless of why disablement hasn't
+/// happened yet (auto-disable off, a still-in-flight/failed AccountDisablement, or manual review).
 /// That gap-detection data (LastWorkingDay, plan Status) is owned by HR.Modules.Offboarding, so this
 /// provider composes IOffboardingReportReader (Offboarding's own cross-module reader contract,
 /// already consumed the same way in the opposite direction by

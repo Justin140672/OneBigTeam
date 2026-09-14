@@ -654,14 +654,17 @@ public class AuditHistoryIntegrationTests
         createResp.EnsureSuccessStatusCode();
         var created = await createResp.Content.ReadFromJsonAsync<IdPayload>();
 
+        var currentVersion = await GetCurrentProbationRecordVersionAsync(hrAdminClient, companyId, created!.Id);
+
         var updateResp = await hrAdminClient.PutAsJsonAsync(
-            $"/api/companies/{companyId}/probation-records/{created!.Id}", new
+            $"/api/companies/{companyId}/probation-records/{created.Id}", new
             {
                 companyId,
                 id = created.Id,
                 managerEmployeeId = newManagerId,
                 expectedEndDate = "2026-10-01",
-                notes = sensitiveNotes
+                notes = sensitiveNotes,
+                expectedVersion = currentVersion
             });
         updateResp.EnsureSuccessStatusCode();
 
@@ -696,7 +699,8 @@ public class AuditHistoryIntegrationTests
                 companyId,
                 id = Guid.NewGuid(),
                 managerEmployeeId = Guid.NewGuid(),
-                expectedEndDate = "2026-09-01"
+                expectedEndDate = "2026-09-01",
+                expectedVersion = 1
             });
 
         Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
@@ -742,13 +746,16 @@ public class AuditHistoryIntegrationTests
             });
         completeResp.EnsureSuccessStatusCode();
 
+        var currentVersion = await GetCurrentProbationRecordVersionAsync(hrAdminClient, companyId, created.Id);
+
         var response = await hrAdminClient.PutAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{created.Id}", new
             {
                 companyId,
                 id = created.Id,
                 managerEmployeeId = managerId,
-                expectedEndDate = "2026-12-01"
+                expectedEndDate = "2026-12-01",
+                expectedVersion = currentVersion
             });
 
         Assert.Equal(System.Net.HttpStatusCode.Conflict, response.StatusCode);
@@ -1188,6 +1195,17 @@ public class AuditHistoryIntegrationTests
     private sealed record VersionPayload(int Version);
 
     private sealed record IdPayload(Guid Id);
+
+    // Ticket 18 fix: UpdateProbationRecord now always requires ExpectedVersion (Ticket 16/2
+    // optimistic concurrency); the create response doesn't carry the initial Version, so tests
+    // that PUT an update fetch it via the GET detail endpoint first.
+    private static async Task<int> GetCurrentProbationRecordVersionAsync(HttpClient client, Guid companyId, Guid id)
+    {
+        var detail = await client.GetAsync($"/api/companies/{companyId}/probation-records/{id}");
+        detail.EnsureSuccessStatusCode();
+        var payload = await detail.Content.ReadFromJsonAsync<VersionPayload>();
+        return payload!.Version;
+    }
 
     private sealed record EmployeeTaskItemPayload(Guid Id, string Source);
 

@@ -1,0 +1,249 @@
+@page "/customers/{CompanyId:guid}/support-requests/{Id:guid}"
+@inject SupportRequestAdminService SupportRequestAdminService
+@using Syncfusion.Blazor.DropDowns
+
+<PageTitle>Support request — Admin Portal</PageTitle>
+
+<AdminBreadcrumb Trail="@(new (string, string?)[] { ("Customers", "/customers"), ("Customer details", $"/customers/{CompanyId}"), ("Support requests", $"/customers/{CompanyId}/support-requests"), ("Support request", null) })" />
+
+<h1>Support request</h1>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_outcome == SupportRequestFetchOutcome.Unauthenticated)
+{
+    <div class="dashboard-error">You are not signed in. Please sign in again.</div>
+}
+else if (_outcome == SupportRequestFetchOutcome.NotAnEnabledPlatformAdministrator)
+{
+    <div class="dashboard-error">
+        You are not an enabled platform administrator, so you cannot view this support request.
+    </div>
+}
+else if (_outcome == SupportRequestFetchOutcome.NotFound || _detail is null)
+{
+    <div class="dashboard-error">This support request could not be found.</div>
+}
+else if (_outcome == SupportRequestFetchOutcome.Failed)
+{
+    <div class="dashboard-error">A temporary error occurred while loading this support request. Please try again.</div>
+}
+else
+{
+    @if (_conflictVisible)
+    {
+        <div class="alert alert-warning save-conflict-banner mb-3" role="alert">
+            <div class="save-conflict-banner__message">
+                <span>Someone else changed this support request while you were viewing it. Your status change has not been saved.</span>
+            </div>
+            <SfButton CssClass="e-small" OnClick="ReloadAfterConflictAsync" Disabled="@_reloading">Reload latest values</SfButton>
+        </div>
+    }
+
+    <div class="details-grid">
+        <section class="details-panel">
+            <h2>@_detail.Title</h2>
+            <dl class="details-kv">
+                <dt>Reference</dt>
+                <dd>@_detail.ReferenceNumber</dd>
+                <dt>Type</dt>
+                <dd>@SupportRequestAdminOptions.TypeLabel(_detail.Type)</dd>
+                <dt>Priority</dt>
+                <dd>@_detail.Priority</dd>
+                <dt>Created</dt>
+                <dd>@_detail.CreatedAt.ToString("dd MMM yyyy HH:mm")</dd>
+                <dt>Last updated</dt>
+                <dd>@_detail.UpdatedAt.ToString("dd MMM yyyy HH:mm")</dd>
+                <dt>Page URL</dt>
+                <dd>@(_detail.PageUrl ?? "—")</dd>
+                <dt>Browser</dt>
+                <dd>@(_detail.Browser ?? "—")</dd>
+                <dt>App version</dt>
+                <dd>@(_detail.AppVersion ?? "—")</dd>
+                <dt>Correlation id</dt>
+                <dd>@(_detail.CorrelationId ?? "—")</dd>
+            </dl>
+
+            <h3>Description</h3>
+            <p>@_detail.Description</p>
+
+            @if (_detail.IncludeDiagnostics && !string.IsNullOrWhiteSpace(_detail.DiagnosticsJson))
+            {
+                <h3>Diagnostics</h3>
+                <pre>@_detail.DiagnosticsJson</pre>
+            }
+
+            @if (_detail.Attachments.Count > 0)
+            {
+                <h3>Attachments</h3>
+                <ul>
+                    @foreach (var attachment in _detail.Attachments)
+                    {
+                        <li>@attachment.FileName (@attachment.SizeBytes bytes)</li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section class="details-panel admin-actions-panel">
+            <h2>Status</h2>
+            <p class="admin-actions-intro">
+                Changing status notifies this company's HR Administrators.
+            </p>
+            <div class="admin-action-field">
+                <label for="support-request-status">Status</label>
+                <SfDropDownList TValue="string" TItem="string" @bind-Value="_selectedStatus" DataSource="@SupportRequestAdminOptions.Statuses"
+                                 AllowFiltering="true" Enabled="@(!_saving)"
+                                 HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "support-request-status" })" />
+            </div>
+
+            @if (_globalError is not null)
+            {
+                <div class="alert alert-danger">@_globalError</div>
+            }
+
+            <div class="admin-actions-buttons">
+                <SfButton IsPrimary="true" Disabled="@(_saving || _selectedStatus == _detail.Status)" OnClick="SaveStatusAsync">
+                    @if (_saving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Save status
+                </SfButton>
+            </div>
+
+            @if (_statusUpdatedMessage is not null)
+            {
+                <p class="admin-action-success">@_statusUpdatedMessage</p>
+            }
+        </section>
+
+        @if (_detail.Responses.Count > 0)
+        {
+            <section class="details-panel">
+                <h2>Conversation</h2>
+                @foreach (var response in _detail.Responses)
+                {
+                    <div class="details-panel">
+                        <p class="admin-actions-intro">
+                            @(response.IsStaffResponse ? "Staff" : "Customer") — @response.CreatedAt.ToString("dd MMM yyyy HH:mm")
+                        </p>
+                        <p>@((MarkupString)response.BodyHtml)</p>
+                        @if (response.Attachments.Count > 0)
+                        {
+                            <ul>
+                                @foreach (var attachment in response.Attachments)
+                                {
+                                    <li>@attachment.FileName (@attachment.SizeBytes bytes)</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                }
+            </section>
+        }
+    </div>
+}
+
+<a href="/customers/@CompanyId/support-requests">Back to support requests</a>
+
+@code {
+    [Parameter]
+    public Guid CompanyId { get; set; }
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private SupportRequestDetailModel? _detail;
+    private SupportRequestFetchOutcome _outcome = SupportRequestFetchOutcome.Success;
+    private bool _loading = true;
+
+    // Ticket 15 optimistic-concurrency state machine (mirrors HR.Web's EditSectionBase /
+    // SaveConflictBanner contract, reimplemented inline here since HR.Admin.Web cannot reference
+    // HR.Web): capture the version on load, submit it as ExpectedVersion on save, replace it with
+    // whatever the API returns on 200, and never overwrite local state on 409 until the user
+    // explicitly reloads.
+    private int _loadedVersion;
+    private string _selectedStatus = string.Empty;
+    private bool _saving;
+    private bool _reloading;
+    private bool _conflictVisible;
+    private string? _globalError;
+    private string? _statusUpdatedMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var result = await SupportRequestAdminService.GetSupportRequestAsync(CompanyId, Id);
+        _outcome = result.Outcome;
+        _detail = result.Detail;
+        if (_detail is not null)
+        {
+            _loadedVersion = _detail.Version;
+            _selectedStatus = _detail.Status;
+        }
+        _loading = false;
+    }
+
+    private async Task SaveStatusAsync()
+    {
+        if (_detail is null)
+            return;
+
+        _saving = true;
+        _globalError = null;
+        _statusUpdatedMessage = null;
+
+        try
+        {
+            var result = await SupportRequestAdminService.UpdateStatusAsync(CompanyId, Id, _selectedStatus, _loadedVersion);
+
+            switch (result.Outcome)
+            {
+                case SupportRequestStatusUpdateOutcome.Success:
+                    var response = result.Response!;
+                    _detail = _detail with { Status = response.Status, UpdatedAt = response.UpdatedAt, Version = response.Version };
+                    _loadedVersion = response.Version;
+                    _conflictVisible = false;
+                    _statusUpdatedMessage = "Status updated successfully.";
+                    break;
+
+                case SupportRequestStatusUpdateOutcome.Conflict:
+                    _conflictVisible = true;
+                    break;
+
+                case SupportRequestStatusUpdateOutcome.Failed:
+                default:
+                    _globalError = result.ErrorMessage ?? "Failed to update the status. You may not be authorised to perform this action.";
+                    break;
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ReloadAfterConflictAsync()
+    {
+        _reloading = true;
+        try
+        {
+            await LoadAsync();
+            _conflictVisible = false;
+            _globalError = null;
+            _statusUpdatedMessage = null;
+        }
+        finally
+        {
+            _reloading = false;
+        }
+    }
+}

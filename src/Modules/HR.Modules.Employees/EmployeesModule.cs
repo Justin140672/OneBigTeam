@@ -148,6 +148,12 @@ public static class EmployeesModule
             "process-promotions",
             job => job.ExecuteAsync(),
             Cron.Daily(0));
+        // P1 fix: reconciliation sweep for former employees whose access disablement was never
+        // relayed to Identity before OnEmployeeDepartureFinalised existed — see job remarks.
+        jobManager.AddOrUpdate<ReconcileFormerEmployeeAccessJob>(
+            "reconcile-former-employee-access",
+            job => job.ExecuteAsync(),
+            Cron.Daily(1));
         return app;
     }
 
@@ -381,6 +387,7 @@ public static class EmployeesModule
         services.AddScoped<GetEmployeePromotionHistoryHandler>();
 
         services.AddScoped<ProcessPromotionsJob>();
+        services.AddScoped<ReconcileFormerEmployeeAccessJob>();
 
         services.AddScoped<GetEmployeeTimelineHandler>();
         services.AddScoped<IValidator<GetEmployeeTimelineRequest>, GetEmployeeTimelineValidator>();

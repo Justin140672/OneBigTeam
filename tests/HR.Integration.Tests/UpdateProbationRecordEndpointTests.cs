@@ -66,14 +66,17 @@ public class UpdateProbationRecordEndpointTests
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<ProbationRecordPayload>();
 
+        var currentVersion = await GetCurrentVersionAsync(client, companyId, created!.Id);
+
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/probation-records/{created!.Id}", new
+            $"/api/companies/{companyId}/probation-records/{created.Id}", new
             {
                 companyId,
                 id = created.Id,
                 managerEmployeeId = newManagerId,
                 expectedEndDate = "2026-09-01",
-                notes = "Updated via PUT."
+                notes = "Updated via PUT.",
+                expectedVersion = currentVersion
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -100,7 +103,8 @@ public class UpdateProbationRecordEndpointTests
                 companyId,
                 id = Guid.NewGuid(),
                 managerEmployeeId = Guid.NewGuid(),
-                expectedEndDate = "2026-09-01"
+                expectedEndDate = "2026-09-01",
+                expectedVersion = 1
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -149,6 +153,8 @@ public class UpdateProbationRecordEndpointTests
             });
         completeResponse.EnsureSuccessStatusCode();
 
+        var currentVersion = await GetCurrentVersionAsync(client, companyId, created.Id);
+
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{created.Id}", new
             {
@@ -156,10 +162,97 @@ public class UpdateProbationRecordEndpointTests
                 id = created.Id,
                 managerEmployeeId = managerId,
                 expectedEndDate = "2026-12-01",
-                notes = "Attempted edit after decision."
+                notes = "Attempted edit after decision.",
+                expectedVersion = currentVersion
             });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    // Ticket 18: the 409 for a terminal (Passed/Failed/NotApplicable) record must carry
+    // code == "conflict" (never "concurrency") with a message that references the terminal
+    // status, and must leave the stored record and its audit trail completely untouched.
+    [Fact]
+    public async Task Put_ProbationRecord_On_Passed_Record_Returns_ConflictCode_And_Leaves_Record_Unchanged()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, actorId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, actorId, SystemRoles.HrAdministrator, companyId);
+
+        var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
+        {
+            companyId,
+            employeeId = Guid.NewGuid(),
+            managerEmployeeId = managerId,
+            startDate = "2026-06-01",
+            expectedEndDate = "2026-09-01"
+        });
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<ProbationRecordPayload>();
+
+        var reviewResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
+        {
+            companyId,
+            probationRecordId = created!.Id,
+            reviewType = "FinalDecision",
+            dueDate = "2026-09-01"
+        });
+        reviewResponse.EnsureSuccessStatusCode();
+        var review = await reviewResponse.Content.ReadFromJsonAsync<ReviewItem>();
+
+        var completeResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{created.Id}/reviews/{review!.Id}/complete",
+            new
+            {
+                companyId,
+                probationRecordId = created.Id,
+                reviewId = review.Id,
+                outcome = "Pass",
+                decisionDate = "2026-09-01"
+            });
+        completeResponse.EnsureSuccessStatusCode();
+
+        var beforeDetail = await client.GetAsync($"/api/companies/{companyId}/probation-records/{created.Id}");
+        beforeDetail.EnsureSuccessStatusCode();
+        var before = await beforeDetail.Content.ReadFromJsonAsync<UpdatedProbationRecordPayload>();
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                managerEmployeeId = managerId,
+                expectedEndDate = "2027-01-01",
+                notes = "Attempted edit after terminal decision.",
+                expectedVersion = before!.Version
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ErrorBody>();
+        Assert.NotNull(body);
+        Assert.Equal("conflict", body!.Code);
+        Assert.False(string.IsNullOrWhiteSpace(body.Error));
+        Assert.Contains("Passed", body.Error, StringComparison.OrdinalIgnoreCase);
+
+        var afterDetail = await client.GetAsync($"/api/companies/{companyId}/probation-records/{created.Id}");
+        afterDetail.EnsureSuccessStatusCode();
+        var after = await afterDetail.Content.ReadFromJsonAsync<UpdatedProbationRecordPayload>();
+
+        Assert.Equal(before!.ManagerEmployeeId, after!.ManagerEmployeeId);
+        Assert.Equal(before.ExpectedEndDate, after.ExpectedEndDate);
+        Assert.Equal(before.Notes, after.Notes);
+        Assert.Equal(before.Status, after.Status);
+
+        // No new review activity from the rejected attempt (it tried to change ExpectedEndDate,
+        // which would otherwise trigger recalculation on a successful save).
+        var reviewsAfter = await client.GetAsync($"/api/companies/{companyId}/probation-records/{created.Id}/reviews");
+        reviewsAfter.EnsureSuccessStatusCode();
+        var reviewsPayload = await reviewsAfter.Content.ReadFromJsonAsync<ReviewsPayload>();
+        Assert.Single(reviewsPayload!.Items);
     }
 
     [Fact]
@@ -195,6 +288,7 @@ public class UpdateProbationRecordEndpointTests
             $"/api/companies/{companyId}/probation-records/{created.Id}/reviews");
         var beforeReviews = await beforeReviewsResponse.Content.ReadFromJsonAsync<ReviewsPayload>();
         var originalFinalDecisionId = Assert.Single(beforeReviews!.Items).Id;
+        var currentVersion = await GetCurrentVersionAsync(client, companyId, created.Id);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{created.Id}", new
@@ -202,7 +296,8 @@ public class UpdateProbationRecordEndpointTests
                 companyId,
                 id = created.Id,
                 managerEmployeeId = managerId,
-                expectedEndDate = "2026-12-01"
+                expectedEndDate = "2026-12-01",
+                expectedVersion = currentVersion
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -253,6 +348,7 @@ public class UpdateProbationRecordEndpointTests
             $"/api/companies/{companyId}/probation-records/{created.Id}/reviews");
         var beforeReviews = await beforeReviewsResponse.Content.ReadFromJsonAsync<ReviewsPayload>();
         var originalFinalDecisionId = Assert.Single(beforeReviews!.Items).Id;
+        var currentVersion = await GetCurrentVersionAsync(client, companyId, created.Id);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{created.Id}", new
@@ -261,7 +357,8 @@ public class UpdateProbationRecordEndpointTests
                 id = created.Id,
                 managerEmployeeId = managerId,
                 expectedEndDate = "2026-09-01", // unchanged
-                notes = "No date change."
+                notes = "No date change.",
+                expectedVersion = currentVersion
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -306,6 +403,8 @@ public class UpdateProbationRecordEndpointTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
+    private sealed record ErrorBody(string? Error, string? Code);
+
     private sealed record ReviewsPayload(IReadOnlyList<ReviewItem> Items);
 
     private sealed record ReviewItem(
@@ -342,5 +441,16 @@ public class UpdateProbationRecordEndpointTests
         Guid? DecisionMakerEmployeeId,
         DateOnly? DecisionDate,
         string? OutcomeNotes,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        int Version);
+
+    // Ticket 18 fix: PUT now always requires ExpectedVersion (Ticket 16/2 optimistic concurrency);
+    // the create response does not carry the initial Version, so tests that need it fetch it here.
+    private static async Task<int> GetCurrentVersionAsync(HttpClient client, Guid companyId, Guid id)
+    {
+        var detail = await client.GetAsync($"/api/companies/{companyId}/probation-records/{id}");
+        detail.EnsureSuccessStatusCode();
+        var payload = await detail.Content.ReadFromJsonAsync<UpdatedProbationRecordPayload>();
+        return payload!.Version;
+    }
 }

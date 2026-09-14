@@ -12,7 +12,21 @@ public class UpdateSupportRequestStatusValidatorTests
         CompanyId = Guid.NewGuid(),
         Id = Guid.NewGuid(),
         Status = SupportRequestStatus.UnderReview,
+        ExpectedVersion = 1,
     };
+
+    // Ticket 15 (optimistic concurrency) — ExpectedVersion is mandatory on this protected update.
+    [Fact]
+    public void Validate_Fails_When_ExpectedVersion_Is_Null()
+    {
+        var request = Valid();
+        request = request with { ExpectedVersion = null };
+
+        var result = _validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateSupportRequestStatusRequest.ExpectedVersion));
+    }
 
     [Fact]
     public void Validate_Passes_For_Valid_Request()

@@ -1,0 +1,230 @@
+@using System.ComponentModel.DataAnnotations
+@using Syncfusion.Blazor.Data
+@inject ProbationService ProbationService
+@inject EmployeeService EmployeeService
+@inherits EditSectionBase<ProbationRecordEditPanel.ProbationEditModel>
+
+@* Ticket 17: HR Administrator "administrative correction" edit for a probation record — manager,
+   expected end date and notes ONLY (status, extension reason, decision date/maker and outcome
+   notes are workflow-owned via CompleteProbationReview and are deliberately not editable here; see
+   ProbationRecord.ApplyAdministrativeCorrection). Follows the same EditSectionBase / optimistic-
+   concurrency / SaveConflictBanner contract as EmployeeEmploymentTab, but owns its own Save button
+   since it isn't hosted inside a multi-tab page with a single combined save. *@
+
+@if (IsLoading)
+{
+    <HrLoadingIndicator />
+}
+else
+{
+    @* data-testid wrapper: EmployeeEdit hosts multiple tabs (Personal Details' DOB date picker,
+       Employment's HR Notes textarea, etc.) that stay mounted in the DOM — just hidden — when
+       another tab is active. Unscoped page-wide locators like ".e-date-wrapper input.e-input" or
+       "textarea" would resolve to one of those *other*, hidden fields instead of this panel's own
+       (Playwright "element is not visible" timeouts). Every E2E locator for this panel must be
+       scoped to this wrapper — see ProbationRecordEditPanelComponent. *@
+    <div data-testid="probation-record-edit-panel">
+        <SaveConflictBanner Visible="SaveConflict"
+                             Disabled="@_reloading"
+                             Message="This probation record was changed by someone else while you were editing. Your changes have not been saved."
+                             OnReload="ReloadAfterConflictAsync" />
+
+        @if (!string.IsNullOrEmpty(GlobalError) && !SaveConflict)
+        {
+            <div class="alert alert-danger mb-3">@GlobalError</div>
+        }
+        @if (!string.IsNullOrEmpty(SuccessMsg))
+        {
+            <div class="alert alert-success mb-3" role="status">@SuccessMsg</div>
+        }
+
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="probation-manager-input">Manager <span class="text-danger">*</span></label>
+                    <SfDropDownList @ref="_managerDropdown"
+                                    TValue="Guid?"
+                                    TItem="ManagerOption"
+                                    DataSource="@_managerOptions"
+                                    @bind-Value="Model.ManagerEmployeeId"
+                                    Placeholder="Select manager"
+                                    AllowFiltering="true"
+                                    HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "probation-manager-input" })">
+                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                        <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
+                    </SfDropDownList>
+                    <ValidationMessage For="@(() => Model.ManagerEmployeeId)" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="probation-expected-end-date-input">Expected End Date <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ExpectedEndDate" Format="dd/MM/yyyy"
+                                  ID="probation-expected-end-date-input" />
+                    <ValidationMessage For="@(() => Model.ExpectedEndDate)" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="probation-notes-input">Notes</label>
+                    <HrTextBox @bind-Value="Model.Notes" Multiline="true" Rows="3" Maxlength="2000"
+                               Placeholder="Optional internal notes" ID="probation-notes-input" />
+                </div>
+            </div>
+        </EditForm>
+
+        <div class="mt-3 d-flex gap-2">
+            <SfButton IsPrimary="true" OnClick="SaveAsync" data-testid="save-probation-record">Save</SfButton>
+            <SfButton CssClass="e-outline" OnClick="@(() => OnCancel.InvokeAsync())">Cancel</SfButton>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public ProbationRecordModel Record { get; set; } = null!;
+    [Parameter] public EventCallback<ProbationRecordModel> OnSaved { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    // Ticket 18: fired instead of OnSaved when a conflict reload discovers the record has become
+    // terminal (Passed/Failed/NotApplicable) while this panel was open — e.g. a workflow completed
+    // the review while an administrator was mid-edit. The parent tab must adopt the authoritative
+    // record, close/disable this editor, and surface the supplied explanation; further edits are
+    // not possible because terminal records can never be saved.
+    [Parameter] public EventCallback<(ProbationRecordModel Latest, string Message)> OnBecameTerminal { get; set; }
+
+    private static bool IsTerminalStatus(string status) => status is "Passed" or "Failed" or "NotApplicable";
+
+    protected override object? LoadKey => Record.Id;
+
+    private List<ManagerOption> _managerOptions = [];
+    private SfDropDownList<Guid?, ManagerOption> _managerDropdown = default!;
+    private int _managerFilterRequestId;
+    private bool _reloading;
+
+    protected override async Task LoadAsync()
+    {
+        LoadedVersion = Record.Version;
+        Model.ManagerEmployeeId = Record.ManagerEmployeeId;
+        Model.ExpectedEndDate = Record.ExpectedEndDate;
+        Model.Notes = Record.Notes ?? string.Empty;
+
+        var employees = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
+        _managerOptions = (employees?.Items ?? [])
+            .Where(e => e.Id != Record.EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(m => m.Name)
+            .ToList();
+
+        if (_managerOptions.All(m => m.Id != Record.ManagerEmployeeId))
+        {
+            var current = await EmployeeService.GetEmployeeAsync(CompanyId, Record.ManagerEmployeeId);
+            if (current is not null)
+                _managerOptions.Add(new ManagerOption(current.Id, $"{current.FirstName} {current.LastName}"));
+        }
+    }
+
+    private async Task OnManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var requestId = ++_managerFilterRequestId;
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        if (requestId != _managerFilterRequestId) return;
+        var options = (result?.Items ?? [])
+            .Where(e => e.Id != Record.EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .ToList();
+        await _managerDropdown.FilterAsync(options, new Query());
+    }
+
+    protected override async Task<string?> SaveCoreAsync()
+    {
+        if (Model.ManagerEmployeeId is not { } managerId)
+            return "A manager is required.";
+
+        var request = new UpdateProbationRecordApiRequest(
+            CompanyId,
+            Record.Id,
+            managerId,
+            Model.ExpectedEndDate!.Value,
+            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
+            ExpectedVersionForSave);
+
+        var result = await ProbationService.UpdateProbationRecordAsync(CompanyId, request);
+        var error = ApplySaveResult(result, "Failed to save the probation record.");
+
+        if (error is null)
+        {
+            var updated = Record with
+            {
+                ManagerEmployeeId = managerId,
+                ExpectedEndDate = Model.ExpectedEndDate!.Value,
+                Notes = string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
+                UpdatedAt = DateTimeOffset.UtcNow,
+                Version = result.NewVersion ?? Record.Version,
+            };
+            await OnSaved.InvokeAsync(updated);
+        }
+
+        return error;
+    }
+
+    // Ticket 17 conflict recovery: re-fetches the authoritative record and adopts its values —
+    // Manager/ExpectedEndDate/Notes and LoadedVersion — directly into this panel so the user stays
+    // in the edit form and can immediately see and further edit the winning values, then save again
+    // against the fresh version. Also tells the parent tab about the winning record so its own
+    // read-only display (and the Record parameter this panel receives) stays in sync.
+    private async Task ReloadAfterConflictAsync()
+    {
+        _reloading = true;
+        try
+        {
+            var latest = await ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, Record.EmployeeId);
+            if (latest is not null)
+            {
+                if (IsTerminalStatus(latest.Status))
+                {
+                    // The record reached a terminal status (Passed/Failed/NotApplicable) while this
+                    // editor was open. It can never be saved again, so hand the authoritative record
+                    // to the parent and exit — do not clear SaveConflict / keep editing.
+                    await OnBecameTerminal.InvokeAsync((latest,
+                        $"This probation record has reached the terminal status '{latest.Status}' and can no longer be edited."));
+                    return;
+                }
+
+                ApplySaveResult(ApiSaveResult.Ok(latest.Version));
+                Model.ManagerEmployeeId = latest.ManagerEmployeeId;
+                Model.ExpectedEndDate = latest.ExpectedEndDate;
+                Model.Notes = latest.Notes ?? string.Empty;
+
+                if (_managerOptions.All(m => m.Id != latest.ManagerEmployeeId))
+                {
+                    var current = await EmployeeService.GetEmployeeAsync(CompanyId, latest.ManagerEmployeeId);
+                    if (current is not null)
+                        _managerOptions.Add(new ManagerOption(current.Id, $"{current.FirstName} {current.LastName}"));
+                }
+
+                await OnSaved.InvokeAsync(latest);
+            }
+
+            GlobalError = null;
+        }
+        finally
+        {
+            _reloading = false;
+            StateHasChanged();
+        }
+    }
+
+    public sealed class ProbationEditModel
+    {
+        [Required(ErrorMessage = "Manager is required.")]
+        public Guid? ManagerEmployeeId { get; set; }
+
+        [Required(ErrorMessage = "Expected end date is required.")]
+        public DateOnly? ExpectedEndDate { get; set; }
+
+        public string Notes { get; set; } = string.Empty;
+    }
+
+    private sealed record ManagerOption(Guid Id, string Name);
+}

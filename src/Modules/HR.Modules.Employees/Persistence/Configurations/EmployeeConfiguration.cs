@@ -191,6 +191,9 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(e => e.LeavingDate)
             .HasColumnName("leaving_date");
 
+        builder.Property(e => e.AccessDisablementReconciledAt)
+            .HasColumnName("access_disablement_reconciled_at");
+
         builder.Property(e => e.NoticePeriodUnitOverride)
             .HasColumnName("notice_period_unit_override")
             .HasConversion<string>()

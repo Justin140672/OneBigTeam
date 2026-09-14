@@ -13,6 +13,7 @@ public sealed record SupportRequestListItem(
     string Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
+    int Version,
     string? LatestResponseSnippet);
 
 public sealed record SupportRequestAttachment(
@@ -46,12 +47,15 @@ public sealed record SupportRequestDetailModel(
     string? CorrelationId,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
+    int Version,
     List<SupportRequestAttachment> Attachments,
     List<SupportRequestResponseItem> Responses);
 
 public sealed record SubmitSupportRequestResult(Guid Id, string ReferenceNumber);
 
-public sealed record UpdateSupportRequestStatusResult(Guid Id, string Status, DateTimeOffset UpdatedAt);
+// Ticket 16: UpdateSupportRequestStatusResult (write-path DTO) removed along with
+// SupportService.UpdateStatusAsync — status editing is exclusively an HR.Admin.Web capability now.
+// See HR.Admin.Web.Models.SupportRequestAdminModels for the equivalent Admin-side type.
 
 public sealed record AddSupportResponseResult(Guid Id, bool IsStaffResponse, DateTimeOffset CreatedAt);
 
@@ -115,10 +119,5 @@ public sealed class AddSupportResponseFormModel
     public string BodyHtml { get; set; } = string.Empty;
 }
 
-// --- Status change form model (admin queue) ---
-
-public sealed class UpdateSupportRequestStatusFormModel
-{
-    [Required(ErrorMessage = "Status is required.")]
-    public string? Status { get; set; }
-}
+// Ticket 16: UpdateSupportRequestStatusFormModel removed — status editing is exclusively an
+// HR.Admin.Web capability now (this form model had no remaining callers in HR.Web).

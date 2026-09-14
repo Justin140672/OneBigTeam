@@ -80,7 +80,7 @@ public class UpdateSupportRequestStatusEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/support/requests/{Guid.NewGuid()}/status",
-            new { companyId, id = Guid.NewGuid(), status = "UnderReview" });
+            new { companyId, id = Guid.NewGuid(), status = "UnderReview", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -98,7 +98,7 @@ public class UpdateSupportRequestStatusEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/support/requests/{payload!.Id}/status",
-            new { companyId, id = payload.Id, status = "UnderReview" });
+            new { companyId, id = payload.Id, status = "UnderReview", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var updated = await response.Content.ReadFromJsonAsync<StatusPayload>();
@@ -117,22 +117,25 @@ public class UpdateSupportRequestStatusEndpointTests
         var payload = await created.Content.ReadFromJsonAsync<SubmitPayload>();
         Assert.NotNull(payload);
 
-        // Walk the request to Closed via valid intermediate states.
+        // Walk the request to Closed via valid intermediate states, tracking the version returned
+        // after each successful transition (Ticket 15: ExpectedVersion is now mandatory).
+        var version = 1;
         foreach (var status in new[] { "UnderReview", "Resolved", "Closed" })
         {
             var step = await client.PutAsJsonAsync(
                 $"/api/companies/{companyId}/support/requests/{payload!.Id}/status",
-                new { companyId, id = payload.Id, status });
+                new { companyId, id = payload.Id, status, expectedVersion = version });
             step.EnsureSuccessStatusCode();
+            version = (await step.Content.ReadFromJsonAsync<StatusPayload>())!.Version;
         }
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/support/requests/{payload!.Id}/status",
-            new { companyId, id = payload.Id, status = "Submitted" });
+            new { companyId, id = payload.Id, status = "Submitted", expectedVersion = version });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
     private sealed record SubmitPayload(Guid Id, string ReferenceNumber);
-    private sealed record StatusPayload(Guid Id, string Status, DateTimeOffset UpdatedAt);
+    private sealed record StatusPayload(Guid Id, string Status, DateTimeOffset UpdatedAt, int Version);
 }

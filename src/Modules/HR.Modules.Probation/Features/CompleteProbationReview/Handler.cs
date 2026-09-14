@@ -108,6 +108,14 @@ internal sealed class CompleteProbationReviewHandler
 
         review.Complete(completedByEmployeeId, request.Outcome, request.Notes, now);
 
+        // Ticket 16 (optimistic concurrency) classification: this is a review-completion workflow
+        // (its own loaded aggregate is ProbationReview, not an admin edit screen keyed on
+        // ProbationRecord.Version), not an independently-loaded "edit ProbationRecord" form. Per the
+        // ticket's guidance this is treated as a system/workflow-triggered transition — plain
+        // SaveChangesAsync is kept, and the shared VersionAdvancingSaveChangesInterceptor (wired via
+        // ProbationDbContext's UseVersionedAggregates()) automatically advances ProbationRecord's
+        // Version here, which is sufficient to make a concurrently-loaded administrative-edit
+        // screen (UpdateProbationRecord) go stale.
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         if (request.Outcome == ProbationOutcome.Extend)

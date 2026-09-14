@@ -105,6 +105,10 @@ internal sealed class ManagerChangedHandler(
         }
 
         record.ChangeManager(integrationEvent.NewManagerId.Value, now);
+
+        // Ticket 16 (optimistic concurrency) classification: purely integration-event/system-driven
+        // (fired from the Employees module's manager-changed event), not a client-loaded edit form —
+        // the shared VersionAdvancingSaveChangesInterceptor advances Version automatically here.
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (pendingCheckIn is null)

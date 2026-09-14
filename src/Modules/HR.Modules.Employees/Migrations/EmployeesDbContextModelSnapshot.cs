@@ -226,6 +226,10 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("AccessDisablementReconciledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("access_disablement_reconciled_at");
+
                     b.Property<string>("AddressLine1")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")

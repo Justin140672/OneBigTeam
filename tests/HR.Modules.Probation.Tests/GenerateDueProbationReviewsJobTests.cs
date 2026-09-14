@@ -619,4 +619,50 @@ public class GenerateDueProbationReviewsJobTests
         new(new DbContextOptionsBuilder<ProbationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
+
+    // Ticket 16 (optimistic concurrency): this job intentionally still calls plain
+    // SaveChangesAsync rather than a guarded/force-save concurrency call — see the comment at
+    // GenerateDueProbationReviewsJob's ActivateIfDue call site. It relies entirely on
+    // ProbationDbContext's real UseVersionedAggregates() registration (wired in ProbationModule)
+    // to advance Version automatically via VersionAdvancingSaveChangesInterceptor. The other
+    // BuildContext() above deliberately omits that interceptor (matching plain
+    // DbContextOptionsBuilder usage elsewhere in this file), so this test builds its own context
+    // with the interceptor installed to prove the automatic-advancement mechanism actually works.
+    private static ProbationDbContext BuildContextWithVersionedAggregates()
+    {
+        var builder = new DbContextOptionsBuilder<ProbationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"));
+        // UseVersionedAggregates() returns the non-generic DbContextOptionsBuilder base type, so it
+        // is called as a statement (mutating the same builder instance) rather than chained, to keep
+        // builder.Options typed as DbContextOptions<ProbationDbContext> below.
+        builder.UseVersionedAggregates();
+        return new ProbationDbContext(builder.Options);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Activating_NotStarted_Record_Advances_Version_Via_Interceptor()
+    {
+        await using var context = BuildContextWithVersionedAggregates();
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            StartDate, ExpectedEndDate, null, StartDate.AddDays(-5), SeedNow);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        Assert.Equal(1, record.Version);
+
+        await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc)).ExecuteAsync();
+
+        var reloaded = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.ReviewDue, reloaded.Status);
+
+        // The job legitimately performs more than one persisted mutation to this record in a single
+        // run (activation, then immediately becoming review-due), each its own SaveChangesAsync
+        // call — the interceptor advances Version by one per save, so the exact delta is an
+        // implementation detail of the job, not part of this test's contract. What matters here is
+        // proving the automatic-advancement mechanism actually fired with no ExpectedVersion
+        // supplied by any caller.
+        Assert.True(reloaded.Version > 1, "Version should have advanced automatically via the interceptor.");
+    }
 }

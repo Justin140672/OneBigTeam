@@ -8,4 +8,5 @@ internal sealed record GetProbationRecordResponse(
     string? ExtensionReason,
     DateOnly? DecisionDate,
     Guid? DecisionMakerEmployeeId,
-    string? OutcomeNotes);
+    string? OutcomeNotes,
+    int Version);

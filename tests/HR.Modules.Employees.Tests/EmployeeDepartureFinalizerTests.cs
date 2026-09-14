@@ -146,6 +146,31 @@ public class EmployeeDepartureFinalizerTests
     }
 
     [Fact]
+    public async Task FinalizeAsync_Reports_AccessDisabled_False_On_IntegrationEvent_When_AutoDisable_Setting_Is_False()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var employee = CreateLeavingEmployee(companyId, Now, hasSystemAccess: true);
+        context.Employees.Add(employee);
+        var process = CreateLeavingProcess(companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var integrationEventPublisher = new CapturingIntegrationEventPublisher();
+        var finalizer = BuildFinalizer(
+            context,
+            integrationEventPublisher: integrationEventPublisher,
+            leavingSettingsReader: new FakeCompanyLeavingSettingsReader(autoDisableAccessOnLeavingDate: false));
+
+        await finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None);
+
+        var integrationEvent = Assert.Single(
+            integrationEventPublisher.Published.OfType<EmployeeDepartureFinalisedIntegrationEvent>());
+        Assert.False(integrationEvent.AccessDisabled);
+    }
+
+    [Fact]
     public async Task FinalizeAsync_Disables_SystemAccess_And_Reports_AccessDisabled_When_AutoDisable_Setting_Is_True()
     {
         await using var context = BuildContext();
@@ -158,9 +183,11 @@ public class EmployeeDepartureFinalizerTests
         await context.SaveChangesAsync();
 
         var auditPublisher = new FakeAuditPublisher();
+        var integrationEventPublisher = new CapturingIntegrationEventPublisher();
         var finalizer = BuildFinalizer(
             context,
             auditPublisher: auditPublisher,
+            integrationEventPublisher: integrationEventPublisher,
             leavingSettingsReader: new FakeCompanyLeavingSettingsReader(autoDisableAccessOnLeavingDate: true));
 
         await finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None);
@@ -170,6 +197,10 @@ public class EmployeeDepartureFinalizerTests
 
         var auditEvent = Assert.IsType<EmployeeDepartureFinalisedAuditEvent>(Assert.Single(auditPublisher.Published));
         Assert.True(auditEvent.AccessDisabled);
+
+        var integrationEvent = Assert.Single(
+            integrationEventPublisher.Published.OfType<EmployeeDepartureFinalisedIntegrationEvent>());
+        Assert.True(integrationEvent.AccessDisabled);
     }
 
     [Theory]

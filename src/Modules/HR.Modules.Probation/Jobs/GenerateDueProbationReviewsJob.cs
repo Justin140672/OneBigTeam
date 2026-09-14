@@ -245,6 +245,9 @@ internal sealed class GenerateDueProbationReviewsJob(
             activatedAny = true;
         }
 
+        // Ticket 16 (optimistic concurrency) classification: background/recurring job, no
+        // client-supplied version — the shared VersionAdvancingSaveChangesInterceptor advances
+        // each modified ProbationRecord's Version automatically here.
         if (activatedAny)
             await dbContext.SaveChangesAsync();
     }

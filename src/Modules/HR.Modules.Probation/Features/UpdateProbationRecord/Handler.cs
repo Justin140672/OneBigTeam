@@ -5,6 +5,8 @@ using HR.Modules.Companies.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
+// SaveChangesWithConcurrencyAsync is declared in HR.SharedKernel (already imported above).
+
 namespace HR.Modules.Probation.Features.UpdateProbationRecord;
 
 internal sealed class UpdateProbationRecordHandler
@@ -58,7 +60,17 @@ internal sealed class UpdateProbationRecordHandler
             string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
             now);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        // Ticket 16 (optimistic concurrency): guarded save. Audit publication and review
+        // recalculation below must run strictly after this succeeds — a rejected/stale save must
+        // not publish an audit event or trigger recalculation.
+        var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
+            record,
+            request.ExpectedVersion,
+            "This probation record was changed by someone else since you opened it. Reload the latest details and try again.",
+            cancellationToken);
+
+        if (saveResult.IsFailure)
+            return Result.Failure<UpdateProbationRecordResponse>(saveResult.Error);
 
         // PROB-07: administrative-correction audit — before/after carry only the structured,
         // non-sensitive fields that can actually change here (manager, expected end date); Notes
@@ -99,6 +111,7 @@ internal sealed class UpdateProbationRecordHandler
             record.DecisionMakerEmployeeId,
             record.DecisionDate,
             record.OutcomeNotes,
-            record.UpdatedAt));
+            record.UpdatedAt,
+            record.Version));
     }
 }
