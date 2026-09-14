@@ -44,17 +44,17 @@
       },
       "Newtonsoft.Json": {
         "type": "Direct",
-        "requested": "[13.0.3, )",
-        "resolved": "13.0.3",
-        "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="
+        "requested": "[13.0.4, )",
+        "resolved": "13.0.4",
+        "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A=="
       },
       "Testcontainers.PostgreSql": {
         "type": "Direct",
-        "requested": "[4.14.0, )",
-        "resolved": "4.14.0",
-        "contentHash": "OPHWR9oCW89yuNxJjUo8Xtwrk0bcOdzFOE2Ryo01GAf/3WEzD+0j0gmdKSxx5kBprCdlbXurBJyaV7nSLPyWKQ==",
+        "requested": "[4.15.0, )",
+        "resolved": "4.15.0",
+        "contentHash": "45ZvqAzrh9BoI15Z4id7WEfhk1pVKqVeAX76aef8fR5ScglD75fSQtYuXhKFx4kIcgRL5aLKt3pRiqCVIgsL9g==",
         "dependencies": {
-          "Testcontainers": "4.14.0"
+          "Testcontainers": "4.15.0"
         }
       },
       "xunit": {
@@ -70,9 +70,9 @@
       },
       "xunit.runner.visualstudio": {
         "type": "Direct",
-        "requested": "[3.1.5, )",
-        "resolved": "3.1.5",
-        "contentHash": "tKi7dSTwP4m5m9eXPM2Ime4Kn7xNf4x4zT9sdLO/G4hZVnQCRiMTWoSZqI/pYTVeI27oPPqHBKYI/DjJ9GsYgA=="
+        "requested": "[4.0.0, )",
+        "resolved": "4.0.0",
+        "contentHash": "kzLFyBYUnoidpGOXvpNOfIo8C92gVgVR6X8ncHwhcrDYugiOut5rrhDkr0L3cWHd7J2pKXf6LgaeXoBBDlx1ag=="
       },
       "BouncyCastle.Cryptography": {
         "type": "Transitive",
@@ -927,8 +927,8 @@
       },
       "Testcontainers": {
         "type": "Transitive",
-        "resolved": "4.14.0",
-        "contentHash": "ojuBi91xcMsR6vnFuNsQDWU9tlZlrtmqy95VPNWVVnh24GiwFL/WMnVmb6bRv8LqovtnKPJN9cpmH1k02Z4ZoA==",
+        "resolved": "4.15.0",
+        "contentHash": "8tCZKMm++C/9dHIr8lsE1iDBIBmthbo2XlGFDr4gorT1vgZrJwU36fNkCGuX7h7V39rpQoTK/aG+FhJz3jhY3A==",
         "dependencies": {
           "Docker.DotNet.Enhanced": "4.3.3",
           "Docker.DotNet.Enhanced.X509": "4.3.3",
