@@ -21,9 +21,26 @@ namespace HR.Modules.Probation.Features.ReassignReviewsOnManagerChanged;
 /// matches a probation record's <c>EmployeeId</c>) — a manager's own probation record, if they have
 /// one, is unaffected by someone else's manager reassignment.
 ///
-/// Idempotent against duplicate event delivery: if the record's <c>ManagerEmployeeId</c> already
-/// equals the event's <c>NewManagerId</c>, the change has already been applied and this is a no-op —
-/// so a redelivered event never cancels/recreates the same task twice.
+/// Round 3 reliability fix: completion is now judged by the ACTUAL persisted task state, not by
+/// "does record.ManagerEmployeeId already equal the event's NewManagerId". The old equality guard
+/// returned immediately on that condition, which meant a retry after a partial failure (manager
+/// saved, then task cancel/create threw) saw "already correct" and skipped the task work entirely —
+/// so PublishAndConfirmAsync would mark the event delivered even though the review task was left
+/// pointing at the old/departed manager. ReconcileManagerCheckInTaskAsync below always re-checks
+/// current task state and only returns once a correctly-assigned single active task exists (or none
+/// is required), regardless of whether the manager field needed updating this time.
+///
+/// Duplicate-task prevention: before creating a replacement task, the handler checks for an
+/// existing open task for the same source entity/assignee via
+/// <see cref="IOpenTaskBySourceEntityReader"/>, and additionally passes a deterministic
+/// <c>idempotencyKey</c> to <see cref="ITaskCreator.CreateAsync"/> so a concurrent/duplicate retry
+/// can never create two active tasks for the same reconciliation.
+///
+/// Out-of-order/delayed event handling: the manager actually applied to the record — and therefore
+/// the target of task reconciliation — is resolved via <see cref="ProbationRecord.ApplyManagerChangeFromEvent"/>,
+/// which ignores a stale event (one whose OccurredAt is older than the last manager-change event
+/// already applied). Recovery/redelivery of an old A-&gt;B event after a later B-&gt;C event has landed
+/// reconciles the task against the CURRENT (C) manager, never regressing to the stale payload.
 ///
 /// Missing-manager handling: if the employee is left without a manager (<c>NewManagerId</c> is
 /// null), any open ManagerCheckIn task is cancelled rather than left pointing at a manager who is no
@@ -37,6 +54,7 @@ internal sealed class ManagerChangedHandler(
     ProbationDbContext dbContext,
     ITaskCreator taskCreator,
     ITaskCanceller taskCanceller,
+    IOpenTaskBySourceEntityReader openTaskReader,
     IEmployeeNameReader employeeNameReader,
     IEmployeeProbationDatesReader probationDatesReader,
     ICompanyTimeZoneReader timeZoneReader,
@@ -75,8 +93,7 @@ internal sealed class ManagerChangedHandler(
             return;
         }
 
-        if (record.ManagerEmployeeId == integrationEvent.NewManagerId)
-            return; // Already applied — duplicate delivery of the same event.
+        var now = clock.UtcNowOffset();
 
         var pendingCheckIn = await dbContext.ProbationReviews
             .FirstOrDefaultAsync(
@@ -86,38 +103,76 @@ internal sealed class ManagerChangedHandler(
                      && r.Status == ProbationReviewStatus.Pending,
                 cancellationToken);
 
-        var now = clock.UtcNowOffset();
-
         if (integrationEvent.NewManagerId is null)
         {
             if (pendingCheckIn is not null)
             {
+                // Idempotent: CancelBySourceEntityAsync is itself a no-op if no matching open task
+                // exists, so this is safe to run every time regardless of whether an earlier attempt
+                // already cancelled it.
                 await taskCanceller.CancelBySourceEntityAsync(
                     record.CompanyId, pendingCheckIn.Id, TaskSource.Probation, TaskActionType.Review, cancellationToken);
-            }
 
-            logger.LogWarning(
-                "Probation record {ProbationRecordId} employee {EmployeeId} lost their manager; " +
-                "ManagerCheckIn task cancelled and left unassigned pending a new manager.",
-                record.Id, record.EmployeeId);
+                logger.LogWarning(
+                    "Probation record {ProbationRecordId} employee {EmployeeId} lost their manager; " +
+                    "ManagerCheckIn task cancelled and left unassigned pending a new manager.",
+                    record.Id, record.EmployeeId);
+            }
 
             return;
         }
 
-        record.ChangeManager(integrationEvent.NewManagerId.Value, now);
+        // Resolves against ManagerChangeSourceOccurredAt precedence — a stale/out-of-order event is
+        // a no-op here, and record.ManagerEmployeeId (read afterwards) reflects whichever manager
+        // change actually "wins", not necessarily this event's own payload.
+        var recordChanged = record.ApplyManagerChangeFromEvent(
+            integrationEvent.NewManagerId.Value, integrationEvent.OccurredAt, now);
 
-        // Ticket 16 (optimistic concurrency) classification: purely integration-event/system-driven
-        // (fired from the Employees module's manager-changed event), not a client-loaded edit form —
-        // the shared VersionAdvancingSaveChangesInterceptor advances Version automatically here.
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (recordChanged)
+        {
+            // Ticket 16 (optimistic concurrency) classification: purely integration-event/system-
+            // driven (fired from the Employees module's manager-changed event), not a client-loaded
+            // edit form — the shared VersionAdvancingSaveChangesInterceptor advances Version
+            // automatically here.
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
+        // Always reconciled — even when the manager field required no change this time — so a retry
+        // that previously failed after the manager save but before the task was fixed up still
+        // completes the task work instead of short-circuiting on a stale "already applied" read.
+        await ReconcileManagerCheckInTaskAsync(record, pendingCheckIn, cancellationToken);
+    }
+
+    /// <summary>
+    /// Ensures exactly one active ManagerCheckIn task exists for <paramref name="pendingCheckIn"/>,
+    /// correctly assigned to <c>record.ManagerEmployeeId</c> (the CURRENT persisted manager, not
+    /// necessarily this event's payload manager — see <see cref="ProbationRecord.ApplyManagerChangeFromEvent"/>).
+    /// Safe to call repeatedly/concurrently: checks the actually-open task via
+    /// <see cref="IOpenTaskBySourceEntityReader"/> first (idempotent no-op if already correct), and
+    /// the replacement creation carries a deterministic idempotency key as a second, database-backed
+    /// guard against duplicates.
+    /// </summary>
+    private async Task ReconcileManagerCheckInTaskAsync(
+        ProbationRecord record, ProbationReview? pendingCheckIn, CancellationToken cancellationToken)
+    {
         if (pendingCheckIn is null)
-            return;
+            return; // No in-flight ManagerCheckIn review — nothing to reconcile.
+
+        var targetManagerId = record.ManagerEmployeeId;
+
+        var existingCorrectTaskId = await openTaskReader.GetOpenTaskIdForAssigneeAsync(
+            record.CompanyId, pendingCheckIn.Id, targetManagerId, TaskActionType.Review, cancellationToken);
+
+        if (existingCorrectTaskId is not null)
+            return; // Already correctly assigned — nothing further to do (covers duplicate redelivery).
 
         // The Tasks module has no cross-module "reassign" contract — the ITaskCreator/ITaskCanceller
         // pair already used throughout this module (see ProbationReviewRecalculationService,
-        // ProbationExtensionService) is the established pattern: cancel the task pointed at the old
-        // manager and create a fresh one, against the same sourceEntityId, for the new manager.
+        // ProbationExtensionService) is the established pattern: cancel any task still pointed at a
+        // stale assignee and create a fresh one, against the same sourceEntityId, for the current
+        // manager. CancelBySourceEntityAsync only cancels the first open match for this source
+        // entity/action type, which is correct here — ManagerCheckIn reviews only ever have at most
+        // one active task at a time by construction.
         await taskCanceller.CancelBySourceEntityAsync(
             record.CompanyId, pendingCheckIn.Id, TaskSource.Probation, TaskActionType.Review, cancellationToken);
 
@@ -126,17 +181,18 @@ internal sealed class ManagerChangedHandler(
 
         await taskCreator.CreateAsync(
             record.CompanyId,
-            integrationEvent.NewManagerId.Value,
+            targetManagerId,
             $"Complete probation review — {employeeName}",
             $"Probation manager check-in due {pendingCheckIn.DueDate:d MMM yyyy} (reassigned).",
             TaskPriority.High,
             TaskSource.Probation,
             TaskActionType.Review,
             pendingCheckIn.DueDate,
-            assignedEmployeeId: integrationEvent.NewManagerId.Value,
-            assignedUserId: integrationEvent.NewManagerId.Value,
+            assignedEmployeeId: targetManagerId,
+            assignedUserId: targetManagerId,
             sourceEntityId: pendingCheckIn.Id,
-            cancellationToken);
+            cancellationToken,
+            idempotencyKey: $"ProbationManagerCheckIn:{pendingCheckIn.Id}:{targetManagerId}");
     }
 
     /// <summary>

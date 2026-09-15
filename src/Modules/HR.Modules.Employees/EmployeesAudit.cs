@@ -668,6 +668,7 @@ internal sealed record EmployeeDepartureFinalisedAuditEvent(
     string IAuditEvent.EntityType => "Employee";
     Guid IAuditEvent.EntityId => EmployeeId;
     Guid? IAuditEvent.EmployeeId => EmployeeId;
+    AuditActorType IAuditEvent.ActorType => AuditActorType.ScheduledJob;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;

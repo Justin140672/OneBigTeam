@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Features.CreateDocumentType;
@@ -24,15 +25,7 @@ internal sealed class Endpoint(CreateDocumentTypeHandler handler)
 
         if (result.IsFailure)
         {
-            var businessError = new { error = result.Error.Message };
-
-            if (result.Error.Code == "conflict")
-            {
-                await Send.ResultAsync(TypedResults.Conflict(businessError));
-                return;
-            }
-
-            await Send.ResultAsync(TypedResults.BadRequest(businessError));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

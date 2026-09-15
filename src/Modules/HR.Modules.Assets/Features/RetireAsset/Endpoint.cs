@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Assets.Features.RetireAsset;
@@ -20,15 +21,9 @@ internal sealed class Endpoint(RetireAssetHandler handler)
             request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
             cancellationToken);
 
-        if (result.IsFailure && result.Error.Code == "conflict")
-        {
-            await Send.ResultAsync(TypedResults.Conflict(new { error = result.Error.Message }));
-            return;
-        }
-
         if (result.IsFailure)
         {
-            await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

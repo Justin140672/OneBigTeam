@@ -58,6 +58,10 @@ namespace HR.Modules.Probation.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("extension_reason");
 
+                    b.Property<DateTimeOffset?>("ManagerChangeSourceOccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("manager_change_source_occurred_at");
+
                     b.Property<Guid>("ManagerEmployeeId")
                         .HasColumnType("uuid")
                         .HasColumnName("manager_employee_id");

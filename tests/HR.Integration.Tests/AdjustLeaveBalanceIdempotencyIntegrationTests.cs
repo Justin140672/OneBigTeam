@@ -152,6 +152,20 @@ public class AdjustLeaveBalanceIdempotencyIntegrationTests
         var response = await SendAdjustmentAsync(client, companyId, employeeId, payload, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
+        // The handler's own inline dispatch (immediately after commit, via the real publisher)
+        // already delivered this successfully - rewind it to "never delivered" so the failure
+        // scenario below exercises genuine recovery rather than a no-op on an already-empty batch.
+        using (var rewindScope = _factory.Services.CreateScope())
+        {
+            var db = rewindScope.ServiceProvider.GetRequiredService<LeaveDbContext>();
+            var entry = await db.AuditOutboxEntries.SingleAsync(e => e.CompanyId == companyId);
+            entry.DispatchedAt = null;
+            entry.AttemptCount = 0;
+            entry.NextAttemptAt = null;
+            entry.LastError = null;
+            await db.SaveChangesAsync();
+        }
+
         // Run the dispatcher with a publisher that always fails - via a fresh scope/DbContext, so
         // this proves database durability rather than tracked-entity behaviour.
         using (var failScope = _factory.Services.CreateScope())

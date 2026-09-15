@@ -72,6 +72,9 @@ internal sealed class ProbationRecordConfiguration : IEntityTypeConfiguration<Pr
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property(r => r.ManagerChangeSourceOccurredAt)
+            .HasColumnName("manager_change_source_occurred_at");
+
         // Ticket 16 (optimistic concurrency).
         builder.Property(r => r.Version)
             .HasColumnName("version")

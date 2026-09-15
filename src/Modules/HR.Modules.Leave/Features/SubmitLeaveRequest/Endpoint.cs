@@ -42,25 +42,11 @@ internal sealed class Endpoint(
 
         if (result.IsFailure)
         {
-            var businessError = new { error = result.Error.Message };
-
-            if (result.Error.Code == "not_found")
-            {
-                await Send.ResultAsync(TypedResults.NotFound(businessError));
-                return;
-            }
-
-            // P2 (Ticket 4 follow-up): routes "concurrency" (as well as "conflict") to 409, matching
-            // ApproveLeaveRequest/Endpoint.cs - a losing auto-approval save now returns
-            // Error.Concurrency rather than throwing, and clients must see the same retryable 409
-            // shape they'd get from a manual-approval conflict.
-            if (result.Error.Code is "conflict" or "concurrency")
-            {
-                await Send.ResultAsync(TypedResults.Conflict(businessError));
-                return;
-            }
-
-            await Send.ResultAsync(TypedResults.BadRequest(businessError));
+            // P2 (Ticket 4 follow-up): "concurrency" and "conflict" both need to reach the caller
+            // as 409, matching ApproveLeaveRequest/Endpoint.cs — ProblemResults.FromError already
+            // maps both codes to 409 (distinguishable via the `code` field), so this now matches
+            // the shared translator exactly.
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

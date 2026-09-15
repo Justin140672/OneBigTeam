@@ -3,7 +3,7 @@
 @inject MarketingContentService MarketingContent
 
 <SeoHead Title="HR Software Product Roadmap | One Big Team"
-         Description="See what's coming next to One Big Team, including AI-powered position profiles, employee webhooks and an AI help assistant." />
+         Description="See what's coming next to One Big Team, including performance reviews, training, qualifications, integrations and AI assistance." />
 
 <SiteHeader CurrentPage="roadmap" />
 
@@ -52,26 +52,17 @@
 <SiteFooter />
 
 @code {
-    // Delivery-status buckets rendered in this order; sections with no items are omitted entirely.
-    private static readonly (string Status, string Label)[] Buckets =
-    [
-        ("Available", "Available now"),
-        ("ComingSoon", "Coming soon"),
-        ("Planned", "Planned"),
-        ("Exploring", "Exploring"),
-    ];
-
     private IReadOnlyList<RoadmapGroup> groups = [];
 
     protected override async Task OnInitializedAsync()
     {
         var content = await MarketingContent.GetContentAsync();
-        groups = Buckets
-            .Select(bucket => new RoadmapGroup(
-                bucket.Label,
-                content.Roadmap.Where(item => string.Equals(item.DeliveryStatus, bucket.Status, StringComparison.OrdinalIgnoreCase)).ToList()))
-            .Where(group => group.Items.Count > 0)
+        var upcoming = content.Roadmap
+            .Where(item => !string.Equals(item.DeliveryStatus, "Available", StringComparison.OrdinalIgnoreCase))
             .ToList();
+        groups = upcoming.Count > 0
+            ? [new RoadmapGroup("Coming soon", upcoming)]
+            : [];
     }
 
     private sealed record RoadmapGroup(string Label, IReadOnlyList<MarketingRoadmapContent> Items);

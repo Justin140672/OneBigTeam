@@ -128,6 +128,20 @@ public class CreateAssetIdempotencyIntegrationTests
         var response = await SendCreateAsync(client, companyId, payload, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
+        // The handler's own inline dispatch (immediately after commit, via the real publisher)
+        // already delivered this successfully - rewind it to "never delivered" so the failure
+        // scenario below exercises genuine recovery rather than a no-op on an already-empty batch.
+        using (var rewindScope = _factory.Services.CreateScope())
+        {
+            var db = rewindScope.ServiceProvider.GetRequiredService<AssetsDbContext>();
+            var entry = await db.AuditOutboxEntries.SingleAsync(e => e.CompanyId == companyId);
+            entry.DispatchedAt = null;
+            entry.AttemptCount = 0;
+            entry.NextAttemptAt = null;
+            entry.LastError = null;
+            await db.SaveChangesAsync();
+        }
+
         using (var failScope = _factory.Services.CreateScope())
         {
             var db = failScope.ServiceProvider.GetRequiredService<AssetsDbContext>();

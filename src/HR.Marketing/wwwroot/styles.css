@@ -98,9 +98,15 @@ img {
 }
 
 .icon {
-    width: 1em;
+    width: 1.25em;
     height: 1em;
     flex-shrink: 0;
+    text-align: center;
+}
+
+/* Unknown icon names still show a question mark instead of an empty space. */
+:where(.icon)::before {
+    content: "\f059";
 }
 
 a {

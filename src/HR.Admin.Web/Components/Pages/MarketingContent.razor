@@ -82,6 +82,7 @@ else
             <div class="admin-action-field">
                 <label>Icon name <span class="text-danger">*</span></label>
                 <SfTextBox @bind-Value="_editingFeature.IconName" Placeholder="users" />
+                <small class="text-muted">Font Awesome Free 6 solid icon name, e.g. users or clipboard-check.</small>
             </div>
             <div class="admin-action-field">
                 <label>Summary <span class="text-danger">*</span></label>
@@ -168,6 +169,7 @@ else
             <div class="admin-action-field">
                 <label>Icon name <span class="text-danger">*</span></label>
                 <SfTextBox @bind-Value="_editingRoadmap.IconName" />
+                <small class="text-muted">Font Awesome Free 6 solid icon name, e.g. clipboard-check or chart-line.</small>
             </div>
             <div class="admin-action-field">
                 <label>Delivery status</label>
@@ -219,7 +221,7 @@ else
         public string Title = "";
         public string Description = "";
         public string IconName = "";
-        public string DeliveryStatus = "Planned";
+        public string DeliveryStatus = "ComingSoon";
         public int DisplayOrder;
     }
 

@@ -88,6 +88,14 @@ public static class LeaveModule
             "reconcile-missing-leave-policy-deactivations",
             job => job.ExecuteAsync(),
             Cron.Daily(2));
+        // Round 3 reliability fix (Gap-2 follow-up): distinct, bounded, paginated one-time sweep of
+        // the ENTIRE finalised-departure history — closes the gap ReconcileMissingLeaveDeactivationsJob's
+        // 30-day lookback can never reach (see ReconcileHistoricalLeaveDeactivationsJob's remarks).
+        // Runs hourly while the backlog is being drained; becomes a cheap no-op once IsComplete.
+        jobManager.AddOrUpdate<ReconcileHistoricalLeaveDeactivationsJob>(
+            "reconcile-historical-leave-policy-deactivations",
+            job => job.ExecuteAsync(),
+            Cron.Hourly());
         // Ticket 3 (P1) follow-up items 5/6: dispatch audit-outbox entries and clean up expired
         // idempotency records. Every 5 minutes is comfortably below the 7-day retention window while
         // keeping audit delivery latency low after a transient failure.
@@ -149,6 +157,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         services.AddScoped<LeavePolicyDeactivationJob>();
         services.AddScoped<ReconcileLeavePolicyDeactivationsJob>();
         services.AddScoped<ReconcileMissingLeaveDeactivationsJob>();
+        services.AddScoped<ReconcileHistoricalLeaveDeactivationsJob>();
         services.AddScoped<IIntegrationEventHandler<EmployeeLeavingDateSetIntegrationEvent>, LeavingDateChangeHandler>();
         services.AddScoped<IIntegrationEventHandler<EmployeeLeavingProcessCancelledIntegrationEvent>, LeavingDateChangeHandler>();
         services.AddScoped<ILeaveApprovalService, LeaveApprovalService>();

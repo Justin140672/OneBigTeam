@@ -95,8 +95,8 @@ public static class MarketingModule
     /// <summary>
     /// Idempotent seed of the marketing content set. Upserts the <see cref="MarketingProduct"/>
     /// singleton, then inserts any of the seed features (matched by slug) / roadmap items (matched
-    /// by title) that are not already present. Never updates or deletes existing rows, so it is
-    /// safe to run on every startup and after platform administrators have edited content.
+    /// by stable seed id or title) that are not already present. Upgrades untouched legacy
+    /// roadmap seeds once, preserving administrator edits and completion/publication choices.
     /// </summary>
     public static async Task SeedMarketingAsync(this IServiceProvider services)
     {
@@ -137,28 +137,37 @@ public static class MarketingModule
             }
         }
 
-        var existingTitles = (await db.MarketingRoadmapItems.Select(r => r.Title).ToListAsync())
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        for (var index = 0; index < SeedRoadmapItems.Length; index++)
+        var existingItems = await db.MarketingRoadmapItems.ToListAsync();
+        for (var index = 0; index < PhaseTwoRoadmapCatalog.All.Count; index++)
         {
-            var seed = SeedRoadmapItems[index];
-            if (existingTitles.Contains(seed.Title))
+            var seed = PhaseTwoRoadmapCatalog.All[index];
+            var existing = existingItems.FirstOrDefault(r => r.Id == seed.Id)
+                ?? existingItems.FirstOrDefault(r => string.Equals(r.Title, seed.Title, StringComparison.OrdinalIgnoreCase))
+                ?? existingItems.FirstOrDefault(r => seed.LegacyTitle is not null && r.Title == seed.LegacyTitle);
+
+            if (existing is not null)
             {
+                // Upgrade only untouched legacy seed content once. Preserve admin changes,
+                // publication choices and completed statuses on every subsequent startup.
+                if (seed.LegacyTitle is not null && existing.Title == seed.LegacyTitle
+                    && existing.CreatedByUserId is null && existing.UpdatedByUserId is null
+                    && existing.DeliveryStatus != MarketingDeliveryStatus.Available)
+                {
+                    existing.Update(seed.Title, seed.Description, seed.IconName,
+                        MarketingDeliveryStatus.ComingSoon, index, null, now);
+                }
                 continue;
             }
 
             var created = MarketingRoadmapItem.Create(
-                Guid.NewGuid(), product.Id, seed.Title, seed.Description, seed.IconName,
-                seed.DeliveryStatus, index, null, now);
+                seed.Id, product.Id, seed.Title, seed.Description, seed.IconName,
+                MarketingDeliveryStatus.ComingSoon, index, null, now);
+            if (created.IsFailure)
+                throw new InvalidOperationException(created.Error.Message);
 
-            if (created.IsSuccess)
-            {
-                created.Value!.Publish(null, now);
-                db.MarketingRoadmapItems.Add(created.Value!);
-            }
+            created.Value!.Publish(null, now);
+            db.MarketingRoadmapItems.Add(created.Value);
         }
-
         await db.SaveChangesAsync();
     }
 
@@ -170,11 +179,6 @@ public static class MarketingModule
         string Intro,
         IReadOnlyList<string> Benefits);
 
-    private sealed record SeedRoadmapItem(
-        string IconName,
-        string Title,
-        string Description,
-        MarketingDeliveryStatus DeliveryStatus);
 
     // Values copied verbatim from src/HR.Marketing/Services/FeatureCatalog.cs (the current seed
     // source of record). That file is intentionally left in place for now.
@@ -280,23 +284,4 @@ public static class MarketingModule
             ]),
     ];
 
-    // Values copied verbatim from src/HR.Marketing/Services/UpcomingFeatureCatalog.cs.
-    private static readonly SeedRoadmapItem[] SeedRoadmapItems =
-    [
-        new SeedRoadmapItem(
-            "folder-open",
-            "AI-powered position profiles",
-            "Writing a good job description or position profile from scratch takes time you probably don't have. AI-assisted drafting will help you get to a strong, ready-to-use position profile faster, so you can focus on hiring rather than wordsmithing.",
-            MarketingDeliveryStatus.ComingSoon),
-        new SeedRoadmapItem(
-            "diagram-project",
-            "Employee webhooks",
-            "Re-keying the same joiner, mover and leaver updates into other systems is slow and error-prone. Webhooks will let One Big Team notify the other tools you use automatically when an employee joins, changes role or leaves, keeping everything in sync without manual double-entry.",
-            MarketingDeliveryStatus.ComingSoon),
-        new SeedRoadmapItem(
-            "chart-line",
-            "AI help assistant",
-            "Not everyone wants to dig through help articles to find an answer. A built-in AI assistant will let you ask a question in plain language and get a contextual answer right where you're working, so you can get back to the task at hand.",
-            MarketingDeliveryStatus.Planned),
-    ];
 }

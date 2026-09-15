@@ -16,6 +16,22 @@ public interface IFinalisedEmployeeDeparturesReader
 {
     Task<IReadOnlyList<FinalisedEmployeeDeparture>> GetFinalisedDeparturesSinceAsync(
         DateTimeOffset since, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Round 3 reliability fix (Gap-2 follow-up): a bounded, keyset-paginated companion to
+    /// <see cref="GetFinalisedDeparturesSinceAsync"/> for consumers that need to sweep the ENTIRE
+    /// finalised-departure history (not just a recent lookback window) without ever issuing one
+    /// unbounded query. Ordered by (FinalisationCompletedAt, EmployeeId) ascending across all
+    /// companies. Pass the cursor of the last row processed from the previous page
+    /// (<paramref name="afterFinalisationCompletedAt"/>/<paramref name="afterEmployeeId"/>, both
+    /// null to start from the beginning) to resume exactly where a prior run left off. Returns up to
+    /// <paramref name="take"/> rows; an empty result means no more rows exist after the given cursor.
+    /// </summary>
+    Task<IReadOnlyList<FinalisedEmployeeDeparture>> GetFinalisedDeparturesPageAsync(
+        DateTimeOffset? afterFinalisationCompletedAt,
+        Guid? afterEmployeeId,
+        int take,
+        CancellationToken cancellationToken);
 }
 
 public sealed record FinalisedEmployeeDeparture(

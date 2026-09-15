@@ -53,6 +53,12 @@ internal sealed class Endpoint(ValidateImportSessionHandler handler, IAuthorizat
 
         if (result.IsFailure)
         {
+            // Exception (Ticket 20): intentionally NOT routed through ProblemResults.FromError.
+            // This endpoint's validation-style business errors (e.g. malformed import rows) map
+            // to 422 UnprocessableEntity per an existing contract (see
+            // DataImportHardeningEndpointTests, which asserts 422), which differs from the
+            // shared translator's 400 default for unrecognised error codes. not_found/conflict
+            // still align with the shared mapping and are kept literal here for symmetry.
             var error = new { error = result.Error.Message };
 
             if (result.Error.Code == "not_found")

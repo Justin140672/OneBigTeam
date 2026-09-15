@@ -75,6 +75,41 @@ namespace HR.Modules.Leave.Migrations
                     b.ToTable("employee_leave_policy_assignments", "leave");
                 });
 
+            modelBuilder.Entity("HR.Modules.Leave.Domain.HistoricalLeaveDeactivationRepairProgress", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("IsComplete")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_complete");
+
+                    b.Property<Guid?>("LastProcessedEmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_processed_employee_id");
+
+                    b.Property<DateTimeOffset?>("LastProcessedFinalisationCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_processed_finalisation_completed_at");
+
+                    b.Property<int>("TotalRepaired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("total_repaired");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("historical_leave_deactivation_repair_progress", "leave");
+                });
+
             modelBuilder.Entity("HR.Modules.Leave.Domain.LeaveBalance", b =>
                 {
                     b.Property<Guid>("Id")

@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Companies.Features.CreateBillingPortalSession;
@@ -18,21 +19,7 @@ internal sealed class Endpoint(
 
         if (result.IsFailure)
         {
-            var businessError = new { error = result.Error.Message };
-
-            if (result.Error.Code == "unauthorized")
-            {
-                await Send.ResultAsync(TypedResults.Unauthorized());
-                return;
-            }
-
-            if (result.Error.Code == "not_found")
-            {
-                await Send.ResultAsync(TypedResults.NotFound(businessError));
-                return;
-            }
-
-            await Send.ResultAsync(TypedResults.BadRequest(businessError));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

@@ -147,6 +147,7 @@ internal sealed class CreateAssetHandler(
             entity.Id,
             entity.AssetNumber,
             entity.Name,
+            request.ActorId,
             now), request.CompanyId, now);
 
         // Ticket 3 (P1) final gap item 6: no-op in production. Lets an integration test simulate a

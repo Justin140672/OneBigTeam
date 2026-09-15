@@ -66,6 +66,16 @@ internal sealed class ProbationRecord : IVersionedAggregate
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    /// <summary>
+    /// Round 3 reliability fix: the OccurredAt of the most recent
+    /// EmployeeManagerChangedIntegrationEvent actually applied to <see cref="ManagerEmployeeId"/> by
+    /// <see cref="ApplyManagerChangeFromEvent"/>. Distinct from <see cref="UpdatedAt"/> (which
+    /// changes on many unrelated mutations), this lets ManagerChangedHandler detect and ignore a
+    /// stale/out-of-order redelivery — e.g. recovery replaying an old A-&gt;B event after a later
+    /// B-&gt;C event has already been applied — rather than trusting event arrival order.
+    /// </summary>
+    public DateTimeOffset? ManagerChangeSourceOccurredAt { get; private set; }
+
     // Ticket 16 (optimistic concurrency): explicit, persisted concurrency token. Mapped as an EF
     // concurrency token in ProbationRecordConfiguration. Every other mutation path in this module
     // (CompleteProbationReview, MarkProbationNotApplicable, ReassignReviewsOnManagerChanged,
@@ -231,6 +241,31 @@ internal sealed class ProbationRecord : IVersionedAggregate
     {
         ManagerEmployeeId = newManagerEmployeeId;
         UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Round 3 reliability fix: replaces the old "record.ManagerEmployeeId == event.NewManagerId
+    /// means already applied" idempotency guard in ManagerChangedHandler, which hid incomplete task
+    /// reconciliation work on retry. Applies <paramref name="newManagerEmployeeId"/> only if
+    /// <paramref name="occurredAt"/> is at least as new as the last manager-change event actually
+    /// applied (<see cref="ManagerChangeSourceOccurredAt"/>) — a stale/out-of-order redelivery (e.g.
+    /// an old A-&gt;B event replayed after a later B-&gt;C event already landed) is a no-op here, so the
+    /// record never regresses to an outdated manager. Returns true if the record's ManagerEmployeeId
+    /// was changed by this call, false if it was left as-is (already current, or event is stale).
+    /// </summary>
+    public bool ApplyManagerChangeFromEvent(Guid newManagerEmployeeId, DateTimeOffset occurredAt, DateTimeOffset now)
+    {
+        if (ManagerChangeSourceOccurredAt is not null && occurredAt < ManagerChangeSourceOccurredAt)
+            return false; // Stale/out-of-order event — a newer manager change has already been applied.
+
+        ManagerChangeSourceOccurredAt = occurredAt;
+
+        if (ManagerEmployeeId == newManagerEmployeeId)
+            return false; // Already reflects this manager — no field actually changed.
+
+        ManagerEmployeeId = newManagerEmployeeId;
+        UpdatedAt = now;
+        return true;
     }
 
     public void Extend(

@@ -7,12 +7,13 @@ internal sealed record AssetCreatedAuditEvent(
     Guid AssetId,
     string AssetNumber,
     string Name,
+    Guid ActorUserId,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
     string IAuditEvent.EventType => "asset.created";
     string IAuditEvent.EntityType => "Asset";
     Guid IAuditEvent.EntityId => AssetId;
-    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorUserId => ActorUserId;
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => $"Asset '{Name}' ({AssetNumber}) created";

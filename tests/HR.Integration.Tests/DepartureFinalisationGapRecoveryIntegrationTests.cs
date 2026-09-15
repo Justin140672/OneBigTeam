@@ -457,4 +457,166 @@ public class DepartureFinalisationGapRecoveryIntegrationTests
             Assert.Equal(LeavePolicyDeactivationOnDeparture.StatusPending, request.Status);
         }
     }
+
+    // ==========================================================================================
+    // Round 3 (Gap-2 follow-up): ReconcileHistoricalLeaveDeactivationsJob — the entire-history,
+    // paginated backlog sweep that closes the gap ReconcileMissingLeaveDeactivationsJob's 30-day
+    // lookback can never reach.
+    // ==========================================================================================
+
+    /// <summary>Seeds a departure "already finalised" long ago, directly via the real domain methods
+    /// (rather than the real-time finalizer), so FinalisationCompletedAt can be backdated beyond the
+    /// 30-day lookback while leaving no LeavePolicyDeactivationOnDeparture row — modelling a departure
+    /// stranded before the recovery mechanism existed, or during an extended outage of it.</summary>
+    private async Task<Guid> SeedHistoricallyFinalisedDepartureAsync(
+        EmployeesDbContext employeesDb, Guid companyId, Guid employeeId, DateTimeOffset finalisationCompletedAt)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var process = CreateInProgressProcess(companyId, employeeId, DateOnly.FromDateTime(finalisationCompletedAt.UtcDateTime), now);
+        process.Complete(now);
+        process.MarkFinalisationCompleted(finalisationCompletedAt);
+        employeesDb.EmployeeLeavingProcesses.Add(process);
+        await employeesDb.SaveChangesAsync();
+        return process.Id;
+    }
+
+    [Fact]
+    public async Task Gap2Historical_DepartureFinalisedOver30DaysAgo_IsMissedByTheDailyJob_ButRepairedByTheHistoricalJob()
+    {
+        var companyId = Guid.NewGuid();
+        Guid employeeId, assignmentId;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
+            var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(employeesDb, companyId);
+            employeeId = await SeedEmployeeAsync(employeesDb, companyId, referenceData, "Historical", "Departed");
+
+            // Mark the employee a former (non-current) employee — ICurrentEmployeeReader's real
+            // implementation classifies by Employee.Status, and this scenario models a genuinely
+            // departed employee (not a rehire — that is the distinct scenario covered below).
+            var employee = await employeesDb.Employees.SingleAsync(e => e.Id == employeeId);
+            employee.SetFormerEmployee(DateTimeOffset.UtcNow);
+
+            var leaveDb = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
+            var now = DateTimeOffset.UtcNow;
+            var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 0, false, isDefault: true, now: now);
+            leaveDb.LeavePolicies.Add(policy);
+            var assignment = EmployeeLeavePolicyAssignment.Create(
+                Guid.NewGuid(), companyId, employeeId, policy.Id, new DateOnly(2018, 1, 1), now);
+            assignmentId = assignment.Id;
+            leaveDb.EmployeeLeavePolicyAssignments.Add(assignment);
+            await leaveDb.SaveChangesAsync();
+
+            // Finalised well outside the 30-day lookback (and outside any plausible daily-job window).
+            await SeedHistoricallyFinalisedDepartureAsync(
+                employeesDb, companyId, employeeId, DateTimeOffset.UtcNow.AddDays(-400));
+        }
+
+        // The regular daily job must NOT find/fix this — proving the 30-day/entire-history split is
+        // real, not just documentation.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var reconcileJob = scope.ServiceProvider.GetRequiredService<ReconcileMissingLeaveDeactivationsJob>();
+            await reconcileJob.ExecuteAsync();
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var leaveDb = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
+            var rows = await leaveDb.LeavePolicyDeactivationsOnDeparture
+                .Where(d => d.CompanyId == companyId && d.EmployeeId == employeeId)
+                .ToListAsync();
+            Assert.Empty(rows); // confirmed: the 30-day job cannot see this departure
+
+            var assignment = await leaveDb.EmployeeLeavePolicyAssignments.SingleAsync(a => a.Id == assignmentId);
+            Assert.True(assignment.IsActive);
+        }
+
+        // The historical sweep job DOES find and fix it.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var historicalJob = scope.ServiceProvider.GetRequiredService<ReconcileHistoricalLeaveDeactivationsJob>();
+            await historicalJob.ExecuteAsync();
+        }
+
+        Guid deactivationId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var leaveDb = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
+            var request = await leaveDb.LeavePolicyDeactivationsOnDeparture
+                .SingleAsync(d => d.CompanyId == companyId && d.EmployeeId == employeeId);
+            Assert.Equal(LeavePolicyDeactivationOnDeparture.StatusPending, request.Status);
+            deactivationId = request.Id;
+        }
+
+        // Mirrors the other scenarios in this file: directly invoke the (faked-away) Hangfire-enqueued
+        // job body.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var job = scope.ServiceProvider.GetRequiredService<LeavePolicyDeactivationJob>();
+            await job.ProcessAsync(deactivationId, companyId);
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var leaveDb = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
+            var assignment = await leaveDb.EmployeeLeavePolicyAssignments.SingleAsync(a => a.Id == assignmentId);
+            Assert.False(assignment.IsActive);
+        }
+    }
+
+    [Fact]
+    public async Task Gap2Historical_RehiredEmployee_HistoricalDepartureIsNotUsedToDeactivateTheirCurrentAssignment()
+    {
+        // Requirement 6: rehire safety. The employee is CURRENT (non-former) again by the time the
+        // historical sweep reaches their old, stale departure record — their present-day, legitimate
+        // assignment must not be touched.
+        var companyId = Guid.NewGuid();
+        Guid employeeId, assignmentId;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
+            var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(employeesDb, companyId);
+            employeeId = await SeedEmployeeAsync(employeesDb, companyId, referenceData, "Rehired", "Employee");
+
+            // Seed a stale historical departure for this employee...
+            await SeedHistoricallyFinalisedDepartureAsync(
+                employeesDb, companyId, employeeId, DateTimeOffset.UtcNow.AddDays(-400));
+
+            // ...but the employee is (still/again) Active — SeedEmployeeAsync already calls
+            // Activate(), and Employee.Status is exactly what ICurrentEmployeeReader's real
+            // implementation classifies "current" vs "former" by — modelling the rehire: the
+            // employee is current again despite the stale historical departure record.
+
+            var leaveDb = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
+            var now = DateTimeOffset.UtcNow;
+            var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 0, false, isDefault: true, now: now);
+            leaveDb.LeavePolicies.Add(policy);
+            var assignment = EmployeeLeavePolicyAssignment.Create(
+                Guid.NewGuid(), companyId, employeeId, policy.Id, new DateOnly(2026, 1, 1), now); // legitimate post-rehire assignment
+            assignmentId = assignment.Id;
+            leaveDb.EmployeeLeavePolicyAssignments.Add(assignment);
+            await leaveDb.SaveChangesAsync();
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var historicalJob = scope.ServiceProvider.GetRequiredService<ReconcileHistoricalLeaveDeactivationsJob>();
+            await historicalJob.ExecuteAsync();
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var leaveDb = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
+            var rows = await leaveDb.LeavePolicyDeactivationsOnDeparture
+                .Where(d => d.CompanyId == companyId && d.EmployeeId == employeeId)
+                .ToListAsync();
+            Assert.Empty(rows); // no deactivation request created for the rehired employee
+
+            var assignment = await leaveDb.EmployeeLeavePolicyAssignments.SingleAsync(a => a.Id == assignmentId);
+            Assert.True(assignment.IsActive);
+        }
+    }
 }

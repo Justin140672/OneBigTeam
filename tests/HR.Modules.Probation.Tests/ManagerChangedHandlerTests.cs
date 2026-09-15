@@ -106,34 +106,54 @@ public class ManagerChangedHandlerTests
         Assert.NotEqual(Guid.Empty, updatedRecord.ManagerEmployeeId);
     }
 
+    // Round 3 reliability fix: replaces the old "manager already equals NewManagerId => no task
+    // work at all" idempotency-guard test. That equality guard is exactly what this round removed
+    // from ManagerChangedHandler, because it hid incomplete task reconciliation on retry (the manager
+    // field could already be saved from a first attempt that then failed before fixing up the task).
+    // The new behaviour: even when the manager field requires no change, the task is still
+    // reconciled against the CURRENT persisted task state — here, no open task is recorded for this
+    // manager at all, so the handler must still cancel any stale task and create the correct one.
     [Fact]
-    public async Task HandleAsync_Duplicate_Event_Delivery_Is_A_No_Op()
+    public async Task HandleAsync_Manager_Already_Correct_But_No_Open_Task_Recorded_Still_Reconciles_Task()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var newManagerId = Guid.NewGuid();
 
-        // Manager already equals NewManagerId — simulating that the first delivery already applied.
+        // Manager already equals NewManagerId — simulating that a prior attempt already saved the
+        // manager field but crashed before fixing up the task (the exact Gap-1 partial-failure
+        // scenario this round's fix addresses).
         var (record, review) = await SeedRecordWithPendingCheckIn(context, companyId, employeeId, newManagerId);
 
         var taskCreator = new FakeTaskCreator();
         var taskCanceller = new FakeTaskCanceller();
-        var handler = BuildHandler(context, taskCreator, taskCanceller);
+        // No open task registered for (review.Id, newManagerId) — the actual, persisted task state
+        // says nothing correct exists yet.
+        var openTaskReader = new ManualOpenTaskBySourceEntityReader();
+        var handler = BuildHandler(context, taskCreator, taskCanceller, openTaskReader: openTaskReader);
 
         await handler.HandleAsync(
             new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, Guid.NewGuid(), newManagerId, Now),
             CancellationToken.None);
 
-        Assert.Empty(taskCanceller.Calls);
-        Assert.Empty(taskCreator.Created);
+        // The old guard would have made this a total no-op; the fix requires the task work to
+        // actually happen regardless.
+        var cancelCall = Assert.Single(taskCanceller.Calls);
+        Assert.Equal(review.Id, cancelCall.SourceEntityId);
+        var createdTask = Assert.Single(taskCreator.Created);
+        Assert.Equal(newManagerId, createdTask.AssignedEmployeeId);
+        Assert.Equal($"ProbationManagerCheckIn:{review.Id}:{newManagerId}", createdTask.IdempotencyKey);
 
         var reloadedReview = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
         Assert.Equal(ProbationReviewStatus.Pending, reloadedReview.Status);
     }
 
+    // Covers a correctly-assigned open task already existing (e.g. a previous attempt's task work
+    // actually did complete, or an out-of-band process already fixed it up) — reconciliation must be
+    // a true no-op: no cancel, no create.
     [Fact]
-    public async Task HandleAsync_Second_Call_With_Same_NewManagerId_Produces_No_Additional_Calls()
+    public async Task HandleAsync_Correctly_Assigned_Open_Task_Already_Exists_Is_A_No_Op()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -141,23 +161,160 @@ public class ManagerChangedHandlerTests
         var oldManagerId = Guid.NewGuid();
         var newManagerId = Guid.NewGuid();
 
-        await SeedRecordWithPendingCheckIn(context, companyId, employeeId, oldManagerId);
+        var (record, review) = await SeedRecordWithPendingCheckIn(context, companyId, employeeId, oldManagerId);
+
+        var openTaskReader = new ManualOpenTaskBySourceEntityReader();
+        openTaskReader.Register(review.Id, newManagerId, Guid.NewGuid());
 
         var taskCreator = new FakeTaskCreator();
         var taskCanceller = new FakeTaskCanceller();
+        var handler = BuildHandler(context, taskCreator, taskCanceller, openTaskReader: openTaskReader);
+
+        await handler.HandleAsync(
+            new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, oldManagerId, newManagerId, Now),
+            CancellationToken.None);
+
+        Assert.Empty(taskCanceller.Calls);
+        Assert.Empty(taskCreator.Created);
+
+        var updatedRecord = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(newManagerId, updatedRecord.ManagerEmployeeId); // manager field still updated
+    }
+
+    // Duplicate redelivery (requirement 4): once the first delivery's task work has actually landed
+    // (modelled here by registering the resulting task as the correctly-assigned open task before the
+    // second delivery), a second delivery of the same event must be a pure no-op — exactly one active
+    // task, no duplicate cancel/create calls.
+    [Fact]
+    public async Task HandleAsync_Redelivery_After_Task_Already_Correctly_Assigned_Produces_No_Additional_Calls()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var oldManagerId = Guid.NewGuid();
+        var newManagerId = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordWithPendingCheckIn(context, companyId, employeeId, oldManagerId);
+
+        var taskCreator = new FakeTaskCreator();
+        var taskCanceller = new FakeTaskCanceller();
+        var openTaskReader = new ManualOpenTaskBySourceEntityReader();
 
         var firstEvent = new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, oldManagerId, newManagerId, Now);
 
-        await BuildHandler(context, taskCreator, taskCanceller).HandleAsync(firstEvent, CancellationToken.None);
+        await BuildHandler(context, taskCreator, taskCanceller, openTaskReader: openTaskReader)
+            .HandleAsync(firstEvent, CancellationToken.None);
 
-        var callsAfterFirst = taskCanceller.Calls.Count;
-        var createdAfterFirst = taskCreator.Created.Count;
+        var createdTask = Assert.Single(taskCreator.Created);
+        Assert.Single(taskCanceller.Calls);
+
+        // Simulate that the task created by the first delivery is now the actually-open, correctly
+        // assigned task (as it would be in production once ITaskCreator's write has landed).
+        openTaskReader.Register(review.Id, newManagerId, createdTask.ReturnedTaskId);
 
         // Redelivery of the same event.
-        await BuildHandler(context, taskCreator, taskCanceller).HandleAsync(firstEvent, CancellationToken.None);
+        await BuildHandler(context, taskCreator, taskCanceller, openTaskReader: openTaskReader)
+            .HandleAsync(firstEvent, CancellationToken.None);
 
-        Assert.Equal(callsAfterFirst, taskCanceller.Calls.Count);
-        Assert.Equal(createdAfterFirst, taskCreator.Created.Count);
+        Assert.Single(taskCanceller.Calls); // no additional cancel
+        Assert.Single(taskCreator.Created); // no duplicate task created
+    }
+
+    // Requirement 3: redelivery that repairs the task work must only be judged "done" once the task
+    // state is actually correct — models the handler running once (partial failure: task left wrong),
+    // then a second time (successfully), asserting the task-correct outcome only appears after the
+    // second run.
+    [Fact]
+    public async Task HandleAsync_First_Run_Leaves_Task_Wrong_Second_Run_Repairs_It()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var oldManagerId = Guid.NewGuid();
+        var newManagerId = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordWithPendingCheckIn(context, companyId, employeeId, oldManagerId);
+
+        var taskCreator = new FakeTaskCreator();
+        var taskCanceller = new FakeTaskCanceller();
+        var openTaskReader = new ManualOpenTaskBySourceEntityReader();
+
+        var evt = new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, oldManagerId, newManagerId, Now);
+
+        // First run: task work happens (cancel old + create new for newManagerId), but — modelling a
+        // partial failure where the created task never actually became visible as "open" (e.g. the
+        // downstream write didn't durably land) — the reader is NOT updated to reflect it.
+        await BuildHandler(context, taskCreator, taskCanceller, openTaskReader: openTaskReader)
+            .HandleAsync(evt, CancellationToken.None);
+
+        Assert.Null(await openTaskReader.GetOpenTaskIdForAssigneeAsync(
+            companyId, review.Id, newManagerId, TaskActionType.Review, CancellationToken.None));
+
+        // Second run (redelivery/reconciliation): still no correctly-assigned task recorded, so the
+        // handler must repair it again rather than assuming the manager-field match means "done".
+        await BuildHandler(context, taskCreator, taskCanceller, openTaskReader: openTaskReader)
+            .HandleAsync(evt, CancellationToken.None);
+
+        Assert.Equal(2, taskCanceller.Calls.Count);
+        Assert.Equal(2, taskCreator.Created.Count);
+
+        // Now simulate the repair actually landing, and confirm a further redelivery converges to a
+        // no-op.
+        openTaskReader.Register(review.Id, newManagerId, taskCreator.Created[^1].ReturnedTaskId);
+        await BuildHandler(context, taskCreator, taskCanceller, openTaskReader: openTaskReader)
+            .HandleAsync(evt, CancellationToken.None);
+
+        Assert.Equal(2, taskCanceller.Calls.Count); // no further calls once correctly assigned
+        Assert.Equal(2, taskCreator.Created.Count);
+    }
+
+    // Out-of-order/stale event handling: an old A->B event redelivered after a later B->C event has
+    // already landed must not regress ManagerEmployeeId, and task reconciliation must target the
+    // CURRENT (C) manager, never the stale event's own payload.
+    [Fact]
+    public async Task HandleAsync_Stale_Redelivered_Event_Does_Not_Regress_Manager_And_Reconciles_Against_Current_Manager()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerA = Guid.NewGuid();
+        var managerB = Guid.NewGuid();
+        var managerC = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordWithPendingCheckIn(context, companyId, employeeId, managerA);
+
+        var taskCreator = new FakeTaskCreator();
+        var taskCanceller = new FakeTaskCanceller();
+        var openTaskReader = new ManualOpenTaskBySourceEntityReader();
+
+        var earlierOccurredAt = Now;
+        var laterOccurredAt = Now.AddMinutes(5);
+
+        // The later B->C event lands first (as recovery/redelivery can reorder events).
+        await BuildHandler(context, taskCreator, taskCanceller, openTaskReader: openTaskReader)
+            .HandleAsync(
+                new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, managerB, managerC, laterOccurredAt),
+                CancellationToken.None);
+
+        var afterLater = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(managerC, afterLater.ManagerEmployeeId);
+
+        taskCreator.Created.Clear();
+        taskCanceller.Calls.Clear();
+
+        // The stale A->B event is now redelivered (e.g. a late/duplicate delivery from before C was
+        // applied). It must be ignored for the manager field, and any task reconciliation must target
+        // the CURRENT manager (C), never regress to B.
+        await BuildHandler(context, taskCreator, taskCanceller, openTaskReader: openTaskReader)
+            .HandleAsync(
+                new EmployeeManagerChangedIntegrationEvent(companyId, employeeId, managerA, managerB, earlierOccurredAt),
+                CancellationToken.None);
+
+        var afterStale = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(managerC, afterStale.ManagerEmployeeId); // never regressed to B
+
+        var createdTask = Assert.Single(taskCreator.Created);
+        Assert.Equal(managerC, createdTask.AssignedEmployeeId); // reconciled against current (C), not stale payload (B)
     }
 
     [Fact]
@@ -442,10 +599,12 @@ public class ManagerChangedHandlerTests
         FakeTaskCreator taskCreator,
         FakeTaskCanceller taskCanceller,
         IEmployeeProbationDatesReader? probationDatesReader = null,
-        FakeAuditPublisher? auditPublisher = null) =>
+        FakeAuditPublisher? auditPublisher = null,
+        IOpenTaskBySourceEntityReader? openTaskReader = null) =>
         new(context,
             taskCreator,
             taskCanceller,
+            openTaskReader ?? new FakeOpenTaskBySourceEntityReader(),
             new FakeEmployeeNameReader(),
             probationDatesReader ?? new FakeEmployeeProbationDatesReader(),
             new FakeCompanyTimeZoneReader(),
@@ -457,6 +616,38 @@ public class ManagerChangedHandlerTests
         new(new DbContextOptionsBuilder<ProbationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
+
+    /// <summary>
+    /// Assignee-aware stand-in for <see cref="IOpenTaskBySourceEntityReader"/>, distinct from the
+    /// shared <c>FakeOpenTaskBySourceEntityReader</c> (which is keyed by source entity only and
+    /// cannot express "a task exists for this source entity but for the WRONG assignee" — exactly the
+    /// distinction ManagerChangedHandler's reconciliation logic depends on). Local to this test class
+    /// since no other Probation test currently needs per-assignee open-task state.
+    /// </summary>
+    private sealed class ManualOpenTaskBySourceEntityReader : IOpenTaskBySourceEntityReader
+    {
+        private readonly Dictionary<(Guid SourceEntityId, Guid AssignedEmployeeId), Guid> _openTasks = [];
+
+        public void Register(Guid sourceEntityId, Guid assignedEmployeeId, Guid taskId) =>
+            _openTasks[(sourceEntityId, assignedEmployeeId)] = taskId;
+
+        public Task<IReadOnlyDictionary<Guid, Guid>> GetOpenTaskIdsAsync(
+            Guid companyId,
+            IEnumerable<Guid> sourceEntityIds,
+            CancellationToken cancellationToken,
+            TaskActionType? actionType = null) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, Guid>>(new Dictionary<Guid, Guid>());
+
+        public Task<Guid?> GetOpenTaskIdForAssigneeAsync(
+            Guid companyId,
+            Guid sourceEntityId,
+            Guid assignedEmployeeId,
+            TaskActionType actionType,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(_openTasks.TryGetValue((sourceEntityId, assignedEmployeeId), out var id)
+                ? (Guid?)id
+                : null);
+    }
 
     [Fact]
     public void ManagerChangedHandler_Implements_IRequiredIntegrationEventHandler()

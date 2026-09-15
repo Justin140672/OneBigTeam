@@ -1,5 +1,7 @@
 using FastEndpoints;
 
+using HR.SharedKernel;
+
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Marketing.Features.UpdateMarketingFeature;
@@ -23,13 +25,7 @@ internal sealed class Endpoint(UpdateMarketingFeatureHandler handler)
 
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code switch
-            {
-                "not_found" => StatusCodes.Status404NotFound,
-                "conflict" => StatusCodes.Status409Conflict,
-                _ => StatusCodes.Status400BadRequest,
-            };
-            await Send.ResultAsync(Results.Json(new { error = result.Error.Message }, statusCode: statusCode));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 
