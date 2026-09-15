@@ -173,11 +173,15 @@
         // user to retry or abandon the pending operation.
         try
         {
+            // Comments must be normalized here, before the idempotency key snapshot is taken below,
+            // so the fingerprint and the HTTP body are always derived from the identical trimmed
+            // value - trimming afterwards (or only at the HTTP boundary) would let whitespace-only
+            // edits change one without the other.
             var request = new AdjustLeaveBalanceModel(
                 LeaveTypeId,
                 _model.AdjustmentValue!.Value,
                 _model.Reason,
-                string.IsNullOrWhiteSpace(_model.Comments) ? null : _model.Comments,
+                FormText.Optional(_model.Comments),
                 _model.AllowNegativeOverride);
 
             // Fingerprint includes which employee/leave type this dialog instance currently targets

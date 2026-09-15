@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using HR.Admin.Web.Models;
+using HR.SharedKernel;
 
 namespace HR.Admin.Web.Services;
 
@@ -41,7 +42,7 @@ public sealed class AdminUsersService(HrApiHttpClientFactory httpClientFactory)
         {
             var response = await Http.PostAsJsonAsync(
                 "api/platform-administrators",
-                new CreateAdministratorRequest(email, role),
+                new CreateAdministratorRequest(FormText.Required(email), FormText.Required(role)),
                 cancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -76,7 +77,7 @@ public sealed class AdminUsersService(HrApiHttpClientFactory httpClientFactory)
         PostActionAsync($"api/platform-administrators/{id}/enable", new AdministratorIdRequest(id), cancellationToken);
 
     public Task<bool> AssignRoleAsync(Guid id, string role, CancellationToken cancellationToken = default) =>
-        PostActionAsync($"api/platform-administrators/{id}/role", new AssignAdministratorRoleRequest(id, role), cancellationToken);
+        PostActionAsync($"api/platform-administrators/{id}/role", new AssignAdministratorRoleRequest(id, FormText.Required(role)), cancellationToken);
 
     /// <summary>
     /// Performs a real MFA reset via the identity provider: removes every multi-factor factor for
@@ -90,7 +91,7 @@ public sealed class AdminUsersService(HrApiHttpClientFactory httpClientFactory)
         {
             var response = await Http.PostAsJsonAsync(
                 $"api/platform-administrators/{id}/reset-mfa",
-                new ResetAdministratorMfaRequest(id, true, reason),
+                new ResetAdministratorMfaRequest(id, true, FormText.Required(reason)),
                 cancellationToken);
 
             if (!response.IsSuccessStatusCode)

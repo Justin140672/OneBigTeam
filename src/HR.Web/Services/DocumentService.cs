@@ -284,7 +284,7 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         try
         {
             var request = new UpdateSharedCompanyDocumentMetadataRequest(
-                companyId, documentId, title, description, categoryId, effectiveDate, reviewDate,
+                companyId, documentId, FormText.Required(title), FormText.Optional(description), categoryId, effectiveDate, reviewDate,
                 reviewFrequency, customReviewFrequencyMonths, reviewOwnerEmployeeId, expectedVersion);
 
             var response = await Http.PutAsJsonAsync(
@@ -590,9 +590,10 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         try
         {
             using var content = new MultipartFormDataContent();
-            content.Add(new StringContent(title), "Title");
-            if (!string.IsNullOrWhiteSpace(description))
-                content.Add(new StringContent(description), "Description");
+            content.Add(new StringContent(FormText.Required(title)), "Title");
+            var normalizedDescription = FormText.Optional(description);
+            if (normalizedDescription is not null)
+                content.Add(new StringContent(normalizedDescription), "Description");
             content.Add(new StringContent(categoryId.ToString()), "CategoryId");
             if (effectiveDate.HasValue)
                 content.Add(new StringContent(effectiveDate.Value.ToString("yyyy-MM-dd")), "EffectiveDate");
@@ -614,8 +615,9 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
             content.Add(new StringContent(requiresAcknowledgement.ToString()), "RequiresAcknowledgement");
             if (acknowledgementDueDate.HasValue)
                 content.Add(new StringContent(acknowledgementDueDate.Value.ToString("yyyy-MM-dd")), "AcknowledgementDueDate");
-            if (!string.IsNullOrWhiteSpace(acknowledgementStatement))
-                content.Add(new StringContent(acknowledgementStatement), "AcknowledgementStatement");
+            var normalizedAcknowledgementStatement = FormText.Optional(acknowledgementStatement);
+            if (normalizedAcknowledgementStatement is not null)
+                content.Add(new StringContent(normalizedAcknowledgementStatement), "AcknowledgementStatement");
 
             await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
             var fileContent = new StreamContent(stream);
@@ -660,9 +662,10 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         try
         {
             using var content = new MultipartFormDataContent();
-            content.Add(new StringContent(title), "Title");
-            if (!string.IsNullOrWhiteSpace(description))
-                content.Add(new StringContent(description), "Description");
+            content.Add(new StringContent(FormText.Required(title)), "Title");
+            var normalizedDescription = FormText.Optional(description);
+            if (normalizedDescription is not null)
+                content.Add(new StringContent(normalizedDescription), "Description");
             content.Add(new StringContent(documentTypeId.ToString()), "DocumentTypeId");
             if (issueDate.HasValue)
                 content.Add(new StringContent(issueDate.Value.ToString("yyyy-MM-dd")), "IssueDate");
@@ -712,9 +715,10 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         try
         {
             using var content = new MultipartFormDataContent();
-            content.Add(new StringContent(title), "Title");
-            if (!string.IsNullOrWhiteSpace(description))
-                content.Add(new StringContent(description), "Description");
+            content.Add(new StringContent(FormText.Required(title)), "Title");
+            var normalizedDescription = FormText.Optional(description);
+            if (normalizedDescription is not null)
+                content.Add(new StringContent(normalizedDescription), "Description");
             if (issueDate.HasValue)
                 content.Add(new StringContent(issueDate.Value.ToString("yyyy-MM-dd")), "IssueDate");
             if (expiryDate.HasValue)
