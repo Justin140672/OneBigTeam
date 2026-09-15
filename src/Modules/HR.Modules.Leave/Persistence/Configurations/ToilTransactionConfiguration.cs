@@ -81,7 +81,19 @@ internal sealed class ToilTransactionConfiguration : IEntityTypeConfiguration<To
         builder.HasIndex(t => new { t.CompanyId, t.EmployeeId });
         builder.HasIndex(t => new { t.CompanyId, t.LeaveBalanceId });
         builder.HasIndex(t => new { t.CompanyId, t.EmployeeId, t.OccurredOn });
-        builder.HasIndex(t => t.RelatedTransactionId);
         builder.HasIndex(t => t.SourceLeaveRequestId);
+
+        // TOIL expiry follow-up (P1): DB-enforced dedup safeguard. A given Earned bucket
+        // (RelatedTransactionId) may have at most one Expired ledger entry against it. This is the
+        // authoritative guard against double-expiry - even if two ToilExpiryService runs somehow
+        // interleave despite the row-lock guard in ExpireCompanyAsync, the second insert violates
+        // this constraint and is treated as "already expired" rather than corrupting the balance.
+        // Replaces the previous plain (non-unique, non-filtered) index on RelatedTransactionId;
+        // lookups by RelatedTransactionId in this module are always additionally scoped by
+        // CompanyId/LeaveBalanceId, which remain covered by the composite indexes above.
+        builder.HasIndex(t => t.RelatedTransactionId)
+            .IsUnique()
+            .HasFilter("type = 'Expired'")
+            .HasDatabaseName("ix_toil_transactions_related_transaction_id_expired_unique");
     }
 }

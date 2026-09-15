@@ -230,17 +230,32 @@ internal sealed class SubmitLeaveRequestHandler
             conflicts,
             excludedHolidays);
 
-        if (request.IdempotencyKey is { } key)
+        // P2 (Ticket 4 follow-up): the auto-approval path above (ApplyBalanceEffectsAndApproveAsync)
+        // mutates a shared LeaveBalance/TOIL ledger row, exactly like manual approval does in
+        // ApproveLeaveRequestHandler. Without this guard a concurrent auto-approving submission
+        // (or manual approval/rejection/cancellation touching the same balance) could raise
+        // DbUpdateConcurrencyException here and surface as an unhandled 500 instead of a clean
+        // conflict. Nothing has committed at this point, so no audit/notification/integration event
+        // below runs for a losing save - the caller must reload and retry from scratch.
+        try
         {
-            var outcome = await _dbContext.SaveIdempotentAsync(_dbContext.IdempotencyRecords,
-                scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+            if (request.IdempotencyKey is { } key)
+            {
+                var outcome = await _dbContext.SaveIdempotentAsync(_dbContext.IdempotencyRecords,
+                    scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+                if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                    return Result.Success(outcome.Response!);
+            }
+            else
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
         }
-        else
+        catch (DbUpdateConcurrencyException)
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            return Result.Failure<SubmitLeaveRequestResponse>(
+                Error.Concurrency("This leave request's leave balance was changed by someone else. Reload and try again."));
         }
 
         await _auditPublisher.PublishAsync(new LeaveSubmittedAuditEvent(

@@ -48,7 +48,11 @@ internal sealed class Endpoint(
                 return;
             }
 
-            if (result.Error.Code == "conflict")
+            // P2 (Ticket 4 follow-up): routes "concurrency" (as well as "conflict") to 409, matching
+            // ApproveLeaveRequest/Endpoint.cs - a losing auto-approval save now returns
+            // Error.Concurrency rather than throwing, and clients must see the same retryable 409
+            // shape they'd get from a manual-approval conflict.
+            if (result.Error.Code is "conflict" or "concurrency")
             {
                 await Send.ResultAsync(TypedResults.Conflict(businessError));
                 return;

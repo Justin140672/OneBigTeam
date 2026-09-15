@@ -1,5 +1,6 @@
 using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure.Abstractions;
+using HR.SharedKernel;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -145,7 +146,7 @@ public sealed class TaskService(HrApiHttpClientFactory httpClientFactory)
         {
             var response = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/tasks/{taskId}/complete",
-                new { OutcomeDecision = outcomeDecision, OutcomeReason = outcomeReason },
+                new { OutcomeDecision = FormText.Optional(outcomeDecision), OutcomeReason = FormText.Optional(outcomeReason) },
                 cancellationToken);
             return response.IsSuccessStatusCode;
         }

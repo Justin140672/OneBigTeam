@@ -218,17 +218,33 @@ internal sealed class SubmitLeaveRequestDraftHandler(
             conflicts,
             excludedHolidays);
 
-        if (request.IdempotencyKey is { } key)
+        // P2 (Ticket 4 follow-up): mirrors SubmitLeaveRequestHandler's guard - the auto-approval
+        // path above mutates a shared LeaveBalance/TOIL ledger row, so a concurrent save here can
+        // raise DbUpdateConcurrencyException. On conflict, nothing has been persisted: EF only
+        // tracks the mutations made in memory above (draft.UpdateDraftDetails/AssignLeavePolicy/
+        // MarkSubmittedPending/ApplyBalanceEffectsAndApproveAsync's Approve() call, and the balance
+        // adjustment), none of which reach the database when SaveChangesAsync throws - so the
+        // persisted draft row is left completely unchanged and remains retryable exactly as before
+        // this call. No audit/notification/integration event fires below for a losing save.
+        try
         {
-            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
-                scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+            if (request.IdempotencyKey is { } key)
+            {
+                var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                    scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+                if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                    return Result.Success(outcome.Response!);
+            }
+            else
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
         }
-        else
+        catch (DbUpdateConcurrencyException)
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result.Failure<SubmitLeaveRequestDraftResponse>(
+                Error.Concurrency("This leave request or its leave balance was changed by someone else. Reload and try again."));
         }
 
         await auditPublisher.PublishAsync(new LeaveSubmittedAuditEvent(

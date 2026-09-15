@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using HR.Web.Models;
 using HR.Web.Services;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Web.Tests;
@@ -199,6 +201,158 @@ public class FormTextServiceNormalizationTests
         Assert.Contains("search=jane", capturing.CapturedRequestUri);
     }
 
+    // ── DocumentService.UploadEmployeeDocumentAsync (multipart) ────────────────────────
+
+    [Fact]
+    public async Task UploadEmployeeDocumentAsync_Trims_Title_And_Normalizes_Description_In_Posted_Multipart_Body()
+    {
+        var capturing = new BodyCapturingHandler(HttpStatusCode.OK, JsonContent.Create(new { }));
+        var service = new DocumentService(BuildFactory(capturing));
+
+        await service.UploadEmployeeDocumentAsync(
+            Guid.NewGuid(), Guid.NewGuid(),
+            "  Passport  ", "  copy of passport  ", Guid.NewGuid(), null, null,
+            new FakeBrowserFile("passport.pdf", "application/pdf"));
+
+        var body = capturing.CapturedRawBody;
+        Assert.NotNull(body);
+        Assert.Contains("Passport", body);
+        Assert.DoesNotContain("  Passport  ", body);
+        Assert.Contains("copy of passport", body);
+        Assert.DoesNotContain("  copy of passport  ", body);
+    }
+
+    [Fact]
+    public async Task UploadEmployeeDocumentAsync_Whitespace_Only_Description_Is_Omitted_From_Multipart_Body()
+    {
+        var capturing = new BodyCapturingHandler(HttpStatusCode.OK, JsonContent.Create(new { }));
+        var service = new DocumentService(BuildFactory(capturing));
+
+        await service.UploadEmployeeDocumentAsync(
+            Guid.NewGuid(), Guid.NewGuid(),
+            "Passport", "\t\n", Guid.NewGuid(), null, null,
+            new FakeBrowserFile("passport.pdf", "application/pdf"));
+
+        var body = capturing.CapturedRawBody;
+        Assert.NotNull(body);
+        Assert.DoesNotContain("name=\"Description\"", body);
+    }
+
+    // ── DocumentService.UploadSharedCompanyDocumentAsync (multipart) ───────────────────
+
+    [Fact]
+    public async Task UploadSharedCompanyDocumentAsync_Trims_Title_Description_And_AcknowledgementStatement_In_Posted_Multipart_Body()
+    {
+        var capturing = new BodyCapturingHandler(HttpStatusCode.OK, JsonContent.Create(new { }));
+        var service = new DocumentService(BuildFactory(capturing));
+
+        await service.UploadSharedCompanyDocumentAsync(
+            Guid.NewGuid(),
+            "  Employee Handbook  ",
+            "  the handbook  ",
+            Guid.NewGuid(), null, null,
+            [], [], [], [],
+            requiresAcknowledgement: true,
+            acknowledgementDueDate: null,
+            acknowledgementStatement: "  I confirm I have read this  ",
+            new FakeBrowserFile("handbook.pdf", "application/pdf"));
+
+        var body = capturing.CapturedRawBody;
+        Assert.NotNull(body);
+        Assert.Contains("Employee Handbook", body);
+        Assert.DoesNotContain("  Employee Handbook  ", body);
+        Assert.Contains("the handbook", body);
+        Assert.DoesNotContain("  the handbook  ", body);
+        Assert.Contains("I confirm I have read this", body);
+        Assert.DoesNotContain("  I confirm I have read this  ", body);
+    }
+
+    [Fact]
+    public async Task UploadSharedCompanyDocumentAsync_Whitespace_Only_AcknowledgementStatement_Is_Omitted_From_Multipart_Body()
+    {
+        var capturing = new BodyCapturingHandler(HttpStatusCode.OK, JsonContent.Create(new { }));
+        var service = new DocumentService(BuildFactory(capturing));
+
+        await service.UploadSharedCompanyDocumentAsync(
+            Guid.NewGuid(),
+            "Employee Handbook",
+            null,
+            Guid.NewGuid(), null, null,
+            [], [], [], [],
+            requiresAcknowledgement: false,
+            acknowledgementDueDate: null,
+            acknowledgementStatement: "   ",
+            new FakeBrowserFile("handbook.pdf", "application/pdf"));
+
+        var body = capturing.CapturedRawBody;
+        Assert.NotNull(body);
+        Assert.DoesNotContain("name=\"AcknowledgementStatement\"", body);
+    }
+
+    // ── DocumentService.UpdateSharedCompanyDocumentMetadataAsync ────────────────────────
+
+    [Fact]
+    public async Task UpdateSharedCompanyDocumentMetadataAsync_Trims_Title_And_Normalizes_Blank_Description_To_Null()
+    {
+        var capturing = new BodyCapturingHandler(HttpStatusCode.OK, JsonContent.Create(new { version = 2 }));
+        var service = new DocumentService(BuildFactory(capturing));
+
+        await service.UpdateSharedCompanyDocumentMetadataAsync(
+            Guid.NewGuid(), Guid.NewGuid(),
+            "  Employee Handbook  ", "   ", Guid.NewGuid(), null, null);
+
+        var body = await capturing.GetJsonBodyAsync();
+        Assert.Equal("Employee Handbook", body.GetProperty("title").GetString());
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("description").ValueKind);
+    }
+
+    // ── AdjustLeaveBalanceDialog's request model is exercised via LeaveService directly ─
+    // (the dialog builds the normalized request and idempotency key from the same value —
+    // covered here by verifying the service posts a trimmed value it is handed).
+
+    [Fact]
+    public async Task AdjustLeaveBalanceAsync_Posts_Comments_As_Given_Preserving_PreNormalized_Value()
+    {
+        var capturing = new BodyCapturingHandler(HttpStatusCode.OK, JsonContent.Create(new { }));
+        var service = new LeaveService(BuildFactory(capturing));
+
+        var request = new AdjustLeaveBalanceModel(
+            Guid.NewGuid(), 1m, LeaveBalanceAdjustmentReason.Correction, "correction requested", false);
+
+        await service.AdjustLeaveBalanceAsync(Guid.NewGuid(), Guid.NewGuid(), request, Guid.NewGuid());
+
+        var body = await capturing.GetJsonBodyAsync();
+        Assert.Equal("correction requested", body.GetProperty("comments").GetString());
+    }
+
+    // ── TaskService.CompleteTaskAsync ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CompleteTaskAsync_Trims_Outcome_Decision_And_Reason_In_Posted_Body()
+    {
+        var capturing = new BodyCapturingHandler(HttpStatusCode.OK);
+        var service = new TaskService(BuildFactory(capturing));
+
+        await service.CompleteTaskAsync(Guid.NewGuid(), Guid.NewGuid(), "  Approved  ", "  looks good  ");
+
+        var body = await capturing.GetJsonBodyAsync();
+        Assert.Equal("Approved", body.GetProperty("outcomeDecision").GetString());
+        Assert.Equal("looks good", body.GetProperty("outcomeReason").GetString());
+    }
+
+    [Fact]
+    public async Task CompleteTaskAsync_Whitespace_Only_Outcome_Fields_Become_Null_In_Posted_Body()
+    {
+        var capturing = new BodyCapturingHandler(HttpStatusCode.OK);
+        var service = new TaskService(BuildFactory(capturing));
+
+        await service.CompleteTaskAsync(Guid.NewGuid(), Guid.NewGuid(), "   ", "\t\n");
+
+        var body = await capturing.GetJsonBodyAsync();
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("outcomeDecision").ValueKind);
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("outcomeReason").ValueKind);
+    }
+
     // ── SupportService.SubmitSupportRequestAsync (multipart) ───────────────────────────
 
     [Fact]
@@ -243,6 +397,19 @@ public class FormTextServiceNormalizationTests
             Assert.NotNull(_capturedBody);
             return Task.FromResult(JsonDocument.Parse(_capturedBody!).RootElement);
         }
+    }
+
+    // Minimal IBrowserFile stand-in so multipart upload service methods can be exercised without
+    // a real Blazor rendering context — only the members those methods actually touch are wired up.
+    private sealed class FakeBrowserFile(string name, string contentType) : IBrowserFile
+    {
+        public string Name { get; } = name;
+        public DateTimeOffset LastModified { get; } = DateTimeOffset.UtcNow;
+        public long Size { get; } = 4;
+        public string ContentType { get; } = contentType;
+
+        public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default)
+            => new MemoryStream(Encoding.UTF8.GetBytes("test"));
     }
 }
 
