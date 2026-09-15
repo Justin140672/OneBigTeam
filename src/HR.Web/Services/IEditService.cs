@@ -41,6 +41,19 @@ public interface IConcurrencyAwareEditService<TModel, TKey> : IEditService<TMode
 public interface IIdempotentCreateService<TModel>
 {
     Task<MutationOutcome<TModel>> CreateAsync(Guid companyId, TModel model, Guid idempotencyKey);
+
+    // Bug fix (P1 follow-up to Ticket 19): EditPageBase<TModel, TKey> previously fingerprinted the
+    // RAW edit model to build the idempotency key, before this service applied its own
+    // FormText.Required/Optional normalization to build the outgoing request DTO. A whitespace-only
+    // edit (or a blank vs. null difference on an optional field) therefore rotated the key even
+    // though the actual HTTP request body was byte-for-byte identical - turning an ambiguous retry
+    // (timeout/5xx/unconfirmed response) into a real duplicate-create risk.
+    //
+    // This hook lets the service expose the exact same canonical, normalized request object it is
+    // about to send over HTTP, scoped to company/resource, so the caller (EditPageBase) can
+    // fingerprint THAT instead of the raw model - without the service owning/storing the operation
+    // key itself (that ownership stays on the page/dialog instance, per PendingIdempotentOperation).
+    object BuildRequestSnapshot(Guid companyId, TModel model);
 }
 
 // Implemented by a "simple" edit model whose service round-trips an optimistic-concurrency token.

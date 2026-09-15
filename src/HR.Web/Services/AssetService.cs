@@ -324,13 +324,25 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
         };
     }
 
+    // Bug fix (P1 follow-up to Ticket 19): the single source of truth for "what does the outgoing
+    // create request look like for this model" - used both to build the actual HTTP request body
+    // AND (via BuildRequestSnapshot below) to fingerprint the idempotency key. Keeping one mapper
+    // means the fingerprint can never drift from the real request.
+    private static CreateAssetRequest BuildCreateRequest(Guid companyId, AssetEditModel model) => new(
+        companyId, FormText.Required(model.AssetNumber), model.CategoryId!.Value, FormText.Required(model.Name),
+        FormText.Optional(model.Manufacturer), FormText.Optional(model.Model), FormText.Optional(model.SerialNumber),
+        model.PurchaseDate, model.PurchasePrice);
+
+    // Bug fix (P1 follow-up to Ticket 19): exposes the exact normalized request DTO that will be
+    // sent over HTTP so EditPageBase can fingerprint it instead of the raw (un-normalized) edit
+    // model - see IIdempotentCreateService<TModel>.BuildRequestSnapshot for the full rationale.
+    object IIdempotentCreateService<AssetEditModel>.BuildRequestSnapshot(Guid companyId, AssetEditModel model) =>
+        BuildCreateRequest(companyId, model);
+
     private async Task<MutationOutcome<CreateAssetResponse>> CreateFromModelAsync(
         Guid companyId, AssetEditModel model, Guid idempotencyKey)
     {
-        var request = new CreateAssetRequest(
-            companyId, FormText.Required(model.AssetNumber), model.CategoryId!.Value, FormText.Required(model.Name),
-            FormText.Optional(model.Manufacturer), FormText.Optional(model.Model), FormText.Optional(model.SerialNumber),
-            model.PurchaseDate, model.PurchasePrice);
+        var request = BuildCreateRequest(companyId, model);
 
         return await CreateAssetAsync(companyId, request, idempotencyKey);
     }

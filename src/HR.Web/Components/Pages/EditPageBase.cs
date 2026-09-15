@@ -520,9 +520,14 @@ public abstract class EditPageBase<TModel, TKey> : EditPageBase<TModel>
         {
             if (Service is IIdempotentCreateService<TModel> idempotentService)
             {
-                // Fingerprint keyed on the company too (GetCompanyId() can vary per page for some
-                // entities), not just the model.
-                var key = _createOperation.PrepareKey((GetCompanyId(), Model));
+                // Bug fix (P1 follow-up to Ticket 19): fingerprint the service's own canonical,
+                // normalized outgoing request (via BuildRequestSnapshot) rather than the raw Model -
+                // the snapshot already carries its own company/resource scope (e.g. CompanyId is a
+                // field on the request DTO), so whitespace-only edits or blank/null differences on
+                // optional fields that normalize to the identical HTTP request no longer rotate the
+                // key. Fingerprinting the raw Model instead would rotate the key on cosmetic changes
+                // that never reach the wire, letting an ambiguous retry create a duplicate.
+                var key = _createOperation.PrepareKey(idempotentService.BuildRequestSnapshot(GetCompanyId(), Model));
 
                 var outcome = await idempotentService.CreateAsync(GetCompanyId(), Model, key);
 
