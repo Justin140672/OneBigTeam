@@ -5,6 +5,7 @@ using HR.Modules.Identity.Services;
 using HR.Modules.Identity.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Identity.Tests;
 
@@ -55,6 +56,7 @@ public class ReconcilePositionRoleAssignmentsTests(IdentityDatabaseFixture fixtu
     private IServiceProvider BuildServices(IEmployeeAudienceReader audienceReader, IPositionProfileReader positionProfileReader)
     {
         var services = new ServiceCollection();
+        services.AddLogging();
         services.AddDbContext<IdentityDbContext>(options =>
             options.UseNpgsql(fixture.ConnectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "identity")));
@@ -62,6 +64,12 @@ public class ReconcilePositionRoleAssignmentsTests(IdentityDatabaseFixture fixtu
         services.AddScoped(_ => positionProfileReader);
         services.AddScoped(sp => new PositionSync(
             sp.GetRequiredService<IdentityDbContext>(), sp.GetRequiredService<IPositionProfileReader>()));
+        // PositionRoleReconciliationService now depends on IClock (Ticket 6 follow-up fix — must
+        // reconcile against an injected clock, not the real wall clock, so behaviour is
+        // deterministic/testable). These tests don't assert on the exact expiry instant, so the
+        // real-time SystemClock is fine here.
+        services.AddSingleton<HR.SharedKernel.IClock, HR.SharedKernel.SystemClock>();
+        services.AddScoped<PositionRoleReconciliationService>();
         return services.BuildServiceProvider();
     }
 
