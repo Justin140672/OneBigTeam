@@ -5,7 +5,10 @@ using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using HR.SharedKernel.Outbox;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Employees.Features.UpdateEmployeeProfileAndEmployment;
 
@@ -21,6 +24,7 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
     private readonly ICompanyEmployeeNumberSettingsReader _employeeNumberSettingsReader;
     private readonly IAuditEventPublisher _auditEventPublisher;
     private readonly IIntegrationEventPublisher _integrationEventPublisher;
+    private readonly ILogger<UpdateEmployeeProfileAndEmploymentHandler>? _logger;
 
     public UpdateEmployeeProfileAndEmploymentHandler(
         EmployeesDbContext dbContext,
@@ -28,7 +32,8 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
         ICompanyContactValidationReader contactValidationReader,
         ICompanyEmployeeNumberSettingsReader employeeNumberSettingsReader,
         IAuditEventPublisher auditEventPublisher,
-        IIntegrationEventPublisher integrationEventPublisher)
+        IIntegrationEventPublisher integrationEventPublisher,
+        ILogger<UpdateEmployeeProfileAndEmploymentHandler>? logger = null)
     {
         _dbContext = dbContext;
         _clock = clock;
@@ -36,6 +41,7 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
         _employeeNumberSettingsReader = employeeNumberSettingsReader;
         _auditEventPublisher = auditEventPublisher;
         _integrationEventPublisher = integrationEventPublisher;
+        _logger = logger;
     }
 
     public async Task<Result<UpdateEmployeeProfileAndEmploymentResponse>> HandleAsync(
@@ -250,6 +256,19 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
         if (employee.IsInitialCompanyAdmin && employee.Status == EmploymentStatus.Draft)
             employee.Activate(now);
 
+        // Ticket 6 follow-up: stage the position-change integration event in the SAME transaction as
+        // the business write, instead of publishing after commit — see UpdateEmploymentDetails
+        // Handler's equivalent comment for the full rationale (closes the crash/consumer-failure
+        // window for identity's position-role sync).
+        var positionProfileChanged = overallPositionBefore != employee.PositionProfileId;
+        if (positionProfileChanged)
+        {
+            _dbContext.AuditOutboxEntries.EnqueueIntegrationOutbox(
+                new EmployeePositionChangedIntegrationEvent(
+                    employee.CompanyId, employee.Id, overallPositionBefore, employee.PositionProfileId, now),
+                employee.CompanyId, now);
+        }
+
         // ---- Single guarded commit ----------------------------------------------------------
         var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
             employee,
@@ -259,6 +278,21 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
 
         if (saveResult.IsFailure)
             return Fail(saveResult.Error);
+
+        if (positionProfileChanged && _logger is not null)
+        {
+            try
+            {
+                await _dbContext.DispatchPendingAsync(
+                    _dbContext.AuditOutboxEntries, _auditEventPublisher, now, IdempotencyCleanupExtensions.DefaultBatchSize,
+                    _logger, cancellationToken, _integrationEventPublisher);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception,
+                    "Inline dispatch of position-change outbox entries failed; the background maintenance job will retry.");
+            }
+        }
 
         // ---- Post-commit: merged audit + integration events --------------------------------
         var correlationId = request.CorrelationId ?? Guid.NewGuid();
@@ -274,14 +308,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
             new EmploymentDetailsUpdatedAuditEvent(
                 employee.CompanyId, employee.Id, actorEmployeeId, now, employmentBefore, employmentAfter, correlationId),
             cancellationToken);
-
-        if (overallPositionBefore != employee.PositionProfileId)
-        {
-            await _integrationEventPublisher.PublishAsync(
-                new EmployeePositionChangedIntegrationEvent(
-                    employee.CompanyId, employee.Id, overallPositionBefore, employee.PositionProfileId, now),
-                cancellationToken);
-        }
 
         if (overallLocationBefore != employee.LocationId)
         {

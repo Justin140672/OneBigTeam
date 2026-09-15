@@ -1857,12 +1857,17 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
     padding: 0.75rem 1rem;
     background: #fff;
     border-top: 1px solid #dee2e6;
-    box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.06);
+    box-shadow: none;
 }
 
 /* Thin visual separator between the personal-information cards and the Users & Access
    section on the employee Details tab (AC9 — kept structurally distinct without adding a
    new top-level tab, since this page's tab indices are hand-computed elsewhere in the file). */
+.position-profile-description textarea {
+    min-height: 240px;
+    resize: vertical;
+}
+
 .employee-section-divider {
     border-top: 2px solid #dee2e6;
 }

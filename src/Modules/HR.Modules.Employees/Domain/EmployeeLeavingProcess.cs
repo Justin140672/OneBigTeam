@@ -33,6 +33,27 @@ internal sealed class EmployeeLeavingProcess : IVersionedAggregate
     // actually has direct reports; otherwise it is simply unused.
     public Guid? ReplacementManagerEmployeeId { get; private set; }
 
+    // Set only once every downstream finalisation step (offboarding-completeness check, manager
+    // notification, audit publish, integration event publish, timeline write) in
+    // EmployeeDepartureFinalizer has actually completed for this process — distinct from Status
+    // becoming Completed, which happens earlier as soon as the terminal-state save succeeds. A
+    // process can be Completed with this still null if the process crashed/threw between those two
+    // points; ProcessLeavingEmployeesJob's reconciliation scan uses that gap to find and re-run the
+    // missing downstream steps for a stranded departure.
+    //
+    // IMPORTANT — what this DOES and DOES NOT guarantee: this only means the in-process
+    // IIntegrationEventPublisher.PublishAsync call for EmployeeDepartureFinalisedIntegrationEvent
+    // returned control to EmployeeDepartureFinalizer. HR.SharedKernel.IntegrationEventPublisher
+    // deliberately catches and only logs each handler's own exception (so one failing consumer never
+    // blocks another consumer or this publishing call) — so this flag does NOT mean every consuming
+    // module's downstream work actually completed. Any module with a required, must-not-be-lost
+    // reaction to this event is responsible for its own durable tracking/retry of that reaction (see
+    // HR.Modules.Identity's AccountDisablement/AccountDisablementJob for account disablement, and
+    // HR.Modules.Leave's LeavePolicyDeactivationOnDeparture/LeavePolicyDeactivationJob for leave
+    // policy deactivation) — Employees cannot and must not gate this flag on another module's
+    // internal state, since that would require querying another module's schema directly.
+    public DateTimeOffset? FinalisationCompletedAt { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -112,6 +133,22 @@ internal sealed class EmployeeLeavingProcess : IVersionedAggregate
             throw new InvalidOperationException($"Cannot complete a leaving process with status '{Status}'.");
 
         Status = LeavingProcessStatus.Completed;
+        UpdatedAt = now;
+    }
+
+    // Called by EmployeeDepartureFinalizer once every downstream finalisation step has actually
+    // succeeded. Guarded so a defensive/reconciliation re-invocation for a process that already
+    // finished downstream work is a safe no-op rather than an error.
+    public void MarkFinalisationCompleted(DateTimeOffset now)
+    {
+        if (Status != LeavingProcessStatus.Completed)
+            throw new InvalidOperationException(
+                $"Cannot mark finalisation completed for a leaving process with status '{Status}'.");
+
+        if (FinalisationCompletedAt is not null)
+            return;
+
+        FinalisationCompletedAt = now;
         UpdatedAt = now;
     }
 }

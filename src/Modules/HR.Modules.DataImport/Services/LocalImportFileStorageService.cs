@@ -16,7 +16,13 @@ internal sealed class LocalImportFileStorageService : IImportFileStorageService
         string storageFolder,
         CancellationToken cancellationToken)
     {
-        var storageKey = $"{storageFolder.Trim('/')}/{Guid.NewGuid():N}/{fileName}";
+        // The original file name is untrusted and is recorded separately as display metadata
+        // (ImportSession.FileName); the physical storage key never incorporates it, so it cannot
+        // be used to escape the storage root via ".." or rooted path segments.
+        var extension  = Path.GetExtension(fileName);
+        var safeFolder = string.Join('/', storageFolder.Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Select(segment => Uri.EscapeDataString(segment)));
+        var storageKey = $"{safeFolder}/{Guid.NewGuid():N}{extension}";
         var fullPath   = ToFullPath(storageKey);
 
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
@@ -55,6 +61,39 @@ internal sealed class LocalImportFileStorageService : IImportFileStorageService
         return Task.FromResult(stream);
     }
 
-    private string ToFullPath(string storageKey) =>
-        Path.Combine(_basePath, storageKey.Replace('/', Path.DirectorySeparatorChar));
+    // Defence in depth: even though storage keys are now generated server-side (never derived
+    // from user-supplied file names), every operation still resolves through this canonical
+    // containment check so a malformed or pre-existing unsafe storage key (e.g. from data
+    // predating this fix) can never resolve outside the storage root.
+    //
+    // The containment comparison is deliberately Ordinal (case-sensitive), not
+    // OrdinalIgnoreCase: on a case-sensitive filesystem (Linux) a case-insensitive prefix check
+    // would treat "../DATA-IMPORT/x" as contained under ".../data-import/" even though it
+    // resolves into a different, sibling directory. Ordinal comparison rejects that key outright
+    // instead of silently granting access to it. Generated keys are always lowercase hex, so this
+    // never rejects a legitimately generated key on either OS.
+    private string ToFullPath(string storageKey)
+    {
+        var segments = storageKey.Split(['/', '\\']);
+        foreach (var segment in segments)
+        {
+            if (segment.Length == 0 || segment is "." or ".." || segment.Contains(':'))
+                throw new InvalidOperationException($"Storage key '{storageKey}' contains an invalid path segment.");
+        }
+
+        if (Path.IsPathRooted(storageKey))
+            throw new InvalidOperationException($"Storage key '{storageKey}' must be relative.");
+
+        var basePathFull = Path.GetFullPath(_basePath);
+        var candidate     = Path.GetFullPath(Path.Combine(basePathFull, string.Join(Path.DirectorySeparatorChar, segments)));
+
+        var basePathWithSeparator = basePathFull.EndsWith(Path.DirectorySeparatorChar)
+            ? basePathFull
+            : basePathFull + Path.DirectorySeparatorChar;
+
+        if (!candidate.StartsWith(basePathWithSeparator, StringComparison.Ordinal))
+            throw new InvalidOperationException("Resolved storage path escapes the import storage root.");
+
+        return candidate;
+    }
 }

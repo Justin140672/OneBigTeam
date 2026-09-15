@@ -73,6 +73,21 @@ public static class LeaveModule
             "toil-expiry",
             job => job.ExecuteAsync(),
             Cron.Daily(0));
+        // Reliability follow-up: recovers any leave-policy deactivation-on-departure request left
+        // Pending (enqueue never happened) or Failed (exhausted Hangfire retries) — see
+        // EmployeeDepartureFinalisedHandler and LeavePolicyDeactivationJob.
+        jobManager.AddOrUpdate<ReconcileLeavePolicyDeactivationsJob>(
+            "reconcile-leave-policy-deactivations",
+            job => job.ExecuteAsync(),
+            Cron.Daily(1));
+        // Gap-2 reliability fix: recovers finalised departures that never got a
+        // LeavePolicyDeactivationOnDeparture row created at all (e.g. EmployeeDepartureFinalisedHandler
+        // itself threw before inserting one) — see ReconcileMissingLeaveDeactivationsJob's remarks for
+        // why this is a distinct failure mode from the one ReconcileLeavePolicyDeactivationsJob covers.
+        jobManager.AddOrUpdate<ReconcileMissingLeaveDeactivationsJob>(
+            "reconcile-missing-leave-policy-deactivations",
+            job => job.ExecuteAsync(),
+            Cron.Daily(2));
         // Ticket 3 (P1) follow-up items 5/6: dispatch audit-outbox entries and clean up expired
         // idempotency records. Every 5 minutes is comfortably below the 7-day retention window while
         // keeping audit delivery latency low after a transient failure.
@@ -131,6 +146,9 @@ public static class LeaveModule
 services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<IIntegrationEventHandler<EmployeeDetailsCorrectedIntegrationEvent>, EmployeeDetailsCorrectedHandler>();
         services.AddScoped<IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>, EmployeeDepartureFinalisedHandler>();
+        services.AddScoped<LeavePolicyDeactivationJob>();
+        services.AddScoped<ReconcileLeavePolicyDeactivationsJob>();
+        services.AddScoped<ReconcileMissingLeaveDeactivationsJob>();
         services.AddScoped<IIntegrationEventHandler<EmployeeLeavingDateSetIntegrationEvent>, LeavingDateChangeHandler>();
         services.AddScoped<IIntegrationEventHandler<EmployeeLeavingProcessCancelledIntegrationEvent>, LeavingDateChangeHandler>();
         services.AddScoped<ILeaveApprovalService, LeaveApprovalService>();

@@ -7,6 +7,7 @@ using HR.SharedKernel.Idempotency;
 using HR.SharedKernel.Outbox;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Leave.Features.AdjustLeaveBalance;
 
@@ -16,6 +17,13 @@ internal sealed class AdjustLeaveBalanceHandler(
     IWorkingPatternProvider workingPatternProvider,
     ICompanyLeaveSettingsReader leaveSettingsReader,
     IEmployeeNameReader employeeNameReader,
+    // Optional (like postCommitFaultInjector below) so the many existing handler-level unit tests
+    // that construct this handler directly don't all need updating. Production DI always supplies
+    // real instances via the required IAuditEventPublisher/ILogger registrations in Program.cs;
+    // when null (unit tests), the inline post-commit outbox dispatch below is simply skipped and
+    // the event stays queued for the background IdempotencyMaintenanceJob.
+    IAuditEventPublisher? auditPublisher = null,
+    ILogger<AdjustLeaveBalanceHandler>? logger = null,
     IPostCommitFaultInjector? postCommitFaultInjector = null)
 {
     // Optional so the many existing handler-level unit tests that construct this handler directly
@@ -233,6 +241,25 @@ internal sealed class AdjustLeaveBalanceHandler(
         // exact scenario a retry with the same Idempotency-Key must replay rather than repeat.
         await _postCommitFaultInjector.MaybeFailAfterCommitAsync(
             nameof(AdjustLeaveBalanceHandler), request.IdempotencyKey, cancellationToken);
+
+        // Deliver the just-committed audit outbox entry immediately rather than waiting for the
+        // next IdempotencyMaintenanceJob cron tick (every 5 minutes) - audit history readers expect
+        // this to be visible right after the request completes. The outbox row remains the source
+        // of truth: if this inline attempt throws, the background job still retries it on schedule.
+        if (auditPublisher is not null && logger is not null)
+        {
+            try
+            {
+                await dbContext.DispatchPendingAsync(
+                    dbContext.AuditOutboxEntries, auditPublisher, now, IdempotencyCleanupExtensions.DefaultBatchSize,
+                    logger, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception,
+                    "Inline dispatch of leave-balance-adjustment outbox entries failed; the background maintenance job will retry.");
+            }
+        }
 
         return Result.Success(response);
     }

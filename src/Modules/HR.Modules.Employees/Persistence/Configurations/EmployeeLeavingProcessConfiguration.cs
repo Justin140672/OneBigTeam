@@ -82,6 +82,9 @@ internal sealed class EmployeeLeavingProcessConfiguration : IEntityTypeConfigura
         builder.Property(p => p.ReplacementManagerEmployeeId)
             .HasColumnName("replacement_manager_employee_id");
 
+        builder.Property(p => p.FinalisationCompletedAt)
+            .HasColumnName("finalisation_completed_at");
+
         builder.Property(p => p.Version)
             .HasColumnName("version")
             .IsRequired()
@@ -99,5 +102,9 @@ internal sealed class EmployeeLeavingProcessConfiguration : IEntityTypeConfigura
         builder.HasIndex(p => p.CompanyId);
         builder.HasIndex(p => new { p.CompanyId, p.EmployeeId });
         builder.HasIndex(p => new { p.CompanyId, p.EmployeeId, p.Status });
+
+        // Supports ProcessLeavingEmployeesJob's reconciliation scan for stranded departures
+        // (Status == Completed but FinalisationCompletedAt still null).
+        builder.HasIndex(p => new { p.Status, p.FinalisationCompletedAt });
     }
 }

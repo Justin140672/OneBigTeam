@@ -1,6 +1,7 @@
 using HR.Modules.Leave.Services;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.ApproveLeaveRequest;
+using HR.Modules.Leave.Features.RejectLeaveRequest;
 using HR.Modules.Leave.Persistence;
 using HR.Modules.Leave.Tests.Infrastructure;
 using HR.Infrastructure.Abstractions;
@@ -357,6 +358,12 @@ public class ApproveLeaveRequestHandlerTests
     {
         // Approving today (2026-06-12, policy year 2026) a request whose StartDate falls in a
         // future policy year (2027) must look up the 2027 balance row, not the 2026 one.
+        // AccrualMethod.None (full entitlement available immediately) is used deliberately here:
+        // Monthly/Fortnightly accrual is anchored to accrualStartDate and evaluated as-of the
+        // approval date (LEAVE-04), so a 2027 balance approved in 2026 - before its own accrual
+        // period has even started - would legitimately show zero accrued days. That accrual-timing
+        // behaviour is covered separately; this test's own concern is only which policy-year
+        // balance row approval selects.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -364,7 +371,7 @@ public class ApproveLeaveRequestHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         var leaveType = LeaveType.Create(leaveTypeId, companyId, "Annual Leave", "ANNUAL", 25,
-            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
 
         var leaveRequest = LeaveRequest.Create(
             Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
@@ -373,8 +380,13 @@ public class ApproveLeaveRequestHandlerTests
             2m, "New year holiday", now);
 
         // Only the 2027 balance exists — a 2026 (today's) balance would produce the wrong deduction.
+        // AccrualStartDate is the employee's actual continuous accrual-eligible-from date (see
+        // LeaveBalance.AccrualStartDate), not necessarily the policy year's calendar start - here
+        // it is set to before today so the accrued-availability check (LEAVE-04/Ticket 5) does not
+        // zero out the balance just because "today" precedes 2027-01-01. Mirrors the same fixture
+        // choice in SubmitLeaveRequestHandlerTests.HandleAsync_Checks_Future_Years_Balance_....
         var balance2027 = LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(), 2027, 25m, new DateOnly(2027, 1, 1), now);
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(), 2027, 25m, new DateOnly(2026, 1, 1), now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeaveRequests.Add(leaveRequest);
@@ -759,5 +771,248 @@ public class ApproveLeaveRequestHandlerTests
         Assert.Equal(leaveRequest.Id,               written.SourceEntityId);
         Assert.Equal(NotificationType.LeaveApproved, written.Type);
         Assert.Equal(NotificationPriority.Normal,    written.Priority);
+    }
+
+    // --- P2 (Ticket 5): approval must recheck accrued availability, not just deduct blindly ---
+
+    private static LeaveDbContext BuildContext(string dbName) =>
+        new(new DbContextOptionsBuilder<LeaveDbContext>().UseInMemoryDatabase(dbName).Options);
+
+    [Fact]
+    public async Task HandleAsync_Second_Sequential_Approval_Fails_When_Combined_Requests_Exceed_Balance()
+    {
+        // Regression for the original P2 report: submission only checks availability at the moment
+        // a request is created - a pending request does not reserve leave - so two individually
+        // valid pending requests could previously both be approved, driving the balance negative
+        // under a policy that forbids it. Each approval below uses its own DbContext instance
+        // (a fresh "request") against the same underlying store, as two separate approval calls
+        // against the same employee/balance would in production.
+        var dbName = Guid.NewGuid().ToString("N");
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveTypeId = Guid.NewGuid();
+        var policyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        await using (var seedContext = BuildContext(dbName))
+        {
+            var leaveType = LeaveType.Create(leaveTypeId, companyId, "Annual Leave", "ANNUAL", 5,
+                AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
+            var policy = LeavePolicy.Create(policyId, companyId, "No Negative Policy", null, 0,
+                allowNegativeBalance: false, isDefault: false, now);
+            var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId,
+                2026, 5m, new DateOnly(2026, 1, 1), now);
+
+            var requestOne = LeaveRequest.Create(
+                Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId,
+                new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+                new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+                5m, "First week", now);
+
+            var requestTwo = LeaveRequest.Create(
+                Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId,
+                new DateOnly(2026, 9, 7), LeaveDayPart.FullDay,
+                new DateOnly(2026, 9, 11), LeaveDayPart.FullDay,
+                5m, "Second week", now);
+
+            seedContext.LeaveTypes.Add(leaveType);
+            seedContext.LeavePolicies.Add(policy);
+            seedContext.LeaveBalances.Add(balance);
+            seedContext.LeaveRequests.AddRange(requestOne, requestTwo);
+            await seedContext.SaveChangesAsync();
+        }
+
+        Guid requestOneId, requestTwoId;
+        await using (var lookupContext = BuildContext(dbName))
+        {
+            var requests = await lookupContext.LeaveRequests.OrderBy(r => r.StartDate).ToListAsync();
+            requestOneId = requests[0].Id;
+            requestTwoId = requests[1].Id;
+        }
+
+        await using (var firstApprovalContext = BuildContext(dbName))
+        {
+            var handler = new ApproveLeaveRequestHandler(firstApprovalContext, new FakeClock(FixedUtcNow),
+                new LeaveApprovalEffectsService(firstApprovalContext, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(firstApprovalContext)));
+
+            var firstResult = await handler.HandleAsync(
+                ApproveRequest(companyId, employeeId, requestOneId, Guid.NewGuid()), CancellationToken.None);
+
+            Assert.True(firstResult.IsSuccess);
+        }
+
+        var auditPublisher = new CapturingAuditEventPublisher();
+        var integrationPublisher = new CapturingIntegrationEventPublisher();
+        var notif = new FakeNotificationWriter();
+
+        await using (var secondApprovalContext = BuildContext(dbName))
+        {
+            var handler = new ApproveLeaveRequestHandler(secondApprovalContext, new FakeClock(FixedUtcNow),
+                new LeaveApprovalEffectsService(secondApprovalContext, notif, integrationPublisher, new FakeCompanyLeaveSettingsReader(), auditPublisher, new ToilLedgerService(secondApprovalContext)));
+
+            var secondResult = await handler.HandleAsync(
+                ApproveRequest(companyId, employeeId, requestTwoId, Guid.NewGuid()), CancellationToken.None);
+
+            Assert.True(secondResult.IsFailure);
+            Assert.Equal("validation", secondResult.Error.Code);
+            Assert.Contains("insufficient", secondResult.Error.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        await using (var verifyContext = BuildContext(dbName))
+        {
+            var savedRequestTwo = await verifyContext.LeaveRequests.SingleAsync(r => r.Id == requestTwoId);
+            Assert.Equal(LeaveRequestStatus.Pending, savedRequestTwo.Status);
+            Assert.Null(savedRequestTwo.ReviewedByEmployeeId);
+
+            var savedBalance = await verifyContext.LeaveBalances.SingleAsync();
+            Assert.Equal(5m, savedBalance.UsedDays);   // only the first approval's usage
+            Assert.Equal(0m, savedBalance.RemainingDays);
+        }
+
+        Assert.Empty(auditPublisher.Published);
+        Assert.Empty(integrationPublisher.Published);
+        Assert.Empty(notif.Written);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Approves_Over_Balance_When_Policy_Allows_Negative_Balance()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveTypeId = Guid.NewGuid();
+        var policyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(leaveTypeId, companyId, "Annual Leave", "ANNUAL", 2,
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
+        var policy = LeavePolicy.Create(policyId, companyId, "Negative Allowed Policy", null, 0,
+            allowNegativeBalance: true, isDefault: false, now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId,
+            2026, 2m, new DateOnly(2026, 1, 1), now);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId,
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Over-balance request", now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.LeaveBalances.Add(balance);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedRequest = await context.LeaveRequests.SingleAsync();
+        Assert.Equal(LeaveRequestStatus.Approved, savedRequest.Status);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(5m, savedBalance.UsedDays);
+        Assert.Equal(-3m, savedBalance.RemainingDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Approves_When_Balance_Adjustment_Recorded_Between_Submission_And_Approval()
+    {
+        // Accrual/adjustments are re-evaluated at approval time, not frozen at submission time -
+        // an authorised balance correction made while a request is pending must be reflected here.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveTypeId = Guid.NewGuid();
+        var policyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(leaveTypeId, companyId, "Annual Leave", "ANNUAL", 3,
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
+        var policy = LeavePolicy.Create(policyId, companyId, "No Negative Policy", null, 0,
+            allowNegativeBalance: false, isDefault: false, now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId,
+            2026, 3m, new DateOnly(2026, 1, 1), now);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId,
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Needs an adjustment first", now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.LeaveBalances.Add(balance);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        // Simulates an authorised correction (e.g. AdjustLeaveBalanceHandler) applied while the
+        // request sat pending, giving it just enough headroom to be approved.
+        balance.Adjust(2m, now);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(5m, savedBalance.UsedDays);
+        Assert.Equal(0m, savedBalance.RemainingDays); // 3 entitlement + 2 adjustment - 5 used
+    }
+
+    [Fact]
+    public async Task HandleAsync_Rejecting_Unrelated_Pending_Request_Does_Not_Undo_An_Authorised_Negative_Balance_Correction()
+    {
+        // An authorised correction (e.g. a manual balance adjustment) is allowed to leave a balance
+        // negative even under a no-negative-balance policy - that override lives outside the
+        // approval path entirely. Rejecting a separate, still-pending request must not touch the
+        // balance at all (only an approved request's usage is reversed on rejection), so the
+        // correction must survive untouched.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveTypeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
+            2026, 5m, new DateOnly(2026, 1, 1), now);
+        balance.RecordUsage(5m, now);
+        balance.Adjust(-3m, now); // authorised correction pushes the balance negative (-3 remaining)
+
+        var pendingRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
+            new DateOnly(2026, 9, 7), LeaveDayPart.FullDay,
+            new DateOnly(2026, 9, 7), LeaveDayPart.FullDay,
+            1m, "Unrelated request", now);
+
+        context.LeaveBalances.Add(balance);
+        context.LeaveRequests.Add(pendingRequest);
+        await context.SaveChangesAsync();
+
+        var handler = new RejectLeaveRequestHandler(
+            context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
+            new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+
+        var result = await handler.HandleAsync(new RejectLeaveRequestRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            LeaveRequestId = pendingRequest.Id,
+            ReviewedByEmployeeId = Guid.NewGuid(),
+            RejectionReason = "Not needed"
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(5m, savedBalance.UsedDays);
+        Assert.Equal(-3m, savedBalance.AdjustmentDays);
+        Assert.Equal(-3m, savedBalance.RemainingDays); // correction preserved, untouched by the rejection
     }
 }

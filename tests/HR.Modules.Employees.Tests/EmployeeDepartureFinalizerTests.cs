@@ -493,6 +493,40 @@ public class EmployeeDepartureFinalizerTests
     }
 
     [Fact]
+    public async Task FinalizeAsync_Writes_PendingManagerChangedEvent_Row_In_Same_Save_As_Reassignment_And_Marks_Published()
+    {
+        // Durability fix: CascadeManagerDepartureAsync must persist a PendingManagerChangedEvent
+        // row (capturing previous/new manager) in the SAME save as the report's ManagerId
+        // reassignment, then publish and mark it published once the publish loop succeeds — see
+        // PendingManagerChangedEvent's remarks.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var employee = CreateLeavingEmployee(companyId, Now);
+        var replacement = CreateManager(companyId, Now);
+        var report = CreateManager(companyId, Now);
+        report.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), employee.Id, Now);
+        context.Employees.AddRange(employee, replacement, report);
+        var process = CreateLeavingProcess(
+            companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now,
+            replacementManagerEmployeeId: replacement.Id);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var finalizer = BuildFinalizer(context, directReportsReader: new FakeDirectReportsReader(report.Id));
+
+        await finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None);
+
+        var pendingEvent = await context.PendingManagerChangedEvents.SingleAsync();
+        Assert.Equal(companyId, pendingEvent.CompanyId);
+        Assert.Equal(report.Id, pendingEvent.ReportEmployeeId);
+        Assert.Equal(employee.Id, pendingEvent.PreviousManagerId);
+        Assert.Equal(replacement.Id, pendingEvent.NewManagerId);
+        Assert.Equal(process.Id, pendingEvent.LeavingProcessId);
+        Assert.NotNull(pendingEvent.PublishedAt);
+    }
+
+    [Fact]
     public async Task FinalizeAsync_Always_Publishes_EmployeeDepartureFinalisedAuditEvent_With_Correct_Values()
     {
         await using var context = BuildContext();
@@ -520,5 +554,147 @@ public class EmployeeDepartureFinalizerTests
         Assert.Equal(Now, auditEvent.OccurredAt);
         Assert.True(auditEvent.AccessDisabled);
         Assert.True(auditEvent.OffboardingIncomplete);
+    }
+
+    // -- Terminal-state / downstream-finalisation ordering and resumption -------------------
+
+    [Fact]
+    public async Task FinalizeAsync_Produces_Correct_Final_State_When_DirectReports_Cause_An_Intermediate_Save()
+    {
+        // Regression test for the ordering bug: CascadeManagerDepartureAsync's own SaveChangesAsync
+        // (triggered here by the departing employee having a direct report) used to run AFTER the
+        // employee/process terminal-state mutations were applied in memory, prematurely flushing
+        // them before the downstream steps ran. Asserts the full call still ends in the correct
+        // final state, including FinalisationCompletedAt being set.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var employee = CreateLeavingEmployee(companyId, Now);
+        var report = CreateManager(companyId, Now);
+        report.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), employee.Id, Now);
+        context.Employees.AddRange(employee, report);
+        var process = CreateLeavingProcess(companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var integrationEventPublisher = new CapturingIntegrationEventPublisher();
+        var timelineWriter = new FakeEmployeeTimelineWriter();
+        var finalizer = BuildFinalizer(
+            context,
+            auditPublisher: auditPublisher,
+            integrationEventPublisher: integrationEventPublisher,
+            timelineWriter: timelineWriter,
+            directReportsReader: new FakeDirectReportsReader(report.Id));
+
+        await finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None);
+
+        var savedEmployee = await context.Employees.SingleAsync(e => e.Id == employee.Id);
+        Assert.Equal(EmploymentStatus.FormerEmployee, savedEmployee.Status);
+
+        var savedProcess = await context.EmployeeLeavingProcesses.SingleAsync();
+        Assert.Equal(LeavingProcessStatus.Completed, savedProcess.Status);
+        Assert.NotNull(savedProcess.FinalisationCompletedAt);
+
+        var savedReport = await context.Employees.SingleAsync(e => e.Id == report.Id);
+        Assert.Null(savedReport.ManagerId);
+
+        Assert.Single(auditPublisher.Published);
+        Assert.Single(integrationEventPublisher.Published.OfType<EmployeeDepartureFinalisedIntegrationEvent>());
+        Assert.Single(timelineWriter.Added);
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_Resumes_Downstream_Steps_Only_For_A_Stranded_Partial_Failure()
+    {
+        // Simulates a process that got as far as PersistTerminalStateAsync succeeding (Employee ->
+        // FormerEmployee, Process -> Completed) but never reached CompleteDownstreamFinalisationAsync
+        // (FinalisationCompletedAt still null) — built directly via the domain methods since the
+        // finalizer itself won't leave the fixture in this state under test doubles.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var manager = CreateManager(companyId, Now);
+        context.Employees.Add(manager);
+        await context.SaveChangesAsync();
+
+        var employee = CreateLeavingEmployee(companyId, Now, managerId: manager.Id);
+        var process = CreateLeavingProcess(companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
+
+        // Drive both aggregates to the stranded state directly.
+        employee.SetFormerEmployee(Now);
+        process.Complete(Now);
+        Assert.Null(process.FinalisationCompletedAt);
+
+        context.Employees.Add(employee);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var integrationEventPublisher = new CapturingIntegrationEventPublisher();
+        var timelineWriter = new FakeEmployeeTimelineWriter();
+        var notificationWriter = new FakeNotificationWriter();
+        var finalizer = BuildFinalizer(
+            context,
+            auditPublisher: auditPublisher,
+            integrationEventPublisher: integrationEventPublisher,
+            timelineWriter: timelineWriter,
+            notificationWriter: notificationWriter,
+            offboardingStatusReader: new FakeOffboardingStatusReader(new OffboardingStatusSummary("InProgress")));
+
+        var exception = await Record.ExceptionAsync(
+            () => finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None));
+
+        Assert.Null(exception);
+
+        var savedProcess = await context.EmployeeLeavingProcesses.SingleAsync();
+        Assert.Equal(LeavingProcessStatus.Completed, savedProcess.Status);
+        Assert.NotNull(savedProcess.FinalisationCompletedAt);
+
+        Assert.Single(auditPublisher.Published);
+        Assert.Single(integrationEventPublisher.Published.OfType<EmployeeDepartureFinalisedIntegrationEvent>());
+        Assert.Single(timelineWriter.Added);
+        Assert.Single(notificationWriter.Written);
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_Is_A_No_Op_When_FinalisationCompletedAt_Already_Set()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var employee = CreateLeavingEmployee(companyId, Now);
+        var process = CreateLeavingProcess(companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
+
+        // Drive to the fully-finalised state directly.
+        employee.SetFormerEmployee(Now);
+        process.Complete(Now);
+        process.MarkFinalisationCompleted(Now);
+        var completedAt = process.FinalisationCompletedAt;
+
+        context.Employees.Add(employee);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var integrationEventPublisher = new CapturingIntegrationEventPublisher();
+        var timelineWriter = new FakeEmployeeTimelineWriter();
+        var notificationWriter = new FakeNotificationWriter();
+        var finalizer = BuildFinalizer(
+            context,
+            auditPublisher: auditPublisher,
+            integrationEventPublisher: integrationEventPublisher,
+            timelineWriter: timelineWriter,
+            notificationWriter: notificationWriter);
+
+        await finalizer.FinalizeAsync(employee, process, Now.AddMinutes(5), CancellationToken.None);
+
+        Assert.Empty(auditPublisher.Published);
+        Assert.Empty(integrationEventPublisher.Published);
+        Assert.Empty(timelineWriter.Added);
+        Assert.Empty(notificationWriter.Written);
+
+        var savedProcess = await context.EmployeeLeavingProcesses.SingleAsync();
+        Assert.Equal(completedAt, savedProcess.FinalisationCompletedAt);
     }
 }

@@ -196,6 +196,10 @@ section[id] {
         color: var(--color-accent);
     }
 
+.hero-actions[hidden] {
+    display: none;
+}
+
 .header-actions,
 .hero-actions {
     display: flex;
@@ -911,6 +915,11 @@ a.card:focus-visible,
     padding-top: clamp(48px, 6vw, 80px);
     padding-bottom: clamp(28px, 4vw, 48px);
     background: var(--color-bg);
+}
+
+.pricing-hero .hero-copy,
+.pricing-hero .hero-text {
+    max-width: 960px;
 }
 
 .pricing-section {

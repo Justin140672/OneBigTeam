@@ -1,4 +1,7 @@
+using Hangfire;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Leave.Domain;
+using HR.Modules.Leave.Jobs;
 using HR.Modules.Leave.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -12,13 +15,24 @@ namespace HR.Modules.Leave.Features.DeactivateLeavePolicyAssignmentOnEmployeeDep
 // that distinction available to LeaveYearRolloverService, which now requires an active assignment
 // before rolling an employee's balance forward.
 //
-// Historical LeaveBalance/LeaveBalanceAdjustment rows are intentionally left untouched — leavers
-// keep their balance history, they simply stop receiving new ones.
+// Follow-up reliability fix: this handler used to deactivate the assignment inline. But
+// HR.SharedKernel.IntegrationEventPublisher deliberately catches and only logs a handler's
+// exception (so one failing consumer never blocks another or the publishing caller) — meaning a
+// transient failure here was silently dropped with no retry, while Employees'
+// EmployeeLeavingProcess.FinalisationCompletedAt was still correctly marked (it only guarantees
+// the publish call returned to every handler, not that each handler's own work completed — see
+// that property's remarks). Instead, this now records a durable, retryable
+// LeavePolicyDeactivationOnDeparture request (mirrors HR.Modules.Identity's AccountDisablement /
+// AccountDisablementJob pattern) and enqueues LeavePolicyDeactivationJob to perform and confirm the
+// actual deactivation, with Hangfire's own retry policy plus a daily reconciliation sweep
+// (ReconcileLeavePolicyDeactivationsJob) for anything still stuck.
 //
-// Idempotent: EmployeeLeavePolicyAssignment.Deactivate() is a no-op if already inactive, so
-// redelivery of this event (or an amended/re-finalised departure) causes no further changes.
-internal sealed class EmployeeDepartureFinalisedHandler(LeaveDbContext dbContext)
-    : IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>
+// Idempotent: a unique index on (company_id, employee_id) means re-delivery of this event never
+// creates a second deactivation request.
+internal sealed class EmployeeDepartureFinalisedHandler(
+    LeaveDbContext dbContext,
+    IClock clock,
+    IBackgroundJobClient backgroundJobClient) : IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>
 {
     public async Task HandleAsync(EmployeeDepartureFinalisedIntegrationEvent integrationEvent, CancellationToken cancellationToken)
     {
@@ -30,8 +44,21 @@ internal sealed class EmployeeDepartureFinalisedHandler(LeaveDbContext dbContext
         if (assignment is null || !assignment.IsActive)
             return;
 
-        assignment.Deactivate(integrationEvent.OccurredAt);
+        var alreadyRequested = await dbContext.LeavePolicyDeactivationsOnDeparture
+            .AnyAsync(
+                d => d.CompanyId == integrationEvent.CompanyId && d.EmployeeId == integrationEvent.EmployeeId,
+                cancellationToken);
+        if (alreadyRequested)
+            return;
 
+        var now = clock.UtcNowOffset();
+        var request = LeavePolicyDeactivationOnDeparture.CreatePending(
+            Guid.NewGuid(), integrationEvent.CompanyId, integrationEvent.EmployeeId, integrationEvent.OccurredAt, now);
+
+        dbContext.LeavePolicyDeactivationsOnDeparture.Add(request);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        backgroundJobClient.Enqueue<LeavePolicyDeactivationJob>(
+            job => job.ProcessAsync(request.Id, integrationEvent.CompanyId));
     }
 }

@@ -15,7 +15,24 @@ public sealed class IntegrationEventPublisher(IServiceProvider serviceProvider, 
     public async Task PublishAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)
         where TEvent : IIntegrationEvent
     {
+        await DispatchAsync(integrationEvent, cancellationToken);
+    }
+
+    public async Task<bool> PublishAndConfirmAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)
+        where TEvent : IIntegrationEvent
+    {
+        return await DispatchAsync(integrationEvent, cancellationToken);
+    }
+
+    // allRequiredSucceeded starts true and is only ever flipped to false, so PublishAsync (which
+    // ignores the return value) and PublishAndConfirmAsync share this single dispatch loop with no
+    // behavioural difference for non-required handlers.
+    private async Task<bool> DispatchAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)
+        where TEvent : IIntegrationEvent
+    {
         var handlers = serviceProvider.GetServices<IIntegrationEventHandler<TEvent>>();
+        var allRequiredSucceeded = true;
+
         foreach (var handler in handlers)
         {
             try
@@ -29,7 +46,12 @@ public sealed class IntegrationEventPublisher(IServiceProvider serviceProvider, 
                     "Integration event handler {HandlerType} failed while handling {EventType}",
                     handler.GetType().Name,
                     typeof(TEvent).Name);
+
+                if (handler is IRequiredIntegrationEventHandler<TEvent>)
+                    allRequiredSucceeded = false;
             }
         }
+
+        return allRequiredSucceeded;
     }
 }

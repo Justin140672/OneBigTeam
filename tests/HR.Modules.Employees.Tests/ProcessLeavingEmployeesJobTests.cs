@@ -384,4 +384,225 @@ public class ProcessLeavingEmployeesJobTests
         var savedProcess = await context.EmployeeLeavingProcesses.SingleAsync();
         Assert.Equal(LeavingProcessStatus.Completed, savedProcess.Status);
     }
+
+    // -- Stranded-departure reconciliation scan ----------------------------------------------
+
+    [Fact]
+    public async Task ExecuteAsync_Reconciles_A_Stranded_Departure_That_ProcessDueLeavers_Would_Never_Pick_Up()
+    {
+        // A process left Completed with FinalisationCompletedAt still null (as if an earlier
+        // FinalizeAsync attempt persisted the terminal state but crashed before the downstream
+        // steps), whose employee is no longer Status == Leaving — ProcessDueLeaversAsync's query
+        // would never select it, so only the reconciliation scan can pick it up.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var manager = CreateManager(companyId, Now);
+        context.Employees.Add(manager);
+        await context.SaveChangesAsync();
+
+        var employee = CreateLeavingEmployee(companyId, Now, managerId: manager.Id);
+        var process = CreateLeavingProcess(companyId, employee.Id, Today.AddDays(-1), Now);
+
+        employee.SetFormerEmployee(Now);
+        process.Complete(Now);
+        Assert.Null(process.FinalisationCompletedAt);
+
+        context.Employees.Add(employee);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var notificationWriter = new FakeNotificationWriter();
+        var job = BuildJob(
+            context,
+            auditPublisher: auditPublisher,
+            offboardingStatusReader: new FakeOffboardingStatusReader(new OffboardingStatusSummary("InProgress")),
+            notificationWriter: notificationWriter);
+
+        await job.ExecuteAsync();
+
+        var savedProcess = await context.EmployeeLeavingProcesses.SingleAsync();
+        Assert.NotNull(savedProcess.FinalisationCompletedAt);
+
+        var auditEvent = Assert.IsType<EmployeeDepartureFinalisedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal(employee.Id, auditEvent.EmployeeId);
+
+        var notification = Assert.Single(notificationWriter.Written);
+        Assert.Equal(manager.Id, notification.EmployeeId);
+    }
+
+    // -- Per-employee failure isolation (reliability fix) ------------------------------------
+
+    private static EmployeeDepartureFinalizer BuildRealFinalizer(
+        EmployeesDbContext dbContext,
+        FakeAuditPublisher? auditPublisher = null,
+        FakeOffboardingStatusReader? offboardingStatusReader = null,
+        FakeCompanyLeavingSettingsReader? leavingSettingsReader = null,
+        FakeNotificationWriter? notificationWriter = null) =>
+        new(
+            dbContext,
+            auditPublisher ?? new FakeAuditPublisher(),
+            new NoOpIntegrationEventPublisher(),
+            offboardingStatusReader ?? new FakeOffboardingStatusReader(new OffboardingStatusSummary("Completed")),
+            leavingSettingsReader ?? new FakeCompanyLeavingSettingsReader(),
+            notificationWriter ?? new FakeNotificationWriter(),
+            new FakeEmployeeTimelineWriter(),
+            new FakeDirectReportsReader());
+
+    [Fact]
+    public async Task ExecuteAsync_A_Throwing_Due_Leaver_Does_Not_Stop_A_Later_Healthy_Due_Leaver_In_The_Same_Run()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var throwingEmployee = CreateLeavingEmployee(companyId, Now);
+        context.Employees.Add(throwingEmployee);
+        var throwingProcess = CreateLeavingProcess(companyId, throwingEmployee.Id, Today.AddDays(-1), Now);
+        context.EmployeeLeavingProcesses.Add(throwingProcess);
+
+        var healthyEmployee = CreateLeavingEmployee(companyId, Now);
+        context.Employees.Add(healthyEmployee);
+        var healthyProcess = CreateLeavingProcess(companyId, healthyEmployee.Id, Today.AddDays(-1), Now);
+        context.EmployeeLeavingProcesses.Add(healthyProcess);
+
+        await context.SaveChangesAsync();
+
+        var finalizer = new SelectivelyThrowingDepartureFinalizer(BuildRealFinalizer(context), throwingEmployee.Id);
+        var job = new ProcessLeavingEmployeesJob(
+            context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), finalizer,
+            NullLogger<ProcessLeavingEmployeesJob>.Instance);
+
+        var exception = await Record.ExceptionAsync(() => job.ExecuteAsync());
+
+        Assert.Null(exception);
+        Assert.Contains(throwingEmployee.Id, finalizer.InvokedFor);
+        Assert.Contains(healthyEmployee.Id, finalizer.InvokedFor);
+
+        var savedThrowing = await context.Employees.SingleAsync(e => e.Id == throwingEmployee.Id);
+        Assert.Equal(EmploymentStatus.Leaving, savedThrowing.Status); // untouched by the failed attempt
+
+        var savedHealthy = await context.Employees.SingleAsync(e => e.Id == healthyEmployee.Id);
+        Assert.Equal(EmploymentStatus.FormerEmployee, savedHealthy.Status);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_A_Throwing_Due_Leaver_Does_Not_Stop_The_Stranded_Recovery_Scan_From_Running_Afterward()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var throwingEmployee = CreateLeavingEmployee(companyId, Now);
+        context.Employees.Add(throwingEmployee);
+        var throwingProcess = CreateLeavingProcess(companyId, throwingEmployee.Id, Today.AddDays(-1), Now);
+        context.EmployeeLeavingProcesses.Add(throwingProcess);
+
+        // A stranded departure that only the reconciliation scan (not ProcessDueLeaversAsync) can pick up.
+        var strandedEmployee = CreateLeavingEmployee(companyId, Now);
+        var strandedProcess = CreateLeavingProcess(companyId, strandedEmployee.Id, Today.AddDays(-1), Now);
+        strandedEmployee.SetFormerEmployee(Now);
+        strandedProcess.Complete(Now);
+        context.Employees.Add(strandedEmployee);
+        context.EmployeeLeavingProcesses.Add(strandedProcess);
+
+        await context.SaveChangesAsync();
+
+        var finalizer = new SelectivelyThrowingDepartureFinalizer(BuildRealFinalizer(context), throwingEmployee.Id);
+        var job = new ProcessLeavingEmployeesJob(
+            context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), finalizer,
+            NullLogger<ProcessLeavingEmployeesJob>.Instance);
+
+        var exception = await Record.ExceptionAsync(() => job.ExecuteAsync());
+
+        Assert.Null(exception);
+
+        var savedStrandedProcess = await context.EmployeeLeavingProcesses.SingleAsync(p => p.Id == strandedProcess.Id);
+        Assert.NotNull(savedStrandedProcess.FinalisationCompletedAt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Logs_Error_With_Employee_Company_And_Process_Ids_When_Due_Leaver_Finalisation_Throws()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var throwingEmployee = CreateLeavingEmployee(companyId, Now);
+        context.Employees.Add(throwingEmployee);
+        var throwingProcess = CreateLeavingProcess(companyId, throwingEmployee.Id, Today.AddDays(-1), Now);
+        context.EmployeeLeavingProcesses.Add(throwingProcess);
+        await context.SaveChangesAsync();
+
+        var finalizer = new SelectivelyThrowingDepartureFinalizer(BuildRealFinalizer(context), throwingEmployee.Id);
+        var logger = new ListLogger<ProcessLeavingEmployeesJob>();
+        var job = new ProcessLeavingEmployeesJob(
+            context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), finalizer, logger);
+
+        await job.ExecuteAsync();
+
+        Assert.Contains(logger.Messages, m =>
+            m.Contains(throwingEmployee.Id.ToString()) &&
+            m.Contains(companyId.ToString()) &&
+            m.Contains(throwingProcess.Id.ToString()));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_A_Throwing_Stranded_Reconciliation_Does_Not_Stop_A_Later_Stranded_Record_In_The_Same_Run()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var throwingEmployee = CreateLeavingEmployee(companyId, Now);
+        var throwingProcess = CreateLeavingProcess(companyId, throwingEmployee.Id, Today.AddDays(-1), Now);
+        throwingEmployee.SetFormerEmployee(Now);
+        throwingProcess.Complete(Now);
+        context.Employees.Add(throwingEmployee);
+        context.EmployeeLeavingProcesses.Add(throwingProcess);
+
+        var healthyEmployee = CreateLeavingEmployee(companyId, Now);
+        var healthyProcess = CreateLeavingProcess(companyId, healthyEmployee.Id, Today.AddDays(-1), Now);
+        healthyEmployee.SetFormerEmployee(Now);
+        healthyProcess.Complete(Now);
+        context.Employees.Add(healthyEmployee);
+        context.EmployeeLeavingProcesses.Add(healthyProcess);
+
+        await context.SaveChangesAsync();
+
+        var finalizer = new SelectivelyThrowingDepartureFinalizer(BuildRealFinalizer(context), throwingEmployee.Id);
+        var job = new ProcessLeavingEmployeesJob(
+            context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), finalizer,
+            NullLogger<ProcessLeavingEmployeesJob>.Instance);
+
+        var exception = await Record.ExceptionAsync(() => job.ExecuteAsync());
+
+        Assert.Null(exception);
+
+        var savedThrowingProcess = await context.EmployeeLeavingProcesses.SingleAsync(p => p.Id == throwingProcess.Id);
+        Assert.Null(savedThrowingProcess.FinalisationCompletedAt);
+
+        var savedHealthyProcess = await context.EmployeeLeavingProcesses.SingleAsync(p => p.Id == healthyProcess.Id);
+        Assert.NotNull(savedHealthyProcess.FinalisationCompletedAt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Skips_Stranded_Process_Without_Throwing_When_Employee_Not_Found()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        // A stranded leaving process referencing an employee that no longer exists in the DB.
+        var orphanEmployeeId = Guid.NewGuid();
+        var process = CreateLeavingProcess(companyId, orphanEmployeeId, Today.AddDays(-1), Now);
+        process.Complete(Now);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var job = BuildJob(context);
+
+        var exception = await Record.ExceptionAsync(() => job.ExecuteAsync());
+
+        Assert.Null(exception);
+
+        var savedProcess = await context.EmployeeLeavingProcesses.SingleAsync();
+        Assert.Null(savedProcess.FinalisationCompletedAt);
+    }
 }

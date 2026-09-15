@@ -41,7 +41,10 @@ internal sealed class GetEmployeeTimelineHandler(
 
         var query = dbContext.EmployeeTimelineEntries
             .AsNoTracking()
-            .Where(e => e.CompanyId == request.CompanyId && e.EmployeeId == request.EmployeeId);
+            .Where(e => e.CompanyId == request.CompanyId && e.EmployeeId == request.EmployeeId)
+            // Routine profile corrections belong in audit history, not the lifecycle timeline.
+            // Filter before pagination so historical entries do not leave gaps in the results.
+            .Where(e => e.EventType != EmployeeTimelineEventType.EmployeeDetailsCorrected);
 
         // Push the three-tier visibility check into the query itself rather than materialising
         // rows the caller isn't allowed to see. Equivalent to

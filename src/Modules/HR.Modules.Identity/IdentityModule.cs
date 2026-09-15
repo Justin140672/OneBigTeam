@@ -199,6 +199,9 @@ public static class IdentityModule
 
         // IAM-03: position-based default role administration.
         services.AddScoped<HR.Modules.Identity.Services.PositionSync>();
+        // Ticket 6 follow-up: recurring, converge-style authoritative reconciliation (see class docs).
+        services.AddScoped<HR.Modules.Identity.Services.PositionRoleReconciliationService>();
+        services.AddScoped<Jobs.PositionRoleReconciliationJob>();
         services.AddScoped<ListPositionRoleDefaultsHandler>();
         services.AddScoped<IValidator<ListPositionRoleDefaultsRequest>, ListPositionRoleDefaultsValidator>();
         services.AddScoped<SetPositionRoleDefaultsHandler>();
@@ -348,57 +351,33 @@ public static class IdentityModule
             "identity-idempotency-maintenance",
             job => job.ExecuteAsync(),
             "*/5 * * * *");
+        // Ticket 6 follow-up: recurring authoritative position-role reconciliation — recovers a
+        // missed/failed EmployeePositionChangedIntegrationEvent sync without requiring a restart.
+        // Documented recovery interval: within 15 minutes of the underlying data drifting.
+        jobManager.AddOrUpdate<Jobs.PositionRoleReconciliationJob>(
+            "identity-position-role-reconciliation",
+            job => job.ExecuteAsync(),
+            "*/15 * * * *");
         return app;
     }
 
     /// <summary>
-    /// IAM-03 backfill/reconciliation: ensures every current employee's position assignment
-    /// (as of now, per HR.Modules.Employees) has a matching identity.user_positions row, for
-    /// employees created before position-based role bridging existed (see
-    /// Features/OnEmployeeCreated and Features/OnEmployeePositionChanged, which only fire on new
-    /// integration-event traffic going forward). Called on every startup, in every environment,
-    /// right after MigrateIdentityAsync — idempotent and additive only: it never expires or
-    /// removes an existing UserPosition row, so it cannot clobber a manually-corrected assignment.
-    /// Scoped per company (via UserProfile.CompanyId) so it never processes cross-tenant data.
+    /// Ticket 6 follow-up: authoritative, converge-style reconciliation of identity.user_positions —
+    /// see <see cref="HR.Modules.Identity.Services.PositionRoleReconciliationService"/> for the
+    /// actual logic. Originally an additive-only IAM-03 backfill (it only ever added a missing
+    /// assignment, never expired a stale one, which left a failed revocation's grant active
+    /// indefinitely); now converges every employee's assignments to their current authoritative
+    /// position on every call. Called on every startup, in every environment, right after
+    /// MigrateIdentityAsync for immediate first-run coverage, and again every 15 minutes via
+    /// <see cref="Jobs.PositionRoleReconciliationJob"/> (see UseIdentityRecurringJobs) so a
+    /// missed/failed sync recovers without requiring a restart.
     /// </summary>
     public static async Task ReconcilePositionRoleAssignmentsAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        var employeeAudienceReader = scope.ServiceProvider.GetRequiredService<IEmployeeAudienceReader>();
-        var positionSync = scope.ServiceProvider.GetRequiredService<HR.Modules.Identity.Services.PositionSync>();
-        var now = DateTimeOffset.UtcNow;
-
-        var companyIds = await db.UserProfiles.Select(p => p.CompanyId).Distinct().ToListAsync();
-
-        foreach (var companyId in companyIds)
-        {
-            var employeeIds = await employeeAudienceReader.GetAllEmployeeIdsAsync(companyId, CancellationToken.None);
-            if (employeeIds.Count == 0)
-                continue;
-
-            var profiles = await employeeAudienceReader.GetEmployeeAudienceProfilesAsync(
-                companyId, employeeIds, CancellationToken.None);
-
-            foreach (var (employeeId, profile) in profiles)
-            {
-                if (profile.PositionProfileId is null)
-                    continue;
-
-                var positionId = profile.PositionProfileId.Value;
-
-                var hasActiveAssignment = await db.UserPositions.AnyAsync(up =>
-                    up.UserId == employeeId && up.PositionId == positionId &&
-                    (up.ExpiresAt == null || up.ExpiresAt > now));
-                if (hasActiveAssignment)
-                    continue;
-
-                await positionSync.EnsureExistsAsync(companyId, positionId, now, CancellationToken.None);
-                db.UserPositions.Add(UserPosition.Create(employeeId, positionId, now));
-            }
-        }
-
-        await db.SaveChangesAsync();
+        var reconciliationService = scope.ServiceProvider
+            .GetRequiredService<HR.Modules.Identity.Services.PositionRoleReconciliationService>();
+        await reconciliationService.ReconcileAllCompaniesAsync(CancellationToken.None);
     }
 
     /// <summary>

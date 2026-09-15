@@ -79,4 +79,65 @@ public class EmployeeLeavingProcessTests
 
         Assert.Equal("Cannot cancel a leaving process with status 'Cancelled'.", ex.Message);
     }
+
+    [Fact]
+    public void Complete_Sets_Status_And_UpdatedAt()
+    {
+        var leavingProcess = CreateInProgress(FixedNow);
+        var later = FixedNow.AddDays(30);
+
+        leavingProcess.Complete(later);
+
+        Assert.Equal(LeavingProcessStatus.Completed, leavingProcess.Status);
+        Assert.Equal(later, leavingProcess.UpdatedAt);
+    }
+
+    [Fact]
+    public void Complete_Throws_When_Status_Is_Not_InProgress()
+    {
+        var leavingProcess = CreateInProgress(FixedNow);
+        leavingProcess.Cancel("Retracted.", FixedNow.AddDays(1));
+
+        var ex = Assert.Throws<InvalidOperationException>(() => leavingProcess.Complete(FixedNow.AddDays(2)));
+
+        Assert.Equal("Cannot complete a leaving process with status 'Cancelled'.", ex.Message);
+    }
+
+    [Fact]
+    public void MarkFinalisationCompleted_Throws_When_Status_Is_Not_Completed()
+    {
+        var leavingProcess = CreateInProgress(FixedNow);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => leavingProcess.MarkFinalisationCompleted(FixedNow.AddDays(1)));
+
+        Assert.Equal("Cannot mark finalisation completed for a leaving process with status 'InProgress'.", ex.Message);
+        Assert.Null(leavingProcess.FinalisationCompletedAt);
+    }
+
+    [Fact]
+    public void MarkFinalisationCompleted_Sets_FinalisationCompletedAt_And_UpdatedAt_When_Completed()
+    {
+        var leavingProcess = CreateInProgress(FixedNow);
+        leavingProcess.Complete(FixedNow.AddDays(30));
+        var later = FixedNow.AddDays(31);
+
+        leavingProcess.MarkFinalisationCompleted(later);
+
+        Assert.Equal(later, leavingProcess.FinalisationCompletedAt);
+        Assert.Equal(later, leavingProcess.UpdatedAt);
+    }
+
+    [Fact]
+    public void MarkFinalisationCompleted_Is_A_No_Op_When_Called_A_Second_Time()
+    {
+        var leavingProcess = CreateInProgress(FixedNow);
+        leavingProcess.Complete(FixedNow.AddDays(30));
+        var firstCompletion = FixedNow.AddDays(31);
+        leavingProcess.MarkFinalisationCompleted(firstCompletion);
+
+        var exception = Record.Exception(() => leavingProcess.MarkFinalisationCompleted(FixedNow.AddDays(32)));
+
+        Assert.Null(exception);
+        Assert.Equal(firstCompletion, leavingProcess.FinalisationCompletedAt);
+    }
 }

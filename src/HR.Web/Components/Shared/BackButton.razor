@@ -1,0 +1,12 @@
+@* Simple browser-history back button for pages that don't have a meaningful breadcrumb parent -
+   just navigates back to wherever the user came from (reuses the existing app.js goBack() helper). *@
+@inject IJSRuntime JS
+
+<button type="button" class="back-button" @onclick="GoBack" aria-label="Back">
+    <i class="fa-solid fa-arrow-left"></i>
+    <span>Back</span>
+</button>
+
+@code {
+    private async Task GoBack() => await JS.InvokeVoidAsync("goBack");
+}

@@ -452,13 +452,28 @@ if (app.Environment.IsDevelopment())
 		if (!localStorageBuckets.TryGetValue(bucket, out var basePath))
 			return Results.NotFound();
 
-		var relativePath = string.Join(
-			Path.DirectorySeparatorChar,
-			key.Split('/').Select(Uri.UnescapeDataString));
+		var segments = key.Split('/').Select(Uri.UnescapeDataString).ToArray();
+		foreach (var segment in segments)
+		{
+			if (segment.Length == 0 || segment is "." or ".." || segment.Contains(':'))
+				return Results.NotFound();
+		}
+
+		if (Path.IsPathRooted(key))
+			return Results.NotFound();
+
+		var relativePath = string.Join(Path.DirectorySeparatorChar, segments);
 		var fullPath = Path.GetFullPath(Path.Combine(basePath, relativePath));
 
+		var basePathWithSeparator = basePath.EndsWith(Path.DirectorySeparatorChar)
+			? basePath
+			: basePath + Path.DirectorySeparatorChar;
+
 		// Guard against the resolved path escaping the storage root (path traversal via "..").
-		if (!fullPath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase)
+		// Ordinal (not OrdinalIgnoreCase): on a case-sensitive filesystem (Linux) a
+		// case-insensitive prefix check would let a differently-cased sibling directory pass as
+		// "contained" even though it resolves elsewhere.
+		if (!fullPath.StartsWith(basePathWithSeparator, StringComparison.Ordinal)
 			|| !File.Exists(fullPath))
 		{
 			return Results.NotFound();

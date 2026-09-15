@@ -6,6 +6,7 @@ using HR.SharedKernel.Idempotency;
 using HR.SharedKernel.Outbox;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Assets.Features.CreateAsset;
 
@@ -14,6 +15,13 @@ internal sealed class CreateAssetHandler(
     IClock clock,
     ICompanyAssetNumberSettingsReader assetNumberSettingsReader,
     IAssetNumberGenerator assetNumberGenerator,
+    // Optional (like postCommitFaultInjector below) so the many existing handler-level unit tests
+    // that construct this handler directly don't all need updating. Production DI always supplies
+    // real instances via the required IAuditEventPublisher/ILogger registrations in Program.cs;
+    // when null (unit tests), the inline post-commit outbox dispatch below is simply skipped and
+    // the event stays queued for the background IdempotencyMaintenanceJob.
+    IAuditEventPublisher? auditPublisher = null,
+    ILogger<CreateAssetHandler>? logger = null,
     IPostCommitFaultInjector? postCommitFaultInjector = null)
 {
     // Optional so the many existing handler-level unit tests that construct this handler directly
@@ -172,6 +180,24 @@ internal sealed class CreateAssetHandler(
         // must not consume a second asset number).
         await _postCommitFaultInjector.MaybeFailAfterCommitAsync(
             nameof(CreateAssetHandler), request.IdempotencyKey, cancellationToken);
+
+        // Deliver the just-committed audit outbox entry immediately rather than waiting for the
+        // next IdempotencyMaintenanceJob cron tick (every 5 minutes). The outbox row remains the
+        // source of truth: if this inline attempt throws, the background job still retries it.
+        if (auditPublisher is not null && logger is not null)
+        {
+            try
+            {
+                await db.DispatchPendingAsync(
+                    db.AuditOutboxEntries, auditPublisher, now, IdempotencyCleanupExtensions.DefaultBatchSize,
+                    logger, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception,
+                    "Inline dispatch of asset-creation outbox entries failed; the background maintenance job will retry.");
+            }
+        }
 
         return Result.Success(response);
     }

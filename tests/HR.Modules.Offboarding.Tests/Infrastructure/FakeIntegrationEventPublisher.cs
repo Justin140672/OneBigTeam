@@ -12,4 +12,11 @@ internal sealed class FakeIntegrationEventPublisher : IIntegrationEventPublisher
         PublishedEvents.Add(integrationEvent!);
         return Task.CompletedTask;
     }
+
+    public async Task<bool> PublishAndConfirmAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)
+        where TEvent : IIntegrationEvent
+    {
+        await PublishAsync(integrationEvent, cancellationToken);
+        return true;
+    }
 }

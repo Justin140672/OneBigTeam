@@ -405,6 +405,48 @@ public class SubmitLeaveRequestDraftHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Conflicts);
     }
+
+    [Fact]
+    public async Task HandleAsync_RequiresApproval_False_Second_Draft_Submission_Fails_When_Balance_Exhausted()
+    {
+        // P2 (Ticket 5): draft auto-approval shares LeaveApprovalEffectsService with manual
+        // approval and direct-submission auto-approval, so the same no-negative-balance rule must
+        // hold here too - submitting and auto-approving one 5-day draft against a 5-day balance
+        // must leave nothing for a second draft covering different dates.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var (leaveType, policy, firstDraft) = await SeedDraftWithPolicyAsync(
+            context, companyId, employeeId, requiresApproval: false, entitlementDays: 5);
+
+        var secondDraft = LeaveRequest.CreateDraft(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, null,
+            new DateOnly(2026, 9, 7), LeaveDayPart.FullDay,
+            new DateOnly(2026, 9, 11), LeaveDayPart.FullDay,
+            5m, "Second week", now);
+        context.LeaveRequests.Add(secondDraft);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context);
+
+        var firstResult = await handler.HandleAsync(SubmitRequest(companyId, employeeId, firstDraft.Id), CancellationToken.None);
+        Assert.True(firstResult.IsSuccess);
+        Assert.Equal("Approved", firstResult.Value!.Status);
+
+        var secondResult = await handler.HandleAsync(SubmitRequest(companyId, employeeId, secondDraft.Id), CancellationToken.None);
+
+        Assert.True(secondResult.IsFailure);
+        Assert.Equal("validation", secondResult.Error.Code);
+
+        var savedSecondDraft = await context.LeaveRequests.SingleAsync(r => r.Id == secondDraft.Id);
+        Assert.Equal(LeaveRequestStatus.Draft, savedSecondDraft.Status); // untouched by the failed submission
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(5m, savedBalance.UsedDays);
+        Assert.Equal(0m, savedBalance.RemainingDays);
+    }
 }
 
 public class SubmitLeaveRequestDraftValidatorTests

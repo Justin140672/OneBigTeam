@@ -751,6 +751,10 @@ internal sealed record FileScanStatusChangedAuditEvent(
     Guid?   IAuditEvent.ActorUserId     => null;
     Guid?   IAuditEvent.ActorEmployeeId => null;
     Guid?   IAuditEvent.CorrelationId   => null;
+    // AUD-04: raised by ScanUploadedFileJob, a Hangfire background job with no HttpContext/current
+    // user available at all - must not default to Human (which requires an actor) or every scan
+    // status change is rejected by AuditActorAttributionGuard.
+    AuditActorType IAuditEvent.ActorType => AuditActorType.ScheduledJob;
     string? IAuditEvent.Summary         => $"{EntityTypeName} {FileEntityId} scan status changed: {PreviousStatus} -> {NewStatus}";
     object? IAuditEvent.Before          => new { Status = PreviousStatus };
     object? IAuditEvent.After           => new { Status = NewStatus, FailureReason };

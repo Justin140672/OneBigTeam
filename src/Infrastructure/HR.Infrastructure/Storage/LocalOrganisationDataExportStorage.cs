@@ -57,6 +57,36 @@ internal sealed class LocalOrganisationDataExportStorage : IOrganisationDataExpo
         return Task.FromResult<IReadOnlyList<string>>(keys);
     }
 
-    private string ToFullPath(string storageKey) =>
-        Path.Combine(_basePath, storageKey.Replace('/', Path.DirectorySeparatorChar));
+    // Defence in depth: this storage key is built server-side from GUIDs only, but still resolves
+    // through a canonical containment check so a malformed key can never resolve outside the root.
+    //
+    // The containment comparison is deliberately Ordinal (case-sensitive), not
+    // OrdinalIgnoreCase: on a case-sensitive filesystem (Linux) a case-insensitive prefix check
+    // would treat a differently-cased sibling directory as contained under the storage root even
+    // though it resolves elsewhere. Ordinal comparison rejects that key outright. Generated keys
+    // are always lowercase hex, so this never rejects a legitimately generated key on either OS.
+    private string ToFullPath(string storageKey)
+    {
+        var segments = storageKey.Split(['/', '\\']);
+        foreach (var segment in segments)
+        {
+            if (segment.Length == 0 || segment is "." or ".." || segment.Contains(':'))
+                throw new InvalidOperationException($"Storage key '{storageKey}' contains an invalid path segment.");
+        }
+
+        if (Path.IsPathRooted(storageKey))
+            throw new InvalidOperationException($"Storage key '{storageKey}' must be relative.");
+
+        var basePathFull = Path.GetFullPath(_basePath);
+        var candidate     = Path.GetFullPath(Path.Combine(basePathFull, string.Join(Path.DirectorySeparatorChar, segments)));
+
+        var basePathWithSeparator = basePathFull.EndsWith(Path.DirectorySeparatorChar)
+            ? basePathFull
+            : basePathFull + Path.DirectorySeparatorChar;
+
+        if (!candidate.StartsWith(basePathWithSeparator, StringComparison.Ordinal))
+            throw new InvalidOperationException("Resolved storage path escapes the storage root.");
+
+        return candidate;
+    }
 }

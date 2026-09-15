@@ -10,6 +10,7 @@ using HR.SharedKernel.Idempotency;
 using HR.SharedKernel.Outbox;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Employees.Features.CreateEmployee;
 
@@ -21,6 +22,9 @@ internal sealed class CreateEmployeeHandler
     private readonly ICompanyContactValidationReader _contactValidationReader;
     private readonly ICompanyEmployeeNumberSettingsReader _employeeNumberSettingsReader;
     private readonly IEmployeeNumberGenerator _employeeNumberGenerator;
+    private readonly IAuditEventPublisher? _auditPublisher;
+    private readonly IIntegrationEventPublisher? _integrationPublisher;
+    private readonly ILogger<CreateEmployeeHandler>? _logger;
 
     public CreateEmployeeHandler(
         EmployeesDbContext dbContext,
@@ -28,7 +32,15 @@ internal sealed class CreateEmployeeHandler
         IProbationDateResolver probationDateResolver,
         ICompanyContactValidationReader contactValidationReader,
         ICompanyEmployeeNumberSettingsReader employeeNumberSettingsReader,
-        IEmployeeNumberGenerator employeeNumberGenerator)
+        IEmployeeNumberGenerator employeeNumberGenerator,
+        // Optional so the many existing handler-level unit tests that construct this handler
+        // directly (with no interest in delivering the outbox event inline) don't all need
+        // updating. Production DI always supplies real instances via the required interface
+        // registrations in Program.cs; when null (unit tests), the inline dispatch below is
+        // simply skipped and the event stays queued for the background IdempotencyMaintenanceJob.
+        IAuditEventPublisher? auditPublisher = null,
+        IIntegrationEventPublisher? integrationPublisher = null,
+        ILogger<CreateEmployeeHandler>? logger = null)
     {
         _dbContext = dbContext;
         _clock = clock;
@@ -36,6 +48,9 @@ internal sealed class CreateEmployeeHandler
         _contactValidationReader = contactValidationReader;
         _employeeNumberSettingsReader = employeeNumberSettingsReader;
         _employeeNumberGenerator = employeeNumberGenerator;
+        _auditPublisher = auditPublisher;
+        _integrationPublisher = integrationPublisher;
+        _logger = logger;
     }
 
     public async Task<Result<CreateEmployeeResponse>> HandleAsync(
@@ -400,6 +415,28 @@ internal sealed class CreateEmployeeHandler
             // returned, rather than propagating a raw DB exception.
             return Result.Failure<CreateEmployeeResponse>(
                 Error.Conflict($"An employee with employee number '{employeeNumber}' already exists in this company."));
+        }
+
+        // Deliver the just-committed outbox entry (EmployeeCreatedIntegrationEvent) immediately
+        // rather than waiting for the next IdempotencyMaintenanceJob cron tick (every 5 minutes) -
+        // onboarding/probation/leave/task/notification/document-request provisioning all key off
+        // this event and must not be delayed for the common (non-crash) path. The outbox row stays
+        // the source of truth: if this inline attempt throws or the process dies right here, the
+        // background job still picks it up and delivers it on its own schedule, so nothing is lost -
+        // this is purely a best-effort latency optimisation on top of that existing guarantee.
+        if (_auditPublisher is not null && _integrationPublisher is not null && _logger is not null)
+        {
+            try
+            {
+                await _dbContext.DispatchPendingAsync(
+                    _dbContext.AuditOutboxEntries, _auditPublisher, now, IdempotencyCleanupExtensions.DefaultBatchSize,
+                    _logger, cancellationToken, _integrationPublisher);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception,
+                    "Inline dispatch of employee-creation outbox entries failed; the background maintenance job will retry.");
+            }
         }
 
         return Result.Success(response);

@@ -29,6 +29,28 @@ internal sealed class RecordingHandler : IIntegrationEventHandler<TestIntegratio
     }
 }
 
+internal sealed class ThrowingRequiredHandler : IRequiredIntegrationEventHandler<TestIntegrationEvent>
+{
+    public bool Invoked { get; private set; }
+
+    public Task HandleAsync(TestIntegrationEvent integrationEvent, CancellationToken cancellationToken)
+    {
+        Invoked = true;
+        throw new InvalidOperationException("Simulated required handler failure");
+    }
+}
+
+internal sealed class RecordingRequiredHandler : IRequiredIntegrationEventHandler<TestIntegrationEvent>
+{
+    public bool Invoked { get; private set; }
+
+    public Task HandleAsync(TestIntegrationEvent integrationEvent, CancellationToken cancellationToken)
+    {
+        Invoked = true;
+        return Task.CompletedTask;
+    }
+}
+
 internal sealed class SpyLogger<T> : ILogger<T>
 {
     public List<(LogLevel Level, string Message, Exception? Exception)> Entries { get; } = [];
@@ -102,5 +124,82 @@ public class IntegrationEventPublisherTests
         Assert.Contains(nameof(TestIntegrationEvent), errorEntry.Message);
         Assert.Contains(nameof(ThrowingHandler), errorEntry.Message);
         Assert.NotNull(errorEntry.Exception);
+    }
+
+    [Fact]
+    public async Task PublishAndConfirmAsync_WhenAllHandlersSucceed_ReturnsTrue()
+    {
+        var recording = new RecordingHandler();
+        var recordingRequired = new RecordingRequiredHandler();
+        var logger = new SpyLogger<IntegrationEventPublisher>();
+        var provider = BuildProvider(logger, recording, recordingRequired);
+        var publisher = new IntegrationEventPublisher(provider, logger);
+
+        var result = await publisher.PublishAndConfirmAsync(new TestIntegrationEvent(), CancellationToken.None);
+
+        Assert.True(result);
+        Assert.True(recording.Invoked);
+        Assert.True(recordingRequired.Invoked);
+    }
+
+    [Fact]
+    public async Task PublishAndConfirmAsync_WhenARequiredHandlerThrows_ReturnsFalse()
+    {
+        var throwingRequired = new ThrowingRequiredHandler();
+        var logger = new SpyLogger<IntegrationEventPublisher>();
+        var provider = BuildProvider(logger, throwingRequired);
+        var publisher = new IntegrationEventPublisher(provider, logger);
+
+        var result = await publisher.PublishAndConfirmAsync(new TestIntegrationEvent(), CancellationToken.None);
+
+        Assert.False(result);
+        Assert.True(throwingRequired.Invoked);
+    }
+
+    [Fact]
+    public async Task PublishAndConfirmAsync_WhenOnlyANonRequiredHandlerThrows_ReturnsTrue()
+    {
+        // Best-effort semantics for non-required handlers are unchanged: a plain
+        // IIntegrationEventHandler<T> failing must not flip the confirmed-delivery result, only a
+        // handler that has explicitly opted in via IRequiredIntegrationEventHandler<T> can do that.
+        var throwing = new ThrowingHandler();
+        var logger = new SpyLogger<IntegrationEventPublisher>();
+        var provider = BuildProvider(logger, throwing);
+        var publisher = new IntegrationEventPublisher(provider, logger);
+
+        var result = await publisher.PublishAndConfirmAsync(new TestIntegrationEvent(), CancellationToken.None);
+
+        Assert.True(result);
+        Assert.True(throwing.Invoked);
+    }
+
+    [Fact]
+    public async Task PublishAndConfirmAsync_WhenARequiredHandlerThrows_OtherRegisteredHandlersStillRun()
+    {
+        var throwingRequired = new ThrowingRequiredHandler();
+        var recording = new RecordingHandler();
+        var logger = new SpyLogger<IntegrationEventPublisher>();
+        var provider = BuildProvider(logger, throwingRequired, recording);
+        var publisher = new IntegrationEventPublisher(provider, logger);
+
+        var result = await publisher.PublishAndConfirmAsync(new TestIntegrationEvent(), CancellationToken.None);
+
+        Assert.False(result);
+        Assert.True(throwingRequired.Invoked);
+        Assert.True(recording.Invoked); // never blocked by the required handler's failure
+    }
+
+    [Fact]
+    public async Task PublishAndConfirmAsync_WhenARequiredHandlerThrows_DoesNotPropagateToCaller()
+    {
+        var throwingRequired = new ThrowingRequiredHandler();
+        var logger = new SpyLogger<IntegrationEventPublisher>();
+        var provider = BuildProvider(logger, throwingRequired);
+        var publisher = new IntegrationEventPublisher(provider, logger);
+
+        var exception = await Record.ExceptionAsync(() =>
+            publisher.PublishAndConfirmAsync(new TestIntegrationEvent(), CancellationToken.None));
+
+        Assert.Null(exception);
     }
 }

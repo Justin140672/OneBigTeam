@@ -42,7 +42,7 @@ internal sealed class ManagerChangedHandler(
     ICompanyTimeZoneReader timeZoneReader,
     IClock clock,
     IAuditEventPublisher auditPublisher,
-    ILogger<ManagerChangedHandler> logger) : IIntegrationEventHandler<EmployeeManagerChangedIntegrationEvent>
+    ILogger<ManagerChangedHandler> logger) : IRequiredIntegrationEventHandler<EmployeeManagerChangedIntegrationEvent>
 {
     public async Task HandleAsync(EmployeeManagerChangedIntegrationEvent integrationEvent, CancellationToken cancellationToken)
     {

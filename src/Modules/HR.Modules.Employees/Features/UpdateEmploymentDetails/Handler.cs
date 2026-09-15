@@ -4,7 +4,10 @@ using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using HR.SharedKernel.Outbox;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Employees.Features.UpdateEmploymentDetails;
 
@@ -15,19 +18,22 @@ internal sealed class UpdateEmploymentDetailsHandler
     private readonly IIntegrationEventPublisher _integrationEventPublisher;
     private readonly IAuditEventPublisher _auditEventPublisher;
     private readonly ICompanyEmployeeNumberSettingsReader _employeeNumberSettingsReader;
+    private readonly ILogger<UpdateEmploymentDetailsHandler>? _logger;
 
     public UpdateEmploymentDetailsHandler(
         EmployeesDbContext dbContext,
         IClock clock,
         IIntegrationEventPublisher integrationEventPublisher,
         IAuditEventPublisher auditEventPublisher,
-        ICompanyEmployeeNumberSettingsReader employeeNumberSettingsReader)
+        ICompanyEmployeeNumberSettingsReader employeeNumberSettingsReader,
+        ILogger<UpdateEmploymentDetailsHandler>? logger = null)
     {
         _dbContext = dbContext;
         _clock = clock;
         _integrationEventPublisher = integrationEventPublisher;
         _auditEventPublisher = auditEventPublisher;
         _employeeNumberSettingsReader = employeeNumberSettingsReader;
+        _logger = logger;
     }
 
     public async Task<Result<UpdateEmploymentDetailsResponse>> HandleAsync(
@@ -229,6 +235,23 @@ internal sealed class UpdateEmploymentDetailsHandler
             now);
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
 
+        // Ticket 6 follow-up: stage the position-change integration event in the SAME transaction as
+        // the business write, instead of publishing after commit. A crash between "committed" and
+        // "published" (or a consumer failure the publisher swallows — see IntegrationEventPublisher)
+        // can now only delay delivery of the identity module's position-role sync (the background
+        // IdempotencyMaintenanceJob dispatcher retries the outbox row until it succeeds, and the
+        // recurring PositionRoleReconciliationService converges independently in the meantime),
+        // never lose it outright. Uses the in-memory before/after values, which are already final at
+        // this point in the method (employee.PositionProfileId does not change during save).
+        var positionProfileChanged = previousPositionProfileId != employee.PositionProfileId;
+        if (positionProfileChanged)
+        {
+            _dbContext.AuditOutboxEntries.EnqueueIntegrationOutbox(
+                new EmployeePositionChangedIntegrationEvent(
+                    employee.CompanyId, employee.Id, previousPositionProfileId, employee.PositionProfileId, now),
+                employee.CompanyId, now);
+        }
+
         // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict.
         var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
             employee,
@@ -238,6 +261,25 @@ internal sealed class UpdateEmploymentDetailsHandler
 
         if (saveResult.IsFailure)
             return Result.Failure<UpdateEmploymentDetailsResponse>(saveResult.Error);
+
+        // Deliver the just-committed position-change outbox entry immediately rather than waiting
+        // for the next IdempotencyMaintenanceJob cron tick — the outbox row remains the source of
+        // truth if this inline attempt throws or the process dies right here (purely a best-effort
+        // latency optimisation on top of the durability guarantee already provided by the outbox row).
+        if (positionProfileChanged && _logger is not null)
+        {
+            try
+            {
+                await _dbContext.DispatchPendingAsync(
+                    _dbContext.AuditOutboxEntries, _auditEventPublisher, now, IdempotencyCleanupExtensions.DefaultBatchSize,
+                    _logger, cancellationToken, _integrationEventPublisher);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception,
+                    "Inline dispatch of position-change outbox entries failed; the background maintenance job will retry.");
+            }
+        }
 
         var employmentDetailsAfter = new EmploymentDetailsSnapshot(
             employee.EmployeeNumber,
@@ -253,14 +295,6 @@ internal sealed class UpdateEmploymentDetailsHandler
             new EmploymentDetailsUpdatedAuditEvent(
                 employee.CompanyId, employee.Id, actorEmployeeId, now, employmentDetailsBefore, employmentDetailsAfter, request.CorrelationId),
             cancellationToken);
-
-        if (previousPositionProfileId != employee.PositionProfileId)
-        {
-            await _integrationEventPublisher.PublishAsync(
-                new EmployeePositionChangedIntegrationEvent(
-                    employee.CompanyId, employee.Id, previousPositionProfileId, employee.PositionProfileId, now),
-                cancellationToken);
-        }
 
         if (previousLocationId != employee.LocationId)
         {

@@ -6,6 +6,7 @@ using HR.Modules.Employees.Tests.Infrastructure;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Employees.Tests;
 
@@ -24,7 +25,13 @@ public class UpdateEmploymentDetailsHandlerTests
             clock,
             integrationEventPublisher ?? new NoOpIntegrationEventPublisher(),
             auditPublisher ?? new FakeAuditPublisher(),
-            new FakeCompanyEmployeeNumberSettingsReader());
+            new FakeCompanyEmployeeNumberSettingsReader(),
+            // Ticket 6 follow-up: the position-change event is now staged via the outbox and
+            // delivered by an inline best-effort dispatch right after commit (falling back to the
+            // background job in production). Supplying a logger here mirrors production DI (always
+            // resolvable) and keeps existing assertions against the publisher meaningful — without
+            // it, the inline dispatch is skipped and the event only exists as an outbox row.
+            NullLogger<UpdateEmploymentDetailsHandler>.Instance);
 
     // ── probation date — employee override ────────────────────────────────────
 

@@ -917,5 +917,57 @@ public class SubmitLeaveRequestHandlerTests
         Assert.Equal("Pending", result.Value!.Status);
         Assert.IsType<LeaveRequestedIntegrationEvent>(Assert.Single(publisher.Published));
     }
+
+    [Fact]
+    public async Task HandleAsync_RequiresApproval_False_Second_Sequential_Submission_Fails_When_Balance_Exhausted()
+    {
+        // P2 (Ticket 5): the auto-approval path shares LeaveApprovalEffectsService with manual
+        // approval, so the same "cannot exceed available balance under a no-negative-balance
+        // policy" rule must hold here too - two auto-approving submissions for a 5-day balance,
+        // each requesting 5 days, must not both succeed.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 5,
+            AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Auto-approve Policy", null, 0,
+            allowNegativeBalance: false, isDefault: false, now, requiresApproval: false);
+        var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
+            DateOnly.FromDateTime(FixedUtcNow), now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            FixedUtcNow.Year, 5m, new DateOnly(FixedUtcNow.Year, 1, 1), now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.EmployeeLeavePolicyAssignments.Add(assignment);
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
+
+        var firstRequest = ValidRequest(companyId, employeeId, leaveType.Id); // 2026-08-03..07, 5 days
+        var firstResult = await handler.HandleAsync(firstRequest, CancellationToken.None);
+        Assert.True(firstResult.IsSuccess);
+        Assert.Equal("Approved", firstResult.Value!.Status);
+
+        var secondRequest = firstRequest with
+        {
+            StartDate = new DateOnly(2026, 9, 7),
+            EndDate = new DateOnly(2026, 9, 11)
+        };
+        var secondResult = await handler.HandleAsync(secondRequest, CancellationToken.None);
+
+        Assert.True(secondResult.IsFailure);
+        Assert.Equal("validation", secondResult.Error.Code);
+        Assert.Contains("Insufficient leave balance", secondResult.Error.Message);
+
+        Assert.Equal(1, await context.LeaveRequests.CountAsync(r => r.Status == LeaveRequestStatus.Approved));
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(5m, savedBalance.UsedDays);
+        Assert.Equal(0m, savedBalance.RemainingDays);
+    }
 }
 

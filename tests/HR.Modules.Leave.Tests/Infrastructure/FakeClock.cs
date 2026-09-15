@@ -2,12 +2,7 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Leave.Tests.Infrastructure;
 
-internal sealed class FakeClock : IClock
+internal sealed class FakeClock(DateTime utcNow) : IClock
 {
-    public FakeClock(DateTime utcNow)
-    {
-        UtcNow = utcNow;
-    }
-
-    public DateTime UtcNow { get; }
+    public DateTime UtcNow { get; } = utcNow;
 }

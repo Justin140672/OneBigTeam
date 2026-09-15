@@ -21,6 +21,7 @@ internal sealed class LeaveDbContext : DbContext
     public DbSet<LeaveBalanceAdjustment> LeaveBalanceAdjustments => Set<LeaveBalanceAdjustment>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<AuditOutboxEntry> AuditOutboxEntries => Set<AuditOutboxEntry>();
+    public DbSet<LeavePolicyDeactivationOnDeparture> LeavePolicyDeactivationsOnDeparture => Set<LeavePolicyDeactivationOnDeparture>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -4,6 +4,7 @@ using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Identity.Features.OnEmployeePositionChanged;
 
@@ -14,15 +15,46 @@ namespace HR.Modules.Identity.Features.OnEmployeePositionChanged;
 // survives a transfer (see IdentityAuthorizationService.GetEffectiveRolesAsync, which layers
 // overrides on top of the merged position+direct role set every time it is evaluated — there is no
 // separate "recalculation" step to run).
+//
+// Ticket 6 follow-up: integration event delivery can be delayed, duplicated, or arrive
+// out-of-order (e.g. two rapid transfers A->B->C processed as C-then-A->B) relative to the
+// employee's actual current state. Trusting the event's own Previous/New position blindly can
+// reopen a superseded position's grant. Before applying anything, this handler checks the
+// employee's CURRENT authoritative position (via IEmployeeAudienceReader, a live read against
+// HR.Modules.Employees) and only proceeds when the event's NewPositionProfileId still matches it —
+// otherwise the event is stale/out-of-order and is skipped entirely (both the previous-expiry and
+// new-assignment steps), deferring convergence to PositionRoleReconciliationService's next
+// scheduled pass rather than risking a wrong intermediate state.
 internal sealed class Handler(
     IdentityDbContext db,
     IClock clock,
     IAuditEventPublisher auditEventPublisher,
-    PositionSync positionSync) : IIntegrationEventHandler<EmployeePositionChangedIntegrationEvent>
+    PositionSync positionSync,
+    IEmployeeAudienceReader employeeAudienceReader,
+    ILogger<Handler> logger) : IIntegrationEventHandler<EmployeePositionChangedIntegrationEvent>
 {
     public async Task HandleAsync(EmployeePositionChangedIntegrationEvent integrationEvent, CancellationToken cancellationToken)
     {
         var now = clock.UtcNowOffset();
+
+        var currentProfile = await employeeAudienceReader.GetEmployeeAudienceAsync(
+            integrationEvent.CompanyId, integrationEvent.EmployeeId, cancellationToken);
+
+        if (currentProfile?.PositionProfileId != integrationEvent.NewPositionProfileId)
+        {
+            // Stale/out-of-order delivery, or the employee's current state can't be confirmed right
+            // now — do not touch either the previous or the new assignment. Applying only half of a
+            // stale event (e.g. expiring a still-current previous assignment) would be worse than
+            // doing nothing; the recurring reconciliation pass converges on the true current state
+            // regardless of event ordering.
+            logger.LogInformation(
+                "Skipped stale/out-of-order EmployeePositionChangedIntegrationEvent for employee {EmployeeId} " +
+                "in company {CompanyId}: event's new position {EventNewPositionId} does not match the " +
+                "employee's current authoritative position {CurrentPositionId}.",
+                integrationEvent.EmployeeId, integrationEvent.CompanyId,
+                integrationEvent.NewPositionProfileId, currentProfile?.PositionProfileId);
+            return;
+        }
 
         var previousAssignment = await db.UserPositions.FirstOrDefaultAsync(
             up => up.UserId == integrationEvent.EmployeeId &&

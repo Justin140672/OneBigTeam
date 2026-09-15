@@ -26,6 +26,12 @@ internal sealed class ProcessLeavingEmployeesJob(
     {
         var now = clock.UtcNowOffset();
 
+        await ProcessDueLeaversAsync(now);
+        await ReconcileStrandedDeparturesAsync(now);
+    }
+
+    private async Task ProcessDueLeaversAsync(DateTimeOffset now)
+    {
         var leavingEmployees = await dbContext.Employees
             .Where(e => e.Status == EmploymentStatus.Leaving)
             .ToListAsync();
@@ -71,8 +77,99 @@ internal sealed class ProcessLeavingEmployeesJob(
                 todayByCompany[employee.CompanyId] = today;
             }
 
-            if (process.LeavingDate <= today)
+            if (process.LeavingDate > today)
+                continue;
+
+            // Reliability fix: one employee's finalisation throwing must never stop the rest of the
+            // batch — previously an unhandled exception here aborted the whole loop, silently
+            // blocking every later due leaver AND the stranded-recovery scan below (which never got
+            // a chance to run). EmployeesDbContext is Scoped per job execution (one instance shared
+            // across this whole method, per Hangfire's per-job DI scope), so a caught exception can
+            // leave partially-mutated entities tracked — DetachDirtyEntries() discards only those
+            // before moving on, so the next employee's SaveChangesAsync can never accidentally flush
+            // this employee's incomplete work. (A blanket ChangeTracker.Clear() was tried first and
+            // rejected: it also detaches the still-Unchanged employees/processes already loaded by
+            // this method's own ToListAsync() calls but not yet reached in the loop, silently
+            // preventing their later mutations from ever being saved.)
+            try
+            {
                 await departureFinalizer.FinalizeAsync(employee, process, now, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(
+                    ex,
+                    "ProcessLeavingEmployeesJob: departure finalisation failed for employee {EmployeeId} in company {CompanyId} (leaving process {ProcessId}, step: due-leaver finalisation) — skipping and continuing with the remaining batch.",
+                    employee.Id,
+                    employee.CompanyId,
+                    process.Id);
+
+                DetachDirtyEntries();
+            }
+        }
+    }
+
+    // Recovers departures where an earlier FinalizeAsync attempt persisted the terminal state
+    // (EmployeeLeavingProcess -> Completed, Employee -> FormerEmployee) but crashed/threw before
+    // completing the downstream steps (offboarding check, manager notification, audit publish,
+    // integration publish, timeline write) — those employees are no longer Status == Leaving, so
+    // ProcessDueLeaversAsync above would never pick them up again. FinalizeAsync itself detects
+    // this state (Status == Completed but FinalisationCompletedAt still null) and resumes from the
+    // downstream steps only, so calling it again here is safe and does not repeat the terminal-state
+    // mutation.
+    private async Task ReconcileStrandedDeparturesAsync(DateTimeOffset now)
+    {
+        var strandedProcesses = await dbContext.EmployeeLeavingProcesses
+            .Where(p => p.Status == LeavingProcessStatus.Completed && p.FinalisationCompletedAt == null)
+            .ToListAsync();
+
+        if (strandedProcesses.Count == 0)
+            return;
+
+        var employeeIds = strandedProcesses.Select(p => p.EmployeeId).ToList();
+        var employeesById = await dbContext.Employees
+            .Where(e => employeeIds.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id);
+
+        foreach (var process in strandedProcesses)
+        {
+            if (!employeesById.TryGetValue(process.EmployeeId, out var employee))
+            {
+                logger.LogWarning(
+                    "Leaving process {ProcessId} in company {CompanyId} is Completed but not fully " +
+                    "finalised, and its employee {EmployeeId} could not be found — skipping.",
+                    process.Id,
+                    process.CompanyId,
+                    process.EmployeeId);
+                continue;
+            }
+
+            try
+            {
+                await departureFinalizer.FinalizeAsync(employee, process, now, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(
+                    ex,
+                    "ProcessLeavingEmployeesJob: stranded-departure reconciliation failed for employee {EmployeeId} in company {CompanyId} (leaving process {ProcessId}, step: stranded recovery) — skipping and continuing with the remaining batch.",
+                    employee.Id,
+                    employee.CompanyId,
+                    process.Id);
+
+                DetachDirtyEntries();
+            }
+        }
+    }
+
+    // Discards only entities carrying uncommitted modifications (Added/Modified/Deleted) from a
+    // failed finalisation attempt — anything still Unchanged (including employees/processes this
+    // method already loaded but hasn't reached yet in the loop) stays tracked and normally saveable.
+    private void DetachDirtyEntries()
+    {
+        foreach (var entry in dbContext.ChangeTracker.Entries().Where(e => e.State != EntityState.Unchanged).ToList())
+        {
+            entry.State = EntityState.Detached;
         }
     }
 }

@@ -84,6 +84,20 @@ public class SicknessEvidenceReminderJobRetrySafetyTests
             Published.Add(integrationEvent!);
             return Task.CompletedTask;
         }
+
+        public async Task<bool> PublishAndConfirmAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)
+            where TEvent : IIntegrationEvent
+        {
+            try
+            {
+                await PublishAsync(integrationEvent, cancellationToken);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 
     // ── seeding ──────────────────────────────────────────────────────────

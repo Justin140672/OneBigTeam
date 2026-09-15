@@ -73,6 +73,35 @@ internal sealed class LeaveApprovalEffectsService(
                     Error.Validation(
                         $"No leave balance found for policy year {policyYear}. The request cannot be approved until a balance exists for this employee and leave type."));
 
+            // P2: submission only checks available balance at the moment the request is created -
+            // a pending request does not reserve leave. Multiple individually-valid pending requests
+            // can therefore be approved sequentially without ever hitting a concurrency conflict, so
+            // this check must be re-run here (using the same accrual math as submission/preview,
+            // LEAVE-04) rather than relying solely on optimistic concurrency to catch the conflict.
+            if (leaveType is not null)
+            {
+                var policy = await dbContext.LeavePolicies
+                    .SingleOrDefaultAsync(p => p.Id == leaveRequest.LeavePolicyId, cancellationToken);
+
+                if (policy is null || !policy.AllowNegativeBalance)
+                {
+                    var (_, balancePolicyYearEnd) = LeaveYearCalculator.GetPolicyYearBounds(policyYear, leaveSettings.LeaveYearStartMonth);
+                    var accruedDays = LeaveAccrualCalculator.CalculateAccruedDays(
+                        balance.EntitlementDays,
+                        leaveType.AccrualMethod,
+                        balance.AccrualStartDate,
+                        balancePolicyYearEnd,
+                        DateOnly.FromDateTime(now.Date));
+
+                    var availableDays = accruedDays + balance.AdjustmentDays - balance.UsedDays;
+
+                    if (availableDays < leaveRequest.TotalDays)
+                        return Result.Failure(
+                            Error.Validation(
+                                $"Insufficient leave balance. This request requires {leaveRequest.TotalDays} day(s) but only {availableDays} remain available - approving would take the balance negative."));
+                }
+            }
+
             balance.RecordUsage(leaveRequest.TotalDays, now);
         }
 

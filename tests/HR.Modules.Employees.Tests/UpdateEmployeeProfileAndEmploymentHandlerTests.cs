@@ -3,6 +3,7 @@ using HR.Modules.Employees.Features.UpdateEmployeeProfileAndEmployment;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Employees.Tests;
 
@@ -37,7 +38,8 @@ public class UpdateEmployeeProfileAndEmploymentHandlerTests
             new FakeCompanyContactValidationReader(),
             new FakeCompanyEmployeeNumberSettingsReader(),
             audit ?? new FakeAuditPublisher(),
-            integration ?? new CapturingIntegrationEventPublisher());
+            integration ?? new CapturingIntegrationEventPublisher(),
+            NullLogger<UpdateEmployeeProfileAndEmploymentHandler>.Instance);
 
     private static UpdateEmployeeProfileAndEmploymentRequest Request(
         Guid companyId, Guid id, int? expectedVersion,

@@ -412,7 +412,12 @@ public class UpdateEmployeeProfileHandlerTests
 
         var newPositionId = Guid.NewGuid();
         var publisher = new CapturingIntegrationEventPublisher();
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), publisher);
+        // Ticket 6 follow-up: the position-change event is now staged via the outbox and delivered
+        // by an inline best-effort dispatch right after commit — a logger must be supplied (mirrors
+        // production DI, always resolvable) for that inline dispatch to run in this test.
+        var handler = new UpdateEmployeeProfileHandler(
+            context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), publisher,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<UpdateEmployeeProfileHandler>.Instance);
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest

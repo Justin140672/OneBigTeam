@@ -50,6 +50,10 @@ public sealed class NoOpIntegrationEventPublisher : IIntegrationEventPublisher
     public Task PublishAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)
         where TEvent : IIntegrationEvent
         => Task.CompletedTask;
+
+    public Task<bool> PublishAndConfirmAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)
+        where TEvent : IIntegrationEvent
+        => Task.FromResult(true);
 }
 
 public sealed class CapturingIntegrationEventPublisher : IIntegrationEventPublisher
@@ -62,5 +66,12 @@ public sealed class CapturingIntegrationEventPublisher : IIntegrationEventPublis
     {
         _published.Add(integrationEvent);
         return Task.CompletedTask;
+    }
+
+    public async Task<bool> PublishAndConfirmAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)
+        where TEvent : IIntegrationEvent
+    {
+        await PublishAsync(integrationEvent, cancellationToken);
+        return true;
     }
 }

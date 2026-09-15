@@ -82,10 +82,11 @@ public class GetProbationRecordAuditHistoryEndpointTests
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
         var recordId = await CreateRecord(client, companyId, Guid.NewGuid());
+        var currentVersion = await GetCurrentVersionAsync(client, companyId, recordId);
 
         var updateResp = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{recordId}",
-            new { companyId, id = recordId, managerEmployeeId = Guid.NewGuid(), expectedEndDate = "2026-10-01", notes = "amended" });
+            new { companyId, id = recordId, managerEmployeeId = Guid.NewGuid(), expectedEndDate = "2026-10-01", notes = "amended", expectedVersion = currentVersion });
         updateResp.EnsureSuccessStatusCode();
 
         var response = await client.GetAsync(Url(companyId, recordId));
@@ -132,7 +133,18 @@ public class GetProbationRecordAuditHistoryEndpointTests
         Assert.Empty(payload!.Items);
     }
 
+    // Ticket 18 fix: PUT now always requires ExpectedVersion (Ticket 16/2 optimistic concurrency);
+    // the create response does not carry the initial Version, so tests that need it fetch it here.
+    private static async Task<int> GetCurrentVersionAsync(HttpClient client, Guid companyId, Guid id)
+    {
+        var detail = await client.GetAsync($"/api/companies/{companyId}/probation-records/{id}");
+        detail.EnsureSuccessStatusCode();
+        var payload = await detail.Content.ReadFromJsonAsync<RecordDetailPayload>();
+        return payload!.Version;
+    }
+
     private sealed record IdPayload(Guid Id);
     private sealed record HistoryPayload(List<HistoryItem> Items);
     private sealed record HistoryItem(DateTimeOffset OccurredAt, string Action, string User);
+    private sealed record RecordDetailPayload(int Version);
 }

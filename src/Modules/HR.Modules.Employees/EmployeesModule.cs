@@ -154,6 +154,13 @@ public static class EmployeesModule
             "reconcile-former-employee-access",
             job => job.ExecuteAsync(),
             Cron.Daily(1));
+        // Reliability follow-up: recovers EmployeeManagerChangedIntegrationEvent deliveries lost
+        // when the manager-departure cascade was interrupted between saving the reassignment and
+        // publishing the event — see PendingManagerChangedEvent and the job's own remarks.
+        jobManager.AddOrUpdate<ReconcilePendingManagerChangedEventsJob>(
+            "reconcile-pending-manager-changed-events",
+            job => job.ExecuteAsync(),
+            Cron.Daily(1));
         // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
         jobManager.AddOrUpdate<IdempotencyMaintenanceJob>(
             "employees-idempotency-maintenance",
@@ -393,6 +400,7 @@ public static class EmployeesModule
 
         services.AddScoped<ProcessPromotionsJob>();
         services.AddScoped<ReconcileFormerEmployeeAccessJob>();
+        services.AddScoped<ReconcilePendingManagerChangedEventsJob>();
         services.AddScoped<IdempotencyMaintenanceJob>();
 
         services.AddScoped<GetEmployeeTimelineHandler>();
@@ -436,6 +444,7 @@ public static class EmployeesModule
         services.AddScoped<IEmployeeInviteCandidateReader, EmployeeInviteCandidateReader>();
         services.AddScoped<IManagerReader, ManagerReader>();
         services.AddScoped<IActiveLeavingProcessReader, ActiveLeavingProcessReader>();
+        services.AddScoped<IFinalisedEmployeeDeparturesReader, FinalisedEmployeeDeparturesReader>();
         services.AddScoped<IEmployeeStartDateReader, EmployeeStartDateReader>();
         services.AddScoped<IEmployeeProbationDatesReader, EmployeeProbationDatesReader>();
         services.AddScoped<IPositionProfileDocumentsReader, PositionProfileDocumentsReader>();

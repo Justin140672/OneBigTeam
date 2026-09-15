@@ -4,6 +4,7 @@ using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Tests.Infrastructure;
 using HR.Modules.Employees.Contracts;
 using HR.Modules.Tasks.Contracts;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -456,4 +457,15 @@ public class ManagerChangedHandlerTests
         new(new DbContextOptionsBuilder<ProbationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
+
+    [Fact]
+    public void ManagerChangedHandler_Implements_IRequiredIntegrationEventHandler()
+    {
+        // Gap-1 reliability fix: this handler must be resolvable as
+        // IRequiredIntegrationEventHandler<EmployeeManagerChangedIntegrationEvent> so
+        // IntegrationEventPublisher.PublishAndConfirmAsync only reports delivery confirmed once this
+        // specific handler has actually succeeded (not merely that the publish call returned).
+        Assert.True(typeof(IRequiredIntegrationEventHandler<EmployeeManagerChangedIntegrationEvent>)
+            .IsAssignableFrom(typeof(ManagerChangedHandler)));
+    }
 }

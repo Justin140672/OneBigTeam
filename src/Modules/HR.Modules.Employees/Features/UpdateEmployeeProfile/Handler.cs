@@ -4,7 +4,10 @@ using HR.Modules.Companies.Contracts;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.Idempotency;
+using HR.SharedKernel.Outbox;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Employees.Features.UpdateEmployeeProfile;
 
@@ -15,19 +18,22 @@ internal sealed class UpdateEmployeeProfileHandler
     private readonly ICompanyContactValidationReader _contactValidationReader;
     private readonly IAuditEventPublisher _auditEventPublisher;
     private readonly IIntegrationEventPublisher _integrationEventPublisher;
+    private readonly ILogger<UpdateEmployeeProfileHandler>? _logger;
 
     public UpdateEmployeeProfileHandler(
         EmployeesDbContext dbContext,
         IClock clock,
         ICompanyContactValidationReader contactValidationReader,
         IAuditEventPublisher auditEventPublisher,
-        IIntegrationEventPublisher integrationEventPublisher)
+        IIntegrationEventPublisher integrationEventPublisher,
+        ILogger<UpdateEmployeeProfileHandler>? logger = null)
     {
         _dbContext = dbContext;
         _clock = clock;
         _contactValidationReader = contactValidationReader;
         _auditEventPublisher = auditEventPublisher;
         _integrationEventPublisher = integrationEventPublisher;
+        _logger = logger;
     }
 
     public async Task<Result<UpdateEmployeeProfileResponse>> HandleAsync(
@@ -141,6 +147,22 @@ internal sealed class UpdateEmployeeProfileHandler
         if (employee.IsInitialCompanyAdmin && employee.Status == HR.Modules.Employees.Domain.EmploymentStatus.Draft)
             employee.Activate(now);
 
+        // Position/Location "after" is known now (mutation already applied above, save has not run
+        // yet) — snapshot early so the position-change integration event can be staged in the SAME
+        // transaction as the business write (Ticket 6 follow-up: closes the crash/consumer-failure
+        // window for identity's position-role sync — see UpdateEmploymentDetails Handler's
+        // equivalent comment for the full rationale).
+        var positionProfileChangedForOutbox =
+            before.PositionProfileId != employee.PositionProfileId &&
+            before.PositionProfileId is not null;
+        if (positionProfileChangedForOutbox)
+        {
+            _dbContext.AuditOutboxEntries.EnqueueIntegrationOutbox(
+                new EmployeePositionChangedIntegrationEvent(
+                    employee.CompanyId, employee.Id, before.PositionProfileId!.Value, employee.PositionProfileId, now),
+                employee.CompanyId, now);
+        }
+
         // Ticket 2: optimistic concurrency. Nothing is committed on conflict, so no audit /
         // integration events are published for a rejected save.
         var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
@@ -151,6 +173,21 @@ internal sealed class UpdateEmployeeProfileHandler
 
         if (saveResult.IsFailure)
             return Result.Failure<UpdateEmployeeProfileResponse>(saveResult.Error);
+
+        if (positionProfileChangedForOutbox && _logger is not null)
+        {
+            try
+            {
+                await _dbContext.DispatchPendingAsync(
+                    _dbContext.AuditOutboxEntries, _auditEventPublisher, now, IdempotencyCleanupExtensions.DefaultBatchSize,
+                    _logger, cancellationToken, _integrationEventPublisher);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception,
+                    "Inline dispatch of position-change outbox entries failed; the background maintenance job will retry.");
+            }
+        }
 
         var after = new EmployeeProfileSnapshot(
             employee.FirstName,
@@ -178,14 +215,6 @@ internal sealed class UpdateEmployeeProfileHandler
         // only Position/Location are checked here alongside a catch-all "details corrected" for
         // anything else that changed (name, email, personal details, etc.) — kept deliberately
         // generic per EmployeeDetailsCorrectedIntegrationEvent's doc comment.
-        if (before.PositionProfileId != after.PositionProfileId && after.PositionProfileId is not null && before.PositionProfileId is not null)
-        {
-            await _integrationEventPublisher.PublishAsync(
-                new EmployeePositionChangedIntegrationEvent(
-                    employee.CompanyId, employee.Id, before.PositionProfileId.Value, after.PositionProfileId.Value, now),
-                cancellationToken);
-        }
-
         if (before.LocationId != after.LocationId && after.LocationId is not null && before.LocationId is not null)
         {
             await _integrationEventPublisher.PublishAsync(

@@ -47,7 +47,7 @@
                             <div class="card-body">
                                 <HrTextField Label="Title" Required="true" @bind-Value="Model.Title"
                                              Placeholder="e.g. Senior Software Engineer" />
-                                <HrTextField Label="Description" @bind-Value="Model.Description"
+                                <HrTextField Label="Description" @bind-Value="Model.Description" Multiline="true" FieldClass="position-profile-description"
                                              Placeholder="Optional description" />
                                 <HrDropDownField TValue="Guid?" TItem="DepartmentListItemModel" Label="Department" Required="true"
                                                  DataSource="@_departments" ValueField="Id" TextField="Name"
@@ -91,7 +91,7 @@
                                                 <div class="card-body @(IsViewMode ? "view-mode" : "")">
                                                     <HrTextField Label="Title" Required="true" @bind-Value="Model.Title"
                                                                  Placeholder="e.g. Senior Software Engineer" />
-                                                    <HrTextField Label="Description" @bind-Value="Model.Description"
+                                                    <HrTextField Label="Description" @bind-Value="Model.Description" Multiline="true" FieldClass="position-profile-description"
                                                                  Placeholder="Optional description" />
                                                     <HrDropDownField TValue="Guid?" TItem="DepartmentListItemModel" Label="Department" Required="true"
                                                                      DataSource="@_departments" ValueField="Id" TextField="Name"

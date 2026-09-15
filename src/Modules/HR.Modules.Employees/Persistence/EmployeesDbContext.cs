@@ -41,6 +41,7 @@ internal sealed class EmployeesDbContext : DbContext
     public DbSet<EmployeeEqualityData> EmployeeEqualityData => Set<EmployeeEqualityData>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<AuditOutboxEntry> AuditOutboxEntries => Set<AuditOutboxEntry>();
+    public DbSet<PendingManagerChangedEvent> PendingManagerChangedEvents => Set<PendingManagerChangedEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

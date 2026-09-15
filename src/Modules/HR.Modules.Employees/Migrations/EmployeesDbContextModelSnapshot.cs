@@ -581,6 +581,10 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("employee_id");
 
+                    b.Property<DateTimeOffset?>("FinalisationCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finalisation_completed_at");
+
                     b.Property<DateOnly>("LastWorkingDay")
                         .HasColumnType("date")
                         .HasColumnName("last_working_day");
@@ -649,6 +653,8 @@ namespace HR.Modules.Employees.Migrations
                     b.HasIndex("CompanyId");
 
                     b.HasIndex("CompanyId", "EmployeeId");
+
+                    b.HasIndex("Status", "FinalisationCompletedAt");
 
                     b.HasIndex("CompanyId", "EmployeeId", "Status");
 
@@ -1161,6 +1167,53 @@ namespace HR.Modules.Employees.Migrations
                     b.HasIndex("OnboardingTemplateId");
 
                     b.ToTable("onboarding_template_tasks", "employees");
+                });
+
+            modelBuilder.Entity("HR.Modules.Employees.Domain.PendingManagerChangedEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("LeavingProcessId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("leaving_process_id");
+
+                    b.Property<Guid?>("NewManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("new_manager_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid?>("PreviousManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("previous_manager_id");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<Guid>("ReportEmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("report_employee_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("PublishedAt");
+
+                    b.ToTable("pending_manager_changed_events", "employees");
                 });
 
             modelBuilder.Entity("HR.Modules.Employees.Domain.PositionProfile", b =>
