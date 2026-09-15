@@ -81,17 +81,33 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, ICloc
             leaveRequest.ReviewedAt!.Value,
             leaveRequest.UpdatedAt);
 
-        if (request.IdempotencyKey is { } key)
+        // P1 #4 (optimistic concurrency): LeaveRequest and LeaveBalance both carry a persisted
+        // Version concurrency token (see LeaveRequest.Version / LeaveBalance.Version). A concurrent
+        // reject/cancel of this same request, or a concurrent approval of a different request that
+        // deducts from the same balance row, causes EF's built-in concurrency check to reject this
+        // save with DbUpdateConcurrencyException instead of silently losing a balance update.
+        // Nothing commits, so no audit/notification/integration event runs below. The caller must
+        // reload and retry - business rules (status, remaining balance) are revalidated from
+        // scratch on the next attempt rather than blindly retried here.
+        try
         {
-            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
-                scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+            if (request.IdempotencyKey is { } key)
+            {
+                var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                    scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+                if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                    return Result.Success(outcome.Response!);
+            }
+            else
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
         }
-        else
+        catch (DbUpdateConcurrencyException)
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result.Failure<ApproveLeaveRequestResponse>(
+                Error.Concurrency("This leave request or its leave balance was changed by someone else. Reload and try again."));
         }
 
         await approvalEffects.PublishApprovalOutcomeAsync(leaveRequest, request.ReviewedByEmployeeId, now, cancellationToken);

@@ -34,18 +34,9 @@ internal sealed class Endpoint(AdjustLeaveBalanceHandler handler, ICurrentUser c
 
         if (result.IsFailure)
         {
-            var businessError = new { error = result.Error.Message };
-            if (result.Error.Code == "not_found")
-            {
-                await Send.ResultAsync(TypedResults.NotFound(businessError));
-                return;
-            }
-            if (result.Error.Code == "conflict")
-            {
-                await Send.ResultAsync(TypedResults.Conflict(businessError));
-                return;
-            }
-            await Send.ResultAsync(TypedResults.BadRequest(businessError));
+            // P1 #4: routes "concurrency" (as well as "conflict") to 409, matching every other
+            // versioned-aggregate endpoint (see ProblemResults.FromError).
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

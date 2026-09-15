@@ -119,17 +119,30 @@ internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, I
             transaction.Notes,
             transaction.CreatedAt);
 
-        if (request.IdempotencyKey is { } key)
+        // P1 #4 (optimistic concurrency): balance.Adjust(...) above is a read-modify-write
+        // (AdjustmentDays += days) against LeaveBalance.Version. Two concurrent TOIL awards (or an
+        // award racing an approval/cancellation that touches the same balance row) must not both
+        // commit against the same originally-loaded row - EF's built-in concurrency check rejects
+        // the loser with DbUpdateConcurrencyException instead of silently losing an award.
+        try
         {
-            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
-                scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+            if (request.IdempotencyKey is { } key)
+            {
+                var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                    scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+                if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                    return Result.Success(outcome.Response!);
+            }
+            else
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
         }
-        else
+        catch (DbUpdateConcurrencyException)
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result.Failure<AwardToilResponse>(
+                Error.Concurrency("This employee's TOIL balance was changed by someone else. Reload and try again."));
         }
 
         await auditPublisher.PublishAsync(new LeaveBalanceAdjustedAuditEvent(

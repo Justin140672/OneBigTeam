@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Leave.Domain;
 
-internal sealed class LeaveRequest
+internal sealed class LeaveRequest : IVersionedAggregate
 {
     private LeaveRequest() { }
 
@@ -21,6 +23,17 @@ internal sealed class LeaveRequest
     public string? RejectionReason { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    // P1 #4 (optimistic concurrency): explicit, persisted concurrency token. Mapped as an EF
+    // concurrency token in LeaveRequestConfiguration. Prevents two concurrent status transitions on
+    // the same request (e.g. approve + reject/cancel racing) from both succeeding — the shared
+    // VersionAdvancingSaveChangesInterceptor (wired via LeaveDbContext's UseVersionedAggregates())
+    // advances Version automatically, and EF's built-in concurrency check rejects the second,
+    // stale-loaded save with DbUpdateConcurrencyException, translated to a Conflict result by the
+    // ApproveLeaveRequest/RejectLeaveRequest/CancelLeaveRequest handlers.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public static LeaveRequest Create(
         Guid id,
@@ -51,6 +64,7 @@ internal sealed class LeaveRequest
             EndPart = endPart,
             TotalDays = totalDays,
             Reason = reason,
+            Version = 1,
             CreatedAt = now,
             UpdatedAt = now
         };

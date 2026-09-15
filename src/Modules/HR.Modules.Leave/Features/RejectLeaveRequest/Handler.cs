@@ -85,17 +85,28 @@ internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, INotif
             leaveRequest.RejectionReason,
             leaveRequest.UpdatedAt);
 
-        if (request.IdempotencyKey is { } key)
+        // P1 #4 (optimistic concurrency): see ApproveLeaveRequestHandler for why LeaveRequest and
+        // LeaveBalance both carry a Version concurrency token, and why a stale save here must be
+        // rejected rather than silently overwriting a concurrent approve/cancel/reject.
+        try
         {
-            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
-                scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+            if (request.IdempotencyKey is { } key)
+            {
+                var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                    scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+                if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                    return Result.Success(outcome.Response!);
+            }
+            else
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
         }
-        else
+        catch (DbUpdateConcurrencyException)
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result.Failure<RejectLeaveRequestResponse>(
+                Error.Concurrency("This leave request or its leave balance was changed by someone else. Reload and try again."));
         }
 
         var body = request.RejectionReason is not null

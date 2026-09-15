@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Leave.Domain;
 
-internal sealed class LeaveBalance
+internal sealed class LeaveBalance : IVersionedAggregate
 {
     private LeaveBalance() { }
 
@@ -28,6 +30,20 @@ internal sealed class LeaveBalance
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    // P1 #4 (optimistic concurrency): explicit, persisted concurrency token. Mapped as an EF
+    // concurrency token in LeaveBalanceConfiguration. Balance mutations (RecordUsage/ReverseUsage/
+    // Adjust) are read-modify-write in memory (UsedDays += days), so without a concurrency token two
+    // concurrent approvals/rejections/TOIL consumptions reading the same starting balance could
+    // silently lose one deduction. Every writer relies on the shared
+    // VersionAdvancingSaveChangesInterceptor (wired via LeaveDbContext's UseVersionedAggregates())
+    // to advance Version automatically and on EF's built-in concurrency-token check (which compares
+    // the tracked entity's originally-loaded Version against the current row) to reject a stale
+    // save with DbUpdateConcurrencyException — see ApproveLeaveRequestHandler, RejectLeaveRequest
+    // Handler, CancelLeaveRequestHandler and ToilLedgerService.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
+
     public decimal RemainingDays => EntitlementDays + AdjustmentDays - UsedDays;
 
     public static LeaveBalance Create(
@@ -53,6 +69,7 @@ internal sealed class LeaveBalance
             UsedDays = 0,
             AdjustmentDays = 0,
             AccrualStartDate = accrualStartDate,
+            Version = 1,
             CreatedAt = now,
             UpdatedAt = now
         };

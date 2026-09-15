@@ -190,23 +190,39 @@ internal sealed class AdjustLeaveBalanceHandler(
         await _postCommitFaultInjector.MaybeFailAfterCommitAsync(
             $"{nameof(AdjustLeaveBalanceHandler)}.PreCommit", request.IdempotencyKey, cancellationToken);
 
-        if (request.IdempotencyKey is { } key)
+        // P1 #4 (optimistic concurrency): balance.Adjust(...) above is a read-modify-write
+        // (AdjustmentDays += adjustmentDays) against LeaveBalance.Version. A concurrent adjustment,
+        // approval, rejection or TOIL award touching the same balance row must not be silently
+        // overwritten - EF's built-in concurrency check rejects the loser with
+        // DbUpdateConcurrencyException. Nothing commits (the transaction is rolled back), so the
+        // caller must reload the balance and revalidate the negative-balance check above before
+        // retrying, rather than this handler blindly retrying with stale figures.
+        try
         {
-            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
-                scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
-
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+            if (request.IdempotencyKey is { } key)
             {
-                // Lost a race against a concurrent duplicate under the same key. SaveIdempotentAsync
-                // already rolled back this attempt's transaction (including the staged outbox entry
-                // above) - nothing here was committed, so skip our own commit and hand back the
-                // winner's result untouched. Its own outbox row continues delivery independently.
-                return Result.Success(outcome.Response!);
+                var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                    scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
+
+                if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                {
+                    // Lost a race against a concurrent duplicate under the same key. SaveIdempotentAsync
+                    // already rolled back this attempt's transaction (including the staged outbox entry
+                    // above) - nothing here was committed, so skip our own commit and hand back the
+                    // winner's result untouched. Its own outbox row continues delivery independently.
+                    return Result.Success(outcome.Response!);
+                }
+            }
+            else
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
             }
         }
-        else
+        catch (DbUpdateConcurrencyException)
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.RollbackAsync(cancellationToken);
+            return Result.Failure<AdjustLeaveBalanceResponse>(
+                Error.Concurrency("This employee's leave balance was changed by someone else. Reload and try again."));
         }
 
         await transaction.CommitAsync(cancellationToken);

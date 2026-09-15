@@ -63,6 +63,12 @@ internal sealed class LeaveBalanceConfiguration : IEntityTypeConfiguration<Leave
 
         builder.Ignore(b => b.RemainingDays);
 
+        builder.Property(b => b.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(b => b.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
