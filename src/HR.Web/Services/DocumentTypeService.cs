@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -41,8 +42,8 @@ public class DocumentTypeService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, DocumentTypeEditModel model, int? expectedVersion)
     {
         var request = new UpdateDocumentTypeRequest(
-            companyId, id, model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            companyId, id, FormText.Required(model.Name),
+            FormText.Optional(model.Description),
             model.AllowEmployeeUpload, expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/document-types/{id}", request);
@@ -69,7 +70,7 @@ public class DocumentTypeService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, DocumentTypeEditModel model)
     {
         var request = new CreateDocumentTypeRequest(
-            companyId, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            companyId, FormText.Required(model.Name), FormText.Optional(model.Description),
             model.AllowEmployeeUpload);
 
         var (created, error) = await CreateAsync(companyId, request);
@@ -80,7 +81,7 @@ public class DocumentTypeService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, DocumentTypeEditModel model)
     {
         var request = new UpdateDocumentTypeRequest(
-            companyId, id, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            companyId, id, FormText.Required(model.Name), FormText.Optional(model.Description),
             model.AllowEmployeeUpload);
 
         var (updated, error) = await UpdateAsync(companyId, id, request);

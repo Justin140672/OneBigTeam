@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @using HR.Web.Models
 @using HR.Web.Services
@@ -298,7 +299,7 @@
                 CompanyId,
                 _model.EffectiveDate.Value,
                 _model.Reason,
-                string.IsNullOrWhiteSpace(_model.Notes) ? null : _model.Notes.Trim(),
+                FormText.Optional(_model.Notes),
                 _model.Mode.ToString(),
                 _previewRows.Select(r => new BulkCompensationAdjustmentItem(
                     r.EmployeeId,

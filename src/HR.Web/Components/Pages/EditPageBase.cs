@@ -36,6 +36,26 @@ public abstract class EditPageBase : ComponentBase, IDisposable
     // takes precedence over GlobalError in the markup.
     protected bool SaveConflict { get; set; }
 
+    // Ticket 3 (P1) final gap: true when the last save attempt returned MutationOutcomeKind.
+    // AmbiguousFailure (a 5xx/408/429/transport failure/timeout/malformed response) — the mutation
+    // may or may not have committed server-side. The idempotency key is deliberately retained (see
+    // EditPageBase<TModel, TKey>.SaveCoreAsync) so an unchanged retry safely replays rather than
+    // repeats the mutation. Drives an "unconfirmed, not a definitive failure" banner distinct from
+    // GlobalError's normal "this was rejected" styling, and gates the explicit abandon action below.
+    protected bool SaveAmbiguous { get; set; }
+
+    // Explicit user action (Ticket 3 final gap item 7) to give up on a pending ambiguous operation —
+    // e.g. the user closes the dialog/page and intentionally starts a fresh attempt instead of
+    // retrying. Must never be inferred automatically: only a real user choice, after being warned
+    // that abandoning may create a second record if the previous attempt actually committed, may
+    // discard a retained idempotency key. Concrete pages/dialogs wire this to a "Start Over" action
+    // that is only shown while SaveAmbiguous is true.
+    protected virtual void AbandonPendingOperation()
+    {
+        SaveAmbiguous = false;
+        GlobalError = null;
+    }
+
     // Wired to <SaveConflictBanner OnReload="...">. Re-fetches server state (ReloadServerStateAsync)
     // and clears the conflict banner. Whether the user's in-progress edits are preserved or
     // replaced is the override's decision — the explicit "Reload latest values" action adopts the
@@ -192,6 +212,7 @@ public abstract class EditPageBase : ComponentBase, IDisposable
         GlobalError = null;
         SuccessMsg = null;
         SaveConflict = false;
+        SaveAmbiguous = false;
 
         if (!Validate())
         {
@@ -202,7 +223,31 @@ public abstract class EditPageBase : ComponentBase, IDisposable
         Saving = true;
         StateHasChanged();
 
-        var error = await SaveCoreAsync();
+        // Bug fix (P1 follow-up to Ticket 3): Saving was previously only cleared once SaveCoreAsync
+        // returned normally. IEditService/IIdempotentCreateService implementations (AssetService,
+        // LeaveService, ...) no longer let body-read failures escape as exceptions - they're
+        // classified as AmbiguousFailure instead - but this try/finally is kept as defence in depth:
+        // any other unexpected exception out of SaveCoreAsync would otherwise leave Saving pinned
+        // true forever, permanently disabling the Save button with no way to retry or abandon the
+        // pending operation.
+        string? error;
+        try
+        {
+            error = await SaveCoreAsync();
+        }
+        catch (Exception)
+        {
+            // Unexpected exception reaching the UI: the outcome is unconfirmed, not a definitive
+            // failure. SaveCoreAsync only completes/discards its PendingIdempotentOperation on a
+            // definitive outcome (see EditPageBase<TModel, TKey>.SaveCoreAsync), so an exception
+            // thrown before that point already leaves the key/snapshot retained - nothing further
+            // to preserve here beyond surfacing an "unconfirmed" message instead of a hard failure.
+            SaveAmbiguous = true;
+            Saving = false;
+            GlobalError = "We could not confirm whether this save was applied. Please try again.";
+            return;
+        }
+
         Saving = false;
 
         if (error is null)
@@ -430,6 +475,16 @@ public abstract class EditPageBase<TModel, TKey> : EditPageBase<TModel>
 
     protected virtual bool IsNew => GetId() is null;
 
+    // Ticket 3 (P1) final gap item 7: explicit abandonment discards the retained key/fingerprint —
+    // the NEXT Save (even of the identical model) is treated as a brand new logical create. Only
+    // reachable via a real user action (see base AbandonPendingOperation's remarks) while
+    // SaveAmbiguous is true.
+    protected override void AbandonPendingOperation()
+    {
+        _createOperation.Complete();
+        base.AbandonPendingOperation();
+    }
+
     // Ticket 2: the optimistic-concurrency token the current Model was loaded at, read straight off
     // the model when it (and its service) opt into concurrency. Sent as the expected version on the
     // next save and refreshed from every successful update — see SaveCoreAsync below.
@@ -469,25 +524,23 @@ public abstract class EditPageBase<TModel, TKey> : EditPageBase<TModel>
                 // entities), not just the model.
                 var key = _createOperation.PrepareKey((GetCompanyId(), Model));
 
-                try
-                {
-                    var (created, createError) = await idempotentService.CreateAsync(GetCompanyId(), Model, key);
+                var outcome = await idempotentService.CreateAsync(GetCompanyId(), Model, key);
 
-                    // A definitive outcome (success or a business rejection) was returned - not
-                    // thrown - so this operation is done: the next Save (a corrected resubmission,
-                    // or a fresh create after navigating away and back) is a new logical operation.
-                    _createOperation.Complete();
-
-                    return created is not null ? null : createError ?? "Failed to save.";
-                }
-                catch
+                // Ticket 3 (P1) final gap: only a DEFINITIVE outcome (Succeeded or Rejected)
+                // completes this operation and discards its key — an AmbiguousFailure (5xx/408/429/
+                // transport failure/timeout/malformed response) must retain the key and snapshot so
+                // an unchanged retry replays the server's stored result rather than repeating the
+                // create.
+                if (outcome.Kind == HR.SharedKernel.Idempotency.MutationOutcomeKind.AmbiguousFailure)
                 {
-                    // Ambiguous - the response was lost (network failure/timeout), so the mutation
-                    // may already have committed server-side. Deliberately do NOT complete the
-                    // operation: the next Save of this same unchanged model must reuse its key so
-                    // the server can replay rather than repeat the create.
-                    return "Failed to save. Please try again.";
+                    SaveAmbiguous = true;
+                    return outcome.Error ?? "The request could not be confirmed. It's safe to try again.";
                 }
+
+                _createOperation.Complete();
+                return outcome.Kind == HR.SharedKernel.Idempotency.MutationOutcomeKind.Succeeded
+                    ? null
+                    : outcome.Error ?? "Failed to save.";
             }
 
             var (createdModel, createModelError) = await Service.CreateAsync(GetCompanyId(), Model);

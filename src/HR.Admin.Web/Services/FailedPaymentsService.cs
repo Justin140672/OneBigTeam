@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using HR.Admin.Web.Models;
+using HR.SharedKernel;
 
 namespace HR.Admin.Web.Services;
 
@@ -21,7 +22,8 @@ public sealed class FailedPaymentsService(HrApiHttpClientFactory httpClientFacto
         try
         {
             var query = new List<string>();
-            if (!string.IsNullOrWhiteSpace(search))
+            search = FormText.OptionalSearch(search);
+            if (search is not null)
                 query.Add($"search={Uri.EscapeDataString(search)}");
             if (!string.IsNullOrWhiteSpace(statusFilter))
                 query.Add($"statusFilter={Uri.EscapeDataString(statusFilter)}");

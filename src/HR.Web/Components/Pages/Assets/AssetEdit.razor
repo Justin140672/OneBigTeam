@@ -27,7 +27,15 @@
         <SaveConflictBanner Visible="SaveConflict" Disabled="@Saving" OnReload="ReloadLatestValuesAsync"
                             Message="Someone else changed this asset while you were editing. Your changes have not been saved." />
 
-        @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
+        @if (SaveAmbiguous)
+        {
+            <div class="alert alert-warning">
+                <p class="mb-2">@GlobalError</p>
+                <p class="mb-2">We could not confirm whether this asset was created. Click <strong>Save</strong> again to safely retry — it will not create a duplicate. Only choose <strong>Start Over</strong> if you're sure you want to abandon this attempt; if the previous attempt actually succeeded, starting over may create a second asset.</p>
+                <SfButton CssClass="e-small" OnClick="AbandonPendingOperation">Start Over</SfButton>
+            </div>
+        }
+        else if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
         {
             <div class="alert alert-danger">@GlobalError</div>
         }

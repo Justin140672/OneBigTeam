@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -82,8 +83,8 @@ public class PublicHolidayService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, PublicHolidayEditModel model, int? expectedVersion)
     {
         var request = new UpdatePublicHolidayRequest(
-            companyId, id, DateOnly.FromDateTime(model.Date!.Value), model.Name.Trim(),
-            model.CountryCode.Trim().ToUpperInvariant(), expectedVersion);
+            companyId, id, DateOnly.FromDateTime(model.Date!.Value), FormText.Required(model.Name),
+            FormText.Required(model.CountryCode).ToUpperInvariant(), expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/public-holidays/{id}", request);
 
@@ -109,7 +110,7 @@ public class PublicHolidayService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, PublicHolidayEditModel model)
     {
         var request = new CreatePublicHolidayRequest(
-            companyId, DateOnly.FromDateTime(model.Date!.Value), model.Name.Trim(), model.CountryCode.Trim().ToUpperInvariant());
+            companyId, DateOnly.FromDateTime(model.Date!.Value), FormText.Required(model.Name), FormText.Required(model.CountryCode).ToUpperInvariant());
 
         var (created, error) = await CreateAsync(companyId, request);
         return (created is null ? null : model, error);
@@ -119,7 +120,7 @@ public class PublicHolidayService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, PublicHolidayEditModel model)
     {
         var request = new UpdatePublicHolidayRequest(
-            companyId, id, DateOnly.FromDateTime(model.Date!.Value), model.Name.Trim(), model.CountryCode.Trim().ToUpperInvariant());
+            companyId, id, DateOnly.FromDateTime(model.Date!.Value), FormText.Required(model.Name), FormText.Required(model.CountryCode).ToUpperInvariant());
 
         var (updated, error) = await UpdateAsync(companyId, id, request);
         return (updated is null ? null : model, error);

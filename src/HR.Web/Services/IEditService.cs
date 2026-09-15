@@ -1,3 +1,5 @@
+using HR.SharedKernel.Idempotency;
+
 namespace HR.Web.Services;
 
 // Common shape shared by every "simple" edit page's service (Department, EmploymentType, etc.):
@@ -31,9 +33,14 @@ public interface IConcurrencyAwareEditService<TModel, TKey> : IEditService<TMode
 // this and owns the key's lifecycle itself (generate once per logical create, reuse across retries
 // of an unchanged submission, rotate the moment the submitted model changes, discard on a
 // definitive outcome) - the service stays stateless with respect to operation identity.
+// Ticket 3 (P1) final gap: returns a MutationOutcome<TModel> (not a plain tuple) so the caller
+// (EditPageBase<TModel, TKey>) can tell a definitive outcome (Succeeded/Rejected — discard the
+// idempotency key) apart from an AmbiguousFailure (5xx/408/429/transport/timeout/cancellation-after-
+// dispatch/malformed success body — retain the key and let the user retry safely) without
+// string-matching an error message or relying on a thrown exception as the only ambiguous signal.
 public interface IIdempotentCreateService<TModel>
 {
-    Task<(TModel? Result, string? Error)> CreateAsync(Guid companyId, TModel model, Guid idempotencyKey);
+    Task<MutationOutcome<TModel>> CreateAsync(Guid companyId, TModel model, Guid idempotencyKey);
 }
 
 // Implemented by a "simple" edit model whose service round-trips an optimistic-concurrency token.

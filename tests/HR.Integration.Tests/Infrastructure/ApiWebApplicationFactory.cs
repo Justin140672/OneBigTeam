@@ -25,6 +25,11 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
 
     internal FakeSupabaseAuthGateway SupabaseAuthGateway { get; } = new FakeSupabaseAuthGateway();
 
+    // Ticket 3 (P1) final gap item 5: shared across every test in the collection, like the other
+    // fakes above — each test arms/resets it around its own request(s) rather than getting its own
+    // factory instance.
+    internal FaultInjectingPostCommitFaultInjector PostCommitFaultInjector { get; } = new();
+
     async Task IAsyncLifetime.InitializeAsync()
     {
         await _postgres.StartAsync();
@@ -91,6 +96,13 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
             // job execution otherwise races test-driven state (e.g. ScanUploadedFileJob vs a
             // test's manual "mark scan clean" step).
             services.AddSingleton<IBackgroundJobClient, FakeBackgroundJobClient>();
+
+            // Ticket 3 (P1) final gap item 5: replace the production no-op with the shared,
+            // test-armable double so AdjustLeaveBalanceIdempotencyFaultTests /
+            // CreateAssetIdempotencyFaultTests can simulate a post-commit (or pre-commit) failure
+            // for a specific handler + idempotency key without any production code depending on
+            // test infrastructure.
+            services.AddSingleton<HR.SharedKernel.Idempotency.IPostCommitFaultInjector>(PostCommitFaultInjector);
         });
     }
 }

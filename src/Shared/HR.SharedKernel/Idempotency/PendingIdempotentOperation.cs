@@ -11,6 +11,14 @@ namespace HR.SharedKernel.Idempotency;
 /// </summary>
 public sealed class PendingIdempotentOperation
 {
+    // Bug fix (P1 follow-up to Ticket 3): production callers commonly pass C# value tuples as the
+    // snapshot (e.g. `(CompanyId, EmployeeId, request)`) - value tuples expose their contents as
+    // PUBLIC FIELDS, not properties. Default System.Text.Json options only serialize properties, so
+    // every tuple snapshot silently fingerprinted to "{}" and a changed request never rotated the
+    // key. IncludeFields makes tuple (and any other field-based) snapshots serialize their real
+    // contents so a material change is actually detected.
+    private static readonly JsonSerializerOptions SnapshotOptions = new() { IncludeFields = true };
+
     private readonly IdempotencyKeyScope _key = new();
     private string? _pendingFingerprint;
 
@@ -23,7 +31,7 @@ public sealed class PendingIdempotentOperation
     /// </summary>
     public Guid PrepareKey(object requestSnapshot)
     {
-        var fingerprint = JsonSerializer.Serialize(requestSnapshot);
+        var fingerprint = JsonSerializer.Serialize(requestSnapshot, SnapshotOptions);
         if (_pendingFingerprint != fingerprint)
         {
             _key.Reset();

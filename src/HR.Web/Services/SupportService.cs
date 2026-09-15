@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using HR.SharedKernel;
 using HR.Web.Models;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.Logging;
@@ -75,8 +76,8 @@ public sealed class SupportService(HrApiHttpClientFactory httpClientFactory, ILo
             using var content = new MultipartFormDataContent();
             content.Add(new StringContent(companyId.ToString()), "CompanyId");
             content.Add(new StringContent(type), "Type");
-            content.Add(new StringContent(title), "Title");
-            content.Add(new StringContent(description), "Description");
+            content.Add(new StringContent(FormText.Required(title)), "Title");
+            content.Add(new StringContent(FormText.Required(description)), "Description");
             content.Add(new StringContent(priority), "Priority");
             content.Add(new StringContent(includeDiagnostics.ToString()), "IncludeDiagnostics");
             if (!string.IsNullOrWhiteSpace(pageUrl)) content.Add(new StringContent(pageUrl), "PageUrl");
@@ -146,6 +147,8 @@ public sealed class SupportService(HrApiHttpClientFactory httpClientFactory, ILo
             using var content = new MultipartFormDataContent();
             content.Add(new StringContent(companyId.ToString()), "CompanyId");
             content.Add(new StringContent(id.ToString()), "Id");
+            // bodyHtml is rich/formatted editor content — not run through FormText, whitespace
+            // and markup here are meaningful and normalized (if at all) by the rich-text editor itself.
             content.Add(new StringContent(bodyHtml), "BodyHtml");
 
             var streams = new List<Stream>();

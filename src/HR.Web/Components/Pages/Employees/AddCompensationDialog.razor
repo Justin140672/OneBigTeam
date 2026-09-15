@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @inject CompensationService CompensationService
 @inherits EditDialogBase<AddCompensationDialog.AddCompensationFormModel>
@@ -101,10 +102,10 @@
             Model.EffectiveFrom!.Value,
             Model.SalaryType,
             Model.Salary!.Value,
-            Model.Currency.Trim().ToUpperInvariant(),
+            FormText.Required(Model.Currency).ToUpperInvariant(),
             null,
             null,
-            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
+            FormText.Optional(Model.Notes),
             Model.Reason);
 
         var (created, error) = await CompensationService.CreateCompensationRecordAsync(CompanyId, EmployeeId, request);

@@ -1,6 +1,7 @@
 @page "/admin-users"
 @inject AdminUsersService AdminUsersService
 @using Syncfusion.Blazor.DropDowns
+@using HR.SharedKernel
 
 <PageTitle>Administrators — Admin Portal</PageTitle>
 
@@ -229,7 +230,7 @@ else
         _creating = true;
         try
         {
-            var created = await AdminUsersService.CreateAdministratorAsync(_newEmail.Trim(), _newRole);
+            var created = await AdminUsersService.CreateAdministratorAsync(FormText.Required(_newEmail), _newRole);
             if (created is null)
             {
                 _createError = "Could not create the administrator. The email may already be in use, or you may not be authorised to perform this action.";

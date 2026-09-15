@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -13,7 +14,8 @@ public class PositionProfileService(HrApiHttpClientFactory httpClientFactory)
         {
             var query = System.Web.HttpUtility.ParseQueryString(string.Empty);
             if (includeInactive) query["includeInactive"] = "true";
-            if (!string.IsNullOrWhiteSpace(search)) query["search"] = search;
+            search = FormText.OptionalSearch(search);
+            if (search is not null) query["search"] = search;
             if (pageSize is > 0) query["pageSize"] = pageSize.Value.ToString();
 
             var url = $"api/companies/{companyId}/position-profiles";

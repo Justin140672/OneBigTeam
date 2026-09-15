@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @inject EmployeeService EmployeeService
 @inject AppSession Session
@@ -263,10 +264,10 @@ else
 
         var request = new AddEmergencyContactRequest(
             CompanyId,
-            _form.Name.Trim(),
-            _form.Relationship.Trim(),
-            _form.PhoneNumber.Trim(),
-            string.IsNullOrWhiteSpace(_form.Email) ? null : _form.Email.Trim());
+            FormText.Required(_form.Name),
+            FormText.Required(_form.Relationship),
+            FormText.Required(_form.PhoneNumber),
+            FormText.Optional(_form.Email));
 
         var (contact, error) = await EmployeeService.AddMyEmergencyContactAsync(CompanyId, request);
         _saving = false;
@@ -292,10 +293,10 @@ else
         var request = new UpdateEmergencyContactRequest(
             CompanyId,
             contactId,
-            _form.Name.Trim(),
-            _form.Relationship.Trim(),
-            _form.PhoneNumber.Trim(),
-            string.IsNullOrWhiteSpace(_form.Email) ? null : _form.Email.Trim());
+            FormText.Required(_form.Name),
+            FormText.Required(_form.Relationship),
+            FormText.Required(_form.PhoneNumber),
+            FormText.Optional(_form.Email));
 
         var (success, error) = await EmployeeService.UpdateMyEmergencyContactAsync(CompanyId, request);
         _saving = false;

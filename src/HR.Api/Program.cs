@@ -98,6 +98,12 @@ builder.Services.AddFastEndpoints(o => o.IncludeAbstractValidators = true);
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
     o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddSingleton<IClock, SystemClock>();
+// Ticket 3 (P1) final gap item 5: production default is a no-op. An integration test overrides this
+// registration (WebApplicationFactory ConfigureTestServices) with a fault-injecting double to
+// reproduce "committed, then the response failed" without any production code depending on test
+// infrastructure. See IPostCommitFaultInjector's remarks.
+builder.Services.AddSingleton<HR.SharedKernel.Idempotency.IPostCommitFaultInjector,
+    HR.SharedKernel.Idempotency.NoOpPostCommitFaultInjector>();
 builder.Services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
 
 // Lightweight abuse protection for the public marketing contact form (POST /api/contact below) —

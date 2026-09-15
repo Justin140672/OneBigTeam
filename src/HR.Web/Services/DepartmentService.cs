@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -56,8 +57,8 @@ public class DepartmentService(HrApiHttpClientFactory httpClientFactory)
         var request = new UpdateDepartmentRequest(
             companyId,
             id,
-            model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            FormText.Required(model.Name),
+            FormText.Optional(model.Description),
             model.ParentDepartmentId,
             model.ManagerEmployeeId,
             expectedVersion);
@@ -87,8 +88,8 @@ public class DepartmentService(HrApiHttpClientFactory httpClientFactory)
     {
         var request = new CreateDepartmentRequest(
             companyId,
-            model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            FormText.Required(model.Name),
+            FormText.Optional(model.Description),
             model.ParentDepartmentId);
 
         var (created, error) = await CreateDepartmentAsync(companyId, request);
@@ -101,8 +102,8 @@ public class DepartmentService(HrApiHttpClientFactory httpClientFactory)
         var request = new UpdateDepartmentRequest(
             companyId,
             id,
-            model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            FormText.Required(model.Name),
+            FormText.Optional(model.Description),
             model.ParentDepartmentId,
             model.ManagerEmployeeId,
             model.Version);

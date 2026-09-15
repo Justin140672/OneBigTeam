@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -99,7 +100,7 @@ public class SicknessCategoryService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, SicknessCategoryEditModel model, int? expectedVersion)
     {
         var request = new UpdateSicknessCategoryRequest(
-            companyId, id, model.Name.Trim(), model.DisplayOrder, expectedVersion);
+            companyId, id, FormText.Required(model.Name), model.DisplayOrder, expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/sickness-categories/{id}", request);
 
@@ -124,7 +125,7 @@ public class SicknessCategoryService(HrApiHttpClientFactory httpClientFactory)
     async Task<(SicknessCategoryEditModel? Result, string? Error)> IEditService<SicknessCategoryEditModel, Guid>.CreateAsync(
         Guid companyId, SicknessCategoryEditModel model)
     {
-        var request = new CreateSicknessCategoryRequest(companyId, model.Name.Trim(), model.DisplayOrder);
+        var request = new CreateSicknessCategoryRequest(companyId, FormText.Required(model.Name), model.DisplayOrder);
         var (created, error) = await CreateAsync(companyId, request);
         return (created is null ? null : model, error);
     }
@@ -132,7 +133,7 @@ public class SicknessCategoryService(HrApiHttpClientFactory httpClientFactory)
     async Task<(SicknessCategoryEditModel? Result, string? Error)> IEditService<SicknessCategoryEditModel, Guid>.UpdateAsync(
         Guid companyId, Guid id, SicknessCategoryEditModel model)
     {
-        var request = new UpdateSicknessCategoryRequest(companyId, id, model.Name.Trim(), model.DisplayOrder);
+        var request = new UpdateSicknessCategoryRequest(companyId, id, FormText.Required(model.Name), model.DisplayOrder);
         var (updated, error) = await UpdateAsync(companyId, id, request);
         return (updated is null ? null : model, error);
     }

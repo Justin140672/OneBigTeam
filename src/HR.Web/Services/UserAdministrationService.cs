@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using HR.SharedKernel;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -12,8 +13,9 @@ public sealed class UserAdministrationService(HrApiHttpClientFactory httpClientF
     {
         try
         {
+            search = FormText.OptionalSearch(search);
             var url = $"api/companies/{companyId}/users?page={page}&pageSize={pageSize}";
-            if (!string.IsNullOrWhiteSpace(search)) url += $"&search={Uri.EscapeDataString(search)}";
+            if (search is not null) url += $"&search={Uri.EscapeDataString(search)}";
 
             return await Http.GetFromJsonAsync<ListUsersResponse>(url, HrApiJsonOptions.Default);
         }

@@ -15,8 +15,15 @@ internal sealed class AdjustLeaveBalanceHandler(
     IClock clock,
     IWorkingPatternProvider workingPatternProvider,
     ICompanyLeaveSettingsReader leaveSettingsReader,
-    IEmployeeNameReader employeeNameReader)
+    IEmployeeNameReader employeeNameReader,
+    IPostCommitFaultInjector? postCommitFaultInjector = null)
 {
+    // Optional so the many existing handler-level unit tests that construct this handler directly
+    // (with no interest in Ticket 3's fault-injection seam) don't all need updating for an unrelated
+    // parameter. Production DI always supplies a real instance (NoOpPostCommitFaultInjector by
+    // default) via the required interface registration in Program.cs.
+    private readonly IPostCommitFaultInjector _postCommitFaultInjector = postCommitFaultInjector ?? new NoOpPostCommitFaultInjector();
+
     public async Task<Result<AdjustLeaveBalanceResponse>> HandleAsync(
         AdjustLeaveBalanceRequest request,
         CancellationToken cancellationToken)
@@ -177,6 +184,12 @@ internal sealed class AdjustLeaveBalanceHandler(
         // Explicit transaction per ticket requirement, even though both writes share one DbContext/SaveChangesAsync.
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
+        // Ticket 3 (P1) final gap item 6: no-op in production. Lets an integration test simulate a
+        // failure BEFORE this transaction commits (so nothing is persisted), proving a retry with the
+        // same Idempotency-Key performs and commits the mutation exactly once.
+        await _postCommitFaultInjector.MaybeFailAfterCommitAsync(
+            $"{nameof(AdjustLeaveBalanceHandler)}.PreCommit", request.IdempotencyKey, cancellationToken);
+
         if (request.IdempotencyKey is { } key)
         {
             var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
@@ -197,6 +210,13 @@ internal sealed class AdjustLeaveBalanceHandler(
         }
 
         await transaction.CommitAsync(cancellationToken);
+
+        // Ticket 3 (P1) final gap item 5: no-op in production. Lets an integration test simulate a
+        // 500/502/503/504 (or a dropped response) occurring AFTER this transaction has already
+        // committed the balance adjustment, the idempotency record and the audit outbox entry — the
+        // exact scenario a retry with the same Idempotency-Key must replay rather than repeat.
+        await _postCommitFaultInjector.MaybeFailAfterCommitAsync(
+            nameof(AdjustLeaveBalanceHandler), request.IdempotencyKey, cancellationToken);
 
         return Result.Success(response);
     }

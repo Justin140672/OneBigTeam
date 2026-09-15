@@ -229,7 +229,7 @@
         _globalError = null;
         _success = null;
 
-        var (result, error) = await ApplicationService.SaveCvReviewNotesAsync(CompanyId, VacancyId, ApplicationId, Trimmed(_notes));
+        var (result, error) = await ApplicationService.SaveCvReviewNotesAsync(CompanyId, VacancyId, ApplicationId, _notes);
         _busy = false;
 
         if (error is not null)
@@ -249,7 +249,7 @@
         _globalError = null;
         _success = null;
 
-        var (result, error) = await ApplicationService.MoveApplicationForwardAsync(CompanyId, VacancyId, ApplicationId, Trimmed(_notes));
+        var (result, error) = await ApplicationService.MoveApplicationForwardAsync(CompanyId, VacancyId, ApplicationId, _notes);
         _busy = false;
 
         if (error is not null)
@@ -267,7 +267,7 @@
         _busy = true;
 
         var (result, error) = await ApplicationService.RejectCandidateAsync(
-            CompanyId, VacancyId, ApplicationId, string.IsNullOrWhiteSpace(_rejectionReason) ? null : _rejectionReason.Trim());
+            CompanyId, VacancyId, ApplicationId, _rejectionReason);
         _busy = false;
 
         if (error is not null)
@@ -304,7 +304,4 @@
     }
 
     private void Close() => Navigation.NavigateTo(BackTarget);
-
-    private static string? Trimmed(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

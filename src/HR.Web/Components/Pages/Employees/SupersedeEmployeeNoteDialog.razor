@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @using HR.Web.Models
 @inject EmployeeNoteService EmployeeNoteService
@@ -76,7 +77,7 @@
             CompanyId,
             EmployeeId,
             Model.Category,
-            Model.NoteText.Trim(),
+            FormText.Required(Model.NoteText),
             Model.IsImportant);
 
         var (created, error) = await EmployeeNoteService.SupersedeEmployeeNoteAsync(

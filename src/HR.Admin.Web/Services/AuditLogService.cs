@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using HR.Admin.Web.Models;
+using HR.SharedKernel;
 
 namespace HR.Admin.Web.Services;
 
@@ -29,7 +30,8 @@ public sealed class AuditLogService(HrApiHttpClientFactory httpClientFactory)
             var query = new List<string>();
             if (companyId.HasValue)
                 query.Add($"companyId={companyId.Value}");
-            if (!string.IsNullOrWhiteSpace(administratorEmail))
+            administratorEmail = FormText.OptionalSearch(administratorEmail);
+            if (administratorEmail is not null)
                 query.Add($"administratorEmail={Uri.EscapeDataString(administratorEmail)}");
             if (fromDate.HasValue)
                 query.Add($"fromDate={Uri.EscapeDataString(fromDate.Value.ToString("O"))}");

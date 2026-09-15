@@ -46,7 +46,15 @@
                         </label>
                     </div>
                 </div>
-                @if (_error is not null)
+                @if (_ambiguous)
+                {
+                    <div class="alert alert-warning mt-2 mb-0">
+                        <p class="mb-2">@_error</p>
+                        <p class="mb-2">We could not confirm whether this adjustment was applied. Click <strong>Save</strong> again to safely retry — it will not adjust the balance twice. Only choose <strong>Start Over</strong> if you're sure you want to abandon this attempt; if it actually succeeded, starting over and resubmitting may adjust the balance twice.</p>
+                        <SfButton CssClass="e-small" OnClick="AbandonAndReset">Start Over</SfButton>
+                    </div>
+                }
+                else if (_error is not null)
                 {
                     <div class="alert alert-danger mt-2 mb-0">@_error</div>
                 }
@@ -100,6 +108,12 @@
     private string? _error;
     private bool _submitting;
 
+    // Ticket 3 (P1) final gap: true when the last submit attempt returned an AmbiguousFailure (a
+    // 5xx/408/429/transport failure/timeout/malformed response) — distinct from a definitive
+    // rejection. Drives the "unconfirmed, safe to retry" banner above and gates the explicit
+    // Start Over action, which is the only way to discard a key retained under this condition.
+    private bool _ambiguous;
+
     // Ticket 3 (P1) final follow-up items 1/2: this dialog instance - not the scoped LeaveService -
     // owns the idempotency key for the ONE logical "adjust balance" submission it currently
     // represents. Reused across retries of that same unchanged submission; rotated the moment the
@@ -133,6 +147,7 @@
     private async Task SubmitAsync()
     {
         _error = null;
+        _ambiguous = false;
 
         if (!_editContext.Validate())
         {
@@ -149,30 +164,47 @@
         _submitting = true;
         _error = null;
 
-        var request = new AdjustLeaveBalanceModel(
-            LeaveTypeId,
-            _model.AdjustmentValue!.Value,
-            _model.Reason,
-            string.IsNullOrWhiteSpace(_model.Comments) ? null : _model.Comments,
-            _model.AllowNegativeOverride);
-
-        // Fingerprint includes which employee/leave type this dialog instance currently targets -
-        // it's a reusable component, so Blazor can rebind it to a different employee between opens
-        // without recreating it.
-        var key = _submitOperation.PrepareKey((CompanyId, EmployeeId, request));
-
+        // Bug fix (P1 follow-up to Ticket 3): _submitting was previously only cleared along the
+        // normal AmbiguousFailure/Succeeded/Rejected result paths below. LeaveService now never
+        // lets a body-read failure escape as an exception (it's classified as AmbiguousFailure
+        // instead), but this try/finally is kept as defence in depth against any other unexpected
+        // exception reaching here (e.g. a bug in a future caller, an OOM, ...) — without it, an
+        // escaped exception would leave the Save button permanently disabled with no way for the
+        // user to retry or abandon the pending operation.
         try
         {
-            var (response, error) = await LeaveService.AdjustLeaveBalanceAsync(
-                CompanyId, EmployeeId, request, key);
+            var request = new AdjustLeaveBalanceModel(
+                LeaveTypeId,
+                _model.AdjustmentValue!.Value,
+                _model.Reason,
+                string.IsNullOrWhiteSpace(_model.Comments) ? null : _model.Comments,
+                _model.AllowNegativeOverride);
 
-            // A definitive outcome (success or a business rejection) was returned - not thrown -
-            // so this submission has concluded one way or another: the NEXT submit (a corrected
+            // Fingerprint includes which employee/leave type this dialog instance currently targets
+            // - it's a reusable component, so Blazor can rebind it to a different employee between
+            // opens without recreating it.
+            var key = _submitOperation.PrepareKey((CompanyId, EmployeeId, request));
+
+            var outcome = await LeaveService.AdjustLeaveBalanceAsync(CompanyId, EmployeeId, request, key);
+
+            if (outcome.Kind == MutationOutcomeKind.AmbiguousFailure)
+            {
+                // Ambiguous - the mutation may already have committed server-side. Deliberately do
+                // NOT complete the operation: the key and this exact request are retained so the
+                // user's next click of this same "Save" button (unchanged fields) reuses them and
+                // the server replays rather than repeats the adjustment. The form stays populated.
+                _ambiguous = true;
+                _error = outcome.Error ?? "Failed to adjust leave balance. Please try again.";
+                return;
+            }
+
+            // A definitive outcome (success or a business rejection) was returned - so this
+            // submission has concluded one way or another: the NEXT submit (a corrected
             // resubmission, or a fresh adjustment after this dialog is reopened) starts a new
             // logical operation.
             _submitOperation.Complete();
 
-            if (response is not null)
+            if (outcome.Kind == MutationOutcomeKind.Succeeded)
             {
                 await VisibleChanged.InvokeAsync(false);
                 Reset();
@@ -180,16 +212,16 @@
             }
             else
             {
-                _error = error ?? "Failed to adjust leave balance.";
+                _error = outcome.Error ?? "Failed to adjust leave balance.";
             }
         }
         catch (Exception)
         {
-            // Ambiguous - the response was lost (network failure/timeout), so the mutation may
-            // already have committed server-side. Deliberately do NOT reset the key/fingerprint:
-            // the user's next click of this same "Save" button (unchanged fields) must reuse them
-            // so the server can replay rather than repeat the adjustment.
-            _error = "Failed to adjust leave balance. Please try again.";
+            // Unexpected exception reaching the UI: the outcome is unconfirmed, not a definitive
+            // failure - preserve the pending operation (do NOT call _submitOperation.Complete())
+            // so an unchanged retry can still safely replay rather than repeat the adjustment.
+            _ambiguous = true;
+            _error = "We could not confirm whether this adjustment was applied. Please try again.";
         }
         finally
         {
@@ -203,6 +235,17 @@
         Reset();
     }
 
+    // Ticket 3 (P1) final gap item 7: explicit user action to give up on a pending ambiguous
+    // operation while staying on the dialog (as opposed to Cancel, which also abandons it but by
+    // closing the dialog). Only reachable from the ambiguous-outcome banner, which already warns
+    // that this may create a second record if the previous attempt actually committed.
+    private void AbandonAndReset()
+    {
+        _ambiguous = false;
+        _submitOperation.Complete();
+        Reset();
+    }
+
     private void Reset()
     {
         _model.AdjustmentValue = null;
@@ -211,6 +254,7 @@
         _model.AllowNegativeOverride = false;
         _editContext = new EditContext(_model);
         _error = null;
+        _ambiguous = false;
 
         // Cancelling discards whatever partial submission was pending - the next open of this
         // dialog (even for the same employee/leave type) is a new logical operation.

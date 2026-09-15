@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using HR.SharedKernel.Idempotency;
 using HR.Web.Models;
+using HR.SharedKernel;
 
 namespace HR.Web.Services;
 
@@ -41,7 +42,7 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
         {
             var response = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/assets/{assetId}/assignments",
-                new { companyId, assetId, employeeId, assignedBy, notes },
+                new { companyId, assetId, employeeId, assignedBy, notes = FormText.Optional(notes) },
                 cancellationToken);
             return response.IsSuccessStatusCode;
         }
@@ -102,34 +103,119 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
     }
 
     /// <summary>
-    /// Ticket 3 (P1) final follow-up item 1: stateless with respect to operation identity - the
-    /// caller supplies <paramref name="idempotencyKey"/> and owns its lifecycle. A network
-    /// failure/timeout throws before reaching any return here (this method has no catch of its
-    /// own, matching its pre-existing behaviour) rather than being swallowed into a returned
-    /// tuple, so the caller can tell "ambiguous - keep the key for a retry" apart from a
-    /// definitive outcome without string-matching an error message.
+    /// Ticket 3 (P1) final gap: stateless with respect to operation identity - the caller supplies
+    /// <paramref name="idempotencyKey"/> and owns its lifecycle. Returns a
+    /// <see cref="MutationOutcome{T}"/> so the caller can distinguish a definitive outcome (Succeeded
+    /// or Rejected — safe to discard the key) from an AmbiguousFailure (5xx/408/429/transport
+    /// failure/timeout/cancellation-after-dispatch/malformed success body — the key and request must
+    /// be retained so an unchanged retry replays rather than repeats the mutation). This method
+    /// deliberately never lets an exception escape — every ambiguous case is captured and returned
+    /// as <see cref="MutationOutcomeKind.AmbiguousFailure"/> instead.
     /// </summary>
-    public async Task<(CreateAssetResponse? Result, string? Error)> CreateAssetAsync(
-        Guid companyId, CreateAssetRequest request, Guid idempotencyKey)
+    public async Task<MutationOutcome<CreateAssetResponse>> CreateAssetAsync(
+        Guid companyId, CreateAssetRequest request, Guid idempotencyKey, CancellationToken cancellationToken = default)
     {
-        var response = await Http.PostAsJsonIdempotentAsync(
-            $"api/companies/{companyId}/assets", request, idempotencyKey);
-
-        if (response.IsSuccessStatusCode)
+        HttpResponseMessage response;
+        try
         {
-            var created = await response.Content.ReadFromJsonAsync<CreateAssetResponse>();
-            return (created, null);
+            response = await Http.PostAsJsonIdempotentAsync(
+                $"api/companies/{companyId}/assets", request, idempotencyKey, cancellationToken: cancellationToken);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // A client-side request timeout surfaces as OperationCanceledException even though the
+            // caller's own token was never cancelled — the request was already dispatched, so the
+            // server may have received and committed it.
+            return MutationOutcome<CreateAssetResponse>.Ambiguous(
+                "The request timed out. It's safe to try again — a duplicate asset will not be created.");
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancellation requested by the caller. We cannot prove the request was never sent
+            // (it may already be in flight on the wire), so this must still be treated as
+            // ambiguous rather than assumed abandoned pre-dispatch.
+            return MutationOutcome<CreateAssetResponse>.Ambiguous(
+                "The request was cancelled before a response was received.");
+        }
+        catch (HttpRequestException)
+        {
+            return MutationOutcome<CreateAssetResponse>.Ambiguous(
+                "A network error occurred. It's safe to try again — a duplicate asset will not be created.");
         }
 
+        return await ClassifyCreateResponseAsync(response, cancellationToken);
+    }
+
+    // Bug fix (P1 follow-up to Ticket 3): sending the request and reading its response body are ONE
+    // operation as far as idempotency is concerned. Previously only JsonException was caught while
+    // parsing the success body, so a cancellation, response-stream I/O failure, or dropped
+    // connection while READING the body (as opposed to sending) would escape uncaught here, bypass
+    // AmbiguousFailure classification entirely, and propagate up into the caller/UI — abandoning
+    // the retained idempotency key/snapshot instead of preserving them for a safe retry. The
+    // response is always disposed once classification/body-reading is complete.
+    private static async Task<MutationOutcome<CreateAssetResponse>> ClassifyCreateResponseAsync(
+        HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        using var _ = response;
+
+        var kind = MutationHttpClassifier.ClassifyStatusCode(response.StatusCode);
+
+        if (kind == MutationOutcomeKind.Succeeded)
+        {
+            try
+            {
+                var created = await response.Content.ReadFromJsonAsync<CreateAssetResponse>(cancellationToken: cancellationToken);
+                if (created is null)
+                    return MutationOutcome<CreateAssetResponse>.Ambiguous(
+                        "The server's response could not be read. It's safe to try again.");
+
+                return MutationOutcome<CreateAssetResponse>.Succeeded(created);
+            }
+            catch (Exception ex) when (ex is System.Text.Json.JsonException or IOException
+                or OperationCanceledException or HttpRequestException)
+            {
+                // Invalid/truncated success response, cancellation, or a transport failure while
+                // reading the body — the mutation may well have committed, but this client cannot
+                // confirm it from this response body.
+                return MutationOutcome<CreateAssetResponse>.Ambiguous(
+                    "The server's response could not be read. It's safe to try again.");
+            }
+        }
+
+        if (kind == MutationOutcomeKind.AmbiguousFailure)
+        {
+            return MutationOutcome<CreateAssetResponse>.Ambiguous(
+                "The request could not be confirmed. It's safe to try again — a duplicate asset will not be created.");
+        }
+
+        // Definitive rejection (400/401/403/404/409/422/...). The status code alone already
+        // confirms a definitive outcome, so a failure reading the (secondary) error body must not
+        // itself be treated as ambiguous — fall back to a generic message instead.
         if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
             // Either a genuine duplicate asset number, or the idempotency layer's own "key reused
             // for a different request" conflict.
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (null, body?.Error ?? "An asset with that number already exists.");
+            var conflictBody = await TryReadErrorEnvelopeAsync(response, cancellationToken);
+            return MutationOutcome<CreateAssetResponse>.Rejected(
+                conflictBody?.Error ?? "An asset with that number already exists.");
         }
 
-        return (null, "Failed to create asset.");
+        var body = await TryReadErrorEnvelopeAsync(response, cancellationToken);
+        return MutationOutcome<CreateAssetResponse>.Rejected(body?.Error ?? "Failed to create asset.");
+    }
+
+    private static async Task<ErrorEnvelope?> TryReadErrorEnvelopeAsync(
+        HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<ErrorEnvelope>(cancellationToken: cancellationToken);
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or IOException
+            or OperationCanceledException or HttpRequestException)
+        {
+            return null;
+        }
     }
 
     public async Task<(UpdateAssetResponse? Result, string? Error)> UpdateAssetAsync(
@@ -191,10 +277,8 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, AssetEditModel model, int? expectedVersion)
     {
         var request = new UpdateAssetRequest(
-            companyId, id, model.AssetNumber.Trim(), model.CategoryId!.Value, model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Manufacturer) ? null : model.Manufacturer.Trim(),
-            string.IsNullOrWhiteSpace(model.Model) ? null : model.Model.Trim(),
-            string.IsNullOrWhiteSpace(model.SerialNumber) ? null : model.SerialNumber.Trim(),
+            companyId, id, FormText.Required(model.AssetNumber), model.CategoryId!.Value, FormText.Required(model.Name),
+            FormText.Optional(model.Manufacturer), FormText.Optional(model.Model), FormText.Optional(model.SerialNumber),
             model.PurchaseDate, model.PurchasePrice, expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/assets/{id}", request);
@@ -222,35 +306,41 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
     // path (EditPageBase<TModel, TKey>) detects IIdempotentCreateService<AssetEditModel> below and
     // owns a real key's lifecycle across retries instead of hitting this overload.
     async Task<(AssetEditModel? Result, string? Error)> IEditService<AssetEditModel, Guid>.CreateAsync(
-        Guid companyId, AssetEditModel model) =>
-        await CreateFromModelAsync(companyId, model, Guid.NewGuid());
+        Guid companyId, AssetEditModel model)
+    {
+        var outcome = await CreateFromModelAsync(companyId, model, Guid.NewGuid());
+        return (outcome.Kind == MutationOutcomeKind.Succeeded ? model : null, outcome.Error);
+    }
 
-    async Task<(AssetEditModel? Result, string? Error)> IIdempotentCreateService<AssetEditModel>.CreateAsync(
-        Guid companyId, AssetEditModel model, Guid idempotencyKey) =>
-        await CreateFromModelAsync(companyId, model, idempotencyKey);
+    async Task<MutationOutcome<AssetEditModel>> IIdempotentCreateService<AssetEditModel>.CreateAsync(
+        Guid companyId, AssetEditModel model, Guid idempotencyKey)
+    {
+        var outcome = await CreateFromModelAsync(companyId, model, idempotencyKey);
+        return outcome.Kind switch
+        {
+            MutationOutcomeKind.Succeeded => MutationOutcome<AssetEditModel>.Succeeded(model),
+            MutationOutcomeKind.Rejected => MutationOutcome<AssetEditModel>.Rejected(outcome.Error!),
+            _ => MutationOutcome<AssetEditModel>.Ambiguous(outcome.Error!),
+        };
+    }
 
-    private async Task<(AssetEditModel? Result, string? Error)> CreateFromModelAsync(
+    private async Task<MutationOutcome<CreateAssetResponse>> CreateFromModelAsync(
         Guid companyId, AssetEditModel model, Guid idempotencyKey)
     {
         var request = new CreateAssetRequest(
-            companyId, model.AssetNumber.Trim(), model.CategoryId!.Value, model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Manufacturer) ? null : model.Manufacturer.Trim(),
-            string.IsNullOrWhiteSpace(model.Model) ? null : model.Model.Trim(),
-            string.IsNullOrWhiteSpace(model.SerialNumber) ? null : model.SerialNumber.Trim(),
+            companyId, FormText.Required(model.AssetNumber), model.CategoryId!.Value, FormText.Required(model.Name),
+            FormText.Optional(model.Manufacturer), FormText.Optional(model.Model), FormText.Optional(model.SerialNumber),
             model.PurchaseDate, model.PurchasePrice);
 
-        var (created, error) = await CreateAssetAsync(companyId, request, idempotencyKey);
-        return (created is null ? null : model, error);
+        return await CreateAssetAsync(companyId, request, idempotencyKey);
     }
 
     async Task<(AssetEditModel? Result, string? Error)> IEditService<AssetEditModel, Guid>.UpdateAsync(
         Guid companyId, Guid id, AssetEditModel model)
     {
         var request = new UpdateAssetRequest(
-            companyId, id, model.AssetNumber.Trim(), model.CategoryId!.Value, model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Manufacturer) ? null : model.Manufacturer.Trim(),
-            string.IsNullOrWhiteSpace(model.Model) ? null : model.Model.Trim(),
-            string.IsNullOrWhiteSpace(model.SerialNumber) ? null : model.SerialNumber.Trim(),
+            companyId, id, FormText.Required(model.AssetNumber), model.CategoryId!.Value, FormText.Required(model.Name),
+            FormText.Optional(model.Manufacturer), FormText.Optional(model.Model), FormText.Optional(model.SerialNumber),
             model.PurchaseDate, model.PurchasePrice);
 
         var (updated, error) = await UpdateAssetAsync(companyId, id, request);

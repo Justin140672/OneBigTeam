@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @using HR.Web.Models
 @inject PromotionService PromotionService
@@ -358,8 +359,8 @@
             EmployeeId,
             Model.NewPositionProfileId!.Value,
             Model.EffectiveDate!.Value,
-            Model.Reason.Trim(),
-            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
+            FormText.Required(Model.Reason),
+            FormText.Optional(Model.Notes),
             Model.ChangeManager && Model.NewManagerId is Guid mId && mId != Guid.Empty ? mId : null,
             Model.ChangeLocation && Model.NewLocationId is Guid lId && lId != Guid.Empty ? lId : null,
             _awaitingBackdateConfirmation,
@@ -367,11 +368,11 @@
             Model.CreateCompensationChange ? Model.CompensationSalaryType : null,
             Model.CreateCompensationChange ? Model.CompensationSalary : null,
             Model.CreateCompensationChange && !string.IsNullOrWhiteSpace(Model.CompensationCurrency)
-                ? Model.CompensationCurrency.Trim().ToUpperInvariant() : null,
+                ? FormText.Required(Model.CompensationCurrency).ToUpperInvariant() : null,
             Model.CreateCompensationChange ? Model.CompensationHoursPerWeek : null,
             Model.CreateCompensationChange ? Model.CompensationFte : null,
             Model.CreateCompensationChange && !string.IsNullOrWhiteSpace(Model.CompensationNotes)
-                ? Model.CompensationNotes.Trim() : null);
+                ? FormText.Required(Model.CompensationNotes) : null);
 
         var (result, error, requiresConfirmation) = await PromotionService.PromoteEmployeeAsync(CompanyId, EmployeeId, request);
 

@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using HR.SharedKernel;
 using HR.Web.Models;
 using Microsoft.AspNetCore.Components.Forms;
 
@@ -114,8 +115,9 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
     {
         try
         {
+            search = FormText.OptionalSearch(search);
             var qs = $"pageNumber={pageNumber}&pageSize={pageSize}";
-            if (!string.IsNullOrWhiteSpace(search))   qs += $"&search={Uri.EscapeDataString(search)}";
+            if (search is not null)   qs += $"&search={Uri.EscapeDataString(search)}";
             if (categoryId is not null)                qs += $"&categoryId={categoryId}";
             var url = $"api/companies/{companyId}/shared-documents?{qs}";
             return await Http.GetFromJsonAsync<SharedCompanyDocumentListResponse>(url, HrApiJsonOptions.Default, cancellationToken);
@@ -393,7 +395,7 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
     {
         try
         {
-            var request = new ArchiveSharedCompanyDocumentRequest(companyId, documentId, reason);
+            var request = new ArchiveSharedCompanyDocumentRequest(companyId, documentId, FormText.Required(reason));
 
             var response = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/shared-documents/{documentId}/archive", request, cancellationToken);
@@ -456,7 +458,7 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
     {
         try
         {
-            var request = new CompleteSharedCompanyDocumentReviewRequest(companyId, documentId, reviewNotes);
+            var request = new CompleteSharedCompanyDocumentReviewRequest(companyId, documentId, FormText.Required(reviewNotes));
 
             var response = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/shared-documents/{documentId}/complete-review", request, cancellationToken);
@@ -520,10 +522,11 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         try
         {
             using var content = new MultipartFormDataContent();
-            content.Add(new StringContent(versionNote), "VersionNote");
+            content.Add(new StringContent(FormText.Required(versionNote)), "VersionNote");
             content.Add(new StringContent(requiresReacknowledgement.ToString()), "RequiresReacknowledgement");
-            if (!string.IsNullOrWhiteSpace(acknowledgementStatement))
-                content.Add(new StringContent(acknowledgementStatement), "AcknowledgementStatement");
+            var acknowledgement = FormText.Optional(acknowledgementStatement);
+            if (acknowledgement is not null)
+                content.Add(new StringContent(acknowledgement), "AcknowledgementStatement");
 
             await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
             var fileContent = new StreamContent(stream);

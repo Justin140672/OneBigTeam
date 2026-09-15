@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using System.Net;
 using System.Net.Http.Json;
 using HR.Web.Models;
@@ -18,7 +19,8 @@ public sealed class ExternalRecruiterService(HrApiHttpClientFactory httpClientFa
         {
             var url = $"api/companies/{companyId}/external-recruiters";
             var query = new List<string> { $"pageNumber={pageNumber}", $"pageSize={pageSize}" };
-            if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+            search = FormText.OptionalSearch(search);
+            if (search is not null) query.Add($"search={Uri.EscapeDataString(search)}");
             if (isActive is not null) query.Add($"isActive={isActive.Value}");
             url += "?" + string.Join("&", query);
 
@@ -127,12 +129,12 @@ public sealed class ExternalRecruiterService(HrApiHttpClientFactory httpClientFa
         Guid companyId, Guid id, ExternalRecruiterEditModel model, int? expectedVersion)
     {
         var request = new UpdateExternalRecruiterRequest(
-            companyId, id, model.AgencyName.Trim(),
-            string.IsNullOrWhiteSpace(model.ContactName) ? null : model.ContactName.Trim(),
-            string.IsNullOrWhiteSpace(model.ContactEmail) ? null : model.ContactEmail.Trim(),
-            string.IsNullOrWhiteSpace(model.ContactTelephone) ? null : model.ContactTelephone.Trim(),
-            string.IsNullOrWhiteSpace(model.Website) ? null : model.Website.Trim(),
-            string.IsNullOrWhiteSpace(model.Notes) ? null : model.Notes.Trim(),
+            companyId, id, FormText.Required(model.AgencyName),
+            FormText.Optional(model.ContactName),
+            FormText.Optional(model.ContactEmail),
+            FormText.Optional(model.ContactTelephone),
+            FormText.Optional(model.Website),
+            FormText.Optional(model.Notes),
             expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/external-recruiters/{id}", request);
@@ -157,12 +159,12 @@ public sealed class ExternalRecruiterService(HrApiHttpClientFactory httpClientFa
         Guid companyId, ExternalRecruiterEditModel model)
     {
         var request = new CreateExternalRecruiterRequest(
-            companyId, model.AgencyName.Trim(),
-            string.IsNullOrWhiteSpace(model.ContactName) ? null : model.ContactName.Trim(),
-            string.IsNullOrWhiteSpace(model.ContactEmail) ? null : model.ContactEmail.Trim(),
-            string.IsNullOrWhiteSpace(model.ContactTelephone) ? null : model.ContactTelephone.Trim(),
-            string.IsNullOrWhiteSpace(model.Website) ? null : model.Website.Trim(),
-            string.IsNullOrWhiteSpace(model.Notes) ? null : model.Notes.Trim());
+            companyId, FormText.Required(model.AgencyName),
+            FormText.Optional(model.ContactName),
+            FormText.Optional(model.ContactEmail),
+            FormText.Optional(model.ContactTelephone),
+            FormText.Optional(model.Website),
+            FormText.Optional(model.Notes));
 
         var (created, error) = await CreateExternalRecruiterAsync(companyId, request);
         return (created is null ? null : model, error);
@@ -172,12 +174,12 @@ public sealed class ExternalRecruiterService(HrApiHttpClientFactory httpClientFa
         Guid companyId, Guid id, ExternalRecruiterEditModel model)
     {
         var request = new UpdateExternalRecruiterRequest(
-            companyId, id, model.AgencyName.Trim(),
-            string.IsNullOrWhiteSpace(model.ContactName) ? null : model.ContactName.Trim(),
-            string.IsNullOrWhiteSpace(model.ContactEmail) ? null : model.ContactEmail.Trim(),
-            string.IsNullOrWhiteSpace(model.ContactTelephone) ? null : model.ContactTelephone.Trim(),
-            string.IsNullOrWhiteSpace(model.Website) ? null : model.Website.Trim(),
-            string.IsNullOrWhiteSpace(model.Notes) ? null : model.Notes.Trim());
+            companyId, id, FormText.Required(model.AgencyName),
+            FormText.Optional(model.ContactName),
+            FormText.Optional(model.ContactEmail),
+            FormText.Optional(model.ContactTelephone),
+            FormText.Optional(model.Website),
+            FormText.Optional(model.Notes));
 
         var (updated, error) = await UpdateExternalRecruiterAsync(companyId, id, request);
         return (updated is null ? null : model, error);

@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @page "/companies/{CompanyId:guid}/candidates/new"
 @page "/companies/{CompanyId:guid}/candidates/{Id:guid}"
 @page "/companies/{CompanyId:guid}/candidates/{Id:guid}/view"
@@ -259,7 +260,7 @@
         _actionError = null;
         _actionBusy = true;
 
-        var (result, error) = await CandidateService.DeactivateCandidateAsync(CompanyId, Id!.Value, _deactivateModel.Reason!.Trim());
+        var (result, error) = await CandidateService.DeactivateCandidateAsync(CompanyId, Id!.Value, FormText.Required(_deactivateModel.Reason!));
 
         _actionBusy = false;
 

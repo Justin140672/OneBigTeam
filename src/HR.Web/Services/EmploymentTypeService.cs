@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -39,8 +40,8 @@ public class EmploymentTypeService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, EmploymentTypeEditModel model, int? expectedVersion)
     {
         var request = new UpdateEmploymentTypeRequest(
-            companyId, id, model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            companyId, id, FormText.Required(model.Name),
+            FormText.Optional(model.Description),
             expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/employment-types/{id}", request);
@@ -67,7 +68,7 @@ public class EmploymentTypeService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, EmploymentTypeEditModel model)
     {
         var request = new CreateEmploymentTypeRequest(
-            companyId, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim());
+            companyId, FormText.Required(model.Name), FormText.Optional(model.Description));
 
         var (created, error) = await CreateAsync(companyId, request);
         return (created is null ? null : model, error);
@@ -77,8 +78,8 @@ public class EmploymentTypeService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, EmploymentTypeEditModel model)
     {
         var request = new UpdateEmploymentTypeRequest(
-            companyId, id, model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(), model.Version);
+            companyId, id, FormText.Required(model.Name),
+            FormText.Optional(model.Description), model.Version);
 
         var (updated, error) = await UpdateAsync(companyId, id, request);
         return (updated is null ? null : model, error);

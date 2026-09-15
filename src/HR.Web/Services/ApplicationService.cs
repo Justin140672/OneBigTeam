@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using HR.Web.Models;
+using HR.SharedKernel;
 
 namespace HR.Web.Services;
 
@@ -50,7 +51,7 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
     {
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/vacancies/{vacancyId}/applications",
-            new CreateApplicationRequest(companyId, vacancyId, candidateId, notes, source, sourceExternalRecruiterId));
+            new CreateApplicationRequest(companyId, vacancyId, candidateId, FormText.Optional(notes), source, sourceExternalRecruiterId));
 
         if (response.IsSuccessStatusCode)
             return (await response.Content.ReadFromJsonAsync<CreateApplicationResponse>(), null);
@@ -117,7 +118,7 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
     {
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/reject",
-            new RejectCandidateRequest(companyId, vacancyId, applicationId, rejectionReason));
+            new RejectCandidateRequest(companyId, vacancyId, applicationId, FormText.Optional(rejectionReason)));
 
         if (response.IsSuccessStatusCode)
             return (await response.Content.ReadFromJsonAsync<RejectCandidateResponse>(HrApiJsonOptions.Default), null);
@@ -143,7 +144,7 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
     {
         var response = await Http.PutAsJsonAsync(
             $"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/cv-review-notes",
-            new SaveCvReviewNotesRequest(companyId, vacancyId, applicationId, cvReviewNotes));
+            new SaveCvReviewNotesRequest(companyId, vacancyId, applicationId, FormText.Optional(cvReviewNotes)));
 
         if (response.IsSuccessStatusCode)
             return (await response.Content.ReadFromJsonAsync<SaveCvReviewNotesResponse>(HrApiJsonOptions.Default), null);
@@ -159,7 +160,7 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
     {
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/move-forward",
-            new MoveApplicationForwardRequest(companyId, vacancyId, applicationId, cvReviewNotes));
+            new MoveApplicationForwardRequest(companyId, vacancyId, applicationId, FormText.Optional(cvReviewNotes)));
 
         if (response.IsSuccessStatusCode)
             return (await response.Content.ReadFromJsonAsync<MoveApplicationForwardResponse>(HrApiJsonOptions.Default), null);

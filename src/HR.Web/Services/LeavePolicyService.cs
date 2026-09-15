@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -54,8 +55,8 @@ public class LeavePolicyService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, LeavePolicyEditModel model, int? expectedVersion)
     {
         var request = new UpdateLeavePolicyRequest(
-            companyId, id, model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            companyId, id, FormText.Required(model.Name),
+            FormText.Optional(model.Description),
             model.CarryOverDays, model.AllowNegativeBalance, model.IsDefault, expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/leave-policies/{id}", request);
@@ -82,7 +83,7 @@ public class LeavePolicyService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, LeavePolicyEditModel model)
     {
         var request = new CreateLeavePolicyRequest(
-            companyId, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            companyId, FormText.Required(model.Name), FormText.Optional(model.Description),
             model.CarryOverDays, model.AllowNegativeBalance, model.IsDefault);
 
         var (created, error) = await CreateAsync(companyId, request);
@@ -93,7 +94,7 @@ public class LeavePolicyService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, LeavePolicyEditModel model)
     {
         var request = new UpdateLeavePolicyRequest(
-            companyId, id, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            companyId, id, FormText.Required(model.Name), FormText.Optional(model.Description),
             model.CarryOverDays, model.AllowNegativeBalance, model.IsDefault);
 
         var (updated, error) = await UpdateAsync(companyId, id, request);

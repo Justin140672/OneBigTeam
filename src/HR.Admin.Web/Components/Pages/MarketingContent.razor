@@ -1,4 +1,5 @@
 @page "/marketing-content"
+@using HR.SharedKernel
 @inject MarketingContentAdminService MarketingContentAdminService
 
 <PageTitle>Marketing Content — Admin Portal</PageTitle>
@@ -295,23 +296,25 @@ else
                 .Where(b => b.Length > 0)
                 .ToList();
 
+            // DetailedContent is rich/formatted marketing copy — not run through FormText, its
+            // whitespace/formatting is meaningful and preserved verbatim.
             MarketingMutationResult result;
             if (_editingFeatureId is null)
             {
                 result = await MarketingContentAdminService.CreateFeatureAsync(new CreateMarketingFeatureRequest(
-                    _editingFeature.Slug.Trim(), _editingFeature.IconName.Trim(), _editingFeature.Title.Trim(),
-                    _editingFeature.Summary.Trim(), _editingFeature.Intro.Trim(),
-                    string.IsNullOrWhiteSpace(_editingFeature.DetailedContent) ? null : _editingFeature.DetailedContent,
-                    benefits, string.IsNullOrWhiteSpace(_editingFeature.YouTubeId) ? null : _editingFeature.YouTubeId.Trim(),
+                    FormText.Required(_editingFeature.Slug), FormText.Required(_editingFeature.IconName), FormText.Required(_editingFeature.Title),
+                    FormText.Required(_editingFeature.Summary), FormText.Required(_editingFeature.Intro),
+                    _editingFeature.DetailedContent,
+                    benefits, FormText.Optional(_editingFeature.YouTubeId),
                     _editingFeature.DisplayOrder, _editingFeature.DeliveryStatus));
             }
             else
             {
                 result = await MarketingContentAdminService.UpdateFeatureAsync(new UpdateMarketingFeatureRequest(
-                    _editingFeatureId.Value, _editingFeature.Slug.Trim(), _editingFeature.IconName.Trim(),
-                    _editingFeature.Title.Trim(), _editingFeature.Summary.Trim(), _editingFeature.Intro.Trim(),
-                    string.IsNullOrWhiteSpace(_editingFeature.DetailedContent) ? null : _editingFeature.DetailedContent,
-                    benefits, string.IsNullOrWhiteSpace(_editingFeature.YouTubeId) ? null : _editingFeature.YouTubeId.Trim(),
+                    _editingFeatureId.Value, FormText.Required(_editingFeature.Slug), FormText.Required(_editingFeature.IconName),
+                    FormText.Required(_editingFeature.Title), FormText.Required(_editingFeature.Summary), FormText.Required(_editingFeature.Intro),
+                    _editingFeature.DetailedContent,
+                    benefits, FormText.Optional(_editingFeature.YouTubeId),
                     _editingFeature.DisplayOrder, _editingFeature.DeliveryStatus));
             }
 
@@ -373,14 +376,14 @@ else
             if (_editingRoadmapId is null)
             {
                 result = await MarketingContentAdminService.CreateRoadmapItemAsync(new CreateMarketingRoadmapItemRequest(
-                    _editingRoadmap.Title.Trim(), _editingRoadmap.Description.Trim(), _editingRoadmap.IconName.Trim(),
+                    FormText.Required(_editingRoadmap.Title), FormText.Required(_editingRoadmap.Description), FormText.Required(_editingRoadmap.IconName),
                     _editingRoadmap.DeliveryStatus, _editingRoadmap.DisplayOrder));
             }
             else
             {
                 result = await MarketingContentAdminService.UpdateRoadmapItemAsync(new UpdateMarketingRoadmapItemRequest(
-                    _editingRoadmapId.Value, _editingRoadmap.Title.Trim(), _editingRoadmap.Description.Trim(),
-                    _editingRoadmap.IconName.Trim(), _editingRoadmap.DeliveryStatus, _editingRoadmap.DisplayOrder));
+                    _editingRoadmapId.Value, FormText.Required(_editingRoadmap.Title), FormText.Required(_editingRoadmap.Description),
+                    FormText.Required(_editingRoadmap.IconName), _editingRoadmap.DeliveryStatus, _editingRoadmap.DisplayOrder));
             }
 
             if (await ApplyAsync(result))

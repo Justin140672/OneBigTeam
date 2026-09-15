@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @inject CompensationService CompensationService
 @inherits EditDialogBase<EditFutureCompensationDialog.EditFutureCompensationFormModel>
@@ -145,10 +146,10 @@
             Record.Id,
             Model.SalaryType,
             Model.Salary!.Value,
-            Model.Currency.Trim().ToUpperInvariant(),
+            FormText.Required(Model.Currency).ToUpperInvariant(),
             Model.HoursPerWeek,
             Model.FTE,
-            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
+            FormText.Optional(Model.Notes),
             Model.Reason,
             ExpectedVersion: _loadedVersion);
 

@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -55,8 +56,8 @@ public class LocationService(HrApiHttpClientFactory httpClientFactory)
         var request = new UpdateLocationRequest(
             companyId,
             id,
-            model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            FormText.Required(model.Name),
+            FormText.Optional(model.Description),
             model.LocationTypeId!.Value,
             expectedVersion);
 
@@ -85,8 +86,8 @@ public class LocationService(HrApiHttpClientFactory httpClientFactory)
     {
         var request = new CreateLocationRequest(
             companyId,
-            model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            FormText.Required(model.Name),
+            FormText.Optional(model.Description),
             model.LocationTypeId!.Value);
 
         var (created, error) = await CreateLocationAsync(companyId, request);
@@ -99,8 +100,8 @@ public class LocationService(HrApiHttpClientFactory httpClientFactory)
         var request = new UpdateLocationRequest(
             companyId,
             id,
-            model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            FormText.Required(model.Name),
+            FormText.Optional(model.Description),
             model.LocationTypeId!.Value,
             model.Version);
 

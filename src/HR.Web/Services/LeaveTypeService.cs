@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -44,7 +45,7 @@ public class LeaveTypeService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, LeaveTypeEditModel model, int? expectedVersion)
     {
         var request = new UpdateLeaveTypeRequest(
-            companyId, id, model.Name.Trim(), model.Code.Trim().ToUpperInvariant(),
+            companyId, id, FormText.Required(model.Name), FormText.Required(model.Code).ToUpperInvariant(),
             model.DefaultEntitlementDays, model.AccrualMethod, model.Behaviour, model.HasBalance, expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/leave-types/{id}", request);
@@ -71,7 +72,7 @@ public class LeaveTypeService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, LeaveTypeEditModel model)
     {
         var request = new CreateLeaveTypeRequest(
-            companyId, model.Name.Trim(), model.Code.Trim().ToUpperInvariant(),
+            companyId, FormText.Required(model.Name), FormText.Required(model.Code).ToUpperInvariant(),
             model.DefaultEntitlementDays, model.AccrualMethod, model.Behaviour, model.HasBalance);
 
         var (created, error) = await CreateAsync(companyId, request);
@@ -82,7 +83,7 @@ public class LeaveTypeService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, LeaveTypeEditModel model)
     {
         var request = new UpdateLeaveTypeRequest(
-            companyId, id, model.Name.Trim(), model.Code.Trim().ToUpperInvariant(),
+            companyId, id, FormText.Required(model.Name), FormText.Required(model.Code).ToUpperInvariant(),
             model.DefaultEntitlementDays, model.AccrualMethod, model.Behaviour, model.HasBalance);
 
         var (updated, error) = await UpdateAsync(companyId, id, request);

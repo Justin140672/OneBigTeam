@@ -13,8 +13,15 @@ internal sealed class CreateAssetHandler(
     AssetsDbContext db,
     IClock clock,
     ICompanyAssetNumberSettingsReader assetNumberSettingsReader,
-    IAssetNumberGenerator assetNumberGenerator)
+    IAssetNumberGenerator assetNumberGenerator,
+    IPostCommitFaultInjector? postCommitFaultInjector = null)
 {
+    // Optional so the many existing handler-level unit tests that construct this handler directly
+    // (with no interest in Ticket 3's fault-injection seam) don't all need updating for an unrelated
+    // parameter. Production DI always supplies a real instance (NoOpPostCommitFaultInjector by
+    // default) via the required interface registration in Program.cs.
+    private readonly IPostCommitFaultInjector _postCommitFaultInjector = postCommitFaultInjector ?? new NoOpPostCommitFaultInjector();
+
     public async Task<Result<CreateAssetResponse>> HandleAsync(
         CreateAssetRequest request,
         CancellationToken cancellationToken)
@@ -134,6 +141,13 @@ internal sealed class CreateAssetHandler(
             entity.Name,
             now), request.CompanyId, now);
 
+        // Ticket 3 (P1) final gap item 6: no-op in production. Lets an integration test simulate a
+        // failure BEFORE this save commits (so nothing is persisted, including no asset number
+        // consumed), proving a retry with the same Idempotency-Key performs and commits the mutation
+        // exactly once.
+        await _postCommitFaultInjector.MaybeFailAfterCommitAsync(
+            $"{nameof(CreateAssetHandler)}.PreCommit", request.IdempotencyKey, cancellationToken);
+
         if (request.IdempotencyKey is { } key)
         {
             var outcome = await db.SaveIdempotentAsync(db.IdempotencyRecords,
@@ -150,6 +164,14 @@ internal sealed class CreateAssetHandler(
         {
             await db.SaveChangesAsync(cancellationToken);
         }
+
+        // Ticket 3 (P1) final gap item 5: no-op in production. Lets an integration test simulate a
+        // 500/502/503/504 (or a dropped response) occurring AFTER this asset row, the idempotency
+        // record and the audit outbox entry have already committed — the exact scenario a retry with
+        // the same Idempotency-Key must replay rather than repeat (and, for automatic numbering,
+        // must not consume a second asset number).
+        await _postCommitFaultInjector.MaybeFailAfterCommitAsync(
+            nameof(CreateAssetHandler), request.IdempotencyKey, cancellationToken);
 
         return Result.Success(response);
     }

@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @inject EmployeeService EmployeeService
 @inject AppSession Session
@@ -211,7 +212,7 @@ else
         _submitting = true;
 
         var (_, error) = await EmployeeService.RequestPersonalDetailsChangeAsync(
-            CompanyId, EmployeeId, _model.Notes!.Trim());
+            CompanyId, EmployeeId, FormText.Required(_model.Notes!));
 
         _submitting = false;
 

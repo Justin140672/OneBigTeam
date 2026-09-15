@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @using System.Text.Json
 @using HR.Web.Models
 @using HR.Web.Services
@@ -338,7 +339,7 @@
 
         _savedViewError = null;
         var json = JsonSerializer.Serialize(BuildSavedFilterState());
-        var request = new SaveReportViewRequest(ReportId, _newViewName.Trim(), json, null);
+        var request = new SaveReportViewRequest(ReportId, FormText.Required(_newViewName), json, null);
         var (result, error) = await ReportingService.SaveReportViewAsync(CompanyId, request);
 
         if (result is null)
@@ -366,7 +367,7 @@
         if (_selectedView is null || string.IsNullOrWhiteSpace(_renameViewName)) return;
 
         _savedViewError = null;
-        var (result, error) = await ReportingService.RenameReportViewAsync(CompanyId, _selectedView.Id, _renameViewName.Trim());
+        var (result, error) = await ReportingService.RenameReportViewAsync(CompanyId, _selectedView.Id, FormText.Required(_renameViewName));
 
         if (result is null)
         {

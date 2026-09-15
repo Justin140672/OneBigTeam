@@ -1,4 +1,5 @@
 @page "/settings"
+@using HR.SharedKernel
 @inject PlatformSettingsService PlatformSettingsService
 
 <PageTitle>Platform Settings — Admin Portal</PageTitle>
@@ -199,14 +200,14 @@ else
         {
             var flags = _featureFlags
                 .Where(f => !string.IsNullOrWhiteSpace(f.Name))
-                .ToDictionary(f => f.Name.Trim(), f => f.Enabled);
+                .ToDictionary(f => FormText.Required(f.Name), f => f.Enabled);
 
             var request = new UpdatePlatformSettingsRequest(
                 _trialLengthDays,
                 _defaultMonthlyPriceGbp,
-                _supportEmail.Trim(),
+                FormText.Required(_supportEmail),
                 _maintenanceModeEnabled,
-                _maintenanceModeEnabled ? _maintenanceModeMessage : null,
+                _maintenanceModeEnabled ? FormText.Optional(_maintenanceModeMessage) : null,
                 flags);
 
             var result = await PlatformSettingsService.UpdateSettingsAsync(request);

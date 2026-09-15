@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @inject EmployeeService EmployeeService
 @inject AppSession Session
@@ -273,15 +274,15 @@ else
     {
         var request = new UpdateMyContactDetailsRequest(
             CompanyId,
-            string.IsNullOrWhiteSpace(Model.PersonalEmail) ? null : Model.PersonalEmail.Trim(),
-            string.IsNullOrWhiteSpace(Model.PhoneNumber)   ? null : Model.PhoneNumber.Trim(),
-            string.IsNullOrWhiteSpace(Model.HomePhone)     ? null : Model.HomePhone.Trim(),
-            Model.AddressLine1.Trim(),
-            string.IsNullOrWhiteSpace(Model.AddressLine2)  ? null : Model.AddressLine2.Trim(),
-            Model.City.Trim(),
-            string.IsNullOrWhiteSpace(Model.County)        ? null : Model.County.Trim(),
-            Model.PostCode.Trim(),
-            Model.Country.Trim(),
+            FormText.Optional(Model.PersonalEmail),
+            FormText.Optional(Model.PhoneNumber),
+            FormText.Optional(Model.HomePhone),
+            FormText.Required(Model.AddressLine1),
+            FormText.Optional(Model.AddressLine2),
+            FormText.Required(Model.City),
+            FormText.Optional(Model.County),
+            FormText.Required(Model.PostCode),
+            FormText.Required(Model.Country),
             ExpectedVersion: ExpectedVersionForSave);
 
         var result = await EmployeeService.UpdateMyContactDetailsAsync(CompanyId, request);

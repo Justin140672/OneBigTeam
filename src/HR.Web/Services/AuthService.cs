@@ -20,7 +20,8 @@ public sealed class AuthService(HrApiHttpClientFactory httpClientFactory, ILogge
     {
         try
         {
-            var response = await Http.PostAsJsonAsync("api/login", new { Email = email, Password = password });
+            // Trim the identifier; the password is preserved byte-for-byte as entered (Ticket 19).
+            var response = await Http.PostAsJsonAsync("api/login", new { Email = FormText.Required(email), Password = password });
 
             if (response.IsSuccessStatusCode)
             {

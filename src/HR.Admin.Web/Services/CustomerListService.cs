@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using HR.Admin.Web.Models;
+using HR.SharedKernel;
 
 namespace HR.Admin.Web.Services;
 
@@ -20,7 +21,8 @@ public sealed class CustomerListService(HrApiHttpClientFactory httpClientFactory
     {
         try
         {
-            var url = string.IsNullOrWhiteSpace(search)
+            search = FormText.OptionalSearch(search);
+            var url = search is null
                 ? "api/companies/admin/customers"
                 : $"api/companies/admin/customers?search={Uri.EscapeDataString(search)}";
 

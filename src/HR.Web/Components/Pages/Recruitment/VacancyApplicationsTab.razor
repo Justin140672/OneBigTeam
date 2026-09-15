@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Forms
 @using Syncfusion.Blazor.Data
@@ -668,7 +669,7 @@
         var request = new OfferCandidateRequest(
             CompanyId, VacancyId, _activeApplication.Id,
             _offerModel.OfferedSalary, freq, _offerModel.ProposedStartDate, _offerModel.OfferDate,
-            string.IsNullOrWhiteSpace(_offerModel.OfferNotes) ? null : _offerModel.OfferNotes.Trim());
+            FormText.Optional(_offerModel.OfferNotes));
 
         var (result, error) = await ApplicationService.OfferCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);
         if (result is null)
@@ -1048,7 +1049,7 @@
                 // normalize to UTC here. ToUniversalTime() keeps the same absolute instant — it
                 // only changes the offset, not the wall-clock moment being saved.
                 new DateTimeOffset(_scheduleModel.ScheduledAt!.Value).ToUniversalTime(), _scheduleModel.DurationMinutes,
-                string.IsNullOrWhiteSpace(_scheduleModel.Location) ? null : _scheduleModel.Location.Trim()));
+                FormText.Optional(_scheduleModel.Location)));
 
     private void OpenRejectDialog(ApplicationListItemModel row)
     {
@@ -1294,15 +1295,15 @@
         var request = new HireCandidateRequest(
             CompanyId, VacancyId, _activeApplication.Id,
             _hireModel.StartDate, _hireModel.DateOfBirth!.Value, _hireModel.Nationality!, _hireModel.Gender!,
-            string.IsNullOrWhiteSpace(_hireModel.GenderOther) ? null : _hireModel.GenderOther.Trim(),
-            employeeNumberRequired ? _hireModel.EmployeeNumber!.Trim() : string.Empty, _hireModel.EmploymentTypeId!.Value,
+            FormText.Optional(_hireModel.GenderOther),
+            employeeNumberRequired ? FormText.Required(_hireModel.EmployeeNumber!) : string.Empty, _hireModel.EmploymentTypeId!.Value,
             _hireModel.ManagerId == Guid.Empty ? null : _hireModel.ManagerId,
             // Not yet consumed server-side — see HireCandidateRequest's remarks above.
-            string.IsNullOrWhiteSpace(_hireModel.AddressLine1) ? null : _hireModel.AddressLine1.Trim(),
-            string.IsNullOrWhiteSpace(_hireModel.AddressLine2) ? null : _hireModel.AddressLine2.Trim(),
-            string.IsNullOrWhiteSpace(_hireModel.City) ? null : _hireModel.City.Trim(),
-            string.IsNullOrWhiteSpace(_hireModel.County) ? null : _hireModel.County.Trim(),
-            string.IsNullOrWhiteSpace(_hireModel.PostCode) ? null : _hireModel.PostCode.Trim());
+            FormText.Optional(_hireModel.AddressLine1),
+            FormText.Optional(_hireModel.AddressLine2),
+            FormText.Optional(_hireModel.City),
+            FormText.Optional(_hireModel.County),
+            FormText.Optional(_hireModel.PostCode));
 
         var (result, error) = await ApplicationService.HireCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);
 

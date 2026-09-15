@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @inject DocumentService DocumentService
 
@@ -140,7 +141,7 @@
         _uploading = true;
         _error = await DocumentService.UploadRequestedDocumentAsync(
             CompanyId, EmployeeId, _request.Id,
-            _model.Title!.Trim(), description: null, _model.IssueDate, _model.ExpiryDate,
+            FormText.Required(_model.Title!), description: null, _model.IssueDate, _model.ExpiryDate,
             _selectedFile!);
         _uploading = false;
 

@@ -555,7 +555,7 @@
         _archiveError = null;
         StateHasChanged();
 
-        var error = await DocumentService.ArchiveSharedCompanyDocumentAsync(CompanyId, DocumentId, _archiveModel.Reason!.Trim());
+        var error = await DocumentService.ArchiveSharedCompanyDocumentAsync(CompanyId, DocumentId, _archiveModel.Reason!);
 
         _archiving = false;
 

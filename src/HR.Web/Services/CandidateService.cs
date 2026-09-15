@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -16,8 +17,9 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
     {
         try
         {
+            search = FormText.OptionalSearch(search);
             var url = $"api/companies/{companyId}/candidates?pageNumber={pageNumber}&pageSize={pageSize}";
-            if (!string.IsNullOrWhiteSpace(search)) url += $"&search={Uri.EscapeDataString(search)}";
+            if (search is not null) url += $"&search={Uri.EscapeDataString(search)}";
             if (includeInactive) url += "&includeInactive=true";
 
             return await Http.GetFromJsonAsync<ListCandidatesResponse>(url, HrApiJsonOptions.Default);
@@ -165,9 +167,9 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, CandidateEditModel model, int? expectedVersion)
     {
         var request = new UpdateCandidateRequest(
-            companyId, id, model.FirstName.Trim(), model.LastName.Trim(), model.Email.Trim(),
-            string.IsNullOrWhiteSpace(model.Phone) ? null : model.Phone.Trim(),
-            string.IsNullOrWhiteSpace(model.ResumeUrl) ? null : model.ResumeUrl.Trim(),
+            companyId, id, FormText.Required(model.FirstName), FormText.Required(model.LastName), FormText.Required(model.Email),
+            FormText.Optional(model.Phone),
+            FormText.Optional(model.ResumeUrl),
             expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/candidates/{id}", request);
@@ -190,9 +192,9 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
     async Task<(CandidateEditModel? Result, string? Error)> IEditService<CandidateEditModel, Guid>.CreateAsync(Guid companyId, CandidateEditModel model)
     {
         var request = new CreateCandidateRequest(
-            companyId, model.FirstName.Trim(), model.LastName.Trim(), model.Email.Trim(),
-            string.IsNullOrWhiteSpace(model.Phone) ? null : model.Phone.Trim(),
-            string.IsNullOrWhiteSpace(model.ResumeUrl) ? null : model.ResumeUrl.Trim());
+            companyId, FormText.Required(model.FirstName), FormText.Required(model.LastName), FormText.Required(model.Email),
+            FormText.Optional(model.Phone),
+            FormText.Optional(model.ResumeUrl));
 
         var (created, error) = await CreateCandidateAsync(companyId, request);
         return (created is null ? null : model, error);
@@ -201,9 +203,9 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
     async Task<(CandidateEditModel? Result, string? Error)> IEditService<CandidateEditModel, Guid>.UpdateAsync(Guid companyId, Guid id, CandidateEditModel model)
     {
         var request = new UpdateCandidateRequest(
-            companyId, id, model.FirstName.Trim(), model.LastName.Trim(), model.Email.Trim(),
-            string.IsNullOrWhiteSpace(model.Phone) ? null : model.Phone.Trim(),
-            string.IsNullOrWhiteSpace(model.ResumeUrl) ? null : model.ResumeUrl.Trim());
+            companyId, id, FormText.Required(model.FirstName), FormText.Required(model.LastName), FormText.Required(model.Email),
+            FormText.Optional(model.Phone),
+            FormText.Optional(model.ResumeUrl));
 
         var (updated, error) = await UpdateCandidateAsync(companyId, id, request);
         return (updated is null ? null : model, error);

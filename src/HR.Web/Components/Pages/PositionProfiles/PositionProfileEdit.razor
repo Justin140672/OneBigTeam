@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @page "/companies/{CompanyId:guid}/position-profiles/new"
 @page "/companies/{CompanyId:guid}/position-profiles/{Id:guid}"
 @page "/companies/{CompanyId:guid}/position-profiles/{Id:guid}/view"
@@ -205,7 +206,7 @@
 
     private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Position Profile"
-        : Model.Title.Trim().Length > 0 ? Model.Title.Trim()
+        : Model.Title.Trim().Length > 0 ? FormText.Required(Model.Title)
         : IsViewMode ? "View Position Profile" : "Edit Position Profile";
 
     // Ticket 2: optimistic-concurrency token loaded with the profile, sent as ExpectedVersion on
@@ -333,8 +334,8 @@
                 CompanyId,
                 Model.DepartmentId!.Value,
                 Model.LocationId!.Value,
-                Model.Title.Trim(),
-                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
+                FormText.Required(Model.Title),
+                FormText.Optional(Model.Description),
                 Model.ProbationMonthsOverride,
                 workingDaysOverride,
                 hoursPerDayOverride,
@@ -356,8 +357,8 @@
                 Id!.Value,
                 Model.DepartmentId!.Value,
                 Model.LocationId!.Value,
-                Model.Title.Trim(),
-                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
+                FormText.Required(Model.Title),
+                FormText.Optional(Model.Description),
                 Model.ProbationMonthsOverride,
                 workingDaysOverride,
                 hoursPerDayOverride,

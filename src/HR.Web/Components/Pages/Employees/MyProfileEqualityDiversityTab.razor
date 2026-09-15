@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @inject EmployeeService EmployeeService
 @inject AppSession Session
 @inject IJSRuntime JS
@@ -275,9 +276,7 @@ else
         Convert.ToInt32(value) == 0 ? null : value;
 
     private static string? TextFor<T>(T selected, T selfDescribed, string? text) where T : struct, Enum =>
-        EqualityComparer<T>.Default.Equals(selected, selfDescribed) && !string.IsNullOrWhiteSpace(text)
-            ? text!.Trim()
-            : null;
+        EqualityComparer<T>.Default.Equals(selected, selfDescribed) ? FormText.Optional(text) : null;
 
     private async Task SaveAsync()
     {
@@ -294,8 +293,7 @@ else
             Nullify(_model.EthnicGroup),
             TextFor(_model.EthnicGroup, EthnicGroupChoice.SelfDescribed, _model.EthnicGroupSelfDescribed),
             Nullify(_model.DisabilityStatus),
-            _model.DisabilityStatus == YesNoChoice.Yes && !string.IsNullOrWhiteSpace(_model.DisabilityImpact)
-                ? _model.DisabilityImpact!.Trim() : null,
+            _model.DisabilityStatus == YesNoChoice.Yes ? FormText.Optional(_model.DisabilityImpact) : null,
             Nullify(_model.SexualOrientation),
             TextFor(_model.SexualOrientation, SexualOrientationChoice.SelfDescribed, _model.SexualOrientationSelfDescribed),
             Nullify(_model.ReligionOrBelief),

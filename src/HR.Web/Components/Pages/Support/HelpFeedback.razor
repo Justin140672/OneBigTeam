@@ -291,7 +291,7 @@
         }
 
         var (created, error) = await SupportService.SubmitSupportRequestAsync(
-            CompanyId, _model.Type!, _model.Title.Trim(), _model.Description.Trim(), _model.Priority!,
+            CompanyId, _model.Type!, _model.Title, _model.Description, _model.Priority!,
             _model.IncludeDiagnostics, pageUrl, browser, appVersion, correlationId, recentClientErrors, _selectedFiles);
 
         _submitting = false;

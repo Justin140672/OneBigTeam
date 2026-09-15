@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using System.Net;
 using System.Net.Http.Json;
 using HR.Web.Models;
@@ -112,7 +113,7 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
         Guid companyId, Guid id, RecruitmentStageEditModel model, int? expectedVersion)
     {
         var request = new UpdateRecruitmentStageRequest(
-            companyId, id, model.Name.Trim(), model.IsTerminal, model.TerminalOutcome,
+            companyId, id, FormText.Required(model.Name), model.IsTerminal, model.TerminalOutcome,
             model.IsTerminal ? null : model.Purpose, expectedVersion);
 
         var response = await Http.PutAsJsonAsync(
@@ -142,7 +143,7 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
         var existingCount = (await ListStagesAsync(companyId))?.Items.Count ?? 0;
 
         var request = new CreateRecruitmentStageRequest(
-            companyId, model.Name.Trim(), existingCount + 1, model.IsTerminal, model.TerminalOutcome,
+            companyId, FormText.Required(model.Name), existingCount + 1, model.IsTerminal, model.TerminalOutcome,
             model.IsTerminal ? null : model.Purpose);
 
         var (created, error) = await CreateAsync(companyId, request);
@@ -153,7 +154,7 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
         Guid companyId, Guid id, RecruitmentStageEditModel model)
     {
         var request = new UpdateRecruitmentStageRequest(
-            companyId, id, model.Name.Trim(), model.IsTerminal, model.TerminalOutcome,
+            companyId, id, FormText.Required(model.Name), model.IsTerminal, model.TerminalOutcome,
             model.IsTerminal ? null : model.Purpose);
 
         var (updated, error) = await UpdateAsync(companyId, id, request);

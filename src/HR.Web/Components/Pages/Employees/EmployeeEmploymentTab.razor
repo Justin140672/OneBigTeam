@@ -675,7 +675,7 @@ else
         }
 
         return new EmploymentPortion(
-            string.IsNullOrWhiteSpace(Model.EmployeeNumber) ? null : Model.EmployeeNumber.Trim(),
+            FormText.Optional(Model.EmployeeNumber),
             Model.EmploymentTypeId,
             Model.Status,
             Model.DepartmentId,
@@ -690,7 +690,7 @@ else
             Model.OverrideNoticePeriod ? Model.NoticePeriodLength : null,
             workingDaysOverride,
             hoursPerDayOverride,
-            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim());
+            FormText.Optional(Model.Notes));
     }
 
     // Item 5: EmployeeEdit's single Save reads GetEmploymentPortion() directly instead of calling

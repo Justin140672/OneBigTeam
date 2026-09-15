@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @inject UserAdministrationService UserAdministrationService
 
 <SfDialog Visible="IsOpen" IsModal="true" Width="560px" ShowCloseIcon="false">
@@ -130,7 +131,7 @@
         _globalError = null;
 
         var (result, error) = await UserAdministrationService.InviteEmployeeUserAsync(
-            CompanyId, PreselectedEmployeeId, _email.Trim(), AllSelectedRoleIds);
+            CompanyId, PreselectedEmployeeId, FormText.Required(_email), AllSelectedRoleIds);
 
         _submitting = false;
 

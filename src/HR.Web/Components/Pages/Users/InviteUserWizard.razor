@@ -1,3 +1,4 @@
+@using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @inject UserAdministrationService UserAdministrationService
 
@@ -241,7 +242,7 @@
         _error = null;
 
         var (result, error) = await UserAdministrationService.InviteEmployeeUserAsync(
-            CompanyId, _model.EmployeeId!.Value, _model.Email!.Trim(), AllSelectedRoleIds);
+            CompanyId, _model.EmployeeId!.Value, FormText.Required(_model.Email!), AllSelectedRoleIds);
 
         _submitting = false;
 

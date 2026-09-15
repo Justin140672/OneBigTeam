@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -91,8 +92,8 @@ public class AssetCategoryService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, AssetCategoryEditModel model, int? expectedVersion)
     {
         var request = new UpdateAssetCategoryRequest(
-            companyId, id, model.Name.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            companyId, id, FormText.Required(model.Name),
+            FormText.Optional(model.Description),
             expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/asset-categories/{id}", request);
@@ -119,7 +120,7 @@ public class AssetCategoryService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, AssetCategoryEditModel model)
     {
         var request = new CreateAssetCategoryRequest(
-            companyId, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim());
+            companyId, FormText.Required(model.Name), FormText.Optional(model.Description));
 
         var (created, error) = await CreateAsync(companyId, request);
         return (created is null ? null : model, error);
@@ -129,7 +130,7 @@ public class AssetCategoryService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, AssetCategoryEditModel model)
     {
         var request = new UpdateAssetCategoryRequest(
-            companyId, id, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim());
+            companyId, id, FormText.Required(model.Name), FormText.Optional(model.Description));
 
         var (updated, error) = await UpdateAsync(companyId, id, request);
         return (updated is null ? null : model, error);

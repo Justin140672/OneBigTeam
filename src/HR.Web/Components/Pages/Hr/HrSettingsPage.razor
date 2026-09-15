@@ -566,11 +566,11 @@
             Model.NoticePeriodLength,
             Model.AutoDisableAccessOnLeavingDate,
             Model.EmployeeNumberMode,
-            string.IsNullOrWhiteSpace(Model.EmployeeNumberPrefix) ? null : Model.EmployeeNumberPrefix.Trim(),
+            FormText.Optional(Model.EmployeeNumberPrefix),
             Model.NextEmployeeNumber,
             Model.EmployeeNumberMinimumLength,
             Model.AssetNumberMode,
-            string.IsNullOrWhiteSpace(Model.AssetNumberPrefix) ? null : Model.AssetNumberPrefix.Trim(),
+            FormText.Optional(Model.AssetNumberPrefix),
             Model.NextAssetNumber,
             Model.AssetNumberMinimumLength,
             Model.Version);

@@ -1,5 +1,6 @@
 @using System.ComponentModel.DataAnnotations
 @using Syncfusion.Blazor.Data
+@using HR.SharedKernel
 @inject ProbationService ProbationService
 @inject EmployeeService EmployeeService
 @inherits EditSectionBase<ProbationRecordEditPanel.ProbationEditModel>
@@ -146,7 +147,7 @@ else
             Record.Id,
             managerId,
             Model.ExpectedEndDate!.Value,
-            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
+            FormText.Optional(Model.Notes),
             ExpectedVersionForSave);
 
         var result = await ProbationService.UpdateProbationRecordAsync(CompanyId, request);
@@ -158,7 +159,7 @@ else
             {
                 ManagerEmployeeId = managerId,
                 ExpectedEndDate = Model.ExpectedEndDate!.Value,
-                Notes = string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
+                Notes = FormText.Optional(Model.Notes),
                 UpdatedAt = DateTimeOffset.UtcNow,
                 Version = result.NewVersion ?? Record.Version,
             };

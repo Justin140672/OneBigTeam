@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using System.Net;
 using System.Net.Http.Json;
 using HR.Web.Models;
@@ -26,7 +27,8 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
             if (positionProfileId is not null) query.Add($"positionProfileId={positionProfileId}");
             if (departmentId is not null) query.Add($"departmentId={departmentId}");
             if (excludeClosed) query.Add("excludeClosed=true");
-            if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+            search = FormText.OptionalSearch(search);
+            if (search is not null) query.Add($"search={Uri.EscapeDataString(search)}");
             if (pageSize is > 0) query.Add($"pageSize={pageSize.Value}");
             if (query.Count > 0) url += "?" + string.Join("&", query);
 
@@ -79,7 +81,8 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         if (positionProfileId is not null) query.Add($"positionProfileId={positionProfileId}");
         if (departmentId is not null) query.Add($"departmentId={departmentId}");
         if (excludeClosed) query.Add("excludeClosed=true");
-        if (!string.IsNullOrWhiteSpace(search)) query.Add($"search={Uri.EscapeDataString(search)}");
+        search = FormText.OptionalSearch(search);
+        if (search is not null) query.Add($"search={Uri.EscapeDataString(search)}");
         if (pageSize is > 0) query.Add($"pageSize={pageSize.Value}");
         if (query.Count > 0) url += "?" + string.Join("&", query);
         return Http.GetFromJsonAsync<ListVacanciesResponse>(url, HrApiJsonOptions.Default);
@@ -212,12 +215,12 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         var request = new UpdateVacancyRequest(
             companyId, id,
             model.PositionProfileId,
-            string.IsNullOrWhiteSpace(model.AdvertTitle) ? null : model.AdvertTitle.Trim(),
-            string.IsNullOrWhiteSpace(model.AdvertDescription) ? null : model.AdvertDescription.Trim(),
+            FormText.Optional(model.AdvertTitle),
+            FormText.Optional(model.AdvertDescription),
             model.HiringManagerId!.Value,
             AssignedRecruiterId: model.AssignedRecruiterId == Guid.Empty ? null : model.AssignedRecruiterId,
             IsAuthorisedCorrection: model.IsAuthorisedCorrection,
-            CorrectionReason: string.IsNullOrWhiteSpace(model.CorrectionReason) ? null : model.CorrectionReason.Trim(),
+            CorrectionReason: FormText.Optional(model.CorrectionReason),
             IsAdvertisedInternally: model.IsAdvertisedInternally,
             ExpectedVersion: expectedVersion);
 
@@ -243,8 +246,8 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
     {
         var request = new CreateVacancyRequest(
             companyId, model.PositionProfileId!.Value,
-            string.IsNullOrWhiteSpace(model.AdvertTitle) ? null : model.AdvertTitle.Trim(),
-            string.IsNullOrWhiteSpace(model.AdvertDescription) ? null : model.AdvertDescription.Trim(),
+            FormText.Optional(model.AdvertTitle),
+            FormText.Optional(model.AdvertDescription),
             model.HiringManagerId!.Value,
             model.AssignedRecruiterId == Guid.Empty ? null : model.AssignedRecruiterId,
             IsAdvertisedInternally: model.IsAdvertisedInternally);
@@ -258,12 +261,12 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         var request = new UpdateVacancyRequest(
             companyId, id,
             model.PositionProfileId,
-            string.IsNullOrWhiteSpace(model.AdvertTitle) ? null : model.AdvertTitle.Trim(),
-            string.IsNullOrWhiteSpace(model.AdvertDescription) ? null : model.AdvertDescription.Trim(),
+            FormText.Optional(model.AdvertTitle),
+            FormText.Optional(model.AdvertDescription),
             model.HiringManagerId!.Value,
             AssignedRecruiterId: model.AssignedRecruiterId == Guid.Empty ? null : model.AssignedRecruiterId,
             IsAuthorisedCorrection: model.IsAuthorisedCorrection,
-            CorrectionReason: string.IsNullOrWhiteSpace(model.CorrectionReason) ? null : model.CorrectionReason.Trim(),
+            CorrectionReason: FormText.Optional(model.CorrectionReason),
             IsAdvertisedInternally: model.IsAdvertisedInternally);
 
         var (updated, error) = await UpdateVacancyAsync(companyId, id, request);

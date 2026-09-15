@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Web.Models;
 using System.Web;
 
@@ -51,7 +52,8 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         Guid? locationId)
     {
         var query = HttpUtility.ParseQueryString(string.Empty);
-        if (!string.IsNullOrWhiteSpace(search)) query["search"] = search;
+        search = FormText.OptionalSearch(search);
+        if (search is not null) query["search"] = search;
         query["pageNumber"] = pageNumber.ToString();
         query["pageSize"] = pageSize.ToString();
         if (departmentId is not null) query["departmentId"] = departmentId.ToString();
@@ -74,7 +76,8 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, string? term, bool includeLeavers, int limit = 20, CancellationToken ct = default)
     {
         var query = HttpUtility.ParseQueryString(string.Empty);
-        if (!string.IsNullOrWhiteSpace(term)) query["term"] = term;
+        term = FormText.OptionalSearch(term);
+        if (term is not null) query["term"] = term;
         query["includeLeavers"] = includeLeavers ? "true" : "false";
         query["limit"] = limit.ToString();
 

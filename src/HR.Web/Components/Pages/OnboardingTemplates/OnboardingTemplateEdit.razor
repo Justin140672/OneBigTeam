@@ -2,6 +2,7 @@
 @page "/companies/{CompanyId:guid}/onboarding-templates/{Id:guid}"
 @page "/companies/{CompanyId:guid}/onboarding-templates/{Id:guid}/view"
 @rendermode InteractiveServer
+@using HR.SharedKernel
 @inject OnboardingTemplateService OnboardingTemplateService
 @inherits EditPageBase<OnboardingTemplateEditModel>
 
@@ -331,8 +332,8 @@
         var taskItems = Model.Tasks
             .Select(t => new UpdateOnboardingTemplateTaskItem(
                 t.Id,
-                t.Title.Trim(),
-                string.IsNullOrWhiteSpace(t.Description) ? null : t.Description.Trim(),
+                FormText.Required(t.Title),
+                FormText.Optional(t.Description),
                 t.Priority,
                 t.AssignTo,
                 t.DueDaysAfterStart,
@@ -343,8 +344,8 @@
         {
             var createRequest = new CreateOnboardingTemplateRequest(
                 CompanyId,
-                Model.Name.Trim(),
-                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim());
+                FormText.Required(Model.Name),
+                FormText.Optional(Model.Description));
 
             var (created, createError) = await OnboardingTemplateService.CreateAsync(CompanyId, createRequest);
             if (created is null)
@@ -383,8 +384,8 @@
             var request = new UpdateOnboardingTemplateRequest(
                 CompanyId,
                 Id!.Value,
-                Model.Name.Trim(),
-                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
+                FormText.Required(Model.Name),
+                FormText.Optional(Model.Description),
                 taskItems,
                 Model.Version);
 
