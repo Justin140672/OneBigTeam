@@ -11,10 +11,10 @@ internal sealed class AssetTaskCompletionAction(
     public TaskSource Source => TaskSource.Asset;
     public TaskActionType ActionType => TaskActionType.Acknowledge;
 
-    public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
+    public async Task<Result> ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {
         if (context.SourceEntityId is null)
-            return;
+            return Result.Failure(Error.Validation("This task has no associated asset assignment."));
 
         await acknowledgementService.AcknowledgeAsync(
             context.CompanyId,
@@ -35,5 +35,7 @@ internal sealed class AssetTaskCompletionAction(
             assignedUserId:     null,
             sourceEntityId:     context.SourceEntityId,
             cancellationToken);
+
+        return Result.Success();
     }
 }

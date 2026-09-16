@@ -14,7 +14,7 @@ internal sealed class ProbationTaskCompletionAction(ITaskCreator taskCreator, IC
     public TaskSource Source => TaskSource.Probation;
     public TaskActionType ActionType => TaskActionType.Review;
 
-    public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
+    public async Task<Result> ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {
         var employeeName = ExtractEmployeeName(context.Title);
         var dueDate = DateOnly.FromDateTime(clock.UtcNowOffset().AddDays(3).DateTime);
@@ -33,6 +33,8 @@ internal sealed class ProbationTaskCompletionAction(ITaskCreator taskCreator, IC
             assignedUserId: null,
             sourceEntityId: null,
             cancellationToken);
+
+        return Result.Success();
     }
 
     private static string ExtractEmployeeName(string title) =>

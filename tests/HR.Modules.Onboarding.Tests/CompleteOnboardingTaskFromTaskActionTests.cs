@@ -243,7 +243,10 @@ public class CompleteOnboardingTaskFromTaskActionTests
         var (action, _, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, sourceEntityId: null);
 
-        await action.ExecuteAsync(context, CancellationToken.None);
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var savedTask = await dbContext.OnboardingTasks.SingleAsync(t => t.Id == task.Id);
         Assert.Equal(OnboardingTaskStatus.Pending, savedTask.Status);
@@ -268,7 +271,10 @@ public class CompleteOnboardingTaskFromTaskActionTests
         var (action, _, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, sourceEntityId: Guid.NewGuid());
 
-        await action.ExecuteAsync(context, CancellationToken.None);
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
 
         var savedTask = await dbContext.OnboardingTasks.SingleAsync(t => t.Id == task.Id);
         Assert.Equal(OnboardingTaskStatus.Pending, savedTask.Status);

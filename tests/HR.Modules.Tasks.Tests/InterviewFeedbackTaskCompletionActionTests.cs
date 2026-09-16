@@ -36,7 +36,7 @@ public class InterviewFeedbackTaskCompletionActionTests
         var feedbackService = new FakeInterviewFeedbackService();
         var action = new InterviewFeedbackTaskCompletionAction(feedbackService);
 
-        await action.ExecuteAsync(MakeContext("Passed", "Strong technical skills."), CancellationToken.None);
+        var result = await action.ExecuteAsync(MakeContext("Passed", "Strong technical skills."), CancellationToken.None);
 
         var call = Assert.Single(feedbackService.Calls);
         Assert.Equal(CompanyId, call.CompanyId);
@@ -44,30 +44,48 @@ public class InterviewFeedbackTaskCompletionActionTests
         Assert.Equal(CompletedBy, call.RecordedByEmployeeId);
         Assert.Equal("Passed", call.Outcome);
         Assert.Equal("Strong technical skills.", call.Notes);
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
-    public async Task ExecuteAsync_Does_Nothing_When_No_Decision()
+    public async Task ExecuteAsync_Propagates_Failure_From_RecordFeedbackAsync()
+    {
+        var failure = Result.Failure(Error.NotFound("The interview was not found."));
+        var feedbackService = new FakeInterviewFeedbackService(failure);
+        var action = new InterviewFeedbackTaskCompletionAction(feedbackService);
+
+        var result = await action.ExecuteAsync(MakeContext("Passed"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Returns_Validation_Failure_When_No_Decision()
     {
         var feedbackService = new FakeInterviewFeedbackService();
         var action = new InterviewFeedbackTaskCompletionAction(feedbackService);
 
-        await action.ExecuteAsync(MakeContext(outcomeDecision: null), CancellationToken.None);
+        var result = await action.ExecuteAsync(MakeContext(outcomeDecision: null), CancellationToken.None);
 
         Assert.Empty(feedbackService.Calls);
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
     }
 
     [Fact]
-    public async Task ExecuteAsync_Does_Nothing_When_SourceEntityId_Is_Null()
+    public async Task ExecuteAsync_Returns_Validation_Failure_When_SourceEntityId_Is_Null()
     {
         var feedbackService = new FakeInterviewFeedbackService();
         var action = new InterviewFeedbackTaskCompletionAction(feedbackService);
 
         var context = MakeContext("Passed") with { SourceEntityId = null };
 
-        await action.ExecuteAsync(context, CancellationToken.None);
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
 
         Assert.Empty(feedbackService.Calls);
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
     }
 
     [Fact]

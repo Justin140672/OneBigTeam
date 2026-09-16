@@ -9,27 +9,37 @@ internal sealed class LeaveTaskCompletionAction(ILeaveApprovalService leaveAppro
     public TaskSource Source => TaskSource.Leave;
     public TaskActionType ActionType => TaskActionType.Approve;
 
-    public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
+    public async Task<Result> ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {
-        if (context.SourceEntityId is null || context.OutcomeDecision is null)
-            return;
+        // Ticket 3 (P1): a leave-approval task requires an explicit Approve/Reject decision —
+        // previously a missing/malformed decision silently no-op'd and the task was still marked
+        // Completed by the caller, leaving the leave request forever Pending with no way to tell
+        // from the task list that nothing actually happened.
+        if (context.SourceEntityId is null)
+            return Result.Failure(Error.Validation("This task has no associated leave request."));
+
+        if (context.OutcomeDecision is null)
+            return Result.Failure(Error.Validation("A decision (Approve or Reject) is required to complete this task."));
 
         if (context.OutcomeDecision == "Approve")
         {
-            await leaveApprovalService.ApproveAsync(
+            return await leaveApprovalService.ApproveAsync(
                 context.CompanyId,
                 context.SourceEntityId.Value,
                 context.CompletedBy,
                 cancellationToken);
         }
-        else if (context.OutcomeDecision == "Reject")
+
+        if (context.OutcomeDecision == "Reject")
         {
-            await leaveApprovalService.RejectAsync(
+            return await leaveApprovalService.RejectAsync(
                 context.CompanyId,
                 context.SourceEntityId.Value,
                 context.CompletedBy,
                 context.OutcomeReason,
                 cancellationToken);
         }
+
+        return Result.Failure(Error.Validation($"'{context.OutcomeDecision}' is not a valid decision for this task."));
     }
 }

@@ -18,6 +18,16 @@ public class CompleteTaskHandlerTests
     private static readonly TaskCompletionDispatcher NoOpDispatcher =
         new(Enumerable.Empty<ITaskCompletionAction>());
 
+    /// <summary>Stub ITaskCompletionAction used to simulate a failing/succeeding dispatch action
+    /// for a given (Source, ActionType) pair, e.g. TaskSource.Leave / TaskActionType.Approve.</summary>
+    private sealed class StubCompletionAction(TaskSource source, TaskActionType actionType, Result result) : ITaskCompletionAction
+    {
+        public TaskSource Source => source;
+        public TaskActionType ActionType => actionType;
+        public Task<Result> ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken) =>
+            Task.FromResult(result);
+    }
+
     private static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");
     private static readonly Guid CompanyAdministratorRoleId = new("00000000-0000-0000-0000-000000000006");
 
@@ -26,8 +36,9 @@ public class CompleteTaskHandlerTests
         FakeAuditPublisher? audit = null,
         FakeNotificationWriter? notif = null,
         FakeRoleAuthorizationService? authorizationService = null,
-        FakeDirectReportsReader? directReportsReader = null) =>
-        new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher(), NoOpDispatcher,
+        FakeDirectReportsReader? directReportsReader = null,
+        TaskCompletionDispatcher? dispatcher = null) =>
+        new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher(), dispatcher ?? NoOpDispatcher,
             // Defaults to an HR-Administrator caller so tests unrelated to SEC-003/IAM-07
             // authorization (pre-existing behavior around completion/notification/audit) don't
             // need to wire up assignee/manager relationships just to get past the authorization
@@ -145,6 +156,143 @@ public class CompleteTaskHandlerTests
         await context.SaveChangesAsync();
 
         var result = await BuildHandler(context).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Completed", result.Value!.Status);
+    }
+
+    // ---- Ticket 3 (P1): dispatch-before-complete ----
+
+    [Fact]
+    public async Task HandleAsync_Returns_Failure_And_Leaves_Task_Open_When_Dispatch_Fails()
+    {
+        // A leave-approval task with a missing/invalid OutcomeDecision (simulated here via a stub
+        // action returning a validation failure) must not complete the underlying TaskItem — it
+        // must stay in its prior (Open) status so it remains actionable.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Review leave request", null, TaskPriority.Medium, TaskSource.Leave, TaskActionType.Approve,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow, sourceEntityId: Guid.NewGuid());
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var failingDispatcher = new TaskCompletionDispatcher(
+            [new StubCompletionAction(TaskSource.Leave, TaskActionType.Approve,
+                Result.Failure(Error.Validation("A decision (Approve or Reject) is required to complete this task.")))]);
+
+        var result = await BuildHandler(context, dispatcher: failingDispatcher).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = assignedEmployee },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+
+        var persisted = await context.TaskItems.AsNoTracking().SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(TaskItemStatus.Open, persisted.Status);
+        Assert.Null(persisted.CompletedBy);
+        Assert.Null(persisted.CompletedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Save_Complete_Notification_Or_Audit_When_Dispatch_Fails()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+        var audit = new FakeAuditPublisher();
+        var notif = new FakeNotificationWriter();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Review leave request", null, TaskPriority.Medium, TaskSource.Leave, TaskActionType.Approve,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow, sourceEntityId: Guid.NewGuid());
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var failingDispatcher = new TaskCompletionDispatcher(
+            [new StubCompletionAction(TaskSource.Leave, TaskActionType.Approve,
+                Result.Failure(Error.Conflict("The leave request is no longer pending.")))]);
+
+        var result = await BuildHandler(context, audit, notif, dispatcher: failingDispatcher).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = assignedEmployee },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Empty(audit.Published);
+        Assert.Empty(notif.Written);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Completes_Task_When_Dispatch_Succeeds()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Review leave request", null, TaskPriority.Medium, TaskSource.Leave, TaskActionType.Approve,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow, sourceEntityId: Guid.NewGuid());
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var succeedingDispatcher = new TaskCompletionDispatcher(
+            [new StubCompletionAction(TaskSource.Leave, TaskActionType.Approve, Result.Success())]);
+
+        var result = await BuildHandler(context, dispatcher: succeedingDispatcher).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = assignedEmployee, OutcomeDecision = "Approve" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Completed", result.Value!.Status);
+
+        var persisted = await context.TaskItems.AsNoTracking().SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(TaskItemStatus.Completed, persisted.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Completes_Ordinary_Task_With_No_Registered_Action()
+    {
+        // A plain task with a Source/ActionType that has no registered completion action (the
+        // ordinary/default case for most tasks) must still complete normally.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+
+        var task = MakeTask(companyId, TaskItemStatus.Open);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var result = await BuildHandler(context, dispatcher: NoOpDispatcher).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = completedBy },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Completed", result.Value!.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_ReDispatch_When_Task_Already_Completed()
+    {
+        // Idempotency guard: re-completing an already-Completed task must not re-invoke dispatch
+        // (and therefore cannot be tripped up by a dispatcher that would now fail).
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var task = MakeTask(companyId, TaskItemStatus.Completed);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var alwaysFailingDispatcher = new TaskCompletionDispatcher(
+            [new StubCompletionAction(task.Source, task.ActionType, Result.Failure(Error.Validation("should not run")))]);
+
+        var result = await BuildHandler(context, dispatcher: alwaysFailingDispatcher).HandleAsync(
             new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = Guid.NewGuid() },
             CancellationToken.None);
 

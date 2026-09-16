@@ -33,10 +33,10 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
     public TaskSource Source => TaskSource.Offboarding;
     public TaskActionType ActionType => TaskActionType.Complete;
 
-    public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
+    public async Task<Result> ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {
         if (context.SourceEntityId is null)
-            return;
+            return Result.Failure(Error.Validation("This task has no associated offboarding task."));
 
         var offboardingTask = await dbContext.OffboardingTasks
             .FirstOrDefaultAsync(
@@ -44,10 +44,11 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
                 cancellationToken);
 
         if (offboardingTask is null)
-            return;
+            return Result.Failure(Error.NotFound("The associated offboarding task was not found."));
 
+        // Already resolved (e.g. a retried/duplicated completion) — a safe, idempotent no-op.
         if (offboardingTask.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped)
-            return;
+            return Result.Success();
 
         var plan = await dbContext.OffboardingPlans
             .FirstOrDefaultAsync(p => p.Id == offboardingTask.OffboardingPlanId, cancellationToken);
@@ -66,7 +67,7 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
                     "Offboarding task {OffboardingTaskId} could not be skipped: no reason was " +
                     "supplied. Leaving the offboarding task outstanding.",
                     offboardingTask.Id);
-                return;
+                return Result.Failure(Error.Validation("A reason is required to skip this task."));
             }
 
             offboardingTask.Skip(clock.UtcNowOffset(), context.OutcomeReason, context.CompletedBy);
@@ -94,7 +95,7 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
 
             if (plan is not null)
                 await TryCompletePlanAsync(offboardingTask, cancellationToken, plan, context.CompletedBy);
-            return;
+            return Result.Success();
         }
 
         if (plan is null)
@@ -103,7 +104,7 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
             // completion. Fall back to the plain completion below (matches prior behaviour).
             offboardingTask.Complete(clock.UtcNowOffset());
             await dbContext.SaveChangesAsync(cancellationToken);
-            return;
+            return Result.Success();
         }
 
         // OFF-04: an asset-return checklist item must actually return (or explicitly write off) the
@@ -142,7 +143,8 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
                     "employee {EmployeeId}) could not be completed: asset assignment " +
                     "{AssetAssignmentId} returned {Result}. Leaving the offboarding task outstanding.",
                     offboardingTask.Id, plan.Id, plan.EmployeeId, offboardingTask.AssetAssignmentId, returnResult);
-                return;
+                return Result.Failure(Error.Validation(
+                    $"The asset assignment could not be returned ({returnResult})."));
             }
 
             // Success or AlreadyReturned (the assignment was already closed by another path, e.g.
@@ -170,6 +172,8 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
             cancellationToken);
 
         await TryCompletePlanAsync(offboardingTask, cancellationToken, plan, context.CompletedBy);
+
+        return Result.Success();
     }
 
     // OFF-07: shared tail for both the ordinary Complete path and the new Skip path — either

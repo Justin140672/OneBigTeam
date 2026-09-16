@@ -9,15 +9,17 @@ internal sealed class AssetReturnTaskCompletionAction(IAssetReturnService assetR
     public TaskSource Source => TaskSource.Asset;
     public TaskActionType ActionType => TaskActionType.Return;
 
-    public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
+    public async Task<Result> ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {
         if (context.SourceEntityId is null)
-            return;
+            return Result.Failure(Error.Validation("This task has no associated asset assignment."));
 
         await assetReturnService.ReturnAsync(
             context.CompanyId,
             context.SourceEntityId.Value,
             context.CompletedBy,
             cancellationToken);
+
+        return Result.Success();
     }
 }

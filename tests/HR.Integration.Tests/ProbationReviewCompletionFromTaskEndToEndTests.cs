@@ -121,12 +121,14 @@ public class ProbationReviewCompletionFromTaskEndToEndTests
     }
 
     /// <summary>
-    /// PROB-05: a malformed/garbage OutcomeDecision string on a FinalDecision review completes the
-    /// underlying Task (Tasks module completion itself is outside Probation's control) but the
-    /// Probation review is left Pending and the record's status/outcome fields are left untouched.
+    /// Ticket 3 (P1): a malformed/garbage OutcomeDecision string on a FinalDecision review now
+    /// aborts the underlying task completion entirely (dispatch runs BEFORE the TaskItem is marked
+    /// Completed) — the endpoint returns an error, the generic Task stays Open/actionable, and the
+    /// Probation review is left Pending with the record's status/outcome fields untouched. This
+    /// supersedes the pre-fix behavior where the Task silently completed anyway.
     /// </summary>
     [Fact]
-    public async Task CompleteTask_With_Malformed_OutcomeDecision_Completes_Task_But_Leaves_Review_Pending()
+    public async Task CompleteTask_With_Malformed_OutcomeDecision_Returns_Error_And_Leaves_Task_And_Review_Pending()
     {
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(User1, companyId);
@@ -144,7 +146,13 @@ public class ProbationReviewCompletionFromTaskEndToEndTests
         var completeResponse = await client.PostAsync(
             $"/api/companies/{companyId}/tasks/{taskId}/complete",
             Json(new { outcomeDecision = "garbage", outcomeReason = (string?)null }));
-        completeResponse.EnsureSuccessStatusCode();
+
+        Assert.False(completeResponse.IsSuccessStatusCode);
+
+        var taskResponse = await client.GetAsync($"/api/companies/{companyId}/tasks/{taskId}");
+        taskResponse.EnsureSuccessStatusCode();
+        var task = await taskResponse.Content.ReadFromJsonAsync<TaskDetailPayload>();
+        Assert.NotEqual("Completed", task!.Status);
 
         var review = await GetSingleReviewAsync(client, companyId, recordId);
         Assert.Equal("Pending", review.Status);
@@ -153,6 +161,47 @@ public class ProbationReviewCompletionFromTaskEndToEndTests
 
         var record = await GetRecordAsync(client, companyId, recordId);
         Assert.Equal("Active", record.Status);
+    }
+
+    /// <summary>
+    /// Ticket 3 (P1): same dispatch-before-complete ordering, but for an invalid (backwards)
+    /// extension date — the task must remain completable and the review/record untouched.
+    /// </summary>
+    [Fact]
+    public async Task CompleteTask_With_Extend_Date_Not_After_Current_ExpectedEndDate_Returns_Error_And_Leaves_Task_And_Review_Pending()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(User2, companyId);
+
+        var (recordId, reviewId) = await CreateRecordAndReviewAsync(client, companyId, "FinalDecision");
+        var record = await GetRecordAsync(client, companyId, recordId);
+
+        var taskId = await TaskSeeder.SeedAsync(
+            _factory, companyId,
+            title: "Complete probation review — Test Employee",
+            source: TaskSource.Probation,
+            actionType: TaskActionType.Review,
+            sourceEntityId: reviewId,
+            assignedEmployeeId: Guid.NewGuid());
+
+        // The seeded record's expectedEndDate is 2026-04-01 — an extend date equal to it does not
+        // move the date strictly forward, tripping the same guard as CompleteProbationReviewFromTaskAction.
+        var completeResponse = await client.PostAsync(
+            $"/api/companies/{companyId}/tasks/{taskId}/complete",
+            Json(new { outcomeDecision = "Extend|2026-04-01", outcomeReason = "No actual extension." }));
+
+        Assert.False(completeResponse.IsSuccessStatusCode);
+
+        var taskResponse = await client.GetAsync($"/api/companies/{companyId}/tasks/{taskId}");
+        taskResponse.EnsureSuccessStatusCode();
+        var task = await taskResponse.Content.ReadFromJsonAsync<TaskDetailPayload>();
+        Assert.NotEqual("Completed", task!.Status);
+
+        var review = await GetSingleReviewAsync(client, companyId, recordId);
+        Assert.Equal("Pending", review.Status);
+
+        var reloadedRecord = await GetRecordAsync(client, companyId, recordId);
+        Assert.Equal("Active", reloadedRecord.Status);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
@@ -220,6 +269,7 @@ public class ProbationReviewCompletionFromTaskEndToEndTests
         new(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
     private sealed record IdPayload(Guid Id);
+    private sealed record TaskDetailPayload(Guid Id, string Status);
     private sealed record RecordDetailPayload(Guid Id, string Status);
     private sealed record ReviewListPayload(IReadOnlyList<ReviewDetailPayload> Items);
     private sealed record ReviewDetailPayload(

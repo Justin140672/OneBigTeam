@@ -58,9 +58,14 @@ public class CompleteReturnToWorkReviewFromTaskActionTests
         var action = BuildAction(db);
         var completedBy = Guid.NewGuid();
 
-        await action.ExecuteAsync(
+        var result = await action.ExecuteAsync(
             BuildCompletionContext(CompanyId, review.Id, completedBy, "Fit to return"),
             CancellationToken.None);
+
+        // This action always reports Success() (it has no required decision to validate) — the
+        // generic Tasks-module task itself still completes, only the ReturnToWorkReview stays
+        // Pending until reviewed via the dedicated endpoint.
+        Assert.True(result.IsSuccess);
 
         var updated = await db.ReturnToWorkReviews.FindAsync(review.Id);
         Assert.Equal(ReturnToWorkReviewStatus.Pending, updated!.Status);

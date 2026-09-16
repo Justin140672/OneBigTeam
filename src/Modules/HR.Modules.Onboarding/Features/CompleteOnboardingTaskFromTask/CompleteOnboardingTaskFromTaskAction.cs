@@ -23,10 +23,10 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
     public TaskSource Source => TaskSource.Onboarding;
     public TaskActionType ActionType => TaskActionType.Complete;
 
-    public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
+    public async Task<Result> ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {
         if (context.SourceEntityId is null)
-            return;
+            return Result.Failure(Error.Validation("This task has no associated onboarding task."));
 
         var onboardingTask = await dbContext.OnboardingTasks
             .FirstOrDefaultAsync(
@@ -34,10 +34,11 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
                 cancellationToken);
 
         if (onboardingTask is null)
-            return;
+            return Result.Failure(Error.NotFound("The associated onboarding task was not found."));
 
+        // Already resolved (e.g. a retried/duplicated completion) — a safe, idempotent no-op.
         if (onboardingTask.Status is OnboardingTaskStatus.Completed or OnboardingTaskStatus.Skipped)
-            return;
+            return Result.Success();
 
         onboardingTask.Complete(clock.UtcNowOffset());
 
@@ -47,7 +48,7 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
         if (plan is null)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
-            return;
+            return Result.Success();
         }
 
         var now = clock.UtcNowOffset();
@@ -90,6 +91,8 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
                 new OnboardingCompletedIntegrationEvent(plan.CompanyId, plan.EmployeeId, plan.Id, now),
                 cancellationToken);
         }
+
+        return Result.Success();
     }
 
     private async Task NotifyOnboardingStartedAsync(OnboardingPlan plan, DateTimeOffset now, CancellationToken cancellationToken)

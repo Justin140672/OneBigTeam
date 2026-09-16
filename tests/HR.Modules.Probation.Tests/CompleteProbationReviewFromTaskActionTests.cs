@@ -161,8 +161,11 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, Guid.NewGuid(), sourceEntityId: null);
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var review = await context.ProbationReviews.SingleAsync();
         Assert.Equal(ProbationReviewStatus.Pending, review.Status);
@@ -178,8 +181,11 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, Guid.NewGuid(), sourceEntityId: Guid.NewGuid());
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
 
         var review = await context.ProbationReviews.SingleAsync();
         Assert.Equal(ProbationReviewStatus.Pending, review.Status);
@@ -188,6 +194,9 @@ public class CompleteProbationReviewFromTaskActionTests
     [Fact]
     public async Task ExecuteAsync_Does_Nothing_When_Review_Already_Completed()
     {
+        // Already-resolved (e.g. via the direct API path, or a retried task completion) is a safe,
+        // idempotent no-op — it returns Result.Success() rather than a failure, so a legitimate
+        // retry of an already-fully-applied completion isn't rejected.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
@@ -198,8 +207,10 @@ public class CompleteProbationReviewFromTaskActionTests
         var completedBy = Guid.NewGuid();
         var taskContext = BuildContext(companyId, completedBy, review.Id, notes: "Late completion.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
 
         var saved = await context.ProbationReviews.SingleAsync();
         Assert.NotEqual(completedBy, saved.CompletedByEmployeeId);
@@ -346,8 +357,12 @@ public class CompleteProbationReviewFromTaskActionTests
             outcomeDecision: "Extend|2026-10-07",
             notes: "Stale task.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
+
+        // Cancelled is a non-Pending status — same idempotent-no-op guard as the
+        // already-completed case, so this is a Success no-op, not a failure.
+        Assert.True(result.IsSuccess);
 
         var saved = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
         Assert.Equal(ProbationReviewStatus.Cancelled, saved.Status);
@@ -428,8 +443,11 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "garbage", notes: "Bad payload.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var savedReview = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
         Assert.Equal(ProbationReviewStatus.Pending, savedReview.Status);
@@ -450,8 +468,11 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: null);
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var savedReview = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
         Assert.Equal(ProbationReviewStatus.Pending, savedReview.Status);
@@ -471,8 +492,11 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Pass", notes: "Wrong outcome for this review type.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var savedReview = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
         Assert.Equal(ProbationReviewStatus.Pending, savedReview.Status);
@@ -484,6 +508,9 @@ public class CompleteProbationReviewFromTaskActionTests
     [Fact]
     public async Task ExecuteAsync_Leaves_ManagerCheckIn_Review_Pending_When_Outcome_Is_Set()
     {
+        // Negated branch of the same guard as the test above: ManagerCheckIn/HrReview must NOT
+        // accept a Pass/Fail/Extend outcome at all (the "review type does not accept a decision"
+        // branch), as distinct from FinalDecision/ExtensionConfirmation requiring one.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var completedBy = Guid.NewGuid();
@@ -492,8 +519,11 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Pass", notes: "Outcome not allowed on this review type.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var savedReview = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
         Assert.Equal(ProbationReviewStatus.Pending, savedReview.Status);
@@ -513,8 +543,11 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Extend|not-a-date", notes: "Malformed.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var savedReview = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
         Assert.Equal(ProbationReviewStatus.Pending, savedReview.Status);
@@ -534,8 +567,11 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Extend|", notes: "Malformed.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var savedReview = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
         Assert.Equal(ProbationReviewStatus.Pending, savedReview.Status);
@@ -547,6 +583,7 @@ public class CompleteProbationReviewFromTaskActionTests
     [Fact]
     public async Task ExecuteAsync_Leaves_Review_Pending_When_Extend_Date_Equal_To_Current_ExpectedEndDate()
     {
+        // Boundary: extend date == current ExpectedEndDate must fail (not strictly after).
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var completedBy = Guid.NewGuid();
@@ -559,8 +596,11 @@ public class CompleteProbationReviewFromTaskActionTests
             outcomeDecision: $"Extend|{record.ExpectedEndDate:yyyy-MM-dd}",
             notes: "No actual extension.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var savedReview = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
         Assert.Equal(ProbationReviewStatus.Pending, savedReview.Status);
@@ -571,8 +611,35 @@ public class CompleteProbationReviewFromTaskActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_Succeeds_When_Extend_Date_Is_One_Day_After_Current_ExpectedEndDate()
+    {
+        // Boundary counterpart to the test above: ExpectedEndDate + 1 day is strictly after, so it
+        // must succeed — pins the exact inclusive/exclusive edge of the ">" comparison.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+        var newEndDate = record.ExpectedEndDate.AddDays(1);
+
+        var taskContext = BuildContext(companyId, completedBy, review.Id,
+            outcomeDecision: $"Extend|{newEndDate:yyyy-MM-dd}",
+            notes: "Minimal extension.");
+
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+            .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedRecord = await context.ProbationRecords.SingleAsync(r => r.Id == record.Id);
+        Assert.Equal(ProbationStatus.Extended, savedRecord.Status);
+        Assert.Equal(newEndDate, savedRecord.ExpectedEndDate);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_Leaves_Review_Pending_When_Extend_Date_Not_After_DecisionDate_Today()
     {
+        // Boundary: extend date == today (the decision date) must fail (not strictly after).
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var completedBy = Guid.NewGuid();
@@ -586,8 +653,11 @@ public class CompleteProbationReviewFromTaskActionTests
             outcomeDecision: $"Extend|{Today:yyyy-MM-dd}",
             notes: "Backdated to today.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
+        var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var savedReview = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
         Assert.Equal(ProbationReviewStatus.Pending, savedReview.Status);

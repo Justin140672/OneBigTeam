@@ -101,6 +101,33 @@ internal sealed class CompleteTaskHandler(
         var wasAlreadyCompleted = task.Status == TaskItemStatus.Completed;
 
         var now = clock.UtcNowOffset();
+
+        // Ticket 3 (P1): validate/execute the underlying business action BEFORE the task is marked
+        // Completed and saved. A previous version completed the task first, then discovered
+        // rejected/invalid outcomes too late to do anything but silently leave the task Completed
+        // with no matching business-state change (e.g. a rejected leave approval, or a malformed
+        // probation extension). Dispatching first means a failure here leaves the task untouched —
+        // still Open/InProgress and actionable — and the caller gets a real error back.
+        if (!wasAlreadyCompleted)
+        {
+            var dispatchResult = await dispatcher.DispatchAsync(new TaskCompletionContext(
+                task.CompanyId,
+                task.Id,
+                task.Title,
+                task.Description,
+                task.Source,
+                task.ActionType,
+                task.AssignedEmployeeId,
+                request.CompletedBy,
+                now,
+                task.SourceEntityId,
+                request.OutcomeDecision,
+                request.OutcomeReason), cancellationToken);
+
+            if (!dispatchResult.IsSuccess)
+                return Result.Failure<CompleteTaskResponse>(dispatchResult.Error);
+        }
+
         task.Complete(request.CompletedBy, now);
 
         // Built from in-memory values ahead of the save, so it can double as both the response and
@@ -165,20 +192,6 @@ internal sealed class CompleteTaskHandler(
             previousStatus,
             task.AssignedEmployeeId,
             task.CompletedAt!.Value), cancellationToken);
-
-        await dispatcher.DispatchAsync(new TaskCompletionContext(
-            task.CompanyId,
-            task.Id,
-            task.Title,
-            task.Description,
-            task.Source,
-            task.ActionType,
-            task.AssignedEmployeeId,
-            task.CompletedBy!.Value,
-            task.CompletedAt!.Value,
-            task.SourceEntityId,
-            request.OutcomeDecision,
-            request.OutcomeReason), cancellationToken);
 
         return Result.Success(response);
     }

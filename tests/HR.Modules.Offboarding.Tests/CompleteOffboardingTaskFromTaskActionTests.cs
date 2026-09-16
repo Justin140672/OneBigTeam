@@ -323,7 +323,10 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var (action, notifications, taskCreator, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, sourceEntityId: null);
 
-        await action.ExecuteAsync(context, CancellationToken.None);
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == task.Id);
         Assert.Equal(OffboardingTaskStatus.Pending, savedTask.Status);
@@ -350,7 +353,10 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var (action, _, taskCreator, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, sourceEntityId: Guid.NewGuid());
 
-        await action.ExecuteAsync(context, CancellationToken.None);
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
 
         var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == task.Id);
         Assert.Equal(OffboardingTaskStatus.Pending, savedTask.Status);
@@ -499,7 +505,12 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var (action, _, taskCreator, auditPublisher, _) = BuildAction(dbContext, assetReturnService: assetReturnService);
         var context = BuildTaskContext(companyId, task.Id);
 
-        await action.ExecuteAsync(context, CancellationToken.None);
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        // Ticket 3 (P1): an asset-return failure during offboarding must now surface as a real
+        // Result.Failure rather than silently leaving the task open with no error reported.
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == task.Id);
         Assert.Equal(OffboardingTaskStatus.Pending, savedTask.Status);
@@ -728,9 +739,15 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var (action, _, taskCreator, auditPublisher, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, task.Id, outcomeDecision: "Skip", outcomeReason: outcomeReason);
 
-        var exception = await Record.ExceptionAsync(() => action.ExecuteAsync(context, CancellationToken.None));
+        Result result = default!;
+        var exception = await Record.ExceptionAsync(async () => result = await action.ExecuteAsync(context, CancellationToken.None));
 
         Assert.Null(exception);
+        // Ticket 3 (P1): a Skip with no reason now returns Result.Failure instead of silently
+        // leaving the offboarding task open while the generic Tasks-module task completes anyway.
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+
         var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == task.Id);
         Assert.Equal(OffboardingTaskStatus.Pending, savedTask.Status);
         Assert.Null(savedTask.SkipReason);

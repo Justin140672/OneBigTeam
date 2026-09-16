@@ -85,7 +85,10 @@ public class SicknessEvidenceUploadCompletionActionTests
         var (record, _) = await SeedData(db);
         var action = BuildAction(db);
 
-        await action.ExecuteAsync(BuildCompletionContext(CompanyId, sourceEntityId: null), CancellationToken.None);
+        var result = await action.ExecuteAsync(BuildCompletionContext(CompanyId, sourceEntityId: null), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
 
         var updatedRecord = await db.SicknessRecords.FindAsync(record.Id);
         Assert.Equal(SicknessEvidenceStatus.Pending, updatedRecord!.EvidenceStatus);
@@ -98,7 +101,10 @@ public class SicknessEvidenceUploadCompletionActionTests
         var (record, _) = await SeedData(db);
         var action = BuildAction(db);
 
-        await action.ExecuteAsync(BuildCompletionContext(CompanyId, Guid.NewGuid()), CancellationToken.None);
+        var result = await action.ExecuteAsync(BuildCompletionContext(CompanyId, Guid.NewGuid()), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
 
         var updatedRecord = await db.SicknessRecords.FindAsync(record.Id);
         Assert.Equal(SicknessEvidenceStatus.Pending, updatedRecord!.EvidenceStatus);

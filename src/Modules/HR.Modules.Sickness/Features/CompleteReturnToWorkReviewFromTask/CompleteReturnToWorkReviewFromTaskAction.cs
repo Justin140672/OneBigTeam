@@ -1,6 +1,7 @@
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Persistence;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Features.CompleteReturnToWorkReviewFromTask;
@@ -31,10 +32,10 @@ internal sealed class CompleteReturnToWorkReviewFromTaskAction(SicknessDbContext
     public TaskSource Source => TaskSource.Sickness;
     public TaskActionType ActionType => TaskActionType.Review;
 
-    public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
+    public async Task<Result> ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {
         if (context.SourceEntityId is null)
-            return;
+            return Result.Success();
 
         var review = await dbContext.ReturnToWorkReviews
             .AsNoTracking()
@@ -43,9 +44,11 @@ internal sealed class CompleteReturnToWorkReviewFromTaskAction(SicknessDbContext
                 cancellationToken);
 
         if (review is null || review.Status == ReturnToWorkReviewStatus.Completed)
-            return;
+            return Result.Success();
 
         // No structured outcome available on this path — see class remarks. Deliberately not
-        // completing the review here.
+        // completing the review here; this is an intentional no-op, not a failure, since the
+        // generic "complete task" path was never meant to carry a fit-to-return decision.
+        return Result.Success();
     }
 }

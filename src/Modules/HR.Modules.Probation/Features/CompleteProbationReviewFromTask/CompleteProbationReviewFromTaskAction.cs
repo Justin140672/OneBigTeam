@@ -19,23 +19,32 @@ internal sealed class CompleteProbationReviewFromTaskAction(
     public TaskSource Source => TaskSource.Probation;
     public TaskActionType ActionType => TaskActionType.Review;
 
-    public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
+    public async Task<Result> ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {
-        if (context.SourceEntityId is null) return;
+        if (context.SourceEntityId is null)
+            return Result.Failure(Error.Validation("This task has no associated probation review."));
 
         var review = await dbContext.ProbationReviews
             .FirstOrDefaultAsync(
                 r => r.Id == context.SourceEntityId && r.CompanyId == context.CompanyId,
                 cancellationToken);
 
-        if (review is null || review.Status != ProbationReviewStatus.Pending) return;
+        if (review is null)
+            return Result.Failure(Error.NotFound("The associated probation review was not found."));
+
+        // Already resolved (e.g. via the direct CompleteProbationReview API path, or a retried
+        // completion) — a safe, idempotent no-op rather than a failure, so a legitimate retry of an
+        // already-fully-applied completion isn't rejected.
+        if (review.Status != ProbationReviewStatus.Pending)
+            return Result.Success();
 
         var record = await dbContext.ProbationRecords
             .FirstOrDefaultAsync(
                 r => r.Id == review.ProbationRecordId && r.CompanyId == context.CompanyId,
                 cancellationToken);
 
-        if (record is null) return;
+        if (record is null)
+            return Result.Failure(Error.NotFound("The associated probation record was not found."));
 
         var now          = clock.UtcNowOffset();
         var decisionDate = DateOnly.FromDateTime(now.DateTime);
@@ -50,27 +59,32 @@ internal sealed class CompleteProbationReviewFromTaskAction(
         // always means "malformed or absent" for this review's required outcome shape.
         if (review.ReviewType == ProbationReviewType.FinalDecision
             && outcome is not (ProbationOutcome.Pass or ProbationOutcome.Fail or ProbationOutcome.Extend))
-            return;
+            return Result.Failure(Error.Validation(
+                "A decision of Pass, Fail, or Extend is required to complete this review."));
 
         if (review.ReviewType == ProbationReviewType.ExtensionConfirmation
             && outcome != ProbationOutcome.Extend)
-            return;
+            return Result.Failure(Error.Validation(
+                "An Extend decision with a valid extension date is required to complete this review."));
 
         if (review.ReviewType is not (ProbationReviewType.FinalDecision or ProbationReviewType.ExtensionConfirmation)
             && outcome.HasValue)
-            return;
+            return Result.Failure(Error.Validation(
+                "This review type does not accept a Pass/Fail/Extend decision."));
 
         // An Extend outcome without a parseable extension date is malformed — reject rather than
         // silently completing the review with no effective extension.
         if (outcome == ProbationOutcome.Extend && !extensionEndDate.HasValue)
-            return;
+            return Result.Failure(Error.Validation(
+                "A valid extension end date is required to extend probation."));
 
         // PROB-05: extension end date must move strictly forward against both the record's
         // current expected end date and the decision date — same rule as the direct API path
         // (CompleteProbationReviewHandler). Reject without mutating anything if violated.
         if (outcome == ProbationOutcome.Extend
             && (extensionEndDate!.Value <= record.ExpectedEndDate || extensionEndDate.Value <= decisionDate))
-            return;
+            return Result.Failure(Error.Validation(
+                "The extension end date must be after both the current expected end date and today."));
 
         var previousExpectedEndDate = record.ExpectedEndDate;
         var extensionReason = context.OutcomeReason ?? "Probation extended.";
@@ -146,6 +160,8 @@ internal sealed class CompleteProbationReviewFromTaskAction(
             await ProbationOutcomeNotifier.NotifyAsync(
                 notificationWriter, record, review, now, cancellationToken);
         }
+
+        return Result.Success();
     }
 
     // OutcomeDecision is "Pass", "Fail", or "Extend|yyyy-MM-dd".

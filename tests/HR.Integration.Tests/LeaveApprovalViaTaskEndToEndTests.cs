@@ -234,6 +234,108 @@ public class LeaveApprovalViaTaskEndToEndTests
         Assert.Equal(25m, balance.RemainingDays);
     }
 
+    /// <summary>
+    /// Ticket 3 (P1): completing a leave-approval task with a missing OutcomeDecision must fail —
+    /// dispatch now runs BEFORE the underlying TaskItem is marked Completed, so the task stays
+    /// Open/actionable and the leave request stays Pending rather than the task silently completing
+    /// with no matching leave decision.
+    /// </summary>
+    [Fact]
+    public async Task Completing_Leave_Approval_Task_With_Missing_OutcomeDecision_Returns_Error_And_Leaves_Task_Open()
+    {
+        var companyId  = Guid.NewGuid();
+        var managerId  = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Employee);
+
+        using var adminClient   = await AuthenticatedClient(AdminUser, companyId);
+        using var managerClient = await AuthenticatedClient(managerId, companyId);
+
+        var leaveTypeId = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
+            db.LeaveTypes.Add(LeaveType.Create(
+                leaveTypeId, companyId, "Annual Leave", "ANNUAL", 25,
+                AccrualMethod.None, LeaveTypeBehaviour.Standard, DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+
+        var policyResp = await adminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"Policy {Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
+        policyResp.EnsureSuccessStatusCode();
+        var policy = await policyResp.Content.ReadFromJsonAsync<IdPayload>();
+
+        var refData      = await CreateReferenceDataAsync(adminClient, companyId);
+        var managerEmpId = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Manager", refData, managerId);
+        var empId        = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Employee", refData);
+
+        var managerAssignResp = await adminClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{empId}/manager",
+            new { companyId, id = empId, managerId = managerEmpId });
+        managerAssignResp.EnsureSuccessStatusCode();
+
+        var policyAssignResp = await adminClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{empId}/leave-policy",
+            new { companyId, employeeId = empId, leavePolicyId = policy!.Id, effectiveFrom = "2026-01-01" });
+        policyAssignResp.EnsureSuccessStatusCode();
+
+        await EnsureBalanceAsync(companyId, empId, leaveTypeId, policy.Id);
+
+        var submitResp = await adminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{empId}/leave-requests",
+            new
+            {
+                companyId,
+                employeeId = empId,
+                leaveTypeId,
+                startDate = "2026-10-05",
+                startPart = "FullDay",
+                endDate   = "2026-10-09",
+                endPart   = "FullDay",
+                reason    = "Missing decision test"
+            });
+        submitResp.EnsureSuccessStatusCode();
+        var leaveRequest = await submitResp.Content.ReadFromJsonAsync<LeaveRequestPayload>();
+
+        var managerTasks = await GetEmployeeTasksAsync(adminClient, companyId, managerEmpId);
+        var approvalTask = Assert.Single(
+            managerTasks,
+            t => t.Source == "Leave" && t.ActionType == "Approve" && t.SourceEntityId == leaveRequest!.Id);
+
+        // No outcomeDecision supplied at all.
+        var completeResp = await managerClient.PostAsync(
+            $"/api/companies/{companyId}/tasks/{approvalTask.Id}/complete",
+            Json(new { }));
+
+        Assert.False(completeResp.IsSuccessStatusCode);
+
+        // The task must still be Open, and therefore still completable with a real decision later.
+        var refetchedTasks = await GetEmployeeTasksAsync(adminClient, companyId, managerEmpId);
+        var stillOpenTask = Assert.Single(refetchedTasks, t => t.Id == approvalTask.Id);
+        Assert.Equal("Open", stillOpenTask.Status);
+
+        var listResp = await adminClient.GetAsync(
+            $"/api/companies/{companyId}/employees/{empId}/leave-requests");
+        listResp.EnsureSuccessStatusCode();
+        var list = await listResp.Content.ReadFromJsonAsync<LeaveListPayload>();
+        var request = Assert.Single(list!.Items);
+        Assert.Equal("Pending", request.Status);
+
+        // A retried completion with a valid decision must still succeed — the earlier failed
+        // attempt must not have left the task or leave request in a stuck state.
+        var retryResp = await managerClient.PostAsync(
+            $"/api/companies/{companyId}/tasks/{approvalTask.Id}/complete",
+            Json(new { outcomeDecision = "Approve" }));
+        retryResp.EnsureSuccessStatusCode();
+
+        var listAfterRetryResp = await adminClient.GetAsync(
+            $"/api/companies/{companyId}/employees/{empId}/leave-requests");
+        listAfterRetryResp.EnsureSuccessStatusCode();
+        var listAfterRetry = await listAfterRetryResp.Content.ReadFromJsonAsync<LeaveListPayload>();
+        Assert.Equal("Approved", Assert.Single(listAfterRetry!.Items).Status);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)

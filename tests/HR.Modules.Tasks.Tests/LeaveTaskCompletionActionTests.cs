@@ -38,10 +38,26 @@ public class LeaveTaskCompletionActionTests
         var leaveService = new FakeLeaveApprovalService();
         var action = new LeaveTaskCompletionAction(leaveService);
 
-        await action.ExecuteAsync(MakeContext("Approve"), CancellationToken.None);
+        var result = await action.ExecuteAsync(MakeContext("Approve"), CancellationToken.None);
 
         var call = Assert.Single(leaveService.Calls);
         Assert.Equal("Approve", call.Action);
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Approve_Propagates_Failure_From_ApproveAsync()
+    {
+        // Ticket 3 (P1): if the underlying leave approval service fails (e.g. the request is no
+        // longer Pending), the action must surface that failure rather than silently succeeding.
+        var failure = Result.Failure(Error.Conflict("The leave request is no longer pending."));
+        var leaveService = new FakeLeaveApprovalService(approveResult: failure);
+        var action = new LeaveTaskCompletionAction(leaveService);
+
+        var result = await action.ExecuteAsync(MakeContext("Approve"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
     }
 
     [Fact]
@@ -66,10 +82,24 @@ public class LeaveTaskCompletionActionTests
         var leaveService = new FakeLeaveApprovalService();
         var action = new LeaveTaskCompletionAction(leaveService);
 
-        await action.ExecuteAsync(MakeContext("Reject", "Sprint release week"), CancellationToken.None);
+        var result = await action.ExecuteAsync(MakeContext("Reject", "Sprint release week"), CancellationToken.None);
 
         var call = Assert.Single(leaveService.Calls);
         Assert.Equal("Reject", call.Action);
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Reject_Propagates_Failure_From_RejectAsync()
+    {
+        var failure = Result.Failure(Error.Conflict("The leave request is no longer pending."));
+        var leaveService = new FakeLeaveApprovalService(rejectResult: failure);
+        var action = new LeaveTaskCompletionAction(leaveService);
+
+        var result = await action.ExecuteAsync(MakeContext("Reject", "Too short-staffed"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
     }
 
     [Fact]
@@ -97,38 +127,61 @@ public class LeaveTaskCompletionActionTests
     // ── Guard clauses ──────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task ExecuteAsync_Does_Nothing_When_No_Decision()
+    public async Task ExecuteAsync_Returns_Validation_Failure_When_No_Decision()
     {
         var leaveService = new FakeLeaveApprovalService();
         var action = new LeaveTaskCompletionAction(leaveService);
 
-        await action.ExecuteAsync(MakeContext(outcomeDecision: null), CancellationToken.None);
+        var result = await action.ExecuteAsync(MakeContext(outcomeDecision: null), CancellationToken.None);
 
         Assert.Empty(leaveService.Calls);
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
     }
 
     [Fact]
-    public async Task ExecuteAsync_Does_Nothing_When_SourceEntityId_Is_Null()
+    public async Task ExecuteAsync_Returns_Validation_Failure_When_SourceEntityId_Is_Null()
     {
         var leaveService = new FakeLeaveApprovalService();
         var action = new LeaveTaskCompletionAction(leaveService);
 
         var context = MakeContext("Approve", sourceEntityId: null) with { SourceEntityId = null };
 
-        await action.ExecuteAsync(context, CancellationToken.None);
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
 
         Assert.Empty(leaveService.Calls);
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
     }
 
     [Fact]
-    public async Task ExecuteAsync_Does_Nothing_For_Unknown_Decision()
+    public async Task ExecuteAsync_Returns_Validation_Failure_For_Unknown_Decision()
     {
         var leaveService = new FakeLeaveApprovalService();
         var action = new LeaveTaskCompletionAction(leaveService);
 
-        await action.ExecuteAsync(MakeContext("Maybe"), CancellationToken.None);
+        var result = await action.ExecuteAsync(MakeContext("Maybe"), CancellationToken.None);
 
         Assert.Empty(leaveService.Calls);
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Returns_Validation_Failure_For_Whitespace_Only_Decision()
+    {
+        // NotEmpty-style guards must reject whitespace-only input, not just null/empty — the
+        // OutcomeDecision check here is a plain string comparison so whitespace falls through to
+        // the "unknown decision" branch rather than the "no decision" branch; either way it must
+        // fail, not silently no-op.
+        var leaveService = new FakeLeaveApprovalService();
+        var action = new LeaveTaskCompletionAction(leaveService);
+
+        var result = await action.ExecuteAsync(MakeContext("   "), CancellationToken.None);
+
+        Assert.Empty(leaveService.Calls);
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
     }
 
     [Fact]

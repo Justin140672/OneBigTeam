@@ -16,10 +16,10 @@ internal sealed class SicknessEvidenceUploadCompletionAction(
     public TaskSource Source => TaskSource.Sickness;
     public TaskActionType ActionType => TaskActionType.Upload;
 
-    public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
+    public async Task<Result> ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {
         if (context.SourceEntityId is null)
-            return;
+            return Result.Failure(Error.Validation("This task has no associated evidence request."));
 
         var evidenceRequest = await db.SicknessEvidenceRequests
             .FirstOrDefaultAsync(
@@ -28,10 +28,10 @@ internal sealed class SicknessEvidenceUploadCompletionAction(
                 cancellationToken);
 
         if (evidenceRequest is null)
-            return;
+            return Result.Failure(Error.NotFound("The associated evidence request was not found."));
 
         if (evidenceRequest.Status == SicknessEvidenceRequestStatus.Fulfilled)
-            return;
+            return Result.Success();
 
         var now = clock.UtcNowOffset();
 
@@ -61,5 +61,7 @@ internal sealed class SicknessEvidenceUploadCompletionAction(
                     OccurredAt:        now),
                 cancellationToken);
         }
+
+        return Result.Success();
     }
 }
