@@ -5,6 +5,7 @@ using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using HR.Modules.Recruitment.Domain;
 
 namespace HR.Modules.Recruitment.Features.MoveApplicationStage;
 
@@ -116,13 +117,24 @@ internal sealed class MoveApplicationStageHandler(
             application.CreatedAt,
             application.UpdatedAt);
 
+        // Ticket 14 (P2): SaveIdempotentWithConcurrencyAsync pins/advances application's version and
+        // translates a stale-save DbUpdateConcurrencyException the same way the non-idempotent
+        // branch below does — an Idempotency-Key must not bypass optimistic-concurrency protection.
+        const string conflictMessage = "This application was changed by someone else. Reload and try again.";
+
         if (request.IdempotencyKey is { } key)
         {
-            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, MoveApplicationStageResponse>(
-                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+            var outcome = await db.SaveIdempotentWithConcurrencyAsync<IdempotencyRecord, Application, MoveApplicationStageResponse>(
+                db.IdempotencyRecords, application, expectedVersion, scope, key, fingerprint!,
+                StatusCodes.Status200OK, response, now, cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+            switch (outcome.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(outcome.Response!);
+                case IdempotencyOutcomeKind.ConcurrencyConflict:
+                    return Result.Failure<MoveApplicationStageResponse>(Error.Concurrency(conflictMessage));
+            }
         }
         else
         {
@@ -130,8 +142,7 @@ internal sealed class MoveApplicationStageHandler(
             // (another generic move, or a named transition like Hire/Reject) that already saved
             // since we read is detected instead of silently overwritten.
             var saveResult = await db.SaveChangesWithConcurrencyAsync(
-                application, expectedVersion,
-                "This application was changed by someone else. Reload and try again.", cancellationToken);
+                application, expectedVersion, conflictMessage, cancellationToken);
 
             if (!saveResult.IsSuccess)
                 return Result.Failure<MoveApplicationStageResponse>(saveResult.Error);

@@ -10,6 +10,13 @@ public enum IdempotencyOutcomeKind
 
     /// <summary>The key was already used for a request with a different fingerprint (caller bug).</summary>
     KeyReused,
+
+    /// <summary>Ticket 14 (P2): the underlying aggregate's version no longer matched the caller's
+    /// expected version — a concurrent writer saved first. Nothing committed (including no
+    /// idempotency record), so the same key may be retried once the caller has reloaded and
+    /// confirmed/reapplied their change. See
+    /// <see cref="DbContextIdempotencyExtensions.SaveIdempotentWithConcurrencyAsync{TRecord,TAggregate,TResponse}"/>.</summary>
+    ConcurrencyConflict,
 }
 
 public sealed record IdempotencyOutcome<TResponse>(IdempotencyOutcomeKind Kind, int StatusCode, TResponse? Response)
@@ -22,4 +29,7 @@ public sealed record IdempotencyOutcome<TResponse>(IdempotencyOutcomeKind Kind, 
 
     public static IdempotencyOutcome<TResponse> KeyReused() =>
         new(IdempotencyOutcomeKind.KeyReused, 0, default);
+
+    public static IdempotencyOutcome<TResponse> ConcurrencyConflict() =>
+        new(IdempotencyOutcomeKind.ConcurrencyConflict, 0, default);
 }

@@ -206,32 +206,38 @@ internal sealed class HireCandidateHandler(
             application.CreatedAt,
             application.UpdatedAt);
 
+        // Ticket 14 (P2): SaveIdempotentWithConcurrencyAsync pins/advances application's version and
+        // translates a stale-save DbUpdateConcurrencyException the same way the non-idempotent
+        // branch below does — an Idempotency-Key must not bypass optimistic-concurrency protection.
+        // Note the Employee was already provisioned above via the idempotent (SourceReference-keyed)
+        // CreateFromCandidateAsync call before either save branch runs — a concurrency conflict here
+        // (either branch) means the Application/Candidate link did not commit, but the Employee row
+        // may already exist; a retried Hire request reuses that same Employee via its stable
+        // SourceReference rather than creating a second one (see NFR-08 remarks above), so a retry
+        // after this failure still converges to a consistent state.
+        const string conflictMessage = "This application was changed by someone else. Reload and try again.";
+
         if (request.IdempotencyKey is { } key)
         {
-            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, HireCandidateResponse>(
-                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+            var outcome = await db.SaveIdempotentWithConcurrencyAsync<IdempotencyRecord, Application, HireCandidateResponse>(
+                db.IdempotencyRecords, application, expectedVersion, scope, key, fingerprint!,
+                StatusCodes.Status200OK, response, now, cancellationToken);
 
             // Lost a race against a concurrent duplicate under the same key - this attempt's
             // RecordHire/LinkToEmployee changes were rolled back along with it, so skip the
-            // integration/audit event publishes and hand back the winner's result untouched. Note
-            // the employee itself was already provisioned above via the idempotent
-            // CreateFromCandidateAsync call, so no duplicate Employee is created either way.
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+            // integration/audit event publishes and hand back the winner's result untouched.
+            switch (outcome.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(outcome.Response!);
+                case IdempotencyOutcomeKind.ConcurrencyConflict:
+                    return Result.Failure<HireCandidateResponse>(Error.Concurrency(conflictMessage));
+            }
         }
         else
         {
-            // Ticket 6 (P1): pin the version read at the top of this handler so a concurrent writer
-            // (e.g. RejectCandidate racing this Hire on the same application) is detected rather than
-            // silently overwritten. Note the Employee was already provisioned above via the
-            // idempotent (SourceReference-keyed) CreateFromCandidateAsync call before this save is
-            // attempted — a concurrency conflict here means the Application/Candidate link did not
-            // commit, but the Employee row may already exist; a retried Hire request reuses that same
-            // Employee via its stable SourceReference rather than creating a second one (see NFR-08
-            // remarks above), so a retry after this failure still converges to a consistent state.
             var saveResult = await db.SaveChangesWithConcurrencyAsync(
-                application, expectedVersion,
-                "This application was changed by someone else. Reload and try again.", cancellationToken);
+                application, expectedVersion, conflictMessage, cancellationToken);
 
             if (!saveResult.IsSuccess)
                 return Result.Failure<HireCandidateResponse>(saveResult.Error);

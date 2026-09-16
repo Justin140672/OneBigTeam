@@ -127,6 +127,54 @@ public static class DbContextIdempotencyExtensions
     }
 
     /// <summary>
+    /// Ticket 14 (P2): the same insert-or-replay pattern as <see cref="SaveIdempotentAsync{TRecord,TResponse}"/>,
+    /// but ALSO pins and advances an <see cref="IVersionedAggregate"/>'s optimistic-concurrency
+    /// token in the same SaveChangesAsync call, and translates a resulting
+    /// <see cref="DbUpdateConcurrencyException"/> into <see cref="IdempotencyOutcomeKind.ConcurrencyConflict"/>
+    /// instead of letting it propagate uncaught. Every idempotent-keyed transition branch that also
+    /// carries an optimistic-concurrency guard (see e.g. Recruitment's HireCandidate/OfferCandidate/
+    /// RejectCandidate/MoveApplicationStage/MoveApplicationForward handlers) should use this instead
+    /// of calling <see cref="SaveIdempotentAsync{TRecord,TResponse}"/> directly — previously, the
+    /// presence of an Idempotency-Key silently bypassed BOTH the version-pinning/increment (so two
+    /// racing idempotent-keyed writes never actually conflicted, since the token itself never
+    /// advanced) AND the exception translation (an unrelated stale write would have propagated as an
+    /// unhandled 500 rather than the same controlled conflict every non-idempotent caller gets).
+    ///
+    /// A concurrency conflict never commits anything — including no idempotency record — so the SAME
+    /// key may safely be reused for a corrected retry once the caller has reloaded.
+    /// </summary>
+    public static async Task<IdempotencyOutcome<TResponse>> SaveIdempotentWithConcurrencyAsync<TRecord, TAggregate, TResponse>(
+        this DbContext dbContext,
+        DbSet<TRecord> records,
+        TAggregate aggregate,
+        int expectedVersion,
+        IdempotencyScope scope,
+        string idempotencyKey,
+        string requestFingerprint,
+        int statusCode,
+        TResponse response,
+        DateTimeOffset now,
+        CancellationToken cancellationToken,
+        TimeSpan? retention = null)
+        where TRecord : class, IIdempotencyRecord, new()
+        where TAggregate : class, IVersionedAggregate
+    {
+        dbContext.Entry(aggregate).Property(nameof(IVersionedAggregate.Version)).OriginalValue = expectedVersion;
+        aggregate.IncrementVersion();
+
+        try
+        {
+            return await SaveIdempotentAsync(
+                dbContext, records, scope, idempotencyKey, requestFingerprint, statusCode, response, now,
+                cancellationToken, retention);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return IdempotencyOutcome<TResponse>.ConcurrencyConflict();
+        }
+    }
+
+    /// <summary>
     /// Ticket 3 (P1) follow-up item 6: deletes one bounded batch of expired records and returns how
     /// many were removed. Safe under concurrent execution - this issues a single DELETE statement (no
     /// read-then-act race), and only ever matches rows already past <see cref="IIdempotencyRecord.ExpiresAt"/>,

@@ -97,6 +97,63 @@ public class ApplicationConcurrencyHandlerTests
         Assert.Equal(2, saved.Version);
     }
 
+    // Ticket 14 (P2): supplying an Idempotency-Key must NOT bypass the same concurrency protection
+    // exercised above — previously the idempotent-keyed branch called plain SaveIdempotentAsync,
+    // which neither pinned/advanced Application.Version nor translated a stale-save exception, so a
+    // racing idempotent-keyed write either silently succeeded uncontested or surfaced as an unhandled
+    // 500 instead of the same controlled Error.Concurrency every non-idempotent caller gets.
+    [Fact]
+    public async Task MoveApplicationStage_With_IdempotencyKey_Stale_Version_Returns_Concurrency_Failure_And_Persists_No_Idempotency_Record()
+    {
+        var seed = await SeedAsync(s => s.ApplicationReceived);
+
+        await using var ctxA = new RecruitmentDbContext(Options(seed.DbName));
+        await ctxA.Applications.SingleAsync();
+
+        await using (var ctxB = new RecruitmentDbContext(Options(seed.DbName)))
+        {
+            var winner = await MoveStageHandler(ctxB).HandleAsync(
+                new MoveApplicationStageRequest
+                {
+                    CompanyId = seed.CompanyId,
+                    VacancyId = seed.VacancyId,
+                    ApplicationId = seed.ApplicationId,
+                    NewStageId = seed.Stages.CvReview.Id,
+                },
+                Guid.NewGuid(), CancellationToken.None);
+            Assert.True(winner.IsSuccess);
+        }
+
+        const string idempotencyKey = "move-stage-key-1";
+        var events = new FakeIntegrationEventPublisher();
+        var audit = new FakeAuditPublisher();
+        var loser = await MoveStageHandler(ctxA, audit, events).HandleAsync(
+            new MoveApplicationStageRequest
+            {
+                CompanyId = seed.CompanyId,
+                VacancyId = seed.VacancyId,
+                ApplicationId = seed.ApplicationId,
+                NewStageId = seed.Stages.Interview.Id,
+                IdempotencyKey = idempotencyKey,
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(loser.IsFailure);
+        Assert.Equal("concurrency", loser.Error.Code);
+        Assert.Empty(events.PublishedEvents);
+        Assert.Empty(audit.Published);
+
+        await using var verify = new RecruitmentDbContext(Options(seed.DbName));
+        var saved = await verify.Applications.SingleAsync();
+        Assert.Equal(seed.Stages.CvReview.Id, saved.CurrentStageId);
+        Assert.Equal(2, saved.Version);
+        // NOTE: whether the idempotency record itself was also rolled back can't be reliably
+        // asserted against EF Core's InMemory provider — unlike a real relational DB, InMemory does
+        // not always roll back an unrelated entity in the same SaveChangesAsync call when another
+        // entity fails a concurrency check. That atomicity is instead verified by the PostgreSQL
+        // integration tests (see IdempotentApplicationTransitionConcurrencyEndpointTests).
+    }
+
     // ---- HireCandidateHandler ----------------------------------------------------------------
 
     private static HireCandidateHandler HireHandler(
@@ -224,6 +281,43 @@ public class ApplicationConcurrencyHandlerTests
         Assert.Equal(seed.Stages.Hired.Id, savedApplication.CurrentStageId);
     }
 
+    [Fact]
+    public async Task HireCandidate_With_IdempotencyKey_Stale_Version_Returns_Concurrency_Failure_And_Persists_No_Idempotency_Record()
+    {
+        var seed = await SeedAsync(s => s.Offer);
+
+        await using var ctxA = new RecruitmentDbContext(Options(seed.DbName));
+        var vacancyA = await ctxA.Vacancies.SingleAsync();
+        var readerA = ResolvableReader(vacancyA.PositionProfileId, out _, out _);
+        await ctxA.Applications.SingleAsync();
+        await ctxA.Candidates.SingleAsync();
+
+        await using (var ctxB = new RecruitmentDbContext(Options(seed.DbName)))
+        {
+            var rejectWinner = await new RejectCandidateHandler(ctxB, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxB, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()))
+                .HandleAsync(
+                    new RejectCandidateRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId },
+                    Guid.NewGuid(), CancellationToken.None);
+            Assert.True(rejectWinner.IsSuccess);
+        }
+
+        const string idempotencyKey = "hire-key-1";
+        var provisioning = new FakeEmployeeProvisioningService();
+        var hireLoser = await HireHandler(ctxA, provisioning, readerA).HandleAsync(
+            HireRequest(seed.CompanyId, seed.VacancyId, seed.ApplicationId) with { IdempotencyKey = idempotencyKey },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(hireLoser.IsFailure);
+        Assert.Equal("concurrency", hireLoser.Error.Code);
+
+        await using var verify = new RecruitmentDbContext(Options(seed.DbName));
+        var savedApplication = await verify.Applications.SingleAsync();
+        Assert.Equal(seed.Stages.Rejected.Id, savedApplication.CurrentStageId);
+        // NOTE: EF InMemory does not reliably roll back an unrelated entity in the same
+        // SaveChangesAsync call when another entity fails a concurrency check; that atomicity is
+        // verified against real PostgreSQL by IdempotentApplicationTransitionConcurrencyEndpointTests.
+    }
+
     // ---- RejectCandidateHandler ---------------------------------------------------------------
 
     [Fact]
@@ -255,6 +349,40 @@ public class ApplicationConcurrencyHandlerTests
         var saved = await verify.Applications.SingleAsync();
         Assert.Equal("Winner", saved.RejectionReason);
         Assert.Equal(2, saved.Version);
+    }
+
+    [Fact]
+    public async Task RejectCandidate_With_IdempotencyKey_Stale_Version_Returns_Concurrency_Failure_And_Persists_No_Idempotency_Record()
+    {
+        var seed = await SeedAsync(s => s.ApplicationReceived);
+
+        await using var ctxA = new RecruitmentDbContext(Options(seed.DbName));
+        await ctxA.Applications.SingleAsync();
+
+        await using (var ctxB = new RecruitmentDbContext(Options(seed.DbName)))
+        {
+            var winner = await new RejectCandidateHandler(ctxB, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxB, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()))
+                .HandleAsync(
+                    new RejectCandidateRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId, RejectionReason = "Winner" },
+                    Guid.NewGuid(), CancellationToken.None);
+            Assert.True(winner.IsSuccess);
+        }
+
+        const string idempotencyKey = "reject-key-1";
+        var loser = await new RejectCandidateHandler(ctxA, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxA, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()))
+            .HandleAsync(
+                new RejectCandidateRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId, RejectionReason = "Loser", IdempotencyKey = idempotencyKey },
+                Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(loser.IsFailure);
+        Assert.Equal("concurrency", loser.Error.Code);
+
+        await using var verify = new RecruitmentDbContext(Options(seed.DbName));
+        var saved = await verify.Applications.SingleAsync();
+        Assert.Equal("Winner", saved.RejectionReason);
+        Assert.Equal(2, saved.Version);
+        // NOTE: see the equivalent NOTE above HireCandidate's test — EF InMemory does not
+        // reliably model this cross-entity rollback; verified against real PostgreSQL separately.
     }
 
     // ---- OfferCandidateHandler ------------------------------------------------------------------
@@ -299,6 +427,40 @@ public class ApplicationConcurrencyHandlerTests
         Assert.Equal(2, saved.Version);
     }
 
+    [Fact]
+    public async Task OfferCandidate_With_IdempotencyKey_Stale_Version_Returns_Concurrency_Failure_And_Persists_No_Idempotency_Record()
+    {
+        var seed = await SeedAsync(s => s.Interview);
+
+        await using var ctxA = new RecruitmentDbContext(Options(seed.DbName));
+        await ctxA.Applications.SingleAsync();
+
+        await using (var ctxB = new RecruitmentDbContext(Options(seed.DbName)))
+        {
+            var winner = await OfferHandler(ctxB).HandleAsync(
+                new OfferCandidateRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId },
+                Guid.NewGuid(), CancellationToken.None);
+            Assert.True(winner.IsSuccess);
+        }
+
+        const string idempotencyKey = "offer-key-1";
+        var audit = new FakeAuditPublisher();
+        var loser = await OfferHandler(ctxA, audit).HandleAsync(
+            new OfferCandidateRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId, IdempotencyKey = idempotencyKey },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(loser.IsFailure);
+        Assert.Equal("concurrency", loser.Error.Code);
+        Assert.Empty(audit.Published);
+
+        await using var verify = new RecruitmentDbContext(Options(seed.DbName));
+        var saved = await verify.Applications.SingleAsync();
+        Assert.Equal(seed.Stages.Offer.Id, saved.CurrentStageId);
+        Assert.Equal(2, saved.Version);
+        // NOTE: see the equivalent NOTE above HireCandidate's test — EF InMemory does not
+        // reliably model this cross-entity rollback; verified against real PostgreSQL separately.
+    }
+
     // ---- MoveApplicationForwardHandler ------------------------------------------------------------
 
     private static MoveApplicationForwardHandler ForwardHandler(RecruitmentDbContext db, FakeAuditPublisher? audit = null) =>
@@ -338,5 +500,40 @@ public class ApplicationConcurrencyHandlerTests
         Assert.Equal(seed.Stages.CvReview.Id, saved.CurrentStageId);
         Assert.Null(saved.CvReviewNotes);
         Assert.Equal(2, saved.Version);
+    }
+
+    [Fact]
+    public async Task MoveApplicationForward_With_IdempotencyKey_Stale_Version_Returns_Concurrency_Failure_And_Persists_No_Idempotency_Record()
+    {
+        var seed = await SeedAsync(s => s.ApplicationReceived);
+
+        await using var ctxA = new RecruitmentDbContext(Options(seed.DbName));
+        await ctxA.Applications.SingleAsync();
+
+        await using (var ctxB = new RecruitmentDbContext(Options(seed.DbName)))
+        {
+            var winner = await ForwardHandler(ctxB).HandleAsync(
+                new MoveApplicationForwardRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId },
+                Guid.NewGuid(), CancellationToken.None);
+            Assert.True(winner.IsSuccess);
+        }
+
+        const string idempotencyKey = "move-forward-key-1";
+        var audit = new FakeAuditPublisher();
+        var loser = await ForwardHandler(ctxA, audit).HandleAsync(
+            new MoveApplicationForwardRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId, CvReviewNotes = "Loser notes", IdempotencyKey = idempotencyKey },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(loser.IsFailure);
+        Assert.Equal("concurrency", loser.Error.Code);
+        Assert.Empty(audit.Published);
+
+        await using var verify = new RecruitmentDbContext(Options(seed.DbName));
+        var saved = await verify.Applications.SingleAsync();
+        Assert.Equal(seed.Stages.CvReview.Id, saved.CurrentStageId);
+        Assert.Null(saved.CvReviewNotes);
+        Assert.Equal(2, saved.Version);
+        // NOTE: see the equivalent NOTE above HireCandidate's test — EF InMemory does not
+        // reliably model this cross-entity rollback; verified against real PostgreSQL separately.
     }
 }

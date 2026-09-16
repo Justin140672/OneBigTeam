@@ -1,3 +1,4 @@
+using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
 using HR.SharedKernel;
@@ -110,20 +111,30 @@ internal sealed class MoveApplicationForwardHandler(
             application.CvReviewNotes,
             application.UpdatedAt);
 
+        // Ticket 14 (P2): SaveIdempotentWithConcurrencyAsync pins/advances application's version and
+        // translates a stale-save DbUpdateConcurrencyException the same way the non-idempotent
+        // branch below does — an Idempotency-Key must not bypass optimistic-concurrency protection.
+        const string conflictMessage = "This application was changed by someone else. Reload and try again.";
+
         if (request.IdempotencyKey is { } key)
         {
-            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, MoveApplicationForwardResponse>(
-                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+            var outcome = await db.SaveIdempotentWithConcurrencyAsync<IdempotencyRecord, Application, MoveApplicationForwardResponse>(
+                db.IdempotencyRecords, application, expectedVersion, scope, key, fingerprint!,
+                StatusCodes.Status200OK, response, now, cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+            switch (outcome.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(outcome.Response!);
+                case IdempotencyOutcomeKind.ConcurrencyConflict:
+                    return Result.Failure<MoveApplicationForwardResponse>(Error.Concurrency(conflictMessage));
+            }
         }
         else
         {
             // Ticket 6 (P1): see MoveApplicationStageHandler's matching guard.
             var saveResult = await db.SaveChangesWithConcurrencyAsync(
-                application, expectedVersion,
-                "This application was changed by someone else. Reload and try again.", cancellationToken);
+                application, expectedVersion, conflictMessage, cancellationToken);
 
             if (!saveResult.IsSuccess)
                 return Result.Failure<MoveApplicationForwardResponse>(saveResult.Error);
