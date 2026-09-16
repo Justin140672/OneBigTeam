@@ -51,6 +51,9 @@ public static class TasksModule
         services.AddScoped<IWorkloadActionProvider, EmployeeTasksOverdueWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, ManagerTasksOverdueWorkloadActionProvider>();
         services.AddScoped<TaskCompletionDispatcher>();
+        // Ticket 4 (P1): retries CompleteTaskHandler's notification/audit confirmation for a
+        // completion whose business action already succeeded — see Jobs/TaskCompletionEffectsJob.cs.
+        services.AddScoped<Jobs.TaskCompletionEffectsJob>();
         // IAM-07: standardised resource-level (self / manager-hierarchy / HR administrator)
         // authorization for task endpoints — see TasksResourceAuthorizer remarks.
         services.AddScoped<TasksResourceAuthorizer>();

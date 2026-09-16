@@ -1,5 +1,7 @@
+using Hangfire;
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
+using HR.Modules.Tasks.Jobs;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
 using HR.SharedKernel;
@@ -7,6 +9,7 @@ using HR.SharedKernel.Idempotency;
 using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Tasks.Features.CompleteTask;
 
@@ -16,7 +19,9 @@ internal sealed class CompleteTaskHandler(
     IClock clock,
     IAuditEventPublisher auditPublisher,
     TaskCompletionDispatcher dispatcher,
-    TasksResourceAuthorizer resourceAuthorizer)
+    TasksResourceAuthorizer resourceAuthorizer,
+    IBackgroundJobClient backgroundJobClient,
+    ILogger<CompleteTaskHandler> logger)
 {
     public async Task<Result<CompleteTaskResponse>> HandleAsync(
         CompleteTaskRequest request,
@@ -108,8 +113,23 @@ internal sealed class CompleteTaskHandler(
         // with no matching business-state change (e.g. a rejected leave approval, or a malformed
         // probation extension). Dispatching first means a failure here leaves the task untouched —
         // still Open/InProgress and actionable — and the caller gets a real error back.
+        // Ticket 4 (P1): persist the completion request — including the decision payload — as a
+        // durable TaskCompletionOperation BEFORE the business dispatch runs, so the caller's
+        // decision/reason survive a crash between "request received" and "business action applied"
+        // even though the dispatch itself is still synchronous. The operation's Status then tracks
+        // exactly how far completion got: Rejected (dispatch declined it, task never completed),
+        // DispatchApplied (business action + TaskItem completion both committed, side effects still
+        // pending/retrying), or Processed (fully applied).
+        TaskCompletionOperation? operation = null;
+
         if (!wasAlreadyCompleted)
         {
+            operation = TaskCompletionOperation.CreatePending(
+                Guid.NewGuid(), task.CompanyId, task.Id, request.CompletedBy,
+                request.OutcomeDecision, request.OutcomeReason, now);
+            dbContext.TaskCompletionOperations.Add(operation);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
             var dispatchResult = await dispatcher.DispatchAsync(new TaskCompletionContext(
                 task.CompanyId,
                 task.Id,
@@ -125,7 +145,13 @@ internal sealed class CompleteTaskHandler(
                 request.OutcomeReason), cancellationToken);
 
             if (!dispatchResult.IsSuccess)
+            {
+                operation.MarkRejected(dispatchResult.Error.Message, now);
+                await dbContext.SaveChangesAsync(cancellationToken);
                 return Result.Failure<CompleteTaskResponse>(dispatchResult.Error);
+            }
+
+            operation.MarkDispatchApplied(now);
         }
 
         task.Complete(request.CompletedBy, now);
@@ -172,26 +198,47 @@ internal sealed class CompleteTaskHandler(
             return Result.Success(response);
         }
 
-        if (task.AssignedEmployeeId.HasValue)
+        // Ticket 4 (P1): the business action and the TaskItem's Completed transition are already
+        // durably committed above — a failure from here on must never re-run either of them (that
+        // would risk duplicating the business action), and must never fail the request back to the
+        // caller (the task genuinely is completed; only confirming the notification/audit side
+        // effects is outstanding). A failure here hands off to TaskCompletionEffectsJob, which
+        // retries just those two idempotent steps against the persisted operation.
+        try
         {
-            await notificationWriter.WriteAsync(
-                Guid.NewGuid(), task.CompanyId, task.AssignedEmployeeId.Value,
-                $"Task completed: {task.Title}",
-                null,
-                task.Id,
-                NotificationType.TaskCompleted,
-                NotificationPriority.Normal,
-                now,
-                cancellationToken);
-        }
+            if (task.AssignedEmployeeId.HasValue)
+            {
+                await notificationWriter.WriteAsync(
+                    Guid.NewGuid(), task.CompanyId, task.AssignedEmployeeId.Value,
+                    $"Task completed: {task.Title}",
+                    null,
+                    task.Id,
+                    NotificationType.TaskCompleted,
+                    NotificationPriority.Normal,
+                    now,
+                    cancellationToken);
+            }
 
-        await auditPublisher.PublishAsync(new TaskCompletedAuditEvent(
-            task.CompanyId,
-            task.Id,
-            task.CompletedBy!.Value,
-            previousStatus,
-            task.AssignedEmployeeId,
-            task.CompletedAt!.Value), cancellationToken);
+            await auditPublisher.PublishAsync(new TaskCompletedAuditEvent(
+                task.CompanyId,
+                task.Id,
+                task.CompletedBy!.Value,
+                previousStatus,
+                task.AssignedEmployeeId,
+                task.CompletedAt!.Value), cancellationToken);
+
+            operation!.MarkProcessed(clock.UtcNowOffset());
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "CompleteTaskHandler: task {TaskId} was completed but confirming its notification/audit side effects failed inline — handing off to TaskCompletionEffectsJob (operation {OperationId}).",
+                task.Id, operation!.Id);
+
+            backgroundJobClient.Enqueue<TaskCompletionEffectsJob>(
+                job => job.ProcessAsync(operation.Id, task.CompanyId));
+        }
 
         return Result.Success(response);
     }

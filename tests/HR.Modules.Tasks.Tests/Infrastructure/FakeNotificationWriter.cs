@@ -13,6 +13,13 @@ internal sealed class FakeNotificationWriter : INotificationWriter
 
     public List<WrittenNotification> Written { get; } = [];
 
+    /// <summary>
+    /// Ticket 4 (P1): when set, WriteAsync throws instead of recording, simulating a transient
+    /// notification-store failure so CompleteTaskHandler's inline-failure -> TaskCompletionEffectsJob
+    /// handoff path can be exercised.
+    /// </summary>
+    public bool ThrowOnWrite { get; set; }
+
     public Task WriteAsync(
         Guid id, Guid companyId, Guid employeeId,
         string title, string? body,
@@ -21,6 +28,9 @@ internal sealed class FakeNotificationWriter : INotificationWriter
         DateTimeOffset createdAt,
         CancellationToken cancellationToken = default)
     {
+        if (ThrowOnWrite)
+            throw new InvalidOperationException("Simulated notification write failure.");
+
         Written.Add(new WrittenNotification(id, companyId, employeeId, title, body, sourceEntityId, type, priority, createdAt));
         return Task.CompletedTask;
     }

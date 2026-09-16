@@ -1,12 +1,14 @@
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.CompleteTask;
+using HR.Modules.Tasks.Jobs;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
 using HR.Modules.Tasks.Tests.Infrastructure;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Tasks.Tests;
 
@@ -37,7 +39,8 @@ public class CompleteTaskHandlerTests
         FakeNotificationWriter? notif = null,
         FakeRoleAuthorizationService? authorizationService = null,
         FakeDirectReportsReader? directReportsReader = null,
-        TaskCompletionDispatcher? dispatcher = null) =>
+        TaskCompletionDispatcher? dispatcher = null,
+        RecordingBackgroundJobClient? backgroundJobClient = null) =>
         new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher(), dispatcher ?? NoOpDispatcher,
             // Defaults to an HR-Administrator caller so tests unrelated to SEC-003/IAM-07
             // authorization (pre-existing behavior around completion/notification/audit) don't
@@ -45,7 +48,9 @@ public class CompleteTaskHandlerTests
             // check.
             new TasksResourceAuthorizer(
                 authorizationService ?? new FakeRoleAuthorizationService(HrAdministratorRoleId),
-                directReportsReader ?? new FakeDirectReportsReader()));
+                directReportsReader ?? new FakeDirectReportsReader()),
+            backgroundJobClient ?? new RecordingBackgroundJobClient(),
+            NullLogger<CompleteTaskHandler>.Instance);
 
     private static TaskItem MakeTask(Guid companyId, TaskItemStatus status = TaskItemStatus.Open)
     {
@@ -835,6 +840,161 @@ public class CompleteTaskHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
+    }
+
+    // ---- Ticket 4 (P1): durable TaskCompletionOperation ----
+
+    [Fact]
+    public async Task HandleAsync_Persists_Processed_Operation_When_Side_Effects_Succeed_Inline_And_Enqueues_No_Job()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+        var task = MakeTask(companyId, TaskItemStatus.Open);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var jobClient = new RecordingBackgroundJobClient();
+
+        var result = await BuildHandler(context, backgroundJobClient: jobClient).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = completedBy },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var operation = await context.TaskCompletionOperations.AsNoTracking()
+            .SingleAsync(o => o.TaskId == task.Id);
+        Assert.Equal(TaskCompletionOperation.StatusProcessed, operation.Status);
+        Assert.NotNull(operation.ProcessedAt);
+        Assert.Equal(companyId, operation.CompanyId);
+        Assert.Equal(completedBy, operation.CompletedBy);
+
+        Assert.Empty(jobClient.CreatedJobs);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Persists_Rejected_Operation_With_Reason_When_Dispatch_Fails()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Review leave request", null, TaskPriority.Medium, TaskSource.Leave, TaskActionType.Approve,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow, sourceEntityId: Guid.NewGuid());
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        const string failureReason = "The leave request is no longer pending.";
+        var failingDispatcher = new TaskCompletionDispatcher(
+            [new StubCompletionAction(TaskSource.Leave, TaskActionType.Approve,
+                Result.Failure(Error.Conflict(failureReason)))]);
+
+        var result = await BuildHandler(context, dispatcher: failingDispatcher).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = assignedEmployee },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+
+        var operation = await context.TaskCompletionOperations.AsNoTracking()
+            .SingleAsync(o => o.TaskId == task.Id);
+        Assert.Equal(TaskCompletionOperation.StatusRejected, operation.Status);
+        Assert.Equal(failureReason, operation.FailureReason);
+        Assert.Null(operation.ProcessedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Enqueues_TaskCompletionEffectsJob_And_Still_Returns_Success_When_Notification_Write_Fails_Inline()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Onboarding checklist", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var notif = new FakeNotificationWriter { ThrowOnWrite = true };
+        var jobClient = new RecordingBackgroundJobClient();
+
+        var result = await BuildHandler(context, notif: notif, backgroundJobClient: jobClient).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = completedBy },
+            CancellationToken.None);
+
+        // The task genuinely is completed — notification failures cannot permanently block
+        // business processing — so the handler still reports success to the caller.
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Completed", result.Value!.Status);
+
+        var persistedTask = await context.TaskItems.AsNoTracking().SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(TaskItemStatus.Completed, persistedTask.Status);
+
+        var operation = await context.TaskCompletionOperations.AsNoTracking()
+            .SingleAsync(o => o.TaskId == task.Id);
+        Assert.Equal(TaskCompletionOperation.StatusDispatchApplied, operation.Status);
+        Assert.Null(operation.ProcessedAt);
+
+        var enqueued = Assert.Single(jobClient.CreatedJobs);
+        Assert.Equal(typeof(TaskCompletionEffectsJob), enqueued.Type);
+        Assert.Equal(nameof(TaskCompletionEffectsJob.ProcessAsync), enqueued.Method.Name);
+        Assert.Equal(operation.Id, enqueued.Args[0]);
+        Assert.Equal(companyId, enqueued.Args[1]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Enqueues_TaskCompletionEffectsJob_And_Still_Returns_Success_When_Audit_Publish_Fails_Inline()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+        var task = MakeTask(companyId, TaskItemStatus.Open);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var audit = new FakeAuditPublisher { ThrowOnPublish = true };
+        var jobClient = new RecordingBackgroundJobClient();
+
+        var result = await BuildHandler(context, audit, backgroundJobClient: jobClient).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = completedBy },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var persistedTask = await context.TaskItems.AsNoTracking().SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(TaskItemStatus.Completed, persistedTask.Status);
+
+        var operation = await context.TaskCompletionOperations.AsNoTracking()
+            .SingleAsync(o => o.TaskId == task.Id);
+        Assert.Equal(TaskCompletionOperation.StatusDispatchApplied, operation.Status);
+
+        var enqueued = Assert.Single(jobClient.CreatedJobs);
+        Assert.Equal(typeof(TaskCompletionEffectsJob), enqueued.Type);
+        Assert.Equal(operation.Id, enqueued.Args[0]);
+        Assert.Equal(companyId, enqueued.Args[1]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Create_Operation_When_Task_Already_Completed()
+    {
+        // Idempotency guard: re-completing an already-Completed task short-circuits before the
+        // Ticket 4 durable-operation record is ever created.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var task = MakeTask(companyId, TaskItemStatus.Completed);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var result = await BuildHandler(context).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(await context.TaskCompletionOperations.AnyAsync(o => o.TaskId == task.Id));
     }
 
     private static TasksDbContext BuildContext()
