@@ -134,6 +134,8 @@ public static class RecruitmentModule
         services.AddScoped<IValidator<ApproveOfferRequest>, ApproveOfferValidator>();
         services.AddScoped<PurgeEligibleCandidatesHandler>();
         services.AddScoped<IValidator<PurgeEligibleCandidatesRequest>, PurgeEligibleCandidatesValidator>();
+        // Ticket 7 (P2): durable, retried blob deletion for documents removed by candidate purge.
+        services.AddScoped<Jobs.PurgeCandidateDocumentStorageJob>();
 
         services.AddScoped<HR.SharedKernel.IIntegrationEventHandler<HR.Modules.Employees.Contracts.EmployeePromotedIntegrationEvent>, EmployeePromotedHandler>();
 

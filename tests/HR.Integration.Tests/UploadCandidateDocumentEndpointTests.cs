@@ -172,6 +172,31 @@ public class UploadCandidateDocumentEndpointTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Post_Document_Returns_Conflict_For_Purged_Candidate()
+    {
+        var companyId = Guid.NewGuid();
+        var candidateId = await RecruitmentTestSeeder.SeedCandidateAsync(_factory, companyId, Now);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+            var candidate = await db.Candidates.SingleAsync(c => c.Id == candidateId);
+            candidate.Purge(Guid.NewGuid(), Now);
+            await db.SaveChangesAsync();
+        }
+        using var client = await ClientAs(RecruiterUser, companyId);
+
+        var response = await client.PostAsync(Url(companyId, candidateId), BuildUpload());
+
+        // This endpoint maps every non-not_found handler failure to 422 (see Endpoint.cs) — there is
+        // no distinct 409 branch, unlike some other endpoints in this codebase.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+        Assert.Empty(await verifyDb.CandidateDocuments.Where(d => d.CandidateId == candidateId).ToListAsync());
+    }
+
     private sealed record UploadPayload(
         Guid Id, Guid CompanyId, Guid CandidateId, string Title, string FileName, long FileSize,
         string ContentType, DateTimeOffset CreatedAt);

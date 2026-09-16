@@ -162,5 +162,75 @@ public class PurgeEligibleCandidatesEndpointTests
         Assert.Equal("Emma", saved.FirstName);
     }
 
+    [Fact]
+    public async Task Post_PurgeEligible_Redacts_ApplicationFreeText_HardDeletes_Documents_And_Downloading_Document_404s()
+    {
+        var companyId = Guid.NewGuid();
+        var candidateId = await SeedEligibleCandidateAsync(companyId);
+        var oldEnough = Now.AddDays(-731);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+            var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
+            var stages = HR.Modules.Recruitment.Services.RecruitmentStageSeeder.BuildDefaultStages(companyId, Now).ToList();
+            var interviewStage = stages.Single(s => s.Name == "Interview");
+            var application = Application.Create(
+                Guid.NewGuid(), companyId, vacancy.Id, candidateId, interviewStage.Id, "Keep an eye", oldEnough);
+            application.RecordRejection(interviewStage.Id, "Not a fit", oldEnough);
+            application.Withdraw(oldEnough);
+            var document = CandidateDocument.Create(
+                Guid.NewGuid(), companyId, candidateId, "CV", "cv.pdf", 2048, "application/pdf",
+                $"{companyId}/{candidateId}/{Guid.NewGuid():N}/cv.pdf", Guid.NewGuid(), oldEnough);
+
+            db.Vacancies.Add(vacancy);
+            db.RecruitmentStages.AddRange(stages);
+            db.Applications.Add(application);
+            db.CandidateDocuments.Add(document);
+            await db.SaveChangesAsync();
+        }
+
+        Guid documentId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+            documentId = await db.CandidateDocuments
+                .Where(d => d.CompanyId == companyId && d.CandidateId == candidateId)
+                .Select(d => d.Id)
+                .SingleAsync();
+        }
+
+        using var client = await ClientAs(CompanyAdminUser, companyId);
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/candidates/purge-eligible", new { });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<PurgeEligiblePayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(1, payload!.PurgedCount);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+            var savedApplication = await db.Applications.SingleAsync(a => a.CandidateId == candidateId);
+            Assert.Null(savedApplication.Notes);
+            Assert.Null(savedApplication.RejectionReason);
+
+            Assert.Empty(await db.CandidateDocuments.Where(d => d.CandidateId == candidateId).ToListAsync());
+        }
+
+        // DownloadCandidateDocument requires "candidate:view", which CompanyAdministrator alone does
+        // not hold in this app's role/permission catalogue — use the Recruiter role (which does)
+        // for this specific call, same as RecruiterOnlyUser is used elsewhere in this test class.
+        using var downloadClient = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        downloadClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterOnlyUser.ToString());
+        downloadClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var downloadResponse = await downloadClient.GetAsync(
+            $"/api/companies/{companyId}/candidates/{candidateId}/documents/{documentId}/download");
+
+        Assert.Equal(HttpStatusCode.NotFound, downloadResponse.StatusCode);
+    }
+
     private sealed record PurgeEligiblePayload(int PurgedCount);
 }

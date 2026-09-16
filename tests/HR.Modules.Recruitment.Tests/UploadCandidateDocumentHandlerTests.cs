@@ -239,6 +239,29 @@ public class UploadCandidateDocumentHandlerTests
         Assert.Equal(storage.Uploads[0].StorageKey, storage.Deletions[0]);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_And_Does_Not_Upload_Or_Create_Row_For_Purged_Candidate()
+    {
+        await using var db = BuildContext();
+        var storage = new FakeCandidateDocumentStorageService();
+        var companyId = Guid.NewGuid();
+        var candidate = await SeedCandidate(db, companyId);
+        candidate.Purge(Guid.NewGuid(), Now);
+        await db.SaveChangesAsync();
+        var handler = BuildHandler(db, storage);
+
+        var result = await handler.HandleAsync(
+            new UploadCandidateDocumentRequest { CompanyId = companyId, CandidateId = candidate.Id, Title = "Resume", File = FakePdfFile() },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+
+        Assert.Empty(storage.Uploads);
+        Assert.Empty(await db.CandidateDocuments.ToListAsync());
+    }
+
     private sealed class ThrowingRecruitmentDbContext(DbContextOptions<RecruitmentDbContext> options)
         : RecruitmentDbContext(options)
     {

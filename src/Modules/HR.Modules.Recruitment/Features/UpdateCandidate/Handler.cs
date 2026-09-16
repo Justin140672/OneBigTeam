@@ -19,6 +19,13 @@ internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clo
             return Result.Failure<UpdateCandidateResponse>(
                 Error.NotFound($"Candidate '{request.CandidateId}' was not found."));
 
+        // Ticket 7 (P2): a purged candidate's personal fields were redacted by an explicit,
+        // separately-authorised retention action (PurgeEligibleCandidatesHandler) — an ordinary
+        // update must never be able to repopulate them.
+        if (candidate.PurgedAt is not null)
+            return Result.Failure<UpdateCandidateResponse>(
+                Error.Conflict("This candidate's data has been purged under the retention policy and can no longer be edited."));
+
         var newEmail = request.Email.Trim();
         if (!string.Equals(candidate.Email, newEmail, StringComparison.Ordinal))
         {

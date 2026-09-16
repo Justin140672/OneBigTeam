@@ -18,12 +18,21 @@ internal sealed class UploadCandidateDocumentHandler(
         Guid uploadedBy,
         CancellationToken cancellationToken)
     {
-        var candidateExists = await db.Candidates
-            .AnyAsync(c => c.Id == request.CandidateId && c.CompanyId == request.CompanyId, cancellationToken);
+        var candidate = await db.Candidates
+            .AsNoTracking()
+            .Where(c => c.Id == request.CandidateId && c.CompanyId == request.CompanyId)
+            .Select(c => new { c.PurgedAt })
+            .SingleOrDefaultAsync(cancellationToken);
 
-        if (!candidateExists)
+        if (candidate is null)
             return Result.Failure<UploadCandidateDocumentResponse>(
                 Error.NotFound($"Candidate '{request.CandidateId}' was not found."));
+
+        // Ticket 7 (P2): a purged candidate's documents/personal data were removed by an explicit,
+        // separately-authorised retention action — a new upload must never be able to repopulate them.
+        if (candidate.PurgedAt is not null)
+            return Result.Failure<UploadCandidateDocumentResponse>(
+                Error.Conflict("This candidate's data has been purged under the retention policy and can no longer accept new documents."));
 
         var file = request.File;
         var validationResult = Validate(file.FileName, file.ContentType, file.Length, options.Value);

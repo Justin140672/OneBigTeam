@@ -1,6 +1,7 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.PurgeEligibleCandidates;
+using HR.Modules.Recruitment.Jobs;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -222,12 +223,140 @@ public class PurgeEligibleCandidatesHandlerTests
         Assert.Null(saved.PurgedAt);
     }
 
+    [Fact]
+    public async Task HandleAsync_Redacts_Application_FreeText_But_Keeps_Structural_Fields()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var oldEnough = Now.AddDays(-731);
+        var candidate = CreateCandidateUpdatedAt(companyId, oldEnough);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var application = Application.Create(
+            Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, "Some pipeline notes", oldEnough);
+        application.RecordRejection(stages.Interview.Id, "Not a culture fit", oldEnough);
+        application.RecordCvReview("Strong CV", Guid.NewGuid(), oldEnough);
+        application.RecordOfferTerms(50000m, OfferSalaryFrequency.Annual, null, DateOnly.FromDateTime(oldEnough.Date), "Confidential offer notes", oldEnough);
+        // No open (non-terminal-stage, non-withdrawn) application should exist for the candidate to
+        // remain eligible — withdraw so it doesn't block eligibility while still carrying data to redact.
+        application.Withdraw(oldEnough);
+        db.Candidates.Add(candidate);
+        db.Vacancies.Add(vacancy);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new PurgeEligibleCandidatesRequest { CompanyId = companyId },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.PurgedCount);
+
+        var savedApplication = await db.Applications.SingleAsync();
+        Assert.Null(savedApplication.Notes);
+        Assert.Null(savedApplication.RejectionReason);
+        Assert.Null(savedApplication.CvReviewNotes);
+        Assert.Null(savedApplication.OfferNotes);
+
+        // Structural/history fields must be left untouched.
+        Assert.Equal(stages.Interview.Id, savedApplication.CurrentStageId);
+        Assert.Equal(oldEnough, savedApplication.AppliedAt);
+        Assert.Equal(50000m, savedApplication.OfferedSalary);
+        Assert.Equal(OfferSalaryFrequency.Annual, savedApplication.OfferedSalaryFrequency);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Purges_Eligible_Candidates_Documents_And_Enqueues_Storage_Deletion_Job_Per_Document()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var oldEnough = Now.AddDays(-731);
+        var candidate = CreateCandidateUpdatedAt(companyId, oldEnough);
+        var document1 = CandidateDocument.Create(
+            Guid.NewGuid(), companyId, candidate.Id, "CV", "cv.pdf", 2048, "application/pdf",
+            $"{companyId}/{candidate.Id}/{Guid.NewGuid():N}/cv.pdf", Guid.NewGuid(), oldEnough);
+        var document2 = CandidateDocument.Create(
+            Guid.NewGuid(), companyId, candidate.Id, "Cover letter", "cover.pdf", 1024, "application/pdf",
+            $"{companyId}/{candidate.Id}/{Guid.NewGuid():N}/cover.pdf", Guid.NewGuid(), oldEnough);
+        db.Candidates.Add(candidate);
+        db.CandidateDocuments.AddRange(document1, document2);
+        await db.SaveChangesAsync();
+
+        var jobClient = new RecordingBackgroundJobClient();
+
+        var result = await handler(db, backgroundJobClient: jobClient).HandleAsync(
+            new PurgeEligibleCandidatesRequest { CompanyId = companyId },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.PurgedCount);
+
+        Assert.Empty(await db.CandidateDocuments.ToListAsync());
+
+        Assert.Equal(2, jobClient.CreatedJobs.Count);
+        var enqueuedStorageKeys = jobClient.CreatedJobs
+            .Select(job =>
+            {
+                Assert.Equal(typeof(PurgeCandidateDocumentStorageJob), job.Type);
+                Assert.Equal(nameof(PurgeCandidateDocumentStorageJob.ProcessAsync), job.Method.Name);
+                return (string)job.Args[0];
+            })
+            .ToList();
+        Assert.Contains(document1.StorageKey, enqueuedStorageKeys);
+        Assert.Contains(document2.StorageKey, enqueuedStorageKeys);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Leaves_NonEligible_Candidates_Applications_And_Documents_Untouched()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var oldEnough = Now.AddDays(-731);
+        var eligibleCandidate = CreateCandidateUpdatedAt(companyId, oldEnough);
+
+        var recentCandidate = CreateCandidateUpdatedAt(companyId, Now.AddDays(-10));
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var untouchedApplication = Application.Create(
+            Guid.NewGuid(), companyId, vacancy.Id, recentCandidate.Id, stages.Interview.Id, "Keep me", Now.AddDays(-10));
+        var untouchedDocument = CandidateDocument.Create(
+            Guid.NewGuid(), companyId, recentCandidate.Id, "CV", "cv.pdf", 2048, "application/pdf",
+            $"{companyId}/{recentCandidate.Id}/{Guid.NewGuid():N}/cv.pdf", Guid.NewGuid(), Now.AddDays(-10));
+
+        db.Candidates.AddRange(eligibleCandidate, recentCandidate);
+        db.Vacancies.Add(vacancy);
+        db.Applications.Add(untouchedApplication);
+        db.CandidateDocuments.Add(untouchedDocument);
+        await db.SaveChangesAsync();
+
+        var jobClient = new RecordingBackgroundJobClient();
+
+        var result = await handler(db, backgroundJobClient: jobClient).HandleAsync(
+            new PurgeEligibleCandidatesRequest { CompanyId = companyId },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.PurgedCount);
+
+        var savedApplication = await db.Applications.SingleAsync();
+        Assert.Equal("Keep me", savedApplication.Notes);
+
+        var savedDocument = await db.CandidateDocuments.SingleAsync();
+        Assert.Equal(untouchedDocument.Id, savedDocument.Id);
+
+        Assert.Empty(jobClient.CreatedJobs);
+    }
+
     private static PurgeEligibleCandidatesHandler handler(
         RecruitmentDbContext db,
         FakeCompanyRecruitmentSettingsReader? recruitmentSettingsReader = null,
         FakeAuditPublisher? auditPublisher = null,
-        FakeLegalHoldStatusReader? legalHoldStatusReader = null) =>
-        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher(), recruitmentSettingsReader ?? new FakeCompanyRecruitmentSettingsReader(), legalHoldStatusReader ?? new FakeLegalHoldStatusReader());
+        FakeLegalHoldStatusReader? legalHoldStatusReader = null,
+        Infrastructure.RecordingBackgroundJobClient? backgroundJobClient = null) =>
+        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher(), recruitmentSettingsReader ?? new FakeCompanyRecruitmentSettingsReader(), legalHoldStatusReader ?? new FakeLegalHoldStatusReader(), backgroundJobClient ?? new Infrastructure.RecordingBackgroundJobClient());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

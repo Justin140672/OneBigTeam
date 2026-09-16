@@ -227,6 +227,22 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
         UpdatedAt = now;
     }
 
+    /// <summary>
+    /// Ticket 7 (P2): redacts the free-form personal-data text fields recorded on this application
+    /// (recruiter/reviewer notes, rejection reason, offer notes, CV review notes) as part of
+    /// PurgeEligibleCandidatesHandler purging the owning Candidate. Structural/historical fields
+    /// (stage, dates, salary figures needed for compliance/reporting) are deliberately retained —
+    /// only free text that could contain personal data about the candidate is cleared.
+    /// </summary>
+    public void RedactPersonalData(DateTimeOffset now)
+    {
+        Notes = null;
+        RejectionReason = null;
+        CvReviewNotes = null;
+        OfferNotes = null;
+        UpdatedAt = now;
+    }
+
     public void Withdraw(DateTimeOffset now)
     {
         // A scheduled-but-not-yet-resolved interview shouldn't linger as "Pending" once the

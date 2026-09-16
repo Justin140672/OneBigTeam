@@ -200,6 +200,31 @@ public class UpdateCandidateEndpointTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Put_Candidate_Returns_Conflict_For_Purged_Candidate()
+    {
+        var companyId = Guid.NewGuid();
+        var candidateId = await SeedCandidateAsync(companyId, $"emma.{Guid.NewGuid():N}@example.com");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+            var candidate = await db.Candidates.SingleAsync(c => c.Id == candidateId);
+            candidate.Purge(Guid.NewGuid(), Now);
+            await db.SaveChangesAsync();
+        }
+        using var client = await ClientAs(RecruiterUser, companyId);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/candidates/{candidateId}", Body(companyId, candidateId));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        using var scopeVerify = _factory.Services.CreateScope();
+        var verifyDb = scopeVerify.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+        var saved = await verifyDb.Candidates.SingleAsync(c => c.Id == candidateId);
+        Assert.Equal("[purged]", saved.FirstName);
+    }
+
     private sealed record CandidatePayload(
         Guid Id, Guid CompanyId, string FirstName, string LastName, string Email, string? Phone, string? ResumeUrl);
 }

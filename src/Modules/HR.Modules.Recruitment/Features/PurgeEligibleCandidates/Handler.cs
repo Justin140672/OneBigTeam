@@ -1,3 +1,5 @@
+using Hangfire;
+using HR.Modules.Recruitment.Jobs;
 using HR.Modules.Recruitment.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
@@ -23,7 +25,8 @@ internal sealed class PurgeEligibleCandidatesHandler(
     IClock clock,
     IAuditEventPublisher auditPublisher,
     ICompanyRecruitmentSettingsReader recruitmentSettingsReader,
-    ILegalHoldStatusReader legalHoldStatusReader)
+    ILegalHoldStatusReader legalHoldStatusReader,
+    IBackgroundJobClient backgroundJobClient)
 {
     public async Task<Result<PurgeEligibleCandidatesResponse>> HandleAsync(
         PurgeEligibleCandidatesRequest request,
@@ -78,8 +81,36 @@ internal sealed class PurgeEligibleCandidatesHandler(
         if (eligibleCandidates.Count == 0)
             return Result.Success(new PurgeEligibleCandidatesResponse(0));
 
+        var eligibleCandidateIds = eligibleCandidates.Select(c => c.Id).ToList();
+
         foreach (var candidate in eligibleCandidates)
             candidate.Purge(purgedBy, now);
+
+        // Ticket 7 (P2): purge previously only redacted the Candidate's own basic fields, leaving
+        // uploaded documents and free-form application text (recruiter notes, rejection reason,
+        // offer notes, CV review notes) fully intact. Widen the purge boundary to cover both:
+        //  - Application free text is redacted in place (structural/history fields — stage, dates,
+        //    salary — are retained; see Application.RedactPersonalData).
+        //  - CandidateDocument rows are hard-deleted here (so DownloadCandidateDocument 404s
+        //    immediately, regardless of storage timing); the actual blob deletion is handed off to
+        //    PurgeCandidateDocumentStorageJob (durable, Hangfire-retried) so a transient storage
+        //    failure never blocks or partially-applies this purge.
+        var applicationsToRedact = await db.Applications
+            .Where(a => a.CompanyId == request.CompanyId && eligibleCandidateIds.Contains(a.CandidateId))
+            .ToListAsync(cancellationToken);
+
+        foreach (var application in applicationsToRedact)
+        {
+            application.RedactPersonalData(now);
+            application.IncrementVersion();
+        }
+
+        var documentsToPurge = await db.CandidateDocuments
+            .Where(d => d.CompanyId == request.CompanyId && eligibleCandidateIds.Contains(d.CandidateId))
+            .ToListAsync(cancellationToken);
+
+        var storageKeysToDelete = documentsToPurge.Select(d => d.StorageKey).ToList();
+        db.CandidateDocuments.RemoveRange(documentsToPurge);
 
         var response = new PurgeEligibleCandidatesResponse(eligibleCandidates.Count);
 
@@ -94,6 +125,11 @@ internal sealed class PurgeEligibleCandidatesHandler(
         else
         {
             await db.SaveChangesAsync(cancellationToken);
+        }
+
+        foreach (var storageKey in storageKeysToDelete)
+        {
+            backgroundJobClient.Enqueue<PurgeCandidateDocumentStorageJob>(job => job.ProcessAsync(storageKey));
         }
 
         await auditPublisher.PublishAsync(

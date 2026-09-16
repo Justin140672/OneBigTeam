@@ -126,6 +126,42 @@ public class UpdateCandidateHandlerTests
         Assert.Equal("+44 7700 900001", result.Value!.Phone);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_And_Does_Not_Mutate_Purged_Candidate()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        candidate.Purge(Guid.NewGuid(), Now);
+        db.Candidates.Add(candidate);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, auditPublisher).HandleAsync(
+            new UpdateCandidateRequest
+            {
+                CompanyId   = companyId,
+                CandidateId = candidate.Id,
+                FirstName   = "Someone",
+                LastName    = "Else",
+                Email       = "someone.else@example.com",
+                Phone       = "+44 7700 900999",
+                ResumeUrl   = "https://example.com/new-resume.pdf",
+                ExpectedVersion = candidate.Version,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
+
+        var saved = await db.Candidates.SingleAsync();
+        Assert.Equal("[purged]", saved.FirstName);
+        Assert.NotEqual("Someone", saved.FirstName);
+        Assert.NotEqual("someone.else@example.com", saved.Email);
+    }
+
     private static UpdateCandidateHandler handler(RecruitmentDbContext db, FakeAuditPublisher? auditPublisher = null) =>
         new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher());
 
