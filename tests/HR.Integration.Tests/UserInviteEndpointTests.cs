@@ -223,9 +223,83 @@ public class UserInviteEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    // Ticket 2 (P1): AcceptInvite previously only checked IsClaimed and IsExpired, never
+    // IsCancelled, so a cancelled invitation stayed fully usable — able to create a Supabase
+    // account, a UserProfile and role assignments — until its natural 7-day expiry.
+    [Fact]
+    public async Task Post_Accept_Returns_Conflict_And_Creates_Nothing_For_Cancelled_Invite()
+    {
+        var employeeId = Guid.NewGuid();
+        var (token, inviteId, email) = await SeedInviteAsync(employeeId, expiredDaysOffset: 7, cancelled: true);
+
+        using var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/invites/accept",
+            new { token, password = "SecurePass1!" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<ErrorPayload>();
+        Assert.NotNull(payload);
+        Assert.Contains("cancelled", payload!.Error, StringComparison.OrdinalIgnoreCase);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        Assert.False(await db.UserProfiles.AnyAsync(p => p.Id == employeeId));
+        Assert.False(await db.UserRoles.AnyAsync(ur => ur.UserId == employeeId));
+
+        // No account was ever created via the Supabase gateway for this email.
+        Assert.DoesNotContain(_factory.SupabaseAuthGateway.ConfirmedUsersCreated, u => u.Email == email);
+
+        var reloaded = await db.UserInvites.SingleAsync(i => i.Id == inviteId);
+        Assert.False(reloaded.IsClaimed);
+    }
+
+    // Sequential race: an admin cancels the invite, then the invitee (working from a stale page)
+    // submits acceptance. This deterministically exercises the IsCancelled short-circuit rather
+    // than the underlying Version concurrency token (which guards the case where both requests
+    // race on the same in-flight read — see HR.Modules.Identity.Tests/CancelInviteHandlerTests for
+    // a direct concurrency-token test using two DbContexts against the same store).
+    [Fact]
+    public async Task Post_Accept_After_Cancel_Endpoint_Call_Returns_Conflict()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
+        var inviteId = await IdentityUserAdminTestHelpers.SeedInviteAsync(
+            _factory, companyId, employeeId, $"race.{Guid.NewGuid():N}@example.com");
+
+        string token;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            token = (await db.UserInvites.SingleAsync(i => i.Id == inviteId)).Token;
+        }
+
+        using var adminClient = _factory.CreateClient();
+        adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, InviteAdminUser.ToString());
+        adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, InviteAdminUser, SystemRoles.HrAdministrator, companyId);
+
+        var cancel = await adminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/invites/{inviteId}/cancel", new { });
+        Assert.Equal(HttpStatusCode.OK, cancel.StatusCode);
+
+        using var inviteeClient = _factory.CreateClient();
+        var accept = await inviteeClient.PostAsJsonAsync("/api/invites/accept",
+            new { token, password = "SecurePass1!" });
+
+        Assert.Equal(HttpStatusCode.Conflict, accept.StatusCode);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task<string> SeedInviteAsync(Guid employeeId, int expiredDaysOffset)
+    {
+        var (token, _, _) = await SeedInviteAsync(employeeId, expiredDaysOffset, cancelled: false);
+        return token;
+    }
+
+    private async Task<(string Token, Guid InviteId, string Email)> SeedInviteAsync(
+        Guid employeeId, int expiredDaysOffset, bool cancelled)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
@@ -241,11 +315,15 @@ public class UserInviteEndpointTests
             invite = UserInvite.Create(employeeId, Guid.NewGuid(), invite.Email, pastNow);
         }
 
+        if (cancelled)
+            invite.Cancel(now);
+
         db.UserInvites.Add(invite);
         await db.SaveChangesAsync();
-        return invite.Token;
+        return (invite.Token, invite.Id, invite.Email);
     }
 
     private sealed record InvitePayload(string Token, DateTimeOffset ExpiresAt);
     private sealed record AcceptPayload(Guid UserId);
+    private sealed record ErrorPayload(string Error);
 }

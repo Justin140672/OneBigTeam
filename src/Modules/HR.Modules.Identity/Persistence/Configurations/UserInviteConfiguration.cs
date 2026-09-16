@@ -22,6 +22,12 @@ internal sealed class UserInviteConfiguration : IEntityTypeConfiguration<UserInv
         builder.Property(i => i.CreatedByUserId).HasColumnName("created_by_user_id");
         builder.Property(i => i.CreatedAt).HasColumnName("created_at").IsRequired();
 
+        builder.Property(i => i.Version)
+            .HasColumnName("version")
+            .IsConcurrencyToken()
+            .HasDefaultValue(1)
+            .IsRequired();
+
         builder.Property(i => i.PendingRoleIds)
             .HasColumnName("pending_role_ids")
             .HasField("_pendingRoleIds")

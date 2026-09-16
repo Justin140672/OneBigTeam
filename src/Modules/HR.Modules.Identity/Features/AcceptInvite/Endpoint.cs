@@ -45,6 +45,15 @@ internal sealed class Endpoint(
             return;
         }
 
+        // Ticket 2 (P1): CancelInvite only sets CancelledAt — the token and row are otherwise left
+        // intact — so without this check a cancelled invite (including one carrying privileged
+        // roles) stayed fully usable until its natural expiry.
+        if (invite.IsCancelled)
+        {
+            await Send.ResultAsync(TypedResults.Conflict(new { error = "This invite has been cancelled." }));
+            return;
+        }
+
         var now = clock.UtcNow;
 
         if (invite.IsExpired)
@@ -91,8 +100,33 @@ internal sealed class Endpoint(
                 db.UserRoles.Add(UserRole.Create(invite.EmployeeId, roleId, now));
         }
 
+        var expectedVersion = invite.Version;
         invite.Claim(now);
-        await db.SaveChangesAsync(ct);
+
+        var saveResult = await db.SaveChangesWithConcurrencyAsync(
+            invite, expectedVersion, "This invite is no longer valid.", ct);
+
+        if (!saveResult.IsSuccess)
+        {
+            // Someone else (most likely CancelInvite) modified this invite between our read and our
+            // write — re-check its current state so the response is accurate rather than a generic
+            // conflict.
+            var current = await db.UserInvites.AsNoTracking().FirstOrDefaultAsync(i => i.Id == invite.Id, ct);
+            if (current?.IsCancelled == true)
+            {
+                await Send.ResultAsync(TypedResults.Conflict(new { error = "This invite has been cancelled." }));
+                return;
+            }
+
+            if (current?.IsClaimed == true)
+            {
+                await Send.ResultAsync(TypedResults.Conflict(new { error = "This invite has already been used." }));
+                return;
+            }
+
+            await Send.ResultAsync(TypedResults.Conflict(new { error = "This invite could not be accepted. Please try again." }));
+            return;
+        }
 
         await Send.ResultAsync(TypedResults.Ok(new AcceptInviteResponse(invite.EmployeeId)));
     }

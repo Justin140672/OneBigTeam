@@ -48,6 +48,9 @@ internal sealed class CancelInviteHandler(
             return Result.Failure<CancelInviteResponse>(
                 Error.Conflict("Only a pending, non-cancelled invitation can be cancelled."));
 
+        // Ticket 2 (P1): pin the version we just read so a concurrent AcceptInvite acting on stale
+        // state cannot silently win the race — see AcceptInvite/Endpoint.cs's matching guard.
+        var expectedVersion = invite.Version;
         var now = clock.UtcNow;
         invite.Cancel(now);
 
@@ -63,7 +66,11 @@ internal sealed class CancelInviteHandler(
         }
         else
         {
-            await db.SaveChangesAsync(cancellationToken);
+            var saveResult = await db.SaveChangesWithConcurrencyAsync(
+                invite, expectedVersion, "This invitation was already accepted and can no longer be cancelled.", cancellationToken);
+
+            if (!saveResult.IsSuccess)
+                return Result.Failure<CancelInviteResponse>(saveResult.Error);
         }
 
         await auditEventPublisher.PublishAsync(

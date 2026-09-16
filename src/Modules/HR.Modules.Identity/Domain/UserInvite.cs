@@ -1,6 +1,8 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Identity.Domain;
 
-internal sealed class UserInvite
+internal sealed class UserInvite : IVersionedAggregate
 {
     private readonly List<Guid> _pendingRoleIds = [];
 
@@ -19,6 +21,14 @@ internal sealed class UserInvite
     public DateTimeOffset? CancelledAt { get; private set; }
     public Guid? CreatedByUserId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
+
+    // Ticket 2 (P1): guards against AcceptInvite and CancelInvite racing on the same invite — e.g.
+    // an admin cancelling an invite at the same instant the invitee submits acceptance from a
+    // stale page. Both handlers pin the Version they loaded before saving; whichever writes second
+    // gets a concurrency conflict instead of silently overwriting the other's outcome.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     /// <summary>Roles to assign once this invite is accepted. Empty means "fall back to the base Employee role".</summary>
     public IReadOnlyList<Guid> PendingRoleIds => _pendingRoleIds;
