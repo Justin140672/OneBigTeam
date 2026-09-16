@@ -299,7 +299,13 @@ public sealed class SessionRevocationEnforcementTests : IAsyncLifetime
         public Task<Guid> EnsureDevUserAsync(string email, string password, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
-        public Task<Guid> CreateConfirmedUserAsync(string email, string password, CancellationToken cancellationToken)
+        public Task<Guid> CreateConfirmedUserAsync(
+            string email, string password, CancellationToken cancellationToken,
+            IReadOnlyDictionary<string, string>? metadata = null)
+            => throw new NotSupportedException();
+
+        public Task<(Guid UserId, IReadOnlyDictionary<string, string> Metadata)?> GetUserMetadataByEmailAsync(
+            string email, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
         public Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)

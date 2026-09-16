@@ -194,6 +194,34 @@ internal sealed record UserAccountDisablementFailedAuditEvent(
     object? IAuditEvent.Metadata       => new { Reason };
 }
 
+// Ticket 12 (P1): published when InviteAcceptanceReconciliationJob detects an invite that was
+// cancelled while its InviteAcceptanceOperation was still SupabaseConfirmed (a confirmed Supabase
+// Auth user may have been created but local provisioning — UserProfile/roles/invite-claim — never
+// completed and now never will). Surfaces the orphaned Supabase user id for manual follow-up
+// (e.g. deleting the unused Auth account); this job deliberately does not call Supabase's delete
+// API itself, since that is a irreversible/high-blast-radius action better left to a human review.
+internal sealed record InviteAcceptanceOrphanedByCancellationAuditEvent(
+    Guid CompanyId,
+    Guid InviteId,
+    Guid EmployeeId,
+    Guid? SupabaseAuthUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "invite.acceptance-orphaned-by-cancellation";
+    string IAuditEvent.EntityType      => "InviteAcceptanceOperation";
+    Guid   IAuditEvent.EntityId        => InviteId;
+    Guid?  IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId     => null;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    AuditActorType IAuditEvent.ActorType => AuditActorType.IntegrationHandler;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        =>
+        "Invite was cancelled while a Supabase account was being provisioned for it — the account may need manual cleanup";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => null;
+    object? IAuditEvent.Metadata       => new { SupabaseAuthUserId };
+}
+
 // Published when a user account is re-enabled by an administrator (Features/EnableUser).
 internal sealed record UserEnabledAuditEvent(
     Guid CompanyId,

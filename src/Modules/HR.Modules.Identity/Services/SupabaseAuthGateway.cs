@@ -313,16 +313,26 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         return session.UserId;
     }
 
-    public async Task<Guid> CreateConfirmedUserAsync(string email, string password, CancellationToken cancellationToken)
+    public async Task<Guid> CreateConfirmedUserAsync(
+        string email, string password, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? metadata = null)
     {
         var http = CreateClient(options.Value.SecretKey);
 
-        var requestBody = new
-        {
-            email,
-            password,
-            email_confirm = true,
-        };
+        object requestBody = metadata is { Count: > 0 }
+            ? new
+            {
+                email,
+                password,
+                email_confirm = true,
+                user_metadata = metadata,
+            }
+            : new
+            {
+                email,
+                password,
+                email_confirm = true,
+            };
 
         using var response = await http.PostAsJsonAsync("/auth/v1/admin/users", requestBody, JsonOptions, cancellationToken);
 
@@ -452,9 +462,51 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         return match?.Id is { } id && Guid.TryParse(id, out var userId) ? userId : null;
     }
 
+    public async Task<(Guid UserId, IReadOnlyDictionary<string, string> Metadata)?> GetUserMetadataByEmailAsync(
+        string email, CancellationToken cancellationToken)
+    {
+        // Ticket 12 (P1): same admin list-by-email lookup as GetUserIdByEmailAsync, but also
+        // surfaces user_metadata so a caller can verify a specific provisioning correlation value
+        // rather than trusting the mere existence of a matching account.
+        var http = CreateClient(options.Value.SecretKey);
+        var normalized = email.Trim().ToLowerInvariant();
+
+        using var response = await http.GetAsync(
+            $"/auth/v1/admin/users?filter={Uri.EscapeDataString(normalized)}&per_page=200", cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase list-users request failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<SupabaseAdminUsersResponse>(JsonOptions, cancellationToken);
+
+        var match = payload?.Users?.FirstOrDefault(u =>
+            string.Equals(u.Email?.Trim(), normalized, StringComparison.OrdinalIgnoreCase));
+
+        if (match?.Id is not { } id || !Guid.TryParse(id, out var userId))
+            return null;
+
+        var metadata = new Dictionary<string, string>();
+        if (match.UserMetadata is not null)
+        {
+            foreach (var property in match.UserMetadata)
+            {
+                if (property.Value.ValueKind == JsonValueKind.String)
+                    metadata[property.Key] = property.Value.GetString() ?? string.Empty;
+            }
+        }
+
+        return (userId, metadata);
+    }
+
     private sealed record SupabaseAdminUsersResponse(List<SupabaseAdminUser>? Users);
 
-    private sealed record SupabaseAdminUser(string? Id, string? Email);
+    private sealed record SupabaseAdminUser(
+        string? Id, string? Email,
+        [property: JsonPropertyName("user_metadata")] Dictionary<string, JsonElement>? UserMetadata);
 
     public async Task SignOutAsync(string userAccessToken, CancellationToken cancellationToken)
     {

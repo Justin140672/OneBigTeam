@@ -196,6 +196,13 @@ public static class IdentityModule
             IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>,
             Features.OnEmployeeDepartureFinalised.Handler>();
         services.AddScoped<Jobs.AccountDisablementJob>();
+        // Ticket 10 (P1) follow-up: recovers stale/interrupted AccountDisablement requests (see
+        // class docs) — registration was missed when the job was first added; without it, Hangfire's
+        // activator cannot resolve the job type for its recurring schedule (see
+        // UseIdentityRecurringJobs).
+        services.AddScoped<Jobs.AccountDisablementReconciliationJob>();
+        // Ticket 12 (P1): recovers InviteAcceptanceOperation rows stuck SupabaseConfirmed.
+        services.AddScoped<Jobs.InviteAcceptanceReconciliationJob>();
 
         // IAM-03: position-based default role administration.
         services.AddScoped<HR.Modules.Identity.Services.PositionSync>();
@@ -373,6 +380,14 @@ public static class IdentityModule
             "identity-account-disablement-reconciliation",
             job => job.ExecuteAsync(),
             "*/10 * * * *");
+        // Ticket 12 (P1): recovers InviteAcceptanceOperation rows stuck SupabaseConfirmed —
+        // orphaning them (with an audit trail) when the underlying invite was cancelled while
+        // provisioning was in flight, or converging them to Completed when the invite was actually
+        // claimed. See InviteAcceptanceReconciliationJob for the full recovery scenarios.
+        jobManager.AddOrUpdate<Jobs.InviteAcceptanceReconciliationJob>(
+            "identity-invite-acceptance-reconciliation",
+            job => job.ExecuteAsync(),
+            "*/15 * * * *");
         return app;
     }
 

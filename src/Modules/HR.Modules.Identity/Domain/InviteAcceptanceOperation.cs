@@ -15,6 +15,14 @@ namespace HR.Modules.Identity.Domain;
 /// user id (via ISupabaseAuthGateway.GetUserIdByEmailAsync) and confirms no OTHER UserProfile is
 /// already linked to that id (guarding against ever attaching to a genuinely unrelated pre-existing
 /// account) before resuming local provisioning with it.
+///
+/// Ticket 12 (P1): the check above was insufficient — a genuinely FIRST attempt also creates this
+/// same Pending row before ever calling Supabase, so its mere existence can't prove "we created
+/// this account" versus "this email was already registered by someone/something else". AcceptInvite
+/// now stamps this operation's own id into the new Supabase user's <c>user_metadata</c> at creation
+/// time (see Features/AcceptInvite/Endpoint.cs) and, on a later EmailAlreadyRegisteredException,
+/// only resumes when the existing account's metadata carries that EXACT id back — genuine proof
+/// this operation (not a pre-existing or foreign identity) created it.
 /// </summary>
 internal sealed class InviteAcceptanceOperation
 {
@@ -23,6 +31,14 @@ internal sealed class InviteAcceptanceOperation
     public const string StatusPending           = "pending";
     public const string StatusSupabaseConfirmed = "supabase_confirmed";
     public const string StatusCompleted         = "completed";
+    /// <summary>
+    /// Ticket 12 (P1): the invite was cancelled while Supabase user creation was still in flight (or
+    /// before local provisioning ever completed) — terminal, and flags that a confirmed Supabase
+    /// user may have been left behind with no corresponding local UserProfile. Set only by
+    /// InviteAcceptanceReconciliationJob, never inline by AcceptInvite itself (which has no
+    /// visibility into a concurrent cancellation).
+    /// </summary>
+    public const string StatusOrphaned = "orphaned";
 
     public Guid Id { get; private set; }
     public Guid InviteId { get; private set; }
@@ -63,5 +79,12 @@ internal sealed class InviteAcceptanceOperation
         Status = StatusCompleted;
         UpdatedAt = now;
         CompletedAt = now;
+    }
+
+    /// <summary>Ticket 12 (P1): see <see cref="StatusOrphaned"/>.</summary>
+    public void MarkOrphaned(DateTimeOffset now)
+    {
+        Status = StatusOrphaned;
+        UpdatedAt = now;
     }
 }

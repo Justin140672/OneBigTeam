@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
@@ -71,8 +72,28 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
     public Task<Guid> EnsureDevUserAsync(string email, string password, CancellationToken cancellationToken) =>
         Task.FromResult(DeriveFakeUserId(email));
 
-    public Task<Guid> CreateConfirmedUserAsync(string email, string password, CancellationToken cancellationToken) =>
-        Task.FromResult(DeriveFakeUserId(email));
+    // Ticket 12 (P1): records the caller-supplied metadata against the same deterministic per-email
+    // id so GetUserMetadataByEmailAsync below can prove/disprove a provisioning correlation value,
+    // same as the real gateway's user_metadata round trip.
+    private static readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, string>> Metadata = new();
+
+    public Task<Guid> CreateConfirmedUserAsync(
+        string email, string password, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? metadata = null)
+    {
+        if (metadata is { Count: > 0 })
+            Metadata[email.Trim().ToLowerInvariant()] = metadata;
+
+        return Task.FromResult(DeriveFakeUserId(email));
+    }
+
+    public Task<(Guid UserId, IReadOnlyDictionary<string, string> Metadata)?> GetUserMetadataByEmailAsync(
+        string email, CancellationToken cancellationToken)
+    {
+        var normalized = email.Trim().ToLowerInvariant();
+        var metadata = Metadata.GetValueOrDefault(normalized, new Dictionary<string, string>());
+        return Task.FromResult<(Guid, IReadOnlyDictionary<string, string>)?>((DeriveFakeUserId(email), metadata));
+    }
 
     public Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)
     {

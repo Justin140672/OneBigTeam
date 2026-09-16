@@ -86,27 +86,58 @@ internal sealed class Endpoint(
             Guid supabaseUserId;
             try
             {
-                supabaseUserId = await supabaseAuthGateway.CreateConfirmedUserAsync(invite.Email, req.Password, ct);
+                // Ticket 12 (P1): stamps this operation's own id onto the new Supabase user's
+                // metadata at creation time — the ONLY thing that later proves "this exact operation
+                // (not some unrelated earlier or foreign account) created this Supabase user" when a
+                // retry hits EmailAlreadyRegisteredException below. A pending local operation row
+                // alone is never sufficient proof: a genuinely first attempt also creates one before
+                // ever calling Supabase, so its mere existence can't distinguish "we made this" from
+                // "someone/something else already had this email".
+                supabaseUserId = await supabaseAuthGateway.CreateConfirmedUserAsync(
+                    invite.Email, req.Password, ct,
+                    metadata: new Dictionary<string, string>
+                    {
+                        ["provisioning_operation_id"] = operation.Id.ToString(),
+                    });
             }
             catch (EmailAlreadyRegisteredException)
             {
-                // Ticket 8 (P2): only ever treat "already registered" as OUR OWN earlier attempt
-                // resuming — never as licence to attach to an unrelated pre-existing account — when
-                // we have our own operation record for this exact invite AND the resolved Supabase
-                // user id is not already linked to any OTHER UserProfile.
-                var resolvedUserId = await supabaseAuthGateway.GetUserIdByEmailAsync(invite.Email, ct);
+                // Ticket 12 (P1): "already registered" now only ever resumes provisioning when the
+                // existing Supabase user's own metadata carries THIS operation's id — proving THIS
+                // invite's own earlier (interrupted) attempt created it — never merely because a
+                // local Pending operation happens to exist (see class remarks above; that alone is
+                // indistinguishable from a normal first attempt) and never merely because no other
+                // UserProfile is linked to it (a genuinely pre-existing or foreign identity would
+                // also pass that check). Any other case — no matching account, a match with no/wrong
+                // correlation value — is rejected as a conflict rather than silently linking the
+                // invite to an account whose ownership was never actually proven, and the invitee's
+                // supplied password is never silently discarded in favour of an existing unrelated
+                // account.
+                var resolved = await supabaseAuthGateway.GetUserMetadataByEmailAsync(invite.Email, ct);
 
-                var linkedToAnotherProfile = resolvedUserId is not null &&
-                    await db.UserProfiles.AnyAsync(p => p.SupabaseAuthUserId == resolvedUserId, ct);
+                var provesThisOperationCreatedIt =
+                    resolved is not null
+                    && resolved.Value.Metadata.TryGetValue("provisioning_operation_id", out var correlationId)
+                    && correlationId == operation.Id.ToString();
 
-                if (resolvedUserId is null || linkedToAnotherProfile)
+                if (!provesThisOperationCreatedIt)
                 {
                     await Send.ResultAsync(TypedResults.Conflict(
                         new { error = "An account with this email already exists." }));
                     return;
                 }
 
-                supabaseUserId = resolvedUserId.Value;
+                var linkedToAnotherProfile = await db.UserProfiles.AnyAsync(
+                    p => p.SupabaseAuthUserId == resolved!.Value.UserId, ct);
+
+                if (linkedToAnotherProfile)
+                {
+                    await Send.ResultAsync(TypedResults.Conflict(
+                        new { error = "An account with this email already exists." }));
+                    return;
+                }
+
+                supabaseUserId = resolved!.Value.UserId;
             }
 
             operation.MarkSupabaseConfirmed(supabaseUserId, now);

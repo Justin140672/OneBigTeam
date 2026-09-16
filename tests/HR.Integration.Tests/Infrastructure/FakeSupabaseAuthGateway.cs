@@ -140,7 +140,14 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
     }
 
-    public Task<Guid> CreateConfirmedUserAsync(string email, string password, CancellationToken cancellationToken)
+    /// <summary>Ticket 12 (P1): records the caller-supplied metadata for a given email so
+    /// <see cref="GetUserMetadataByEmailAsync"/> can prove/disprove a provisioning correlation
+    /// value, mirroring the real gateway's user_metadata round trip.</summary>
+    public Dictionary<string, IReadOnlyDictionary<string, string>> MetadataByEmail { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public Task<Guid> CreateConfirmedUserAsync(
+        string email, string password, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? metadata = null)
     {
         if (ShouldThrowOnCreate)
         {
@@ -153,7 +160,23 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         }
 
         ConfirmedUsersCreated.Add((email, password));
+        if (metadata is { Count: > 0 })
+            MetadataByEmail[email.Trim()] = metadata;
+
         return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
+    }
+
+    public Task<(Guid UserId, IReadOnlyDictionary<string, string> Metadata)?> GetUserMetadataByEmailAsync(
+        string email, CancellationToken cancellationToken)
+    {
+        if (!UserIdsByEmail.TryGetValue(email.Trim(), out var userId))
+            return Task.FromResult<(Guid, IReadOnlyDictionary<string, string>)?>(null);
+
+        var metadata = MetadataByEmail.TryGetValue(email.Trim(), out var m)
+            ? m
+            : new Dictionary<string, string>();
+
+        return Task.FromResult<(Guid, IReadOnlyDictionary<string, string>)?>((userId, metadata));
     }
 
     public Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)

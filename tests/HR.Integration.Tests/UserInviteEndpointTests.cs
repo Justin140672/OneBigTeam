@@ -307,6 +307,7 @@ public class UserInviteEndpointTests
         var inviteId = await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, employeeId, email);
 
         string token;
+        Guid operationId;
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
@@ -316,6 +317,7 @@ public class UserInviteEndpointTests
             // (Status = Pending) and called Supabase, but crashed before the local commit.
             var operation = InviteAcceptanceOperation.CreatePending(
                 Guid.NewGuid(), inviteId, companyId, employeeId, email, DateTimeOffset.UtcNow);
+            operationId = operation.Id;
             db.InviteAcceptanceOperations.Add(operation);
             await db.SaveChangesAsync();
         }
@@ -323,6 +325,14 @@ public class UserInviteEndpointTests
         var resolvedSupabaseUserId = Guid.NewGuid();
         _factory.SupabaseAuthGateway.EmailAlreadyRegisteredFor = email;
         _factory.SupabaseAuthGateway.UserIdsByEmail[email] = resolvedSupabaseUserId;
+        // Ticket 12 (P1): the retry only resumes when the existing Supabase user's metadata proves
+        // THIS operation created it — simulates that the interrupted first attempt's
+        // CreateConfirmedUserAsync call actually reached Supabase (and stamped this correlation
+        // value) before the process died.
+        _factory.SupabaseAuthGateway.MetadataByEmail[email] = new Dictionary<string, string>
+        {
+            ["provisioning_operation_id"] = operationId.ToString(),
+        };
 
         using var client = _factory.CreateClient();
         var response = await client.PostAsJsonAsync("/api/invites/accept",
@@ -437,6 +447,123 @@ public class UserInviteEndpointTests
         Assert.False(await verifyDb.UserRoles.AnyAsync(ur => ur.UserId == employeeId));
         var reloadedInvite = await verifyDb.UserInvites.SingleAsync(i => i.Id == inviteId);
         Assert.False(reloadedInvite.IsClaimed);
+    }
+
+    [Fact]
+    public async Task Post_Accept_Returns_Conflict_When_Resolved_Supabase_User_Has_No_Provisioning_Metadata()
+    {
+        // Ticket 12 (P1): EmailAlreadyRegisteredException is thrown and a Supabase user IS
+        // resolved for the email, but that account carries no "provisioning_operation_id" metadata
+        // at all — a genuinely pre-existing/unrelated Supabase account that happens to share the
+        // email, not one this operation created. Distinct from
+        // Post_Accept_Returns_Conflict_When_Resolved_Supabase_User_Belongs_To_Another_Profile: here
+        // the resolved user isn't linked to ANY local UserProfile yet — it's rejected before that
+        // check is even reached.
+        var companyId = Guid.NewGuid();
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
+        var email = $"nometadata.{Guid.NewGuid():N}@example.com";
+        var inviteId = await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, employeeId, email);
+
+        string token;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            token = (await db.UserInvites.SingleAsync(i => i.Id == inviteId)).Token;
+
+            var operation = InviteAcceptanceOperation.CreatePending(
+                Guid.NewGuid(), inviteId, companyId, employeeId, email, DateTimeOffset.UtcNow);
+            db.InviteAcceptanceOperations.Add(operation);
+            await db.SaveChangesAsync();
+        }
+
+        var unrelatedSupabaseUserId = Guid.NewGuid();
+        _factory.SupabaseAuthGateway.EmailAlreadyRegisteredFor = email;
+        _factory.SupabaseAuthGateway.UserIdsByEmail[email] = unrelatedSupabaseUserId;
+        // Deliberately NOT populating MetadataByEmail for this email — GetUserMetadataByEmailAsync
+        // resolves the user id but with an empty metadata dictionary.
+
+        using var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/invites/accept",
+            new { token, password = "SecurePass1!" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        using var scope2 = _factory.Services.CreateScope();
+        var verifyDb = scope2.ServiceProvider.GetRequiredService<IdentityDbContext>();
+
+        Assert.False(await verifyDb.UserProfiles.AnyAsync(p => p.Id == employeeId));
+        var reloadedInvite = await verifyDb.UserInvites.SingleAsync(i => i.Id == inviteId);
+        Assert.False(reloadedInvite.IsClaimed);
+    }
+
+    [Fact]
+    public async Task Post_Accept_Returns_Conflict_When_Resolved_Supabase_User_Metadata_Belongs_To_A_Different_Operation()
+    {
+        // Ticket 12 (P1): a Supabase user IS resolved and its metadata DOES have a
+        // "provisioning_operation_id" key, but the value belongs to a DIFFERENT operation (e.g. a
+        // stale/foreign correlation value) — proves the check requires an EXACT value match, not
+        // merely the presence of the key.
+        var companyId = Guid.NewGuid();
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
+        var email = $"wrongop.{Guid.NewGuid():N}@example.com";
+        var inviteId = await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, employeeId, email);
+
+        string token;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            token = (await db.UserInvites.SingleAsync(i => i.Id == inviteId)).Token;
+
+            var operation = InviteAcceptanceOperation.CreatePending(
+                Guid.NewGuid(), inviteId, companyId, employeeId, email, DateTimeOffset.UtcNow);
+            db.InviteAcceptanceOperations.Add(operation);
+            await db.SaveChangesAsync();
+        }
+
+        var unrelatedSupabaseUserId = Guid.NewGuid();
+        _factory.SupabaseAuthGateway.EmailAlreadyRegisteredFor = email;
+        _factory.SupabaseAuthGateway.UserIdsByEmail[email] = unrelatedSupabaseUserId;
+        _factory.SupabaseAuthGateway.MetadataByEmail[email] = new Dictionary<string, string>
+        {
+            ["provisioning_operation_id"] = Guid.NewGuid().ToString(), // some other operation's id
+        };
+
+        using var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/invites/accept",
+            new { token, password = "SecurePass1!" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        using var scope2 = _factory.Services.CreateScope();
+        var verifyDb = scope2.ServiceProvider.GetRequiredService<IdentityDbContext>();
+
+        Assert.False(await verifyDb.UserProfiles.AnyAsync(p => p.Id == employeeId));
+        var reloadedInvite = await verifyDb.UserInvites.SingleAsync(i => i.Id == inviteId);
+        Assert.False(reloadedInvite.IsClaimed);
+    }
+
+    [Fact]
+    public async Task Post_Accept_First_Time_Stamps_Operation_Id_Into_Created_User_Metadata()
+    {
+        // Ticket 12 (P1): confirms the normal first-acceptance path (no prior operation, Supabase
+        // succeeds immediately) actually passes metadata containing "provisioning_operation_id"
+        // equal to the freshly created operation's own id to CreateConfirmedUserAsync — the
+        // correlation value a later retry would need to match to safely resume.
+        var employeeId = Guid.NewGuid();
+        var (token, inviteId, email) = await SeedInviteAsync(employeeId, expiredDaysOffset: 7, cancelled: false);
+
+        using var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/invites/accept",
+            new { token, password = "SecurePass1!" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        var operation = await db.InviteAcceptanceOperations.SingleAsync(o => o.InviteId == inviteId);
+
+        var recordedMetadata = Assert.Contains(email, _factory.SupabaseAuthGateway.MetadataByEmail);
+        Assert.Equal(operation.Id.ToString(), recordedMetadata["provisioning_operation_id"]);
     }
 
     [Fact]

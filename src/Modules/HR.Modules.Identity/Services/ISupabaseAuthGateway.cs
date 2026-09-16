@@ -68,8 +68,17 @@ internal interface ISupabaseAuthGateway
     /// has independent proof of email ownership — the invite link itself was emailed to that
     /// address — so there's nothing left to verify. Throws EmailAlreadyRegisteredException if
     /// Supabase reports the email as already registered (mirrors CreateUserAsync).
+    ///
+    /// Ticket 12 (P1): <paramref name="metadata"/>, when supplied, is stored as the new user's
+    /// Supabase <c>user_metadata</c> — used by AcceptInvite to stamp an application-generated
+    /// provisioning correlation value (the InviteAcceptanceOperation's own id) onto the account at
+    /// creation time, so a later retry that hits EmailAlreadyRegisteredException can PROVE (via
+    /// <see cref="GetUserMetadataByEmailAsync"/>) that this exact operation created the account,
+    /// rather than assuming any "already registered" response on retry must mean that.
     /// </summary>
-    Task<Guid> CreateConfirmedUserAsync(string email, string password, CancellationToken cancellationToken);
+    Task<Guid> CreateConfirmedUserAsync(
+        string email, string password, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? metadata = null);
 
     /// <summary>
     /// Performs a real Supabase password-grant login (POST /auth/v1/token?grant_type=password) for
@@ -110,6 +119,17 @@ internal interface ISupabaseAuthGateway
     /// lookup.
     /// </summary>
     Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Ticket 12 (P1): resolves the Supabase Auth user id AND <c>user_metadata</c> for
+    /// <paramref name="email"/> (or <c>null</c> when no such user exists) — used by AcceptInvite to
+    /// check whether a pre-existing/already-registered account carries the exact provisioning
+    /// correlation value this invite's own InviteAcceptanceOperation stamped onto it at creation
+    /// time (see <see cref="CreateConfirmedUserAsync"/>), before ever attaching a local profile to
+    /// it.
+    /// </summary>
+    Task<(Guid UserId, IReadOnlyDictionary<string, string> Metadata)?> GetUserMetadataByEmailAsync(
+        string email, CancellationToken cancellationToken);
 }
 
 internal sealed record SupabaseSession(string AccessToken, string RefreshToken, Guid UserId, DateTimeOffset ExpiresAt);

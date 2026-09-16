@@ -125,7 +125,17 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
     }
 
-    public Task<Guid> CreateConfirmedUserAsync(string email, string password, CancellationToken cancellationToken)
+    public List<(string Email, string Password, IReadOnlyDictionary<string, string>? Metadata)> ConfirmedUsersCreatedWithMetadata { get; } = [];
+
+    /// <summary>Ticket 12 (P1): metadata that GetUserMetadataByEmailAsync should report for a given
+    /// email — tests set this directly to simulate a pre-existing account (with or without a
+    /// matching provisioning correlation value) rather than relying only on whatever
+    /// CreateConfirmedUserAsync itself recorded.</summary>
+    public Dictionary<string, IReadOnlyDictionary<string, string>> MetadataByEmail { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public Task<Guid> CreateConfirmedUserAsync(
+        string email, string password, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? metadata = null)
     {
         if (ShouldThrowEmailAlreadyRegistered)
         {
@@ -138,7 +148,25 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         }
 
         ConfirmedUsersCreated.Add((email, password));
+        ConfirmedUsersCreatedWithMetadata.Add((email, password, metadata));
+
+        if (metadata is { Count: > 0 })
+            MetadataByEmail[email.Trim()] = metadata;
+
         return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
+    }
+
+    public Task<(Guid UserId, IReadOnlyDictionary<string, string> Metadata)?> GetUserMetadataByEmailAsync(
+        string email, CancellationToken cancellationToken)
+    {
+        if (!UserIdsByEmail.TryGetValue(email.Trim(), out var userId))
+            return Task.FromResult<(Guid, IReadOnlyDictionary<string, string>)?>(null);
+
+        var metadata = MetadataByEmail.TryGetValue(email.Trim(), out var m)
+            ? m
+            : new Dictionary<string, string>();
+
+        return Task.FromResult<(Guid, IReadOnlyDictionary<string, string>)?>((userId, metadata));
     }
 
     public Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)
