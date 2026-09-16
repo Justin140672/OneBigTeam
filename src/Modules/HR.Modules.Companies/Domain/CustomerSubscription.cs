@@ -140,6 +140,30 @@ internal sealed class CustomerSubscription
         return string.CompareOrdinal(eventId, LastAppliedStripeEventId) <= 0;
     }
 
+    /// <summary>
+    /// Ticket 9 (P2): true when <paramref name="eventId"/>/<paramref name="eventCreatedAt"/> is a
+    /// genuinely different event from the last one applied, but shares the same creation timestamp
+    /// (Stripe timestamps only have second resolution) — there is no reliable signal for which of
+    /// the two actually happened "first" from the webhook payloads alone. IsStaleStripeEvent used to
+    /// resolve this purely via <c>CompareOrdinal</c> on the event id, which produces a deterministic
+    /// winner but has no relationship to which event Stripe considers authoritative — a
+    /// less-complete "checkout.session.completed" delivery could win over a richer
+    /// "customer.subscription.updated" delivery (or vice versa) purely by chance of id ordering.
+    /// Callers should reconcile against the live Stripe subscription (see
+    /// IStripeGateway.GetSubscriptionAsync) rather than trust either payload's fields directly when
+    /// this returns true.
+    /// </summary>
+    public bool IsAmbiguousWithLastApplied(string? eventId, DateTimeOffset? eventCreatedAt)
+    {
+        if (eventCreatedAt is null || LastAppliedStripeEventCreatedAt is null)
+            return false;
+
+        if (eventCreatedAt.Value != LastAppliedStripeEventCreatedAt.Value)
+            return false;
+
+        return !string.Equals(eventId, LastAppliedStripeEventId, StringComparison.Ordinal);
+    }
+
     private void RecordAppliedStripeEvent(string? eventId, DateTimeOffset? eventCreatedAt, DateTimeOffset now)
     {
         if (eventCreatedAt is not null)

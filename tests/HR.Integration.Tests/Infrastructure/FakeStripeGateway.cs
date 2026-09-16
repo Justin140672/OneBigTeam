@@ -107,6 +107,27 @@ internal sealed class FakeStripeGateway : IStripeGateway
         return Task.FromResult(invoice);
     }
 
+    // Ticket 9 (P2): configurable live-subscription snapshot for StripeWebhookHandler's ambiguous-
+    // tie reconciliation path. Keyed by StripeSubscriptionId so a test can configure distinct
+    // snapshots for multiple subscriptions if needed; GetSubscriptionAsyncException lets a test
+    // simulate a reconciliation failure (must remain retryable, never silently accepted).
+    public Dictionary<string, StripeSubscriptionSnapshot?> SubscriptionSnapshotsById { get; } = [];
+
+    public Exception? GetSubscriptionAsyncException { get; set; }
+
+    public List<string> GetSubscriptionAsyncCalls { get; } = [];
+
+    public Task<StripeSubscriptionSnapshot?> GetSubscriptionAsync(string stripeSubscriptionId, CancellationToken cancellationToken)
+    {
+        GetSubscriptionAsyncCalls.Add(stripeSubscriptionId);
+
+        if (GetSubscriptionAsyncException is not null)
+            throw GetSubscriptionAsyncException;
+
+        SubscriptionSnapshotsById.TryGetValue(stripeSubscriptionId, out var snapshot);
+        return Task.FromResult(snapshot);
+    }
+
     public void Reset()
     {
         CheckoutUrlToReturn = "https://checkout.stripe.com/test-session";
@@ -123,5 +144,8 @@ internal sealed class FakeStripeGateway : IStripeGateway
         FailedInvoicesToReturn = [];
         MostRecentPaidInvoiceByStripeCustomerId = [];
         GetMostRecentPaidInvoiceCalls.Clear();
+        SubscriptionSnapshotsById.Clear();
+        GetSubscriptionAsyncException = null;
+        GetSubscriptionAsyncCalls.Clear();
     }
 }

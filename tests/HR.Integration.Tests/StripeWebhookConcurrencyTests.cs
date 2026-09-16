@@ -200,6 +200,15 @@ public class StripeWebhookConcurrencyTests
         _factory.StripeGateway.WebhookEventsByPayload["lower-payload"] = lowerIdEvent;
         _factory.StripeGateway.WebhookEventsByPayload["higher-payload"] = higherIdEvent;
 
+        // Ticket 9 (P2): the two concurrent events share the same creation timestamp, so whichever
+        // one commits SECOND now hits the ambiguous-tie reconciliation path (see
+        // CustomerSubscription.IsAmbiguousWithLastApplied) rather than an arbitrary event-id
+        // tie-break — it reconciles against this configured live Stripe snapshot instead of either
+        // payload's own fields.
+        var authoritativePeriodEnd = now.AddMonths(6);
+        _factory.StripeGateway.SubscriptionSnapshotsById["sub_race_4"] = new StripeSubscriptionSnapshot(
+            "sub_race_4", "cus_race_4", "past_due", authoritativePeriodEnd, CancelAtPeriodEnd: true, PriceId: null);
+
         using var client = _factory.CreateClient();
         var lowerTask = client.SendAsync(BuildRequest("lower-payload", "t=1,v1=fake"));
         var higherTask = client.SendAsync(BuildRequest("higher-payload", "t=1,v1=fake"));
@@ -208,14 +217,12 @@ public class StripeWebhookConcurrencyTests
         Assert.All(responses, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
 
         var persisted = await LoadAsync(companyId);
-        // "evt_zzz_tie" > "evt_aaa_tie" ordinally — the FINAL persisted state deterministically
-        // reflects the higher-id winner regardless of which physical write lands at the database
-        // first. (Per-event Applied flags are NOT asserted here: whichever event happens to commit
-        // first legitimately gets Applied=true at that moment — that historical record does not
-        // retroactively flip even if a later event supersedes it. Only the tie-break's effect on the
-        // FINAL subscription state is deterministic; see the InMemory-level test for a
-        // deterministic-ordering check of the Applied flags themselves.)
+        // Whichever event committed first applied its own payload; the second commit detected the
+        // ambiguous tie and reconciled against the authoritative live Stripe snapshot above — so the
+        // FINAL persisted state always converges on the snapshot, regardless of physical commit
+        // order or event-id ordinal comparison.
         Assert.Equal(SubscriptionStatus.PastDue, persisted.Status);
+        Assert.Equal(authoritativePeriodEnd, persisted.CurrentPeriodEnd);
         Assert.True(persisted.CancelAtPeriodEnd);
 
         // Both events are recorded exactly once each (idempotency preserved under real concurrency);

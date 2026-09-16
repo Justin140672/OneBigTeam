@@ -176,6 +176,66 @@ public class StripeWebhookEndpointTests
     }
 
     [Fact]
+    public async Task Post_StripeWebhook_AmbiguousTie_Reconciles_From_Live_Snapshot_Not_Payload()
+    {
+        var companyId = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+            db.Companies.Add(Company.Create(companyId, $"Test Company {companyId:N}", DateTimeOffset.UtcNow));
+
+            var subscription = CustomerSubscription.StartTrial(companyId, DateTimeOffset.UtcNow, trialLengthDays: 14);
+            var tieTimestamp = new DateTimeOffset(2026, 9, 16, 10, 0, 0, TimeSpan.Zero);
+            subscription.ActivateSubscription(
+                "cus_ambig_test", "sub_ambig_test", "price_1", DateTimeOffset.UtcNow.AddMonths(1),
+                DateTimeOffset.UtcNow, "evt_ambig_first", tieTimestamp);
+            db.CustomerSubscriptions.Add(subscription);
+            await db.SaveChangesAsync();
+        }
+
+        // Truncated to microsecond precision — Postgres' timestamptz has microsecond resolution,
+        // finer than .NET's tick resolution, so an un-truncated DateTimeOffset fails an exact
+        // round-trip equality check after a save/reload.
+        var snapshotPeriodEnd = new DateTimeOffset(DateTimeOffset.UtcNow.AddMonths(9).Ticks / 10 * 10, TimeSpan.Zero);
+        var payloadPeriodEnd = new DateTimeOffset(DateTimeOffset.UtcNow.AddMonths(1).Ticks / 10 * 10, TimeSpan.Zero);
+        var tieTimestampForEvent = new DateTimeOffset(2026, 9, 16, 10, 0, 0, TimeSpan.Zero);
+
+        _factory.StripeGateway.WebhookEventToReturn = new StripeWebhookEvent(
+            "customer.subscription.updated",
+            "cus_ambig_test",
+            "sub_ambig_test",
+            CompanyId: null,
+            payloadPeriodEnd,
+            CancelAtPeriodEnd: true,
+            StripeStatus: "past_due",
+            PriceId: null,
+            EventId: "evt_ambig_second",
+            EventCreatedAt: tieTimestampForEvent);
+
+        _factory.StripeGateway.SubscriptionSnapshotsById["sub_ambig_test"] = new StripeSubscriptionSnapshot(
+            "sub_ambig_test", "cus_ambig_test", "active", snapshotPeriodEnd, CancelAtPeriodEnd: false, PriceId: "price_authoritative");
+
+        using var client = _factory.CreateClient();
+        var response = await client.SendAsync(BuildRequest("{}", "t=1,v1=fake"));
+        response.EnsureSuccessStatusCode();
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var persisted = await verifyDb.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+
+        // Reconciled from the live Stripe snapshot, not the ambiguous webhook payload's own
+        // (deliberately different) fields.
+        Assert.Equal(SubscriptionStatus.Active, persisted.Status);
+        Assert.Equal(snapshotPeriodEnd, persisted.CurrentPeriodEnd);
+        Assert.False(persisted.CancelAtPeriodEnd);
+        // Reconciliation for an already-activated subscription goes through UpdateFromStripe (same
+        // as any ordinary customer.subscription.updated projection), which does not touch PriceId —
+        // only the initial ActivateSubscription call sets it. PriceId therefore remains whatever
+        // ActivateSubscription originally set, not the snapshot's value.
+        Assert.Equal("price_1", persisted.PriceId);
+    }
+
+    [Fact]
     public async Task Post_StripeWebhook_SubscriptionUpdated_Updates_Matched_Subscription()
     {
         var companyId = await SeedCompanyWithSubscriptionAsync("cus_update_test", "sub_update_test");

@@ -48,41 +48,52 @@ public class StripeWebhookConcurrencyTests
         new("customer.subscription.deleted", "cus_1", "sub_1", null, null, true, "canceled", null,
             EventId: evtId, EventCreatedAt: evtCreatedAt);
 
-    // ---- Equal-EventCreatedAt tie-break (higher ordinal event id wins), both delivery orders ----
+    // ---- Equal-EventCreatedAt ties reconcile against live Stripe state (Ticket 9, P2), converging
+    // to the SAME authoritative outcome regardless of delivery order — replaces the old arbitrary
+    // "higher ordinal event id wins" tie-break, which had no relationship to which event Stripe
+    // itself considered authoritative. ----
 
     [Fact]
-    public async Task Equal_timestamp_tiebreak_higherOrdinalId_wins_when_lowerId_delivered_first()
+    public async Task Equal_timestamp_tie_reconciles_to_live_snapshot_when_first_event_delivered_first()
     {
         var companyId = await SeedActiveAsync();
         var tie = new DateTimeOffset(Now.AddHours(1));
+        var authoritativePeriodEnd = new DateTimeOffset(Now.AddMonths(2));
 
         var gw = new FakeStripeGateway { WebhookEventToReturn = Updated("active", new DateTimeOffset(Now.AddMonths(1)), "evt_aaa", tie) };
         await using (var c1 = Ctx())
             await Handler(c1, gw, Now.AddHours(2)).HandleAsync("p", "s", CancellationToken.None);
 
-        gw.WebhookEventToReturn = Updated("past_due", new DateTimeOffset(Now.AddMonths(2)), "evt_bbb", tie, cancel: true);
+        // Second, different event at the SAME timestamp — an ambiguous tie against evt_aaa. Stripe's
+        // live state (configured here) is what actually wins, not either payload's own fields.
+        gw.WebhookEventToReturn = Updated("past_due", new DateTimeOffset(Now.AddMonths(3)), "evt_bbb", tie, cancel: true);
+        gw.SubscriptionSnapshotsById["sub_1"] = new StripeSubscriptionSnapshot(
+            "sub_1", "cus_1", "past_due", authoritativePeriodEnd, CancelAtPeriodEnd: true, PriceId: "price_1");
         await using (var c2 = Ctx())
             await Handler(c2, gw, Now.AddHours(3)).HandleAsync("p", "s", CancellationToken.None);
 
         await using var verify = Ctx();
         var persisted = await verify.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
-        // "evt_bbb" > "evt_aaa" ordinally — the higher id wins the tie regardless of delivery order.
-        // evt_aaa was legitimately applied when it arrived (no prior marker existed yet) — that
-        // historical Applied=true record does not retroactively change once evt_bbb supersedes it;
-        // what matters is that the FINAL effective subscription state reflects the tie-break winner.
         Assert.Equal(SubscriptionStatus.PastDue, persisted.Status);
+        Assert.Equal(authoritativePeriodEnd, persisted.CurrentPeriodEnd);
         Assert.True(persisted.CancelAtPeriodEnd);
         Assert.True((await verify.ProcessedStripeEvents.SingleAsync(e => e.StripeEventId == "evt_bbb")).Applied);
         Assert.True((await verify.ProcessedStripeEvents.SingleAsync(e => e.StripeEventId == "evt_aaa")).Applied);
     }
 
     [Fact]
-    public async Task Equal_timestamp_tiebreak_higherOrdinalId_wins_when_higherId_delivered_first()
+    public async Task Equal_timestamp_tie_reconciles_to_live_snapshot_regardless_of_delivery_order()
     {
         var companyId = await SeedActiveAsync();
         var tie = new DateTimeOffset(Now.AddHours(1));
+        var authoritativePeriodEnd = new DateTimeOffset(Now.AddMonths(2));
 
-        var gw = new FakeStripeGateway { WebhookEventToReturn = Updated("past_due", new DateTimeOffset(Now.AddMonths(2)), "evt_bbb", tie, cancel: true) };
+        var gw = new FakeStripeGateway
+        {
+            WebhookEventToReturn = Updated("past_due", new DateTimeOffset(Now.AddMonths(2)), "evt_bbb", tie, cancel: true),
+        };
+        gw.SubscriptionSnapshotsById["sub_1"] = new StripeSubscriptionSnapshot(
+            "sub_1", "cus_1", "past_due", authoritativePeriodEnd, CancelAtPeriodEnd: true, PriceId: "price_1");
         await using (var c1 = Ctx())
             await Handler(c1, gw, Now.AddHours(2)).HandleAsync("p", "s", CancellationToken.None);
 
@@ -92,11 +103,11 @@ public class StripeWebhookConcurrencyTests
 
         await using var verify = Ctx();
         var persisted = await verify.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
-        // Same winner ("evt_bbb") regardless of delivery order — convergence.
+        // Same authoritative outcome regardless of delivery order — convergence via reconciliation,
+        // not via whichever event happens to sort higher ordinally.
         Assert.Equal(SubscriptionStatus.PastDue, persisted.Status);
+        Assert.Equal(authoritativePeriodEnd, persisted.CurrentPeriodEnd);
         Assert.True(persisted.CancelAtPeriodEnd);
-        Assert.True((await verify.ProcessedStripeEvents.SingleAsync(e => e.StripeEventId == "evt_bbb")).Applied);
-        Assert.False((await verify.ProcessedStripeEvents.SingleAsync(e => e.StripeEventId == "evt_aaa")).Applied);
     }
 
     // ---- Update vs. delete race for the same subscription — newer wins regardless of order ----

@@ -43,4 +43,7 @@ internal sealed class E2eStripeGateway : IStripeGateway
 
     public Task<StripeInvoiceSummary?> GetMostRecentPaidInvoiceAsync(string stripeCustomerId, CancellationToken cancellationToken) =>
         Task.FromResult<StripeInvoiceSummary?>(null);
+
+    public Task<StripeSubscriptionSnapshot?> GetSubscriptionAsync(string stripeSubscriptionId, CancellationToken cancellationToken) =>
+        Task.FromResult<StripeSubscriptionSnapshot?>(null);
 }

@@ -135,6 +135,42 @@ internal sealed class StripeGateway(IOptions<StripeOptions> options) : IStripeGa
         }
     }
 
+    public async Task<StripeSubscriptionSnapshot?> GetSubscriptionAsync(
+        string stripeSubscriptionId, CancellationToken cancellationToken)
+    {
+        var requestOptions = new RequestOptions { ApiKey = options.Value.SecretKey };
+        var service = new SubscriptionService();
+
+        Subscription subscription;
+        try
+        {
+            subscription = await service.GetAsync(
+                stripeSubscriptionId,
+                options: null,
+                requestOptions,
+                cancellationToken);
+        }
+        catch (StripeException ex) when (ex.StripeError?.Code == "resource_missing")
+        {
+            return null;
+        }
+
+        var currentPeriodEnd = subscription.Items?.Data?
+            .Select(item => item.CurrentPeriodEnd)
+            .DefaultIfEmpty()
+            .Max();
+
+        var priceId = subscription.Items?.Data?.FirstOrDefault()?.Price?.Id;
+
+        return new StripeSubscriptionSnapshot(
+            subscription.Id,
+            subscription.CustomerId,
+            subscription.Status,
+            currentPeriodEnd,
+            subscription.CancelAtPeriodEnd,
+            priceId);
+    }
+
     public async Task ResumeSubscriptionAsync(string stripeSubscriptionId, CancellationToken cancellationToken)
     {
         var requestOptions = new RequestOptions { ApiKey = options.Value.SecretKey };

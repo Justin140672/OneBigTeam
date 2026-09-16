@@ -132,4 +132,24 @@ internal sealed class FakeStripeGateway : IStripeGateway
                 ? invoice
                 : null);
     }
+
+    // Ticket 9 (P2): configurable live-subscription snapshot for StripeWebhookHandler's ambiguous-
+    // tie reconciliation path.
+    public IDictionary<string, StripeSubscriptionSnapshot?> SubscriptionSnapshotsById { get; set; } =
+        new Dictionary<string, StripeSubscriptionSnapshot?>();
+
+    public Exception? GetSubscriptionAsyncException { get; set; }
+
+    public List<string> GetSubscriptionAsyncCalls { get; } = [];
+
+    public Task<StripeSubscriptionSnapshot?> GetSubscriptionAsync(string stripeSubscriptionId, CancellationToken cancellationToken)
+    {
+        GetSubscriptionAsyncCalls.Add(stripeSubscriptionId);
+
+        if (GetSubscriptionAsyncException is not null)
+            return Task.FromException<StripeSubscriptionSnapshot?>(GetSubscriptionAsyncException);
+
+        return Task.FromResult(
+            SubscriptionSnapshotsById.TryGetValue(stripeSubscriptionId, out var snapshot) ? snapshot : null);
+    }
 }

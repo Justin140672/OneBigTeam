@@ -56,7 +56,30 @@ internal interface IStripeGateway
     Task<StripeInvoiceSummary?> GetMostRecentPaidInvoiceAsync(
         string stripeCustomerId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Ticket 9 (P2): fetches the CURRENT, authoritative state of a Stripe subscription directly
+    /// from Stripe's API — used by StripeWebhookHandler to reconcile ambiguous webhook deliveries
+    /// (two different events for the same subscription sharing the same creation timestamp, so
+    /// there is no reliable ordering between them) instead of treating an arbitrary event-id
+    /// tie-break as if it were chronological. Returns null if Stripe reports no such subscription.
+    /// </summary>
+    Task<StripeSubscriptionSnapshot?> GetSubscriptionAsync(
+        string stripeSubscriptionId,
+        CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// Ticket 9 (P2): a thin, authoritative snapshot of a live Stripe subscription's current state,
+/// fetched on demand rather than derived from any single webhook payload.
+/// </summary>
+internal sealed record StripeSubscriptionSnapshot(
+    string StripeSubscriptionId,
+    string StripeCustomerId,
+    string Status,
+    DateTimeOffset? CurrentPeriodEnd,
+    bool CancelAtPeriodEnd,
+    string? PriceId);
 
 /// <summary>
 /// Thin projection of the Stripe Invoice fields the Failed Payments Dashboard needs. NextPaymentAttempt

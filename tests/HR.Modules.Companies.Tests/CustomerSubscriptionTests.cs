@@ -800,6 +800,73 @@ public class CustomerSubscriptionTests
         Assert.True(subscription.HasPendingDeletion);
     }
 
+    // ---- Ticket 9 (P2): IsAmbiguousWithLastApplied ----
+
+    [Fact]
+    public void IsAmbiguousWithLastApplied_True_When_Same_Timestamp_And_Different_EventId()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_1", "sub_1", "price_1", Now.AddMonths(1), Now, "evt_1", Now);
+
+        var ambiguous = subscription.IsAmbiguousWithLastApplied("evt_2", Now);
+
+        Assert.True(ambiguous);
+    }
+
+    [Fact]
+    public void IsAmbiguousWithLastApplied_False_When_Same_Timestamp_And_Same_EventId_Redelivery()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_1", "sub_1", "price_1", Now.AddMonths(1), Now, "evt_1", Now);
+
+        var ambiguous = subscription.IsAmbiguousWithLastApplied("evt_1", Now);
+
+        Assert.False(ambiguous);
+    }
+
+    [Fact]
+    public void IsAmbiguousWithLastApplied_False_When_EventCreatedAt_Is_Earlier()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_1", "sub_1", "price_1", Now.AddMonths(1), Now, "evt_1", Now);
+
+        var ambiguous = subscription.IsAmbiguousWithLastApplied("evt_2", Now.AddSeconds(-1));
+
+        Assert.False(ambiguous);
+    }
+
+    [Fact]
+    public void IsAmbiguousWithLastApplied_False_When_EventCreatedAt_Is_Later()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_1", "sub_1", "price_1", Now.AddMonths(1), Now, "evt_1", Now);
+
+        var ambiguous = subscription.IsAmbiguousWithLastApplied("evt_2", Now.AddSeconds(1));
+
+        Assert.False(ambiguous);
+    }
+
+    [Fact]
+    public void IsAmbiguousWithLastApplied_False_When_Nothing_Applied_Yet()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+
+        var ambiguous = subscription.IsAmbiguousWithLastApplied("evt_1", Now);
+
+        Assert.False(ambiguous);
+    }
+
+    [Fact]
+    public void IsAmbiguousWithLastApplied_False_When_EventCreatedAt_Argument_Is_Null()
+    {
+        var subscription = CustomerSubscription.StartTrial(Guid.NewGuid(), Now, trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_1", "sub_1", "price_1", Now.AddMonths(1), Now, "evt_1", Now);
+
+        var ambiguous = subscription.IsAmbiguousWithLastApplied("evt_2", null);
+
+        Assert.False(ambiguous);
+    }
+
     [Fact]
     public void ExecuteDeletion_Succeeds_After_LegalHold_Lifted()
     {
