@@ -188,6 +188,7 @@ internal sealed class HireCandidateHandler(
 
         var now = clock.UtcNowOffset();
         var previousStageId = application.CurrentStageId;
+        var expectedVersion = application.Version;
 
         application.RecordHire(hiredStage.Id, now);
         candidate.LinkToEmployee(provisioningResult.Value!, now);
@@ -220,7 +221,20 @@ internal sealed class HireCandidateHandler(
         }
         else
         {
-            await db.SaveChangesAsync(cancellationToken);
+            // Ticket 6 (P1): pin the version read at the top of this handler so a concurrent writer
+            // (e.g. RejectCandidate racing this Hire on the same application) is detected rather than
+            // silently overwritten. Note the Employee was already provisioned above via the
+            // idempotent (SourceReference-keyed) CreateFromCandidateAsync call before this save is
+            // attempted — a concurrency conflict here means the Application/Candidate link did not
+            // commit, but the Employee row may already exist; a retried Hire request reuses that same
+            // Employee via its stable SourceReference rather than creating a second one (see NFR-08
+            // remarks above), so a retry after this failure still converges to a consistent state.
+            var saveResult = await db.SaveChangesWithConcurrencyAsync(
+                application, expectedVersion,
+                "This application was changed by someone else. Reload and try again.", cancellationToken);
+
+            if (!saveResult.IsSuccess)
+                return Result.Failure<HireCandidateResponse>(saveResult.Error);
         }
 
         await eventPublisher.PublishAsync(new CandidateHiredIntegrationEvent(

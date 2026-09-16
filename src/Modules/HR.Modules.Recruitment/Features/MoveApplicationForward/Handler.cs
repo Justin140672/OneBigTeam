@@ -91,6 +91,7 @@ internal sealed class MoveApplicationForwardHandler(
 
         var now = clock.UtcNowOffset();
         var previousStageId = application.CurrentStageId;
+        var expectedVersion = application.Version;
 
         var notesProvided = request.CvReviewNotes is not null;
         if (notesProvided)
@@ -119,7 +120,13 @@ internal sealed class MoveApplicationForwardHandler(
         }
         else
         {
-            await db.SaveChangesAsync(cancellationToken);
+            // Ticket 6 (P1): see MoveApplicationStageHandler's matching guard.
+            var saveResult = await db.SaveChangesWithConcurrencyAsync(
+                application, expectedVersion,
+                "This application was changed by someone else. Reload and try again.", cancellationToken);
+
+            if (!saveResult.IsSuccess)
+                return Result.Failure<MoveApplicationForwardResponse>(saveResult.Error);
         }
 
         if (notesProvided)

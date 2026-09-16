@@ -107,6 +107,12 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property(a => a.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.Property(a => a.Source)
             .HasColumnName("source")
             .HasConversion<string>()

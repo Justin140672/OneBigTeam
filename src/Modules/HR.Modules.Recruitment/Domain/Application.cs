@@ -1,8 +1,17 @@
 namespace HR.Modules.Recruitment.Domain;
 
-internal sealed class Application
+internal sealed class Application : HR.SharedKernel.IVersionedAggregate
 {
     private Application() { }
+
+    // Ticket 6 (P1): explicit, persisted optimistic-concurrency token, mirroring Candidate.Version /
+    // Vacancy.Version / RecruitmentStage.Version / Interview.Version. Applications previously had no
+    // concurrency protection at all — two concurrent stage transitions (e.g. a Kanban drag-and-drop
+    // move racing a Hire/Reject action) could both commit unchecked, silently discarding one of them
+    // and leaving the application's history inconsistent with what actually happened.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public Guid Id { get; private set; }
     public Guid CompanyId { get; private set; }

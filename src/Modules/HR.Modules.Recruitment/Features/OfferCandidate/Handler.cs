@@ -127,6 +127,7 @@ internal sealed class OfferCandidateHandler(
         var now = clock.UtcNowOffset();
         var today = DateOnly.FromDateTime(now.UtcDateTime);
         var previousStageId = application.CurrentStageId;
+        var expectedVersion = application.Version;
 
         var offeredSalary = request.OfferedSalary ?? employmentDefaults?.SalaryMin;
 
@@ -183,7 +184,13 @@ internal sealed class OfferCandidateHandler(
         }
         else
         {
-            await db.SaveChangesAsync(cancellationToken);
+            // Ticket 6 (P1): see MoveApplicationStageHandler's matching guard.
+            var saveResult = await db.SaveChangesWithConcurrencyAsync(
+                application, expectedVersion,
+                "This application was changed by someone else. Reload and try again.", cancellationToken);
+
+            if (!saveResult.IsSuccess)
+                return Result.Failure<OfferCandidateResponse>(saveResult.Error);
         }
 
         await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);

@@ -74,6 +74,7 @@ internal sealed class RejectCandidateHandler(RecruitmentDbContext db, IClock clo
 
         var now = clock.UtcNowOffset();
         var previousStageId = application.CurrentStageId;
+        var expectedVersion = application.Version;
 
         application.RecordRejection(rejectedStage.Id, request.RejectionReason, now);
         recorder.AddHistoryEntry(application, previousStageId, performedBy, now, request.RejectionReason);
@@ -100,7 +101,13 @@ internal sealed class RejectCandidateHandler(RecruitmentDbContext db, IClock clo
         }
         else
         {
-            await db.SaveChangesAsync(cancellationToken);
+            // Ticket 6 (P1): see MoveApplicationStageHandler's matching guard.
+            var saveResult = await db.SaveChangesWithConcurrencyAsync(
+                application, expectedVersion,
+                "This application was changed by someone else. Reload and try again.", cancellationToken);
+
+            if (!saveResult.IsSuccess)
+                return Result.Failure<RejectCandidateResponse>(saveResult.Error);
         }
 
         await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);

@@ -98,6 +98,7 @@ internal sealed class MoveApplicationStageHandler(
                     "use the dedicated workflow action for this outcome (e.g. Hire, Reject, Withdraw)."));
 
         var previousStageId = application.CurrentStageId;
+        var expectedVersion = application.Version;
         var now = clock.UtcNowOffset();
 
         application.MoveToStage(newStage.Id, now);
@@ -125,7 +126,15 @@ internal sealed class MoveApplicationStageHandler(
         }
         else
         {
-            await db.SaveChangesAsync(cancellationToken);
+            // Ticket 6 (P1): pin the version read at the top of this handler so a concurrent writer
+            // (another generic move, or a named transition like Hire/Reject) that already saved
+            // since we read is detected instead of silently overwritten.
+            var saveResult = await db.SaveChangesWithConcurrencyAsync(
+                application, expectedVersion,
+                "This application was changed by someone else. Reload and try again.", cancellationToken);
+
+            if (!saveResult.IsSuccess)
+                return Result.Failure<MoveApplicationStageResponse>(saveResult.Error);
         }
 
         await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);
