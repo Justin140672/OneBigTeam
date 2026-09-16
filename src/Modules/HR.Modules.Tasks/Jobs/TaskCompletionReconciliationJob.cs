@@ -32,6 +32,16 @@ namespace HR.Modules.Tasks.Jobs;
 /// idempotency-keyed side effect (e.g. AssetTaskCompletionAction's "Return asset" task,
 /// LeaveTaskCompletionAction's approve/reject call) converges on its original result rather than
 /// repeating it.
+///
+/// Ticket 19 (P2): the fixed "no progress within 5 minutes" age check is now only the ELIGIBILITY
+/// filter (still needed so a genuinely in-flight CompleteTaskHandler call, which normally completes
+/// in milliseconds, is never raced) — the actual exclusivity guarantee comes from
+/// <see cref="TaskCompletionOperation.Claim"/>, guarded by the same optimistic-concurrency
+/// primitive as AccountDisablement/CandidateDocumentDeletionOperation. Because
+/// <see cref="TaskCompletionOperation.Version"/> is a real concurrency token, this ALSO protects
+/// against a live CompleteTaskHandler request racing this sweep for the SAME operation — the
+/// handler's own plain SaveChangesAsync call already fails with DbUpdateConcurrencyException if the
+/// reconciler's claim commits first, with no changes required on that side.
 /// </summary>
 [AutomaticRetry(Attempts = MaxAttempts, DelaysInSeconds = new[] { 30, 120, 600 })]
 internal sealed class TaskCompletionReconciliationJob(
@@ -46,7 +56,7 @@ internal sealed class TaskCompletionReconciliationJob(
     /// <summary>
     /// A Pending operation younger than this is assumed to still be genuinely in-flight inside a
     /// normal CompleteTaskHandler call (which completes in milliseconds under healthy conditions),
-    /// not abandoned — avoids racing a live request.
+    /// not abandoned — avoids attempting to claim (and therefore contending with) a live request.
     /// </summary>
     private static readonly TimeSpan StalePendingThreshold = TimeSpan.FromMinutes(5);
 
@@ -55,23 +65,49 @@ internal sealed class TaskCompletionReconciliationJob(
     {
         var now = clock.UtcNowOffset();
         var cutoff = now - StalePendingThreshold;
+        var reconcilerInstanceId = Guid.NewGuid();
 
+        // Ticket 19 (P2): the LeaseExpiresAt check is required, not just the Status/age filter —
+        // Claim() deliberately leaves Status as Pending (see its remarks), so a row a prior sweep
+        // (or this same sweep, on a slow replay) already claimed and is still actively replaying
+        // would otherwise remain "eligible" here and get claimed a second time by a LATER,
+        // independent query — the guarded save on the SECOND claim only protects against a truly
+        // concurrent attempt against the SAME already-fetched row, not a fresh query issued after
+        // the first claim has already committed.
         var stalePending = await dbContext.TaskCompletionOperations
-            .Where(o => o.Status == TaskCompletionOperation.StatusPending && o.CreatedAt < cutoff)
+            .Where(o => o.Status == TaskCompletionOperation.StatusPending
+                && o.CreatedAt < cutoff
+                && (o.LeaseExpiresAt == null || o.LeaseExpiresAt < now))
             .ToListAsync();
 
         foreach (var operation in stalePending)
         {
-            await ReplayPendingAsync(operation, now);
+            await ReplayPendingAsync(operation, reconcilerInstanceId, now);
         }
 
         var abandonedDispatchApplied = await dbContext.TaskCompletionOperations
             .Where(o => o.Status == TaskCompletionOperation.StatusDispatchApplied
-                && (o.LastAttemptAt == null || o.LastAttemptAt < cutoff))
+                && (o.LeaseExpiresAt == null || o.LeaseExpiresAt < now))
             .ToListAsync();
 
         foreach (var operation in abandonedDispatchApplied)
         {
+            var expectedVersion = operation.Version;
+            operation.Claim(reconcilerInstanceId, now);
+
+            var claimResult = await dbContext.SaveChangesWithConcurrencyAsync(
+                operation, expectedVersion,
+                "This task completion operation was already claimed by another reconciler.",
+                CancellationToken.None);
+
+            if (claimResult.IsFailure)
+            {
+                logger.LogInformation(
+                    "TaskCompletionReconciliationJob: lost the claim race for abandoned DispatchApplied operation {OperationId} (task {TaskId}, company {CompanyId}) — skipping this sweep.",
+                    operation.Id, operation.TaskId, operation.CompanyId);
+                continue;
+            }
+
             logger.LogWarning(
                 "TaskCompletionReconciliationJob: re-enqueuing abandoned DispatchApplied operation {OperationId} (task {TaskId}, company {CompanyId}) for side-effect confirmation.",
                 operation.Id, operation.TaskId, operation.CompanyId);
@@ -81,8 +117,26 @@ internal sealed class TaskCompletionReconciliationJob(
         }
     }
 
-    private async Task ReplayPendingAsync(TaskCompletionOperation operation, DateTimeOffset now)
+    private async Task ReplayPendingAsync(TaskCompletionOperation operation, Guid reconcilerInstanceId, DateTimeOffset now)
     {
+        // Ticket 19 (P2): claim BEFORE touching anything else — guards against a live
+        // CompleteTaskHandler request (or another reconciler replica) racing this exact replay.
+        var expectedVersion = operation.Version;
+        operation.Claim(reconcilerInstanceId, now);
+
+        var claimResult = await dbContext.SaveChangesWithConcurrencyAsync(
+            operation, expectedVersion,
+            "This task completion operation was already claimed by another worker.",
+            CancellationToken.None);
+
+        if (claimResult.IsFailure)
+        {
+            logger.LogInformation(
+                "TaskCompletionReconciliationJob: lost the claim race for stale pending operation {OperationId} (task {TaskId}, company {CompanyId}) — skipping this sweep.",
+                operation.Id, operation.TaskId, operation.CompanyId);
+            return;
+        }
+
         var task = await dbContext.TaskItems.SingleOrDefaultAsync(t => t.Id == operation.TaskId);
 
         if (task is null)

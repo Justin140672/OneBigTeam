@@ -48,7 +48,7 @@ internal sealed class EmployeeEqualityDataConfiguration : IEntityTypeConfigurati
         // identifiable orphan. A real FK to employees.employees guarantees a row cannot exist
         // without its employee, and ON DELETE CASCADE guarantees it is destroyed the instant the
         // employee row is physically deleted (the manual per-store customer-deletion procedure in
-        // docs/compliance/data-protection-operations.md, and full-tenant deletion which drops the
+        // specifications/compliance/data-protection-operations.md, and full-tenant deletion which drops the
         // whole `employees` schema).
         //
         // Cascade is deliberately chosen here even though sibling employee-child tables use

@@ -159,6 +159,11 @@ internal sealed record ProbationExtendedAuditEvent(
     Guid NewFinalReviewId,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
+    // Ticket 15 (P1): deterministic EventId derived from the extension-confirmation review id —
+    // exactly one such review (and therefore one ProbationExtendedAuditEvent) is ever created per
+    // extension decision (see ProbationExtensionService.ApplyAsync), so a recovered/replayed
+    // dispatch can never create a duplicate audit row.
+    Guid IAuditEvent.EventId            => ExtensionConfirmationReviewId;
     string IAuditEvent.EventType        => "probation-record.extended";
     string IAuditEvent.EntityType       => "ProbationRecord";
     Guid   IAuditEvent.EntityId         => ProbationRecordId;
@@ -191,6 +196,8 @@ internal sealed record ProbationReviewCompletedAuditEvent(
     bool HasNotes,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
+    // Ticket 15 (P1): deterministic EventId derived from the review id — see ProbationPassedAuditEvent.
+    Guid IAuditEvent.EventId            => ProbationReviewId;
     string IAuditEvent.EventType        => "probation-review.completed";
     string IAuditEvent.EntityType       => "ProbationReview";
     Guid   IAuditEvent.EntityId         => ProbationReviewId;
@@ -223,6 +230,10 @@ internal sealed record ProbationPassedAuditEvent(
     bool HasNotes,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
+    // Ticket 15 (P1): deterministic EventId derived from the review id — exactly one
+    // ProbationPassedAuditEvent is ever meaningful per review, so a recovered/replayed dispatch
+    // (see CompleteProbationReviewFromTaskAction) can never create a duplicate audit row.
+    Guid IAuditEvent.EventId            => ProbationReviewId;
     string IAuditEvent.EventType        => "probation-record.passed";
     string IAuditEvent.EntityType       => "ProbationRecord";
     Guid   IAuditEvent.EntityId         => ProbationRecordId;
@@ -253,6 +264,8 @@ internal sealed record ProbationFailedAuditEvent(
     bool HasNotes,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
+    // Ticket 15 (P1): deterministic EventId derived from the review id — see ProbationPassedAuditEvent.
+    Guid IAuditEvent.EventId            => ProbationReviewId;
     string IAuditEvent.EventType        => "probation-record.failed";
     string IAuditEvent.EntityType       => "ProbationRecord";
     Guid   IAuditEvent.EntityId         => ProbationRecordId;

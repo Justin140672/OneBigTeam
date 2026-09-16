@@ -175,7 +175,11 @@ public class OffboardingCompletionRulesIntegrationTests
         var taskItemId = await FindTaskItemIdBySourceEntityAsync(client, companyId, employeeId, task.Id);
 
         var resp = await CompleteTaskAsync(client, companyId, taskItemId, outcomeDecision: "Skip");
-        resp.EnsureSuccessStatusCode(); // Best-effort action — the HTTP call itself still succeeds.
+        // Ticket 3 (P1): a Skip with no reason is a validation failure, not a best-effort no-op —
+        // the HTTP call itself fails (see CompleteOffboardingTaskFromTaskActionTests for the
+        // equivalent unit-level coverage), and neither the offboarding task nor the underlying
+        // Tasks-module task item is completed.
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
 
         var overviewAfter = await GetOverviewAsync(client, companyId, employeeId);
         var taskAfter = Assert.Single(overviewAfter.Tasks, t => t.Id == task.Id);

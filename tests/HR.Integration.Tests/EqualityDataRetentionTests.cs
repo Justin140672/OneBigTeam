@@ -77,7 +77,7 @@ public class EqualityDataRetentionTests
         Assert.Equal(1, await CountEqualityRowsByIdAsync(equalityId));
 
         // Physically delete the employee row (mirrors the manual per-store customer-deletion
-        // procedure in docs/compliance/data-protection-operations.md).
+        // procedure in specifications/compliance/data-protection-operations.md).
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();

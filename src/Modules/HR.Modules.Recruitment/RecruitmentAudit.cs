@@ -189,6 +189,67 @@ internal sealed record CandidatesPurgedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
+/// <summary>
+/// Ticket 18 (P1): published when PurgeCandidateDocumentStorageJob suspends a document blob
+/// deletion because the owning company is currently under legal hold — non-sensitive (no document
+/// content, only the operation/storage-key identifiers already visible on the deletion-operation
+/// row itself).
+/// </summary>
+internal sealed record CandidateDocumentDeletionSuspendedForLegalHoldAuditEvent(
+    Guid CompanyId,
+    Guid OperationId,
+    Guid CandidateId,
+    string StorageKey,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    // Ticket 18 (P1): stable per-operation-per-suspension-window key would require a counter this
+    // domain doesn't track; reusing OperationId is intentionally accepted as "at most one currently
+    // meaningful suspension notice per operation" is good enough for an operational/non-business-
+    // critical event — a duplicate suspend notice (e.g. two workers racing the same stale-Processing
+    // reset) is a harmless no-op via DbAuditEventPublisher's EventId dedupe.
+    Guid IAuditEvent.EventId => OperationId;
+    string IAuditEvent.EventType => "candidate-document-deletion.suspended-for-legal-hold";
+    string IAuditEvent.EntityType => "CandidateDocumentDeletionOperation";
+    Guid IAuditEvent.EntityId => OperationId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    AuditActorType IAuditEvent.ActorType => AuditActorType.IntegrationHandler;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Candidate document deletion suspended — company is under legal hold";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => null;
+    object? IAuditEvent.Metadata => new { CandidateId, StorageKey };
+}
+
+/// <summary>
+/// Ticket 18 (P1): published when a previously-suspended document blob deletion resumes because
+/// the legal hold has been confirmed lifted.
+/// </summary>
+internal sealed record CandidateDocumentDeletionResumedAfterLegalHoldAuditEvent(
+    Guid CompanyId,
+    Guid OperationId,
+    Guid CandidateId,
+    string StorageKey,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    // Ticket 18 (P1): deliberately NOT keyed on OperationId here — CandidateDocumentDeletionSuspendedForLegalHoldAuditEvent
+    // above already claims that EventId for this same operation while held (dedupe matters most
+    // there, since a Held operation may be re-checked across many sweeps); a resumed event fires at
+    // most once per hold-then-lift cycle and reusing the same id would collide with — and be
+    // silently dropped by — the unique-EventId dedupe against the still-committed suspend event.
+    string IAuditEvent.EventType => "candidate-document-deletion.resumed-after-legal-hold";
+    string IAuditEvent.EntityType => "CandidateDocumentDeletionOperation";
+    Guid IAuditEvent.EntityId => OperationId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    AuditActorType IAuditEvent.ActorType => AuditActorType.IntegrationHandler;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Candidate document deletion resumed — legal hold lifted";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => null;
+    object? IAuditEvent.Metadata => new { CandidateId, StorageKey };
+}
+
 internal sealed record VacancyPositionProfileAssignedAuditEvent(
     Guid CompanyId,
     Guid VacancyId,
@@ -292,6 +353,11 @@ internal sealed record InterviewOutcomeRecordedAuditEvent(
     Guid RecordedBy,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
+    // Ticket 15 (P1): deterministic EventId derived from the interview id — the domain rule
+    // ("Cannot record an outcome for an interview with outcome already set") guarantees exactly one
+    // meaningful recording per interview, so a recovered/replayed dispatch (see
+    // InterviewFeedbackService.RecordFeedbackAsync) can never create a duplicate audit row.
+    Guid IAuditEvent.EventId => InterviewId;
     string IAuditEvent.EventType => "interview.outcome_recorded";
     string IAuditEvent.EntityType => "Interview";
     Guid IAuditEvent.EntityId => InterviewId;

@@ -12,7 +12,7 @@ namespace HR.Modules.Notifications.Jobs;
 /// NFR-07: the only scheduled retention-deletion job in the codebase. Deletes in-app notifications
 /// that have been <b>read</b> and are older than the retention window. Read notifications are
 /// transient UI state with no lawful-basis retention requirement (see
-/// docs/compliance/data-retention-inventory.md), which makes this the safest high-value category to
+/// specifications/compliance/data-retention-inventory.md), which makes this the safest high-value category to
 /// automate.
 ///
 /// Safety controls:

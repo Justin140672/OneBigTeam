@@ -32,7 +32,16 @@ internal sealed class ProbationTaskCompletionAction(ITaskCreator taskCreator, IC
             assignedEmployeeId: null,
             assignedUserId: null,
             sourceEntityId: null,
-            cancellationToken);
+            cancellationToken,
+            // Ticket 15 (P1): this action has no domain state of its own to check "already done" —
+            // unlike every other ITaskCompletionAction, it unconditionally creates a follow-up task
+            // on every call. Without a stable key, a reconciliation replay of the SAME dispatch (see
+            // TaskCompletionReconciliationJob) would create a second "Issue probation outcome
+            // letter" task. Keyed on DispatchOperationId so a replay converges on the original task
+            // instead — same idiom as AssetTaskCompletionAction's "Return asset" task.
+            idempotencyKey: context.DispatchOperationId == Guid.Empty
+                ? null
+                : $"TaskCompletionDispatch:{context.DispatchOperationId}:ProbationOutcomeLetter");
 
         return Result.Success();
     }

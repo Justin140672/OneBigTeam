@@ -119,6 +119,31 @@ public class ReadOnlyModeMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_Returns_403_With_Structured_Body_And_Does_Not_Call_Next_When_Paused_On_NonAllowListed_Mutation()
+    {
+        // Ticket 25 (P1): a Paused subscription must be blocked the same way TrialExpired is today.
+        var companyId = Guid.NewGuid();
+        var reader = new FakeSubscriptionStatusReader
+        {
+            SnapshotToReturn = new SubscriptionStatusSnapshot(SubscriptionStatus.Paused, IsReadOnly: true, TrialDaysRemaining: 0)
+        };
+        var context = BuildAuthenticatedContext("POST", "/api/companies/some-mutation", companyId);
+        context.Response.Body = new MemoryStream();
+
+        var nextCalled = false;
+        var middleware = new ReadOnlyModeMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
+
+        await middleware.InvokeAsync(context, reader, FakeCurrentTenant.For(companyId.ToString()));
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
+
+        context.Response.Body.Seek(0, SeekOrigin.Begin);
+        using var doc = await JsonDocument.ParseAsync(context.Response.Body);
+        Assert.Equal("subscription_read_only", doc.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
     public async Task InvokeAsync_Returns_403_With_Structured_Body_And_Does_Not_Call_Next_When_ReadOnly_On_NonAllowListed_Mutation()
     {
         var companyId = Guid.NewGuid();

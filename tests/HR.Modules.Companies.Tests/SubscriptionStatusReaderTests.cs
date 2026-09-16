@@ -71,6 +71,27 @@ public class SubscriptionStatusReaderTests
     }
 
     [Fact]
+    public async Task GetStatusAsync_Returns_ReadOnly_For_Paused_Subscription()
+    {
+        // Ticket 25 (P1): a Stripe "paused" subscription is treated as read-only, the same as an
+        // expired trial or an admin-forced override.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_1", "sub_1", "price_1", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        subscription.UpdateFromStripe(SubscriptionStatus.Paused, new DateTimeOffset(Now.AddMonths(1)), cancelAtPeriodEnd: false, new DateTimeOffset(Now.AddDays(1)));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var reader = new SubscriptionStatusReader(context, new FakeClock(Now.AddDays(2)));
+
+        var snapshot = await reader.GetStatusAsync(companyId, CancellationToken.None);
+
+        Assert.Equal(SubscriptionStatus.Paused, snapshot.Status);
+        Assert.True(snapshot.IsReadOnly);
+    }
+
+    [Fact]
     public async Task GetStatusAsync_Returns_TrialExpired_ReadOnly_When_No_Subscription_Row_Exists()
     {
         await using var context = BuildContext();

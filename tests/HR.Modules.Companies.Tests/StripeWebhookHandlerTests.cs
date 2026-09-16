@@ -445,6 +445,569 @@ public class StripeWebhookHandlerTests
         Assert.Equal(snapshotPeriodEnd, persisted.CurrentPeriodEnd);
     }
 
+    // ---- Ticket 22 / Ticket 25 (P1): fail-closed on unrecognized Stripe subscription statuses ----
+    // NOTE: "paused" was the ORIGINAL example of an "unrecognized" status used by these two tests
+    // before Ticket 25 explicitly mapped it to SubscriptionStatus.Paused (see MapStatus). They now
+    // use a genuinely-unrecognized made-up status ("some_future_status") so they keep proving the
+    // fail-closed default branch still throws for values this switch really doesn't know about —
+    // without colliding with the newly-supported "paused" case exercised elsewhere in this file.
+
+    [Fact]
+    public async Task HandleAsync_SubscriptionUpdated_Unrecognized_Status_Throws_And_Leaves_Event_Unprocessed()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_123", "sub_456", "price_789", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var gateway = new FakeStripeGateway
+        {
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.updated",
+                "cus_123",
+                "sub_456",
+                CompanyId: null,
+                new DateTimeOffset(Now.AddMonths(2)),
+                CancelAtPeriodEnd: true,
+                StripeStatus: "some_future_status",
+                PriceId: null,
+                EventId: "evt_unrecognized"),
+        };
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(1)), NullLogger<StripeWebhookHandler>.Instance);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.HandleAsync("payload", "sig", CancellationToken.None));
+        Assert.Contains("some_future_status", ex.Message);
+
+        Assert.False(await context.ProcessedStripeEvents.AnyAsync(e => e.StripeEventId == "evt_unrecognized"));
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Equal(SubscriptionStatus.Active, persisted.Status);
+        Assert.Equal(new DateTimeOffset(Now.AddMonths(1)), persisted.CurrentPeriodEnd);
+        Assert.False(persisted.CancelAtPeriodEnd);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AmbiguousTie_Reconciliation_Unrecognized_Live_Status_Throws_And_Leaves_Event_Unprocessed()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_1", "sub_1", "price_1", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now), "evt_first", new DateTimeOffset(Now));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var gateway = new FakeStripeGateway
+        {
+            // Same timestamp as the already-applied event, but a different event id — ambiguous tie —
+            // forces reconciliation against the live Stripe snapshot below.
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.updated",
+                "cus_1",
+                "sub_1",
+                CompanyId: null,
+                new DateTimeOffset(Now.AddMonths(2)),
+                CancelAtPeriodEnd: true,
+                StripeStatus: "past_due",
+                PriceId: null,
+                EventId: "evt_second",
+                EventCreatedAt: new DateTimeOffset(Now)),
+        };
+        gateway.SubscriptionSnapshotsById["sub_1"] = new StripeSubscriptionSnapshot(
+            "sub_1", "cus_1", "some_future_status", new DateTimeOffset(Now.AddMonths(6)), CancelAtPeriodEnd: false, PriceId: "price_1");
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(1)), NullLogger<StripeWebhookHandler>.Instance);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.HandleAsync("payload", "sig", CancellationToken.None));
+        Assert.Contains("some_future_status", ex.Message);
+
+        Assert.False(await context.ProcessedStripeEvents.AnyAsync(e => e.StripeEventId == "evt_second"));
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Equal(SubscriptionStatus.Active, persisted.Status);
+        Assert.Equal(new DateTimeOffset(Now.AddMonths(1)), persisted.CurrentPeriodEnd);
+        Assert.False(persisted.CancelAtPeriodEnd);
+        Assert.Equal("evt_first", persisted.LastAppliedStripeEventId);
+    }
+
+    [Theory]
+    [InlineData("active", SubscriptionStatus.Active)]
+    [InlineData("trialing", SubscriptionStatus.Active)]
+    [InlineData("past_due", SubscriptionStatus.PastDue)]
+    [InlineData("unpaid", SubscriptionStatus.PastDue)]
+    [InlineData("incomplete", SubscriptionStatus.PastDue)]
+    [InlineData("canceled", SubscriptionStatus.Canceled)]
+    [InlineData("incomplete_expired", SubscriptionStatus.Canceled)]
+    public async Task HandleAsync_SubscriptionUpdated_Recognized_Status_Maps_And_Applies_Correctly(
+        string stripeStatus, SubscriptionStatus expectedStatus)
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_123", "sub_456", "price_789", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var newPeriodEnd = new DateTimeOffset(Now.AddMonths(2));
+        var gateway = new FakeStripeGateway
+        {
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.updated",
+                "cus_123",
+                "sub_456",
+                CompanyId: null,
+                newPeriodEnd,
+                CancelAtPeriodEnd: false,
+                StripeStatus: stripeStatus,
+                PriceId: null,
+                EventId: $"evt_{stripeStatus}"),
+        };
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(1)), NullLogger<StripeWebhookHandler>.Instance);
+
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Equal(expectedStatus, persisted.Status);
+        Assert.Equal(newPeriodEnd, persisted.CurrentPeriodEnd);
+        Assert.True(await context.ProcessedStripeEvents.AnyAsync(e => e.StripeEventId == $"evt_{stripeStatus}"));
+    }
+
+    // ---- Ticket 25 (P1): "paused" / "resumed" Stripe subscription lifecycle ----
+
+    [Fact]
+    public async Task HandleAsync_SubscriptionUpdated_Paused_Status_Sets_Local_Status_To_Paused()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_123", "sub_456", "price_789", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var newPeriodEnd = new DateTimeOffset(Now.AddMonths(2));
+        var gateway = new FakeStripeGateway
+        {
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.updated",
+                "cus_123",
+                "sub_456",
+                CompanyId: null,
+                newPeriodEnd,
+                CancelAtPeriodEnd: false,
+                StripeStatus: "paused",
+                PriceId: null,
+                EventId: "evt_updated_paused"),
+        };
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(1)), NullLogger<StripeWebhookHandler>.Instance);
+
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Equal(SubscriptionStatus.Paused, persisted.Status);
+        Assert.Equal(newPeriodEnd, persisted.CurrentPeriodEnd);
+        Assert.True(await context.ProcessedStripeEvents.AnyAsync(e => e.StripeEventId == "evt_updated_paused"));
+    }
+
+    [Fact]
+    public async Task HandleAsync_SubscriptionPaused_Event_Sets_Local_Status_To_Paused_Directly_From_Payload()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_123", "sub_456", "price_789", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var newPeriodEnd = new DateTimeOffset(Now.AddMonths(2));
+        var gateway = new FakeStripeGateway
+        {
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.paused",
+                "cus_123",
+                "sub_456",
+                CompanyId: null,
+                newPeriodEnd,
+                CancelAtPeriodEnd: false,
+                StripeStatus: "paused",
+                PriceId: null,
+                EventId: "evt_paused_direct"),
+        };
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(1)), NullLogger<StripeWebhookHandler>.Instance);
+
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Equal(SubscriptionStatus.Paused, persisted.Status);
+        Assert.Equal(newPeriodEnd, persisted.CurrentPeriodEnd);
+        // The gateway is never consulted for a live snapshot for a dedicated "paused" event — it is
+        // always trusted directly from the payload (no access-granting risk moving TO Paused).
+        Assert.Empty(gateway.GetSubscriptionAsyncCalls);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SubscriptionResumed_Event_Reconciles_From_Live_Snapshot_And_Restores_Active()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_123", "sub_456", "price_789", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        subscription.UpdateFromStripe(SubscriptionStatus.Paused, new DateTimeOffset(Now.AddMonths(1)), cancelAtPeriodEnd: false, new DateTimeOffset(Now.AddDays(1)));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var snapshotPeriodEnd = new DateTimeOffset(Now.AddMonths(3));
+        var gateway = new FakeStripeGateway
+        {
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.resumed",
+                "cus_123",
+                "sub_456",
+                CompanyId: null,
+                CurrentPeriodEnd: new DateTimeOffset(Now.AddMonths(1)),
+                CancelAtPeriodEnd: false,
+                StripeStatus: "active",
+                PriceId: null,
+                EventId: "evt_resumed"),
+        };
+        gateway.SubscriptionSnapshotsById["sub_456"] = new StripeSubscriptionSnapshot(
+            "sub_456", "cus_123", "active", snapshotPeriodEnd, CancelAtPeriodEnd: false, PriceId: "price_789");
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(2)), NullLogger<StripeWebhookHandler>.Instance);
+
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Equal(SubscriptionStatus.Active, persisted.Status);
+        Assert.Equal(snapshotPeriodEnd, persisted.CurrentPeriodEnd);
+        Assert.Equal(["sub_456"], gateway.GetSubscriptionAsyncCalls);
+        Assert.True(await context.ProcessedStripeEvents.AnyAsync(e => e.StripeEventId == "evt_resumed"));
+    }
+
+    [Fact]
+    public async Task HandleAsync_SubscriptionResumed_Event_Live_Snapshot_Still_Paused_Keeps_Local_Status_Paused()
+    {
+        // Ticket 25 (P1): the whole point of reconciling "resumed" against live Stripe state rather
+        // than trusting the payload — a racing/stale "resumed" delivery must not grant access the
+        // live subscription doesn't actually have.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_123", "sub_456", "price_789", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        subscription.UpdateFromStripe(SubscriptionStatus.Paused, new DateTimeOffset(Now.AddMonths(1)), cancelAtPeriodEnd: false, new DateTimeOffset(Now.AddDays(1)));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var gateway = new FakeStripeGateway
+        {
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.resumed",
+                "cus_123",
+                "sub_456",
+                CompanyId: null,
+                CurrentPeriodEnd: new DateTimeOffset(Now.AddMonths(1)),
+                CancelAtPeriodEnd: false,
+                StripeStatus: "active",
+                PriceId: null,
+                EventId: "evt_resumed_stale"),
+        };
+        gateway.SubscriptionSnapshotsById["sub_456"] = new StripeSubscriptionSnapshot(
+            "sub_456", "cus_123", "paused", new DateTimeOffset(Now.AddMonths(1)), CancelAtPeriodEnd: false, PriceId: "price_789");
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(2)), NullLogger<StripeWebhookHandler>.Instance);
+
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Equal(SubscriptionStatus.Paused, persisted.Status);
+        Assert.Equal(["sub_456"], gateway.GetSubscriptionAsyncCalls);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SubscriptionResumed_Event_Reconciliation_Fetch_Exception_Throws_And_Leaves_Event_Unprocessed()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_123", "sub_456", "price_789", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        subscription.UpdateFromStripe(SubscriptionStatus.Paused, new DateTimeOffset(Now.AddMonths(1)), cancelAtPeriodEnd: false, new DateTimeOffset(Now.AddDays(1)));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var gateway = new FakeStripeGateway
+        {
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.resumed",
+                "cus_123",
+                "sub_456",
+                CompanyId: null,
+                CurrentPeriodEnd: new DateTimeOffset(Now.AddMonths(1)),
+                CancelAtPeriodEnd: false,
+                StripeStatus: "active",
+                PriceId: null,
+                EventId: "evt_resumed_fetch_fail"),
+            GetSubscriptionAsyncException = new InvalidOperationException("Stripe API timeout"),
+        };
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(2)), NullLogger<StripeWebhookHandler>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.HandleAsync("payload", "sig", CancellationToken.None));
+
+        Assert.False(await context.ProcessedStripeEvents.AnyAsync(e => e.StripeEventId == "evt_resumed_fetch_fail"));
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Equal(SubscriptionStatus.Paused, persisted.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SubscriptionResumed_Event_Missing_Live_Snapshot_Throws_And_Leaves_Event_Unprocessed()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_123", "sub_456", "price_789", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        subscription.UpdateFromStripe(SubscriptionStatus.Paused, new DateTimeOffset(Now.AddMonths(1)), cancelAtPeriodEnd: false, new DateTimeOffset(Now.AddDays(1)));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var gateway = new FakeStripeGateway
+        {
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.resumed",
+                "cus_123",
+                "sub_456",
+                CompanyId: null,
+                CurrentPeriodEnd: new DateTimeOffset(Now.AddMonths(1)),
+                CancelAtPeriodEnd: false,
+                StripeStatus: "active",
+                PriceId: null,
+                EventId: "evt_resumed_no_snapshot"),
+            // No SubscriptionSnapshotsById entry for "sub_456" — GetSubscriptionAsync returns null.
+        };
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(2)), NullLogger<StripeWebhookHandler>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.HandleAsync("payload", "sig", CancellationToken.None));
+
+        Assert.False(await context.ProcessedStripeEvents.AnyAsync(e => e.StripeEventId == "evt_resumed_no_snapshot"));
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Equal(SubscriptionStatus.Paused, persisted.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AmbiguousTie_SubscriptionUpdated_Reconciles_To_Paused_When_Live_Snapshot_Is_Paused()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_1", "sub_1", "price_1", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now), "evt_first", new DateTimeOffset(Now));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var snapshotPeriodEnd = new DateTimeOffset(Now.AddMonths(6));
+        var gateway = new FakeStripeGateway
+        {
+            // Same timestamp as the already-applied event, but a different event id — ambiguous tie.
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.updated",
+                "cus_1",
+                "sub_1",
+                CompanyId: null,
+                new DateTimeOffset(Now.AddMonths(1)),
+                CancelAtPeriodEnd: false,
+                StripeStatus: "active",
+                PriceId: null,
+                EventId: "evt_second",
+                EventCreatedAt: new DateTimeOffset(Now)),
+        };
+        gateway.SubscriptionSnapshotsById["sub_1"] = new StripeSubscriptionSnapshot(
+            "sub_1", "cus_1", "paused", snapshotPeriodEnd, CancelAtPeriodEnd: false, PriceId: "price_1");
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(1)), NullLogger<StripeWebhookHandler>.Instance);
+
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Equal(SubscriptionStatus.Paused, persisted.Status);
+        Assert.Equal(snapshotPeriodEnd, persisted.CurrentPeriodEnd);
+        Assert.Equal(["sub_1"], gateway.GetSubscriptionAsyncCalls);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Duplicate_Delivery_Of_Paused_Event_Is_Idempotent_NoOp()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_123", "sub_456", "price_789", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var gateway = new FakeStripeGateway
+        {
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.paused",
+                "cus_123",
+                "sub_456",
+                CompanyId: null,
+                new DateTimeOffset(Now.AddMonths(1)),
+                CancelAtPeriodEnd: false,
+                StripeStatus: "paused",
+                PriceId: null,
+                EventId: "evt_paused_dup"),
+        };
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(1)), NullLogger<StripeWebhookHandler>.Instance);
+
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+
+        var rows = await context.CustomerSubscriptions.Where(s => s.CompanyId == companyId).ToListAsync();
+        var persisted = Assert.Single(rows);
+        Assert.Equal(SubscriptionStatus.Paused, persisted.Status);
+        Assert.Equal(1, await context.ProcessedStripeEvents.CountAsync(e => e.StripeEventId == "evt_paused_dup"));
+    }
+
+    [Fact]
+    public async Task HandleAsync_Duplicate_Delivery_Of_Resumed_Event_Is_Idempotent_NoOp()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_123", "sub_456", "price_789", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        subscription.UpdateFromStripe(SubscriptionStatus.Paused, new DateTimeOffset(Now.AddMonths(1)), cancelAtPeriodEnd: false, new DateTimeOffset(Now.AddDays(1)));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        var gateway = new FakeStripeGateway
+        {
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.resumed",
+                "cus_123",
+                "sub_456",
+                CompanyId: null,
+                new DateTimeOffset(Now.AddMonths(1)),
+                CancelAtPeriodEnd: false,
+                StripeStatus: "active",
+                PriceId: null,
+                EventId: "evt_resumed_dup"),
+        };
+        gateway.SubscriptionSnapshotsById["sub_456"] = new StripeSubscriptionSnapshot(
+            "sub_456", "cus_123", "active", new DateTimeOffset(Now.AddMonths(1)), CancelAtPeriodEnd: false, PriceId: "price_789");
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(2)), NullLogger<StripeWebhookHandler>.Instance);
+
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+
+        var rows = await context.CustomerSubscriptions.Where(s => s.CompanyId == companyId).ToListAsync();
+        var persisted = Assert.Single(rows);
+        Assert.Equal(SubscriptionStatus.Active, persisted.Status);
+        Assert.Equal(1, await context.ProcessedStripeEvents.CountAsync(e => e.StripeEventId == "evt_resumed_dup"));
+        // GetSubscriptionAsync is only invoked on the FIRST delivery — the second is short-circuited
+        // by the ProcessedStripeEvents idempotency check before reconciliation ever runs again.
+        Assert.Equal(["sub_456"], gateway.GetSubscriptionAsyncCalls);
+    }
+
+    [Fact]
+    public async Task HandleAsync_OutOfOrder_Older_Paused_Event_Arriving_After_Newer_Applied_Event_Is_Ignored()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_1", "sub_1", "price_1", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        // A later event has already been applied, setting the subscription Active with a newer marker.
+        subscription.UpdateFromStripe(
+            SubscriptionStatus.Active, new DateTimeOffset(Now.AddMonths(1)), cancelAtPeriodEnd: false,
+            new DateTimeOffset(Now.AddDays(1)), "evt_later_active", new DateTimeOffset(Now.AddHours(2)));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        // An OLDER "paused" event, delivered late.
+        var gateway = new FakeStripeGateway
+        {
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.paused",
+                "cus_1",
+                "sub_1",
+                CompanyId: null,
+                new DateTimeOffset(Now.AddMonths(1)),
+                CancelAtPeriodEnd: false,
+                StripeStatus: "paused",
+                PriceId: null,
+                EventId: "evt_older_paused",
+                EventCreatedAt: new DateTimeOffset(Now.AddHours(1))),
+        };
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(2)), NullLogger<StripeWebhookHandler>.Instance);
+
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        // The stale paused event was ignored — status remains whatever the newer event set.
+        Assert.Equal(SubscriptionStatus.Active, persisted.Status);
+        Assert.Equal("evt_later_active", persisted.LastAppliedStripeEventId);
+
+        // The stale event is recorded as processed (so it isn't redelivered forever) but not applied.
+        var processedEvent = await context.ProcessedStripeEvents.SingleAsync(e => e.StripeEventId == "evt_older_paused");
+        Assert.False(processedEvent.Applied);
+    }
+
+    [Fact]
+    public async Task HandleAsync_OutOfOrder_Resumed_Event_Delivered_Before_Later_Applied_Event_Is_Ignored()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var subscription = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), trialLengthDays: 14);
+        subscription.ActivateSubscription("cus_1", "sub_1", "price_1", new DateTimeOffset(Now.AddMonths(1)), new DateTimeOffset(Now));
+        // A later event (e.g. a subsequent "paused") has already been applied with a newer marker.
+        subscription.UpdateFromStripe(
+            SubscriptionStatus.Paused, new DateTimeOffset(Now.AddMonths(1)), cancelAtPeriodEnd: false,
+            new DateTimeOffset(Now.AddDays(1)), "evt_later_paused", new DateTimeOffset(Now.AddHours(2)));
+        context.CustomerSubscriptions.Add(subscription);
+        await context.SaveChangesAsync();
+
+        // A "resumed" event with an EARLIER timestamp than the already-applied later event, delivered
+        // late (out of order) — must be ignored without reconciliation ever running, since the
+        // ordering guard runs before the resumed-specific reconciliation branch.
+        var gateway = new FakeStripeGateway
+        {
+            WebhookEventToReturn = new StripeWebhookEvent(
+                "customer.subscription.resumed",
+                "cus_1",
+                "sub_1",
+                CompanyId: null,
+                new DateTimeOffset(Now.AddMonths(1)),
+                CancelAtPeriodEnd: false,
+                StripeStatus: "active",
+                PriceId: null,
+                EventId: "evt_earlier_resumed",
+                EventCreatedAt: new DateTimeOffset(Now.AddHours(1))),
+        };
+
+        var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(2)), NullLogger<StripeWebhookHandler>.Instance);
+
+        await handler.HandleAsync("payload", "sig", CancellationToken.None);
+
+        var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        Assert.Equal(SubscriptionStatus.Paused, persisted.Status);
+        Assert.Equal("evt_later_paused", persisted.LastAppliedStripeEventId);
+        Assert.Empty(gateway.GetSubscriptionAsyncCalls);
+
+        var processedEvent = await context.ProcessedStripeEvents.SingleAsync(e => e.StripeEventId == "evt_earlier_resumed");
+        Assert.False(processedEvent.Applied);
+    }
+
     private static CompaniesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<CompaniesDbContext>()

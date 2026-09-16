@@ -7,7 +7,7 @@ internal sealed record AssetCreatedAuditEvent(
     Guid AssetId,
     string AssetNumber,
     string Name,
-    Guid ActorUserId,
+    Guid? ActorUserId,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
     string IAuditEvent.EventType => "asset.created";
@@ -94,6 +94,11 @@ internal sealed record AssetAssignmentReturnedAuditEvent(
     string Outcome = "Returned",
     string? Notes = null) : IAuditEvent
 {
+    // Ticket 15 (P1): deterministic EventId derived from the assignment id — an assignment is
+    // returned exactly once (a later reassignment creates a new AssetAssignment row with its own
+    // id), so a recovered/replayed dispatch (see AssetReturnService.ReturnAsync) can never create a
+    // duplicate audit row.
+    Guid IAuditEvent.EventId => AssignmentId;
     string IAuditEvent.EventType => "asset.assignment.returned";
     string IAuditEvent.EntityType => "AssetAssignment";
     Guid IAuditEvent.EntityId => AssignmentId;

@@ -86,6 +86,8 @@ internal sealed class StripeGateway(IOptions<StripeOptions> options) : IStripeGa
 
             case "customer.subscription.updated":
             case "customer.subscription.deleted":
+            case "customer.subscription.paused":
+            case "customer.subscription.resumed":
             {
                 var subscription = stripeEvent.Data.Object as Subscription;
                 var companyId = ParseCompanyId(subscription?.Metadata);

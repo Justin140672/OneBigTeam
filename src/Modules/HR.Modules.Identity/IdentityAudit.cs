@@ -207,6 +207,12 @@ internal sealed record InviteAcceptanceOrphanedByCancellationAuditEvent(
     Guid? SupabaseAuthUserId,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
+    // Ticket 17 (P1): deterministic EventId derived from the invite id — AcceptInvite reuses a
+    // single InviteAcceptanceOperation row per invite (see Endpoint.cs), so exactly one orphan
+    // event is ever meaningful per invite. A durable EventId means a future re-publish attempt
+    // (e.g. a manual backfill, or a fix to this job's own save-then-publish ordering) can never
+    // create a duplicate audit row: DbAuditEventPublisher dedupes on EventId via a unique index.
+    Guid IAuditEvent.EventId           => InviteId;
     string IAuditEvent.EventType       => "invite.acceptance-orphaned-by-cancellation";
     string IAuditEvent.EntityType      => "InviteAcceptanceOperation";
     Guid   IAuditEvent.EntityId        => InviteId;
@@ -220,6 +226,35 @@ internal sealed record InviteAcceptanceOrphanedByCancellationAuditEvent(
     object? IAuditEvent.Before         => null;
     object? IAuditEvent.After          => null;
     object? IAuditEvent.Metadata       => new { SupabaseAuthUserId };
+}
+
+/// <summary>
+/// Ticket 17 (P1): published when a stale Pending <c>InviteAcceptanceOperation</c> is reconciled
+/// as cancelled with NO matching Supabase account found — i.e. nothing was ever created for it (or
+/// the creation attempt failed outright before this job ever needed to intervene). Distinct from
+/// <see cref="InviteAcceptanceOrphanedByCancellationAuditEvent"/>, which fires only when a matching
+/// external identity actually needs cleanup.
+/// </summary>
+internal sealed record InviteAcceptancePendingCancelledAuditEvent(
+    Guid CompanyId,
+    Guid InviteId,
+    Guid EmployeeId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    Guid IAuditEvent.EventId           => InviteId;
+    string IAuditEvent.EventType       => "invite.acceptance-pending-cancelled";
+    string IAuditEvent.EntityType      => "InviteAcceptanceOperation";
+    Guid   IAuditEvent.EntityId        => InviteId;
+    Guid?  IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId     => null;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    AuditActorType IAuditEvent.ActorType => AuditActorType.IntegrationHandler;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        =>
+        "Invite was cancelled/removed before Supabase account provisioning completed — no matching account found, nothing to clean up";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => null;
+    object? IAuditEvent.Metadata       => null;
 }
 
 // Published when a user account is re-enabled by an administrator (Features/EnableUser).

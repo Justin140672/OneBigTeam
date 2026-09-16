@@ -52,6 +52,12 @@ internal sealed record OffboardingPlanCompletedAuditEvent(
     int SkippedTasks,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
+    // Ticket 15 (P1): deterministic EventId derived from the plan id — exactly one
+    // OffboardingPlanCompletedAuditEvent is ever meaningful per plan, so reusing OffboardingPlanId
+    // as the idempotency key means a recovered/replayed dispatch (see
+    // CompleteOffboardingTaskFromTaskAction.RecoverPlanCompletionEffectsAsync) can never create a
+    // duplicate audit row: DbAuditEventPublisher dedupes on EventId via a unique index.
+    Guid IAuditEvent.EventId            => OffboardingPlanId;
     string IAuditEvent.EventType        => "offboarding-plan.completed";
     string IAuditEvent.EntityType       => "OffboardingPlan";
     Guid   IAuditEvent.EntityId         => OffboardingPlanId;

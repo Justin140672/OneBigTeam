@@ -36,7 +36,7 @@ internal sealed class CreateAssetHandler(
     {
         // Ticket 3 (P1) follow-up item 3: the security/ownership boundary this key is scoped to -
         // the client-supplied key alone is never trusted as identity.
-        var scope = new IdempotencyScope(nameof(CreateAssetHandler), request.CompanyId, request.ActorId);
+        var scope = new IdempotencyScope(nameof(CreateAssetHandler), request.CompanyId, request.ActorId ?? Guid.Empty);
 
         // Ticket 3 (P1) follow-up: dedupe a retried/duplicated request up front, before generating
         // a new auto-numbered asset, so a repeated delivery can't create a second asset for the

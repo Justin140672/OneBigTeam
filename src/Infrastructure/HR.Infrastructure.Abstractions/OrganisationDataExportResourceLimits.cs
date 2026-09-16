@@ -4,7 +4,7 @@ namespace HR.Infrastructure.Abstractions;
 /// Ticket 4: central, tunable resource budgets for the organisation data export build pipeline.
 /// Keeps the concurrency cap, temp-disk ceilings and queue-wait in one place so operations can
 /// adjust them without hunting through the job. Values are deliberately conservative defaults;
-/// see docs/tickets/ticket-4-export-resource-limits.md for the sizing rationale.
+/// see specifications/implemented-tickets/ticket-4-export-resource-limits.md for the sizing rationale.
 /// </summary>
 public sealed class OrganisationDataExportResourceLimits
 {

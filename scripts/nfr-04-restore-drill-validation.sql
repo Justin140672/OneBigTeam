@@ -1,12 +1,12 @@
 -- NFR-04 RESTORE-DRILL VALIDATION (read-only — modifies nothing).
 --
 -- Run this against a database that has just been restored from a backup / pg_dump, either:
---   * a local scratch database populated by scripts/../docs/runbooks/restore-drill.md, or
+--   * a local scratch database populated by scripts/../specifications/runbooks/restore-drill.md, or
 --   * a throwaway Supabase branch/project during the 6-monthly production restore exercise.
 --
 -- Purpose: prove the restored database is structurally sound, tenant-isolated, and that
 -- deletion obligations can be reapplied. Record each section's result in the drill results
--- template in docs/runbooks/restore-drill.md.
+-- template in specifications/runbooks/restore-drill.md.
 --
 -- Every query prints a PASS/FAIL (or a value to eyeball). Nothing here writes data.
 -- Adjust the tenant table list in section 3 if module schemas have been added since this was written.

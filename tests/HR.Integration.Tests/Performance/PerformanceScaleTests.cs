@@ -37,7 +37,7 @@ public sealed class PerformanceScaleTests
     // Because the same ceiling is asserted at 50 / 500 / 2000, an N+1 over employees/leave/tasks
     // would push the 2000-employee run into the hundreds/thousands and fail it even though the
     // 50-employee run passed: the three scale points ARE the "flat, not linear" check. Observed
-    // floors (see docs/performance-testing.md): list ~21, search ~17, report ~14, CRUD ~14,
+    // floors (see specifications/engineering/performance-testing.md): list ~21, search ~17, report ~14, CRUD ~14,
     // dashboard ~93 (a fixed provider fan-out, flat across all three scales — see the NFR-02
     // follow-up note).
     private const int ListCommandCeiling = 45;

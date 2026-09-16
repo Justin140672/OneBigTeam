@@ -22,7 +22,8 @@ internal sealed class FakeInterviewFeedbackService : IInterviewFeedbackService
         Guid recordedByEmployeeId,
         string outcome,
         string? notes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid dispatchOperationId = default)
     {
         Calls.Add(new Call(companyId, interviewId, recordedByEmployeeId, outcome, notes));
         return Task.FromResult(_result);

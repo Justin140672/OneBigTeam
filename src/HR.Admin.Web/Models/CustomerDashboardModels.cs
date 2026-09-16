@@ -8,6 +8,7 @@ public sealed record CustomerDashboardResponse(
     int ActiveCustomers,
     int TrialCustomers,
     int ReadOnlyCustomers,
+    int PausedCustomers,
     int CancelledSubscriptions,
     int PendingPermanentDeletions,
     IReadOnlyList<CustomerDashboardRegistration> RecentRegistrations,

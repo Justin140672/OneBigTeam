@@ -3,7 +3,7 @@ name: Performance (nightly)
 # NFR-02 automated performance & scale tests. NOT a PR gate: seeds 50 / 500 / 2000-employee
 # datasets against a Postgres testcontainer and measures p95 latency + EF command counts for a
 # representative page load, dashboard, search, CRUD op and small report. Runs on a schedule so
-# regressions are caught within a day, and on demand. See docs/performance-testing.md.
+# regressions are caught within a day, and on demand. See specifications/engineering/performance-testing.md.
 
 on:
   schedule:

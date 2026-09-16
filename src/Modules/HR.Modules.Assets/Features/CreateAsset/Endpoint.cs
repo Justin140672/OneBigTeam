@@ -21,7 +21,7 @@ internal sealed class Endpoint(CreateAssetHandler handler, ICurrentUser currentU
             request with
             {
                 IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
-                ActorId = currentUser.UserId ?? Guid.Empty,
+                ActorId = currentUser.UserId,
             },
             cancellationToken);
 

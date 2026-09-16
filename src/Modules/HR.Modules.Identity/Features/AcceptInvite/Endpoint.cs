@@ -5,6 +5,7 @@ using HR.Modules.Identity.Services;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace HR.Modules.Identity.Features.AcceptInvite;
 
@@ -65,6 +66,7 @@ internal sealed class Endpoint(
         // Use the employee ID as the user ID — single identity across modules (UserRole.UserId
         // below relies on this matching, same as SignUpHandler's admin profile).
         InviteAcceptanceOperation? operation = null;
+        Guid? newProfileSupabaseUserId = null;
 
         var profileExists = await db.UserProfiles.AnyAsync(p => p.Id == invite.EmployeeId, ct);
         if (!profileExists)
@@ -77,10 +79,32 @@ internal sealed class Endpoint(
 
             if (operation is null)
             {
-                operation = InviteAcceptanceOperation.CreatePending(
+                var candidate = InviteAcceptanceOperation.CreatePending(
                     Guid.NewGuid(), invite.Id, invite.CompanyId, invite.EmployeeId, invite.Email, now);
-                db.InviteAcceptanceOperations.Add(operation);
-                await db.SaveChangesAsync(ct);
+                db.InviteAcceptanceOperations.Add(candidate);
+
+                try
+                {
+                    await db.SaveChangesAsync(ct);
+                    operation = candidate;
+                }
+                catch (DbUpdateException ex) when (PostgresUniqueViolation.Is(ex))
+                {
+                    // Ticket 24 (P1) req #2/#4: another first-time acceptance request beat us to
+                    // creating the operation for this exact invite between our null-check above and
+                    // our insert here (InviteAcceptanceOperation.InviteId has a unique index). Detach
+                    // our failed candidate row so this (shared, scoped) DbContext stays safe to
+                    // reuse, then load and validate the winning operation. We must NOT proceed to
+                    // call Supabase ourselves from here: doing so would mean two requests
+                    // independently calling CreateConfirmedUserAsync — potentially with two
+                    // different passwords — under circumstances that could converge on the same
+                    // provisioning correlation id. The loser's password must never silently replace
+                    // or override the winner's.
+                    db.Entry(candidate).State = EntityState.Detached;
+
+                    await SendLostOperationRaceResultAsync(invite, ct);
+                    return;
+                }
             }
 
             Guid supabaseUserId;
@@ -141,11 +165,14 @@ internal sealed class Endpoint(
             }
 
             operation.MarkSupabaseConfirmed(supabaseUserId, now);
+            newProfileSupabaseUserId = supabaseUserId;
 
-            var profile = UserProfile.Create(
-                invite.EmployeeId, supabaseUserId, invite.CompanyId, invite.Email,
-                firstName: string.Empty, lastName: string.Empty, now);
-            db.UserProfiles.Add(profile);
+            // Ticket 8 (P2): persist the SupabaseConfirmed transition on its own BEFORE attempting
+            // the atomic local commit below. If the process dies inside the atomic transaction
+            // (which never partially commits — see CommitLocalAcceptanceAsync), a retry/reconciler
+            // must still be able to see that Supabase provisioning itself already succeeded for this
+            // operation, independent of whether the local commit ever lands.
+            await db.SaveChangesAsync(ct);
         }
 
         // Assign the roles selected when the invite was sent (Features/InviteEmployeeUser),
@@ -155,34 +182,49 @@ internal sealed class Endpoint(
             ? invite.PendingRoleIds
             : [SystemRoles.Employee];
 
-        foreach (var roleId in roleIds)
+        // Ticket 26 (P1): everything below commits as ONE explicit PostgreSQL transaction —
+        // UserProfile creation, every UserRole assignment, the invite claim, and the operation's
+        // completion either all land together or none of them do. This replaces the previous
+        // approach of saving the profile, then each role, then the invite claim as separate
+        // committed transactions, which could leave a cancelled invite having already granted a
+        // committed UserProfile and/or privileged UserRole rows before the final claim discovered
+        // the cancellation.
+        var commitResult = await CommitLocalAcceptanceAsync(
+            invite, operation, newProfileSupabaseUserId, roleIds, now, ct);
+
+        if (!commitResult.IsSuccess)
         {
-            var roleExists = await db.UserRoles.AnyAsync(
-                ur => ur.UserId == invite.EmployeeId && ur.RoleId == roleId, ct);
-            if (!roleExists)
-                db.UserRoles.Add(UserRole.Create(invite.EmployeeId, roleId, now));
-        }
-
-        var expectedVersion = invite.Version;
-        invite.Claim(now);
-        operation?.MarkCompleted(now);
-
-        var saveResult = await db.SaveChangesWithConcurrencyAsync(
-            invite, expectedVersion, "This invite is no longer valid.", ct);
-
-        if (!saveResult.IsSuccess)
-        {
-            // Someone else (most likely CancelInvite) modified this invite between our read and our
-            // write — re-check its current state so the response is accurate rather than a generic
-            // conflict.
-            var current = await db.UserInvites.AsNoTracking().FirstOrDefaultAsync(i => i.Id == invite.Id, ct);
-            if (current?.IsCancelled == true)
+            if (commitResult.Error.Code == "concurrency")
             {
-                await Send.ResultAsync(TypedResults.Conflict(new { error = "This invite has been cancelled." }));
+                // Someone else (most likely CancelInvite, or another AcceptInvite request) modified
+                // this invite between our read and our write — re-check its current state so the
+                // response is accurate rather than a generic conflict. Because the whole local commit
+                // above ran in a single transaction that has now rolled back in its entirety, no
+                // profile or role rows from this attempt remain committed.
+                var current = await db.UserInvites.AsNoTracking().FirstOrDefaultAsync(i => i.Id == invite.Id, ct);
+                if (current?.IsCancelled == true)
+                {
+                    await Send.ResultAsync(TypedResults.Conflict(new { error = "This invite has been cancelled." }));
+                    return;
+                }
+
+                if (current?.IsClaimed == true)
+                {
+                    await Send.ResultAsync(TypedResults.Conflict(new { error = "This invite has already been used." }));
+                    return;
+                }
+
+                await Send.ResultAsync(TypedResults.Conflict(new { error = "This invite could not be accepted. Please try again." }));
                 return;
             }
 
-            if (current?.IsClaimed == true)
+            // Ticket 26 (P1) req #3: a duplicate-acceptance race — another concurrent request for
+            // this same invite already committed its own atomic transaction (profile + roles + claim
+            // + operation completion) before ours reached the same unique constraint(s). Our entire
+            // attempt rolled back, so re-check the invite: if it is now claimed, the winner
+            // succeeded and this caller gets a controlled conflict rather than a 500.
+            var winner = await db.UserInvites.AsNoTracking().FirstOrDefaultAsync(i => i.Id == invite.Id, ct);
+            if (winner?.IsClaimed == true)
             {
                 await Send.ResultAsync(TypedResults.Conflict(new { error = "This invite has already been used." }));
                 return;
@@ -193,6 +235,122 @@ internal sealed class Endpoint(
         }
 
         await Send.ResultAsync(TypedResults.Ok(new AcceptInviteResponse(invite.EmployeeId)));
+    }
+
+    /// <summary>
+    /// Ticket 26 (P1): commits UserProfile creation (when <paramref name="newProfileSupabaseUserId"/>
+    /// is set), every UserRole assignment, the invite claim, and the operation's completion in a
+    /// single explicit PostgreSQL transaction backed by one <see cref="DbContext.SaveChangesAsync"/>
+    /// call. The invite's optimistic-concurrency version is pinned so a concurrent winner (another
+    /// AcceptInvite request, or CancelInvite) causes the whole batch — profile insert, role inserts,
+    /// invite update, operation update alike — to fail together and roll back together; nothing here
+    /// is ever committed piecemeal.
+    /// </summary>
+    private async Task<Result> CommitLocalAcceptanceAsync(
+        UserInvite invite,
+        InviteAcceptanceOperation? operation,
+        Guid? newProfileSupabaseUserId,
+        IReadOnlyCollection<Guid> roleIds,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+
+        try
+        {
+            if (newProfileSupabaseUserId is { } supabaseUserId)
+            {
+                var profile = UserProfile.Create(
+                    invite.EmployeeId, supabaseUserId, invite.CompanyId, invite.Email,
+                    firstName: string.Empty, lastName: string.Empty, now);
+                db.UserProfiles.Add(profile);
+            }
+
+            foreach (var roleId in roleIds)
+            {
+                var roleExists = await db.UserRoles.AsNoTracking().AnyAsync(
+                    ur => ur.UserId == invite.EmployeeId && ur.RoleId == roleId, ct);
+                if (roleExists)
+                    continue;
+
+                db.UserRoles.Add(UserRole.Create(invite.EmployeeId, roleId, now));
+            }
+
+            var expectedVersion = invite.Version;
+            invite.Claim(now);
+            operation?.MarkCompleted(now);
+
+            db.Entry(invite).Property(nameof(IVersionedAggregate.Version)).OriginalValue = expectedVersion;
+            invite.IncrementVersion();
+
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return Result.Success();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Ticket 26 (P1) req #2/#4: CancelInvite (or another AcceptInvite request) won the race
+            // on the invite's version — roll back the whole transaction so the profile insert and
+            // every role insert attempted above are undone together with the failed invite update.
+            await SafeRollbackAsync(transaction, ct);
+            return Result.Failure(Error.Concurrency("This invite is no longer valid."));
+        }
+        catch (DbUpdateException ex) when (PostgresUniqueViolation.Is(ex))
+        {
+            // Ticket 26 (P1) req #3: a concurrent acceptance attempt for this same invite already
+            // committed (most likely the identical UserProfile row, whose primary key is the
+            // employee id, or one of the same UserRole rows). Roll back this attempt in full rather
+            // than resuming with a mix of detached/committed state — the caller is told to treat this
+            // as a conflict/replay (see the caller's post-commit handling), and the winner's own
+            // transaction already completed the full profile+roles+claim+operation set atomically.
+            await SafeRollbackAsync(transaction, ct);
+            return Result.Failure(Error.Conflict("This invite could not be accepted. Please try again."));
+        }
+    }
+
+    private static async Task SafeRollbackAsync(IDbContextTransaction transaction, CancellationToken ct)
+    {
+        try
+        {
+            await transaction.RollbackAsync(ct);
+        }
+        catch
+        {
+            // The transaction may already be aborted server-side by the failure that triggered this
+            // rollback attempt; disposal (via the caller's `await using`) still guarantees cleanup.
+        }
+    }
+
+    /// <summary>
+    /// Ticket 24 (P1) req #6: called when this request lost the race to create the
+    /// <see cref="InviteAcceptanceOperation"/> for this invite (see the unique-constraint catch
+    /// above). Reloads the invite so the response reflects the winner's outcome rather than the
+    /// stale state this request read at the top of <see cref="HandleAsync"/>, and never attempts any
+    /// local provisioning or Supabase call itself.
+    /// </summary>
+    private async Task SendLostOperationRaceResultAsync(UserInvite invite, CancellationToken ct)
+    {
+        var current = await db.UserInvites.AsNoTracking().FirstOrDefaultAsync(i => i.Id == invite.Id, ct);
+
+        if (current?.IsCancelled == true)
+        {
+            await Send.ResultAsync(TypedResults.Conflict(new { error = "This invite has been cancelled." }));
+            return;
+        }
+
+        if (current?.IsClaimed == true)
+        {
+            await Send.ResultAsync(TypedResults.Conflict(new { error = "This invite has already been used." }));
+            return;
+        }
+
+        // The winning request is still provisioning (or has just finished and the invite hasn't yet
+        // reflected as claimed above, due to an ordinary read-after-write gap). Ask the client to
+        // retry shortly rather than risk this request touching Supabase or local identity rows.
+        await Send.ResultAsync(TypedResults.Conflict(new
+        {
+            error = "This invitation is already being accepted by another request. Please try again shortly.",
+        }));
     }
 }
 

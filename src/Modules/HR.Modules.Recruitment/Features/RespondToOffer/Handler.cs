@@ -72,6 +72,7 @@ internal sealed class RespondToOfferHandler(
 
         var now = clock.UtcNowOffset();
         var previousStatus = application.OfferResponseStatus.Value.ToString();
+        var expectedVersion = application.Version;
 
         application.RespondToOffer(target, now);
 
@@ -89,17 +90,29 @@ internal sealed class RespondToOfferHandler(
             application.OfferMadeAt,
             application.OfferRespondedAt);
 
+        const string conflictMessage = "This application was changed by someone else. Reload and try again.";
+
         if (request.IdempotencyKey is { } key)
         {
-            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, RespondToOfferResponse>(
-                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+            var outcome = await db.SaveIdempotentWithConcurrencyAsync<IdempotencyRecord, Application, RespondToOfferResponse>(
+                db.IdempotencyRecords, application, expectedVersion, scope, key, fingerprint!,
+                StatusCodes.Status200OK, response, now, cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+            switch (outcome.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(outcome.Response!);
+                case IdempotencyOutcomeKind.ConcurrencyConflict:
+                    return Result.Failure<RespondToOfferResponse>(Error.Concurrency(conflictMessage));
+            }
         }
         else
         {
-            await db.SaveChangesAsync(cancellationToken);
+            var saveResult = await db.SaveChangesWithConcurrencyAsync(
+                application, expectedVersion, conflictMessage, cancellationToken);
+
+            if (!saveResult.IsSuccess)
+                return Result.Failure<RespondToOfferResponse>(saveResult.Error);
         }
 
         await auditPublisher.PublishAsync(

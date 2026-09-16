@@ -19,6 +19,8 @@ internal sealed record CreateAssetRequest
     internal string? IdempotencyKey { get; init; }
 
     // Populated by the endpoint from the authenticated user's id (ticket 3, P1 follow-up item 3) -
-    // the actor scope an idempotency key is bound to. Never bound from the client body.
-    internal Guid ActorId { get; init; }
+    // the actor scope an idempotency key is bound to. Never bound from the client body. Null when
+    // there is no authenticated user (e.g. a system-initiated call), in which case the audit event
+    // records no actor rather than a misleading Guid.Empty.
+    internal Guid? ActorId { get; init; }
 }

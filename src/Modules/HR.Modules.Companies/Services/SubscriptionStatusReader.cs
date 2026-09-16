@@ -28,7 +28,11 @@ internal sealed class SubscriptionStatusReader(CompaniesDbContext dbContext, ICl
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        var isReadOnly = subscription.Status == SubscriptionStatus.TrialExpired || subscription.AdminForcedReadOnly;
+        // Ticket 25 (P1): a paused Stripe subscription is treated as read-only, same as an expired
+        // trial or an explicit admin override — see SubscriptionStatus.Paused remarks.
+        var isReadOnly = subscription.Status == SubscriptionStatus.TrialExpired
+            || subscription.Status == SubscriptionStatus.Paused
+            || subscription.AdminForcedReadOnly;
         var trialDaysRemaining = subscription.Status == SubscriptionStatus.Trial
             ? Math.Max(0, (subscription.TrialExpiresAt - now).Days)
             : 0;

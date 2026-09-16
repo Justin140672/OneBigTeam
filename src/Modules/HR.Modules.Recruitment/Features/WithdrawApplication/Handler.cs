@@ -57,6 +57,7 @@ internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock
                 Error.Validation($"Cannot withdraw an application already on the terminal stage '{currentStage.Name}'."));
 
         var now = clock.UtcNowOffset();
+        var expectedVersion = application.Version;
 
         // Ticket #99 judgement call: withdrawal is candidate-initiated and orthogonal to the pipeline
         // — there is no "Withdrawn" RecruitmentStage. CurrentStageId is left unchanged (the stage the
@@ -90,17 +91,29 @@ internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock
             application.CreatedAt,
             application.UpdatedAt);
 
+        const string conflictMessage = "This application was changed by someone else. Reload and try again.";
+
         if (request.IdempotencyKey is { } key)
         {
-            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, WithdrawApplicationResponse>(
-                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+            var outcome = await db.SaveIdempotentWithConcurrencyAsync<IdempotencyRecord, HR.Modules.Recruitment.Domain.Application, WithdrawApplicationResponse>(
+                db.IdempotencyRecords, application, expectedVersion, scope, key, fingerprint!,
+                StatusCodes.Status200OK, response, now, cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+            switch (outcome.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(outcome.Response!);
+                case IdempotencyOutcomeKind.ConcurrencyConflict:
+                    return Result.Failure<WithdrawApplicationResponse>(Error.Concurrency(conflictMessage));
+            }
         }
         else
         {
-            await db.SaveChangesAsync(cancellationToken);
+            var saveResult = await db.SaveChangesWithConcurrencyAsync(
+                application, expectedVersion, conflictMessage, cancellationToken);
+
+            if (!saveResult.IsSuccess)
+                return Result.Failure<WithdrawApplicationResponse>(saveResult.Error);
         }
 
         await auditPublisher.PublishAsync(

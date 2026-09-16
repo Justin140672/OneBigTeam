@@ -40,6 +40,16 @@ internal sealed class InviteAcceptanceOperation
     /// </summary>
     public const string StatusOrphaned = "orphaned";
 
+    /// <summary>
+    /// Ticket 17 (P1): a stale Pending operation whose invite is cancelled/removed AND whose email
+    /// has no Supabase account carrying THIS operation's own provisioning-correlation id — proof
+    /// nothing was ever created for it (either Supabase creation never ran, or it failed outright).
+    /// Terminal, and distinct from <see cref="StatusOrphaned"/> precisely because no external
+    /// identity needs cleanup here — never set when a genuinely matching Supabase account exists
+    /// (that case is <see cref="StatusOrphaned"/> instead, same as the SupabaseConfirmed path).
+    /// </summary>
+    public const string StatusCancelled = "cancelled";
+
     public Guid Id { get; private set; }
     public Guid InviteId { get; private set; }
     public Guid CompanyId { get; private set; }
@@ -85,6 +95,27 @@ internal sealed class InviteAcceptanceOperation
     public void MarkOrphaned(DateTimeOffset now)
     {
         Status = StatusOrphaned;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Ticket 17 (P1): overload for reconciling a stale Pending operation (never reached
+    /// <see cref="MarkSupabaseConfirmed"/>, so <see cref="SupabaseAuthUserId"/> was never set) where
+    /// a matching Supabase account was nonetheless discovered by email + provisioning-correlation
+    /// check. Records the discovered id so the orphan is identifiable for manual cleanup, same as
+    /// the SupabaseConfirmed path.
+    /// </summary>
+    public void MarkOrphaned(Guid supabaseAuthUserId, DateTimeOffset now)
+    {
+        SupabaseAuthUserId = supabaseAuthUserId;
+        Status = StatusOrphaned;
+        UpdatedAt = now;
+    }
+
+    /// <summary>Ticket 17 (P1): see <see cref="StatusCancelled"/>.</summary>
+    public void MarkCancelled(DateTimeOffset now)
+    {
+        Status = StatusCancelled;
         UpdatedAt = now;
     }
 }

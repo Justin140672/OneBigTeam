@@ -16,6 +16,22 @@ namespace HR.Modules.Identity.Jobs;
 /// The success audit event (UserAutoDisabledOnDepartureAuditEvent) is only published after
 /// SaveChangesAsync has actually persisted IsActive=false — this job never reports disablement
 /// optimistically.
+///
+/// Ticket 19 (P2): claims are guarded by the SAME optimistic-concurrency primitive
+/// (<see cref="DbContextConcurrencyExtensions.SaveChangesWithConcurrencyAsync{T}"/>) regardless of
+/// which of the two possible triggers reaches this method:
+///  - A LIVE dispatch (<see cref="ProcessAsync(Guid,Guid)"/>, enqueued directly by
+///    OnEmployeeDepartureFinalised for a fresh Pending row) claims the row itself here.
+///  - A RECONCILIATION re-enqueue (<see cref="ProcessAsync(Guid,Guid,Guid)"/>,
+///    AccountDisablementReconciliationJob) has ALREADY atomically claimed the row before enqueuing
+///    — this overload only verifies (<see cref="Domain.AccountDisablement.IsClaimedBy"/>) that the
+///    claim is still valid (not stolen by a lease-expiry-triggered reclaim in the meantime) before
+///    proceeding, rather than claiming a second time.
+/// Whichever caller's SaveChangesAsync actually commits the claim first wins the row (advancing
+/// Version); every other concurrent claim attempt for the SAME row observes
+/// <see cref="DbUpdateConcurrencyException"/> and backs off without throwing, retrying, or
+/// touching the account — this is what makes a live dispatch and a reconciliation dispatch for the
+/// SAME operation mutually exclusive.
 /// </summary>
 [AutomaticRetry(Attempts = MaxAttempts, DelaysInSeconds = new[] { 30, 120, 600 })]
 internal sealed class AccountDisablementJob(
@@ -26,7 +42,17 @@ internal sealed class AccountDisablementJob(
 {
     public const int MaxAttempts = 4;
 
-    public async Task ProcessAsync(Guid accountDisablementId, Guid companyId)
+    /// <summary>Live-dispatch entry point — claims the row itself (see class remarks).</summary>
+    public Task ProcessAsync(Guid accountDisablementId, Guid companyId) =>
+        ProcessCoreAsync(accountDisablementId, companyId, alreadyClaimedBy: null);
+
+    /// <summary>Reconciliation entry point — <paramref name="claimedBy"/> is the id
+    /// AccountDisablementReconciliationJob already atomically claimed this row under; verified
+    /// (not re-claimed) before proceeding (see class remarks).</summary>
+    public Task ProcessAsync(Guid accountDisablementId, Guid companyId, Guid claimedBy) =>
+        ProcessCoreAsync(accountDisablementId, companyId, alreadyClaimedBy: claimedBy);
+
+    private async Task ProcessCoreAsync(Guid accountDisablementId, Guid companyId, Guid? alreadyClaimedBy)
     {
         var request = await db.AccountDisablements.SingleOrDefaultAsync(d => d.Id == accountDisablementId);
 
@@ -53,8 +79,45 @@ internal sealed class AccountDisablementJob(
             return;
 
         var now = clock.UtcNow;
-        request.MarkProcessing(now);
-        await db.SaveChangesAsync();
+
+        if (alreadyClaimedBy is { } claimId)
+        {
+            // Ticket 19 (P2): the reconciler already won the claim race for this row atomically —
+            // just verify that claim is still live (its lease hasn't since expired and been
+            // reclaimed by someone else while this job sat in the Hangfire queue) rather than
+            // claiming again.
+            if (!request.IsClaimedBy(claimId, now))
+            {
+                logger.LogInformation(
+                    "AccountDisablementJob: reconciler's claim for account disablement {AccountDisablementId} (company {CompanyId}) is no longer valid — another worker has since claimed it. Skipping.",
+                    accountDisablementId, companyId);
+                return;
+            }
+        }
+        else
+        {
+            var expectedVersion = request.Version;
+            request.Claim(Guid.NewGuid(), now);
+
+            var claimResult = await db.SaveChangesWithConcurrencyAsync(
+                request, expectedVersion,
+                "This account disablement is already being processed by another worker.",
+                CancellationToken.None);
+
+            if (claimResult.IsFailure)
+            {
+                // Ticket 19 (P2): lost the claim race — a live dispatch and a reconciliation
+                // re-enqueue targeted the SAME row and someone else's SaveChangesAsync committed
+                // first. Not a failure of THIS attempt: the winner is responsible for the
+                // disablement, so back off silently rather than throwing (which would consume a
+                // retry attempt and log an operational-failure audit event for work that is, in
+                // fact, already correctly in hand).
+                logger.LogInformation(
+                    "AccountDisablementJob: lost the claim race for account disablement {AccountDisablementId} (company {CompanyId}) — another worker already owns it.",
+                    accountDisablementId, companyId);
+                return;
+            }
+        }
 
         try
         {
@@ -103,7 +166,7 @@ internal sealed class AccountDisablementJob(
 
             if (isFinalAttempt)
             {
-                request.MarkFailed("Account disablement failed.", clock.UtcNow);
+                request.MarkFailed("Account disablement failed.", clock.UtcNow, MaxAttempts);
                 await db.SaveChangesAsync();
 
                 await auditEventPublisher.PublishAsync(

@@ -1,3 +1,4 @@
+using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
@@ -58,11 +59,22 @@ internal sealed class CancelInviteHandler(
 
         if (request.IdempotencyKey is { } key)
         {
-            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, CancelInviteResponse>(
-                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, new DateTimeOffset(now, TimeSpan.Zero), cancellationToken);
+            // Ticket 24 (P1): route the keyed path through the same version-pinning save as the
+            // unkeyed path below, so a concurrent AcceptInvite claiming the invite between our read
+            // and our write produces the same controlled conflict here instead of an unhandled
+            // DbUpdateConcurrencyException. A concurrency conflict commits nothing — including no
+            // idempotency record — so the same key can safely be reused once the caller reloads.
+            var outcome = await db.SaveIdempotentWithConcurrencyAsync<IdempotencyRecord, UserInvite, CancelInviteResponse>(
+                db.IdempotencyRecords, invite, expectedVersion, scope, key, fingerprint!, StatusCodes.Status200OK, response, new DateTimeOffset(now, TimeSpan.Zero), cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+            switch (outcome.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(outcome.Response!);
+                case IdempotencyOutcomeKind.ConcurrencyConflict:
+                    return Result.Failure<CancelInviteResponse>(
+                        Error.Concurrency("This invitation was already accepted and can no longer be cancelled."));
+            }
         }
         else
         {

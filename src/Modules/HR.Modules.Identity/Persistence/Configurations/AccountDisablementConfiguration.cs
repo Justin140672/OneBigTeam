@@ -52,6 +52,33 @@ internal sealed class AccountDisablementConfiguration : IEntityTypeConfiguration
         builder.Property(d => d.ProcessedAt)
             .HasColumnName("processed_at");
 
+        // Ticket 19 (P2): claim/lease + terminal-failure columns.
+        builder.Property(d => d.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken();
+
+        builder.Property(d => d.ClaimedBy)
+            .HasColumnName("claimed_by");
+
+        builder.Property(d => d.LeaseExpiresAt)
+            .HasColumnName("lease_expires_at");
+
+        builder.Property(d => d.IsTerminallyFailed)
+            .HasColumnName("is_terminally_failed")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(d => d.LastRetriedByActorId)
+            .HasColumnName("last_retried_by_actor_id");
+
+        builder.Property(d => d.LastRetryReason)
+            .HasColumnName("last_retry_reason")
+            .HasMaxLength(500);
+
+        builder.Property(d => d.LastRetriedAt)
+            .HasColumnName("last_retried_at");
+
         builder.HasIndex(d => d.CompanyId);
         builder.HasIndex(d => new { d.Status, d.RequestedAt });
 

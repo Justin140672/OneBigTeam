@@ -24,6 +24,7 @@ internal sealed class InterviewFeedbackTaskCompletionAction(IInterviewFeedbackSe
             context.CompletedBy,
             context.OutcomeDecision,
             context.OutcomeReason,
-            cancellationToken);
+            cancellationToken,
+            dispatchOperationId: context.DispatchOperationId);
     }
 }

@@ -46,9 +46,17 @@ internal sealed class GetCustomerDashboardHandler(
             .AsNoTracking()
             .CountAsync(s => s.Status == SubscriptionStatus.Trial, cancellationToken);
 
+        // Ticket 25 (P1): a paused subscription is read-only, same as an expired trial (see
+        // SubscriptionStatusReader.IsReadOnly), so it counts towards this stat too.
         var readOnlyCustomers = await _dbContext.CustomerSubscriptions
             .AsNoTracking()
-            .CountAsync(s => s.Status == SubscriptionStatus.TrialExpired, cancellationToken);
+            .CountAsync(
+                s => s.Status == SubscriptionStatus.TrialExpired || s.Status == SubscriptionStatus.Paused,
+                cancellationToken);
+
+        var pausedCustomers = await _dbContext.CustomerSubscriptions
+            .AsNoTracking()
+            .CountAsync(s => s.Status == SubscriptionStatus.Paused, cancellationToken);
 
         var cancelledSubscriptions = await _dbContext.CustomerSubscriptions
             .AsNoTracking()
@@ -92,6 +100,7 @@ internal sealed class GetCustomerDashboardHandler(
             activeCustomers,
             trialCustomers,
             readOnlyCustomers,
+            pausedCustomers,
             cancelledSubscriptions,
             pendingPermanentDeletions,
             recentRegistrations,

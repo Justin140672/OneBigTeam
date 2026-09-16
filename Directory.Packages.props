@@ -9,7 +9,7 @@
     Central Package Management (NFR-09).
     Every package version used anywhere in the solution is declared exactly once here.
     Individual projects reference packages with <PackageReference Include="..." /> and no Version attribute.
-    See docs/dependency-management.md for the update and severity policy.
+    See specifications/engineering/dependency-management.md for the update and severity policy.
   -->
   <ItemGroup>
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />

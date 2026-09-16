@@ -3,7 +3,7 @@
 #
 # HELPER-LEVEL tests: fake Railway CLI runner, fake Railway GraphQL API sender, fake HTTP probe.
 # They prove the control flow. They do NOT prove the workflow against real Railway infrastructure —
-# see docs/tickets/ticket-5-verified-releases-and-recovery.md ("Unverified / OUTSTANDING").
+# see specifications/implemented-tickets/ticket-5-verified-releases-and-recovery.md ("Unverified / OUTSTANDING").
 #
 # Regression coverage (old behaviour that each defect fix makes impossible):
 #   Defect 1 — recovery used `railway redeploy` (latest) which, after a partial rollout, re-activates

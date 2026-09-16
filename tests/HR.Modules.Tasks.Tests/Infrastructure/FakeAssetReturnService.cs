@@ -18,7 +18,9 @@ internal sealed class FakeAssetReturnService : IAssetReturnService
     public List<VerifiedCall> VerifiedCalls { get; } = [];
     public AssetReturnResult NextResult { get; set; } = AssetReturnResult.Success;
 
-    public Task ReturnAsync(Guid companyId, Guid assignmentId, Guid returnedBy, CancellationToken cancellationToken)
+    public Task ReturnAsync(
+        Guid companyId, Guid assignmentId, Guid returnedBy, CancellationToken cancellationToken,
+        Guid dispatchOperationId = default)
     {
         Calls.Add(new Call(companyId, assignmentId, returnedBy));
         return Task.CompletedTask;
@@ -31,7 +33,8 @@ internal sealed class FakeAssetReturnService : IAssetReturnService
         AssetReturnOutcome outcome,
         Guid returnedBy,
         string? notes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid dispatchOperationId = default)
     {
         VerifiedCalls.Add(new VerifiedCall(companyId, assignmentId, expectedEmployeeId, outcome, returnedBy, notes));
         return Task.FromResult(NextResult);

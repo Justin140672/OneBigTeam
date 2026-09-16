@@ -17,7 +17,7 @@ namespace HR.SharedKernel.Idempotency;
 /// sensitive fields by construction.
 ///
 /// Permitted replay-record contents, retention, and erasure handling are documented in
-/// docs/security/idempotency-replay-data-policy.md.
+/// specifications/security/idempotency-replay-data-policy.md.
 /// </summary>
 public static class ReplayResponsePolicy
 {
@@ -46,7 +46,7 @@ public static class ReplayResponsePolicy
             throw new InvalidOperationException(
                 $"Refusing to persist '{typeof(TResponse).Name}' for idempotent replay: {violation}. " +
                 "Introduce a narrower endpoint-specific replay DTO that excludes this field instead of " +
-                "storing the full response. See docs/security/idempotency-replay-data-policy.md.");
+                "storing the full response. See specifications/security/idempotency-replay-data-policy.md.");
         }
     }
 

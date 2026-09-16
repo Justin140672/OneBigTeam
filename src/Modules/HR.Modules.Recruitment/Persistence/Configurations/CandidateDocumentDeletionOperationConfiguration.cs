@@ -24,6 +24,24 @@ internal sealed class CandidateDocumentDeletionOperationConfiguration
         builder.Property(o => o.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(o => o.CompletedAt).HasColumnName("completed_at");
 
+        // Ticket 19 (P2): claim/lease + terminal-failure columns.
+        builder.Property(o => o.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken();
+
+        builder.Property(o => o.ClaimedBy).HasColumnName("claimed_by");
+        builder.Property(o => o.LeaseExpiresAt).HasColumnName("lease_expires_at");
+
+        builder.Property(o => o.IsTerminallyFailed)
+            .HasColumnName("is_terminally_failed")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(o => o.LastRetriedByActorId).HasColumnName("last_retried_by_actor_id");
+        builder.Property(o => o.LastRetryReason).HasColumnName("last_retry_reason").HasMaxLength(500);
+        builder.Property(o => o.LastRetriedAt).HasColumnName("last_retried_at");
+
         builder.HasIndex(o => o.CandidateId);
         builder.HasIndex(o => new { o.CompanyId, o.Status });
     }

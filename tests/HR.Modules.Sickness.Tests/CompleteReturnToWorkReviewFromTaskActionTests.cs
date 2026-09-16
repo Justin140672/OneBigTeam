@@ -7,11 +7,13 @@ using Microsoft.EntityFrameworkCore;
 namespace HR.Modules.Sickness.Tests;
 
 /// <summary>
-/// SICK-03: CompleteReturnToWorkReviewFromTaskAction no longer completes reviews at all — the
+/// Ticket 16 (P1): CompleteReturnToWorkReviewFromTaskAction never completes a review itself — the
 /// generic Tasks-module task-completion callback has no structured fit-to-return outcome to
-/// supply, and completing a review without an outcome is disallowed. This action is now a
-/// defensive no-op on every path; the review is only ever completed via the dedicated
-/// Features/CompleteReturnToWorkReview endpoint.
+/// supply, and completing a review without an outcome is disallowed. A still-Pending review now
+/// rejects generic completion with a validation failure (so the generic Tasks item stays open)
+/// rather than silently succeeding while the review remains outstanding; the review is only ever
+/// completed via the dedicated Features/CompleteReturnToWorkReview endpoint, whose own callback
+/// hits the "already Completed" branch and succeeds.
 /// </summary>
 public class CompleteReturnToWorkReviewFromTaskActionTests
 {
@@ -51,7 +53,7 @@ public class CompleteReturnToWorkReviewFromTaskActionTests
             EmployeeId, completedBy, Now, sourceEntityId, null, notes);
 
     [Fact]
-    public async Task ExecuteAsync_PendingReview_IsNoOp_ReviewStaysPending()
+    public async Task ExecuteAsync_PendingReview_RejectsGenericCompletion_ReviewStaysPending()
     {
         var db = BuildDbContext();
         var review = await SeedReview(db);
@@ -62,10 +64,12 @@ public class CompleteReturnToWorkReviewFromTaskActionTests
             BuildCompletionContext(CompanyId, review.Id, completedBy, "Fit to return"),
             CancellationToken.None);
 
-        // This action always reports Success() (it has no required decision to validate) — the
-        // generic Tasks-module task itself still completes, only the ReturnToWorkReview stays
-        // Pending until reviewed via the dedicated endpoint.
-        Assert.True(result.IsSuccess);
+        // Ticket 16 (P1): a Pending review has no structured fit-to-return decision available on
+        // this generic path — the action now rejects completion (so CompleteTaskHandler leaves the
+        // generic Tasks item open/actionable, per ITaskCompletionAction's "a failed Result aborts
+        // completion entirely" contract) instead of silently succeeding while the review itself
+        // stays outstanding.
+        Assert.True(result.IsFailure);
 
         var updated = await db.ReturnToWorkReviews.FindAsync(review.Id);
         Assert.Equal(ReturnToWorkReviewStatus.Pending, updated!.Status);

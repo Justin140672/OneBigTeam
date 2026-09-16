@@ -9,7 +9,7 @@ namespace HR.Integration.Tests.Performance;
 /// <summary>
 /// NFR-02 measurement harness. Warms up, then runs N measured iterations of an operation, capturing
 /// wall-clock latency and EF command count per iteration. Reports p95 latency (the agreed metric for
-/// API/page operations — see docs/performance-testing.md), plus median / p99 / max and cold-vs-warm,
+/// API/page operations — see specifications/engineering/performance-testing.md), plus median / p99 / max and cold-vs-warm,
 /// and records the run to <see cref="PerformanceResults"/> for artefact output.
 ///
 /// The pass/fail budget is <c>target * PERF_CI_MULTIPLIER</c>. The product targets

@@ -51,7 +51,9 @@ internal sealed class StripeWebhookHandler(
         if (webhookEvent.EventType is not (
             "checkout.session.completed" or
             "customer.subscription.updated" or
-            "customer.subscription.deleted"))
+            "customer.subscription.deleted" or
+            "customer.subscription.paused" or
+            "customer.subscription.resumed"))
         {
             return;
         }
@@ -121,7 +123,26 @@ internal sealed class StripeWebhookHandler(
                 continue; // Concurrency conflict — reload and re-evaluate.
             }
 
-            ApplyProjection(webhookEvent, subscription, now);
+            // Ticket 25 (P1): a dedicated "resumed" event must not blindly trust its own payload as
+            // grounds to restore active/paid access — reconcile against the live Stripe subscription
+            // first (same authoritative-fetch pattern as the ambiguous-event reconciliation above),
+            // so a stale/racing "resumed" delivery can never grant access the live subscription no
+            // longer actually has.
+            if (webhookEvent.EventType == "customer.subscription.resumed")
+            {
+                var reconciled = await TryReconcileFromLiveStripeStateAsync(
+                    webhookEvent, subscription, now, cancellationToken, isResumedReconciliation: true);
+
+                if (!reconciled)
+                {
+                    throw new InvalidOperationException(
+                        $"Could not reconcile resumed Stripe event {webhookEvent.EventId} against live subscription state.");
+                }
+            }
+            else
+            {
+                ApplyProjection(webhookEvent, subscription, now);
+            }
 
             // The processed-event row is written in the SAME SaveChanges as the projection: the event
             // is "processed" only if and when the local state change commits. A concurrent duplicate
@@ -158,12 +179,21 @@ internal sealed class StripeWebhookHandler(
         StripeWebhookEvent webhookEvent,
         CustomerSubscription subscription,
         DateTimeOffset now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool isResumedReconciliation = false)
     {
         var stripeSubscriptionId = webhookEvent.StripeSubscriptionId ?? subscription.StripeSubscriptionId;
 
         if (string.IsNullOrWhiteSpace(stripeSubscriptionId))
         {
+            if (isResumedReconciliation)
+            {
+                // No subscription id to reconcile a "resumed" event against — refuse to guess and
+                // let the caller treat this as retryable, rather than applying the raw payload as
+                // an ambiguous tie would.
+                return false;
+            }
+
             // A bare checkout.session.completed tie with no subscription id to reconcile against —
             // fall back to applying the webhook payload directly; there is nothing more authoritative
             // to fetch.
@@ -218,7 +248,7 @@ internal sealed class StripeWebhookHandler(
         return true;
     }
 
-    private static void ApplyProjection(StripeWebhookEvent webhookEvent, CustomerSubscription subscription, DateTimeOffset now)
+    private void ApplyProjection(StripeWebhookEvent webhookEvent, CustomerSubscription subscription, DateTimeOffset now)
     {
         switch (webhookEvent.EventType)
         {
@@ -248,6 +278,19 @@ internal sealed class StripeWebhookHandler(
                     SubscriptionStatus.Canceled,
                     webhookEvent.CurrentPeriodEnd,
                     cancelAtPeriodEnd: true,
+                    now,
+                    webhookEvent.EventId,
+                    webhookEvent.EventCreatedAt);
+                break;
+
+            // Ticket 25 (P1): dedicated "paused" event — always trusted directly from the payload
+            // (unlike "resumed" above, moving TO the read-only Paused status carries no access-
+            // granting risk that would require a live-Stripe reconciliation round trip first).
+            case "customer.subscription.paused":
+                subscription.UpdateFromStripe(
+                    SubscriptionStatus.Paused,
+                    webhookEvent.CurrentPeriodEnd,
+                    webhookEvent.CancelAtPeriodEnd ?? subscription.CancelAtPeriodEnd,
                     now,
                     webhookEvent.EventId,
                     webhookEvent.EventCreatedAt);
@@ -335,11 +378,37 @@ internal sealed class StripeWebhookHandler(
         return null;
     }
 
-    private static SubscriptionStatus MapStatus(string? stripeStatus) => stripeStatus switch
+    // Ticket 22 / Ticket 25 (P1): fail closed on any Stripe subscription status we don't
+    // explicitly recognise. Previously an unmapped status silently fell through to
+    // SubscriptionStatus.Active — granting full paid access without ever having confirmed that is
+    // the correct projection. "paused" was originally used as this fallback's own example of an
+    // "unknown" value, but it is actually a valid, documented Stripe status (see the explicit case
+    // above) — it must converge to the read-only Paused status, not throw forever. Any FUTURE
+    // status this switch still doesn't recognise continues to throw here: the event is NOT marked
+    // processed and NOT applied (see HandleAsync/TryReconcileFromLiveStripeStateAsync, both of
+    // which propagate this out uncaught), so Stripe redelivers the webhook until this is fixed,
+    // rather than us guessing a status that grants access.
+    private SubscriptionStatus MapStatus(string? stripeStatus)
     {
-        "active" or "trialing" => SubscriptionStatus.Active,
-        "past_due" or "unpaid" or "incomplete" => SubscriptionStatus.PastDue,
-        "canceled" or "incomplete_expired" => SubscriptionStatus.Canceled,
-        _ => SubscriptionStatus.Active,
-    };
+        switch (stripeStatus)
+        {
+            case "active" or "trialing":
+                return SubscriptionStatus.Active;
+            case "past_due" or "unpaid" or "incomplete":
+                return SubscriptionStatus.PastDue;
+            case "canceled" or "incomplete_expired":
+                return SubscriptionStatus.Canceled;
+            // Ticket 25 (P1): "paused" is a valid, documented Stripe subscription status (pause
+            // collection) — explicitly mapped to the read-only Paused status rather than treated as
+            // unrecognized. See SubscriptionStatus.Paused remarks for the product decision.
+            case "paused":
+                return SubscriptionStatus.Paused;
+            default:
+                logger.LogError(
+                    "Stripe webhook received unrecognized subscription status {StripeStatus} — refusing to apply a guessed projection",
+                    stripeStatus);
+                throw new InvalidOperationException(
+                    $"Unrecognized Stripe subscription status '{stripeStatus}' — refusing to guess a projection.");
+        }
+    }
 }

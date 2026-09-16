@@ -18,7 +18,8 @@ internal sealed class AssetReturnTaskCompletionAction(IAssetReturnService assetR
             context.CompanyId,
             context.SourceEntityId.Value,
             context.CompletedBy,
-            cancellationToken);
+            cancellationToken,
+            dispatchOperationId: context.DispatchOperationId);
 
         return Result.Success();
     }

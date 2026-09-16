@@ -80,7 +80,7 @@ This document records current product decisions that supersede conflicting older
 
 ## Leave management
 
-- `14-leave-management.md` is the authoritative Leave capability document; where `06-leave-management.md` conflicts with it, `14-leave-management.md` takes precedence.
+- `14-leave-management.md` is the authoritative Leave capability document.
 - Leave is distinct from the Sickness module. Leave owns leave requests, leave balances, leave policies, TOIL and general absence tracking. Sickness owns sickness records, evidence and return-to-work reviews as a separate domain, not a leave type. There is no "Sick Leave" leave type — it was removed (migration `RemoveSickLeaveType`) precisely to avoid double-tracking the same absence in two modules.
 - Default leave types provisioned for every new company (`LeaveTypeDefaultsProvisioner`): Annual Leave, Unpaid Leave, Compassionate Leave, Parental Leave, Time Off In Lieu (TOIL). Sick Leave is deliberately excluded — sickness absence is tracked exclusively by the Sickness module.
 - "Other" is not a provisioned default leave type. Leave types are fully configurable per company (`CreateLeaveType`/`UpdateLeaveType`/`DeactivateLeaveType`), so a company that wants a general/miscellaneous leave type can create one; MVP does not assume every company needs it.
@@ -90,7 +90,7 @@ This document records current product decisions that supersede conflicting older
 
 ## Sickness management
 
-- `15-sickness-management.md` is the authoritative Sickness capability document; where `07-sickness-management.md` conflicts with it, `15-sickness-management.md` takes precedence.
+- `15-sickness-management.md` is the authoritative Sickness capability document.
 - `ReturnToWorkRequiredAfterDays` is confirmed as **1 working day** (`CompanySettings.CreateDefault`, `CompanySicknessSettings.Default`, and the `HR.Web` HR settings edit-model fallback all agree). An earlier draft of `15-sickness-management.md` stated 3 working days; that was spec drift against the already-implemented (SICK-04-era) behaviour, not a considered decision, so the spec was corrected to match the code rather than the reverse — a lightweight "does this warrant a return-to-work chat" check is meant to happen almost immediately after any absence, not only longer ones.
 - The return-to-work threshold is evaluated against `SicknessRecord.TotalDays`, which is a **working-day** count (`SicknessCalculator`) — the employee's own working pattern, excluding non-working days and, if the company opts in, public holidays. This is deliberately different from the fit-note threshold, which is evaluated in **calendar** days (`FitNoteEvaluator`, SICK-01) because weekends and holidays should count toward "how long has this person actually been off" for evidence purposes but not toward "did this absence disrupt enough working time to warrant a chat". Do not conflate the two without updating this record.
 - `FitNoteRequiredAfterDays` default remains 7 calendar days (SICK-01, unchanged by SICK-05).

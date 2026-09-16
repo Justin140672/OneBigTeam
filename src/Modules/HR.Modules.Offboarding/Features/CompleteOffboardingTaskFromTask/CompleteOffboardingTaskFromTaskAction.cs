@@ -46,9 +46,31 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
         if (offboardingTask is null)
             return Result.Failure(Error.NotFound("The associated offboarding task was not found."));
 
-        // Already resolved (e.g. a retried/duplicated completion) — a safe, idempotent no-op.
+        // Ticket 15 (P1): "already resolved" (e.g. a retried/duplicated dispatch, or a reconciliation
+        // sweep replaying an interrupted operation) proves only that THIS task's own status
+        // transition committed — it says nothing about whether the plan-level follow-ups
+        // (final review task, audit, integration event) that TryCompletePlanAsync fires AFTER that
+        // commit ever ran. Recover them instead of assuming task-level completion implies the whole
+        // dispatch, including plan-level effects, is done.
         if (offboardingTask.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped)
+        {
+            // Recovery only applies to a genuine Tasks-dispatch replay (identified by a stable
+            // DispatchOperationId — ticket 11), never to an arbitrary already-resolved call with no
+            // dispatch identity — see CompleteOnboardingTaskFromTaskAction's identical guard for the
+            // full reasoning (a long-settled plan reached its current state via some unrelated path
+            // must not have its audit/review-task effects unconditionally re-attempted on every
+            // later no-op call).
+            if (context.DispatchOperationId != Guid.Empty)
+            {
+                var existingPlan = await dbContext.OffboardingPlans
+                    .FirstOrDefaultAsync(p => p.Id == offboardingTask.OffboardingPlanId, cancellationToken);
+
+                if (existingPlan is not null)
+                    await RecoverPlanCompletionEffectsAsync(existingPlan, cancellationToken);
+            }
+
             return Result.Success();
+        }
 
         var plan = await dbContext.OffboardingPlans
             .FirstOrDefaultAsync(p => p.Id == offboardingTask.OffboardingPlanId, cancellationToken);
@@ -134,7 +156,8 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
                 outcome,
                 returnedBy: context.CompletedBy,
                 notes: context.OutcomeReason,
-                cancellationToken);
+                cancellationToken,
+                dispatchOperationId: context.DispatchOperationId);
 
             if (returnResult is AssetReturnResult.EmployeeMismatch or AssetReturnResult.NotFound)
             {
@@ -283,6 +306,49 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
             cancellationToken);
     }
 
+    /// <summary>
+    /// Ticket 15 (P1): re-derives which plan-completion follow-ups are still owed purely from the
+    /// plan's own persisted state, for the case where a prior dispatch already committed the task
+    /// (and possibly the plan) transition but was interrupted before TryCompletePlanAsync's
+    /// post-commit effects (review task, audit, integration event) ran. Every effect here is itself
+    /// idempotent under replay — <see cref="OffboardingPlan.TryClaimFinalReviewTaskCreation"/> is a
+    /// durable one-shot claim, the audit event's EventId is deterministic, and integration-event
+    /// consumers are required to be idempotent — so calling this unconditionally whenever the task
+    /// was already resolved can never duplicate any of them.
+    /// </summary>
+    private async Task RecoverPlanCompletionEffectsAsync(OffboardingPlan plan, CancellationToken cancellationToken)
+    {
+        if (plan.Status != OffboardingStatus.Completed)
+            return; // Not this task's completion that finished the plan — nothing owed here.
+
+        var now = clock.UtcNowOffset();
+        var reviewTaskClaimed = plan.TryClaimFinalReviewTaskCreation(now);
+        if (reviewTaskClaimed)
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (reviewTaskClaimed)
+            await CreateHrCompletionReviewTaskAsync(plan, cancellationToken);
+
+        var planTasks = await dbContext.OffboardingTasks
+            .Where(t => t.OffboardingPlanId == plan.Id)
+            .ToListAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new OffboardingPlanCompletedAuditEvent(
+            plan.CompanyId,
+            plan.Id,
+            plan.EmployeeId,
+            OffboardingSystemActor.Id,
+            plan.LastWorkingDay,
+            planTasks.Count,
+            planTasks.Count(t => t.Status == OffboardingTaskStatus.Completed),
+            planTasks.Count(t => t.Status == OffboardingTaskStatus.Skipped),
+            now), cancellationToken);
+
+        await integrationEventPublisher.PublishAsync(
+            new OffboardingPlanCompletedIntegrationEvent(plan.CompanyId, plan.EmployeeId, plan.Id, now),
+            cancellationToken);
+    }
+
     private readonly record struct OffboardingPlanCompletionOutcome(
         bool IsCompleting,
         bool ReviewTaskClaimed,
@@ -368,7 +434,11 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
             assignedEmployeeId: reviewAssigneeId,
             assignedUserId:     null,
             sourceEntityId:     plan.Id,
-            cancellationToken);
+            cancellationToken,
+            // Ticket 15 (P1): defense-in-depth alongside plan.TryClaimFinalReviewTaskCreation — a
+            // stable per-plan key so even a caller that somehow reached this method twice for the
+            // same plan (e.g. a bug in the claim call site) cannot create a second review task.
+            idempotencyKey: $"OffboardingPlanCompleted:{plan.Id}");
 
         var now = clock.UtcNowOffset();
 

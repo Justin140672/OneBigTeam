@@ -47,6 +47,10 @@ internal sealed record SicknessEvidenceFulfilledAuditEvent(
     DateTimeOffset FulfilledAt,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
+    // Ticket 15 (P1): deterministic EventId derived from the evidence-request id — exactly one
+    // fulfilment event is ever meaningful per request, so a recovered/replayed dispatch (see
+    // SicknessEvidenceUploadCompletionAction) can never create a duplicate audit row.
+    Guid IAuditEvent.EventId => EvidenceRequestId;
     string IAuditEvent.EventType => "sickness.evidence_fulfilled";
     string IAuditEvent.EntityType => "SicknessEvidenceRequest";
     Guid IAuditEvent.EntityId => EvidenceRequestId;

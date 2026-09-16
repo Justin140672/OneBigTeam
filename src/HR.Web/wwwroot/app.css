@@ -17,7 +17,7 @@
 
     /* Interaction-state tokens for primary controls (buttons, tabs, pills, links, checkboxes).
        These are the single authoritative names every primary control should reference instead of
-       ad-hoc hex values or one-off page overrides — see docs/frontend/design-tokens.md.
+       ad-hoc hex values or one-off page overrides — see specifications/frontend/design-tokens.md.
          - default   : var(--hr-color-primary)
          - hover     : var(--hr-color-primary-hover)
          - active    : var(--hr-color-primary-active)   (mouse-down/pressed)

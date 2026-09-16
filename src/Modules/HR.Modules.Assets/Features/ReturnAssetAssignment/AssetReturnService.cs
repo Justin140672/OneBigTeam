@@ -15,7 +15,8 @@ internal sealed class AssetReturnService(
         Guid companyId,
         Guid assignmentId,
         Guid returnedBy,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid dispatchOperationId = default)
     {
         await ReturnAsync(
             companyId,
@@ -24,7 +25,8 @@ internal sealed class AssetReturnService(
             AssetReturnOutcome.Returned,
             returnedBy,
             notes: null,
-            cancellationToken);
+            cancellationToken,
+            dispatchOperationId);
     }
 
     public async Task<AssetReturnResult> ReturnAsync(
@@ -34,7 +36,8 @@ internal sealed class AssetReturnService(
         AssetReturnOutcome outcome,
         Guid returnedBy,
         string? notes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid dispatchOperationId = default)
     {
         var assignment = await db.AssetAssignments
             .SingleOrDefaultAsync(
@@ -52,7 +55,28 @@ internal sealed class AssetReturnService(
             return AssetReturnResult.EmployeeMismatch;
 
         if (!assignment.IsActive)
+        {
+            // Ticket 15 (P1): "already returned" proves only that the primary Return() mutation
+            // committed — it says nothing about whether a prior attempt's audit event ever
+            // published. Only recovered for a genuine Tasks-dispatch replay (a stable
+            // dispatchOperationId — ticket 11); a bare re-request with no dispatch identity keeps
+            // the original silent no-op, matching every other ITaskCompletionAction's identical
+            // DispatchOperationId-gated recovery guard.
+            if (dispatchOperationId != Guid.Empty)
+            {
+                await auditPublisher.PublishAsync(new AssetAssignmentReturnedAuditEvent(
+                    companyId,
+                    assignment.Id,
+                    assignment.AssetId,
+                    assignment.EmployeeId,
+                    returnedBy,
+                    clock.UtcNowOffset(),
+                    (assignment.ReturnOutcome ?? AssetAssignmentReturnOutcome.Returned).ToString(),
+                    notes), cancellationToken);
+            }
+
             return AssetReturnResult.AlreadyReturned;
+        }
 
         var asset = await db.Assets
             .SingleOrDefaultAsync(

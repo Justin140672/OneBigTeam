@@ -31,8 +31,13 @@ internal sealed class Endpoint(
                 await Send.ResultAsync(TypedResults.NotFound(error));
                 return;
             }
-            if (result.Error.Code == "conflict")
+            if (result.Error.Code is "conflict" or "concurrency")
             {
+                // Ticket 24 (P1): a concurrency conflict (keyed or unkeyed — see
+                // CancelInviteHandler.HandleAsync) means a concurrent AcceptInvite already claimed
+                // this invite. That is a conflict with current state, not a malformed request, so it
+                // must map to 409 the same way the "conflict" branch above already does — never a
+                // generic 400 and never an unhandled 500.
                 await Send.ResultAsync(TypedResults.Conflict(error));
                 return;
             }

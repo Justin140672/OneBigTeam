@@ -46,7 +46,7 @@ function Get-ReleaseSafety {
       Reads the checked-in release-safety.json. Missing file / missing key => appRollbackSafe = $true
       (the safe default: most releases are expand-only and CAN be rolled back by redeploying code).
       Set appRollbackSafe:false in the release commit whenever it ships a contracting/destructive
-      migration (see docs/runbooks/deployment-pipeline.md section 5).
+      migration (see specifications/runbooks/deployment-pipeline.md section 5).
     #>
     param([string]$Path = (Join-Path $PSScriptRoot 'release-safety.json'))
 
@@ -455,7 +455,7 @@ function Invoke-Recovery {
         $lines += "against the migrated schema. Manual recovery is required:"
         $lines += ""
         $lines += "  1. Decide: roll FORWARD (fix-forward deploy) or restore the database."
-        $lines += "  2. If restoring: follow docs/runbooks/backup-and-disaster-recovery.md — PITR the"
+        $lines += "  2. If restoring: follow specifications/runbooks/backup-and-disaster-recovery.md — PITR the"
         $lines += "     environment database to just BEFORE this deploy started."
         $lines += "  3. Only after the database is at the matching point, roll back the recorded known-good"
         $lines += "     deployments in this order: api, app, then marketing, admin, admin-api."
@@ -466,7 +466,7 @@ function Invoke-Recovery {
         }
         $lines += "  4. Confirm GET {api}/health/ready = 200 and the now-active Railway deployment per"
         $lines += "     service equals the recorded known-good deployment id."
-        $lines += "  5. Record the incident under docs/reviews/ if customer impact exceeded 30 minutes."
+        $lines += "  5. Record the incident under specifications/reviews/ if customer impact exceeded 30 minutes."
         return [pscustomobject]@{ Outcome = 'manual-required'; Lines = $lines; ServiceResults = @()
             Summary = (New-RecoverySummaryTable -ServiceResults @() -Outcome 'manual-required') }
     }
@@ -648,7 +648,7 @@ function Invoke-Recovery {
         return [pscustomobject]@{ Outcome = 'recovered'; Lines = $lines; ServiceResults = $serviceResults; Summary = $summary }
     }
 
-    $lines += "::error::Recovery incomplete. Not every required service was rolled back AND verified (artifact identity + readiness + api startup migrations) — see the table. Manual intervention required (docs/runbooks/deployment-pipeline.md section 6)."
+    $lines += "::error::Recovery incomplete. Not every required service was rolled back AND verified (artifact identity + readiness + api startup migrations) — see the table. Manual intervention required (specifications/runbooks/deployment-pipeline.md section 6)."
     return [pscustomobject]@{ Outcome = 'failed'; Lines = $lines; ServiceResults = $serviceResults; Summary = $summary }
 }
 

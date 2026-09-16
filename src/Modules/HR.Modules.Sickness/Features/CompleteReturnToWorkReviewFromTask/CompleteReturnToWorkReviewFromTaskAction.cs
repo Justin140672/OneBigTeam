@@ -18,14 +18,17 @@ namespace HR.Modules.Sickness.Features.CompleteReturnToWorkReviewFromTask;
 /// the guard below makes this a safe, audit-free no-op (idempotency: "repeated task completion
 /// does not overwrite or duplicate the review").
 ///
-/// If the underlying task is instead completed through the generic
+/// Ticket 16 (P1): if the underlying task is instead completed through the generic
 /// POST /tasks/{id}/complete endpoint (bypassing the dedicated review endpoint — e.g. from a
-/// generic "My Tasks" list), there is no structured outcome available to record. This handler
-/// intentionally leaves the review Pending rather than completing it without a fit-to-return
-/// outcome, mirroring LeaveTaskCompletionAction/InterviewFeedbackTaskCompletionAction's
-/// established "no decision data supplied => no-op" convention elsewhere in the Tasks
-/// integration. The review will still surface as overdue via ReturnToWorkReminderJob /
-/// GetOverdueReturnToWorkReviews until it is completed with a real outcome.
+/// generic "My Tasks" list), there is no structured outcome available to record. Previously this
+/// returned <see cref="Result.Success()"/> for that case too — CompleteTaskHandler then marked the
+/// generic Tasks item Completed even though the review itself remained Pending, contradicting the
+/// rule (see CompleteReturnToWorkReviewHandler) that a review can never resolve without a valid
+/// fit-to-return decision. This now returns a validation failure instead: CompleteTaskHandler
+/// aborts completion entirely on a failed Result (see ITaskCompletionAction's doc), so the generic
+/// task stays open/actionable and the caller is told to use the dedicated review flow. The
+/// dedicated endpoint's own call back into this dispatcher still hits the "already Completed"
+/// branch above and succeeds, completing the linked task exactly once.
 /// </summary>
 internal sealed class CompleteReturnToWorkReviewFromTaskAction(SicknessDbContext dbContext) : ITaskCompletionAction
 {
@@ -43,12 +46,16 @@ internal sealed class CompleteReturnToWorkReviewFromTaskAction(SicknessDbContext
                 r => r.Id == context.SourceEntityId.Value && r.CompanyId == context.CompanyId,
                 cancellationToken);
 
-        if (review is null || review.Status == ReturnToWorkReviewStatus.Completed)
+        if (review is null)
             return Result.Success();
 
-        // No structured outcome available on this path — see class remarks. Deliberately not
-        // completing the review here; this is an intentional no-op, not a failure, since the
-        // generic "complete task" path was never meant to carry a fit-to-return decision.
-        return Result.Success();
+        if (review.Status == ReturnToWorkReviewStatus.Completed)
+            return Result.Success();
+
+        // Ticket 16 (P1): no structured fit-to-return outcome is available on this generic path —
+        // reject rather than silently completing the generic task while the review stays Pending.
+        return Result.Failure(Error.Validation(
+            "A return-to-work review can only be completed with a fit-to-return decision. " +
+            "Use the return-to-work review screen to record the outcome."));
     }
 }

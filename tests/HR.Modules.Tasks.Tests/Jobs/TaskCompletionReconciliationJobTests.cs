@@ -293,6 +293,11 @@ public class TaskCompletionReconciliationJobTests
 
         var operation = TaskCompletionOperation.CreatePending(
             Guid.NewGuid(), companyId, task.Id, completedBy, "Approve", null, FreshCreatedAt);
+        // Ticket 19 (P2): "fresh" is now represented by a still-valid (non-expired) lease from a
+        // recent claim — a DispatchApplied row that never claimed at all (LeaseExpiresAt null) is
+        // indistinguishable from a genuinely abandoned one by design (see the two "Null_LastAttemptAt"
+        // tests above), matching the legacy "null LastAttemptAt is treated as stale" behaviour.
+        operation.Claim(Guid.NewGuid(), FreshCreatedAt);
         operation.MarkDispatchApplied(FreshCreatedAt);
         context.TaskCompletionOperations.Add(operation);
         await context.SaveChangesAsync();
@@ -302,5 +307,76 @@ public class TaskCompletionReconciliationJobTests
         await BuildJob(context, jobClient: jobClient).ExecuteAsync();
 
         Assert.Empty(jobClient.CreatedJobs);
+    }
+
+    // ---- Ticket 19 (P2): terminal failures N/A here (no bounded-retry concept on this operation
+    // type — a Rejected operation is already terminal by design) — atomic claim under concurrency --
+
+    [Fact]
+    public async Task ExecuteAsync_From_Two_Concurrent_Reconcilers_Only_One_Replays_The_Same_Stale_Pending_Operation()
+    {
+        // Ticket 19 (P2): the core claim/lease correctness guarantee, verified against a real
+        // Postgres database — same pattern already validated for AccountDisablementReconciliationJob
+        // and PurgeCandidateDocumentStorageReconciliationJob.
+        var fixture = new TasksDatabaseFixture();
+        await fixture.InitializeAsync();
+        try
+        {
+            var companyId = Guid.NewGuid();
+            var assignedEmployee = Guid.NewGuid();
+            var completedBy = Guid.NewGuid();
+            Guid taskId;
+            Guid operationId;
+
+            await using (var seedDb = fixture.BuildContext())
+            {
+                var task = MakeOpenTask(companyId, assignedEmployee);
+                seedDb.TaskItems.Add(task);
+
+                var operation = TaskCompletionOperation.CreatePending(
+                    Guid.NewGuid(), companyId, task.Id, completedBy, "Approve", null, StaleCreatedAt);
+                seedDb.TaskCompletionOperations.Add(operation);
+                await seedDb.SaveChangesAsync();
+
+                taskId = task.Id;
+                operationId = operation.Id;
+            }
+
+            await using var dbA = fixture.BuildContext();
+            await using var dbB = fixture.BuildContext();
+
+            var jobClientA = new RecordingBackgroundJobClient();
+            var jobClientB = new RecordingBackgroundJobClient();
+
+            var succeedingDispatcherA = new TaskCompletionDispatcher(
+                [new StubCompletionAction(TaskSource.Leave, TaskActionType.Approve, Result.Success())]);
+            var succeedingDispatcherB = new TaskCompletionDispatcher(
+                [new StubCompletionAction(TaskSource.Leave, TaskActionType.Approve, Result.Success())]);
+
+            var jobA = new TaskCompletionReconciliationJob(
+                dbA, succeedingDispatcherA, Clock, jobClientA, NullLogger<TaskCompletionReconciliationJob>.Instance);
+            var jobB = new TaskCompletionReconciliationJob(
+                dbB, succeedingDispatcherB, Clock, jobClientB, NullLogger<TaskCompletionReconciliationJob>.Instance);
+
+            var taskA = jobA.ExecuteAsync();
+            var taskB = jobB.ExecuteAsync();
+            await Task.WhenAll(taskA, taskB);
+
+            var enqueuedByA = jobClientA.CreatedJobs.Count(j => (Guid)j.Args[0] == operationId);
+            var enqueuedByB = jobClientB.CreatedJobs.Count(j => (Guid)j.Args[0] == operationId);
+
+            Assert.Equal(1, enqueuedByA + enqueuedByB);
+
+            await using var verify = fixture.BuildContext();
+            var reloadedOperation = await verify.TaskCompletionOperations.SingleAsync(o => o.Id == operationId);
+            Assert.Equal(TaskCompletionOperation.StatusDispatchApplied, reloadedOperation.Status);
+
+            var reloadedTask = await verify.TaskItems.SingleAsync(t => t.Id == taskId);
+            Assert.Equal(TaskItemStatus.Completed, reloadedTask.Status); // completed exactly once
+        }
+        finally
+        {
+            await fixture.DisposeAsync();
+        }
     }
 }

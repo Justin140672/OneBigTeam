@@ -20,7 +20,7 @@
 #   `canRollback: true`; deployments older than the plan's retention policy report `canRollback:false`
 #   and cannot be restored automatically.
 #
-# GraphQL contract relied on (confirmed 2026-09-10 — see docs/tickets/ticket-5-verified-releases-and-recovery.md):
+# GraphQL contract relied on (confirmed 2026-09-10 — see specifications/implemented-tickets/ticket-5-verified-releases-and-recovery.md):
 #   * Endpoint : https://backboard.railway.com/graphql/v2
 #   * Auth     : project token via the `Project-Access-Token` header (NOT `Authorization: Bearer`,
 #                which is for account / workspace / OAuth tokens).

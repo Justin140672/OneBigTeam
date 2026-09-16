@@ -322,7 +322,7 @@ Health checks validate:
 - Hangfire availability (degraded)
 
 Every service exposes two production endpoints in all environments (see
-`docs/runbooks/availability-and-health-monitoring.md`):
+`specifications/runbooks/availability-and-health-monitoring.md`):
 
 - `GET /alive` — liveness. Anonymous, process-responsiveness only, no dependency probing.
 - `GET /health/ready` — readiness. Anonymous minimal body; returns 503 only when a **critical**
@@ -335,7 +335,7 @@ The legacy `GET /health` aggregate endpoint remains Development-only.
 The 99.5% availability target (`specifications/product-specifications/31-non-functional-requirements.md`)
 is defined as a measurable monthly SLO with a documented SLI, planned-maintenance exclusions,
 error-budget policy, dashboard and alert thresholds in
-`docs/runbooks/availability-and-health-monitoring.md`.
+`specifications/runbooks/availability-and-health-monitoring.md`.
 
 ---
 
@@ -349,11 +349,11 @@ Recovery requirements:
 
 Recovery process should be documented.
 
-The backup and disaster recovery runbook (`docs/runbooks/backup-and-disaster-recovery.md`) defines
+The backup and disaster recovery runbook (`specifications/runbooks/backup-and-disaster-recovery.md`) defines
 the approved recovery objectives (RPO/RTO), backup ownership, schedule, retention, encryption and
 access control for the database and private file storage, the recovery procedure, reapplication of
 pending customer deletion obligations after a restore, and the restore-drill test
-(`docs/runbooks/restore-drill.md` + `scripts/nfr-04-restore-drill-validation.sql`). It also
+(`specifications/runbooks/restore-drill.md` + `scripts/nfr-04-restore-drill-validation.sql`). It also
 reconciles these controls against the DPA and Security page and lists the operator actions that
 must be completed outside the repository.
 

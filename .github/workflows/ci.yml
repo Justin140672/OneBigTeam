@@ -8,7 +8,7 @@ on:
 
 # Quality gate for every change to main. The `ci-success` job at the bottom is the single
 # required status check for branch protection and the precondition every deploy workflow
-# checks before it will run (see docs/runbooks/deployment-pipeline.md).
+# checks before it will run (see specifications/runbooks/deployment-pipeline.md).
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -43,7 +43,7 @@ jobs:
           report=$(dotnet list OneBigTeam.slnx package --vulnerable --include-transitive 2>&1)
           echo "$report"
           if echo "$report" | grep -Eiq '\b(Moderate|High|Critical)\b'; then
-            echo "::error::Vulnerable dependencies at moderate or higher severity detected. See docs/dependency-management.md."
+            echo "::error::Vulnerable dependencies at moderate or higher severity detected. See specifications/engineering/dependency-management.md."
             exit 1
           fi
           echo "No moderate+ vulnerable dependencies."
@@ -58,7 +58,7 @@ jobs:
   # Compute the immutable build version once, share it with every job.
   # version  = 1.0.<run_number>+<short_sha>   (SemVer build metadata)
   # The published artefact and the Railway image are both stamped with
-  # this value + the full git SHA (see docs/runbooks/deployment-pipeline.md).
+  # this value + the full git SHA (see specifications/runbooks/deployment-pipeline.md).
   # ------------------------------------------------------------------
   version:
     runs-on: ubuntu-latest

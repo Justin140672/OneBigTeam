@@ -82,7 +82,7 @@ public class AccountDisablementTests
         request.MarkProcessing(RequestedAt.AddMinutes(1));
         var failedAt = RequestedAt.AddMinutes(5);
 
-        request.MarkFailed("Account disablement failed.", failedAt);
+        request.MarkFailed("Account disablement failed.", failedAt, maxAutomaticAttempts: 4);
 
         Assert.Equal(AccountDisablement.StatusFailed, request.Status);
         Assert.Equal("Account disablement failed.", request.FailureReason);
@@ -94,7 +94,7 @@ public class AccountDisablementTests
     {
         var request = CreatePending();
         request.MarkProcessing(RequestedAt.AddMinutes(1));
-        request.MarkFailed("boom", RequestedAt.AddMinutes(2));
+        request.MarkFailed("boom", RequestedAt.AddMinutes(2), maxAutomaticAttempts: 4);
 
         request.ResetForRetry();
 
@@ -122,5 +122,126 @@ public class AccountDisablementTests
         // StatusPending: request is already Pending by construction.
 
         Assert.Throws<InvalidOperationException>(() => request.ResetForRetry());
+    }
+
+    // ---- Ticket 19 (P2): claim/lease + terminal-failure + manual retry ---------------------------
+
+    [Fact]
+    public void Claim_Sets_ClaimedBy_LeaseExpiresAt_And_Transitions_To_Processing()
+    {
+        var request = CreatePending();
+        var workerId = Guid.NewGuid();
+        var now = RequestedAt.AddMinutes(1);
+
+        request.Claim(workerId, now);
+
+        Assert.Equal(AccountDisablement.StatusProcessing, request.Status);
+        Assert.Equal(1, request.AttemptCount);
+        Assert.True(request.IsClaimedBy(workerId, now));
+        Assert.True(request.IsClaimedBy(workerId, now + AccountDisablement.LeaseDuration - TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
+    public void IsClaimedBy_Returns_False_For_A_Different_Worker()
+    {
+        var request = CreatePending();
+        var now = RequestedAt.AddMinutes(1);
+        request.Claim(Guid.NewGuid(), now);
+
+        Assert.False(request.IsClaimedBy(Guid.NewGuid(), now));
+    }
+
+    [Fact]
+    public void IsClaimedBy_Returns_False_Once_The_Lease_Has_Expired()
+    {
+        var request = CreatePending();
+        var workerId = Guid.NewGuid();
+        var claimedAt = RequestedAt.AddMinutes(1);
+        request.Claim(workerId, claimedAt);
+
+        var afterLeaseExpiry = claimedAt + AccountDisablement.LeaseDuration + TimeSpan.FromSeconds(1);
+
+        Assert.False(request.IsClaimedBy(workerId, afterLeaseExpiry));
+    }
+
+    [Fact]
+    public void MarkProcessed_Clears_The_Claim()
+    {
+        var request = CreatePending();
+        var workerId = Guid.NewGuid();
+        var now = RequestedAt.AddMinutes(1);
+        request.Claim(workerId, now);
+
+        request.MarkProcessed(now.AddMinutes(1));
+
+        Assert.Null(request.ClaimedBy);
+        Assert.Null(request.LeaseExpiresAt);
+    }
+
+    [Fact]
+    public void MarkFailed_Below_Automatic_Retry_Ceiling_Is_Not_Terminal()
+    {
+        var request = CreatePending();
+        request.MarkProcessing(RequestedAt.AddMinutes(1));
+
+        request.MarkFailed("boom", RequestedAt.AddMinutes(2), maxAutomaticAttempts: 4);
+
+        Assert.False(request.IsTerminallyFailed);
+        request.ResetForRetry(); // Must not throw — still automatically retryable.
+        Assert.Equal(AccountDisablement.StatusPending, request.Status);
+    }
+
+    [Fact]
+    public void MarkFailed_At_Automatic_Retry_Ceiling_Is_Terminal_And_Blocks_ResetForRetry()
+    {
+        var request = CreatePending();
+        for (var i = 0; i < 4; i++)
+            request.MarkProcessing(RequestedAt.AddMinutes(i + 1));
+
+        // 4th attempt reaches the ceiling of 4.
+        request.MarkFailed("boom", RequestedAt.AddMinutes(5), maxAutomaticAttempts: 4);
+
+        Assert.True(request.IsTerminallyFailed);
+        Assert.Throws<InvalidOperationException>(() => request.ResetForRetry());
+    }
+
+    [Fact]
+    public void RecordManualRetry_Clears_Terminal_Flag_And_Records_Actor_And_Reason()
+    {
+        var request = CreatePending();
+        for (var i = 0; i < 4; i++)
+            request.MarkProcessing(RequestedAt.AddMinutes(i + 1));
+        request.MarkFailed("boom", RequestedAt.AddMinutes(5), maxAutomaticAttempts: 4);
+        Assert.True(request.IsTerminallyFailed);
+
+        var actorId = Guid.NewGuid();
+        var retriedAt = RequestedAt.AddHours(1);
+        request.RecordManualRetry(actorId, "Confirmed the outage is resolved.", retriedAt);
+
+        Assert.Equal(AccountDisablement.StatusPending, request.Status);
+        Assert.False(request.IsTerminallyFailed);
+        Assert.Null(request.FailureReason);
+        Assert.Equal(actorId, request.LastRetriedByActorId);
+        Assert.Equal("Confirmed the outage is resolved.", request.LastRetryReason);
+        Assert.Equal(retriedAt, request.LastRetriedAt);
+    }
+
+    [Fact]
+    public void RecordManualRetry_Requires_A_Reason()
+    {
+        var request = CreatePending();
+        request.MarkProcessing(RequestedAt.AddMinutes(1));
+        request.MarkFailed("boom", RequestedAt.AddMinutes(2), maxAutomaticAttempts: 4);
+
+        Assert.Throws<ArgumentException>(() => request.RecordManualRetry(Guid.NewGuid(), "", RequestedAt.AddHours(1)));
+    }
+
+    [Fact]
+    public void RecordManualRetry_Throws_When_Not_Failed()
+    {
+        var request = CreatePending();
+
+        Assert.Throws<InvalidOperationException>(
+            () => request.RecordManualRetry(Guid.NewGuid(), "reason", RequestedAt.AddHours(1)));
     }
 }

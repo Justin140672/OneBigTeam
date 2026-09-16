@@ -8,6 +8,18 @@
         <a class="trial-banner-action" href="/subscription">Start subscription</a>
     </div>
 }
+else if (Session.SubscriptionStatus == SubscriptionStatus.Paused)
+{
+    @* Ticket 25 (P1): a paused Stripe subscription is read-only, same as an expired trial (see
+       SubscriptionStatusReader.IsReadOnly) — shown as its own distinct banner rather than reusing
+       the "start subscription" copy, since a paused subscription still exists and typically needs
+       to be resumed via the billing portal, not re-purchased. *@
+    <div class="trial-banner trial-banner--expired">
+        <i class="fa-solid fa-lock me-2"></i>
+        <span>Your subscription is paused and the account is now read-only. Data cannot be added or edited.</span>
+        <a class="trial-banner-action" href="/subscription">Manage billing</a>
+    </div>
+}
 
 @code {
 }

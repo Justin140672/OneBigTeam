@@ -25,6 +25,11 @@ internal sealed record OnboardingPlanCompletedAuditEvent(
     // the Audit tab despite this record's Summary claiming it would.
     Guid ActorEmployeeId) : IAuditEvent
 {
+    // Ticket 15 (P1): deterministic EventId derived from the plan id — exactly one
+    // OnboardingPlanCompletedAuditEvent is ever meaningful per plan, so reusing OnboardingPlanId as
+    // the idempotency key means a replayed/recovered dispatch (see CompleteOnboardingTaskFromTaskAction)
+    // can never create a duplicate audit row: DbAuditEventPublisher dedupes on EventId via a unique index.
+    Guid IAuditEvent.EventId            => OnboardingPlanId;
     string IAuditEvent.EventType        => "onboarding-plan.completed";
     string IAuditEvent.EntityType       => "OnboardingPlan";
     Guid   IAuditEvent.EntityId         => OnboardingPlanId;

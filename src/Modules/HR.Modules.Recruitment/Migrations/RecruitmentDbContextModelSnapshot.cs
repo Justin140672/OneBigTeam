@@ -397,6 +397,10 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("candidate_id");
 
+                    b.Property<Guid?>("ClaimedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("claimed_by");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
@@ -414,9 +418,32 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("failure_reason");
 
+                    b.Property<bool>("IsTerminallyFailed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_terminally_failed");
+
                     b.Property<DateTimeOffset?>("LastAttemptAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_attempt_at");
+
+                    b.Property<DateTimeOffset?>("LastRetriedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_retried_at");
+
+                    b.Property<Guid?>("LastRetriedByActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_retried_by_actor_id");
+
+                    b.Property<string>("LastRetryReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("last_retry_reason");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_at");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -429,6 +456,11 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("storage_key");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
 
                     b.HasKey("Id");
 

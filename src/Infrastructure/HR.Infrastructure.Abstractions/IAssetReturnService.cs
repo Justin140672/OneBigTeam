@@ -44,7 +44,12 @@ public interface IAssetReturnService
     /// employee/HR user is already known to be acting on their own assignment via the Tasks module's
     /// existing authorization checks. Always records outcome <see cref="AssetReturnOutcome.Returned"/>.
     /// </summary>
-    Task ReturnAsync(Guid companyId, Guid assignmentId, Guid returnedBy, CancellationToken cancellationToken);
+    Task ReturnAsync(
+        Guid companyId,
+        Guid assignmentId,
+        Guid returnedBy,
+        CancellationToken cancellationToken,
+        Guid dispatchOperationId = default);
 
     /// <summary>
     /// Verified return supporting a non-"Returned" outcome — used by callers (e.g. Offboarding) that
@@ -56,6 +61,10 @@ public interface IAssetReturnService
     /// <see cref="AssetReturnResult.EmployeeMismatch"/> and no state is changed. Pass null to skip
     /// this check (equivalent to the unverified overload).
     /// </param>
+    // dispatchOperationId (ticket 15, P1): stable Tasks-dispatch operation identity (Guid.Empty when
+    // not applicable). When the assignment is already closed (AlreadyReturned) — e.g. a replayed
+    // dispatch resuming after the primary Return() mutation committed but before its audit event
+    // published — implementations recover the missed audit event rather than silently no-opping.
     Task<AssetReturnResult> ReturnAsync(
         Guid companyId,
         Guid assignmentId,
@@ -63,5 +72,6 @@ public interface IAssetReturnService
         AssetReturnOutcome outcome,
         Guid returnedBy,
         string? notes,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        Guid dispatchOperationId = default);
 }

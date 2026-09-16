@@ -24,6 +24,15 @@ internal sealed class TaskCompletionOperationConfiguration : IEntityTypeConfigur
         builder.Property(o => o.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(o => o.ProcessedAt).HasColumnName("processed_at");
 
+        // Ticket 19 (P2): claim/lease columns.
+        builder.Property(o => o.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken();
+
+        builder.Property(o => o.ClaimedBy).HasColumnName("claimed_by");
+        builder.Property(o => o.LeaseExpiresAt).HasColumnName("lease_expires_at");
+
         builder.HasIndex(o => o.TaskId);
         builder.HasIndex(o => new { o.CompanyId, o.Status });
 

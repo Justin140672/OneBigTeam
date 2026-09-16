@@ -120,9 +120,16 @@ public class GetCustomerDashboardHandlerTests
         var activeSubscription = CustomerSubscription.StartTrial(activeCompany.Id, Now, trialLengthDays: 14);
         activeSubscription.ActivateSubscription("cus_3", "sub_3", "price_1", Now.AddMonths(1), Now);
 
-        context.Companies.AddRange(trialCompany, expiredCompany, canceledCompany, pastDueCompany, activeCompany);
+        // Ticket 25 (P1): a Paused subscription is a distinct customer lifecycle state from an
+        // expired trial, but is folded into ReadOnlyCustomers too (see Handler.cs remarks).
+        var pausedCompany = Company.Create(Guid.NewGuid(), "Paused Co", Now);
+        var pausedSubscription = CustomerSubscription.StartTrial(pausedCompany.Id, Now, trialLengthDays: 14);
+        pausedSubscription.ActivateSubscription("cus_4", "sub_4", "price_1", Now.AddMonths(1), Now);
+        pausedSubscription.UpdateFromStripe(SubscriptionStatus.Paused, Now.AddMonths(1), cancelAtPeriodEnd: false, Now.AddDays(1));
+
+        context.Companies.AddRange(trialCompany, expiredCompany, canceledCompany, pastDueCompany, activeCompany, pausedCompany);
         context.CustomerSubscriptions.AddRange(
-            trialSubscription, expiredSubscription, canceledSubscription, pastDueSubscription, activeSubscription);
+            trialSubscription, expiredSubscription, canceledSubscription, pastDueSubscription, activeSubscription, pausedSubscription);
         await context.SaveChangesAsync();
 
         var handler = new GetCustomerDashboardHandler(
@@ -134,7 +141,9 @@ public class GetCustomerDashboardHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, result.Value!.TrialCustomers);
-        Assert.Equal(1, result.Value.ReadOnlyCustomers);
+        // ReadOnlyCustomers includes both TrialExpired (1) and Paused (1) subscriptions.
+        Assert.Equal(2, result.Value.ReadOnlyCustomers);
+        Assert.Equal(1, result.Value.PausedCustomers);
         Assert.Equal(1, result.Value.CancelledSubscriptions);
     }
 

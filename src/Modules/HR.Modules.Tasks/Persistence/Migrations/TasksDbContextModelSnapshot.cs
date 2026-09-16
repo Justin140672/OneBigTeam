@@ -33,6 +33,10 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("attempt_count");
 
+                    b.Property<Guid?>("ClaimedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("claimed_by");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
@@ -53,6 +57,10 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                     b.Property<DateTimeOffset?>("LastAttemptAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_attempt_at");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_at");
 
                     b.Property<string>("OutcomeDecision")
                         .HasMaxLength(200)
@@ -77,6 +85,11 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                     b.Property<Guid>("TaskId")
                         .HasColumnType("uuid")
                         .HasColumnName("task_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
 
                     b.HasKey("Id");
 

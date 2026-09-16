@@ -57,22 +57,35 @@ internal sealed class ApproveOfferHandler(
                 Error.Validation("Cannot approve an offer for an application that has been withdrawn."));
 
         var now = clock.UtcNowOffset();
+        var expectedVersion = application.Version;
         application.ApproveOffer(approvedBy, now);
 
         var response = new ApproveOfferResponse(
             application.Id, application.CompanyId, application.OfferApprovedAt!.Value, application.OfferApprovedByUserId!.Value);
 
+        const string conflictMessage = "This application was changed by someone else. Reload and try again.";
+
         if (request.IdempotencyKey is { } key)
         {
-            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, ApproveOfferResponse>(
-                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+            var outcome = await db.SaveIdempotentWithConcurrencyAsync<IdempotencyRecord, Domain.Application, ApproveOfferResponse>(
+                db.IdempotencyRecords, application, expectedVersion, scope, key, fingerprint!,
+                StatusCodes.Status200OK, response, now, cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+            switch (outcome.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(outcome.Response!);
+                case IdempotencyOutcomeKind.ConcurrencyConflict:
+                    return Result.Failure<ApproveOfferResponse>(Error.Concurrency(conflictMessage));
+            }
         }
         else
         {
-            await db.SaveChangesAsync(cancellationToken);
+            var saveResult = await db.SaveChangesWithConcurrencyAsync(
+                application, expectedVersion, conflictMessage, cancellationToken);
+
+            if (!saveResult.IsSuccess)
+                return Result.Failure<ApproveOfferResponse>(saveResult.Error);
         }
 
         await auditPublisher.PublishAsync(

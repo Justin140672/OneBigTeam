@@ -57,6 +57,7 @@ internal sealed class SaveCvReviewNotesHandler(
                 Error.Validation("Cannot record a CV review against a withdrawn application."));
 
         var now = clock.UtcNowOffset();
+        var expectedVersion = application.Version;
         application.RecordCvReview(request.CvReviewNotes, performedBy, now);
 
         var response = new SaveCvReviewNotesResponse(
@@ -69,17 +70,29 @@ internal sealed class SaveCvReviewNotesHandler(
             application.CvReviewedByUserId,
             application.UpdatedAt);
 
+        const string conflictMessage = "This application was changed by someone else. Reload and try again.";
+
         if (request.IdempotencyKey is { } key)
         {
-            var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, SaveCvReviewNotesResponse>(
-                db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+            var outcome = await db.SaveIdempotentWithConcurrencyAsync<IdempotencyRecord, Domain.Application, SaveCvReviewNotesResponse>(
+                db.IdempotencyRecords, application, expectedVersion, scope, key, fingerprint!,
+                StatusCodes.Status200OK, response, now, cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+            switch (outcome.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(outcome.Response!);
+                case IdempotencyOutcomeKind.ConcurrencyConflict:
+                    return Result.Failure<SaveCvReviewNotesResponse>(Error.Concurrency(conflictMessage));
+            }
         }
         else
         {
-            await db.SaveChangesAsync(cancellationToken);
+            var saveResult = await db.SaveChangesWithConcurrencyAsync(
+                application, expectedVersion, conflictMessage, cancellationToken);
+
+            if (!saveResult.IsSuccess)
+                return Result.Failure<SaveCvReviewNotesResponse>(saveResult.Error);
         }
 
         await auditPublisher.PublishAsync(
