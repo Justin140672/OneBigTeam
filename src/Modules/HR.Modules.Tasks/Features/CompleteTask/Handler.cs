@@ -124,37 +124,80 @@ internal sealed class CompleteTaskHandler(
 
         if (!wasAlreadyCompleted)
         {
-            operation = TaskCompletionOperation.CreatePending(
-                Guid.NewGuid(), task.CompanyId, task.Id, request.CompletedBy,
-                request.OutcomeDecision, request.OutcomeReason, now);
-            dbContext.TaskCompletionOperations.Add(operation);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            // Ticket 11 (P1): reuse an existing non-Rejected operation for this task rather than
+            // blindly creating a new one — recovers using the ORIGINAL actor/decision/reason if a
+            // prior attempt already got this far (crash before dispatch, or before this save), and
+            // converges a retried/racing request onto the same operation instead of an unrelated
+            // second one. A task whose only prior operation was Rejected is free to get a new one,
+            // since no business mutation applied for that attempt.
+            operation = await dbContext.TaskCompletionOperations
+                .Where(o => o.TaskId == task.Id && o.Status != TaskCompletionOperation.StatusRejected)
+                .OrderByDescending(o => o.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
 
-            var dispatchResult = await dispatcher.DispatchAsync(new TaskCompletionContext(
-                task.CompanyId,
-                task.Id,
-                task.Title,
-                task.Description,
-                task.Source,
-                task.ActionType,
-                task.AssignedEmployeeId,
-                request.CompletedBy,
-                now,
-                task.SourceEntityId,
-                request.OutcomeDecision,
-                request.OutcomeReason), cancellationToken);
-
-            if (!dispatchResult.IsSuccess)
+            if (operation is null)
             {
-                operation.MarkRejected(dispatchResult.Error.Message, now);
-                await dbContext.SaveChangesAsync(cancellationToken);
-                return Result.Failure<CompleteTaskResponse>(dispatchResult.Error);
+                operation = TaskCompletionOperation.CreatePending(
+                    Guid.NewGuid(), task.CompanyId, task.Id, request.CompletedBy,
+                    request.OutcomeDecision, request.OutcomeReason, now);
+                dbContext.TaskCompletionOperations.Add(operation);
+
+                try
+                {
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateException ex) when (PostgresUniqueViolation.Is(
+                    ex, "ix_task_completion_operations_task_id_active"))
+                {
+                    // Lost a race against a concurrent completion request for the same task —
+                    // detach this attempt's losing row and converge onto the winner's operation
+                    // instead, so only one business dispatch ever actually applies.
+                    var entry = dbContext.Entry(operation);
+                    if (entry.State != EntityState.Detached)
+                        entry.State = EntityState.Detached;
+
+                    operation = await dbContext.TaskCompletionOperations
+                        .Where(o => o.TaskId == task.Id && o.Status != TaskCompletionOperation.StatusRejected)
+                        .OrderByDescending(o => o.CreatedAt)
+                        .FirstAsync(cancellationToken);
+                }
             }
 
-            operation.MarkDispatchApplied(now);
+            // Only dispatch when this operation hasn't already had its business action applied —
+            // a resumed DispatchApplied operation just needs the TaskItem completed below, never a
+            // second dispatch.
+            if (operation.Status == TaskCompletionOperation.StatusPending)
+            {
+                var dispatchResult = await dispatcher.DispatchAsync(new TaskCompletionContext(
+                    task.CompanyId,
+                    task.Id,
+                    task.Title,
+                    task.Description,
+                    task.Source,
+                    task.ActionType,
+                    task.AssignedEmployeeId,
+                    operation.CompletedBy,
+                    now,
+                    task.SourceEntityId,
+                    operation.OutcomeDecision,
+                    operation.OutcomeReason,
+                    operation.Id), cancellationToken);
+
+                if (!dispatchResult.IsSuccess)
+                {
+                    operation.MarkRejected(dispatchResult.Error.Message, now);
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    return Result.Failure<CompleteTaskResponse>(dispatchResult.Error);
+                }
+
+                operation.MarkDispatchApplied(now);
+            }
         }
 
-        task.Complete(request.CompletedBy, now);
+        // Ticket 11 (P1): when a persisted operation was reused (resumed/retried), the task must be
+        // completed as its ORIGINAL actor — not whoever issued this particular retry — matching the
+        // decision/reason that was actually dispatched.
+        task.Complete(operation?.CompletedBy ?? request.CompletedBy, now);
 
         // Built from in-memory values ahead of the save, so it can double as both the response and
         // the payload persisted for an idempotency replay.

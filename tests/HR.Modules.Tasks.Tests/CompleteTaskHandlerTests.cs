@@ -1005,4 +1005,149 @@ public class CompleteTaskHandlerTests
 
         return new TasksDbContext(options);
     }
+
+    // ---- Ticket 11 (P1): resumable/idempotent business dispatch ----
+
+    [Fact]
+    public async Task HandleAsync_Reuses_Existing_DispatchApplied_Operation_And_Does_Not_ReDispatch()
+    {
+        // Simulates a retried/duplicated completion call arriving after a prior attempt already got
+        // as far as DispatchApplied (business action applied, TaskItem not yet completed — e.g. a
+        // crash right after MarkDispatchApplied but before task.Complete()/SaveChanges commits in
+        // the same original call). The retry must converge onto that SAME operation and must not
+        // invoke the dispatcher/business action a second time.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+        var originalCompletedBy = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Review leave request", null, TaskPriority.Medium, TaskSource.Leave, TaskActionType.Approve,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow, sourceEntityId: Guid.NewGuid());
+        context.TaskItems.Add(task);
+
+        var existingOperation = TaskCompletionOperation.CreatePending(
+            Guid.NewGuid(), companyId, task.Id, originalCompletedBy, "Approve", null, DateTimeOffset.UtcNow);
+        existingOperation.MarkDispatchApplied(DateTimeOffset.UtcNow);
+        context.TaskCompletionOperations.Add(existingOperation);
+        await context.SaveChangesAsync();
+
+        var alwaysFailingDispatcher = new TaskCompletionDispatcher(
+            [new StubCompletionAction(TaskSource.Leave, TaskActionType.Approve,
+                Result.Failure(Error.Validation("must not be invoked")))]);
+
+        // A different caller/decision on the retry — must be ignored in favor of the original
+        // operation's persisted actor/decision.
+        var result = await BuildHandler(context, dispatcher: alwaysFailingDispatcher).HandleAsync(
+            new CompleteTaskRequest
+            {
+                CompanyId = companyId, Id = task.Id, CompletedBy = Guid.NewGuid(), OutcomeDecision = "Reject",
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Completed", result.Value!.Status);
+
+        // Only the one, pre-existing operation exists — no second row was created.
+        var operation = await context.TaskCompletionOperations.AsNoTracking().SingleAsync(o => o.TaskId == task.Id);
+        Assert.Equal(existingOperation.Id, operation.Id);
+        Assert.Equal(TaskCompletionOperation.StatusProcessed, operation.Status);
+
+        // TaskItem is completed using the ORIGINAL operation's CompletedBy, not the retry's caller.
+        var persisted = await context.TaskItems.AsNoTracking().SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(originalCompletedBy, persisted.CompletedBy);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Rejected_Prior_Operation_Does_Not_Block_A_Fresh_Attempt()
+    {
+        // A prior attempt whose dispatch was rejected applied no business mutation, so a fresh
+        // completion attempt for the same task must proceed normally against a brand-new operation
+        // rather than being stuck behind the rejected one.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Review leave request", null, TaskPriority.Medium, TaskSource.Leave, TaskActionType.Approve,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow, sourceEntityId: Guid.NewGuid());
+        context.TaskItems.Add(task);
+
+        var rejectedOperation = TaskCompletionOperation.CreatePending(
+            Guid.NewGuid(), companyId, task.Id, Guid.NewGuid(), null, null, DateTimeOffset.UtcNow);
+        rejectedOperation.MarkRejected("A decision is required.", DateTimeOffset.UtcNow);
+        context.TaskCompletionOperations.Add(rejectedOperation);
+        await context.SaveChangesAsync();
+
+        var succeedingDispatcher = new TaskCompletionDispatcher(
+            [new StubCompletionAction(TaskSource.Leave, TaskActionType.Approve, Result.Success())]);
+
+        var result = await BuildHandler(context, dispatcher: succeedingDispatcher).HandleAsync(
+            new CompleteTaskRequest
+            {
+                CompanyId = companyId, Id = task.Id, CompletedBy = assignedEmployee, OutcomeDecision = "Approve",
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Completed", result.Value!.Status);
+
+        var operations = await context.TaskCompletionOperations.AsNoTracking()
+            .Where(o => o.TaskId == task.Id).ToListAsync();
+        Assert.Equal(2, operations.Count);
+        Assert.Contains(operations, o => o.Id == rejectedOperation.Id && o.Status == TaskCompletionOperation.StatusRejected);
+        Assert.Contains(operations, o => o.Id != rejectedOperation.Id && o.Status == TaskCompletionOperation.StatusProcessed);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Passes_Operation_Id_As_DispatchOperationId_To_Dispatcher()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Review leave request", null, TaskPriority.Medium, TaskSource.Leave, TaskActionType.Approve,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow, sourceEntityId: Guid.NewGuid());
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        TaskCompletionContext? capturedContext = null;
+        var capturingAction = new CapturingCompletionAction(TaskSource.Leave, TaskActionType.Approve, ctx =>
+        {
+            capturedContext = ctx;
+            return Result.Success();
+        });
+        var dispatcher = new TaskCompletionDispatcher([capturingAction]);
+
+        var result = await BuildHandler(context, dispatcher: dispatcher).HandleAsync(
+            new CompleteTaskRequest
+            {
+                CompanyId = companyId, Id = task.Id, CompletedBy = assignedEmployee, OutcomeDecision = "Approve",
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(capturedContext);
+
+        var operation = await context.TaskCompletionOperations.AsNoTracking().SingleAsync(o => o.TaskId == task.Id);
+        Assert.NotEqual(Guid.Empty, capturedContext!.DispatchOperationId);
+        Assert.Equal(operation.Id, capturedContext.DispatchOperationId);
+    }
+
+    /// <summary>Stub ITaskCompletionAction that captures the TaskCompletionContext it was invoked
+    /// with, for assertions on values (e.g. DispatchOperationId) the plain StubCompletionAction
+    /// above doesn't expose.</summary>
+    private sealed class CapturingCompletionAction(
+        TaskSource source, TaskActionType actionType, Func<TaskCompletionContext, Result> onExecute)
+        : ITaskCompletionAction
+    {
+        public TaskSource Source => source;
+        public TaskActionType ActionType => actionType;
+        public Task<Result> ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken) =>
+            Task.FromResult(onExecute(context));
+    }
 }

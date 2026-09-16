@@ -5,7 +5,9 @@ namespace HR.Modules.Tasks.Tests.Infrastructure;
 
 internal sealed class FakeLeaveApprovalService : ILeaveApprovalService
 {
-    public record Call(string Action, Guid CompanyId, Guid LeaveRequestId, Guid ReviewedByEmployeeId, string? Reason = null);
+    public record Call(
+        string Action, Guid CompanyId, Guid LeaveRequestId, Guid ReviewedByEmployeeId,
+        string? Reason = null, string? IdempotencyKey = null);
 
     private readonly Result _approveResult;
     private readonly Result _rejectResult;
@@ -22,17 +24,17 @@ internal sealed class FakeLeaveApprovalService : ILeaveApprovalService
 
     public Task<Result> ApproveAsync(
         Guid companyId, Guid leaveRequestId, Guid reviewedByEmployeeId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? idempotencyKey = null)
     {
-        Calls.Add(new Call("Approve", companyId, leaveRequestId, reviewedByEmployeeId));
+        Calls.Add(new Call("Approve", companyId, leaveRequestId, reviewedByEmployeeId, IdempotencyKey: idempotencyKey));
         return Task.FromResult(_approveResult);
     }
 
     public Task<Result> RejectAsync(
         Guid companyId, Guid leaveRequestId, Guid reviewedByEmployeeId,
-        string? reason, CancellationToken cancellationToken)
+        string? reason, CancellationToken cancellationToken, string? idempotencyKey = null)
     {
-        Calls.Add(new Call("Reject", companyId, leaveRequestId, reviewedByEmployeeId, reason));
+        Calls.Add(new Call("Reject", companyId, leaveRequestId, reviewedByEmployeeId, reason, idempotencyKey));
         return Task.FromResult(_rejectResult);
     }
 }

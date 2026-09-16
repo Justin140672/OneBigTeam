@@ -16,12 +16,20 @@ internal sealed class AssetTaskCompletionAction(
         if (context.SourceEntityId is null)
             return Result.Failure(Error.Validation("This task has no associated asset assignment."));
 
+        // Note: AcknowledgeAsync is already idempotent by domain state (no-ops when
+        // AcknowledgedAt is already set — see AssetAcknowledgementService), so it needs no dispatch
+        // identity of its own.
         await acknowledgementService.AcknowledgeAsync(
             context.CompanyId,
             context.SourceEntityId.Value,
             context.CompletedBy,
             cancellationToken);
 
+        // Ticket 11 (P1): the "create a return task" effect has no domain-state guard of its own —
+        // without a stable idempotency key, a resumed/retried dispatch for the SAME
+        // TaskCompletionOperation (interrupted before the task/operation commit) would create a
+        // second "Return asset" task. ITaskCreator.CreateAsync already supports this exact pattern
+        // (OBT-REM-13) via a database-enforced (company_id, idempotency_key) uniqueness constraint.
         await taskCreator.CreateAsync(
             context.CompanyId,
             createdBy:          context.CompletedBy,
@@ -34,7 +42,10 @@ internal sealed class AssetTaskCompletionAction(
             assignedEmployeeId: context.AssignedEmployeeId,
             assignedUserId:     null,
             sourceEntityId:     context.SourceEntityId,
-            cancellationToken);
+            cancellationToken,
+            idempotencyKey: context.DispatchOperationId == Guid.Empty
+                ? null
+                : $"TaskCompletionDispatch:{context.DispatchOperationId}:ReturnAsset");
 
         return Result.Success();
     }

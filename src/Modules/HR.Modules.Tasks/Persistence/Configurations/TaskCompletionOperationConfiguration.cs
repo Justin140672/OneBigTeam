@@ -26,5 +26,17 @@ internal sealed class TaskCompletionOperationConfiguration : IEntityTypeConfigur
 
         builder.HasIndex(o => o.TaskId);
         builder.HasIndex(o => new { o.CompanyId, o.Status });
+
+        // Ticket 11 (P1): enforces "one active completion operation per task unless the prior
+        // operation was rejected" at the database level, so two concurrent CompleteTask requests for
+        // the same task can never both insert a Pending/DispatchApplied/Processed operation — the
+        // loser gets a unique-violation and must re-read and converge on the winner's row (see
+        // CompleteTaskHandler). A task whose only prior operation was Rejected is deliberately left
+        // free to get a brand new one (excluded from the filter), since the underlying business
+        // action never applied for that attempt.
+        builder.HasIndex(o => o.TaskId)
+            .IsUnique()
+            .HasDatabaseName("ix_task_completion_operations_task_id_active")
+            .HasFilter("status <> 'rejected'");
     }
 }

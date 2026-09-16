@@ -14,7 +14,7 @@ internal sealed class LeaveApprovalService(
 {
     public async Task<Result> ApproveAsync(
         Guid companyId, Guid leaveRequestId, Guid reviewedByEmployeeId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? idempotencyKey = null)
     {
         var employeeId = await GetEmployeeIdAsync(companyId, leaveRequestId, cancellationToken);
         if (employeeId is null)
@@ -25,7 +25,8 @@ internal sealed class LeaveApprovalService(
             CompanyId            = companyId,
             EmployeeId           = employeeId.Value,
             LeaveRequestId       = leaveRequestId,
-            ReviewedByEmployeeId = reviewedByEmployeeId
+            ReviewedByEmployeeId = reviewedByEmployeeId,
+            IdempotencyKey       = idempotencyKey
         }, cancellationToken);
 
         return result.IsSuccess ? Result.Success() : Result.Failure(result.Error);
@@ -33,7 +34,7 @@ internal sealed class LeaveApprovalService(
 
     public async Task<Result> RejectAsync(
         Guid companyId, Guid leaveRequestId, Guid reviewedByEmployeeId,
-        string? reason, CancellationToken cancellationToken)
+        string? reason, CancellationToken cancellationToken, string? idempotencyKey = null)
     {
         var employeeId = await GetEmployeeIdAsync(companyId, leaveRequestId, cancellationToken);
         if (employeeId is null)
@@ -45,7 +46,8 @@ internal sealed class LeaveApprovalService(
             EmployeeId           = employeeId.Value,
             LeaveRequestId       = leaveRequestId,
             ReviewedByEmployeeId = reviewedByEmployeeId,
-            RejectionReason      = reason
+            RejectionReason      = reason,
+            IdempotencyKey       = idempotencyKey
         }, cancellationToken);
 
         return result.IsSuccess ? Result.Success() : Result.Failure(result.Error);

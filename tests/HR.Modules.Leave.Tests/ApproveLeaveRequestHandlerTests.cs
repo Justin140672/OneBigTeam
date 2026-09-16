@@ -1015,4 +1015,93 @@ public class ApproveLeaveRequestHandlerTests
         Assert.Equal(-3m, savedBalance.AdjustmentDays);
         Assert.Equal(-3m, savedBalance.RemainingDays); // correction preserved, untouched by the rejection
     }
+
+    // ---- Ticket 11 (P1) follow-up gap check: same-idempotency-key replay against a now-Approved
+    // request must replay the original success response rather than failing with the
+    // already-approved validation error. This is the SAME SaveIdempotentAsync-backed mechanism
+    // LeaveTaskCompletionAction now reuses via ILeaveApprovalService's idempotencyKey parameter, so
+    // covering it here also pins the behaviour that path depends on. ----
+
+    [Fact]
+    public async Task HandleAsync_With_Same_IdempotencyKey_Replays_Original_Success_Instead_Of_Failing_On_Already_Approved_Status()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var reviewerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        const string idempotencyKey = "task-completion-dispatch-key-1";
+
+        var leaveRequest = await CreatePendingRequestWithNonBalanceTypeAsync(context, companyId, employeeId, now);
+
+        var request = new ApproveLeaveRequestRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            LeaveRequestId = leaveRequest.Id,
+            ReviewedByEmployeeId = reviewerId,
+            IdempotencyKey = idempotencyKey,
+        };
+
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow),
+            new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
+
+        var firstResult = await handler.HandleAsync(request, CancellationToken.None);
+        Assert.True(firstResult.IsSuccess);
+        Assert.Equal("Approved", firstResult.Value!.Status);
+
+        // Same key, same request payload, submitted again against the now-Approved leave request —
+        // must replay the first call's success response, not fail with
+        // "Cannot approve a leave request with status 'Approved'.".
+        var secondResult = await handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(secondResult.IsSuccess);
+        Assert.Equal(firstResult.Value.Status, secondResult.Value!.Status);
+        Assert.Equal(firstResult.Value.ReviewedAt, secondResult.Value.ReviewedAt);
+        Assert.Equal(firstResult.Value.ReviewedByEmployeeId, secondResult.Value.ReviewedByEmployeeId);
+
+        // Only one approval's worth of effects actually ran — balance/status mutated exactly once.
+        var saved = await context.LeaveRequests.SingleAsync();
+        Assert.Equal(LeaveRequestStatus.Approved, saved.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_Different_IdempotencyKey_Still_Fails_On_Already_Approved_Status()
+    {
+        // Negated branch of the above: a DIFFERENT key against an already-Approved request must
+        // still hit the ordinary validation failure — replay only short-circuits on an exact repeat
+        // key, never as a general "already approved is fine" bypass.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var reviewerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = await CreatePendingRequestWithNonBalanceTypeAsync(context, companyId, employeeId, now);
+
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow),
+            new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)));
+
+        var firstResult = await handler.HandleAsync(new ApproveLeaveRequestRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            LeaveRequestId = leaveRequest.Id,
+            ReviewedByEmployeeId = reviewerId,
+            IdempotencyKey = "key-one",
+        }, CancellationToken.None);
+        Assert.True(firstResult.IsSuccess);
+
+        var secondResult = await handler.HandleAsync(new ApproveLeaveRequestRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            LeaveRequestId = leaveRequest.Id,
+            ReviewedByEmployeeId = reviewerId,
+            IdempotencyKey = "key-two",
+        }, CancellationToken.None);
+
+        Assert.True(secondResult.IsFailure);
+        Assert.Equal("validation", secondResult.Error.Code);
+    }
 }

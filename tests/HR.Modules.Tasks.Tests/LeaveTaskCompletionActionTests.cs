@@ -15,7 +15,8 @@ public class LeaveTaskCompletionActionTests
     private static TaskCompletionContext MakeContext(
         string? outcomeDecision  = "Approve",
         string? outcomeReason    = null,
-        Guid?   sourceEntityId   = null) =>
+        Guid?   sourceEntityId   = null,
+        Guid?   dispatchOperationId = null) =>
         new(
             CompanyId,
             TaskId:            Guid.NewGuid(),
@@ -28,7 +29,8 @@ public class LeaveTaskCompletionActionTests
             CompletedAt:       DateTimeOffset.UtcNow,
             SourceEntityId:    sourceEntityId ?? LeaveRequestId,
             OutcomeDecision:   outcomeDecision,
-            OutcomeReason:     outcomeReason);
+            OutcomeReason:     outcomeReason,
+            DispatchOperationId: dispatchOperationId ?? Guid.Empty);
 
     // ── Approve ────────────────────────────────────────────────────────────────
 
@@ -189,5 +191,55 @@ public class LeaveTaskCompletionActionTests
     {
         var action = new LeaveTaskCompletionAction(new FakeLeaveApprovalService());
         Assert.Equal(TaskSource.Leave, action.Source);
+    }
+
+    // ── Ticket 11 (P1): idempotency-key threading ─────────────────────────────
+
+    [Fact]
+    public async Task ExecuteAsync_Approve_Passes_TaskCompletionDispatch_IdempotencyKey_When_DispatchOperationId_Set()
+    {
+        var leaveService = new FakeLeaveApprovalService();
+        var action = new LeaveTaskCompletionAction(leaveService);
+        var operationId = Guid.NewGuid();
+
+        await action.ExecuteAsync(MakeContext("Approve", dispatchOperationId: operationId), CancellationToken.None);
+
+        Assert.Equal($"TaskCompletionDispatch:{operationId}", leaveService.Calls[0].IdempotencyKey);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Approve_Passes_Null_IdempotencyKey_When_DispatchOperationId_Is_Empty()
+    {
+        var leaveService = new FakeLeaveApprovalService();
+        var action = new LeaveTaskCompletionAction(leaveService);
+
+        await action.ExecuteAsync(MakeContext("Approve", dispatchOperationId: Guid.Empty), CancellationToken.None);
+
+        Assert.Null(leaveService.Calls[0].IdempotencyKey);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Reject_Passes_TaskCompletionDispatch_IdempotencyKey_When_DispatchOperationId_Set()
+    {
+        var leaveService = new FakeLeaveApprovalService();
+        var action = new LeaveTaskCompletionAction(leaveService);
+        var operationId = Guid.NewGuid();
+
+        await action.ExecuteAsync(
+            MakeContext("Reject", "Too short-staffed", dispatchOperationId: operationId), CancellationToken.None);
+
+        Assert.Equal($"TaskCompletionDispatch:{operationId}", leaveService.Calls[0].IdempotencyKey);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Reject_Passes_Null_IdempotencyKey_When_DispatchOperationId_Is_Empty()
+    {
+        var leaveService = new FakeLeaveApprovalService();
+        var action = new LeaveTaskCompletionAction(leaveService);
+
+        await action.ExecuteAsync(
+            MakeContext("Reject", "Too short-staffed", dispatchOperationId: Guid.Empty), CancellationToken.None);
+
+        Assert.Null(leaveService.Calls[0].IdempotencyKey);
     }
 }

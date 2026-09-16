@@ -13,7 +13,7 @@ public class AssetAcknowledgementTaskCompletionActionTests
     private static readonly Guid EmployeeId   = Guid.NewGuid();
     private static readonly Guid CompletedBy  = Guid.NewGuid();
 
-    private static TaskCompletionContext MakeContext(Guid? sourceEntityId = null) =>
+    private static TaskCompletionContext MakeContext(Guid? sourceEntityId = null, Guid? dispatchOperationId = null) =>
         new(
             CompanyId,
             TaskId:             Guid.NewGuid(),
@@ -24,7 +24,8 @@ public class AssetAcknowledgementTaskCompletionActionTests
             AssignedEmployeeId: EmployeeId,
             CompletedBy:        CompletedBy,
             CompletedAt:        DateTimeOffset.UtcNow,
-            SourceEntityId:     sourceEntityId ?? AssignmentId);
+            SourceEntityId:     sourceEntityId ?? AssignmentId,
+            DispatchOperationId: dispatchOperationId ?? Guid.Empty);
 
     private static AssetTaskCompletionAction MakeAction(
         FakeAssetAcknowledgementService? ackService = null,
@@ -116,5 +117,32 @@ public class AssetAcknowledgementTaskCompletionActionTests
 
         Assert.Empty(ackService.Calls);
         Assert.Empty(taskCreator.Created);
+    }
+
+    // ── Ticket 11 (P1): idempotency-key threading for the created "Return asset" task ─────────
+
+    [Fact]
+    public async Task ExecuteAsync_Passes_ReturnAsset_IdempotencyKey_When_DispatchOperationId_Set()
+    {
+        var taskCreator = new FakeTaskCreator();
+        var action = MakeAction(taskCreator: taskCreator);
+        var operationId = Guid.NewGuid();
+
+        await action.ExecuteAsync(MakeContext(dispatchOperationId: operationId), CancellationToken.None);
+
+        var created = taskCreator.Created[0];
+        Assert.Equal($"TaskCompletionDispatch:{operationId}:ReturnAsset", created.IdempotencyKey);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Passes_Null_IdempotencyKey_When_DispatchOperationId_Is_Empty()
+    {
+        var taskCreator = new FakeTaskCreator();
+        var action = MakeAction(taskCreator: taskCreator);
+
+        await action.ExecuteAsync(MakeContext(dispatchOperationId: Guid.Empty), CancellationToken.None);
+
+        var created = taskCreator.Created[0];
+        Assert.Null(created.IdempotencyKey);
     }
 }

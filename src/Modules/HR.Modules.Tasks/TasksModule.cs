@@ -80,6 +80,7 @@ public static class TasksModule
 
         services.AddHostedService<DueSoonNotifier>();
         services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
+        services.AddScoped<Jobs.TaskCompletionReconciliationJob>();
     }
 
     public static WebApplication UseTasksRecurringJobs(this WebApplication app)
@@ -90,6 +91,13 @@ public static class TasksModule
             "tasks-idempotency-maintenance",
             job => job.ExecuteAsync(),
             "*/5 * * * *");
+        // Ticket 11 (P1): repairs TaskCompletionOperation rows abandoned mid-completion (stale
+        // Pending, abandoned DispatchApplied) — see TaskCompletionReconciliationJob for the recovery
+        // scenarios it guards against.
+        jobManager.AddOrUpdate<Jobs.TaskCompletionReconciliationJob>(
+            "tasks-completion-reconciliation",
+            job => job.ExecuteAsync(),
+            "*/10 * * * *");
         return app;
     }
 

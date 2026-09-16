@@ -406,4 +406,97 @@ public class RejectLeaveRequestHandlerTests
         Assert.Equal(NotificationPriority.Normal,    written.Priority);
         Assert.Contains("No capacity",               written.Body);
     }
+
+    // ---- Ticket 11 (P1) follow-up gap check: same-idempotency-key replay against a now-Rejected
+    // request must replay the original success response rather than failing with the
+    // already-rejected validation error — the same mechanism LeaveTaskCompletionAction now relies
+    // on via ILeaveApprovalService's idempotencyKey parameter for Reject. ----
+
+    [Fact]
+    public async Task HandleAsync_With_Same_IdempotencyKey_Replays_Original_Success_Instead_Of_Failing_On_Already_Rejected_Status()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var reviewerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        const string idempotencyKey = "task-completion-dispatch-key-1";
+
+        var leaveRequest = CreatePendingRequest(companyId, employeeId, now);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var request = new RejectLeaveRequestRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            LeaveRequestId = leaveRequest.Id,
+            ReviewedByEmployeeId = reviewerId,
+            RejectionReason = "Team at capacity",
+            IdempotencyKey = idempotencyKey,
+        };
+
+        var handler = new RejectLeaveRequestHandler(
+            context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
+            new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+
+        var firstResult = await handler.HandleAsync(request, CancellationToken.None);
+        Assert.True(firstResult.IsSuccess);
+        Assert.Equal("Rejected", firstResult.Value!.Status);
+
+        var secondResult = await handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(secondResult.IsSuccess);
+        Assert.Equal(firstResult.Value.Status, secondResult.Value!.Status);
+        Assert.Equal(firstResult.Value.ReviewedAt, secondResult.Value.ReviewedAt);
+        Assert.Equal(firstResult.Value.RejectionReason, secondResult.Value.RejectionReason);
+
+        var saved = await context.LeaveRequests.SingleAsync();
+        Assert.Equal(LeaveRequestStatus.Rejected, saved.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_With_Different_IdempotencyKey_Still_Fails_On_Already_Rejected_Status()
+    {
+        // Negated branch of the above: a DIFFERENT key against an already-Rejected request must
+        // still hit the ordinary validation failure — replay only short-circuits on an exact repeat
+        // key, never as a general "already rejected is fine" bypass.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var reviewerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = CreatePendingRequest(companyId, employeeId, now);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var handler = new RejectLeaveRequestHandler(
+            context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
+            new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
+
+        var firstResult = await handler.HandleAsync(new RejectLeaveRequestRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            LeaveRequestId = leaveRequest.Id,
+            ReviewedByEmployeeId = reviewerId,
+            RejectionReason = "Team at capacity",
+            IdempotencyKey = "key-one",
+        }, CancellationToken.None);
+        Assert.True(firstResult.IsSuccess);
+
+        var secondResult = await handler.HandleAsync(new RejectLeaveRequestRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            LeaveRequestId = leaveRequest.Id,
+            ReviewedByEmployeeId = reviewerId,
+            RejectionReason = "Team at capacity",
+            IdempotencyKey = "key-two",
+        }, CancellationToken.None);
+
+        Assert.True(secondResult.IsFailure);
+        Assert.Equal("validation", secondResult.Error.Code);
+    }
 }

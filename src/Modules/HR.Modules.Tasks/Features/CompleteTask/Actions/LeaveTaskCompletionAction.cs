@@ -21,13 +21,22 @@ internal sealed class LeaveTaskCompletionAction(ILeaveApprovalService leaveAppro
         if (context.OutcomeDecision is null)
             return Result.Failure(Error.Validation("A decision (Approve or Reject) is required to complete this task."));
 
+        // Ticket 11 (P1): derives Leave's own idempotency key from the durable
+        // TaskCompletionOperation identity, so a resumed/retried dispatch for the SAME operation
+        // (interrupted before task-completion commit, or a reconciliation sweep) replays the original
+        // approve/reject result instead of failing on the leave request's now-changed status.
+        var idempotencyKey = context.DispatchOperationId == Guid.Empty
+            ? null
+            : $"TaskCompletionDispatch:{context.DispatchOperationId}";
+
         if (context.OutcomeDecision == "Approve")
         {
             return await leaveApprovalService.ApproveAsync(
                 context.CompanyId,
                 context.SourceEntityId.Value,
                 context.CompletedBy,
-                cancellationToken);
+                cancellationToken,
+                idempotencyKey);
         }
 
         if (context.OutcomeDecision == "Reject")
@@ -37,7 +46,8 @@ internal sealed class LeaveTaskCompletionAction(ILeaveApprovalService leaveAppro
                 context.SourceEntityId.Value,
                 context.CompletedBy,
                 context.OutcomeReason,
-                cancellationToken);
+                cancellationToken,
+                idempotencyKey);
         }
 
         return Result.Failure(Error.Validation($"'{context.OutcomeDecision}' is not a valid decision for this task."));
