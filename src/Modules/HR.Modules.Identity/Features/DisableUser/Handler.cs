@@ -53,10 +53,18 @@ internal sealed class DisableUserHandler(
             return Result.Failure<DisableUserResponse>(Error.NotFound("User was not found."));
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == request.UserId, cancellationToken);
-        if (user is null)
+        // Ticket 1 (P1): real Supabase-backed accounts (AcceptInvite, self-service SignUp) live in
+        // UserProfiles, not Users — fall back to that table so those accounts can actually be
+        // disabled too, not just legacy ApplicationUser-backed ones.
+        var profile = user is null
+            ? await db.UserProfiles.FirstOrDefaultAsync(p => p.Id == request.UserId, cancellationToken)
+            : null;
+
+        if (user is null && profile is null)
             return Result.Failure<DisableUserResponse>(Error.NotFound("User was not found."));
 
-        if (!user.IsActive)
+        var isCurrentlyActive = user?.IsActive ?? profile!.IsActive;
+        if (!isCurrentlyActive)
             return Result.Failure<DisableUserResponse>(Error.Conflict("User account is already disabled."));
 
         var now = clock.UtcNow;
@@ -97,9 +105,11 @@ internal sealed class DisableUserHandler(
             }
         }
 
-        user.Deactivate(now);
+        user?.Deactivate(now);
+        profile?.Deactivate(now);
 
-        var response = new DisableUserResponse(user.Id, user.IsActive);
+        var targetId = user?.Id ?? profile!.Id;
+        var response = new DisableUserResponse(targetId, user?.IsActive ?? profile!.IsActive);
 
         if (request.IdempotencyKey is { } key)
         {
@@ -115,7 +125,7 @@ internal sealed class DisableUserHandler(
         }
 
         await auditEventPublisher.PublishAsync(
-            new UserDisabledAuditEvent(request.CompanyId, user.Id, user.Id, actorUserId, now),
+            new UserDisabledAuditEvent(request.CompanyId, targetId, targetId, actorUserId, now),
             cancellationToken);
 
         return Result.Success(response);

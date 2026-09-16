@@ -46,16 +46,25 @@ internal sealed class EnableUserHandler(
             return Result.Failure<EnableUserResponse>(Error.NotFound("User was not found."));
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == request.UserId, cancellationToken);
-        if (user is null)
+        // Ticket 1 (P1): mirror DisableUser's fallback to UserProfile for real Supabase-backed
+        // accounts (AcceptInvite, self-service SignUp).
+        var profile = user is null
+            ? await db.UserProfiles.FirstOrDefaultAsync(p => p.Id == request.UserId, cancellationToken)
+            : null;
+
+        if (user is null && profile is null)
             return Result.Failure<EnableUserResponse>(Error.NotFound("User was not found."));
 
-        if (user.IsActive)
+        var isCurrentlyActive = user?.IsActive ?? profile!.IsActive;
+        if (isCurrentlyActive)
             return Result.Failure<EnableUserResponse>(Error.Conflict("User account is already active."));
 
         var now = clock.UtcNow;
-        user.Reactivate(now);
+        user?.Reactivate(now);
+        profile?.Reactivate(now);
 
-        var response = new EnableUserResponse(user.Id, user.IsActive);
+        var targetId = user?.Id ?? profile!.Id;
+        var response = new EnableUserResponse(targetId, user?.IsActive ?? profile!.IsActive);
 
         if (request.IdempotencyKey is { } key)
         {
@@ -71,7 +80,7 @@ internal sealed class EnableUserHandler(
         }
 
         await auditEventPublisher.PublishAsync(
-            new UserEnabledAuditEvent(request.CompanyId, user.Id, user.Id, actorUserId, now),
+            new UserEnabledAuditEvent(request.CompanyId, targetId, targetId, actorUserId, now),
             cancellationToken);
 
         return Result.Success(response);

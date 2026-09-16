@@ -108,4 +108,63 @@ public class EnableUserHandlerTests(IdentityDatabaseFixture fixture)
 
         Assert.Empty(auditPublisher.PublishedEvents);
     }
+
+    // Ticket 1 (P1): mirror DisableUser's UserProfile fallback for real Supabase-backed accounts
+    // (AcceptInvite, self-service SignUp) that have no ApplicationUser row.
+
+    [Fact]
+    public async Task HandleAsync_Reenables_Previously_Disabled_UserProfile_Only_Account()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await using (var db = fixture.BuildContext())
+        {
+            var profile = UserProfile.Create(
+                userId, Guid.NewGuid(), companyId, $"disabled-{userId}@test.com", "Test", "User", Now);
+            profile.Deactivate(Now);
+            db.UserProfiles.Add(profile);
+            await db.SaveChangesAsync();
+        }
+
+        var auditPublisher = new FakeAuditEventPublisher();
+        var handler = BuildHandler(auditPublisher);
+
+        var result = await handler.HandleAsync(
+            new EnableUserRequest { CompanyId = companyId, UserId = userId },
+            actorUserId: Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.IsActive);
+
+        await using var db2 = fixture.BuildContext();
+        var reloaded = await db2.UserProfiles.FirstAsync(p => p.Id == userId);
+        Assert.True(reloaded.IsActive);
+        Assert.Null(reloaded.DisabledAt);
+
+        Assert.Single(auditPublisher.PublishedEvents, e => e is UserEnabledAuditEvent);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_UserProfile_Only_Account_Already_Active()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await using (var db = fixture.BuildContext())
+        {
+            db.UserProfiles.Add(UserProfile.Create(
+                userId, Guid.NewGuid(), companyId, $"active-{userId}@test.com", "Test", "User", Now));
+            await db.SaveChangesAsync();
+        }
+
+        var handler = BuildHandler(new FakeAuditEventPublisher());
+
+        var result = await handler.HandleAsync(
+            new EnableUserRequest { CompanyId = companyId, UserId = userId },
+            actorUserId: null,
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+    }
 }

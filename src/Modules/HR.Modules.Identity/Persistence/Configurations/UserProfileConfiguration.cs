@@ -44,6 +44,14 @@ internal sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserPr
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(profile => profile.IsActive)
+            .HasColumnName("is_active")
+            .IsRequired()
+            .HasDefaultValue(true);
+
+        builder.Property(profile => profile.DisabledAt)
+            .HasColumnName("disabled_at");
+
         builder.Property(profile => profile.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

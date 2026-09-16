@@ -64,6 +64,18 @@ internal sealed class DisabledAccountMiddleware(RequestDelegate next)
                 .Select(u => (bool?)u.IsActive)
                 .FirstOrDefaultAsync(context.RequestAborted);
 
+            // Ticket 1 (P1): real Supabase-backed accounts (AcceptInvite, self-service SignUp) have
+            // no ApplicationUser row at all — without this fallback a disabled UserProfile-only
+            // account's still-valid token would keep working here indefinitely.
+            if (accountIsActive is null)
+            {
+                accountIsActive = await dbContext.UserProfiles
+                    .AsNoTracking()
+                    .Where(p => p.Id == userId)
+                    .Select(p => (bool?)p.IsActive)
+                    .FirstOrDefaultAsync(context.RequestAborted);
+            }
+
             if (accountIsActive == false)
             {
                 // A disabled company account stays blocked everywhere except a genuine

@@ -127,6 +127,46 @@ public class EnableUserEndpointTests
         Assert.True(reloaded.IsActive);
     }
 
+    // Ticket 1 (P1): mirror DisableUser's UserProfile-only coverage — real Supabase-backed accounts
+    // (AcceptInvite, self-service SignUp) have no ApplicationUser row, so EnableUser must fall back
+    // to re-enabling their UserProfile.
+    [Fact]
+    public async Task Post_EnableUser_Reenables_UserProfile_Only_Account_On_Happy_Path()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Profile", "Only");
+        var userId = await IdentityUserAdminTestHelpers.SeedUserProfileAsync(
+            _factory, companyId, employeeId, $"profileonly.{Guid.NewGuid():N}@test.com");
+
+        var disable = await client.PostAsync($"/api/companies/{companyId}/users/{userId}/disable", EmptyJson());
+        Assert.Equal(HttpStatusCode.OK, disable.StatusCode);
+
+        var response = await client.PostAsync($"/api/companies/{companyId}/users/{userId}/enable", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        var reloaded = await db.UserProfiles.FirstAsync(p => p.Id == userId);
+        Assert.True(reloaded.IsActive);
+        Assert.Null(reloaded.DisabledAt);
+    }
+
+    [Fact]
+    public async Task Post_EnableUser_Returns_Conflict_When_UserProfile_Only_Account_Already_Active()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Profile", "Only");
+        var userId = await IdentityUserAdminTestHelpers.SeedUserProfileAsync(
+            _factory, companyId, employeeId, $"profileonly.{Guid.NewGuid():N}@test.com");
+
+        var response = await client.PostAsync($"/api/companies/{companyId}/users/{userId}/enable", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
     private static StringContent EmptyJson() =>
         new("{}", Encoding.UTF8, "application/json");
 }

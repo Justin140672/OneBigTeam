@@ -170,4 +170,78 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
 
         Assert.True(result.IsSuccess);
     }
+
+    // Ticket 1 (P1): real Supabase-backed accounts (AcceptInvite, self-service SignUp) have a
+    // UserProfile row but no ApplicationUser row at all — DisableUser must fall back to disabling
+    // that instead of silently 404ing / no-opping.
+
+    [Fact]
+    public async Task HandleAsync_Disables_UserProfile_Only_Account_On_Happy_Path()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await using (var db = fixture.BuildContext())
+        {
+            db.UserProfiles.Add(UserProfile.Create(
+                userId, Guid.NewGuid(), companyId, $"profile-{userId}@test.com", "Test", "User", Now));
+            await db.SaveChangesAsync();
+        }
+
+        var auditPublisher = new FakeAuditEventPublisher();
+        var handler = BuildHandler(auditPublisher);
+
+        var result = await handler.HandleAsync(
+            new DisableUserRequest { CompanyId = companyId, UserId = userId },
+            actorUserId: Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value.IsActive);
+
+        await using var db2 = fixture.BuildContext();
+        var reloaded = await db2.UserProfiles.FirstAsync(p => p.Id == userId);
+        Assert.False(reloaded.IsActive);
+        Assert.NotNull(reloaded.DisabledAt);
+
+        Assert.Single(auditPublisher.PublishedEvents, e => e is UserDisabledAuditEvent);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Neither_ApplicationUser_Nor_UserProfile_Exists()
+    {
+        var handler = BuildHandler(new FakeAuditEventPublisher());
+
+        var result = await handler.HandleAsync(
+            new DisableUserRequest { CompanyId = Guid.NewGuid(), UserId = Guid.NewGuid() },
+            actorUserId: Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_UserProfile_Only_Account_Already_Disabled()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await using (var db = fixture.BuildContext())
+        {
+            var profile = UserProfile.Create(
+                userId, Guid.NewGuid(), companyId, $"disabled-{userId}@test.com", "Test", "User", Now);
+            profile.Deactivate(Now);
+            db.UserProfiles.Add(profile);
+            await db.SaveChangesAsync();
+        }
+
+        var handler = BuildHandler(new FakeAuditEventPublisher());
+
+        var result = await handler.HandleAsync(
+            new DisableUserRequest { CompanyId = companyId, UserId = userId },
+            actorUserId: null,
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+    }
 }

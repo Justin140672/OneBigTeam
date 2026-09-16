@@ -210,4 +210,86 @@ public class DisabledAccountEnforcementTests
         Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.DoesNotContain("account_disabled", await response.Content.ReadAsStringAsync());
     }
+
+    // Ticket 1 (P1): real Supabase-backed accounts (AcceptInvite, self-service SignUp) have a
+    // UserProfile row but no ApplicationUser row at all. SupabaseCurrentUserResolutionMiddleware
+    // resolves ResolvedCurrentUser.UserId to profile.Id by matching the incoming "sub" claim against
+    // UserProfile.SupabaseAuthUserId — so, unlike the ApplicationUser-only callers above, the
+    // X-Test-User header for these callers must carry the *SupabaseAuthUserId*, not the profile/
+    // employee id, for the middleware to resolve them at all.
+    private async Task<(Guid employeeId, Guid supabaseAuthUserId, string email)> SeedUserProfileOnlyCallerAsync(
+        Guid companyId, bool isActive = true)
+    {
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Profile", "Only");
+        var supabaseAuthUserId = Guid.NewGuid();
+        var email = $"profileonly.{Guid.NewGuid():N}@test.com";
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            var profile = UserProfile.Create(employeeId, supabaseAuthUserId, companyId, email, "Profile", "Only", DateTimeOffset.UtcNow);
+            if (!isActive)
+                profile.Deactivate(DateTimeOffset.UtcNow);
+            db.UserProfiles.Add(profile);
+
+            // Deliberately NOT using TestRoleSeeder.AssignRoleAsync here: its EnsureUserAndCompanyAsync
+            // self-heals any existing UserProfile's SupabaseAuthUserId to equal the passed-in userId
+            // (== employeeId here), which would clobber the distinct supabaseAuthUserId this
+            // UserProfile-only caller relies on to be resolved by SupabaseCurrentUserResolutionMiddleware
+            // via the X-Test-User header — assigning the role directly avoids that.
+            db.UserRoles.Add(UserRole.Create(employeeId, SystemRoles.Employee, DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+
+        await TestRoleSeeder.EnsureActiveSubscriptionAsync(_factory.Services.CreateScope(), companyId);
+
+        return (employeeId, supabaseAuthUserId, email);
+    }
+
+    [Fact]
+    public async Task Disabling_UserProfile_Only_Account_Via_DisableUser_Endpoint_Gates_Subsequent_Requests()
+    {
+        var companyId = Guid.NewGuid();
+        var (adminUserId, adminEmail) = await SeedAdminCallerAsync(companyId);
+        using var adminClient = AuthenticatedClient(companyId, adminUserId, adminEmail);
+
+        var (targetEmployeeId, targetSupabaseAuthUserId, targetEmail) = await SeedUserProfileOnlyCallerAsync(companyId);
+        // The target's own client authenticates with their SupabaseAuthUserId, not their employee id
+        // — see SeedUserProfileOnlyCallerAsync remarks.
+        using var targetClient = AuthenticatedClient(companyId, targetSupabaseAuthUserId, targetEmail);
+
+        var baseline = await targetClient.GetAsync("/api/me");
+        Assert.Equal(HttpStatusCode.OK, baseline.StatusCode);
+
+        var disableResponse = await adminClient.PostAsync(
+            $"/api/companies/{companyId}/users/{targetEmployeeId}/disable",
+            new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.OK, disableResponse.StatusCode);
+
+        var afterDisable = await targetClient.GetAsync("/api/me");
+        await AssertAccountDisabledAsync(afterDisable);
+    }
+
+    [Fact]
+    public async Task ReEnabling_UserProfile_Only_Account_Via_EnableUser_Endpoint_Restores_Access()
+    {
+        var companyId = Guid.NewGuid();
+        var (adminUserId, adminEmail) = await SeedAdminCallerAsync(companyId);
+        using var adminClient = AuthenticatedClient(companyId, adminUserId, adminEmail);
+
+        var (targetEmployeeId, targetSupabaseAuthUserId, targetEmail) =
+            await SeedUserProfileOnlyCallerAsync(companyId, isActive: false);
+        using var targetClient = AuthenticatedClient(companyId, targetSupabaseAuthUserId, targetEmail);
+
+        var whileDisabled = await targetClient.GetAsync("/api/me");
+        await AssertAccountDisabledAsync(whileDisabled);
+
+        var enableResponse = await adminClient.PostAsync(
+            $"/api/companies/{companyId}/users/{targetEmployeeId}/enable",
+            new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.OK, enableResponse.StatusCode);
+
+        var afterEnable = await targetClient.GetAsync("/api/me");
+        Assert.Equal(HttpStatusCode.OK, afterEnable.StatusCode);
+    }
 }

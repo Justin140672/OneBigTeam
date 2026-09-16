@@ -59,7 +59,14 @@ internal sealed class AccountDisablementJob(
         try
         {
             var user = await db.Users.SingleOrDefaultAsync(u => u.Id == request.ApplicationUserId);
-            if (user is null)
+            // Ticket 1 (P1): real Supabase-backed accounts (AcceptInvite, self-service SignUp) have
+            // no ApplicationUser row — fall back to UserProfile so departure disablement actually
+            // covers those accounts too, not just legacy ApplicationUser-backed ones.
+            var profile = user is null
+                ? await db.UserProfiles.SingleOrDefaultAsync(p => p.Id == request.ApplicationUserId)
+                : null;
+
+            if (user is null && profile is null)
             {
                 // The linked account no longer exists — nothing left to disable; treat as done.
                 request.MarkProcessed(clock.UtcNow);
@@ -67,9 +74,14 @@ internal sealed class AccountDisablementJob(
                 return;
             }
 
-            if (user.IsActive)
+            if (user is { IsActive: true })
             {
                 user.Deactivate(clock.UtcNow);
+            }
+
+            if (profile is { IsActive: true })
+            {
+                profile.Deactivate(clock.UtcNow);
             }
 
             var processedAt = clock.UtcNow;

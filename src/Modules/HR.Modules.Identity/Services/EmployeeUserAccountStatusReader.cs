@@ -25,14 +25,13 @@ internal sealed class EmployeeUserAccountStatusReader(IdentityDbContext db) : IE
 
         // Real Supabase-backed accounts (AcceptInvite, self-service SignUp) live in UserProfiles,
         // not Users — an invited employee who's accepted their invite has a UserProfile row, never
-        // an ApplicationUser one (see AcceptInvite/Endpoint.cs's remarks). UserProfile has no
-        // IsActive/LastLoginAt concept yet (matches self-service company admins today — there's no
-        // disable capability for Supabase-backed accounts anywhere in this app yet), so these
-        // always read as Active with no last-login date.
-        var profileIds = await db.UserProfiles
+        // an ApplicationUser one (see AcceptInvite/Endpoint.cs's remarks). Ticket 1 (P1) gave
+        // UserProfile its own IsActive flag, so these now reflect real disablement instead of
+        // always reading as Active. UserProfile has no LastLoginAt concept yet.
+        var profiles = await db.UserProfiles
             .AsNoTracking()
             .Where(p => ids.Contains(p.Id))
-            .Select(p => p.Id)
+            .Select(p => new { p.Id, p.IsActive })
             .ToListAsync(cancellationToken);
 
         var invites = await db.UserInvites
@@ -51,13 +50,15 @@ internal sealed class EmployeeUserAccountStatusReader(IdentityDbContext db) : IE
                 user.LastLoginAt);
         }
 
-        foreach (var profileId in profileIds)
+        foreach (var profile in profiles)
         {
-            if (result.ContainsKey(profileId))
+            if (result.ContainsKey(profile.Id))
                 continue; // an ApplicationUser already exists — that status takes precedence.
 
-            result[profileId] = new EmployeeUserAccountSummary(
-                profileId, EmployeeUserAccountStatus.Active, LastLoginAt: null);
+            result[profile.Id] = new EmployeeUserAccountSummary(
+                profile.Id,
+                profile.IsActive ? EmployeeUserAccountStatus.Active : EmployeeUserAccountStatus.Disabled,
+                LastLoginAt: null);
         }
 
         foreach (var invite in invites)

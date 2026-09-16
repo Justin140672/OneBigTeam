@@ -62,6 +62,33 @@ public class EmployeeUserAccountStatusReaderTests(IdentityDatabaseFixture fixtur
     }
 
     [Fact]
+    public async Task GetStatusesAsync_Returns_Disabled_For_A_Disabled_UserProfile_Based_Account()
+    {
+        // Ticket 1 (P1) negated-branch coverage: before UserProfile.IsActive existed this always
+        // read as Active regardless of disablement — pin the false branch too, not just the true one
+        // covered by GetStatusesAsync_Returns_Active_For_A_UserProfile_Based_Account above.
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        await using (var db = fixture.BuildContext())
+        {
+            var profile = UserProfile.Create(
+                employeeId, Guid.NewGuid(), companyId, "disabled@example.com", "Ada", "Lovelace", Now);
+            profile.Deactivate(Now);
+            db.UserProfiles.Add(profile);
+            await db.SaveChangesAsync();
+        }
+
+        await using var context = fixture.BuildContext();
+        var reader = new EmployeeUserAccountStatusReader(context);
+
+        var statuses = await reader.GetStatusesAsync(companyId, [employeeId], CancellationToken.None);
+
+        Assert.True(statuses.TryGetValue(employeeId, out var summary));
+        Assert.Equal(EmployeeUserAccountStatus.Disabled, summary!.Status);
+    }
+
+    [Fact]
     public async Task GetStatusesAsync_Returns_PendingInvitation_When_No_User_Or_Profile_Exists()
     {
         var companyId = Guid.NewGuid();

@@ -250,15 +250,24 @@ public static class IdentityModule
         var clock = scope.ServiceProvider.GetRequiredService<IClock>();
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
-        if (user is null)
-            return true; // no ApplicationUser row (e.g. persona seeded only in dev store) — allow, nothing to gate.
+        if (user is not null)
+        {
+            if (!user.IsActive)
+                return false;
 
-        if (!user.IsActive)
-            return false;
+            user.RecordLogin(clock.UtcNow);
+            await db.SaveChangesAsync();
+            return true;
+        }
 
-        user.RecordLogin(clock.UtcNow);
-        await db.SaveChangesAsync();
-        return true;
+        // Ticket 1 (P1): real Supabase-backed accounts (AcceptInvite, self-service SignUp) have no
+        // ApplicationUser row at all — they must still be gated by their own UserProfile.IsActive,
+        // otherwise a disabled invited/signed-up user could keep signing in indefinitely.
+        var profile = await db.UserProfiles.FirstOrDefaultAsync(p => p.Id == userId);
+        if (profile is null)
+            return true; // no account row at all (e.g. persona seeded only in dev store) — allow, nothing to gate.
+
+        return profile.IsActive;
     }
 
     public static IApplicationBuilder UseIdentityModule(this IApplicationBuilder app)
