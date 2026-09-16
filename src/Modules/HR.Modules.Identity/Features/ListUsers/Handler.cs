@@ -108,12 +108,12 @@ internal sealed class ListUsersHandler(
             else
                 invitationStatus = "Pending";
 
-            // UserProfile (Supabase-backed) has no local IsActive/disable concept — its mere
-            // existence means the account is active, same convention as
-            // EmployeeUserAccountStatusReader's earlier fix for this account type.
+            // Ticket 10 (P1): UserProfile (Supabase-backed) now has a real IsActive concept (see
+            // Ticket 1 / AccountDisablementJob), so a disabled profile-backed account must be
+            // reported as Disabled here too, not unconditionally Active.
             var accountStatus = user is not null
                 ? user.IsActive ? "Active" : "Disabled"
-                : profile is not null ? "Active" : "NoAccount";
+                : profile is not null ? (profile.IsActive ? "Active" : "Disabled") : "NoAccount";
 
             var email = user?.Email ?? profile?.Email ?? invite?.Email ?? string.Empty;
 

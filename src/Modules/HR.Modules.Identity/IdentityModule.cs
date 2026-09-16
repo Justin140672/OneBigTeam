@@ -367,6 +367,12 @@ public static class IdentityModule
             "identity-position-role-reconciliation",
             job => job.ExecuteAsync(),
             "*/15 * * * *");
+        // Ticket 10 (P1) follow-up: recovers AccountDisablement requests stuck Pending/Processing/
+        // Failed (interrupted enqueue, crashed job attempt) without requiring another departure event.
+        jobManager.AddOrUpdate<Jobs.AccountDisablementReconciliationJob>(
+            "identity-account-disablement-reconciliation",
+            job => job.ExecuteAsync(),
+            "*/10 * * * *");
         return app;
     }
 

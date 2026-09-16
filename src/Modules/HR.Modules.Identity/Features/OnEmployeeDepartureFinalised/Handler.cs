@@ -37,26 +37,45 @@ internal sealed class Handler(
         if (!integrationEvent.AccessDisabled)
             return;
 
-        // By convention in this system, ApplicationUser.Id == EmployeeId (see
+        // By convention in this system, ApplicationUser.Id / UserProfile.Id == EmployeeId (see
         // Features/OnOffboardingPlanCompleted's former handler and AcceptInvite).
+        //
+        // Ticket 10 (P1): this handler previously only ever looked in db.Users, so a
+        // profile-only (real Supabase-backed) account never got a disablement request created for
+        // it at all — AccountDisablementJob already knew how to disable a UserProfile, but was
+        // never enqueued for one, because this method returned early first. Resolve either backing
+        // model and only skip when neither account exists, or the one that does is already inactive.
         var user = await db.Users
             .FirstOrDefaultAsync(u => u.Id == integrationEvent.EmployeeId, cancellationToken);
+        var profile = user is null
+            ? await db.UserProfiles.FirstOrDefaultAsync(p => p.Id == integrationEvent.EmployeeId, cancellationToken)
+            : null;
 
-        if (user is null || !user.IsActive)
+        if (user is null && profile is null)
             return;
 
+        var isAlreadyInactive = user is { IsActive: false } || profile is { IsActive: false };
+        if (isAlreadyInactive)
+            return;
+
+        var accountId = user?.Id ?? profile!.Id;
+
         var alreadyRequested = await db.AccountDisablements
-            .AnyAsync(d => d.ApplicationUserId == user.Id, cancellationToken);
+            .AnyAsync(d => d.ApplicationUserId == accountId, cancellationToken);
         if (alreadyRequested)
             return;
 
         var now = clock.UtcNow;
         var request = AccountDisablement.CreatePending(
-            Guid.NewGuid(), integrationEvent.CompanyId, user.Id, integrationEvent.EmployeeId, now);
+            Guid.NewGuid(), integrationEvent.CompanyId, accountId, integrationEvent.EmployeeId, now);
 
         db.AccountDisablements.Add(request);
         await db.SaveChangesAsync(cancellationToken);
 
+        // Ticket 10 (P1): enqueue is best-effort — a process interruption between the SaveChangesAsync
+        // above and this call would previously leave the request permanently Pending. Recovery for
+        // that case is provided by AccountDisablementReconciliationJob (see IdentityModule's recurring
+        // job registration), which sweeps stale Pending/Processing/Failed requests and re-enqueues them.
         backgroundJobClient.Enqueue<AccountDisablementJob>(
             job => job.ProcessAsync(request.Id, integrationEvent.CompanyId));
     }

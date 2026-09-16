@@ -85,4 +85,19 @@ internal sealed class AccountDisablement
         Status = StatusPending;
         FailureReason = null;
     }
+
+    /// <summary>
+    /// Ticket 10 (P1): resets a Processing record back to Pending after it has been detected as
+    /// stuck (no progress within <see cref="Jobs.AccountDisablementReconciliationJob"/>'s stale
+    /// threshold) — used to recover from a crash that occurred mid-attempt, between MarkProcessing
+    /// and the job's own MarkProcessed/MarkFailed call.
+    /// </summary>
+    public void ResetToPendingAfterInterruption()
+    {
+        if (Status != StatusProcessing)
+            throw new InvalidOperationException(
+                $"Cannot reset an account disablement with status '{Status}' as interrupted.");
+
+        Status = StatusPending;
+    }
 }

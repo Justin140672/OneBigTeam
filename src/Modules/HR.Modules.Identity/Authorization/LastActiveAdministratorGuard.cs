@@ -41,9 +41,13 @@ internal sealed class LastActiveAdministratorGuard(IdentityDbContext db, IEmploy
         if (hasActiveApplicationUser)
             return true;
 
-        var hasProfile = await db.UserProfiles
-            .AnyAsync(p => otherHolderIds.Contains(p.Id), cancellationToken);
+        // Ticket 10 (P1): a disabled UserProfile no longer counts as an active protected-role
+        // holder — previously any profile row, active or not, satisfied this guard, which let a
+        // company appear to still have an active administrator when the only remaining
+        // profile-backed holder had already been disabled (e.g. via departure finalisation).
+        var hasActiveProfile = await db.UserProfiles
+            .AnyAsync(p => otherHolderIds.Contains(p.Id) && p.IsActive, cancellationToken);
 
-        return hasProfile;
+        return hasActiveProfile;
     }
 }
