@@ -168,5 +168,30 @@ public class MoveApplicationStageEndpointTests
         Assert.Equal(hiredStageId, savedApplication.CurrentStageId);
     }
 
+    [Fact]
+    public async Task Post_MoveStage_Returns_BadRequest_When_Target_Stage_Is_Terminal()
+    {
+        // Ticket 5 (P1): the generic Kanban move must reject any target stage with IsTerminal = true
+        // (e.g. "Hired") — reaching a terminal stage this way skips the dedicated workflow endpoint's
+        // required side effects (HireCandidate's Employee provisioning, in particular). The application
+        // must remain on its prior, non-terminal stage afterward.
+        var companyId = Guid.NewGuid();
+        var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
+        var (vacancyId, applicationId, applicationReceivedStageId, _, hiredStageId) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
+
+        using var client = await AuthenticatedClient(RecruiterUser, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/move-stage",
+            new { companyId, vacancyId, applicationId, newStageId = hiredStageId });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+        var savedApplication = await verifyDb.Applications.SingleAsync(a => a.Id == applicationId);
+        Assert.Equal(applicationReceivedStageId, savedApplication.CurrentStageId);
+    }
+
     private sealed record MoveStagePayload(Guid Id, Guid VacancyId, Guid CandidateId, Guid CurrentStageId);
 }

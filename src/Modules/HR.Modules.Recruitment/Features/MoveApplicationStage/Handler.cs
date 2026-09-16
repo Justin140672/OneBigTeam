@@ -83,6 +83,20 @@ internal sealed class MoveApplicationStageHandler(
             return Result.Failure<MoveApplicationStageResponse>(
                 Error.Validation($"Cannot move an application to the inactive stage '{newStage.Name}'."));
 
+        // Ticket 5 (P1): a terminal stage (Hired/Rejected/Withdrawn, or any other company-configured
+        // terminal outcome) always has required side effects owned by a dedicated workflow endpoint
+        // — most importantly HireCandidate, which provisions the Employee record. This generic
+        // Kanban move has no such side effects, so allowing it to target a terminal stage directly
+        // let an application reach "Hired" with no Employee ever created (see HireCandidateHandler,
+        // which performs that provisioning and is the ONLY sanctioned way onto a Hired stage).
+        // Reject/Withdraw already have their own dedicated endpoints too; route every terminal
+        // transition through them instead of this generic move.
+        if (newStage.IsTerminal)
+            return Result.Failure<MoveApplicationStageResponse>(
+                Error.Validation(
+                    $"Cannot move an application to the terminal stage '{newStage.Name}' via a generic stage move — " +
+                    "use the dedicated workflow action for this outcome (e.g. Hire, Reject, Withdraw)."));
+
         var previousStageId = application.CurrentStageId;
         var now = clock.UtcNowOffset();
 

@@ -168,6 +168,81 @@ public class MoveApplicationStageHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Move_To_Terminal_Hired_Stage_Returns_Validation_Error_And_Does_Not_Move_Or_Publish()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var eventPublisher = new FakeIntegrationEventPublisher();
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, eventPublisher, auditPublisher).HandleAsync(
+            new MoveApplicationStageRequest
+            {
+                CompanyId     = companyId,
+                VacancyId     = vacancy.Id,
+                ApplicationId = application.Id,
+                NewStageId    = stages.Hired.Id,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("terminal stage", result.Error.Message);
+        Assert.Contains("dedicated workflow action", result.Error.Message);
+
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal(stages.Offer.Id, saved.CurrentStageId);
+        Assert.Empty(eventPublisher.PublishedEvents);
+        Assert.Empty(auditPublisher.Published);
+        Assert.Empty(await db.ApplicationStageHistoryEntries.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Move_To_Terminal_Rejected_Stage_Returns_Validation_Error_And_Does_Not_Move()
+    {
+        // The IsTerminal check is symmetric across every terminal outcome, not just Hired — this
+        // pins that a Rejected-outcome terminal stage is rejected too (RejectCandidate is the
+        // dedicated endpoint for this transition).
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new MoveApplicationStageRequest
+            {
+                CompanyId     = companyId,
+                VacancyId     = vacancy.Id,
+                ApplicationId = application.Id,
+                NewStageId    = stages.Rejected.Id,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal(stages.Interview.Id, saved.CurrentStageId);
+    }
+
+    [Fact]
     public async Task HandleAsync_Move_To_Inactive_Stage_Returns_Validation_Error_And_Does_Not_Publish_Events_Or_Add_History()
     {
         await using var db = BuildContext();
