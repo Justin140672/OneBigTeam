@@ -22,6 +22,7 @@ internal sealed class IdentityDbContext : DbContext
     public DbSet<UserPosition> UserPositions => Set<UserPosition>();
     public DbSet<EmployeeRoleOverride> EmployeeRoleOverrides => Set<EmployeeRoleOverride>();
     public DbSet<UserInvite> UserInvites => Set<UserInvite>();
+    public DbSet<InviteAcceptanceOperation> InviteAcceptanceOperations => Set<InviteAcceptanceOperation>();
     public DbSet<PlatformAdministrator> PlatformAdministrators => Set<PlatformAdministrator>();
     public DbSet<SessionRevocation> SessionRevocations => Set<SessionRevocation>();
     public DbSet<AccountDisablement> AccountDisablements => Set<AccountDisablement>();

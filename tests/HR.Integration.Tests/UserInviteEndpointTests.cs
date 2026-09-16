@@ -18,6 +18,7 @@ public class UserInviteEndpointTests
     public UserInviteEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        _factory.SupabaseAuthGateway.Reset();
 
         Task.Run(async () =>
             await TestRoleSeeder.AssignRoleAsync(factory, InviteAdminUser, SystemRoles.HrAdministrator))
@@ -288,6 +289,177 @@ public class UserInviteEndpointTests
             new { token, password = "SecurePass1!" });
 
         Assert.Equal(HttpStatusCode.Conflict, accept.StatusCode);
+    }
+
+    // ── AcceptInvite recovery (Ticket 8, P2) ────────────────────────────────────
+    // AcceptInvite creates the Supabase Auth user BEFORE committing the local UserProfile/UserRoles/
+    // invite-claim. If the process died (or the DB save failed) between those two steps, a naive
+    // retry called Supabase again, got EmailAlreadyRegisteredException, and returned a permanent
+    // 409 — the invitee could never actually accept their own invite. InviteAcceptanceOperation lets
+    // a retry recognise "this is our own interrupted attempt" and resume.
+
+    [Fact]
+    public async Task Post_Accept_Resumes_After_Interrupted_Attempt_Using_Resolved_Supabase_User()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
+        var email = $"resume.{Guid.NewGuid():N}@example.com";
+        var inviteId = await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, employeeId, email);
+
+        string token;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            token = (await db.UserInvites.SingleAsync(i => i.Id == inviteId)).Token;
+
+            // Simulates a previous request that already created the InviteAcceptanceOperation row
+            // (Status = Pending) and called Supabase, but crashed before the local commit.
+            var operation = InviteAcceptanceOperation.CreatePending(
+                Guid.NewGuid(), inviteId, companyId, employeeId, email, DateTimeOffset.UtcNow);
+            db.InviteAcceptanceOperations.Add(operation);
+            await db.SaveChangesAsync();
+        }
+
+        var resolvedSupabaseUserId = Guid.NewGuid();
+        _factory.SupabaseAuthGateway.EmailAlreadyRegisteredFor = email;
+        _factory.SupabaseAuthGateway.UserIdsByEmail[email] = resolvedSupabaseUserId;
+
+        using var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/invites/accept",
+            new { token, password = "SecurePass1!" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<AcceptPayload>();
+        Assert.Equal(employeeId, payload!.UserId);
+
+        using var scope2 = _factory.Services.CreateScope();
+        var verifyDb = scope2.ServiceProvider.GetRequiredService<IdentityDbContext>();
+
+        var profile = await verifyDb.UserProfiles.SingleAsync(p => p.Id == employeeId);
+        Assert.Equal(resolvedSupabaseUserId, profile.SupabaseAuthUserId);
+
+        Assert.True(await verifyDb.UserRoles.AnyAsync(
+            ur => ur.UserId == employeeId && ur.RoleId == SystemRoles.Employee));
+
+        var reloadedInvite = await verifyDb.UserInvites.SingleAsync(i => i.Id == inviteId);
+        Assert.True(reloadedInvite.IsClaimed);
+
+        var reloadedOperation = await verifyDb.InviteAcceptanceOperations.SingleAsync(o => o.InviteId == inviteId);
+        Assert.Equal(InviteAcceptanceOperation.StatusCompleted, reloadedOperation.Status);
+        Assert.Equal(resolvedSupabaseUserId, reloadedOperation.SupabaseAuthUserId);
+
+        // No fresh Supabase account was created — this was a resumed attempt.
+        Assert.DoesNotContain(_factory.SupabaseAuthGateway.ConfirmedUsersCreated, u => u.Email == email);
+    }
+
+    [Fact]
+    public async Task Post_Accept_Returns_Conflict_When_Resolved_Supabase_User_Belongs_To_Another_Profile()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
+        var email = $"clash.{Guid.NewGuid():N}@example.com";
+        var inviteId = await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, employeeId, email);
+
+        // A genuinely unrelated pre-existing account already owns the Supabase identity that
+        // GetUserIdByEmailAsync will resolve for this email.
+        var otherEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Other", "Person");
+        var unrelatedSupabaseUserId = Guid.NewGuid();
+
+        string token;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            token = (await db.UserInvites.SingleAsync(i => i.Id == inviteId)).Token;
+
+            var operation = InviteAcceptanceOperation.CreatePending(
+                Guid.NewGuid(), inviteId, companyId, employeeId, email, DateTimeOffset.UtcNow);
+            db.InviteAcceptanceOperations.Add(operation);
+
+            var unrelatedProfile = UserProfile.Create(
+                otherEmployeeId, unrelatedSupabaseUserId, companyId, $"unrelated.{Guid.NewGuid():N}@example.com",
+                "Other", "Person", DateTimeOffset.UtcNow);
+            db.UserProfiles.Add(unrelatedProfile);
+
+            await db.SaveChangesAsync();
+        }
+
+        _factory.SupabaseAuthGateway.EmailAlreadyRegisteredFor = email;
+        _factory.SupabaseAuthGateway.UserIdsByEmail[email] = unrelatedSupabaseUserId;
+
+        using var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/invites/accept",
+            new { token, password = "SecurePass1!" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        using var scope2 = _factory.Services.CreateScope();
+        var verifyDb = scope2.ServiceProvider.GetRequiredService<IdentityDbContext>();
+
+        Assert.False(await verifyDb.UserProfiles.AnyAsync(p => p.Id == employeeId));
+        var reloadedInvite = await verifyDb.UserInvites.SingleAsync(i => i.Id == inviteId);
+        Assert.False(reloadedInvite.IsClaimed);
+
+        // The pre-existing unrelated profile was left untouched.
+        var untouched = await verifyDb.UserProfiles.SingleAsync(p => p.Id == otherEmployeeId);
+        Assert.Equal(unrelatedSupabaseUserId, untouched.SupabaseAuthUserId);
+    }
+
+    [Fact]
+    public async Task Post_Accept_Returns_Conflict_When_Supabase_User_Not_Resolvable()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
+        var email = $"unresolvable.{Guid.NewGuid():N}@example.com";
+        var inviteId = await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, employeeId, email);
+
+        string token;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            token = (await db.UserInvites.SingleAsync(i => i.Id == inviteId)).Token;
+        }
+
+        // EmailAlreadyRegisteredException is thrown, but GetUserIdByEmailAsync cannot resolve an id
+        // for this email (not present in UserIdsByEmail) — there is nothing safe to resume.
+        _factory.SupabaseAuthGateway.EmailAlreadyRegisteredFor = email;
+
+        using var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/invites/accept",
+            new { token, password = "SecurePass1!" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        using var scope2 = _factory.Services.CreateScope();
+        var verifyDb = scope2.ServiceProvider.GetRequiredService<IdentityDbContext>();
+
+        Assert.False(await verifyDb.UserProfiles.AnyAsync(p => p.Id == employeeId));
+        Assert.False(await verifyDb.UserRoles.AnyAsync(ur => ur.UserId == employeeId));
+        var reloadedInvite = await verifyDb.UserInvites.SingleAsync(i => i.Id == inviteId);
+        Assert.False(reloadedInvite.IsClaimed);
+    }
+
+    [Fact]
+    public async Task Post_Accept_First_Time_Creates_Pending_Operation_That_Reaches_Completed()
+    {
+        // Confirms the new InviteAcceptanceOperation row is created and driven straight through to
+        // Completed within a single uninterrupted request (the "no interruption" happy path).
+        var employeeId = Guid.NewGuid();
+        var (token, inviteId, _) = await SeedInviteAsync(employeeId, expiredDaysOffset: 7, cancelled: false);
+
+        using var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/invites/accept",
+            new { token, password = "SecurePass1!" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+
+        var operation = await db.InviteAcceptanceOperations.SingleAsync(o => o.InviteId == inviteId);
+        Assert.Equal(InviteAcceptanceOperation.StatusCompleted, operation.Status);
+        Assert.NotNull(operation.SupabaseAuthUserId);
+        Assert.NotNull(operation.CompletedAt);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

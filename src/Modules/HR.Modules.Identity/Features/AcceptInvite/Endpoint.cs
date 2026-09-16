@@ -64,9 +64,25 @@ internal sealed class Endpoint(
 
         // Use the employee ID as the user ID — single identity across modules (UserRole.UserId
         // below relies on this matching, same as SignUpHandler's admin profile).
+        InviteAcceptanceOperation? operation = null;
+
         var profileExists = await db.UserProfiles.AnyAsync(p => p.Id == invite.EmployeeId, ct);
         if (!profileExists)
         {
+            // Ticket 8 (P2): persist a durable operation record BEFORE calling Supabase, so a retry
+            // after a crash/failure between "Supabase user created" and "local commit" can tell that
+            // apart from a genuinely fresh first attempt (see InviteAcceptanceOperation remarks).
+            operation = await db.InviteAcceptanceOperations
+                .FirstOrDefaultAsync(o => o.InviteId == invite.Id, ct);
+
+            if (operation is null)
+            {
+                operation = InviteAcceptanceOperation.CreatePending(
+                    Guid.NewGuid(), invite.Id, invite.CompanyId, invite.EmployeeId, invite.Email, now);
+                db.InviteAcceptanceOperations.Add(operation);
+                await db.SaveChangesAsync(ct);
+            }
+
             Guid supabaseUserId;
             try
             {
@@ -74,10 +90,26 @@ internal sealed class Endpoint(
             }
             catch (EmailAlreadyRegisteredException)
             {
-                await Send.ResultAsync(TypedResults.Conflict(
-                    new { error = "An account with this email already exists." }));
-                return;
+                // Ticket 8 (P2): only ever treat "already registered" as OUR OWN earlier attempt
+                // resuming — never as licence to attach to an unrelated pre-existing account — when
+                // we have our own operation record for this exact invite AND the resolved Supabase
+                // user id is not already linked to any OTHER UserProfile.
+                var resolvedUserId = await supabaseAuthGateway.GetUserIdByEmailAsync(invite.Email, ct);
+
+                var linkedToAnotherProfile = resolvedUserId is not null &&
+                    await db.UserProfiles.AnyAsync(p => p.SupabaseAuthUserId == resolvedUserId, ct);
+
+                if (resolvedUserId is null || linkedToAnotherProfile)
+                {
+                    await Send.ResultAsync(TypedResults.Conflict(
+                        new { error = "An account with this email already exists." }));
+                    return;
+                }
+
+                supabaseUserId = resolvedUserId.Value;
             }
+
+            operation.MarkSupabaseConfirmed(supabaseUserId, now);
 
             var profile = UserProfile.Create(
                 invite.EmployeeId, supabaseUserId, invite.CompanyId, invite.Email,
@@ -102,6 +134,7 @@ internal sealed class Endpoint(
 
         var expectedVersion = invite.Version;
         invite.Claim(now);
+        operation?.MarkCompleted(now);
 
         var saveResult = await db.SaveChangesWithConcurrencyAsync(
             invite, expectedVersion, "This invite is no longer valid.", ct);

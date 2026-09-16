@@ -23,6 +23,14 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
     public bool ShouldThrowOnExchange { get; set; }
     public bool ShouldThrowOnSignIn { get; set; }
 
+    /// <summary>
+    /// Ticket 8 (P2): when set, CreateConfirmedUserAsync throws EmailAlreadyRegisteredException for
+    /// this exact email instead of creating a user — simulating Supabase already having the account
+    /// from a previous (possibly interrupted) AcceptInvite attempt. Combine with UserIdsByEmail to
+    /// control what GetUserIdByEmailAsync resolves for the retry.
+    /// </summary>
+    public string? EmailAlreadyRegisteredFor { get; set; }
+
     // Simulates Supabase rejecting a recovery access token (expired / already used / tampered):
     // UpdatePasswordAsync surfaces any non-success Supabase response as an InvalidOperationException,
     // which ResetPasswordHandler maps to a generic validation failure rather than a 500.
@@ -139,6 +147,11 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
             throw new InvalidOperationException("Simulated Supabase failure.");
         }
 
+        if (string.Equals(EmailAlreadyRegisteredFor, email, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new EmailAlreadyRegisteredException(email);
+        }
+
         ConfirmedUsersCreated.Add((email, password));
         return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
     }
@@ -174,5 +187,7 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         EnsuredDevUsers.Clear();
         SignedInUsers.Clear();
         ConfirmedUsersCreated.Clear();
+        EmailAlreadyRegisteredFor = null;
+        UserIdsByEmail.Clear();
     }
 }
