@@ -296,16 +296,78 @@ public class PurgeEligibleCandidatesHandlerTests
         Assert.Empty(await db.CandidateDocuments.ToListAsync());
 
         Assert.Equal(2, jobClient.CreatedJobs.Count);
-        var enqueuedStorageKeys = jobClient.CreatedJobs
+        var enqueuedOperationIds = jobClient.CreatedJobs
             .Select(job =>
             {
                 Assert.Equal(typeof(PurgeCandidateDocumentStorageJob), job.Type);
                 Assert.Equal(nameof(PurgeCandidateDocumentStorageJob.ProcessAsync), job.Method.Name);
-                return (string)job.Args[0];
+                return (Guid)job.Args[0];
             })
             .ToList();
-        Assert.Contains(document1.StorageKey, enqueuedStorageKeys);
-        Assert.Contains(document2.StorageKey, enqueuedStorageKeys);
+
+        var savedOperations = await db.CandidateDocumentDeletionOperations.ToListAsync();
+        Assert.Equal(2, savedOperations.Count);
+        Assert.Equal(savedOperations.Select(o => o.Id).OrderBy(id => id), enqueuedOperationIds.OrderBy(id => id));
+
+        var operationsByStorageKey = savedOperations.ToDictionary(o => o.StorageKey);
+        foreach (var document in new[] { document1, document2 })
+        {
+            Assert.True(operationsByStorageKey.TryGetValue(document.StorageKey, out var operation));
+            Assert.Equal(CandidateDocumentDeletionOperation.StatusPending, operation!.Status);
+            Assert.Equal(candidate.Id, operation.CandidateId);
+            Assert.Equal(companyId, operation.CompanyId);
+        }
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_Exactly_One_AuditDelivery_Row_Covering_All_Purged_Candidates()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var oldEnough = Now.AddDays(-731);
+        var candidate1 = CreateCandidateUpdatedAt(companyId, oldEnough);
+        var candidate2 = CreateCandidateUpdatedAt(companyId, oldEnough);
+        db.Candidates.AddRange(candidate1, candidate2);
+        await db.SaveChangesAsync();
+
+        var purgedBy = Guid.NewGuid();
+        var result = await handler(db).HandleAsync(
+            new PurgeEligibleCandidatesRequest { CompanyId = companyId },
+            purgedBy,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value!.PurgedCount);
+
+        var delivery = await db.CandidatePurgeAuditDeliveries.SingleAsync();
+        Assert.Equal(companyId, delivery.CompanyId);
+        Assert.Equal(purgedBy, delivery.PurgedBy);
+        Assert.Equal(
+            new[] { candidate1.Id, candidate2.Id }.OrderBy(id => id),
+            delivery.CandidateIds.OrderBy(id => id));
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_AuditDelivery_But_No_DeletionOperations_When_Candidate_Has_No_Documents()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var oldEnough = Now.AddDays(-731);
+        var candidate = CreateCandidateUpdatedAt(companyId, oldEnough);
+        db.Candidates.Add(candidate);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new PurgeEligibleCandidatesRequest { CompanyId = companyId },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.PurgedCount);
+
+        Assert.Empty(await db.CandidateDocumentDeletionOperations.ToListAsync());
+        var delivery = await db.CandidatePurgeAuditDeliveries.SingleAsync();
+        Assert.Equal(new[] { candidate.Id }, delivery.CandidateIds);
     }
 
     [Fact]

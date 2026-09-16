@@ -1,4 +1,5 @@
 using Hangfire;
+using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Jobs;
 using HR.Modules.Recruitment.Persistence;
 using HR.Infrastructure.Abstractions;
@@ -109,8 +110,25 @@ internal sealed class PurgeEligibleCandidatesHandler(
             .Where(d => d.CompanyId == request.CompanyId && eligibleCandidateIds.Contains(d.CandidateId))
             .ToListAsync(cancellationToken);
 
-        var storageKeysToDelete = documentsToPurge.Select(d => d.StorageKey).ToList();
         db.CandidateDocuments.RemoveRange(documentsToPurge);
+
+        // Ticket 13 (P2): persist one durable deletion operation per storage key in the SAME
+        // transaction that deletes the CandidateDocument rows — previously the storage key existed
+        // only in memory (storageKeysToDelete) between this commit and the Hangfire enqueue call
+        // below; a crash in that window permanently lost it, since the only other place it lived
+        // (the CandidateDocument row) had already been deleted. See
+        // Jobs/PurgeCandidateDocumentStorageReconciliationJob.cs for the recovery sweep.
+        var deletionOperations = documentsToPurge
+            .Select(d => CandidateDocumentDeletionOperation.CreatePending(
+                Guid.NewGuid(), request.CompanyId, d.CandidateId, d.StorageKey, now))
+            .ToList();
+        db.CandidateDocumentDeletionOperations.AddRange(deletionOperations);
+
+        // Ticket 13 (P2): same durability gap as above, for the purge audit event — previously
+        // published only after commit, with no record if that publish itself failed.
+        var auditDelivery = CandidatePurgeAuditDelivery.CreatePending(
+            Guid.NewGuid(), request.CompanyId, eligibleCandidateIds, purgedBy, now);
+        db.CandidatePurgeAuditDeliveries.Add(auditDelivery);
 
         var response = new PurgeEligibleCandidatesResponse(eligibleCandidates.Count);
 
@@ -127,18 +145,33 @@ internal sealed class PurgeEligibleCandidatesHandler(
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        foreach (var storageKey in storageKeysToDelete)
+        // Latency optimisation only — correctness comes from the persisted operations above plus
+        // PurgeCandidateDocumentStorageReconciliationJob's recurring sweep, not from this enqueue
+        // succeeding.
+        foreach (var operation in deletionOperations)
         {
-            backgroundJobClient.Enqueue<PurgeCandidateDocumentStorageJob>(job => job.ProcessAsync(storageKey));
+            backgroundJobClient.Enqueue<PurgeCandidateDocumentStorageJob>(job => job.ProcessAsync(operation.Id));
         }
 
-        await auditPublisher.PublishAsync(
-            new CandidatesPurgedAuditEvent(
-                request.CompanyId,
-                eligibleCandidates.Select(c => c.Id).ToList(),
-                purgedBy,
-                now),
-            cancellationToken);
+        try
+        {
+            await auditPublisher.PublishAsync(
+                new CandidatesPurgedAuditEvent(
+                    request.CompanyId,
+                    eligibleCandidates.Select(c => c.Id).ToList(),
+                    purgedBy,
+                    now),
+                cancellationToken);
+
+            auditDelivery.MarkDelivered(clock.UtcNowOffset());
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception)
+        {
+            // Left Pending — PurgeCandidateDocumentStorageReconciliationJob's recurring sweep
+            // retries delivery; the purge itself is already fully committed and must not be failed
+            // back to the caller over an audit-publish fault.
+        }
 
         return Result.Success(response);
     }

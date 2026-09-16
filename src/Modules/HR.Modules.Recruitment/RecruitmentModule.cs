@@ -136,6 +136,9 @@ public static class RecruitmentModule
         services.AddScoped<IValidator<PurgeEligibleCandidatesRequest>, PurgeEligibleCandidatesValidator>();
         // Ticket 7 (P2): durable, retried blob deletion for documents removed by candidate purge.
         services.AddScoped<Jobs.PurgeCandidateDocumentStorageJob>();
+        // Ticket 13 (P2): recurring repair for CandidateDocumentDeletionOperation/
+        // CandidatePurgeAuditDelivery rows left behind by an interrupted purge.
+        services.AddScoped<Jobs.PurgeCandidateDocumentStorageReconciliationJob>();
 
         services.AddScoped<HR.SharedKernel.IIntegrationEventHandler<HR.Modules.Employees.Contracts.EmployeePromotedIntegrationEvent>, EmployeePromotedHandler>();
 
@@ -322,6 +325,11 @@ public static class RecruitmentModule
             "recruitment-idempotency-maintenance",
             job => job.ExecuteAsync(),
             "*/5 * * * *");
+        // Ticket 13 (P2): repairs interrupted candidate-purge blob deletions and audit deliveries.
+        jobManager.AddOrUpdate<Jobs.PurgeCandidateDocumentStorageReconciliationJob>(
+            "recruitment-purge-storage-reconciliation",
+            job => job.ExecuteAsync(),
+            "*/10 * * * *");
         return app;
     }
 

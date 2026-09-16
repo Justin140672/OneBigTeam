@@ -20,6 +20,8 @@ internal class RecruitmentDbContext : DbContext
     public DbSet<ExternalRecruiter> ExternalRecruiters => Set<ExternalRecruiter>();
     public DbSet<RecruitmentStage> RecruitmentStages => Set<RecruitmentStage>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+    public DbSet<CandidateDocumentDeletionOperation> CandidateDocumentDeletionOperations => Set<CandidateDocumentDeletionOperation>();
+    public DbSet<CandidatePurgeAuditDelivery> CandidatePurgeAuditDeliveries => Set<CandidatePurgeAuditDelivery>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
