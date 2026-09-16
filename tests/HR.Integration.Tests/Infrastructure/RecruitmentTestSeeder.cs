@@ -52,7 +52,14 @@ internal static class RecruitmentTestSeeder
     /// </summary>
     public static async Task<SeededApplication> SeedApplicationAsync(
         ApiWebApplicationFactory factory, Guid companyId, DateTimeOffset now,
-        string candidateFirstName = "Emma", string candidateLastName = "Clarke")
+        string candidateFirstName = "Emma", string candidateLastName = "Clarke",
+        // Ticket 16 (P2): callers that will exercise HireCandidate against this seeded application
+        // (e.g. the concurrency race tests) must pass a REAL position profile id — one seeded via
+        // EmployeeReferenceDataSeeder — since HireCandidateHandler resolves Department/Location via
+        // IPositionProfileReader.GetSummaryAsync and returns NotFound for a made-up id. Callers that
+        // never hire from this application can leave this null and get the previous random-id
+        // behaviour, unchanged.
+        Guid? positionProfileId = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
@@ -78,7 +85,8 @@ internal static class RecruitmentTestSeeder
         var hiredStageId = stages.Single(s => s.Name == "Hired").Id;
         var rejectedStageId = stages.Single(s => s.Name == "Rejected").Id;
 
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), now);
+        var vacancy = Vacancy.Create(
+            Guid.NewGuid(), companyId, positionProfileId ?? Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), now);
         var candidate = Candidate.Create(
             Guid.NewGuid(), companyId, candidateFirstName, candidateLastName,
             $"{candidateFirstName.ToLowerInvariant()}.{Guid.NewGuid():N}@example.com", null, null, now);

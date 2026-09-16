@@ -20,6 +20,13 @@ namespace HR.Integration.Tests;
 /// 500, and the Application/Candidate end up in a state consistent with whichever transition actually
 /// committed — never a contradictory mix (e.g. Hired stage with no Employee, or an Employee created but
 /// the Candidate left unlinked with the application Rejected).
+///
+/// Ticket 16 (P2): now uses <see cref="ApplicationSaveBarrier"/> so both requests are
+/// guaranteed to have loaded the same stale Application.Version before either is allowed to save —
+/// without this, an unsynchronised Task.WhenAll can (rarely) let the loser's read happen strictly
+/// after the winner's write already committed, which would surface as a business-validation rejection
+/// rather than a genuine version conflict. See IdempotentApplicationTransitionConcurrencyEndpointTests
+/// for the equivalent idempotent-keyed coverage and the barrier's own doc comment for how it works.
 /// </summary>
 [Collection("Integration")]
 public class ApplicationConcurrencyEndpointTests
@@ -91,14 +98,18 @@ public class ApplicationConcurrencyEndpointTests
 
         object RejectBody() => new { companyId, rejectionReason = "Role filled by another candidate" };
 
-        var hireTask = clientA.PostAsJsonAsync(
-            $"/api/companies/{companyId}/vacancies/{vacancy.Id}/applications/{application!.Id}/hire", HireBody());
-        var rejectTask = clientB.PostAsJsonAsync(
-            $"/api/companies/{companyId}/vacancies/{vacancy.Id}/applications/{application.Id}/reject", RejectBody());
+        HttpResponseMessage hireResponse, rejectResponse;
+        using (ApplicationSaveBarrier.Arm(application!.Id))
+        {
+            var hireTask = clientA.PostAsJsonAsync(
+                $"/api/companies/{companyId}/vacancies/{vacancy.Id}/applications/{application.Id}/hire", HireBody());
+            var rejectTask = clientB.PostAsJsonAsync(
+                $"/api/companies/{companyId}/vacancies/{vacancy.Id}/applications/{application.Id}/reject", RejectBody());
 
-        var responses = await Task.WhenAll(hireTask, rejectTask);
-        var hireResponse = responses[0];
-        var rejectResponse = responses[1];
+            var responses = await Task.WhenAll(hireTask, rejectTask);
+            hireResponse = responses[0];
+            rejectResponse = responses[1];
+        }
 
         // Every response must be a clean 200 or a clean 409 ("concurrency"/"conflict") — never a 500,
         // and never both succeeding (that would mean the loser's stale write silently landed instead
