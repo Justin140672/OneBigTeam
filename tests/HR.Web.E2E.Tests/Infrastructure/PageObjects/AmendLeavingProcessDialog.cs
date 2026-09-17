@@ -1,3 +1,4 @@
+using HR.Web.E2E.Tests.Infrastructure;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -95,10 +96,14 @@ public sealed class AmendLeavingProcessDialog(IPage page)
 
     /// <summary>
     /// Returns true if the backdating-confirmation checkbox ("This leaving date is in the past...")
-    /// is visible — only rendered once the entered Leaving Date is in the past.
+    /// is visible — only rendered once the entered Leaving Date is in the past. Waits rather than
+    /// snapshotting: its appearance depends on the Blazor Server round trip triggered by the
+    /// preceding date-field edit, so an instant check right after typing/tabbing out can read
+    /// "hasn't rendered yet" as "will never appear" (see StartLeavingProcessDialog's equivalent).
     /// </summary>
     public Task<bool> IsBackdatedConfirmationVisibleAsync() =>
-        Dialog.Locator(".e-checkbox-wrapper").Filter(new() { HasText = "This leaving date is in the past" }).IsVisibleAsync();
+        Dialog.Locator(".e-checkbox-wrapper").Filter(new() { HasText = "This leaving date is in the past" })
+            .WaitUntilVisibleAsync(2_000);
 
     /// <summary>Checks the backdating-confirmation checkbox.</summary>
     public Task CheckBackdatedConfirmationAsync() =>
