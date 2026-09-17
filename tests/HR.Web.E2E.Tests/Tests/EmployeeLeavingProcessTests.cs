@@ -695,6 +695,17 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.True(await dialog.IsBackdatedConfirmationVisibleAsync(),
             "Expected the backdating checkbox to appear once the leaving date is in the past");
 
+        // The resignation received date is still "today" from step 1, which is after this
+        // backdated leaving date and would itself trip the (separate, unrelated) "leaving date
+        // must be on or after the resignation received date" rule — masking the backdating error
+        // this test actually wants to exercise. Go back and move the received date earlier than
+        // the leaving date too, so only the backdating rule is in play. Going back and forward
+        // doesn't recompute Leaving Date, since it's already been manually edited above.
+        await dialog.ClickBackAsync();
+        await dialog.FillResignationReceivedDateAsync("01/12/2023");
+        await dialog.ClickNextAsync();
+        Assert.Equal("01/01/2024", await dialog.GetLeavingDateTextAsync());
+
         await dialog.ClickNextAsync();
         Assert.True(await dialog.IsVisibleAsync(),
             "Expected the wizard to stay on step 2 until the backdating checkbox is confirmed");
