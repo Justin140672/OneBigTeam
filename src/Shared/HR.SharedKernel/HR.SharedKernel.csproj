@@ -31,4 +31,15 @@
     <InternalsVisibleTo Include="HR.SharedKernel.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageVersion Update="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="Newtonsoft.Json">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
 </Project>

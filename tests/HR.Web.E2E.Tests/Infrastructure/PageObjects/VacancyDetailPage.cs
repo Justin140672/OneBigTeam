@@ -934,7 +934,12 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
         // Ticket #2: the "Offer" toolbar item now opens the "Make an Offer" dialog instead of
         // advancing directly. Accept the pre-populated defaults and submit.
-        var offerDialog = page.Locator(".offer-candidate-dialog");
+        //
+        // Syncfusion applies the "offer-candidate-dialog" CssClass to more than just the dialog
+        // itself (the modal container, and both footer buttons all pick it up too), so the plain
+        // class locator is ambiguous under Playwright's strict mode. The dialog role locator
+        // matches only the actual dialog element.
+        var offerDialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Make an Offer" });
         await offerDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await offerDialog.GetByRole(AriaRole.Button, new() { Name = "Make Offer" }).ClickAsync();
 
