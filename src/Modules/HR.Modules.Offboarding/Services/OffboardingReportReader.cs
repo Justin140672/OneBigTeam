@@ -57,17 +57,20 @@ internal sealed class OffboardingReportReader(OffboardingDbContext dbContext) : 
             // "resolved" (Completed + Skipped), matching the UI exactly.
             var progress = OffboardingProgressCalculator.Calculate(planTasks);
             var resolvedTitles = planTasks
-                .Where(t => t.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped)
+                .Where(t => t.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped
+                    or OffboardingTaskStatus.Waived)
                 .Select(t => t.Title)
                 .ToList();
             var outstanding = planTasks
-                .Where(t => t.Status != OffboardingTaskStatus.Completed && t.Status != OffboardingTaskStatus.Skipped)
+                .Where(t => t.Status is not (OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped
+                    or OffboardingTaskStatus.Waived or OffboardingTaskStatus.Cancelled))
                 .Select(t => t.Title)
                 .ToList();
 
             var documentReviewTask = planTasks.FirstOrDefault(t => t.Title == DocumentReviewTaskTitle);
             var documentsReturned = documentReviewTask is null
-                || documentReviewTask.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped;
+                || documentReviewTask.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped
+                    or OffboardingTaskStatus.Waived;
 
             results.Add(new OffboardingReportItem(
                 plan.EmployeeId,

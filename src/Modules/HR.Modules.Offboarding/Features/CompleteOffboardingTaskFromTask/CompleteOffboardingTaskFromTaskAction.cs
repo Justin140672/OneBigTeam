@@ -52,7 +52,8 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
         // (final review task, audit, integration event) that TryCompletePlanAsync fires AFTER that
         // commit ever ran. Recover them instead of assuming task-level completion implies the whole
         // dispatch, including plan-level effects, is done.
-        if (offboardingTask.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped)
+        if (offboardingTask.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped
+            or OffboardingTaskStatus.Waived or OffboardingTaskStatus.Cancelled)
         {
             // Recovery only applies to a genuine Tasks-dispatch replay (identified by a stable
             // DispatchOperationId — ticket 11), never to an arbitrary already-resolved call with no
@@ -341,7 +342,7 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
             plan.LastWorkingDay,
             planTasks.Count,
             planTasks.Count(t => t.Status == OffboardingTaskStatus.Completed),
-            planTasks.Count(t => t.Status == OffboardingTaskStatus.Skipped),
+            planTasks.Count(t => t.Status is OffboardingTaskStatus.Skipped or OffboardingTaskStatus.Waived),
             now), cancellationToken);
 
         await integrationEventPublisher.PublishAsync(
@@ -385,7 +386,8 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
         // RequiresHrReconciliation alert is no longer accurate and should clear.
         if (plan.RequiresHrReconciliation
             && planTasks.Where(t => t.RequiresHrConfirmation)
-                .All(t => t.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped))
+                .All(t => t.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped
+                or OffboardingTaskStatus.Waived or OffboardingTaskStatus.Cancelled))
         {
             plan.ResolveHrReconciliation(now);
         }
@@ -397,7 +399,7 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
             reviewTaskClaimed,
             planTasks.Count,
             planTasks.Count(t => t.Status == OffboardingTaskStatus.Completed),
-            planTasks.Count(t => t.Status == OffboardingTaskStatus.Skipped),
+            planTasks.Count(t => t.Status is OffboardingTaskStatus.Skipped or OffboardingTaskStatus.Waived),
             now);
     }
 

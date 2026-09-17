@@ -98,11 +98,16 @@ public class GetOffboardingOverviewEndpointTests
         Assert.Equal("Completed", completedAssetTask.Status);
         Assert.NotNull(completedAssetTask.CompletedAt);
         Assert.Equal(completedAssetTask.CompletedAt, completedAssetTask.UpdatedAt);
+        // OFF-04: the employee's asset-return obligation must carry through the AssetAssignmentId
+        // of the asset it's returning so the UI can deep-link to the source assignment record.
+        Assert.NotNull(completedAssetTask.AssetAssignmentId);
 
         var hrTask = Assert.Single(payload.Tasks, t => t.AssignTo == "HR");
         Assert.Equal("Pending", hrTask.Status);
         Assert.Null(hrTask.CompletedAt);
         Assert.Equal(lastWorkingDay, hrTask.DueDate);
+        // The HR document-review obligation isn't asset-backed.
+        Assert.Null(hrTask.AssetAssignmentId);
 
         var managerTasks = payload.Tasks.Where(t => t.AssignTo == "Manager").ToList();
         Assert.Equal(4, managerTasks.Count);
@@ -111,7 +116,39 @@ public class GetOffboardingOverviewEndpointTests
             Assert.Equal("Pending", t.Status);
             Assert.Null(t.CompletedAt);
             Assert.Equal(lastWorkingDay, t.DueDate);
+            Assert.Null(t.AssetAssignmentId);
         });
+    }
+
+    [Fact]
+    public async Task Get_OffboardingOverview_Populates_OpenTaskId_For_A_Synced_Obligation()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AdminClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId);
+
+        var categoryId = await CreateAssetCategoryAsync(client, companyId, "IT Equipment");
+        var assetId = await CreateAssetAsync(client, companyId, categoryId, $"OB-{Guid.NewGuid():N}");
+        await AssignAssetAsync(client, companyId, assetId, employeeId);
+
+        var lastWorkingDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
+        await StartOffboardingAsync(client, companyId, employeeId, lastWorkingDay, "Resigned.");
+
+        // Every obligation is synchronized into a Tasks-module TaskItem as part of starting
+        // offboarding, so its OpenTaskId should already be populated before anything is completed.
+        var listResp = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/tasks");
+        listResp.EnsureSuccessStatusCode();
+        var tasksPayload = await listResp.Content.ReadFromJsonAsync<EmployeeTasksPayload>();
+        Assert.NotEmpty(tasksPayload!.Items);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/offboarding-overview");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<OverviewPayload>();
+        Assert.NotNull(payload);
+
+        Assert.All(payload!.Tasks, t => Assert.NotNull(t.OpenTaskId));
     }
 
     [Fact]
@@ -299,5 +336,7 @@ public class GetOffboardingOverviewEndpointTests
         DateOnly? DueDate,
         DateTimeOffset? CompletedAt,
         DateTimeOffset CreatedAt,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        Guid? OpenTaskId,
+        Guid? AssetAssignmentId);
 }

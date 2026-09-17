@@ -121,6 +121,18 @@ public sealed class StartLeavingProcessDialog(IPage page)
     }
 
     /// <summary>
+    /// Returns true if step 2's backdating-confirmation checkbox ("This leaving date is in the
+    /// past. Confirming will immediately finalise this employee's departure...") is visible — only
+    /// rendered once the entered Leaving Date is in the past (StartLeavingProcessDialog.IsBackdated).
+    /// </summary>
+    public Task<bool> IsBackdatedConfirmationVisibleAsync() =>
+        Dialog.Locator(".e-checkbox-wrapper").Filter(new() { HasText = "This leaving date is in the past" }).IsVisibleAsync();
+
+    /// <summary>Checks step 2's backdating-confirmation checkbox.</summary>
+    public Task CheckBackdatedConfirmationAsync() =>
+        Dialog.Locator(".e-checkbox-wrapper").Filter(new() { HasText = "This leaving date is in the past" }).ClickAsync();
+
+    /// <summary>
     /// Clears the (auto-computed) Leaving Date on step 2 so the "Please select a leaving date."
     /// required-field validation can be exercised — step 2 otherwise arrives pre-populated from
     /// StartLeavingProcessDialog.ComputeProposedLeavingDate.
@@ -153,6 +165,16 @@ public sealed class StartLeavingProcessDialog(IPage page)
     /// </summary>
     public Task SelectLeavingReasonAsync(string reasonLabel) =>
         DropDownSelector.SelectAsync(page, Dialog, reasonLabel);
+
+    /// <summary>
+    /// Fills the Notes field on step 4 — free-text, required only when Leaving Reason is "Other"
+    /// (StartLeavingProcessFormModel.Validate).
+    /// </summary>
+    public async Task FillNotesAsync(string notes)
+    {
+        await Dialog.Locator("textarea").FillAsync(notes);
+        await page.Keyboard.PressAsync("Tab");
+    }
 
     // ── Step 5: Confirmation summary ────────────────────────────────────────────
 

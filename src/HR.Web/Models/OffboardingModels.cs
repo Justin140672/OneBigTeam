@@ -18,6 +18,14 @@ public sealed record OffboardingOverviewModel(
     int TotalTasks,
     int ResolvedTasks,
     int ProgressPercent,
+    // SPEC-OFF-01: server-calculated (OffboardingProgressCalculator) "X of Y required" / "X of Y
+    // total" obligation counts, excluding Cancelled obligations from both. Never recompute these
+    // client-side.
+    int RequiredObligationsTotal,
+    int RequiredObligationsResolved,
+    int TotalObligationsCount,
+    int TotalObligationsResolved,
+    bool IsOverdueAfterDeparture,
     IReadOnlyList<OffboardingTaskOverviewItem> Tasks);
 
 public sealed record OffboardingTaskOverviewItem(
@@ -34,7 +42,28 @@ public sealed record OffboardingTaskOverviewItem(
     bool IsMandatory,
     string? SkipReason,
     Guid? SkippedByUserId,
-    DateTimeOffset? SkippedAt);
+    DateTimeOffset? SkippedAt,
+    Guid? OpenTaskId,
+    Guid? AssetAssignmentId);
+
+// Section 7 of the leaving/offboarding workspace: distinguishes "no offboarding plan exists yet"
+// (a legitimate empty state — e.g. leaving process not started, or setup still pending) from
+// "we couldn't load the plan" (Failed) due to a network/server error. Exactly one of
+// Failed/(Overview != null) is true when the request completes; Overview.HasPlan == false is the
+// no-plan-yet case.
+public sealed record OffboardingOverviewLookupResult(OffboardingOverviewModel? Overview, bool Failed)
+{
+    public static OffboardingOverviewLookupResult SuccessResult(OffboardingOverviewModel? overview) => new(overview, false);
+    public static OffboardingOverviewLookupResult FailedResult() => new(null, true);
+}
+
+public sealed record WaiveOffboardingTaskRequest(Guid CompanyId, string Reason);
+
+public sealed record WaiveOffboardingTaskResponse(
+    Guid Id,
+    string Status,
+    DateTimeOffset? SkippedAt,
+    Guid? SkippedByUserId);
 
 public sealed record StartOffboardingResponse(
     Guid Id,

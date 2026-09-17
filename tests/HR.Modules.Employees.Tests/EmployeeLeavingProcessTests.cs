@@ -42,6 +42,36 @@ public class EmployeeLeavingProcessTests
         Assert.Equal(LeavingProcessStatus.InProgress, leavingProcess.Status);
     }
 
+    // Spec SPEC-OFF-01
+    [Fact]
+    public void Amend_Sets_Notes_When_Provided()
+    {
+        var leavingProcess = CreateInProgress(FixedNow);
+
+        leavingProcess.Amend(
+            new DateOnly(2026, 9, 1), new DateOnly(2026, 8, 31), LeavingReason.Other, FixedNow.AddDays(1),
+            notes: "Emigrating overseas.");
+
+        Assert.Equal("Emigrating overseas.", leavingProcess.Notes);
+        Assert.Equal(NoticePeriodUnit.Weeks, leavingProcess.NoticePeriodUnit);
+        Assert.Equal(4, leavingProcess.NoticePeriodLength);
+        Assert.Equal(NoticePeriodSource.Employee, leavingProcess.NoticeSource);
+    }
+
+    [Fact]
+    public void Amend_Clears_Notes_When_Not_Provided()
+    {
+        var leavingProcess = CreateInProgress(FixedNow);
+        leavingProcess.Amend(
+            new DateOnly(2026, 8, 15), new DateOnly(2026, 8, 14), LeavingReason.Other, FixedNow.AddDays(1),
+            notes: "Original notes.");
+
+        leavingProcess.Amend(
+            new DateOnly(2026, 9, 1), new DateOnly(2026, 8, 31), LeavingReason.MutualAgreement, FixedNow.AddDays(2));
+
+        Assert.Null(leavingProcess.Notes);
+    }
+
     [Fact]
     public void Amend_Throws_When_Status_Is_Not_InProgress()
     {

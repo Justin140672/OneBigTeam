@@ -113,6 +113,8 @@ public class GetLeavingProcessEndpointTests
         Assert.Equal(LastWorkingDay, payload.LastWorkingDay);
         Assert.Equal("Resignation", payload.LeavingReason);
         Assert.Equal("InProgress", payload.Status);
+        Assert.True(payload.StartedAt > DateTimeOffset.MinValue);
+        Assert.Null(payload.CancellationReason);
     }
 
     [Fact]
@@ -176,5 +178,7 @@ public class GetLeavingProcessEndpointTests
         int NoticePeriodLength,
         string NoticeSource,
         string LeavingReason,
-        string Status);
+        string Status,
+        DateTimeOffset StartedAt,
+        string? CancellationReason);
 }

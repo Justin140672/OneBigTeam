@@ -715,24 +715,15 @@
                                         </ContentTemplate>
                                     </TabItem>
                                 }
-                                @if (_showOffboardingTab)
+                                @if (_showLeavingTab || _showOffboardingTab)
                                 {
                                     <TabItem>
-                                        <ChildContent><TabHeader Text="Offboarding" /></ChildContent>
-                                        <ContentTemplate>
-                                            <div class="mt-4">
-                                                <EmployeeOffboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                                            </div>
-                                        </ContentTemplate>
-                                    </TabItem>
-                                }
-                                @if (_showLeavingTab)
-                                {
-                                    <TabItem>
-                                        <ChildContent><TabHeader Text="Leaving" /></ChildContent>
+                                        <ChildContent><TabHeader Text="Leaving & Offboarding" /></ChildContent>
                                         <ContentTemplate>
                                             <div class="mt-4">
                                                 <EmployeeLeavingTab CompanyId="CompanyId" EmployeeId="Id!.Value"
+                                                                     EmploymentStatus="@(_employee?.Status)"
+                                                                     FocusChecklist="@_focusOffboardingChecklist"
                                                                      OnAmendRequested="OpenAmendLeavingProcessDialog"
                                                                      OnCancelRequested="OpenCancelLeavingProcessDialog" />
                                             </div>
@@ -771,7 +762,7 @@
                                                                   OnNavigateToOnboarding="@(() => GoToSection(EmployeeProfileSection.Onboarding))"
                                                                   OnNavigateToDocuments="@(() => GoToSection(EmployeeProfileSection.Documents))"
                                                                   OnNavigateToAcknowledgements="@(() => GoToSection(EmployeeProfileSection.Acknowledgements))"
-                                                                  OnNavigateToOffboarding="@(() => GoToSection(EmployeeProfileSection.Offboarding))"
+                                                                  OnNavigateToOffboarding="@(() => GoToSection(EmployeeProfileSection.Leaving))"
                                                                   OnNavigateToNotes="@(() => GoToSection(EmployeeProfileSection.Notes))" />
                                         </div>
                                     </ContentTemplate>
@@ -968,6 +959,10 @@
     // (deep links from elsewhere, e.g. "?tab=leave") always takes priority and is never
     // overridden by the stored value.
     private bool _hadTabQueryParam;
+    // See ParseTab handling above — true only when the raw "?tab=" value was literally
+    // "offboarding" (now an alias for the merged Leaving section), so EmployeeLeavingTab can
+    // scroll/focus its checklist instead of its leaving-details header.
+    private bool _focusOffboardingChecklist;
     private bool _restoredTabFromStorage;
     private int _lastPersistedSectionValue = -1;
 
@@ -982,8 +977,10 @@
     {
         EmployeeProfileSection.Probation => _showProbationTab,
         EmployeeProfileSection.Onboarding => _showOnboardingTab,
-        EmployeeProfileSection.Offboarding => _showOffboardingTab,
-        EmployeeProfileSection.Leaving => _showLeavingTab,
+        // Merged into one tab entry (see EmployeeProfileNavigation) — visible whenever either the
+        // leaving process or its offboarding plan is relevant for this employee.
+        EmployeeProfileSection.Offboarding => _showLeavingTab || _showOffboardingTab,
+        EmployeeProfileSection.Leaving => _showLeavingTab || _showOffboardingTab,
         EmployeeProfileSection.Notes => Session.IsHrAdministrator,
         _ => true
     };
@@ -1145,6 +1142,12 @@
             {
                 _hadTabQueryParam = true;
                 _activeSection = SectionVisible(section) ? section : EmployeeProfileSection.Details;
+
+                // Old "?tab=offboarding" bookmarks now land on the merged Leaving & Offboarding
+                // workspace (section == Leaving) — carry the original intent through so the
+                // workspace scrolls/focuses its checklist rather than the leaving-details header.
+                _focusOffboardingChecklist =
+                    string.Equals(tab.ToString(), "offboarding", StringComparison.OrdinalIgnoreCase);
             }
         }
 

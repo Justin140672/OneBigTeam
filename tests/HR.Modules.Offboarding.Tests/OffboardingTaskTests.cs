@@ -183,7 +183,7 @@ public class OffboardingTaskTests
     }
 
     [Fact]
-    public void CreateWaived_Produces_A_Skipped_Task_With_Null_CompletedAt_And_Given_Description()
+    public void CreateWaived_Produces_A_Waived_Task_With_Null_CompletedAt_And_Given_Description()
     {
         var id = Guid.NewGuid();
         var companyId = Guid.NewGuid();
@@ -198,8 +198,10 @@ public class OffboardingTaskTests
         Assert.Equal(id, task.Id);
         Assert.Equal(companyId, task.CompanyId);
         Assert.Equal(planId, task.OffboardingPlanId);
-        Assert.Equal(OffboardingTaskStatus.Skipped, task.Status);
-        // Skip() does not set CompletedAt (see Skip_Sets_Status_And_UpdatedAt_But_Leaves_CompletedAt_Null above).
+        // SPEC-OFF-01: CreateWaived now routes through Waive() rather than the legacy Skip() path,
+        // so system-auto-resolved tasks get Status=Waived, not Status=Skipped.
+        Assert.Equal(OffboardingTaskStatus.Waived, task.Status);
+        // Waive() does not set CompletedAt (see Waive_Sets_Status_SkipReason_Actor_And_SkippedAt below).
         Assert.Null(task.CompletedAt);
         Assert.Equal(description, task.Description);
         Assert.Equal(FixedNow, task.UpdatedAt);
@@ -276,9 +278,148 @@ public class OffboardingTaskTests
             description, OffboardingTaskAssignTo.Manager, new DateOnly(2026, 7, 1), FixedNow);
 
         Assert.False(task.IsMandatory);
-        Assert.Equal(OffboardingTaskStatus.Skipped, task.Status);
+        Assert.Equal(OffboardingTaskStatus.Waived, task.Status);
         Assert.Equal(description, task.SkipReason);
         Assert.Equal(Guid.Empty, task.SkippedByUserId); // OffboardingSystemActor.Id
         Assert.Equal(FixedNow, task.SkippedAt);
+    }
+
+    // ---- SPEC-OFF-01: Waive ----
+
+    [Fact]
+    public void Waive_Sets_Status_SkipReason_Actor_And_SkippedAt()
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+        var later = FixedNow.AddDays(1);
+        var actorUserId = Guid.NewGuid();
+
+        task.Waive(later, "Not required for this departure.", actorUserId);
+
+        Assert.Equal(OffboardingTaskStatus.Waived, task.Status);
+        Assert.Equal("Not required for this departure.", task.SkipReason);
+        Assert.Equal(actorUserId, task.SkippedByUserId);
+        Assert.Equal(later, task.SkippedAt);
+        Assert.Null(task.CompletedAt);
+        Assert.Equal(later, task.UpdatedAt);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Waive_Throws_ArgumentException_When_Reason_Is_Null_Empty_Or_Whitespace(string? reason)
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+
+        var ex = Assert.Throws<ArgumentException>(() => task.Waive(FixedNow.AddDays(1), reason!, Guid.NewGuid()));
+        Assert.Equal("reason", ex.ParamName);
+
+        Assert.Equal(OffboardingTaskStatus.Pending, task.Status);
+        Assert.Null(task.SkipReason);
+        Assert.Null(task.SkippedByUserId);
+        Assert.Null(task.SkippedAt);
+        Assert.Equal(FixedNow, task.UpdatedAt);
+    }
+
+    [Theory]
+    [InlineData((int)OffboardingTaskStatus.Completed)]
+    [InlineData((int)OffboardingTaskStatus.Waived)]
+    [InlineData((int)OffboardingTaskStatus.Cancelled)]
+    public void Waive_Throws_InvalidOperationException_When_Already_Terminal(int terminalStatusValue)
+    {
+        var terminalStatus = (OffboardingTaskStatus)terminalStatusValue;
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+        MoveToStatus(task, terminalStatus, FixedNow.AddDays(1));
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => task.Waive(FixedNow.AddDays(2), "Some reason.", Guid.NewGuid()));
+
+        Assert.Equal($"Cannot waive an offboarding task with status '{terminalStatus}'.", ex.Message);
+    }
+
+    // Pending/InProgress are the only non-terminal statuses a task can be waived from — this pins
+    // the negated branch of the guard (i.e. it must NOT throw) for both of them, rather than only
+    // exercising the "not yet started" (Pending) branch implicitly covered by the other Waive tests.
+    [Fact]
+    public void Waive_Succeeds_From_Pending_Status()
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+
+        var exception = Record.Exception(() => task.Waive(FixedNow.AddDays(1), "Not required.", Guid.NewGuid()));
+
+        Assert.Null(exception);
+        Assert.Equal(OffboardingTaskStatus.Waived, task.Status);
+    }
+
+    // ---- SPEC-OFF-01: CancelBecauseLeavingProcessCancelled ----
+
+    [Fact]
+    public void CancelBecauseLeavingProcessCancelled_Sets_Status_Cancelled_With_Fixed_Reason_And_Actor()
+    {
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+        var later = FixedNow.AddDays(1);
+        var actorUserId = Guid.NewGuid();
+
+        task.CancelBecauseLeavingProcessCancelled(later, actorUserId);
+
+        Assert.Equal(OffboardingTaskStatus.Cancelled, task.Status);
+        Assert.Equal("Leaving process cancelled.", task.SkipReason);
+        Assert.Equal(actorUserId, task.SkippedByUserId);
+        Assert.Equal(later, task.SkippedAt);
+        Assert.Equal(later, task.UpdatedAt);
+    }
+
+    [Theory]
+    [InlineData((int)OffboardingTaskStatus.Completed)]
+    [InlineData((int)OffboardingTaskStatus.Waived)]
+    [InlineData((int)OffboardingTaskStatus.Cancelled)]
+    public void CancelBecauseLeavingProcessCancelled_Is_NoOp_When_Already_Terminal(int terminalStatusValue)
+    {
+        var terminalStatus = (OffboardingTaskStatus)terminalStatusValue;
+        var task = OffboardingTask.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Return laptop", null,
+            OffboardingTaskAssignTo.Employee, null, FixedNow);
+        var terminalAt = FixedNow.AddDays(1);
+        MoveToStatus(task, terminalStatus, terminalAt);
+        var originalSkipReason = task.SkipReason;
+        var originalSkippedByUserId = task.SkippedByUserId;
+
+        var exception = Record.Exception(
+            () => task.CancelBecauseLeavingProcessCancelled(FixedNow.AddDays(5), Guid.NewGuid()));
+
+        Assert.Null(exception);
+        Assert.Equal(terminalStatus, task.Status);
+        Assert.Equal(originalSkipReason, task.SkipReason);
+        Assert.Equal(originalSkippedByUserId, task.SkippedByUserId);
+        // No-op must not bump UpdatedAt past when the task actually reached its terminal state.
+        Assert.Equal(terminalAt, task.UpdatedAt);
+    }
+
+    private static void MoveToStatus(OffboardingTask task, OffboardingTaskStatus status, DateTimeOffset at)
+    {
+        switch (status)
+        {
+            case OffboardingTaskStatus.Completed:
+                task.Complete(at);
+                break;
+            case OffboardingTaskStatus.Waived:
+                task.Waive(at, "Not required.", Guid.NewGuid());
+                break;
+            case OffboardingTaskStatus.Cancelled:
+                task.CancelBecauseLeavingProcessCancelled(at, Guid.NewGuid());
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(status));
+        }
     }
 }

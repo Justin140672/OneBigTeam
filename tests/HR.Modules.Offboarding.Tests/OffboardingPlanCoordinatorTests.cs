@@ -88,7 +88,7 @@ public class OffboardingPlanCoordinatorTests
         await coordinator.CancelOutstandingTasksAsync(companyId, employeeId, CancellationToken.None);
 
         var savedPendingTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == pendingTask.Id);
-        Assert.Equal(OffboardingTaskStatus.Skipped, savedPendingTask.Status);
+        Assert.Equal(OffboardingTaskStatus.Cancelled, savedPendingTask.Status);
 
         var savedCompletedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == completedTask.Id);
         Assert.Equal(OffboardingTaskStatus.Completed, savedCompletedTask.Status);
@@ -319,9 +319,8 @@ public class OffboardingPlanCoordinatorTests
         await coordinator.CancelOutstandingTasksAsync(companyId, employeeId, CancellationToken.None);
 
         var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == pendingTask.Id);
-        Assert.Equal(OffboardingTaskStatus.Skipped, savedTask.Status);
-        Assert.Equal(
-            "Skipped automatically — employee's leaving process was withdrawn.", savedTask.SkipReason);
+        Assert.Equal(OffboardingTaskStatus.Cancelled, savedTask.Status);
+        Assert.Equal("Leaving process cancelled.", savedTask.SkipReason);
         Assert.Equal(Guid.Empty, savedTask.SkippedByUserId); // OffboardingSystemActor.Id
         Assert.Equal(Now, savedTask.SkippedAt);
     }

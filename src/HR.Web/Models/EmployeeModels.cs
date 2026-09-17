@@ -435,7 +435,9 @@ public sealed record StartLeavingProcessRequest(
     DateOnly LeavingDate,
     DateOnly LastWorkingDay,
     string LeavingReason,
-    bool ConfirmBackdatedLeavingDate = false);
+    bool ConfirmBackdatedLeavingDate = false,
+    // Mandatory when LeavingReason is "Other"; optional explanatory notes otherwise.
+    string? Notes = null);
 
 public sealed record StartLeavingProcessResponse(
     Guid Id,
@@ -449,7 +451,8 @@ public sealed record StartLeavingProcessResponse(
     string NoticeSource,
     string LeavingReason,
     string Status,
-    DateTimeOffset StartedAt);
+    DateTimeOffset StartedAt,
+    string? Notes = null);
 
 public sealed record LeavingProcessResponse(
     Guid Id,
@@ -462,7 +465,20 @@ public sealed record LeavingProcessResponse(
     string LeavingReason,
     string Status,
     // Ticket 2: optimistic-concurrency token.
-    int Version = 0);
+    int Version = 0,
+    DateTimeOffset StartedAt = default,
+    string? CancellationReason = null,
+    string? Notes = null);
+
+// Section 7 of the leaving/offboarding workspace: distinguishes "no leaving process has ever been
+// started" (NotFound) from "we couldn't load it" (Failed) so the UI never shows an empty state when
+// retrieval actually failed. Exactly one of NotFound/Failed/(Process != null) is true.
+public sealed record LeavingProcessLookupResult(LeavingProcessResponse? Process, bool NotFound, bool Failed)
+{
+    public static LeavingProcessLookupResult SuccessResult(LeavingProcessResponse? process) => new(process, false, false);
+    public static LeavingProcessLookupResult NotFoundResult() => new(null, true, false);
+    public static LeavingProcessLookupResult FailedResult() => new(null, false, true);
+}
 
 public sealed record AmendLeavingProcessRequest(
     Guid CompanyId,
@@ -472,7 +488,9 @@ public sealed record AmendLeavingProcessRequest(
     string LeavingReason,
     bool ConfirmBackdatedLeavingDate = false,
     // Ticket 2: optimistic-concurrency token loaded before editing.
-    int? ExpectedVersion = null);
+    int? ExpectedVersion = null,
+    // Mandatory when LeavingReason is "Other"; optional explanatory notes otherwise.
+    string? Notes = null);
 
 public sealed record AmendLeavingProcessResponse(
     Guid Id,
@@ -488,7 +506,8 @@ public sealed record AmendLeavingProcessResponse(
     string Status,
     bool OffboardingAlreadyStarted,
     // Ticket 2: optimistic-concurrency token after the update.
-    int Version = 0);
+    int Version = 0,
+    string? Notes = null);
 
 public sealed record CancelLeavingProcessRequest(
     Guid CompanyId,

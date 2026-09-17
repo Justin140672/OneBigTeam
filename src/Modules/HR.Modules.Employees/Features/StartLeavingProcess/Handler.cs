@@ -127,7 +127,8 @@ internal sealed class StartLeavingProcessHandler(
             request.LeavingReason,
             actorEmployeeId,
             now,
-            request.ReplacementManagerEmployeeId);
+            request.ReplacementManagerEmployeeId,
+            request.Notes);
 
         dbContext.EmployeeLeavingProcesses.Add(leavingProcess);
 
@@ -148,6 +149,7 @@ internal sealed class StartLeavingProcessHandler(
             leavingProcess.NoticePeriodLength,
             leavingProcess.NoticeSource.ToString(),
             leavingProcess.LeavingReason.ToString(),
+            leavingProcess.Notes,
             leavingProcess.Status.ToString(),
             leavingProcess.StartedAt);
 

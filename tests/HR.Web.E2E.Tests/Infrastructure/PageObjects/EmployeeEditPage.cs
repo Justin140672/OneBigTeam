@@ -35,13 +35,33 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         ["Documents"] = "Tasks & Records",
         ["Acknowledgement History"] = "Tasks & Records",
         ["Onboarding"] = "Tasks & Records",
+        // SPEC-OFF-01: "Offboarding" is no longer a distinct tab in the strip — it was merged into
+        // the single "Leaving & Offboarding" workspace (see EmployeeProfileNavigation.All). Kept as
+        // an alias here (both resolve to the same group/tab) purely so any test still passing the
+        // old "Offboarding" section name to NavigateToSectionAsync/IsSectionTabPresentAsync keeps
+        // compiling and resolving to the right tab, rather than throwing ArgumentException.
         ["Offboarding"] = "Tasks & Records",
         ["Leaving"] = "Tasks & Records",
+        ["Leaving & Offboarding"] = "Tasks & Records",
         ["Assets"] = "Assets",
         ["Timeline"] = "Activity",
         ["Notes"] = "Activity",
         ["Audit"] = "Activity",
     };
+
+    // SPEC-OFF-01: the tab strip's actual accessible name for the merged workspace is
+    // "Leaving & Offboarding" (see EmployeeProfileNavigation.All), not "Leaving" or "Offboarding" —
+    // those two are kept as valid *input* keys above purely for backwards compatibility with
+    // existing test call sites, but any GetByRole(Name=...) lookup needs the real rendered label.
+    // Everything else's display name is just its own section name.
+    private static readonly IReadOnlyDictionary<string, string> SectionDisplayNames = new Dictionary<string, string>
+    {
+        ["Leaving"] = "Leaving & Offboarding",
+        ["Offboarding"] = "Leaving & Offboarding",
+    };
+
+    private static string DisplayNameOf(string sectionName) =>
+        SectionDisplayNames.TryGetValue(sectionName, out var display) ? display : sectionName;
 
     /// <summary>
     /// Opens a profile section by first selecting its owning group tab, then the section tab.
@@ -64,7 +84,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             return;
 
         var sectionTab = page.Locator(".employee-profile-sections > .e-tab-header")
-            .GetByRole(AriaRole.Tab, new() { Name = sectionName, Exact = true });
+            .GetByRole(AriaRole.Tab, new() { Name = DisplayNameOf(sectionName), Exact = true });
         await sectionTab.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
         await sectionTab.ClickAsync();
     }
@@ -90,7 +110,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     /// </summary>
     public static ILocator SectionTab(IPage page, string sectionName) =>
         page.Locator(".employee-profile-sections > .e-tab-header")
-            .GetByRole(AriaRole.Tab, new() { Name = sectionName, Exact = true });
+            .GetByRole(AriaRole.Tab, new() { Name = DisplayNameOf(sectionName), Exact = true });
 
     /// <summary>
     /// True when a section tab is present in its group's strip. Selects the owning group first,

@@ -122,7 +122,7 @@ internal sealed class OffboardingTask
         var task = Create(
             id, companyId, offboardingPlanId, title, description, assignTo, dueDate, now,
             isMandatory: false);
-        task.Skip(now, description, OffboardingSystemActor.Id);
+        task.Waive(now, description, OffboardingSystemActor.Id);
         return task;
     }
 
@@ -153,6 +153,43 @@ internal sealed class OffboardingTask
 
         Status = OffboardingTaskStatus.Skipped;
         SkipReason = reason;
+        SkippedByUserId = actorUserId;
+        SkippedAt = now;
+        UpdatedAt = now;
+    }
+
+    // Spec SPEC-OFF-01: an authorised HR user has decided this obligation is not required. Distinct
+    // from Skip (legacy/generic) and Cancel (parent leaving process cancelled) — a mandatory reason
+    // and actor are always required. Counts as "resolved" for progress purposes but must never be
+    // reported as Completed. Terminal — only Pending/InProgress tasks may be waived.
+    public void Waive(DateTimeOffset now, string reason, Guid actorUserId)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("A reason is required to waive an offboarding task.", nameof(reason));
+
+        if (Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Waived
+            or OffboardingTaskStatus.Cancelled)
+            throw new InvalidOperationException($"Cannot waive an offboarding task with status '{Status}'.");
+
+        Status = OffboardingTaskStatus.Waived;
+        SkipReason = reason;
+        SkippedByUserId = actorUserId;
+        SkippedAt = now;
+        UpdatedAt = now;
+    }
+
+    // Spec SPEC-OFF-01: the parent leaving process was cancelled, so every pending/in-progress
+    // obligation is cancelled with it. Never treated as completion, never blocks a (now-cancelled)
+    // plan, and is reported distinctly from Waived so HR can tell "not required" apart from
+    // "the whole departure was called off".
+    public void CancelBecauseLeavingProcessCancelled(DateTimeOffset now, Guid actorUserId)
+    {
+        if (Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Waived
+            or OffboardingTaskStatus.Cancelled)
+            return;
+
+        Status = OffboardingTaskStatus.Cancelled;
+        SkipReason = "Leaving process cancelled.";
         SkippedByUserId = actorUserId;
         SkippedAt = now;
         UpdatedAt = now;

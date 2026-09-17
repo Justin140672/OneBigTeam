@@ -113,8 +113,14 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
 
         Assert.Equal("5. Confirm", await dialog.GetActiveStepLabelAsync());
 
+        // SPEC-OFF-01: the confirmation step's wording is now tailored per leaving reason (see
+        // StartLeavingProcessDialog.ReasonConfirmationWording) rather than one generic
+        // "Starting offboarding..." sentence, but every reason still shares the same explanation
+        // that confirming automatically creates the checklist with no separate "start offboarding"
+        // step — assert on that shared, reason-independent portion.
         var dialogText = await _page.GetByRole(Microsoft.Playwright.AriaRole.Dialog, new() { Name = "Start Leaving Process" }).TextContentAsync();
-        Assert.Contains("Starting offboarding will begin this employee's leaving process", dialogText);
+        Assert.Contains("This employee has resigned", dialogText);
+        Assert.Contains("no separate \"start offboarding\" step", dialogText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("offboarding checklist", dialogText, StringComparison.OrdinalIgnoreCase);
     }
 

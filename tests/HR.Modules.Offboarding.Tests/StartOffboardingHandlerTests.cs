@@ -589,7 +589,7 @@ public class StartOffboardingHandlerTests
 
         var revokeAccessTask = await dbContext.OffboardingTasks.SingleAsync(
             t => t.Title.Contains("Revoke system access"));
-        Assert.Equal(OffboardingTaskStatus.Skipped, revokeAccessTask.Status);
+        Assert.Equal(OffboardingTaskStatus.Waived, revokeAccessTask.Status);
 
         var documentTask = await dbContext.OffboardingTasks.SingleAsync(
             t => t.Title == "Review outstanding documents for employee exit");

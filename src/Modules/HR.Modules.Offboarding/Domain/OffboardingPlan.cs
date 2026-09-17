@@ -61,8 +61,10 @@ internal sealed class OffboardingPlan
             return false;
 
         return tasks.All(t => t.IsMandatory
-            ? t.Status == OffboardingTaskStatus.Completed
-            : t.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped);
+            ? t.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Waived
+                or OffboardingTaskStatus.Cancelled
+            : t.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped
+                or OffboardingTaskStatus.Waived or OffboardingTaskStatus.Cancelled);
     }
 
     public static OffboardingPlan Create(

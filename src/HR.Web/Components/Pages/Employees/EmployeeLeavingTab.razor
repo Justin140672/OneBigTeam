@@ -1,71 +1,137 @@
+@* SPEC-OFF-01: unified "Leaving & Offboarding" workspace for the employee profile. Merges what
+   used to be two separate tabs (Leaving details + Offboarding checklist) into one continuous
+   workspace under a single EmployeeProfileSection.Leaving tab entry — see EmployeeProfileNavigation
+   and EmployeeEdit.razor. The checklist section itself is still rendered by
+   EmployeeOffboardingTab.razor, now used purely as an embedded sub-component (not its own tab). *@
 @using HR.Web.Models
 @using HR.Infrastructure.Abstractions
 @using Microsoft.AspNetCore.WebUtilities
 @inject EmployeeService EmployeeService
+@inject OffboardingService OffboardingService
+@inject AppSession Session
 @inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
 
 @if (_loading)
 {
     <HrLoadingIndicator />
-}
-else if (_leavingProcess is null)
-{
-    <HrEmptyState Message="No leaving process found for this employee." Icon="fa-solid fa-door-open" />
 }
 else
 {
     @if (_showOffboardingAlreadyStartedWarning)
     {
         <div class="alert alert-warning">
-            Offboarding has already started for this employee — review the Offboarding tab for outstanding tasks.
+            Offboarding has already started for this employee — review the checklist below for outstanding obligations.
         </div>
     }
 
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Leaving Details</h5>
-            <div class="d-flex align-items-center gap-2">
-                @if (_leavingProcess.Status == "InProgress")
+    @if (_leavingLookup!.Failed)
+    {
+        <div class="alert alert-danger d-flex justify-content-between align-items-center">
+            <span>We couldn't load the leaving process for this employee.</span>
+            <SfButton CssClass="e-outline e-small" OnClick="ReloadAsync">Retry</SfButton>
+        </div>
+    }
+    else if (_leavingLookup.NotFound || _leavingLookup.Process is null)
+    {
+        <HrEmptyState Message="No leaving process has been started for this employee." Icon="fa-solid fa-door-open" />
+    }
+    else
+    {
+        var process = _leavingLookup.Process;
+        var isInProgress = process.Status == "InProgress";
+        var isHistorical = process.Status is "Completed" or "Cancelled";
+
+        <div class="card mb-4" id="leaving-details-section">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0">Leaving Details</h5>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    @if (isInProgress)
+                    {
+                        <SfButton CssClass="e-outline e-small" OnClick="@(() => OnAmendRequested.InvokeAsync())">Amend</SfButton>
+                        <SfButton CssClass="e-outline e-danger e-small" OnClick="@(() => OnCancelRequested.InvokeAsync())">Cancel Leaving Process</SfButton>
+                    }
+                    <span class="badge fs-6 px-3 py-2 @StatusBadgeClass(EmploymentStatus)">@EmploymentStatusLabel(EmploymentStatus)</span>
+                    <span class="badge fs-6 px-3 py-2 @LeavingStatusBadgeClass(process.Status)">@LeavingStatusLabel(process.Status)</span>
+                    <span class="badge fs-6 px-3 py-2 @OffboardingStatusBadgeClass()">@OffboardingStatusLabel()</span>
+                </div>
+            </div>
+            <div class="card-body">
+                @if (isHistorical)
                 {
-                    <SfButton CssClass="e-outline e-small" OnClick="@(() => OnAmendRequested.InvokeAsync())">Amend</SfButton>
-                    <SfButton CssClass="e-outline e-danger e-small" OnClick="@(() => OnCancelRequested.InvokeAsync())">Cancel Leaving Process</SfButton>
+                    <div class="alert alert-secondary py-2 mb-3">
+                        Historical — this is this employee's latest leaving attempt and is not currently
+                        active. <!-- TODO(SPEC-OFF-01): there is no endpoint yet to list earlier leaving-process
+                        attempts for this employee; add a "past attempts" view once one exists. -->
+                    </div>
                 }
-                <span class="badge fs-6 px-3 py-2 @StatusBadgeClass(_leavingProcess.Status)">@StatusLabel(_leavingProcess.Status)</span>
+                <p class="text-muted small">
+                    Employment ends on the Leaving Date below even if offboarding is not yet complete —
+                    the leaving date, not the checklist, controls when employment is finalised.
+                </p>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Resignation Received Date</dt>
+                    <dd class="col-sm-8">@process.ResignationReceivedDate.ToString("dd MMM yyyy")</dd>
+                    <dt class="col-sm-4 text-muted fw-normal">Leaving Date</dt>
+                    <dd class="col-sm-8">@process.LeavingDate.ToString("dd MMM yyyy")</dd>
+                    <dt class="col-sm-4 text-muted fw-normal">Last Working Day</dt>
+                    <dd class="col-sm-8">@process.LastWorkingDay.ToString("dd MMM yyyy")</dd>
+                    <dt class="col-sm-4 text-muted fw-normal">Notice Period</dt>
+                    <dd class="col-sm-8">@process.NoticePeriodLength @NoticePeriodUnitLabel(process.NoticePeriodUnit)</dd>
+                    <dt class="col-sm-4 text-muted fw-normal">Notice Source</dt>
+                    <dd class="col-sm-8">@NoticePeriodSourceLabel(process.NoticeSource)</dd>
+                    <dt class="col-sm-4 text-muted fw-normal">Leaving Reason</dt>
+                    <dd class="col-sm-8">@LeavingReasonLabel(process.LeavingReason)</dd>
+                    @if (!string.IsNullOrWhiteSpace(process.Notes))
+                    {
+                        <dt class="col-sm-4 text-muted fw-normal">Notes</dt>
+                        <dd class="col-sm-8">@process.Notes</dd>
+                    }
+                    @if (process.Status == "Cancelled" && !string.IsNullOrWhiteSpace(process.CancellationReason))
+                    {
+                        <dt class="col-sm-4 text-muted fw-normal">Cancellation Reason</dt>
+                        <dd class="col-sm-8">@process.CancellationReason</dd>
+                    }
+                </dl>
             </div>
         </div>
-        <div class="card-body">
-            <dl class="row mb-0">
-                <dt class="col-sm-4 text-muted fw-normal">Resignation Received Date</dt>
-                <dd class="col-sm-8">@_leavingProcess.ResignationReceivedDate.ToString("dd MMM yyyy")</dd>
-                <dt class="col-sm-4 text-muted fw-normal">Leaving Date</dt>
-                <dd class="col-sm-8">@_leavingProcess.LeavingDate.ToString("dd MMM yyyy")</dd>
-                <dt class="col-sm-4 text-muted fw-normal">Last Working Day</dt>
-                <dd class="col-sm-8">@_leavingProcess.LastWorkingDay.ToString("dd MMM yyyy")</dd>
-                <dt class="col-sm-4 text-muted fw-normal">Notice Period</dt>
-                <dd class="col-sm-8">@_leavingProcess.NoticePeriodLength @NoticePeriodUnitLabel(_leavingProcess.NoticePeriodUnit)</dd>
-                <dt class="col-sm-4 text-muted fw-normal">Notice Source</dt>
-                <dd class="col-sm-8">@NoticePeriodSourceLabel(_leavingProcess.NoticeSource)</dd>
-                <dt class="col-sm-4 text-muted fw-normal">Leaving Reason</dt>
-                <dd class="col-sm-8">@LeavingReasonLabel(_leavingProcess.LeavingReason)</dd>
-            </dl>
+
+        <div id="leaving-checklist-section">
+            <EmployeeOffboardingTab CompanyId="CompanyId"
+                                     EmployeeId="EmployeeId"
+                                     Overview="_offboardingLookup?.Overview"
+                                     Failed="_offboardingLookup?.Failed ?? false"
+                                     Loading="false"
+                                     CanWaive="Session.IsHrAdministrator"
+                                     LeavingInProgress="isInProgress"
+                                     OnRetry="ReloadOffboardingAsync"
+                                     OnRefreshRequested="ReloadOffboardingAsync" />
         </div>
-    </div>
+    }
 }
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    // Employee.Status from GetEmployeeResponse — e.g. "Leaving" / "FormerEmployee" / etc. Used only
+    // for the workspace header badge; the authoritative employment-state transition logic lives
+    // server-side (EmployeeLeavingProcess/finalisation).
+    [Parameter] public string? EmploymentStatus { get; set; }
+    // True when the incoming "?tab=" was literally "offboarding" (an old bookmark) — scrolls/focuses
+    // the checklist section instead of the leaving-details header once loaded.
+    [Parameter] public bool FocusChecklist { get; set; }
     [Parameter] public EventCallback OnAmendRequested { get; set; }
     [Parameter] public EventCallback OnCancelRequested { get; set; }
 
     private bool _loading = true;
-    private LeavingProcessResponse? _leavingProcess;
+    private LeavingProcessLookupResult? _leavingLookup;
+    private OffboardingOverviewLookupResult? _offboardingLookup;
     private bool _showOffboardingAlreadyStartedWarning;
+    private bool _hasFocusedChecklist;
 
     protected override async Task OnParametersSetAsync()
     {
-        _loading = true;
-        _leavingProcess = await EmployeeService.GetLeavingProcessAsync(CompanyId, EmployeeId);
+        _loading = _leavingLookup is null;
 
         // EmployeeEdit's OnLeavingProcessAmended appends this flag to the forceLoad navigation it
         // does after a successful Amend, since AmendLeavingProcessResponse.OffboardingAlreadyStarted
@@ -75,7 +141,88 @@ else
         _showOffboardingAlreadyStartedWarning =
             query.TryGetValue("offboardingAlreadyStarted", out var flag) && flag == "true";
 
+        await LoadAsync();
         _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        var leavingTask = EmployeeService.GetLeavingProcessAsync(CompanyId, EmployeeId);
+        var offboardingTask = OffboardingService.GetOverviewAsync(CompanyId, EmployeeId);
+        await Task.WhenAll(leavingTask, offboardingTask);
+        _leavingLookup = leavingTask.Result;
+        _offboardingLookup = offboardingTask.Result;
+    }
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        await LoadAsync();
+        _loading = false;
+    }
+
+    private async Task ReloadOffboardingAsync()
+    {
+        _offboardingLookup = await OffboardingService.GetOverviewAsync(CompanyId, EmployeeId);
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_hasFocusedChecklist && FocusChecklist && !_loading && _leavingLookup?.Process is not null)
+        {
+            _hasFocusedChecklist = true;
+            await JsRuntime.InvokeVoidAsync("eval",
+                "document.getElementById('leaving-checklist-section')?.scrollIntoView({behavior:'smooth', block:'start'})");
+        }
+    }
+
+    private static string EmploymentStatusLabel(string? status) => status switch
+    {
+        "Leaving" => "Leaving",
+        "FormerEmployee" => "Former Employee",
+        _ => status ?? "—"
+    };
+
+    private static string StatusBadgeClass(string? status) => status switch
+    {
+        "Leaving" => "bg-warning text-dark",
+        "FormerEmployee" => "bg-dark",
+        _ => "bg-secondary"
+    };
+
+    // SPEC-OFF-01 §Offboarding-plan state / Finalisation: distinguishes "leaving started but the
+    // offboarding plan hasn't been created/started yet" from a genuine in-progress/completed plan.
+    private string OffboardingStatusLabel()
+    {
+        var overview = _offboardingLookup?.Overview;
+        if (_offboardingLookup?.Failed == true) return "Unknown";
+        if (overview is null || !overview.HasPlan) return "Setup Incomplete";
+        if (overview.IsOverdueAfterDeparture) return "Overdue After Departure";
+        return overview.PlanStatus switch
+        {
+            "InProgress" => "In Progress",
+            "Completed" => "Completed",
+            "Cancelled" => "Cancelled",
+            "NotStarted" => "Setup Incomplete",
+            _ => overview.PlanStatus ?? "Setup Incomplete"
+        };
+    }
+
+    private string OffboardingStatusBadgeClass()
+    {
+        var overview = _offboardingLookup?.Overview;
+        if (_offboardingLookup?.Failed == true) return "bg-secondary";
+        if (overview is null || !overview.HasPlan) return "bg-secondary";
+        if (overview.IsOverdueAfterDeparture) return "bg-danger";
+        return overview.PlanStatus switch
+        {
+            "InProgress" => "bg-primary",
+            "Completed" => "bg-success",
+            "Cancelled" => "bg-danger",
+            _ => "bg-secondary"
+        };
     }
 
     // Same convention as EmployeeEmploymentTab.NoticePeriodSourceLabel.
@@ -101,7 +248,7 @@ else
         _                  => reason
     };
 
-    private static string StatusLabel(string status) => status switch
+    private static string LeavingStatusLabel(string status) => status switch
     {
         "InProgress" => "In Progress",
         "Cancelled"  => "Cancelled",
@@ -109,7 +256,7 @@ else
         _            => status
     };
 
-    private static string StatusBadgeClass(string status) => status switch
+    private static string LeavingStatusBadgeClass(string status) => status switch
     {
         "InProgress" => "bg-warning text-dark",
         "Cancelled"  => "bg-danger",

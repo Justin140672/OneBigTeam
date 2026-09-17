@@ -142,7 +142,68 @@ public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) :
         // plan — it only lands there once the plan (and therefore the tab) already exists, which
         // is now the case here.
         await empEdit.GoToAsync(AcmeId, employeeId, "tab=offboarding");
-        Assert.Equal("Offboarding", await employee.GetActiveTabNameAsync());
+        Assert.Equal("Leaving & Offboarding", await employee.GetActiveTabNameAsync());
+    }
+
+    /// <summary>
+    /// Definition-of-done item 5: an HR administrator can waive a mandatory in-progress checklist
+    /// obligation with a required reason, and the checklist then shows it as "Waived" (not
+    /// "Completed"), with the reason visible underneath the row.
+    /// </summary>
+    [Fact]
+    public async Task WaiveObligation_WithRequiredReason_ShowsWaivedStatus_AndReasonVisible()
+    {
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList     = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit     = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var startDialog = new StartLeavingProcessDialog(_page);
+        var offboarding = new EmployeeOffboardingTab(_page);
+        var waiveDialog = new WaiveOffboardingTaskDialog(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await CreateEmployeeAsync(empList, empEdit, slot: 3);
+
+        await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
+
+        await offboarding.OpenAsync();
+
+        // Fixed mandatory HR task from StartOffboardingHandler.CreateDocumentReviewTaskAsync — a
+        // stable, un-interpolated title, so it can be matched exactly and is always Pending/InProgress
+        // for a freshly-started plan (never pre-completed), giving the "Waive" action reliably.
+        const string task = "Review outstanding documents for employee exit";
+
+        Assert.True(await offboarding.HasWaiveButtonAsync(task),
+            "Expected a 'Waive' action on the mandatory, still-outstanding checklist obligation");
+
+        await offboarding.ClickWaiveAsync(task);
+        Assert.True(await waiveDialog.IsVisibleAsync());
+
+        // Deliberately submit without a reason first — Reason is required.
+        await waiveDialog.ConfirmAsync();
+        Assert.True(await waiveDialog.IsVisibleAsync(),
+            "Expected the Waive Obligation dialog to stay open when Reason is blank");
+        var missingReasonError = await waiveDialog.GetErrorAsync();
+        Assert.False(string.IsNullOrWhiteSpace(missingReasonError),
+            "Expected an inline validation error requiring a waiver reason");
+        Assert.Contains("reason", missingReasonError, StringComparison.OrdinalIgnoreCase);
+
+        const string reason = "Employee has no company documents outstanding — confirmed with HR admin.";
+        await waiveDialog.FillReasonAsync(reason);
+        await waiveDialog.ConfirmAsync();
+        Assert.False(await waiveDialog.IsVisibleAsync(),
+            "Expected the Waive Obligation dialog to close after a successful waive");
+
+        var status = await offboarding.GetChecklistTaskStatusAsync(task);
+        Assert.Equal("Waived", status);
+
+        var waiveReasonText = await offboarding.GetChecklistTaskWaiveReasonAsync(task);
+        Assert.False(string.IsNullOrWhiteSpace(waiveReasonText));
+        Assert.Contains(reason, waiveReasonText);
+
+        Assert.False(await offboarding.HasWaiveButtonAsync(task),
+            "Expected no further 'Waive' action once the obligation is already Waived");
     }
 
     [Fact]

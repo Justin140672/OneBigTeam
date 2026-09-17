@@ -76,8 +76,11 @@ public static class EmployeeProfileNavigation
         new(EmployeeProfileGroup.TasksRecords, EmployeeProfileSection.Documents, "documents", "Documents"),
         new(EmployeeProfileGroup.TasksRecords, EmployeeProfileSection.Acknowledgements, "acknowledgements", "Acknowledgement History"),
         new(EmployeeProfileGroup.TasksRecords, EmployeeProfileSection.Onboarding, "onboarding", "Onboarding"),
-        new(EmployeeProfileGroup.TasksRecords, EmployeeProfileSection.Offboarding, "offboarding", "Offboarding"),
-        new(EmployeeProfileGroup.TasksRecords, EmployeeProfileSection.Leaving, "leaving", "Leaving"),
+        // SPEC-OFF-01: the old separate "Offboarding" tab was merged into the single "Leaving &
+        // Offboarding" workspace (EmployeeLeavingTab.razor) — EmployeeProfileSection.Offboarding is
+        // kept only as a deep-link/bookmark alias (see ParseTab below and GetOffboardingOverview's
+        // OnNavigateToOffboarding caller), it is no longer a distinct entry in the tab strip.
+        new(EmployeeProfileGroup.TasksRecords, EmployeeProfileSection.Leaving, "leaving", "Leaving & Offboarding"),
         new(EmployeeProfileGroup.Assets, EmployeeProfileSection.Assets, "assets", "Assets"),
         new(EmployeeProfileGroup.Activity, EmployeeProfileSection.Timeline, "timeline", "Timeline"),
         new(EmployeeProfileGroup.Activity, EmployeeProfileSection.Notes, "notes", "Notes"),
@@ -125,6 +128,9 @@ public static class EmployeeProfileNavigation
             "compensation-history" => EmployeeProfileSection.Compensation,
             "promotion" or "promotion-history" => EmployeeProfileSection.Promotions,
             "emergency" or "emergency-contact" => EmployeeProfileSection.EmergencyContacts,
+            // "offboarding" is no longer its own tab key (see All above) — old bookmarks/links using
+            // ?tab=offboarding still land on the unified Leaving & Offboarding workspace.
+            "offboarding" => EmployeeProfileSection.Leaving,
             _ => null
         };
     }

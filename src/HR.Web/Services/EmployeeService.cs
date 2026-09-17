@@ -407,16 +407,30 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to start leaving process."));
     }
 
-    public async Task<LeavingProcessResponse?> GetLeavingProcessAsync(Guid companyId, Guid employeeId)
+    // Section 7 (Loading/errors/recovery): 404 means "no leaving process has ever been started for
+    // this employee" — a legitimate empty state. Any other failure (network, 5xx, auth) must not be
+    // shown the same way, or HR could mistake a retrieval failure for "nothing to see here". Callers
+    // should branch on NotFound vs Failed rather than treating a null Process as one undifferentiated
+    // case.
+    public async Task<LeavingProcessLookupResult> GetLeavingProcessAsync(Guid companyId, Guid employeeId)
     {
         try
         {
-            return await Http.GetFromJsonAsync<LeavingProcessResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/leaving-process", HrApiJsonOptions.Default);
+            var response = await Http.GetAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/leaving-process");
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return LeavingProcessLookupResult.NotFoundResult();
+
+            if (!response.IsSuccessStatusCode)
+                return LeavingProcessLookupResult.FailedResult();
+
+            var process = await response.Content.ReadFromJsonAsync<LeavingProcessResponse>(HrApiJsonOptions.Default);
+            return LeavingProcessLookupResult.SuccessResult(process);
         }
         catch
         {
-            return null;
+            return LeavingProcessLookupResult.FailedResult();
         }
     }
 

@@ -80,6 +80,30 @@ public sealed class AmendLeavingProcessDialog(IPage page)
     public Task SelectLeavingReasonAsync(string reasonLabel) =>
         DropDownSelector.SelectAsync(page, Dialog, reasonLabel);
 
+    // ── Notes ────────────────────────────────────────────────────────────────────
+
+    /// <summary>Fills the Notes field — free-text, required only when Leaving Reason is "Other" (AmendLeavingProcessFormModel.Validate).</summary>
+    public async Task FillNotesAsync(string notes)
+    {
+        await Dialog.Locator("textarea").FillAsync(notes);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public async Task<string?> GetNotesTextAsync() => await Dialog.Locator("textarea").InputValueAsync();
+
+    // ── Backdating confirmation ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns true if the backdating-confirmation checkbox ("This leaving date is in the past...")
+    /// is visible — only rendered once the entered Leaving Date is in the past.
+    /// </summary>
+    public Task<bool> IsBackdatedConfirmationVisibleAsync() =>
+        Dialog.Locator(".e-checkbox-wrapper").Filter(new() { HasText = "This leaving date is in the past" }).IsVisibleAsync();
+
+    /// <summary>Checks the backdating-confirmation checkbox.</summary>
+    public Task CheckBackdatedConfirmationAsync() =>
+        Dialog.Locator(".e-checkbox-wrapper").Filter(new() { HasText = "This leaving date is in the past" }).ClickAsync();
+
     // ── Actions ──────────────────────────────────────────────────────────────────
 
     /// <summary>

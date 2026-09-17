@@ -66,7 +66,8 @@ internal sealed class MarkOffboardingIncompleteOnDepartureFinalisedHandler(
                 plan.CompanyId,
                 plan.Id,
                 plan.EmployeeId,
-                tasks.Count(t => t.IsMandatory && t.Status != OffboardingTaskStatus.Completed),
+                tasks.Count(t => t.IsMandatory && t.Status is not (OffboardingTaskStatus.Completed
+                    or OffboardingTaskStatus.Waived or OffboardingTaskStatus.Cancelled)),
                 now),
             cancellationToken);
 

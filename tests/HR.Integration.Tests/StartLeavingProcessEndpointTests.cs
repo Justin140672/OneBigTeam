@@ -479,6 +479,65 @@ public class StartLeavingProcessEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    // Spec SPEC-OFF-01: Notes required when LeavingReason is Other.
+    [Fact]
+    public async Task Post_LeavingProcess_Returns_UnprocessableEntity_When_LeavingReason_Is_Other_And_Notes_Missing()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var user = new Guid("ffffffff-1000-0000-0000-00000000000d");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, user.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, user, SystemRoles.HrAdministrator, companyId);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
+            new
+            {
+                companyId,
+                employeeId,
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LastWorkingDayString,
+                leavingReason = "Other"
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_LeavingProcess_Succeeds_When_LeavingReason_Is_Other_And_Notes_Provided()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var user = new Guid("ffffffff-1000-0000-0000-00000000000e");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, user.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, user, SystemRoles.HrAdministrator, companyId);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
+            new
+            {
+                companyId,
+                employeeId,
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LastWorkingDayString,
+                leavingReason = "Other",
+                notes = "Employee is emigrating."
+            });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<LeavingProcessPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("Other", payload!.LeavingReason);
+    }
+
     private sealed record IdPayload(Guid Id);
 
     private sealed record ErrorPayload(string Error);

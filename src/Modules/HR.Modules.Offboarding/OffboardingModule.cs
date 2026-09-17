@@ -9,6 +9,7 @@ using HR.Modules.Offboarding.Features.GetOffboardingStatus;
 using HR.Modules.Offboarding.Features.MarkOffboardingIncompleteOnDepartureFinalised;
 using HR.Modules.Offboarding.Features.RescheduleOffboardingOnLeavingDateChanged;
 using HR.Modules.Offboarding.Features.StartOffboarding;
+using HR.Modules.Offboarding.Features.WaiveOffboardingTask;
 using HR.Modules.Offboarding.Jobs;
 using HR.Modules.Offboarding.Persistence;
 using HR.Modules.Offboarding.Services;
@@ -38,6 +39,8 @@ public static class OffboardingModule
         services.AddScoped<IOffboardingPlanCoordinator, OffboardingPlanCoordinator>();
         services.AddScoped<IOffboardingHistoryReplayer, OffboardingHistoryReplayer>();
         services.AddScoped<IValidator<StartOffboardingRequest>, StartOffboardingValidator>();
+        services.AddScoped<WaiveOffboardingTaskHandler>();
+        services.AddScoped<IValidator<WaiveOffboardingTaskRequest>, WaiveOffboardingTaskValidator>();
         services.AddScoped<OffboardingReminderJob>();
         services.AddScoped<IWorkloadActionProvider, OutstandingOffboardingTasksWorkloadActionProvider>();
 

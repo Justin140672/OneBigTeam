@@ -73,14 +73,26 @@
                         </SfDropDownList>
                         <ValidationMessage For="@(() => _model.LeavingReason)" />
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">
+                            Notes
+                            @if (_model.LeavingReason == "Other")
+                            {
+                                <span class="text-danger">*</span>
+                            }
+                        </label>
+                        <HrTextBox @bind-Value="_model.Notes" Multiline="true" Rows="3" Maxlength="1000"
+                                   Placeholder="@ReasonNotesPlaceholder(_model.LeavingReason)" />
+                        <ValidationMessage For="@(() => _model.Notes)" />
+                    </div>
                 }
                 else if (_step == 5)
                 {
                     <p class="text-muted small">
-                        Starting offboarding will begin this employee's leaving process: their status will move
-                        toward Leaving (or Former Employee immediately, if the leaving date is backdated), an
-                        offboarding checklist will become available for HR to work through, and this action can
-                        be amended or cancelled later from the Leaving tab if needed.
+                        @ReasonConfirmationWording(_model.LeavingReason)
+                        Confirming automatically creates the offboarding checklist below — there is no
+                        separate "start offboarding" step. This action can be amended or cancelled later
+                        from the Leaving &amp; Offboarding workspace if needed.
                     </p>
                     <dl class="row mb-0">
                         <dt class="col-sm-5 text-muted fw-normal">Resignation Received Date</dt>
@@ -91,6 +103,11 @@
                         <dd class="col-sm-7">@_model.LastWorkingDay?.ToString("dd MMM yyyy")</dd>
                         <dt class="col-sm-5 text-muted fw-normal">Leaving Reason</dt>
                         <dd class="col-sm-7">@EmployeeLeavingTab.LeavingReasonLabel(_model.LeavingReason ?? string.Empty)</dd>
+                        @if (!string.IsNullOrWhiteSpace(_model.Notes))
+                        {
+                            <dt class="col-sm-5 text-muted fw-normal">Notes</dt>
+                            <dd class="col-sm-7">@_model.Notes</dd>
+                        }
                     </dl>
                 }
             </EditForm>
@@ -149,11 +166,11 @@
         [1] = [nameof(StartLeavingProcessFormModel.ResignationReceivedDate)],
         [2] = [nameof(StartLeavingProcessFormModel.LeavingDate), nameof(StartLeavingProcessFormModel.ConfirmBackdatedLeavingDate)],
         [3] = [nameof(StartLeavingProcessFormModel.LastWorkingDay)],
-        [4] = [nameof(StartLeavingProcessFormModel.LeavingReason)],
+        [4] = [nameof(StartLeavingProcessFormModel.LeavingReason), nameof(StartLeavingProcessFormModel.Notes)],
     };
 
     private static readonly List<string> _stepLabels =
-        ["Resignation Date", "Leaving Date", "Last Working Day", "Reason", "Confirm"];
+        ["Resignation Date", "Leaving Date", "Last Working Day", "Reason & Notes", "Confirm"];
 
     // No clear button and no "None" item, per this codebase's convention for required dropdowns
     // (see Model.Gender in EmployeeEdit.razor) — the empty default simply shows the Placeholder
@@ -193,8 +210,28 @@
         _model.ConfirmBackdatedLeavingDate = false;
         _model.LastWorkingDay = null;
         _model.LeavingReason = null;
+        _model.Notes = null;
         _editContext = new EditContext(_model);
     }
+
+    // SPEC-OFF-01 §Leaving routes: tailored per-reason wording rather than generic
+    // resignation-flavoured copy regardless of the reason actually selected.
+    private static string ReasonConfirmationWording(string? reason) => reason switch
+    {
+        "Resignation" => "This employee has resigned. Confirming records their resignation and starts the leaving process.",
+        "Redundancy" => "This employee is being made redundant. Confirming records the redundancy and starts the leaving process.",
+        "Dismissal" => "This employee is being dismissed. Confirming records the dismissal and starts the leaving process.",
+        "Retirement" => "This employee is retiring. Confirming records their retirement and starts the leaving process.",
+        "EndOfContract" => "This employee's contract is ending. Confirming records the end of contract and starts the leaving process.",
+        "MutualAgreement" => "This departure is by mutual agreement. Confirming records the agreed departure and starts the leaving process.",
+        "Other" => "Confirming records this departure and starts the leaving process.",
+        _ => "Confirming starts this employee's leaving process."
+    };
+
+    private static string ReasonNotesPlaceholder(string? reason) =>
+        reason == "Other"
+            ? "Please explain the reason for leaving (required)."
+            : "Optional additional context.";
 
     private void OnLeavingDateChanged(DateOnly? value)
     {
@@ -277,7 +314,8 @@
             _model.LeavingDate!.Value,
             _model.LastWorkingDay!.Value,
             _model.LeavingReason!,
-            _model.ConfirmBackdatedLeavingDate);
+            _model.ConfirmBackdatedLeavingDate,
+            _model.Notes);
 
         var (result, error) = await EmployeeService.StartLeavingProcessAsync(CompanyId, EmployeeId, request);
 
@@ -318,8 +356,16 @@
         [Required(ErrorMessage = "Please select a leaving reason.")]
         public string? LeavingReason { get; set; }
 
+        [MaxLength(1000)]
+        public string? Notes { get; set; }
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
+            if (LeavingReason == "Other" && string.IsNullOrWhiteSpace(Notes))
+                yield return new ValidationResult(
+                    "Explanatory notes are required when the leaving reason is Other.",
+                    [nameof(Notes)]);
+
             if (LeavingDate is not null && ResignationReceivedDate is not null && LeavingDate < ResignationReceivedDate)
                 yield return new ValidationResult(
                     "Leaving date must be on or after the resignation received date.",

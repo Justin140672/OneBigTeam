@@ -10,7 +10,11 @@
         <EditForm EditContext="_editContext">
             <DataAnnotationsValidator />
             <p class="text-muted">
-                This will cancel the leaving process and return this employee's status to Active.
+                This will cancel the leaving process and restore this employee's prior employment
+                status. Completed or waived obligations and their evidence are preserved, not undone —
+                an asset already returned, a document already archived, or an access change already
+                performed will not automatically be reversed. HR should review the checklist afterwards
+                and manually restore anything that needs it.
             </p>
             @if (ShowOffboardingTab)
             {

@@ -53,6 +53,18 @@
                         </SfDropDownList>
                         <ValidationMessage For="@(() => _model.LeavingReason)" />
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">
+                            Notes
+                            @if (_model.LeavingReason == "Other")
+                            {
+                                <span class="text-danger">*</span>
+                            }
+                        </label>
+                        <HrTextBox @bind-Value="_model.Notes" Multiline="true" Rows="3" Maxlength="1000"
+                                   Placeholder="Optional additional context." />
+                        <ValidationMessage For="@(() => _model.Notes)" />
+                    </div>
 
                     <SaveConflictBanner Visible="_saveConflict" Disabled="@_submitting" OnReload="ReloadLatestAsync"
                                         Message="Someone else changed this leaving process while you were editing. Your changes have not been saved." />
@@ -136,13 +148,16 @@
         _model.ConfirmBackdatedLeavingDate = false;
         _model.LastWorkingDay = null;
         _model.LeavingReason = null;
+        _model.Notes = null;
 
-        var current = await EmployeeService.GetLeavingProcessAsync(CompanyId, EmployeeId);
+        var lookup = await EmployeeService.GetLeavingProcessAsync(CompanyId, EmployeeId);
+        var current = lookup.Process;
         if (current is not null)
         {
             _model.LeavingDate = current.LeavingDate;
             _model.LastWorkingDay = current.LastWorkingDay;
             _model.LeavingReason = current.LeavingReason;
+            _model.Notes = current.Notes;
             _loadedVersion = current.Version;
         }
 
@@ -188,7 +203,8 @@
             _model.LastWorkingDay!.Value,
             _model.LeavingReason!,
             _model.ConfirmBackdatedLeavingDate,
-            _loadedVersion);
+            _loadedVersion,
+            _model.Notes);
 
         var saveResult = await EmployeeService.AmendLeavingProcessAsync(CompanyId, EmployeeId, request);
 
@@ -226,8 +242,16 @@
         [Required(ErrorMessage = "Please select a leaving reason.")]
         public string? LeavingReason { get; set; }
 
+        [MaxLength(1000)]
+        public string? Notes { get; set; }
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
+            if (LeavingReason == "Other" && string.IsNullOrWhiteSpace(Notes))
+                yield return new ValidationResult(
+                    "Explanatory notes are required when the leaving reason is Other.",
+                    [nameof(Notes)]);
+
             if (LeavingDate is not null && LastWorkingDay is not null && LastWorkingDay > LeavingDate)
                 yield return new ValidationResult(
                     "Last working day must be on or before the leaving date.",

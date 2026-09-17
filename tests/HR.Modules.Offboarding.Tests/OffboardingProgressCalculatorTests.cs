@@ -30,6 +30,64 @@ public class OffboardingProgressCalculatorTests
         Assert.Equal(0, summary.ResolvedTasks);
         Assert.Equal(0, summary.ProgressPercent);
         Assert.False(summary.CanComplete);
+        // SPEC-OFF-01: the new required/total obligation counters must also be all-zero for an
+        // empty task list, not just the legacy fields above.
+        Assert.Equal(0, summary.RequiredTotal);
+        Assert.Equal(0, summary.RequiredResolved);
+        Assert.Equal(0, summary.TotalResolved);
+        Assert.Equal(0, summary.TotalCount);
+    }
+
+    // ---- SPEC-OFF-01: RequiredTotal / RequiredResolved / TotalResolved / TotalCount ----
+
+    [Fact]
+    public void Calculate_Counts_Waived_Mandatory_Task_As_Resolved_In_Required_And_Total_Counters()
+    {
+        var waivedMandatory = MandatoryTask();
+        waivedMandatory.Waive(FixedNow, "Not required for this departure.", Guid.NewGuid());
+        var pendingMandatory = MandatoryTask();
+
+        var summary = OffboardingProgressCalculator.Calculate([waivedMandatory, pendingMandatory]);
+
+        Assert.Equal(2, summary.RequiredTotal);
+        Assert.Equal(1, summary.RequiredResolved);
+        Assert.Equal(2, summary.TotalCount);
+        Assert.Equal(1, summary.TotalResolved);
+    }
+
+    [Fact]
+    public void Calculate_Excludes_Cancelled_Tasks_From_Required_And_Total_Counters()
+    {
+        var completedMandatory = MandatoryTask();
+        completedMandatory.Complete(FixedNow);
+        var cancelledMandatory = MandatoryTask();
+        cancelledMandatory.CancelBecauseLeavingProcessCancelled(FixedNow, Guid.NewGuid());
+        var cancelledOptional = OptionalTask();
+        cancelledOptional.CancelBecauseLeavingProcessCancelled(FixedNow, Guid.NewGuid());
+
+        var summary = OffboardingProgressCalculator.Calculate(
+            [completedMandatory, cancelledMandatory, cancelledOptional]);
+
+        // Only the one non-cancelled mandatory task counts towards either total.
+        Assert.Equal(1, summary.RequiredTotal);
+        Assert.Equal(1, summary.RequiredResolved);
+        Assert.Equal(1, summary.TotalCount);
+        Assert.Equal(1, summary.TotalResolved);
+    }
+
+    [Fact]
+    public void Calculate_Includes_Optional_Tasks_In_TotalCount_But_Not_RequiredTotal()
+    {
+        var mandatoryPending = MandatoryTask();
+        var optionalCompleted = OptionalTask();
+        optionalCompleted.Complete(FixedNow);
+
+        var summary = OffboardingProgressCalculator.Calculate([mandatoryPending, optionalCompleted]);
+
+        Assert.Equal(1, summary.RequiredTotal);
+        Assert.Equal(0, summary.RequiredResolved);
+        Assert.Equal(2, summary.TotalCount);
+        Assert.Equal(1, summary.TotalResolved);
     }
 
     [Fact]

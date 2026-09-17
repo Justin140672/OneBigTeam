@@ -118,6 +118,7 @@ public class CancelLeavingProcessEndpointTests
         var leavingProcessPayload = await getLeavingProcessResponse.Content.ReadFromJsonAsync<GetLeavingProcessPayload>();
         Assert.NotNull(leavingProcessPayload);
         Assert.Equal("Cancelled", leavingProcessPayload!.Status);
+        Assert.Equal("Employee retracted resignation.", leavingProcessPayload.CancellationReason);
 
         var employeeResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}");
         employeeResponse.EnsureSuccessStatusCode();
@@ -237,7 +238,9 @@ public class CancelLeavingProcessEndpointTests
         int NoticePeriodLength,
         string NoticeSource,
         string LeavingReason,
-        string Status);
+        string Status,
+        DateTimeOffset StartedAt,
+        string? CancellationReason);
 
     private sealed record EmployeeStatusPayload(string Status);
 }

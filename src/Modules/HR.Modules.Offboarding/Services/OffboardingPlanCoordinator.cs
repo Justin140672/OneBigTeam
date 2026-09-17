@@ -123,14 +123,13 @@ internal sealed class OffboardingPlanCoordinator(
             var outstandingTasks = await dbContext.OffboardingTasks
                 .Where(t => t.OffboardingPlanId == plan.Id
                     && t.Status != OffboardingTaskStatus.Completed
-                    && t.Status != OffboardingTaskStatus.Skipped)
+                    && t.Status != OffboardingTaskStatus.Skipped
+                    && t.Status != OffboardingTaskStatus.Waived
+                    && t.Status != OffboardingTaskStatus.Cancelled)
                 .ToListAsync(cancellationToken);
 
             foreach (var task in outstandingTasks)
-                task.Skip(
-                    now,
-                    "Skipped automatically — employee's leaving process was withdrawn.",
-                    OffboardingSystemActor.Id);
+                task.CancelBecauseLeavingProcessCancelled(now, OffboardingSystemActor.Id);
 
             plan.Cancel("Cancelled — employee's leaving process was withdrawn.", now);
 
@@ -221,7 +220,9 @@ internal sealed class OffboardingPlanCoordinator(
         var outstandingTasks = await dbContext.OffboardingTasks
             .Where(t => t.OffboardingPlanId == plan.Id
                 && t.Status != OffboardingTaskStatus.Completed
-                && t.Status != OffboardingTaskStatus.Skipped)
+                && t.Status != OffboardingTaskStatus.Skipped
+                && t.Status != OffboardingTaskStatus.Waived
+                && t.Status != OffboardingTaskStatus.Cancelled)
             .ToListAsync(cancellationToken);
 
         var rescheduledTaskCount = outstandingTasks.Count(t => t.Reschedule(newLastWorkingDay, now));

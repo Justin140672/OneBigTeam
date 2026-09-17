@@ -131,6 +131,34 @@ internal sealed record OffboardingTaskSkippedAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
+// Spec SPEC-OFF-01: published when an authorised HR user manually waives an offboarding task —
+// the task-level counterpart to OffboardingTaskSkippedAuditEvent, but for the distinct "HR decided
+// this obligation is not required" action rather than a system/legacy skip. Actor is always a real
+// resolved HR user (Waive() requires a non-system actorUserId in practice for this handler — see
+// WaiveOffboardingTaskHandler, which always resolves it server-side from the authenticated caller).
+internal sealed record OffboardingTaskWaivedAuditEvent(
+    Guid CompanyId,
+    Guid OffboardingPlanId,
+    Guid OffboardingTaskId,
+    Guid EmployeeId,
+    Guid ActorEmployeeId,
+    string Title,
+    string Reason,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType        => "offboarding-task.waived";
+    string IAuditEvent.EntityType       => "OffboardingTask";
+    Guid   IAuditEvent.EntityId         => OffboardingTaskId;
+    Guid?  IAuditEvent.EmployeeId       => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId      => ActorEmployeeId == OffboardingSystemActor.Id ? null : ActorEmployeeId;
+    Guid?  IAuditEvent.ActorEmployeeId  => ActorEmployeeId;
+    Guid?  IAuditEvent.CorrelationId    => OffboardingPlanId;
+    string? IAuditEvent.Summary         => $"Offboarding task waived: {Title} — {Reason}";
+    object? IAuditEvent.Before          => new { Status = "Pending" };
+    object? IAuditEvent.After           => new { Status = "Waived", Reason };
+    object? IAuditEvent.Metadata        => null;
+}
+
 // Published when an offboarding plan is cancelled as a side effect of the employee's Leaving
 // Process being cancelled (see IOffboardingPlanCoordinator.CancelOutstandingTasksAsync). Like
 // OffboardingPlanCompletedAuditEvent above, this is what lets HR still find the cancelled

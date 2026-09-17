@@ -1,6 +1,7 @@
 using HR.Modules.Offboarding.Domain;
 using HR.Modules.Offboarding.Features.GetOffboardingOverview;
 using HR.Modules.Offboarding.Persistence;
+using HR.Modules.Offboarding.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Offboarding.Tests;
@@ -66,7 +67,9 @@ public class GetOffboardingOverviewHandlerTests
         return task;
     }
 
-    private static GetOffboardingOverviewHandler BuildHandler(OffboardingDbContext dbContext) => new(dbContext);
+    private static GetOffboardingOverviewHandler BuildHandler(
+        OffboardingDbContext dbContext, Dictionary<Guid, Guid>? openTaskIds = null) =>
+        new(dbContext, new FakeOpenTaskBySourceEntityReader(openTaskIds));
 
     [Fact]
     public async Task HandleAsync_Returns_HasPlan_False_And_Empty_Tasks_When_No_Plan_Found()
@@ -379,5 +382,98 @@ public class GetOffboardingOverviewHandlerTests
         Assert.True(result.RequiresHrReconciliation);
         var taskItem = Assert.Single(result.Tasks);
         Assert.True(taskItem.RequiresHrConfirmation);
+    }
+
+    // ---- Leaving/Offboarding unified workspace: OpenTaskId / AssetAssignmentId ----
+
+    [Fact]
+    public async Task HandleAsync_Populates_OpenTaskId_When_Reader_Returns_A_Task_Id_For_The_Obligation()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = SeedPlan(db, companyId, employeeId, Now, status: OffboardingStatus.InProgress);
+        var task = SeedTask(db, companyId, plan.Id, Now, "Conduct exit interview");
+        await db.SaveChangesAsync();
+
+        var openTaskId = Guid.NewGuid();
+        var handler = BuildHandler(db, new Dictionary<Guid, Guid> { [task.Id] = openTaskId });
+        var result = await handler.HandleAsync(
+            new GetOffboardingOverviewRequest(companyId, employeeId),
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Tasks);
+        Assert.Equal(openTaskId, item.OpenTaskId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Leaves_OpenTaskId_Null_When_Reader_Has_No_Entry_For_The_Obligation()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = SeedPlan(db, companyId, employeeId, Now, status: OffboardingStatus.InProgress);
+        SeedTask(db, companyId, plan.Id, Now, "Conduct exit interview");
+        await db.SaveChangesAsync();
+
+        // No entries in the reader's dictionary at all — simulates "not yet synced" or "already
+        // terminal" per the doc comment on OpenTaskId.
+        var handler = BuildHandler(db);
+        var result = await handler.HandleAsync(
+            new GetOffboardingOverviewRequest(companyId, employeeId),
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Tasks);
+        Assert.Null(item.OpenTaskId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Copies_AssetAssignmentId_Through_For_An_Asset_Return_Task()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var assetAssignmentId = Guid.NewGuid();
+
+        var plan = OffboardingPlan.Create(
+            Guid.NewGuid(), companyId, employeeId, DateOnly.FromDateTime(Now.Date), null, Now);
+        plan.Start(Now);
+        db.OffboardingPlans.Add(plan);
+
+        var assetReturnTask = OffboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Return asset: Laptop", null,
+            OffboardingTaskAssignTo.Employee, null, Now, assetAssignmentId: assetAssignmentId);
+        db.OffboardingTasks.Add(assetReturnTask);
+        await db.SaveChangesAsync();
+
+        var handler = BuildHandler(db);
+        var result = await handler.HandleAsync(
+            new GetOffboardingOverviewRequest(companyId, employeeId),
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Tasks);
+        Assert.Equal(assetAssignmentId, item.AssetAssignmentId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Leaves_AssetAssignmentId_Null_For_A_Non_Asset_Task()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = SeedPlan(db, companyId, employeeId, Now, status: OffboardingStatus.InProgress);
+        SeedTask(db, companyId, plan.Id, Now, "Conduct exit interview", assignTo: OffboardingTaskAssignTo.Manager);
+        await db.SaveChangesAsync();
+
+        var handler = BuildHandler(db);
+        var result = await handler.HandleAsync(
+            new GetOffboardingOverviewRequest(companyId, employeeId),
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Tasks);
+        Assert.Null(item.AssetAssignmentId);
     }
 }

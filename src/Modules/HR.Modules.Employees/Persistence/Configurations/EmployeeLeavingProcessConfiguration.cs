@@ -58,6 +58,10 @@ internal sealed class EmployeeLeavingProcessConfiguration : IEntityTypeConfigura
             .HasMaxLength(30)
             .IsRequired();
 
+        builder.Property(p => p.Notes)
+            .HasColumnName("notes")
+            .HasMaxLength(4000);
+
         builder.Property(p => p.Status)
             .HasColumnName("status")
             .HasConversion<string>()

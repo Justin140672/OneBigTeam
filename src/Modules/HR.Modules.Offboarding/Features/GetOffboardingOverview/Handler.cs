@@ -1,10 +1,13 @@
 using HR.Modules.Offboarding.Domain;
 using HR.Modules.Offboarding.Persistence;
+using HR.Modules.Tasks.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Offboarding.Features.GetOffboardingOverview;
 
-internal sealed class GetOffboardingOverviewHandler(OffboardingDbContext dbContext)
+internal sealed class GetOffboardingOverviewHandler(
+    OffboardingDbContext dbContext,
+    IOpenTaskBySourceEntityReader openTaskReader)
 {
     public async Task<GetOffboardingOverviewResponse> HandleAsync(
         GetOffboardingOverviewRequest request,
@@ -30,6 +33,11 @@ internal sealed class GetOffboardingOverviewHandler(OffboardingDbContext dbConte
                 0,
                 0,
                 0,
+                0,
+                0,
+                0,
+                0,
+                false,
                 []);
         }
 
@@ -39,6 +47,9 @@ internal sealed class GetOffboardingOverviewHandler(OffboardingDbContext dbConte
             .ToListAsync(cancellationToken);
 
         var progress = OffboardingProgressCalculator.Calculate(tasks);
+
+        var openTaskIds = await openTaskReader.GetOpenTaskIdsAsync(
+            request.CompanyId, tasks.Select(t => t.Id), cancellationToken);
 
         var taskItems = tasks
             .Select(t => new OffboardingTaskOverviewItem(
@@ -55,7 +66,9 @@ internal sealed class GetOffboardingOverviewHandler(OffboardingDbContext dbConte
                 t.IsMandatory,
                 t.SkipReason,
                 t.SkippedByUserId,
-                t.SkippedAt))
+                t.SkippedAt,
+                openTaskIds.TryGetValue(t.Id, out var openTaskId) ? openTaskId : (Guid?)null,
+                t.AssetAssignmentId))
             .ToList();
 
         return new GetOffboardingOverviewResponse(
@@ -70,6 +83,11 @@ internal sealed class GetOffboardingOverviewHandler(OffboardingDbContext dbConte
             progress.TotalTasks,
             progress.ResolvedTasks,
             progress.ProgressPercent,
+            progress.RequiredTotal,
+            progress.RequiredResolved,
+            progress.TotalCount,
+            progress.TotalResolved,
+            plan.Status == OffboardingStatus.InProgress && plan.HasIncompleteOffboardingAtDeparture,
             taskItems);
     }
 }

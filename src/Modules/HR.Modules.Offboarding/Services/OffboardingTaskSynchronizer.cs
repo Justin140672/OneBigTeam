@@ -37,6 +37,8 @@ internal sealed class OffboardingTaskSynchronizer(
                 && t.OffboardingPlanId == offboardingPlanId
                 && t.TaskItemCreatedAt == null
                 && t.Status != OffboardingTaskStatus.Skipped
+                && t.Status != OffboardingTaskStatus.Waived
+                && t.Status != OffboardingTaskStatus.Cancelled
                 && t.Status != OffboardingTaskStatus.Completed)
             .ToListAsync(cancellationToken);
 

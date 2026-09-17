@@ -1,11 +1,22 @@
+@* SPEC-OFF-01: this is no longer a standalone employee-profile tab (see EmployeeProfileNavigation
+   and EmployeeEdit.razor) — it renders the offboarding checklist section embedded inside the
+   unified EmployeeLeavingTab.razor "Leaving & Offboarding" workspace. *@
 @using HR.Web.Models
+@using HR.Web.Components.Pages.Tasks
 @inject OffboardingService OffboardingService
 
 @if (_loading)
 {
     <HrLoadingIndicator />
 }
-else if (_overview is null || !_overview.HasPlan)
+else if (Failed)
+{
+    <div class="alert alert-danger d-flex justify-content-between align-items-center">
+        <span>We couldn't load the offboarding checklist.</span>
+        <SfButton CssClass="e-outline e-small" OnClick="@(() => OnRetry.InvokeAsync())">Retry</SfButton>
+    </div>
+}
+else if (Overview is null || !Overview.HasPlan)
 {
     <HrEmptyState Message="Offboarding starts automatically when the leaving process begins." Icon="fa-solid fa-person-walking-arrow-right" />
 }
@@ -17,24 +28,22 @@ else
                 <div>
                     <h6 class="text-muted fw-normal mb-1">Offboarding Plan</h6>
                     <p class="mb-0 fw-medium">
-                        Last Working Day @_overview.LastWorkingDay?.ToString("d MMM yyyy")
+                        Last Working Day @Overview.LastWorkingDay?.ToString("d MMM yyyy")
                     </p>
-                    @if (!string.IsNullOrWhiteSpace(_overview.Notes))
+                    @if (!string.IsNullOrWhiteSpace(Overview.Notes))
                     {
-                        <p class="text-muted small mb-0 mt-1">@_overview.Notes</p>
+                        <p class="text-muted small mb-0 mt-1">@Overview.Notes</p>
                     }
                 </div>
-                <span class="badge fs-6 px-3 py-2 @StatusBadgeClass(_overview.PlanStatus)">@StatusLabel(_overview.PlanStatus)</span>
+                <span class="badge fs-6 px-3 py-2 @StatusBadgeClass(EffectivePlanStatus)">@StatusLabel(EffectivePlanStatus)</span>
             </div>
 
-            <div class="mb-1 d-flex justify-content-between small text-muted">
-                <span>@CompletedCount of @TotalCount tasks complete</span>
-                <span>@ProgressPercent%</span>
-            </div>
+            <div class="mb-1 small text-muted">@Overview.RequiredObligationsResolved of @Overview.RequiredObligationsTotal required obligations resolved</div>
+            <div class="mb-1 small text-muted">@Overview.TotalObligationsResolved of @Overview.TotalObligationsCount total obligations resolved</div>
             <div class="progress">
-                <div class="progress-bar @ProgressBarClass(_overview.PlanStatus)"
+                <div class="progress-bar @ProgressBarClass(Overview.PlanStatus)"
                      role="progressbar"
-                     style="width: @ProgressPercent%"
+                     style="width: @(ProgressPercent)%"
                      aria-valuenow="@ProgressPercent"
                      aria-valuemin="0"
                      aria-valuemax="100">
@@ -48,7 +57,7 @@ else
             <h5 class="mb-0">Offboarding Checklist</h5>
         </div>
         <div class="card-body p-0">
-            @if (_overview.Tasks.Count == 0)
+            @if (Overview.Tasks.Count == 0)
             {
                 <p class="text-muted small p-3 mb-0">No offboarding tasks have been created for this plan.</p>
             }
@@ -57,19 +66,43 @@ else
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>Task</th>
-                            <th width="120">Assign To</th>
+                            <th>Obligation</th>
+                            <th width="90">Required</th>
+                            <th width="120">Owner</th>
                             <th width="130">Due Date</th>
-                            <th width="130">Status</th>
-                            <th width="150">Completed</th>
+                            <th width="150">Status</th>
+                            <th width="220">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var t in _overview.Tasks.OrderBy(t => t.DueDate ?? DateOnly.MaxValue))
+                        @foreach (var t in SortedTasks)
                         {
                             var (css, label) = GetTaskBadge(t);
                             <tr>
-                                <td class="align-middle">@t.Title</td>
+                                <td class="align-middle">
+                                    <div class="fw-medium">@t.Title</div>
+                                    @if (!string.IsNullOrWhiteSpace(t.Description))
+                                    {
+                                        <div class="text-muted small">@t.Description</div>
+                                    }
+                                    @if (t.Status is "Completed" && t.CompletedAt is not null)
+                                    {
+                                        <div class="text-muted small">Completed @t.CompletedAt.Value.LocalDateTime.ToString("d MMM yyyy")</div>
+                                    }
+                                    @if (t.Status is "Waived" && !string.IsNullOrWhiteSpace(t.SkipReason))
+                                    {
+                                        <div class="text-muted small">Waived: @t.SkipReason</div>
+                                    }
+                                    @if (IsUnreconciledSkip(t))
+                                    {
+                                        <div class="text-danger small">Needs reconciliation — historical "Skipped" item has no reason/actor on record.</div>
+                                    }
+                                    @if (t.RequiresHrConfirmation && t.Status is "Pending" or "InProgress")
+                                    {
+                                        <div class="text-muted small fst-italic">Requires confirmation from the owning system before it can be completed.</div>
+                                    }
+                                </td>
+                                <td class="align-middle text-muted small">@(t.IsMandatory ? "Required" : "Optional")</td>
                                 <td class="align-middle text-muted small">@t.AssignTo</td>
                                 <td class="align-middle text-muted small">
                                     @(t.DueDate?.ToString("d MMM yyyy") ?? "—")
@@ -77,8 +110,22 @@ else
                                 <td class="align-middle">
                                     <span class="badge @css">@label</span>
                                 </td>
-                                <td class="align-middle text-muted small">
-                                    @(t.CompletedAt?.LocalDateTime.ToString("d MMM yyyy") ?? "—")
+                                <td class="align-middle">
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @if (t.OpenTaskId is { } openTaskId)
+                                        {
+                                            <SfButton CssClass="e-outline e-small" OnClick="@(() => OpenTask(openTaskId))">Open task</SfButton>
+                                        }
+                                        @if (t.AssetAssignmentId is not null)
+                                        {
+                                            @* No asset-assignment detail route currently exists in HR.Web — omitting the
+                                               link rather than inventing one; follow-up: add once Assets exposes one. *@
+                                        }
+                                        @if (CanWaive && LeavingInProgress && t.Status is "Pending" or "InProgress")
+                                        {
+                                            <SfButton CssClass="e-outline e-small e-warning" OnClick="@(() => OpenWaive(t))">Waive</SfButton>
+                                        }
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -87,68 +134,132 @@ else
             }
         </div>
     </div>
+
+    <WaiveOffboardingTaskDialog IsOpen="_waiveDialogOpen"
+                                CompanyId="CompanyId"
+                                OffboardingTaskId="_waiveTaskId"
+                                OnCancelled="CloseWaive"
+                                OnCompleted="CompletedWaiveAsync" />
+
+    <TaskViewDialog CompanyId="CompanyId" TaskId="_selectedTaskId" IsOpen="_taskDialogOpen" OnClosed="CloseTaskDialog" />
 }
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter] public OffboardingOverviewModel? Overview { get; set; }
+    [Parameter] public bool Failed { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public bool CanWaive { get; set; }
+    [Parameter] public bool LeavingInProgress { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public EventCallback OnRefreshRequested { get; set; }
 
-    private bool _loading = true;
-    private OffboardingOverviewModel? _overview;
+    private bool _loading => Loading;
 
-    // OFF-07: server-computed by OffboardingProgressCalculator (GetOffboardingOverviewHandler) —
-    // displayed directly rather than recomputed here, so this can never drift from the Reporting
-    // module's own progress numbers again (they previously disagreed: this counted Skipped tasks as
-    // done while OffboardingReportReader did not).
-    private int TotalCount => _overview?.TotalTasks ?? 0;
-    private int CompletedCount => _overview?.ResolvedTasks ?? 0;
-    private int ProgressPercent => _overview?.ProgressPercent ?? 0;
+    private Guid? _selectedTaskId;
+    private bool _taskDialogOpen;
 
-    protected override async Task OnParametersSetAsync()
+    private bool _waiveDialogOpen;
+    private Guid _waiveTaskId;
+
+    // SPEC-OFF-01 §Finalisation/Reporting: "Overdue after departure" takes priority over the raw
+    // InProgress status shown by the API, since that's a distinct, more specific state HR needs to
+    // see at a glance rather than a generic "In Progress".
+    private string EffectivePlanStatus => Overview?.IsOverdueAfterDeparture == true ? "OverdueAfterDeparture" : Overview?.PlanStatus ?? "NotStarted";
+
+    private int ProgressPercent => Overview?.ProgressPercent ?? 0;
+
+    // Sort order (SPEC-OFF-01 §checklist UI): unresolved overdue first, then upcoming unresolved,
+    // then completed/waived/cancelled at the bottom — still visible, never hidden.
+    private IEnumerable<OffboardingTaskOverviewItem> SortedTasks
     {
-        _loading = true;
-        _overview = await OffboardingService.GetOverviewAsync(CompanyId, EmployeeId);
-        _loading = false;
+        get
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow); // TODO: no company-local-today helper is exposed to HR.Web yet — see report.
+            return (Overview?.Tasks ?? []).OrderBy(t => Rank(t, today)).ThenBy(t => t.DueDate ?? DateOnly.MaxValue);
+
+            static int Rank(OffboardingTaskOverviewItem t, DateOnly today)
+            {
+                var unresolved = t.Status is "Pending" or "InProgress";
+                if (!unresolved) return 2; // completed/waived/cancelled/skipped
+                var overdue = t.DueDate.HasValue && t.DueDate.Value < today;
+                return overdue ? 0 : 1;
+            }
+        }
+    }
+
+    private static bool IsUnreconciledSkip(OffboardingTaskOverviewItem t) =>
+        t.Status == "Skipped" && (string.IsNullOrWhiteSpace(t.SkipReason) || t.SkippedByUserId is null);
+
+    private void OpenTask(Guid taskId)
+    {
+        _selectedTaskId = taskId;
+        _taskDialogOpen = true;
+    }
+
+    private async Task CloseTaskDialog()
+    {
+        _taskDialogOpen = false;
+        await OnRefreshRequested.InvokeAsync();
+    }
+
+    private void OpenWaive(OffboardingTaskOverviewItem t)
+    {
+        _waiveTaskId = t.Id;
+        _waiveDialogOpen = true;
+    }
+
+    private void CloseWaive() => _waiveDialogOpen = false;
+
+    private async Task CompletedWaiveAsync()
+    {
+        _waiveDialogOpen = false;
+        await OnRefreshRequested.InvokeAsync();
     }
 
     private static string StatusLabel(string? status) => status switch
     {
         "NotStarted" => "Not Started",
         "InProgress" => "In Progress",
-        "Completed"  => "Completed",
-        "Cancelled"  => "Cancelled",
-        _            => status ?? "Unknown"
+        "Completed" => "Completed",
+        "Cancelled" => "Cancelled",
+        "OverdueAfterDeparture" => "Overdue After Departure",
+        _ => status ?? "Unknown"
     };
 
     private static string StatusBadgeClass(string? status) => status switch
     {
         "NotStarted" => "bg-secondary",
         "InProgress" => "bg-primary",
-        "Completed"  => "bg-success",
-        "Cancelled"  => "bg-danger",
-        _            => "bg-secondary"
+        "Completed" => "bg-success",
+        "Cancelled" => "bg-danger",
+        "OverdueAfterDeparture" => "bg-danger",
+        _ => "bg-secondary"
     };
 
     private static string ProgressBarClass(string? status) => status switch
     {
         "Completed" => "bg-success",
         "Cancelled" => "bg-danger",
-        _           => "bg-primary"
+        _ => "bg-primary"
     };
 
     private static (string Css, string Label) GetTaskBadge(OffboardingTaskOverviewItem t)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (t.Status == "Pending" && t.DueDate.HasValue && t.DueDate.Value < today)
+        var today = DateOnly.FromDateTime(DateTime.UtcNow); // TODO: see SortedTasks note above.
+        if (t.Status is "Pending" or "InProgress" && t.DueDate.HasValue && t.DueDate.Value < today)
             return ("text-bg-danger", "Overdue");
 
         return t.Status switch
         {
-            "Pending"    => ("text-bg-secondary", "Pending"),
-            "InProgress" => ("text-bg-primary",    "In Progress"),
-            "Completed"  => ("text-bg-success",    "Completed"),
-            "Skipped"    => ("text-bg-secondary",  "Skipped"),
-            _            => ("text-bg-secondary",  t.Status),
+            "Pending" => ("text-bg-secondary", "Pending"),
+            "InProgress" => ("text-bg-primary", "In Progress"),
+            "Completed" => ("text-bg-success", "Completed"),
+            "Waived" => ("text-bg-warning", "Waived"),
+            "Cancelled" => ("text-bg-dark", "Cancelled"),
+            "Skipped" => IsUnreconciledSkip(t) ? ("text-bg-danger", "Skipped (unreconciled)") : ("text-bg-warning", "Waived (legacy)"),
+            _ => ("text-bg-secondary", t.Status),
         };
     }
 }

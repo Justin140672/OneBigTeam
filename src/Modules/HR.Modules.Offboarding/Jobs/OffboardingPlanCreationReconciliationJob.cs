@@ -222,6 +222,8 @@ internal sealed class OffboardingPlanCreationReconciliationJob(
             .AsNoTracking()
             .Where(t => t.TaskItemCreatedAt == null
                 && t.Status != OffboardingTaskStatus.Skipped
+                && t.Status != OffboardingTaskStatus.Waived
+                && t.Status != OffboardingTaskStatus.Cancelled
                 && t.Status != OffboardingTaskStatus.Completed)
             .Select(t => new { t.CompanyId, t.OffboardingPlanId })
             .Distinct()

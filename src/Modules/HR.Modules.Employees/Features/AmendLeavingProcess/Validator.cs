@@ -26,5 +26,10 @@ internal sealed class AmendLeavingProcessValidator : AbstractValidator<AmendLeav
 
         RuleFor(r => r.LeavingReason)
             .IsInEnum();
+
+        RuleFor(r => r.Notes)
+            .NotEmpty()
+            .When(r => r.LeavingReason == HR.Modules.Employees.Domain.LeavingReason.Other)
+            .WithMessage("Explanatory notes are required when the leaving reason is 'Other'.");
     }
 }

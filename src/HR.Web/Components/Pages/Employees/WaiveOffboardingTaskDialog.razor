@@ -1,0 +1,101 @@
+@using System.ComponentModel.DataAnnotations
+@using HR.Web.Models
+@inject OffboardingService OffboardingService
+
+<HrFormDialog IsOpen="IsOpen" Title="Waive Obligation" Width="480px"
+              GlobalError="@_globalError" Busy="_submitting" OnCancelled="DismissAsync">
+    <ChildContent>
+        <EditForm EditContext="_editContext">
+            <DataAnnotationsValidator />
+            <p class="text-muted">
+                Waiving marks this obligation as not required. This can only be undone by HR
+                administrator action and is recorded on the audit trail.
+            </p>
+            <div class="mb-3">
+                <label class="form-label">Waiver Reason <span class="text-danger">*</span></label>
+                <HrTextBox @bind-Value="_model.Reason" Multiline="true" Rows="3" Maxlength="1000" Placeholder="Why is this obligation being waived?" />
+                <ValidationMessage For="@(() => _model.Reason)" />
+            </div>
+        </EditForm>
+    </ChildContent>
+    <FooterContent>
+        <SfButton Disabled="@_submitting" OnClick="DismissAsync">Close</SfButton>
+        <SfButton CssClass="e-warning" IsPrimary="true" Disabled="@_submitting" OnClick="ConfirmAsync">
+            @if (_submitting)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            Waive Obligation
+        </SfButton>
+    </FooterContent>
+</HrFormDialog>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public Guid OffboardingTaskId { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private bool _wasOpen;
+    private bool _submitting;
+    private string? _globalError;
+    private readonly WaiveFormModel _model = new();
+    private EditContext _editContext = default!;
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_wasOpen)
+            ResetState();
+
+        _wasOpen = IsOpen;
+    }
+
+    private void ResetState()
+    {
+        _submitting = false;
+        _globalError = null;
+        _model.Reason = null;
+        _editContext = new EditContext(_model);
+    }
+
+    private async Task ConfirmAsync()
+    {
+        _globalError = null;
+
+        if (!_editContext.Validate())
+        {
+            _globalError = _editContext.GetValidationMessages().FirstOrDefault()
+                ?? "Please correct the highlighted fields below.";
+            return;
+        }
+
+        _submitting = true;
+
+        var (result, error) = await OffboardingService.WaiveTaskAsync(CompanyId, OffboardingTaskId, _model.Reason!);
+
+        _submitting = false;
+
+        if (result is null)
+        {
+            _globalError = error ?? "Failed to waive this obligation.";
+            return;
+        }
+
+        await OnCompleted.InvokeAsync();
+    }
+
+    private async Task DismissAsync() => await OnCancelled.InvokeAsync();
+
+    private sealed class WaiveFormModel
+    {
+        [Required(ErrorMessage = "Please provide a reason for waiving this obligation.")]
+        [MaxLength(1000)]
+        public string? Reason { get; set; }
+    }
+}

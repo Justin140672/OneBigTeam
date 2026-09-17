@@ -237,6 +237,40 @@ public class OffboardingPlanTests
         Assert.False(OffboardingPlan.CanComplete([mandatoryTask, optionalPending]));
     }
 
+    // ---- SPEC-OFF-01: Waived/Cancelled mandatory tasks now satisfy completion ----
+
+    [Fact]
+    public void CanComplete_Returns_True_When_A_Mandatory_Task_Is_Waived_Rather_Than_Completed()
+    {
+        var completedMandatory = MandatoryTask();
+        completedMandatory.Complete(FixedNow);
+        var waivedMandatory = MandatoryTask();
+        waivedMandatory.Waive(FixedNow, "Not required.", Guid.NewGuid());
+
+        Assert.True(OffboardingPlan.CanComplete([completedMandatory, waivedMandatory]));
+    }
+
+    [Fact]
+    public void CanComplete_Returns_True_When_A_Mandatory_Task_Is_Cancelled_Rather_Than_Completed()
+    {
+        var completedMandatory = MandatoryTask();
+        completedMandatory.Complete(FixedNow);
+        var cancelledMandatory = MandatoryTask();
+        cancelledMandatory.CancelBecauseLeavingProcessCancelled(FixedNow, Guid.NewGuid());
+
+        Assert.True(OffboardingPlan.CanComplete([completedMandatory, cancelledMandatory]));
+    }
+
+    [Fact]
+    public void CanComplete_Returns_False_When_A_Mandatory_Task_Is_Still_Pending()
+    {
+        var completedMandatory = MandatoryTask();
+        completedMandatory.Complete(FixedNow);
+        var pendingMandatory = MandatoryTask();
+
+        Assert.False(OffboardingPlan.CanComplete([completedMandatory, pendingMandatory]));
+    }
+
     private static OffboardingTask MandatoryTask() =>
         OffboardingTask.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Mandatory task", null,

@@ -19,6 +19,10 @@ internal sealed class EmployeeLeavingProcess : IVersionedAggregate
     public int NoticePeriodLength { get; private set; }
     public NoticePeriodSource NoticeSource { get; private set; }
     public LeavingReason LeavingReason { get; private set; }
+
+    // Spec SPEC-OFF-01: explanatory notes. Mandatory when LeavingReason is Other (enforced by
+    // StartLeavingProcessValidator/AmendLeavingProcessValidator); optional for every other reason.
+    public string? Notes { get; private set; }
     public LeavingProcessStatus Status { get; private set; }
     public DateTimeOffset StartedAt { get; private set; }
     public Guid StartedByUserId { get; private set; }
@@ -75,7 +79,8 @@ internal sealed class EmployeeLeavingProcess : IVersionedAggregate
         LeavingReason leavingReason,
         Guid startedByUserId,
         DateTimeOffset now,
-        Guid? replacementManagerEmployeeId = null)
+        Guid? replacementManagerEmployeeId = null,
+        string? notes = null)
     {
         return new EmployeeLeavingProcess
         {
@@ -89,6 +94,7 @@ internal sealed class EmployeeLeavingProcess : IVersionedAggregate
             NoticePeriodLength = noticePeriodLength,
             NoticeSource = noticeSource,
             LeavingReason = leavingReason,
+            Notes = notes,
             Status = LeavingProcessStatus.InProgress,
             Version = 1,
             StartedAt = now,
@@ -103,7 +109,9 @@ internal sealed class EmployeeLeavingProcess : IVersionedAggregate
     // in progress. Notice period figures (NoticePeriodUnit/Length/Source) are intentionally left
     // untouched here — once HR explicitly types a new LeavingDate, the original notice-period
     // calculation becomes historical/informational rather than something to silently re-derive.
-    public void Amend(DateOnly leavingDate, DateOnly lastWorkingDay, LeavingReason leavingReason, DateTimeOffset now)
+    public void Amend(
+        DateOnly leavingDate, DateOnly lastWorkingDay, LeavingReason leavingReason, DateTimeOffset now,
+        string? notes = null)
     {
         if (Status != LeavingProcessStatus.InProgress)
             throw new InvalidOperationException($"Cannot amend a leaving process with status '{Status}'.");
@@ -111,6 +119,7 @@ internal sealed class EmployeeLeavingProcess : IVersionedAggregate
         LeavingDate = leavingDate;
         LastWorkingDay = lastWorkingDay;
         LeavingReason = leavingReason;
+        Notes = notes;
         UpdatedAt = now;
     }
 

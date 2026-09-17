@@ -16,6 +16,13 @@ internal sealed record GetOffboardingOverviewResponse(
     int TotalTasks,
     int ResolvedTasks,
     int ProgressPercent,
+    // SPEC-OFF-01: "X of Y required obligations resolved" / "X of Y total obligations resolved",
+    // excluding Cancelled obligations from both counts.
+    int RequiredObligationsTotal,
+    int RequiredObligationsResolved,
+    int TotalObligationsCount,
+    int TotalObligationsResolved,
+    bool IsOverdueAfterDeparture,
     IReadOnlyList<OffboardingTaskOverviewItem> Tasks);
 
 internal sealed record OffboardingTaskOverviewItem(
@@ -32,4 +39,12 @@ internal sealed record OffboardingTaskOverviewItem(
     bool IsMandatory,
     string? SkipReason,
     Guid? SkippedByUserId,
-    DateTimeOffset? SkippedAt);
+    DateTimeOffset? SkippedAt,
+    // Leaving/Offboarding unified workspace: lets the UI deep-link straight to the Tasks-module
+    // task for this obligation (IOpenTaskBySourceEntityReader, keyed on the OffboardingTask's own
+    // id — see OffboardingTaskSynchronizer, which always passes sourceEntityId: task.Id). Null
+    // when no open task exists (not yet synced, or already terminal).
+    Guid? OpenTaskId,
+    // OFF-04: lets the UI offer "open source record" for asset-return obligations without the
+    // client having to know which obligations are asset-backed by title-matching.
+    Guid? AssetAssignmentId);

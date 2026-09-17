@@ -14,5 +14,6 @@ internal sealed record StartLeavingProcessResponse(
     int NoticePeriodLength,
     string NoticeSource,
     string LeavingReason,
+    string? Notes,
     string Status,
     DateTimeOffset StartedAt);

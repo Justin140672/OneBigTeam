@@ -65,7 +65,7 @@ internal sealed class AmendLeavingProcessHandler(
 
         var now = clock.UtcNowOffset();
 
-        leavingProcess.Amend(request.LeavingDate, request.LastWorkingDay, request.LeavingReason, now);
+        leavingProcess.Amend(request.LeavingDate, request.LastWorkingDay, request.LeavingReason, now, request.Notes);
 
         // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict, so the
         // audit/integration events and departure finalisation below only run on a successful save.
@@ -131,6 +131,7 @@ internal sealed class AmendLeavingProcessHandler(
             leavingProcess.NoticePeriodLength,
             leavingProcess.NoticeSource.ToString(),
             leavingProcess.LeavingReason.ToString(),
+            leavingProcess.Notes,
             leavingProcess.Status.ToString(),
             offboardingAlreadyStarted,
             leavingProcess.Version));
