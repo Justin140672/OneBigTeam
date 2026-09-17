@@ -888,7 +888,10 @@
 
     // "More actions" overflow (AC12): groups the less-frequent "Start offboarding" action so it's
     // no longer a prominent primary page action. Only Organisation Chart is always shown here;
-    // Start offboarding is added conditionally below once _showLeavingTab is known.
+    // Start offboarding is added conditionally below once _canStartLeavingProcess is known. Gated
+    // on CanStartLeavingProcess (no in-progress attempt) rather than _showLeavingTab, so the action
+    // remains available after a cancelled/completed attempt — the tab itself stays visible for
+    // history (SPEC-OFF-01) but that must not block starting a new departure.
     private List<DropDownMenuItem> _moreActionsItems = [];
 
     private void BuildMoreActionsItems()
@@ -898,7 +901,7 @@
             new DropDownMenuItem { Id = "org-chart", Text = "View Organisation Chart", IconCss = "fa-solid fa-sitemap" },
         ];
 
-        if (!_showLeavingTab)
+        if (_canStartLeavingProcess)
         {
             _moreActionsItems.Add(new DropDownMenuItem
             {
@@ -972,6 +975,7 @@
     private bool _showOnboardingTab;
     private bool _showOffboardingTab;
     private bool _showLeavingTab;
+    private bool _canStartLeavingProcess;
 
     private bool SectionVisible(EmployeeProfileSection s) => s switch
     {
@@ -1195,6 +1199,7 @@
         _showOnboardingTab = employee.ShowOnboardingTab;
         _showOffboardingTab = employee.ShowOffboardingTab;
         _showLeavingTab = employee.ShowLeavingTab;
+        _canStartLeavingProcess = employee.CanStartLeavingProcess;
     }
 
     // Concurrency-conflict recovery hook (base ReloadLatestValuesAsync, wired to the shared

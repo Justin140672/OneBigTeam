@@ -674,8 +674,13 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         var seeded = SeededE2eEmployees.OffboardingConfirmation[3];
         await empEdit.GoToAsync(AcmeId, seeded.EmployeeId);
 
+        // A resignation received date of "today" plus any positive effective notice period always
+        // resolves to a future calculated leaving date, regardless of when this suite actually runs
+        // — unlike a fixed historical literal, which drifts into "backdated" as real time passes.
+        var receivedToday = DateOnly.FromDateTime(DateTime.Today).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+
         await dialog.OpenAsync();
-        await dialog.FillResignationReceivedDateAsync("01/01/2024");
+        await dialog.FillResignationReceivedDateAsync(receivedToday);
         await dialog.ClickNextAsync();
 
         // Future-dated leaving date: the backdating checkbox should NOT appear (the "not backdated"

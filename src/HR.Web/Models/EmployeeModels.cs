@@ -107,6 +107,7 @@ public record GetEmployeeResponse(
     bool ShowProbationTab,
     bool ShowOffboardingTab,
     bool ShowLeavingTab,
+    bool CanStartLeavingProcess,
     NoticePeriodUnit EffectiveNoticePeriodUnit,
     int EffectiveNoticePeriodLength,
     string EffectiveNoticePeriodSource,

@@ -106,7 +106,17 @@ public sealed class EmployeeOffboardingTab(IPage page)
     public Task<bool> HasWaiveButtonAsync(string taskTitleFragment) =>
         RowFor(taskTitleFragment).GetByRole(AriaRole.Button, new() { Name = "Waive" }).IsVisibleAsync();
 
-    /// <summary>Clicks the "Waive" action button for the given checklist row, opening <see cref="WaiveOffboardingTaskDialog"/>.</summary>
-    public Task ClickWaiveAsync(string taskTitleFragment) =>
-        RowFor(taskTitleFragment).GetByRole(AriaRole.Button, new() { Name = "Waive" }).ClickAsync();
+    /// <summary>
+    /// Clicks the "Waive" action button for the given checklist row, opening
+    /// <see cref="WaiveOffboardingTaskDialog"/>, and waits for the dialog to attach/animate in
+    /// before returning — the Syncfusion dialog is not necessarily visible in the very next frame
+    /// after the click, so callers checking <c>IsVisibleAsync</c> immediately need this to have
+    /// already settled.
+    /// </summary>
+    public async Task ClickWaiveAsync(string taskTitleFragment)
+    {
+        await RowFor(taskTitleFragment).GetByRole(AriaRole.Button, new() { Name = "Waive" }).ClickAsync();
+        await page.GetByRole(AriaRole.Dialog, new() { Name = "Waive Obligation" })
+            .WaitForAsync(new() { Timeout = 8_000 });
+    }
 }

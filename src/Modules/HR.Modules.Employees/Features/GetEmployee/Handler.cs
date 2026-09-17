@@ -147,7 +147,17 @@ internal sealed class GetEmployeeHandler
         // probation/offboarding status, which live in other modules and are read through
         // Infrastructure.Abstractions reader ports), so this is a direct query rather than a
         // cross-module reader.
-        var hasActiveLeavingProcess = await _dbContext.EmployeeLeavingProcesses
+        // Any attempt at all — not just InProgress — keeps the unified workspace reachable so a
+        // completed or cancelled departure remains visible as history (SPEC-OFF-01: "Historical
+        // attempts must remain accessible and clearly distinguished from the current attempt").
+        var hasAnyLeavingProcess = await _dbContext.EmployeeLeavingProcesses
+            .AsNoTracking()
+            .AnyAsync(
+                p => p.CompanyId == request.CompanyId && p.EmployeeId == result.Id,
+                cancellationToken);
+        // Separate from tab visibility: gates the "Start leaving process" action, which must stay
+        // available after a cancelled/completed attempt so a later departure can create a new one.
+        var hasInProgressLeavingProcess = await _dbContext.EmployeeLeavingProcesses
             .AsNoTracking()
             .AnyAsync(
                 p => p.CompanyId == request.CompanyId
@@ -163,7 +173,8 @@ internal sealed class GetEmployeeHandler
             && probationStatus.Status is "Active" or "ReviewDue" or "Extended";
         var showOffboardingTab = offboardingStatus is not null
             && offboardingStatus.Status is not ("Completed" or "Cancelled");
-        var showLeavingTab = hasActiveLeavingProcess;
+        var showLeavingTab = hasAnyLeavingProcess;
+        var canStartLeavingProcess = !hasInProgressLeavingProcess;
 
         return Result.Success(new GetEmployeeResponse(
             result.Id,
@@ -215,6 +226,7 @@ internal sealed class GetEmployeeHandler
             showProbationTab,
             showOffboardingTab,
             showLeavingTab,
+            canStartLeavingProcess,
             effectiveNoticePeriod.Unit,
             effectiveNoticePeriod.Length,
             effectiveNoticePeriod.Source,
